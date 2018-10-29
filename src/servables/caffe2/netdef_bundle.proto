@@ -29,4 +29,9 @@ syntax = "proto3";
 package nvidia.inferenceserver;
 
 // Config proto for NetDefBundleSourceAdapter.
-message NetDefBundleSourceAdapterConfig {}
+message NetDefBundleSourceAdapterConfig
+{
+  // Autofill missing required model configuration settings based on
+  // model definition file.
+  bool autofill = 1;
+}

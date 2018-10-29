@@ -42,12 +42,16 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 
 tensorflow::Status
-CreatePlanBundle(const std::string& path, std::unique_ptr<PlanBundle>* bundle)
+CreatePlanBundle(
+  const PlanBundleSourceAdapterConfig& adapter_config, const std::string& path,
+  std::unique_ptr<PlanBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
 
-  ModelConfig config;
-  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(model_path, &config));
+  ModelConfig model_config;
+  model_config.set_platform(kTensorRTPlanPlatform);
+  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
+    model_path, adapter_config.autofill(), &model_config));
 
   // Read all the plan files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all
@@ -73,7 +77,7 @@ CreatePlanBundle(const std::string& path, std::unique_ptr<PlanBundle>* bundle)
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
   bundle->reset(new PlanBundle);
-  tensorflow::Status status = (*bundle)->Init(path, config);
+  tensorflow::Status status = (*bundle)->Init(path, model_config);
   if (status.ok()) {
     status = (*bundle)->CreateExecutionContexts(models);
   }
@@ -86,7 +90,6 @@ CreatePlanBundle(const std::string& path, std::unique_ptr<PlanBundle>* bundle)
 
 }  // namespace
 
-
 tensorflow::Status
 PlanBundleSourceAdapter::Create(
   const PlanBundleSourceAdapterConfig& config,
@@ -96,8 +99,11 @@ PlanBundleSourceAdapter::Create(
   LOG_VERBOSE(1) << "Create PlanBundleSourceAdaptor for config \""
                  << config.DebugString() << "\"";
 
+  Creator creator = std::bind(
+    &CreatePlanBundle, config, std::placeholders::_1, std::placeholders::_2);
+
   adapter->reset(new PlanBundleSourceAdapter(
-    config, CreatePlanBundle, SimpleSourceAdapter::EstimateNoResources()));
+    config, creator, SimpleSourceAdapter::EstimateNoResources()));
   return tensorflow::Status::OK();
 }
 
@@ -113,5 +119,4 @@ namespace tensorflow { namespace serving {
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
   nvidia::inferenceserver::PlanBundleSourceAdapter,
   nvidia::inferenceserver::PlanBundleSourceAdapterConfig);
-
 }}  // namespace tensorflow::serving

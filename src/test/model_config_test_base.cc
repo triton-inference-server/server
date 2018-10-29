@@ -43,7 +43,7 @@ ModelConfigTestBase::ValidateInit(
   result->clear();
 
   ModelConfig config;
-  tensorflow::Status status = GetNormalizedModelConfig(path, &config);
+  tensorflow::Status status = GetNormalizedModelConfig(path, autofill, &config);
   if (!status.ok()) {
     result->append(status.ToString());
     return false;

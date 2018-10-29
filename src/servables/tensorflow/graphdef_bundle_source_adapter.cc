@@ -49,7 +49,8 @@ CreateGraphDefBundle(
   const auto model_path = tensorflow::io::Dirname(path);
 
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(model_path, &model_config));
+  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
+    model_path, adapter_config.autofill(), &model_config));
 
   // Read all the graphdef files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all

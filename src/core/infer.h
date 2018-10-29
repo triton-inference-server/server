@@ -132,7 +132,6 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   std::vector<std::vector<char>> contiguous_buffers_;
 };
 
-
 // Provide inference request outputs
 class InferResponseProvider {
  public:
@@ -235,7 +234,6 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   struct evbuffer_iovec output_iovec_;
   size_t total_raw_byte_size_;
 };
-
 
 // Interface for servables that handle generic inference requests.
 class InferenceServable {

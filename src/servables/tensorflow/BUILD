@@ -40,6 +40,16 @@ serving_proto_library(
     ],
 )
 
+serving_proto_library(
+    name = "savedmodel_bundle_proto",
+    srcs = ["savedmodel_bundle.proto"],
+    cc_api_version = 2,
+    deps = [
+        "@org_tensorflow//tensorflow/core:protos_all_cc",
+        "@protobuf_archive//:cc_wkt_protos",
+    ],
+)
+
 cc_library(
     name = "base_bundle",
     srcs = ["base_bundle.cc"],
@@ -103,12 +113,12 @@ cc_library(
     hdrs = ["savedmodel_bundle_source_adapter.h"],
     deps = [
         ":savedmodel_bundle",
+        ":savedmodel_bundle_proto",
         "//src/core:utils",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
         "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/servables/tensorflow:saved_model_bundle_source_adapter_proto",
         "@tf_serving//tensorflow_serving/util:optional",
         "@org_tensorflow//tensorflow/core:core_cpu",
         "@org_tensorflow//tensorflow/core:lib",

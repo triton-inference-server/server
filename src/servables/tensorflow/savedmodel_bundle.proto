@@ -23,47 +23,21 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/servables/tensorflow/savedmodel_bundle.h"
-#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/macros.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/storage_path.h"
+syntax = "proto3";
 
-namespace tfs = tensorflow::serving;
+import "tensorflow/core/protobuf/config.proto";
 
-namespace nvidia { namespace inferenceserver {
+package nvidia.inferenceserver;
 
-// Adapter that converts storage paths pointing to SavedModel files
-// into the corresponding savedmodel bundle.
-class SavedModelBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<
-        tfs::StoragePath, SavedModelBundle> {
- public:
-  static tensorflow::Status Create(
-    const SavedModelBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter);
+// Config proto for SavedModelBundleSourceAdapter.
+message SavedModelBundleSourceAdapterConfig
+{
+  // TensorFlow Session configuration options.
+  // See details at tensorflow/core/protobuf/config.proto.
+  tensorflow.ConfigProto session_config = 1;
 
-  ~SavedModelBundleSourceAdapter() override;
-
- private:
-  TF_DISALLOW_COPY_AND_ASSIGN(SavedModelBundleSourceAdapter);
-  using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, SavedModelBundle>;
-
-  SavedModelBundleSourceAdapter(
-    const SavedModelBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
-  {
-  }
-
-  const SavedModelBundleSourceAdapterConfig config_;
-};
-
-}}  // namespace nvidia::inferenceserver
+  // Autofill missing required model configuration settings based on
+  // model definition file.
+  bool autofill = 2;
+}

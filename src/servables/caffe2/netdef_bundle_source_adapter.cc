@@ -43,12 +43,15 @@ namespace {
 
 tensorflow::Status
 CreateNetDefBundle(
+  const NetDefBundleSourceAdapterConfig& adapter_config,
   const std::string& path, std::unique_ptr<NetDefBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
 
-  ModelConfig config;
-  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(model_path, &config));
+  ModelConfig model_config;
+  model_config.set_platform(kCaffe2NetDefPlatform);
+  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
+    model_path, adapter_config.autofill(), &model_config));
 
   // Read all the netdef files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all
@@ -74,7 +77,7 @@ CreateNetDefBundle(
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
   bundle->reset(new NetDefBundle);
-  tensorflow::Status status = (*bundle)->Init(path, config);
+  tensorflow::Status status = (*bundle)->Init(path, model_config);
   if (status.ok()) {
     status = (*bundle)->CreateExecutionContexts(models);
   }
@@ -97,8 +100,11 @@ NetDefBundleSourceAdapter::Create(
   LOG_VERBOSE(1) << "Create NetDefBundleSourceAdaptor for config \""
                  << config.DebugString() << "\"";
 
+  Creator creator = std::bind(
+    &CreateNetDefBundle, config, std::placeholders::_1, std::placeholders::_2);
+
   adapter->reset(new NetDefBundleSourceAdapter(
-    config, CreateNetDefBundle, SimpleSourceAdapter::EstimateNoResources()));
+    config, creator, SimpleSourceAdapter::EstimateNoResources()));
   return tensorflow::Status::OK();
 }
 
@@ -114,5 +120,4 @@ namespace tensorflow { namespace serving {
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
   nvidia::inferenceserver::NetDefBundleSourceAdapter,
   nvidia::inferenceserver::NetDefBundleSourceAdapterConfig);
-
 }}  // namespace tensorflow::serving

@@ -157,6 +157,7 @@ class InferenceServer {
 
   std::string model_store_path_;
   int http_thread_cnt_;
+  bool strict_model_config_;
   bool strict_readiness_;
   bool model_load_unload_enabled_;
   bool profiling_enabled_;

@@ -36,9 +36,11 @@ tensorflow::Status GetModelVersionFromPath(
 
 // Read a ModelConfig and normalize it as expected by model servables.
 // 'path' should be the full-path to the directory containing the
-// model configuration.
+// model configuration. If 'autofill' then attempt to determine any
+// missing required configuration from the model definition.
 tensorflow::Status GetNormalizedModelConfig(
-  const tensorflow::StringPiece& path, ModelConfig* config);
+  const tensorflow::StringPiece& path, const bool autofill,
+  ModelConfig* config);
 
 // Validate that a model is specified correctly (excluding inputs and
 // outputs which are validated via ValidateModelInput() and

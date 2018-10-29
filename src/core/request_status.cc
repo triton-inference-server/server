@@ -26,7 +26,6 @@
 
 #include "src/core/request_status.h"
 
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {

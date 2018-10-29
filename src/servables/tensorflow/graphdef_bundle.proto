@@ -36,4 +36,8 @@ message GraphDefBundleSourceAdapterConfig
   // TensorFlow Session configuration options.
   // See details at tensorflow/core/protobuf/config.proto.
   tensorflow.ConfigProto session_config = 1;
+
+  // Autofill missing required model configuration settings based on
+  // model definition file.
+  bool autofill = 2;
 }

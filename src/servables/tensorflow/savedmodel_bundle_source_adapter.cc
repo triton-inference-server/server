@@ -43,13 +43,15 @@ namespace {
 
 tensorflow::Status
 CreateSavedModelBundle(
-  const tfs::SavedModelBundleSourceAdapterConfig& adapter_config,
+  const SavedModelBundleSourceAdapterConfig& adapter_config,
   const std::string& path, std::unique_ptr<SavedModelBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
 
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(model_path, &model_config));
+  model_config.set_platform(kTensorFlowSavedModelPlatform);
+  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
+    model_path, adapter_config.autofill(), &model_config));
 
   // Read all the savedmodel directories in 'path'. GetChildren()
   // returns all descendants instead for cloud storage like GCS, so
@@ -74,7 +76,7 @@ CreateSavedModelBundle(
   tensorflow::Status status = (*bundle)->Init(path, model_config);
   if (status.ok()) {
     status = (*bundle)->CreateExecutionContexts(
-      adapter_config.legacy_config().session_config(), savedmodel_paths);
+      adapter_config.session_config(), savedmodel_paths);
   }
   if (!status.ok()) {
     bundle->reset();
@@ -85,10 +87,9 @@ CreateSavedModelBundle(
 
 }  // namespace
 
-
 tensorflow::Status
 SavedModelBundleSourceAdapter::Create(
-  const tfs::SavedModelBundleSourceAdapterConfig& config,
+  const SavedModelBundleSourceAdapterConfig& config,
   std::unique_ptr<
     tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
     adapter)
@@ -116,6 +117,5 @@ namespace tensorflow { namespace serving {
 
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
   nvidia::inferenceserver::SavedModelBundleSourceAdapter,
-  SavedModelBundleSourceAdapterConfig);
-
+  nvidia::inferenceserver::SavedModelBundleSourceAdapterConfig);
 }}  // namespace tensorflow::serving

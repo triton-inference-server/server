@@ -65,6 +65,7 @@
 #include "src/servables/tensorflow/graphdef_bundle.h"
 #include "src/servables/tensorflow/graphdef_bundle.pb.h"
 #include "src/servables/tensorflow/savedmodel_bundle.h"
+#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -82,7 +83,6 @@
 #include "tensorflow_serving/core/availability_preserving_policy.h"
 #include "tensorflow_serving/core/servable_handle.h"
 #include "tensorflow_serving/model_servers/server_core.h"
-#include "tensorflow_serving/servables/tensorflow/saved_model_bundle_source_adapter.pb.h"
 #include "tensorflow_serving/util/net_http/server/public/httpserver.h"
 #include "tensorflow_serving/util/net_http/server/public/response_code_enum.h"
 #include "tensorflow_serving/util/net_http/server/public/server_request_interface.h"
@@ -535,6 +535,7 @@ InferenceServer::InferenceServer()
   grpc_port_ = 8001;
   metrics_port_ = 8002;
   http_thread_cnt_ = 8;
+  strict_model_config_ = false;
   strict_readiness_ = true;
   model_load_unload_enabled_ = true;
   profiling_enabled_ = false;
@@ -567,6 +568,7 @@ InferenceServer::Init(int argc, char** argv)
   // On error, the init process will stop.
   // The difference is if the server will be terminated.
   bool exit_on_error = true;
+  bool strict_model_config = strict_model_config_;
   bool strict_readiness = strict_readiness_;
   bool allow_model_load_unload = model_load_unload_enabled_;
   bool allow_profiling = profiling_enabled_;
@@ -604,13 +606,20 @@ InferenceServer::Init(int argc, char** argv)
       "config instead of the default platform."),
     tensorflow::Flag(
       "exit-on-error", &exit_on_error,
-      "Exit the inference server if an error occurs during initialization."),
+      "Exit the inference server if an error occurs during "
+      "initialization."),
+    tensorflow::Flag(
+      "strict-model-config", &strict_model_config,
+      "If true model configuration files must be provided and all required "
+      "configuration settings must be specified. If false the model "
+      "configuration may be absent or only partially specified and the "
+      "server will attempt to derive the missing required configuration."),
     tensorflow::Flag(
       "strict-readiness", &strict_readiness,
       "If true /api/health/ready endpoint indicates ready if the server "
-      "is responsive and all models are available. If false /api/health/ready "
-      "endpoint indicates ready if server is responsive even if some/all "
-      "models are unavailable."),
+      "is responsive and all models are available. If false "
+      "/api/health/ready endpoint indicates ready if server is responsive even "
+      "if some/all models are unavailable."),
     tensorflow::Flag(
       "allow-model-load-unload", &allow_model_load_unload,
       "Allow models to be loaded and unloaded dynamically based on changes "
@@ -639,13 +648,13 @@ InferenceServer::Init(int argc, char** argv)
       "Number of threads handling HTTP requests."),
     tensorflow::Flag(
       "file-system-poll-secs", &file_system_poll_secs,
-      "Interval in seconds between each poll of the file "
-      "system for changes to the model store."),
+      "Interval in seconds between each poll of the file system for changes to "
+      "the model store."),
     tensorflow::Flag(
       "exit-timeout-secs", &exit_timeout_secs,
-      "Timeout (in seconds) when exiting to wait for in-flight inferences "
-      "to finish. After the timeout expires the server exits even if "
-      "inferences are still in flight."),
+      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
+      "finish. After the timeout expires the server exits even if inferences "
+      "are still in flight."),
     tensorflow::Flag(
       "tf-allow-soft-placement", &tf_allow_soft_placement,
       "Instruct TensorFlow to use CPU implementation of an operation when a "
@@ -654,8 +663,8 @@ InferenceServer::Init(int argc, char** argv)
       "tf-gpu-memory-fraction", &tf_gpu_memory_fraction,
       "Reserve a portion of GPU memory for TensorFlow models. Default value "
       "0.0 indicates that TensorFlow should dynamically allocate memory as "
-      "needed. Value of 1.0 indicates that TensorFlow should allocate all "
-      "of GPU memory."),
+      "needed. Value of 1.0 indicates that TensorFlow should allocate all of "
+      "GPU memory."),
   };
 
   std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
@@ -681,6 +690,7 @@ InferenceServer::Init(int argc, char** argv)
   metrics_port_ = allow_metrics ? metrics_port : -1;
   model_store_path_ = model_store_path;
   http_thread_cnt_ = http_thread_cnt;
+  strict_model_config_ = strict_model_config;
   strict_readiness_ = strict_readiness;
   model_load_unload_enabled_ = allow_model_load_unload;
   profiling_enabled_ = allow_profiling;
@@ -1315,6 +1325,8 @@ InferenceServer::BuildPlatformConfigMap(
   {
     GraphDefBundleSourceAdapterConfig graphdef_config;
 
+    graphdef_config.set_autofill(!strict_model_config_);
+
     // Tensorflow session config
     if (tf_gpu_memory_fraction == 0.0) {
       graphdef_config.mutable_session_config()
@@ -1333,35 +1345,36 @@ InferenceServer::BuildPlatformConfigMap(
 
   //// Tensorflow SavedModel
   {
-    tfs::SavedModelBundleSourceAdapterConfig saved_model_config;
+    SavedModelBundleSourceAdapterConfig saved_model_config;
+
+    saved_model_config.set_autofill(!strict_model_config_);
 
     if (tf_gpu_memory_fraction == 0.0) {
-      saved_model_config.mutable_legacy_config()
-        ->mutable_session_config()
+      saved_model_config.mutable_session_config()
         ->mutable_gpu_options()
         ->set_allow_growth(true);
     } else {
-      saved_model_config.mutable_legacy_config()
-        ->mutable_session_config()
+      saved_model_config.mutable_session_config()
         ->mutable_gpu_options()
         ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
     }
 
-    saved_model_config.mutable_legacy_config()
-      ->mutable_session_config()
-      ->set_allow_soft_placement(tf_allow_soft_placement);
+    saved_model_config.mutable_session_config()->set_allow_soft_placement(
+      tf_allow_soft_placement);
     saved_model_source_adapter_config.PackFrom(saved_model_config);
   }
 
   //// Caffe NetDef
   {
     NetDefBundleSourceAdapterConfig netdef_config;
+    netdef_config.set_autofill(!strict_model_config_);
     netdef_source_adapter_config.PackFrom(netdef_config);
   }
 
   //// TensorRT
   {
     PlanBundleSourceAdapterConfig plan_config;
+    plan_config.set_autofill(!strict_model_config_);
     plan_source_adapter_config.PackFrom(plan_config);
   }
 
@@ -1404,7 +1417,12 @@ InferenceServer::BuildModelConfig(
   for (const auto& child : real_children) {
     const auto full_path = tensorflow::io::JoinPath(model_store_path_, child);
     ModelConfig* model_config = model_configs->add_config();
-    TF_RETURN_IF_ERROR(GetNormalizedModelConfig(full_path, model_config));
+
+    // If enabled, try to automatically generate missing parts of the
+    // model configuration from the model definition. In all cases
+    // normalize and validate the config.
+    TF_RETURN_IF_ERROR(
+      GetNormalizedModelConfig(full_path, !strict_model_config_, model_config));
     TF_RETURN_IF_ERROR(ValidateModelConfig(*model_config, std::string()));
 
     // Make sure the name of the model matches the name of the
