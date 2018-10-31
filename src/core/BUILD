@@ -194,6 +194,20 @@ cc_library(
 )
 
 cc_library(
+    name = "model_config_manager",
+    srcs = ["model_config_manager.cc"],
+    hdrs = ["model_config_manager.h"],
+    deps = [
+        ":constants",
+        ":logging",
+        ":model_config_proto",
+        ":utils",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@tf_serving//tensorflow_serving/config:model_server_config_proto",
+    ],
+)
+
+cc_library(
     name = "profile",
     srcs = ["profile.cc"],
     hdrs = ["profile.h"],
@@ -213,6 +227,7 @@ cc_library(
         ":grpc_service_proto",
         ":infer_header",
         ":logging",
+        ":model_config_manager",
         ":model_config_proto",
         ":profile",
         ":request_status",
@@ -230,6 +245,7 @@ cc_library(
         "@com_googlesource_code_re2//:re2",
         "@grpc//:grpc++_unsecure",
         "@org_tensorflow//tensorflow/core:lib",
+        "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
         "@tf_serving//tensorflow_serving/core:availability_preserving_policy",
         "@tf_serving//tensorflow_serving/model_servers:server_core",
@@ -243,6 +259,7 @@ cc_library(
     name = "server_status_header",
     hdrs = ["server_status.h"],
     deps = [
+        ":model_config_manager",
         ":model_config_proto",
         ":server_status_proto",
         "@org_tensorflow//tensorflow/core:lib",

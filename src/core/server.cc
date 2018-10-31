@@ -55,6 +55,7 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/model_config_manager.h"
 #include "src/core/profile.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
@@ -771,26 +772,37 @@ InferenceServer::Init(int argc, char** argv)
   }
   LOG_VERBOSE(1) << options.platform_config_map.DebugString();
 
-  // Model configuration
-  status =
-    BuildModelConfig(&options.model_server_config, &active_model_configs_);
+  // Create the model configuration for all the models in the model
+  // store.
+  ModelConfigManager::ModelConfigMap model_configs;
+  status = ModelConfigManager::ReadModelConfigs(
+    model_store_path_, !strict_model_config_, &model_configs,
+    &options.model_server_config);
   if (!status.ok()) {
     LogInitError(status.error_message());
     return !exit_on_error;
   }
   LOG_VERBOSE(1) << options.model_server_config.DebugString();
 
-  // Create the server status object.
-  status_manager_->InitModelConfigs(active_model_configs_);
-  LOG_VERBOSE(1) << "Server Status Object Created";
-
-  // Create the server core.
-  status = tfs::ServerCore::Create(std::move(options), &core_);
-  LOG_VERBOSE(1) << "ServerCore Created";
-
+  // Register the configurations with the manager.
+  status = ModelConfigManager::SetModelConfigs(model_configs);
   if (!status.ok()) {
-    // We assume that any failure is due to a model not loading
-    // correctly so we just continue if not exiting on error.
+    LogInitError(status.error_message());
+    return !exit_on_error;
+  }
+
+  // Create the server status object.
+  status = status_manager_->InitModelConfigs(model_configs);
+  if (!status.ok()) {
+    LogInitError(status.error_message());
+    return !exit_on_error;
+  }
+
+  // Create the server core. We assume that any failure is due to a
+  // model not loading correctly so we just continue if not exiting on
+  // error.
+  status = tfs::ServerCore::Create(std::move(options), &core_);
+  if (!status.ok()) {
     LOG_ERROR << status;
     if (exit_on_error) {
       return false;
@@ -865,9 +877,10 @@ InferenceServer::Wait()
   if (model_load_unload_enabled_) {
     while (ready_state_ != ServerReadyState::SERVER_EXITING) {
       if (ready_state_ == ServerReadyState::SERVER_READY) {
+        ModelConfigManager::ModelConfigMap mc;
         tfs::ModelServerConfig msc;
-        ModelConfigList mc;
-        tensorflow::Status status = BuildModelConfig(&msc, &mc);
+        tensorflow::Status status = ModelConfigManager::ReadModelConfigs(
+          model_store_path_, !strict_model_config_, &mc, &msc);
         if (!status.ok()) {
           LOG_ERROR << "Failed to build new model configurations: "
                     << status.error_message();
@@ -878,8 +891,7 @@ InferenceServer::Wait()
           // there is any change then need to reload the model
           // configs.
           std::set<std::string> added, removed;
-          if (ModelConfigListChanges(
-                active_model_configs_, mc, &added, &removed)) {
+          if (ModelConfigManager::CompareModelConfigs(mc, &added, &removed)) {
             status = core_->ReloadConfig(msc);
             if (!status.ok()) {
               LOG_ERROR << "Failed to reload new model configurations: "
@@ -888,7 +900,7 @@ InferenceServer::Wait()
 
             // Update status to match new model configuration.
             status_manager_->UpdateModelConfigs(mc, added, removed);
-            active_model_configs_ = mc;
+            ModelConfigManager::SetModelConfigs(mc);
           }
         }
       }
@@ -1173,9 +1185,11 @@ InferenceServer::HandleInfer(
 
   std::function<void()> handle;
 
-  const auto& pf_itr = model_platform_map_.find(request_provider->ModelName());
-  if (pf_itr != model_platform_map_.end()) {
-    const auto& platform = pf_itr->second;
+  const ModelConfig* model_config;
+  status = ModelConfigManager::GetModelConfig(
+    request_provider->ModelName(), &model_config);
+  if (status.ok()) {
+    const auto& platform = model_config->platform();
 
     if (platform == kTensorFlowGraphDefPlatform) {
       status = core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
@@ -1392,113 +1406,6 @@ InferenceServer::BuildPlatformConfigMap(
       .mutable_source_adapter_config()) = plan_source_adapter_config;
 
   return platform_config_map;
-}
-
-tensorflow::Status
-InferenceServer::BuildModelConfig(
-  tfs::ModelServerConfig* msc, ModelConfigList* model_configs)
-{
-  // Each subdirectory of model_store_path is a model directory from
-  // which we read the model configuration. Retrieve a list of
-  // base-path children from the file system.
-  std::vector<std::string> children;
-  TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->GetChildren(model_store_path_, &children));
-
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS.  In such case we should filter out all non-direct
-  // descendants.
-  std::set<std::string> real_children;
-  for (size_t i = 0; i < children.size(); ++i) {
-    const std::string& child = children[i];
-    real_children.insert(child.substr(0, child.find_first_of('/')));
-  }
-
-  for (const auto& child : real_children) {
-    const auto full_path = tensorflow::io::JoinPath(model_store_path_, child);
-    ModelConfig* model_config = model_configs->add_config();
-
-    // If enabled, try to automatically generate missing parts of the
-    // model configuration from the model definition. In all cases
-    // normalize and validate the config.
-    TF_RETURN_IF_ERROR(
-      GetNormalizedModelConfig(full_path, !strict_model_config_, model_config));
-    TF_RETURN_IF_ERROR(ValidateModelConfig(*model_config, std::string()));
-
-    // Make sure the name of the model matches the name of the
-    // directory. This is a somewhat arbitrary requirement but seems
-    // like good practice to require it of the user. It also acts as a
-    // check to make sure we don't have two different models with the
-    // same name.
-    if (model_config->name() != child) {
-      return tensorflow::errors::InvalidArgument(
-        "unexpected directory name '", child, "' for model '",
-        model_config->name(), "', directory name must equal model name");
-    }
-
-    tfs::ModelConfig* tfs_config =
-      msc->mutable_model_config_list()->add_config();
-    tfs_config->set_name(model_config->name());
-    tfs_config->set_base_path(full_path);
-    tfs_config->set_model_platform(model_config->platform());
-
-    // Create the appropriate TFS version policy from the model
-    // configuration policy.
-    if (model_config->version_policy().has_latest()) {
-      tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::Latest
-        latest;
-      latest.set_num_versions(
-        model_config->version_policy().latest().num_versions());
-      tfs_config->mutable_model_version_policy()->mutable_latest()->CopyFrom(
-        latest);
-    } else if (model_config->version_policy().has_all()) {
-      tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::All all;
-      tfs_config->mutable_model_version_policy()->mutable_all()->CopyFrom(all);
-    } else if (model_config->version_policy().has_specific()) {
-      tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::Specific
-        specific;
-      specific.mutable_versions()->CopyFrom(
-        model_config->version_policy().specific().versions());
-      tfs_config->mutable_model_version_policy()->mutable_specific()->CopyFrom(
-        specific);
-    } else {
-      return tensorflow::errors::Internal(
-        "expected version policy for model '", model_config->name());
-    }
-
-    model_platform_map_.insert(
-      std::make_pair(tfs_config->name(), tfs_config->model_platform()));
-  }
-
-  return tensorflow::Status::OK();
-}
-
-bool
-InferenceServer::ModelConfigListChanges(
-  const ModelConfigList& current, const ModelConfigList& next,
-  std::set<std::string>* added, std::set<std::string>* removed) const
-{
-  std::set<std::string> current_names, next_names;
-  for (const auto& c : current.config()) {
-    current_names.insert(c.name());
-  }
-  for (const auto& c : next.config()) {
-    next_names.insert(c.name());
-  }
-
-  if (added != nullptr) {
-    std::set_difference(
-      next_names.begin(), next_names.end(), current_names.begin(),
-      current_names.end(), std::inserter(*added, added->end()));
-  }
-
-  if (removed != nullptr) {
-    std::set_difference(
-      current_names.begin(), current_names.end(), next_names.begin(),
-      next_names.end(), std::inserter(*removed, removed->end()));
-  }
-
-  return current_names != next_names;
 }
 
 }}  // namespace nvidia::inferenceserver

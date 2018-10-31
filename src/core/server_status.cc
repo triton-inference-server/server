@@ -92,9 +92,11 @@ ServerStatusManager::ServerStatusManager(const std::string& server_version)
 }
 
 tensorflow::Status
-ServerStatusManager::InitModelConfigs(const ModelConfigList& model_configs)
+ServerStatusManager::InitModelConfigs(
+  const ModelConfigManager::ModelConfigMap& model_configs)
 {
-  for (const auto& model : model_configs.config()) {
+  for (const auto& p : model_configs) {
+    const ModelConfig& model = p.second;
     auto& ms = *server_status_.mutable_model_status();
     ms[model.name()].mutable_config()->CopyFrom(model);
   }
@@ -104,13 +106,14 @@ ServerStatusManager::InitModelConfigs(const ModelConfigList& model_configs)
 
 tensorflow::Status
 ServerStatusManager::UpdateModelConfigs(
-  const ModelConfigList& model_configs, const std::set<std::string>& added,
-  const std::set<std::string>& removed)
+  const ModelConfigManager::ModelConfigMap& model_configs,
+  const std::set<std::string>& added, const std::set<std::string>& removed)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
   // Add status for all 'added' models...
-  for (const auto& model : model_configs.config()) {
+  for (const auto& p : model_configs) {
+    const ModelConfig& model = p.second;
     auto& ms = *server_status_.mutable_model_status();
 
     if (added.find(model.name()) != added.end()) {

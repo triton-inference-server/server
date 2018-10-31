@@ -45,6 +45,7 @@ cc_binary(
         "//src/core:logging",
         "//src/core:metrics",
         "//src/core:model_config",
+        "//src/core:model_config_manager",
         "//src/core:model_config_proto",
         "//src/core:profile",
         "//src/core:request_status",

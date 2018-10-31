@@ -230,7 +230,8 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
-                ex.message().startswith("Servable not found for request"))
+                ex.message().startswith(
+                    "no configuration for model 'savedmodel_float32_float32_float32'"))
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -285,7 +286,8 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
-                ex.message().startswith("Servable not found for request"))
+                ex.message().startswith(
+                    "no configuration for model 'netdef_float32_float32_float32'"))
 
     def test_dynamic_model_load_unload_disabled(self):
         input_size = 16

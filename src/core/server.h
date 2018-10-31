@@ -127,15 +127,8 @@ class InferenceServer {
   tensorflow::Status ParseProtoTextFile(
     const std::string& file, google::protobuf::Message* message);
 
-  tensorflow::Status BuildModelConfig(
-    tfs::ModelServerConfig* msc, ModelConfigList* model_configs);
-
   tfs::PlatformConfigMap BuildPlatformConfigMap(
     float tf_gpu_memory_fraction, bool tf_allow_soft_placement);
-
-  bool ModelConfigListChanges(
-    const ModelConfigList& current, const ModelConfigList& next,
-    std::set<std::string>* added, std::set<std::string>* removed) const;
 
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;
@@ -165,7 +158,7 @@ class InferenceServer {
   int32_t exit_timeout_secs_;
   uint64_t start_time_ns_;
 
-  std::unordered_map<std::string, std::string> model_platform_map_;
+  // Current state of the inference server.
   ServerReadyState ready_state_;
 
   // Each request is assigned a unique id.
@@ -174,13 +167,6 @@ class InferenceServer {
   // Number of in-flight requests. During shutdown we attempt to wait
   // for all in-flight requests to complete before exiting.
   std::atomic<uint64_t> inflight_request_counter_;
-
-  // The model configurations that are currently active in the
-  // server. This is initialized when the server first starts and can
-  // change as models are loaded and unloaded due to changes in the
-  // model store. Does not need to be protected by a mutex since only
-  // modified by the main thread.
-  ModelConfigList active_model_configs_;
 
   std::unique_ptr<tfs::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;

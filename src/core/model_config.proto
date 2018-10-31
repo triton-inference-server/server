@@ -480,13 +480,3 @@ message ModelConfig
   //@@
   map<string, string> tags = 10;
 }
-
-//@@
-//@@.. cpp:var:: message ModelConfigList
-//@@
-//@@   A list of model configurations.
-//@@
-message ModelConfigList
-{
-  repeated ModelConfig config = 1;
-}
