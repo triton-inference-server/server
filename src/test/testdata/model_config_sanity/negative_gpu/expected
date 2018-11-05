@@ -1,0 +1,1 @@
+Invalid argument: instance group negative_gpu_1 of model negative_gpu specifies invalid GPU id -1, valid GPUs are 0 -

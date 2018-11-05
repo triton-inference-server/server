@@ -1,0 +1,28 @@
+name: "negative_gpu"
+max_batch_size: 1
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 1, 28, 28 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 10, 1, 1 ]
+  }
+]
+instance_group [
+  {
+    gpus: [ 0 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU
+    gpus: [ -1 ]
+  }
+]

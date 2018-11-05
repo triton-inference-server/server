@@ -1,0 +1,21 @@
+
+@
+INPUT0Placeholder*
+shape:ÿÿÿÿÿÿÿÿÿ*
+dtype0
+@
+INPUT1Placeholder*
+dtype0*
+shape:ÿÿÿÿÿÿÿÿÿ
+2
+ADDAddINPUT0INPUT1"/device:CPU:0*
+T0
+2
+SUBSubINPUT0INPUT1"/device:CPU:0*
+T0
+!
+OUTPUT0IdentityADD*
+T0
+!
+OUTPUT1IdentitySUB*
+T0"

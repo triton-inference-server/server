@@ -1,0 +1,120 @@
+..
+  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  #
+  # Redistribution and use in source and binary forms, with or without
+  # modification, are permitted provided that the following conditions
+  # are met:
+  #  * Redistributions of source code must retain the above copyright
+  #    notice, this list of conditions and the following disclaimer.
+  #  * Redistributions in binary form must reproduce the above copyright
+  #    notice, this list of conditions and the following disclaimer in the
+  #    documentation and/or other materials provided with the distribution.
+  #  * Neither the name of NVIDIA CORPORATION nor the names of its
+  #    contributors may be used to endorse or promote products derived
+  #    from this software without specific prior written permission.
+  #
+  # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+  # EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  # PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+  # CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  # EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  # PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  # PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+  # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Running the Server
+==================
+
+.. _section-example-model-repository:
+
+Example Model Repository
+------------------------
+
+Before running the inference server, you must first set up a model
+repository containing the models that the inference server will make
+available for inferencing.
+
+An example model repository containing a Caffe2 ResNet50 and a
+TensorFlow Inception model are provided in the
+docs/examples/model_repository directory. Before using the example
+model repository you must fetch any missing model definition files
+from their public model zoos::
+
+  $ cd docs/examples
+  $ ./fetch_models.sh
+
+.. _section-running-the-inference-server:
+
+Running The Inference Server
+----------------------------
+
+Before running the inference server, you must first set up a model
+repository containing the models that the inference server will make
+available for inferencing. Section :ref:`section-model-repository`
+describes how to create your own model repository. You can also use
+:ref:`section-example-model-repository` to set up an example model
+repository.
+
+Assuming the sample model repository is available in
+/path/to/model/repository, the following command runs the container
+you pulled from NGC or built locally::
+
+  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
+
+The nvidia-docker -v option maps /path/to/model/repository on the host
+into the container at /models, and the -\\-model-store option to the
+inference server is used to point to /models as the model repository.
+
+The -p flags expose the container ports where the inference server
+listens for HTTP requests (port 8000), listens for GRPC requests (port
+8001), and reports Prometheus metrics (port 8002).
+
+The -\\-shm-size and -\\-ulimit flags are recommended to improve inference
+server performance. For -\\-shm-size the minimum recommended size is 1g
+but larger sizes may be necessary depending on the number and size of
+models being served.
+
+For more information on the Prometheus metrics provided by the
+inference server see :ref:`section-metrics`.
+
+.. _section-checking-inference-server-status:
+
+Checking Inference Server Status
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The simplest way to verify that the inference server is running
+correctly is to use the Status API to query the server’s status. From
+the host system use *curl* to access the HTTP endpoint to request
+server status. The response is protobuf text showing the status for
+the server and for each model being served, for example::
+
+  $ curl localhost:8000/api/status
+  id: "inference:0"
+  version: "0.6.0"
+  uptime_ns: 23322988571
+  model_status {
+    key: "resnet50_netdef"
+    value {
+      config {
+        name: "resnet50_netdef"
+        platform: "caffe2_netdef"
+      }
+      ...
+      version_status {
+        key: 1
+        value {
+          ready_state: MODEL_READY
+        }
+      }
+    }
+  }
+  ready_state: SERVER_READY
+
+This status shows configuration information as well as indicating that
+version 1 of the resnet50_netdef model is MODEL_READY. This means that
+the inference server is ready to accept inferencing requests for
+version 1 of that model. A model version ready_state will show up as
+MODEL_UNAVAILABLE if the model failed to load for some reason.

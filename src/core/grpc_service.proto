@@ -1,0 +1,241 @@
+// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package nvidia.inferenceserver;
+
+//@@.. cpp:namespace:: nvidia::inferenceserver
+
+import "src/core/api.proto";
+import "src/core/request_status.proto";
+import "src/core/server_status.proto";
+
+//@@
+//@@.. cpp:var:: service GRPCService
+//@@
+//@@   Inference Server GRPC endpoints.
+//@@
+service GRPCService
+{
+  //@@  .. cpp:var:: rpc Status(StatusRequest) returns (StatusResponse)
+  //@@
+  //@@     Get status for entire inference server or for a specified model.
+  //@@
+  rpc Status(StatusRequest) returns (StatusResponse) {}
+
+  //@@  .. cpp:var:: rpc Profile(ProfileRequest) returns (ProfileResponse)
+  //@@
+  //@@     Enable and disable low-level GPU profiling.
+  //@@
+  rpc Profile(ProfileRequest) returns (ProfileResponse) {}
+
+  //@@  .. cpp:var:: rpc Health(HealthRequest) returns (HealthResponse)
+  //@@
+  //@@     Check liveness and readiness of the inference server.
+  //@@
+  rpc Health(HealthRequest) returns (HealthResponse) {}
+
+  //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
+  //@@
+  //@@     Request inference using a specific model. [ To handle large input
+  //@@     tensors likely need to set the maximum message size to that they
+  //@@     can be transmitted in one pass.
+  //@@
+  rpc Infer(InferRequest) returns (InferResponse) {}
+}
+
+//@@
+//@@.. cpp:var:: message StatusRequest
+//@@
+//@@   Request message for Status gRPC endpoint.
+//@@
+message StatusRequest
+{
+  //@@
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The specific model status to be returned. If empty return status
+  //@@     for all models.
+  //@@
+  string model_name = 1;
+}
+
+//@@
+//@@.. cpp:var:: message StatusResponse
+//@@
+//@@   Response message for Status gRPC endpoint.
+//@@
+message StatusResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+
+  //@@
+  //@@  .. cpp:var:: ServerStatus server_status
+  //@@
+  //@@     The server and model status.
+  //@@
+  ServerStatus server_status = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ProfileRequest
+//@@
+//@@   Request message for Profile gRPC endpoint.
+//@@
+message ProfileRequest
+{
+  //@@
+  //@@  .. cpp:var:: string cmd
+  //@@
+  //@@     The requested profiling action: 'start' requests that GPU
+  //@@     profiling be enabled on all GPUs controlled by the inference
+  //@@     server; 'stop' requests that GPU profiling be disabled on all GPUs
+  //@@     controlled by the inference server.
+  //@@
+  string cmd = 1;
+}
+
+//@@
+//@@.. cpp:var:: message ProfileResponse
+//@@
+//@@   Response message for Profile gRPC endpoint.
+//@@
+message ProfileResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+}
+
+//@@
+//@@.. cpp:var:: message HealthRequest
+//@@
+//@@   Request message for Health gRPC endpoint.
+//@@
+message HealthRequest
+{
+  //@@
+  //@@  .. cpp:var:: string mode
+  //@@
+  //@@     The requested health action: 'live' requests the liveness
+  //@@     state of the inference server; 'ready' requests the readiness state
+  //@@     of the inference server.
+  //@@
+  string mode = 1;
+}
+
+//@@
+//@@.. cpp:var:: message HealthResponse
+//@@
+//@@   Response message for Health gRPC endpoint.
+//@@
+message HealthResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+
+  //@@
+  //@@  .. cpp:var:: bool health
+  //@@
+  //@@     The result of the request. True indicates the inference server is
+  //@@     live/ready, false indicates the inference server is not live/ready.
+  //@@
+  bool health = 2;
+}
+
+//@@
+//@@.. cpp:var:: message InferRequest
+//@@
+//@@   Request message for Infer gRPC endpoint.
+//@@
+message InferRequest
+{
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model to use for inferencing.
+  //@@
+  string model_name = 1;
+
+  //@@  .. cpp:var:: string version
+  //@@
+  //@@     The version of the model to use for inference. If not specified
+  //@@     the latest/most-recent version of the model if used.
+  //@@
+  string version = 2;
+
+  //@@  .. cpp:var:: InferRequestHeader meta_data
+  //@@
+  //@@     Meta-data for the request profiling input tensors and requesting
+  //@@     output tensors.
+  //@@
+  InferRequestHeader meta_data = 3;
+
+  //@@  .. cpp:var:: bytes raw_input (repeated)
+  //@@
+  //@@     The raw input tensor data in the order specified in 'meta_data'.
+  //@@
+  repeated bytes raw_input = 4;
+}
+
+//@@
+//@@.. cpp:var:: message InferResponse
+//@@
+//@@   Response message for Infer gRPC endpoint.
+//@@
+message InferResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+
+  //@@  .. cpp:var:: InferResponseHeader meta_data
+  //@@
+  //@@     The response meta-data for the output tensors.
+  //@@
+  InferResponseHeader meta_data = 2;
+
+  //@@  .. cpp:var:: bytes raw_output (repeated)
+  //@@
+  //@@     The raw output tensor data in the order specified in 'meta_data'.
+  //@@
+  repeated bytes raw_output = 3;
+}

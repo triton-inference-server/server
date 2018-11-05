@@ -1,0 +1,78 @@
+<!--
+# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+{% extends "!layout.html" %}
+  {% block sidebartitle %} {{ super() }}
+
+  <style>
+    /* Sidebar header (and topbar for mobile) */
+    .wy-side-nav-search, .wy-nav-top {
+      background: #76b900;
+    }
+
+    .wy-side-nav-search a:link, .wy-nav-top a:link {
+      color: #fff;
+    }
+    .wy-side-nav-search a:visited, .wy-nav-top a:visited {
+      color: #fff;
+    }
+    .wy-side-nav-search a:hover, .wy-nav-top a:hover {
+      color: #fff;
+    }
+
+    .wy-menu-vertical a:link, .wy-menu-vertical a:visited {
+      color: #d9d9d9
+    }
+
+    .wy-menu-vertical a:active {
+      background-color: #76b900
+    }
+
+    .wy-side-nav-search>div.version {
+      color: rgba(0, 0, 0, 0.3)
+    }
+  </style>
+  {% endblock %}
+
+  {% block footer %} {{ super() }}
+
+  <style>
+  a:link, a:visited {
+    color: #76b900;
+  }
+
+  a:hover {
+    color: #8c0;
+  }
+
+  .rst-content dl:not(.docutils) dt {
+    background: rgba(118, 185, 0, 0.1);
+    color: rgba(59,93,0,1);
+    border-top: solid 3px rgba(59,93,0,1);
+  }
+  </style>
+  {% endblock %}

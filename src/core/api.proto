@@ -1,0 +1,254 @@
+// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package nvidia.inferenceserver;
+
+//@@.. cpp:namespace:: nvidia::inferenceserver
+
+//@@
+//@@.. cpp:var:: message InferRequestHeader
+//@@
+//@@   Meta-data for an inferencing request. The actual input data is
+//@@   delivered separate from this header, in the HTTP body for an HTTP
+//@@   request, or in the :cpp:var:`InferRequest` message for a gRPC request.
+//@@
+message InferRequestHeader
+{
+  //@@  .. cpp:var:: message Input
+  //@@
+  //@@     Meta-data for an input tensor provided as part of an inferencing
+  //@@     request.
+  //@@
+  message Input
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the input tensor.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       The size of the input tensor, in bytes. This is the size for
+    //@@       one instance of the input, not the entire size of a batched
+    //@@       input.
+    //@@
+    uint64 byte_size = 2;
+  }
+
+  //@@  .. cpp:var:: message Output
+  //@@
+  //@@     Meta-data for a requested output tensor as part of an inferencing
+  //@@     request.
+  //@@
+  message Output
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the output tensor.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: uint64 byte_size
+    //@@
+    //@@       The size of the output tensor, in bytes. This is the size for
+    //@@       one instance of the output, not the entire size of a batched
+    //@@       output.
+    //@@
+    uint64 byte_size = 2;
+
+    //@@    .. cpp:var:: message Class
+    //@@
+    //@@       Options for an output returned as a classification.
+    //@@
+    message Class
+    {
+      //@@      .. cpp:var:: uint32 count
+      //@@
+      //@@         Indicates how many classification values should be returned
+      //@@         for the output. The 'count' highest priority values are
+      //@@         returned.
+      //@@
+      uint32 count = 1;
+    }
+
+    //@@    .. cpp:var:: Class cls
+    //@@
+    //@@       Optional. If defined return this output as a classification
+    //@@       instead of raw data. The output tensor will be interpreted as
+    //@@       probabilities and the classifications associated with the
+    //@@       highest probabilities will be returned.
+    //@@
+    Class cls = 3;
+  }
+
+  //@@  .. cpp:var:: uint32 batch_size
+  //@@
+  //@@     The batch size of the inference request. This must be >= 1. For
+  //@@     models that don't support batching batch_size must be 1.
+  //@@
+  uint32 batch_size = 1;
+
+  //@@  .. cpp:var:: Input input (repeated)
+  //@@
+  //@@     The input meta-data for the inputs provided with the the inference
+  //@@     request.
+  //@@
+  repeated Input input = 2;
+
+  //@@  .. cpp:var:: Output output (repeated)
+  //@@
+  //@@     The output meta-data for the inputs provided with the the inference
+  //@@     request.
+  //@@
+  repeated Output output = 3;
+}
+
+//@@
+//@@.. cpp:var:: message InferResponseHeader
+//@@
+//@@   Meta-data for the response to an inferencing request. The actual output
+//@@   data is delivered separate from this header, in the HTTP body for an HTTP
+//@@   request, or in the :cpp:var:`InferResponse` message for a gRPC request.
+//@@
+message InferResponseHeader
+{
+  //@@  .. cpp:var:: message Output
+  //@@
+  //@@     Meta-data for an output tensor requested as part of an inferencing
+  //@@     request.
+  //@@
+  message Output
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the output tensor.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: message Raw
+    //@@
+    //@@       Meta-data for an output tensor being returned as raw data.
+    //@@
+    message Raw
+    {
+      //@@      .. cpp:var:: uint64 byte_size
+      //@@
+      //@@         The size of the output tensor, in bytes. This is the size for
+      //@@         one instance of the output, not the entire size of a batched
+      //@@         output.
+      //@@
+      uint64 byte_size = 1;
+    }
+
+    //@@    .. cpp:var:: message Class
+    //@@
+    //@@       Information about each classification for this output.
+    //@@
+    message Class
+    {
+      //@@      .. cpp:var:: int32 idx
+      //@@
+      //@@         The classification index.
+      //@@
+      int32 idx = 1;
+
+      //@@      .. cpp:var:: float value
+      //@@
+      //@@         The classification value as a float (typically a
+      //@@         probability).
+      //@@
+      float value = 2;
+
+      //@@      .. cpp:var:: string label
+      //@@
+      //@@         The label for the class (optional, only available if provided
+      //@@         by the model).
+      //@@
+      string label = 3;
+    }
+
+    //@@    .. cpp:var:: message Classes
+    //@@
+    //@@       Meta-data for an output tensor being returned as classifications.
+    //@@
+    message Classes
+    {
+      //@@      .. cpp:var:: Class cls (repeated)
+      //@@
+      //@@         The topk classes for this output.
+      //@@
+      repeated Class cls = 1;
+    }
+
+    //@@    .. cpp:var:: Raw raw
+    //@@
+    //@@       If specified deliver results for this output as raw tensor data.
+    //@@       The actual output data is delivered in the HTTP body for an HTTP
+    //@@       request, or in the :cpp:var:`InferResponse` message for a gRPC
+    //@@       request. Only one of 'raw' and 'batch_classes' may be specified.
+    //@@
+    Raw raw = 2;
+
+    //@@    .. cpp:var:: Classes batch_classes (repeated)
+    //@@
+    //@@       If specified deliver results for this output as classifications.
+    //@@       There is one :cpp:var:`Classes` object for each batch entry in
+    //@@       the output. Only one of 'raw' and 'batch_classes' may be
+    //@@       specified.
+    //@@
+    repeated Classes batch_classes = 3;
+  }
+
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The name of the model that produced the outputs.
+  //@@
+  string model_name = 1;
+
+  //@@  .. cpp:var:: uint32 model_version
+  //@@
+  //@@     The version of the model that produced the outputs.
+  //@@
+  uint32 model_version = 2;
+
+  //@@  .. cpp:var:: uint32 batch_size
+  //@@
+  //@@     The batch size of the outputs. This will always be equal to the
+  //@@     batch size of the inputs. For models that don't support
+  //@@     batching the batch_size will be 1.
+  //@@
+  uint32 batch_size = 3;
+
+  //@@  .. cpp:var:: Output output (repeated)
+  //@@
+  //@@     The outputs, in the same order as they were requested in
+  //@@     :cpp:var:`InferRequestHeader`.
+  //@@
+  repeated Output output = 4;
+}

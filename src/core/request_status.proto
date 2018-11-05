@@ -1,0 +1,126 @@
+// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//  * Redistributions of source code must retain the above copyright
+//    notice, this list of conditions and the following disclaimer.
+//  * Redistributions in binary form must reproduce the above copyright
+//    notice, this list of conditions and the following disclaimer in the
+//    documentation and/or other materials provided with the distribution.
+//  * Neither the name of NVIDIA CORPORATION nor the names of its
+//    contributors may be used to endorse or promote products derived
+//    from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package nvidia.inferenceserver;
+
+//@@.. cpp:namespace:: nvidia::inferenceserver
+
+//@@
+//@@.. cpp:enum:: RequestStatusCode
+//@@
+//@@   Status codes returned for inference server requests. The
+//@@   :cpp:enumerator:`RequestStatusCode::SUCCESS` status code indicates
+//@@   not error, all other codes indicate an error.
+//@@
+enum RequestStatusCode {
+  //@@  .. cpp:enumerator:: RequestStatusCode::INVALID = 0
+  //@@
+  //@@     Invalid status. Used internally but should not be returned as
+  //@@     part of a :cpp:var:`RequestStatus`.
+  //@@
+  INVALID = 0;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::SUCCESS = 1
+  //@@
+  //@@     Error code indicating success.
+  //@@
+  SUCCESS = 1;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::UNKNOWN = 2
+  //@@
+  //@@     Error code indicating an unknown failure.
+  //@@
+  UNKNOWN = 2;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::INTERNAL = 3
+  //@@
+  //@@     Error code indicating an internal failure.
+  //@@
+  INTERNAL = 3;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::NOT_FOUND = 4
+  //@@
+  //@@     Error code indicating a resource or request was not found.
+  //@@
+  NOT_FOUND = 4;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::INVALID_ARG = 5
+  //@@
+  //@@     Error code indicating a failure caused by an unknown argument or
+  //@@     value.
+  //@@
+  INVALID_ARG = 5;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::UNAVAILABLE = 6
+  //@@
+  //@@     Error code indicating an unavailable resource.
+  //@@
+  UNAVAILABLE = 6;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::UNSUPPORTED = 7
+  //@@
+  //@@     Error code indicating an unsupported request or operation.
+  //@@
+  UNSUPPORTED = 7;
+}
+
+//@@
+//@@.. cpp:var:: message RequestStatus
+//@@
+//@@   Status returned for all inference server requests. The
+//@@   RequestStatus provides a :cpp:enum:`RequestStatusCode`, an
+//@@   optional status message, and server and request IDs.
+//@@
+message RequestStatus
+{
+  //@@  .. cpp:var:: RequestStatusCode code
+  //@@
+  //@@     The status code.
+  //@@
+  RequestStatusCode code = 1;
+
+  //@@  .. cpp:var:: string msg
+  //@@
+  //@@     The optional status message.
+  //@@
+  string msg = 2;
+
+  //@@  .. cpp:var:: string server_id
+  //@@
+  //@@     The identifying string for the server that is returning
+  //@@     this status.
+  //@@
+  string server_id = 3;
+
+  //@@  .. cpp:var:: string request_id
+  //@@
+  //@@     Unique identifier for the request. Value 0 (zero) indicates
+  //@@     the request ID is not known.
+  //@@
+  uint64 request_id = 4;
+}
