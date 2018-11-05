@@ -25,58 +25,21 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-NVIDIA TensorRT Inference Server
-================================
+Contributing
+============
 
-.. ifconfig:: "dev" in release
+Contributions to TensorRT Inference Server are more than welcome. To
+contribute make a pull request and follow the guidelines outlined in
+the `CONTRIBUTING
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/CONTRIBUTING.md>`_
+document.
 
-   .. warning::
-     You are currently viewing unstable developer preview
-     of the documentation. To see the documentation for the latest
-     stable release click `here
-     <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/index.html>`_
+Coding Convention
+-----------------
 
-.. include:: ../README.rst
-   :start-after: overview-begin-marker-do-not-remove
-   :end-before: overview-end-marker-do-not-remove
+Use clang-format to format all source files (\*.h, \*.cc, \*.proto) to
+a consistent format. You should run clang-format on all source files
+before submitting a pull request::
 
-.. toctree::
-   :hidden:
-
-   Documentation home <self>
-
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
-
-   quickstart
-   install
-   run
-   client
-   model_repository
-   model_configuration
-   http_grpc_api
-   metrics
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Guide
-
-   architecture
-   contribute
-   build
-   test
-
-.. toctree::
-   :maxdepth: 2
-   :caption: API Reference
-
-   protobuf_api/protobuf_api_root
-   cpp_api/cpp_api_root
-   python_api
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
+  $ apt-get install clang-format clang-format-6.0
+  $ clang-format-6.0 --style=file -i *.proto *.cc *.h

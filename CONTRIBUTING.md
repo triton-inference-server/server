@@ -28,10 +28,11 @@
 
 # Contribution Rules
 
-- While we have not yet documented a strict code style convention,
-  please follow the existing conventions in the relevant file,
-  submodule, module, and project when you add new code or when you
-  extend/fix existing functionality.
+- The code style convention is enforced by clang-format. See the
+  Developer Guide for instructions on how to ensure your contributions
+  conform. In general please follow the existing conventions in the
+  relevant file, submodule, module, and project when you add new code
+  or when you extend/fix existing functionality.
 
 - Avoid introducing unnecessary complexity into existing code so that
   maintainability and readability are preserved.
