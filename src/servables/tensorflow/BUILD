@@ -126,6 +126,12 @@ cc_library(
     alwayslink = 1,
 )
 
+filegroup(
+    name = "tf_testdata",
+    srcs = glob(
+        ["testdata/**/*"]),
+)
+
 cc_test(
     name = "graphdef_bundle_test",
     srcs = ["graphdef_bundle_test.cc"],
@@ -135,6 +141,7 @@ cc_test(
         "-lnvidia-ml"
     ],
     data = [
+         ":tf_testdata"
     ],
     deps = [
         ":graphdef_bundle",
@@ -155,6 +162,7 @@ cc_test(
         "-lnvidia-ml"
     ],
     data = [
+         ":tf_testdata"
     ],
     deps = [
         ":savedmodel_bundle",

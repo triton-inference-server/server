@@ -57,14 +57,22 @@ GetAutoFillPlatform(
     real_versions.insert(version.substr(0, version.find_first_of('/')));
   }
 
-  if (real_versions.empty()) {
+  std::set<std::string> version_dirs;
+  for (const auto& version : real_versions) {
+    const auto vp = tensorflow::io::JoinPath(model_path, version);
+    if (tensorflow::Env::Default()->IsDirectory(vp).ok()) {
+      version_dirs.insert(version);
+    }
+  }
+
+  if (version_dirs.empty()) {
     return tensorflow::errors::NotFound(
       "no version sub-directories for model '", model_name, "'");
   }
 
   // If a default named file/directory exists in a version
   // sub-directory then assume the corresponding platform.
-  for (const auto& version : real_versions) {
+  for (const auto& version : version_dirs) {
     const auto vp = tensorflow::io::JoinPath(model_path, version);
 
     // TensorRT

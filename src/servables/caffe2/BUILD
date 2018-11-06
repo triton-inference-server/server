@@ -82,6 +82,12 @@ cc_library(
     alwayslink = 1,
 )
 
+filegroup(
+    name = "caffe2_testdata",
+    srcs = glob(
+        ["testdata/**/*"]),
+)
+
 cc_test(
     name = "netdef_bundle_test",
     srcs = ["netdef_bundle_test.cc"],
@@ -94,6 +100,7 @@ cc_test(
         "-lnvidia-ml"
     ],
     data = [
+        ":caffe2_testdata"
     ],
     deps = [
         ":netdef_bundle",

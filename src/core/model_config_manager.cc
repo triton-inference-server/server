@@ -88,6 +88,10 @@ ModelConfigManager::ReadModelConfigs(
 
   for (const auto& child : real_children) {
     const auto full_path = tensorflow::io::JoinPath(model_store_path, child);
+    if (!tensorflow::Env::Default()->IsDirectory(full_path).ok()) {
+      continue;
+    }
+
     const auto& ret = model_configs->emplace(child, ModelConfig{});
     if (!ret.second) {
       return tensorflow::errors::InvalidArgument(

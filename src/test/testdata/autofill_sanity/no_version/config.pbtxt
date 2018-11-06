@@ -1,0 +1,16 @@
+name: "no_version"
+max_batch_size: 1
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]

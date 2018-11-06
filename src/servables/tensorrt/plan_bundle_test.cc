@@ -46,6 +46,11 @@ TEST_F(PlanBundleTest, ModelConfigSanity)
 
   // Standard testing...
   ValidateAll(kTensorRTPlanPlatform, init_func);
+
+  // Sanity tests with autofill and not providing the platform.
+  ValidateOne(
+    "inference_server/src/servables/tensorrt/testdata/autofill_sanity",
+    true /* autofill */, std::string() /* platform */, init_func);
 }
 
 }}}  // namespace nvidia::inferenceserver::test

@@ -46,6 +46,12 @@ TEST_F(GraphDefBundleTest, ModelConfigSanity)
 
   // Standard testing...
   ValidateAll(kTensorFlowGraphDefPlatform, init_func);
+
+  // Sanity tests with autofill and not providing the platform.
+  ValidateOne(
+    "inference_server/src/servables/tensorflow/testdata/"
+    "graphdef_autofill_sanity",
+    true /* autofill */, std::string() /* platform */, init_func);
 }
 
 }}}  // namespace nvidia::inferenceserver::test

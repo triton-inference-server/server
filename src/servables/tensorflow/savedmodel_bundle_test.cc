@@ -46,6 +46,12 @@ TEST_F(SavedModelBundleTest, ModelConfigSanity)
 
   // Standard testing...
   ValidateAll(kTensorFlowSavedModelPlatform, init_func);
+
+  // Sanity tests with autofill and not providing the platform.
+  ValidateOne(
+    "inference_server/src/servables/tensorflow/testdata/"
+    "savedmodel_autofill_sanity",
+    true /* autofill */, std::string() /* platform */, init_func);
 }
 
 }}}  // namespace nvidia::inferenceserver::test

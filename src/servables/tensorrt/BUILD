@@ -86,6 +86,12 @@ cc_library(
     alwayslink = 1,
 )
 
+filegroup(
+    name = "tensorrt_testdata",
+    srcs = glob(
+        ["testdata/**/*"]),
+)
+
 cc_test(
     name = "plan_bundle_test",
     srcs = ["plan_bundle_test.cc"],
@@ -96,6 +102,7 @@ cc_test(
         "-lnvonnxparser_runtime"
     ],
     data = [
+        ":tensorrt_testdata"
     ],
     deps = [
         ":plan_bundle",

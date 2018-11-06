@@ -37,13 +37,14 @@ namespace nvidia { namespace inferenceserver { namespace test {
 
 bool
 ModelConfigTestBase::ValidateInit(
-  const std::string& path, bool autofill, BundleInitFunc init_func,
+  const std::string& model_path, bool autofill, BundleInitFunc init_func,
   std::string* result)
 {
   result->clear();
 
   ModelConfig config;
-  tensorflow::Status status = GetNormalizedModelConfig(path, autofill, &config);
+  tensorflow::Status status =
+    GetNormalizedModelConfig(model_path, autofill, &config);
   if (!status.ok()) {
     result->append(status.ToString());
     return false;
@@ -55,7 +56,10 @@ ModelConfigTestBase::ValidateInit(
     return false;
   }
 
-  status = init_func(path, config);
+  // ModelConfig unit tests assume model version "1"
+  const std::string version_path = tensorflow::io::JoinPath(model_path, "1");
+
+  status = init_func(version_path, config);
   if (!status.ok()) {
     result->append(status.ToString());
     return false;
@@ -73,6 +77,11 @@ ModelConfigTestBase::ValidateAll(
   ValidateOne(
     "inference_server/src/test/testdata/model_config_sanity",
     false /* autofill */, platform, init_func);
+
+  // Sanity tests with autofill and no platform.
+  ValidateOne(
+    "inference_server/src/test/testdata/autofill_sanity", true /* autofill */,
+    std::string() /* platform */, init_func);
 }
 
 void
@@ -110,7 +119,7 @@ ModelConfigTestBase::ValidateOne(
     }
 
     LOG_INFO << "Testing " << model_name;
-    std::string actual;
+    std::string actual, truncated_actual;
     ValidateInit(model_path, autofill, init_func, &actual);
 
     std::ifstream expected_file(expected_path);
@@ -119,10 +128,13 @@ ModelConfigTestBase::ValidateOne(
       (std::istreambuf_iterator<char>()));
 
     if (expected.size() < actual.size()) {
-      actual = actual.substr(0, expected.size());
+      truncated_actual = actual.substr(0, expected.size());
+    } else {
+      truncated_actual = actual;
     }
-    EXPECT_TRUE(expected == actual);
-    if (expected != actual) {
+
+    EXPECT_TRUE(expected == truncated_actual);
+    if (expected != truncated_actual) {
       LOG_ERROR << "Expected:" << std::endl << expected;
       LOG_ERROR << "Actual:" << std::endl << actual;
     }
