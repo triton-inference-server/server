@@ -69,7 +69,7 @@ class Executor : public IExecutor {
       m_ThreadPool->enqueue([this, i] { ProgressEngine(i); });
     }
     // Queue the Execution Contexts in the recieve queue
-    for (int i = 0; i < m_Contexts.size(); i++) {
+    for (size_t i = 0; i < m_Contexts.size(); i++) {
       // Reseting the context decrements the gauge
       ResetContext(m_Contexts[i].get());
     }

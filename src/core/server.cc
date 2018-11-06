@@ -171,7 +171,15 @@ class InferContext final
       if (status.ok()) {
         server->HandleInfer(
           request_status, request_provider, response_provider, infer_stats,
-          [this, infer_stats, timer]() mutable {
+          [this, request_status, &response, infer_stats, timer]() mutable {
+            // If the response is an error then clear the meta-data
+            // and raw output as they may be partially or
+            // un-initialized.
+            if (request_status->code() != RequestStatusCode::SUCCESS) {
+              response.mutable_meta_data()->Clear();
+              response.mutable_raw_output()->Clear();
+            }
+
             timer.reset();
             this->FinishResponse();
           },
@@ -185,6 +193,12 @@ class InferContext final
       infer_stats->SetFailed(true);
       RequestStatusFactory::Create(
         request_status, 0 /* request_id */, server->Id(), status);
+
+      // If the response is an error then clear the meta-data and raw
+      // output as they may be partially or un-initialized.
+      response.mutable_meta_data()->Clear();
+      response.mutable_raw_output()->Clear();
+
       this->FinishResponse();
     }
   }
