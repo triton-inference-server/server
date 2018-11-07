@@ -149,4 +149,23 @@ class BaseBundle : public InferenceServable {
 
 std::ostream& operator<<(std::ostream& out, const BaseBundle& pb);
 
+/// \return true if a TensorFlow shape matches a model configuration
+/// shape.
+bool CompareDims(
+  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims);
+
+/// \return true if a TensorFlow data-type matches a model
+/// configuration data-type.
+bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
+
+/// \return the string representation of a model configuration shape.
+const std::string DimsDebugString(const DimsList& dims);
+
+/// \return the string representation of a TensorFlow shape.
+const std::string DimsDebugString(const tensorflow::TensorShapeProto& dims);
+
+/// \return the TensorFlow data-type that corresponds to a model
+/// configuration data-type.
+tensorflow::DataType ConvertDataType(DataType dtype);
+
 }}  // namespace nvidia::inferenceserver

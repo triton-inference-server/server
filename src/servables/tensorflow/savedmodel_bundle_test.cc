@@ -41,7 +41,21 @@ TEST_F(SavedModelBundleTest, ModelConfigSanity)
       const std::string& path,
       const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<SavedModelBundle> bundle(new SavedModelBundle());
-    return bundle->Init(path, config);
+    tensorflow::Status status = bundle->Init(path, config);
+    if (status.ok()) {
+      std::unordered_map<std::string, std::string> savedmodel_paths;
+      std::string filename = "model.savedmodel";
+      const auto savedmodel_path = tensorflow::io::JoinPath(path, filename);
+      savedmodel_paths.emplace(
+        std::piecewise_construct, std::make_tuple(filename),
+        std::make_tuple(savedmodel_path));
+
+      tensorflow::ConfigProto session_config;
+      status =
+        bundle->CreateExecutionContexts(session_config, savedmodel_paths);
+    }
+
+    return status;
   };
 
   // Standard testing...

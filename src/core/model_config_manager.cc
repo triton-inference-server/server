@@ -66,7 +66,6 @@ ModelConfigManager::GetModelConfigPlatform(
     TF_RETURN_IF_ERROR(singleton->GetModelConfigInternal(name, &mc));
     *platform = GetPlatform(mc.platform());
     singleton->platforms_.emplace(name, *platform);
-    LOG_INFO << "Got platform for " << name;
   } else {
     *platform = itr->second;
   }

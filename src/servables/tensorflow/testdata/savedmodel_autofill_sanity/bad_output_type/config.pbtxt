@@ -14,7 +14,7 @@ input [
 output [
   {
     name: "OUTPUT0"
-    data_type: TYPE_INT8
+    data_type: TYPE_INT16
     dims: [ 16 ]
   },
   {

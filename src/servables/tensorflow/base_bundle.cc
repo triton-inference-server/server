@@ -657,4 +657,107 @@ operator<<(std::ostream& out, const BaseBundle& pb)
   return out;
 }
 
+bool
+CompareDims(
+  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims)
+{
+  // The first model dimension can be -1 to serve as a placeholder for
+  // batch. The batch dim doesn't appear in the configuration 'dims'.
+  const bool has_batch_dim =
+    (model_shape.dim().size() >= 1) && (model_shape.dim(0).size() == -1);
+  if (model_shape.dim().size() != (dims.size() + (has_batch_dim ? 1 : 0))) {
+    return false;
+  }
+
+  for (int i = 0; i < dims.size(); ++i) {
+    if (model_shape.dim(i + (has_batch_dim ? 1 : 0)).size() != dims[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool
+CompareDataType(tensorflow::DataType model_dtype, DataType dtype)
+{
+  tensorflow::DataType cdtype = ConvertDataType(dtype);
+  if (cdtype == tensorflow::DT_INVALID) {
+    return false;
+  }
+
+  return model_dtype == cdtype;
+}
+
+const std::string
+DimsDebugString(const DimsList& dims)
+{
+  bool first = true;
+  std::string str;
+  str.append("[");
+  for (int i = 0; i < dims.size(); ++i) {
+    if (!first) {
+      str.append(",");
+    }
+    str.append(std::to_string(dims[i]));
+    first = false;
+  }
+  str.append("]");
+  return str;
+}
+
+const std::string
+DimsDebugString(const tensorflow::TensorShapeProto& dims)
+{
+  bool first = true;
+  std::string str;
+  str.append("[");
+  for (int i = 0; i < dims.dim().size(); ++i) {
+    if (!first) {
+      str.append(",");
+    }
+    str.append(std::to_string(dims.dim(i).size()));
+    first = false;
+  }
+  str.append("]");
+  return str;
+}
+
+tensorflow::DataType
+ConvertDataType(DataType dtype)
+{
+  switch (dtype) {
+    case DataType::TYPE_INVALID:
+      return tensorflow::DT_INVALID;
+    case DataType::TYPE_BOOL:
+      return tensorflow::DT_BOOL;
+    case DataType::TYPE_UINT8:
+      return tensorflow::DT_UINT8;
+    case DataType::TYPE_UINT16:
+      return tensorflow::DT_UINT16;
+    case DataType::TYPE_UINT32:
+      return tensorflow::DT_UINT32;
+    case DataType::TYPE_UINT64:
+      return tensorflow::DT_UINT64;
+    case DataType::TYPE_INT8:
+      return tensorflow::DT_INT8;
+    case DataType::TYPE_INT16:
+      return tensorflow::DT_INT16;
+    case DataType::TYPE_INT32:
+      return tensorflow::DT_INT32;
+    case DataType::TYPE_INT64:
+      return tensorflow::DT_INT64;
+    case DataType::TYPE_FP16:
+      return tensorflow::DT_HALF;
+    case DataType::TYPE_FP32:
+      return tensorflow::DT_FLOAT;
+    case DataType::TYPE_FP64:
+      return tensorflow::DT_DOUBLE;
+    default:
+      break;
+  }
+
+  return tensorflow::DT_INVALID;
+}
+
 }}  // namespace nvidia::inferenceserver

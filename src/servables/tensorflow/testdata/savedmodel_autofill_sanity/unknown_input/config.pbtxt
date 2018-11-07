@@ -6,7 +6,7 @@ input [
     dims: [ 16 ]
   },
   {
-    name: "INPUT1"
+    name: "INPUT_UNKNOWN"
     data_type: TYPE_INT32
     dims: [ 16 ]
   }

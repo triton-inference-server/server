@@ -1,0 +1,1 @@
+Invalid argument: unable to load model 'bad_output_dims', output 'OUTPUT1' dims [-1,16] don't match configuration dims [1]

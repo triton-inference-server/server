@@ -38,66 +38,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-bool
-CompareDims(
-  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims)
-{
-  // The first model dimension can be -1 to serve as a placeholder for
-  // batch. The batch dim doesn't appear in the configuration 'dims'.
-  const bool has_batch_dim =
-    (model_shape.dim().size() >= 1) && (model_shape.dim(0).size() == -1);
-  if (model_shape.dim().size() != (dims.size() + (has_batch_dim ? 1 : 0))) {
-    return false;
-  }
-
-  for (int i = 0; i < dims.size(); ++i) {
-    if (model_shape.dim(i + (has_batch_dim ? 1 : 0)).size() != dims[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-const std::string
-DimsDebugString(const DimsList& dims)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.size(); ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims[i]));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-const std::string
-DimsDebugString(const tensorflow::TensorShapeProto& dims)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.dim().size(); ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims.dim(i).size()));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-
-}  // namespace
-
 tensorflow::Status
 SavedModelBundle::Init(
   const tensorflow::StringPiece& path, const ModelConfig& config)
@@ -208,6 +148,13 @@ SavedModelBundle::CreateSession(
         DimsDebugString(iitr->second.tensor_shape()),
         " don't match configuration dims ", DimsDebugString(io.dims()));
     }
+    if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
+      return tensorflow::errors::InvalidArgument(
+        "unable to load model '", Name(), "', input '", io.name(),
+        "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
+        " doesn't match configuration data-type ",
+        DataType_Name(io.data_type()));
+    }
   }
 
   for (const auto& io : Config().output()) {
@@ -224,6 +171,13 @@ SavedModelBundle::CreateSession(
         "unable to load model '", Name(), "', output '", io.name(), "' dims ",
         DimsDebugString(oitr->second.tensor_shape()),
         " don't match configuration dims ", DimsDebugString(io.dims()));
+    }
+    if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
+      return tensorflow::errors::InvalidArgument(
+        "unable to load model '", Name(), "', output '", io.name(),
+        "' data-type ", tensorflow::DataType_Name(oitr->second.dtype()),
+        " doesn't match configuration data-type ",
+        DataType_Name(io.data_type()));
     }
   }
 

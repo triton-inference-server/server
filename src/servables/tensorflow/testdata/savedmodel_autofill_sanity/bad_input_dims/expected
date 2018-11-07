@@ -1,0 +1,1 @@
+Invalid argument: unable to load model 'bad_input_dims', input 'INPUT0' dims [-1,16] don't match configuration dims [16,1]

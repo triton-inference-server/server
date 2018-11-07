@@ -3,7 +3,7 @@ input [
   {
     name: "INPUT0"
     data_type: TYPE_INT32
-    dims: [ 16 ]
+    dims: [ 16, 1 ]
   },
   {
     name: "INPUT1"
