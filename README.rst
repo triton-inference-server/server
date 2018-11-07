@@ -65,9 +65,9 @@ NVIDIA Inference Server provides the following features:
 The User Guide, Developer Guide, and API Reference documentation
 provide guidance on installing, building and running the inference
 server. You can view the documentation for the `current release
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/index.html>`_
+<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
 or for the `master branch
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/index.html>`_.
+<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_.
 
 Documentation for earlier releases is archived `here
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
