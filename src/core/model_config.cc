@@ -26,6 +26,8 @@
 
 #include "src/core/model_config.h"
 
+#include "src/core/constants.h"
+
 namespace nvidia { namespace inferenceserver {
 
 size_t
@@ -93,6 +95,22 @@ uint64_t
 GetSize(const ModelOutput& mio)
 {
   return GetSize(mio.data_type(), mio.dims());
+}
+
+Platform
+GetPlatform(const std::string& platform_str)
+{
+  if (platform_str == kTensorFlowGraphDefPlatform) {
+    return Platform::PLATFORM_TENSORFLOW_GRAPHDEF;
+  } else if (platform_str == kTensorFlowSavedModelPlatform) {
+    return Platform::PLATFORM_TENSORFLOW_SAVEDMODEL;
+  } else if (platform_str == kTensorRTPlanPlatform) {
+    return Platform::PLATFORM_TENSORRT_PLAN;
+  } else if (platform_str == kCaffe2NetDefPlatform) {
+    return Platform::PLATFORM_CAFFE2_NETDEF;
+  }
+
+  return Platform::PLATFORM_UNKNOWN;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -54,6 +54,7 @@
 #include "src/core/infer.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_manager.h"
 #include "src/core/profile.h"
@@ -906,6 +907,7 @@ InferenceServer::Wait()
           // configs.
           std::set<std::string> added, removed;
           if (ModelConfigManager::CompareModelConfigs(mc, &added, &removed)) {
+            ModelConfigManager::SetModelConfigs(mc);
             status = core_->ReloadConfig(msc);
             if (!status.ok()) {
               LOG_ERROR << "Failed to reload new model configurations: "
@@ -914,7 +916,6 @@ InferenceServer::Wait()
 
             // Update status to match new model configuration.
             status_manager_->UpdateModelConfigs(mc, added, removed);
-            ModelConfigManager::SetModelConfigs(mc);
           }
         }
       }
@@ -1199,35 +1200,37 @@ InferenceServer::HandleInfer(
 
   std::function<void()> handle;
 
-  const ModelConfig* model_config;
-  status = ModelConfigManager::GetModelConfig(
-    request_provider->ModelName(), &model_config);
+  Platform platform;
+  status = ModelConfigManager::GetModelConfigPlatform(
+    request_provider->ModelName(), &platform);
   if (status.ok()) {
-    const auto& platform = model_config->platform();
-
-    if (platform == kTensorFlowGraphDefPlatform) {
-      status = core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
-      if (status.ok()) {
-        state->is =
-          static_cast<InferenceServable*>(state->graphdef_bundle.get());
-      }
-    } else if (platform == kTensorFlowSavedModelPlatform) {
-      status =
-        core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
-      if (status.ok()) {
-        state->is =
-          static_cast<InferenceServable*>(state->saved_model_bundle.get());
-      }
-    } else if (platform == kTensorRTPlanPlatform) {
-      status = core_->GetServableHandle(model_spec, &(state->plan_bundle));
-      if (status.ok()) {
-        state->is = static_cast<InferenceServable*>(state->plan_bundle.get());
-      }
-    } else if (platform == kCaffe2NetDefPlatform) {
-      status = core_->GetServableHandle(model_spec, &(state->netdef_bundle));
-      if (status.ok()) {
-        state->is = static_cast<InferenceServable*>(state->netdef_bundle.get());
-      }
+    switch (platform) {
+      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
+        status = core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
+        if (status.ok()) {
+          state->is = static_cast<InferenceServable*>(state->graphdef_bundle.get());
+        }
+        break;
+      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
+        status = core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
+        if (status.ok()) {
+          state->is = static_cast<InferenceServable*>(state->saved_model_bundle.get());
+        }
+        break;
+      case Platform::PLATFORM_TENSORRT_PLAN:
+        status = core_->GetServableHandle(model_spec, &(state->plan_bundle));
+        if (status.ok()) {
+          state->is = static_cast<InferenceServable*>(state->plan_bundle.get());
+        }
+        break;
+      case Platform::PLATFORM_CAFFE2_NETDEF:
+        status = core_->GetServableHandle(model_spec, &(state->netdef_bundle));
+        if (status.ok()) {
+          state->is = static_cast<InferenceServable*>(state->netdef_bundle.get());
+        }
+        break;
+      default:
+        break;
     }
   }
 

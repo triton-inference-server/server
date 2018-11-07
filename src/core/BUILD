@@ -189,6 +189,7 @@ cc_library(
     srcs = ["model_config.cc"],
     hdrs = ["model_config.h"],
     deps = [
+        ":constants",
         ":model_config_proto",
     ],
 )
@@ -200,6 +201,7 @@ cc_library(
     deps = [
         ":constants",
         ":logging",
+        ":model_config",
         ":model_config_proto",
         ":utils",
         "@org_tensorflow//tensorflow/core:lib",
@@ -227,6 +229,7 @@ cc_library(
         ":grpc_service_proto",
         ":infer_header",
         ":logging",
+        ":model_config",
         ":model_config_manager",
         ":model_config_proto",
         ":profile",

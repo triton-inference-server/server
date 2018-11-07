@@ -33,3 +33,5 @@ BraceWrapping:
 BinPackArguments: true
 BinPackParameters: true
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
+
+IndentCaseLabels: true

@@ -33,6 +33,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/model_config_manager.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/env.h"
@@ -47,11 +48,11 @@ CreateSavedModelBundle(
   const std::string& path, std::unique_ptr<SavedModelBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
+  const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
-  model_config.set_platform(kTensorFlowSavedModelPlatform);
-  TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
-    model_path, adapter_config.autofill(), &model_config));
+  TF_RETURN_IF_ERROR(
+    ModelConfigManager::GetModelConfig(std::string(model_name), &model_config));
 
   // Read all the savedmodel directories in 'path'. GetChildren()
   // returns all descendants instead for cloud storage like GCS, so

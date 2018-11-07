@@ -31,6 +31,15 @@ namespace nvidia { namespace inferenceserver {
 
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 
+// Enumeration for the different platform types
+enum Platform {
+  PLATFORM_UNKNOWN = 0,
+  PLATFORM_TENSORRT_PLAN = 1,
+  PLATFORM_TENSORFLOW_GRAPHDEF = 2,
+  PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
+  PLATFORM_CAFFE2_NETDEF = 4
+};
+
 // Get the size of a datatype in bytes. Return 0 if unable to
 // determine the size of the data type.
 size_t GetDataTypeByteSize(const DataType dtype);
@@ -46,5 +55,9 @@ uint64_t GetSize(const ModelInput& mio);
 // Get the size of a tensor based on ModelOutput. Return 0 if unable
 // to determine the size of the data type.
 uint64_t GetSize(const ModelOutput& mio);
+
+// Get the Platform value for a platform string or Platform::UNKNOWN
+// if the platform string is not recognized.
+Platform GetPlatform(const std::string& platform_str);
 
 }}  // namespace nvidia::inferenceserver

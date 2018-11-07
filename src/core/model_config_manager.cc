@@ -44,25 +44,48 @@ ModelConfigManager::GetSingleton()
 }
 
 tensorflow::Status
-ModelConfigManager::SetModelConfigs(const ModelConfigMap& model_configs)
+ModelConfigManager::GetModelConfig(
+  const std::string& name, ModelConfig* model_config)
 {
   ModelConfigManager* singleton = GetSingleton();
-  singleton->configs_ = model_configs;
+  std::lock_guard<std::mutex> lock(singleton->mu_);
+  return singleton->GetModelConfigInternal(name, model_config);
+}
+
+tensorflow::Status
+ModelConfigManager::GetModelConfigPlatform(
+  const std::string& name, Platform* platform)
+{
+  ModelConfigManager* singleton = GetSingleton();
+  std::lock_guard<std::mutex> lock(singleton->mu_);
+
+  // Lazily initialize the platform map...
+  const auto itr = singleton->platforms_.find(name);
+  if (itr == singleton->platforms_.end()) {
+    ModelConfig mc;
+    TF_RETURN_IF_ERROR(singleton->GetModelConfigInternal(name, &mc));
+    *platform = GetPlatform(mc.platform());
+    singleton->platforms_.emplace(name, *platform);
+    LOG_INFO << "Got platform for " << name;
+  } else {
+    *platform = itr->second;
+  }
+
+  if (*platform == Platform::PLATFORM_UNKNOWN) {
+    return tensorflow::errors::NotFound(
+      "unknown platform for model '", name, "'");
+  }
+
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-ModelConfigManager::GetModelConfig(
-  const std::string& name, const ModelConfig** model_config)
+ModelConfigManager::SetModelConfigs(const ModelConfigMap& model_configs)
 {
   ModelConfigManager* singleton = GetSingleton();
-  const auto itr = singleton->configs_.find(name);
-  if (itr == singleton->configs_.end()) {
-    return tensorflow::errors::NotFound(
-      "no configuration for model '", name, "'");
-  }
-
-  *model_config = &itr->second;
+  std::lock_guard<std::mutex> lock(singleton->mu_);
+  singleton->configs_ = model_configs;
+  singleton->platforms_.clear();
   return tensorflow::Status::OK();
 }
 
@@ -158,6 +181,7 @@ ModelConfigManager::CompareModelConfigs(
   std::set<std::string>* removed)
 {
   ModelConfigManager* singleton = GetSingleton();
+  std::lock_guard<std::mutex> lock(singleton->mu_);
 
   std::set<std::string> current_names, next_names;
   for (const auto& p : singleton->configs_) {
@@ -180,6 +204,20 @@ ModelConfigManager::CompareModelConfigs(
   }
 
   return current_names != next_names;
+}
+
+tensorflow::Status
+ModelConfigManager::GetModelConfigInternal(
+  const std::string& name, ModelConfig* model_config)
+{
+  const auto itr = configs_.find(name);
+  if (itr == configs_.end()) {
+    return tensorflow::errors::NotFound(
+      "no configuration for model '", name, "'");
+  }
+
+  *model_config = itr->second;
+  return tensorflow::Status::OK();
 }
 
 

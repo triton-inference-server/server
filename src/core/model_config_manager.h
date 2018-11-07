@@ -26,6 +26,8 @@
 //
 #pragma once
 
+#include <mutex>
+#include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
@@ -43,15 +45,20 @@ class ModelConfigManager {
   // Map from model name to a model configuration.
   using ModelConfigMap = std::unordered_map<std::string, ModelConfig>;
 
+  // Get the configuration for a named model. Return OK if found,
+  // NOT_FOUND otherwise.
+  static tensorflow::Status GetModelConfig(
+    const std::string& name, ModelConfig* model_config);
+
+  // Get the platform for a named model. Return OK if found, NO_FOUND
+  // otherwise.
+  static tensorflow::Status GetModelConfigPlatform(
+    const std::string& name, Platform* platform);
+
   // Set the model configurations, removing any existing model
   // configurations.
   static tensorflow::Status SetModelConfigs(
     const ModelConfigMap& model_configs);
-
-  // Get the configuration for a named model. Return OK if found,
-  // NOT_FOUND otherwise.
-  static tensorflow::Status GetModelConfig(
-    const std::string& name, const ModelConfig** model_config);
 
   // Read the model configurations from all models in a model
   // repository.
@@ -67,8 +74,12 @@ class ModelConfigManager {
   ModelConfigManager() = default;
   ~ModelConfigManager() = default;
   static ModelConfigManager* GetSingleton();
+  tensorflow::Status GetModelConfigInternal(
+    const std::string& name, ModelConfig* model_config);
 
+  std::mutex mu_;
   ModelConfigMap configs_;
+  std::map<std::string, Platform> platforms_;
 };
 
 }}  // namespace nvidia::inferenceserver

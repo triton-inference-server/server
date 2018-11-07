@@ -74,6 +74,10 @@ cc_library(
     deps = [
         ":plan_bundle",
         ":plan_bundle_proto",
+        "//src/core:constants",
+        "//src/core:logging",
+        "//src/core:model_config",
+        "//src/core:model_config_proto",
         "//src/core:utils",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
