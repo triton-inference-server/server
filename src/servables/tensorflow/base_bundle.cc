@@ -40,47 +40,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-tensorflow::DataType
-ConvertDatatype(DataType dtype)
-{
-  switch (dtype) {
-    case DataType::TYPE_INVALID:
-      return tensorflow::DT_INVALID;
-    case DataType::TYPE_BOOL:
-      return tensorflow::DT_BOOL;
-    case DataType::TYPE_UINT8:
-      return tensorflow::DT_UINT8;
-    case DataType::TYPE_UINT16:
-      return tensorflow::DT_UINT16;
-    case DataType::TYPE_UINT32:
-      return tensorflow::DT_UINT32;
-    case DataType::TYPE_UINT64:
-      return tensorflow::DT_UINT64;
-    case DataType::TYPE_INT8:
-      return tensorflow::DT_INT8;
-    case DataType::TYPE_INT16:
-      return tensorflow::DT_INT16;
-    case DataType::TYPE_INT32:
-      return tensorflow::DT_INT32;
-    case DataType::TYPE_INT64:
-      return tensorflow::DT_INT64;
-    case DataType::TYPE_FP16:
-      return tensorflow::DT_HALF;
-    case DataType::TYPE_FP32:
-      return tensorflow::DT_FLOAT;
-    case DataType::TYPE_FP64:
-      return tensorflow::DT_DOUBLE;
-    default:
-      break;
-  }
-
-  return tensorflow::DT_INVALID;
-}
-
-}  // namespace
-
 BaseBundle::Context::Context(
   const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
@@ -136,6 +95,13 @@ BaseBundle::CreateExecutionContexts(
   const tensorflow::ConfigProto& session_config,
   const std::unordered_map<std::string, std::string>& paths)
 {
+  if (LOG_VERBOSE_IS_ON(1)) {
+    LOG_INFO << "Creating execution contexts for:";
+    for (const auto p : paths) {
+      LOG_INFO << "  " << p.first << ": " << p.second;
+    }
+  }
+
   uint32_t total_context_cnt = 0;
 
   for (const auto& group : Config().instance_group()) {
@@ -262,7 +228,7 @@ BaseBundle::Context::InitializeInputs(
       shape.AddDim(io.dims(d));
     }
 
-    tensorflow::DataType dtype = ConvertDatatype(io.data_type());
+    tensorflow::DataType dtype = ConvertDataType(io.data_type());
     inputs_.insert({io.name(), tensorflow::Tensor(dtype, shape)});
   }
 
@@ -279,7 +245,7 @@ BaseBundle::Context::InitializeOutputs(
       shape.AddDim(io.dims(d));
     }
 
-    tensorflow::DataType dtype = ConvertDatatype(io.data_type());
+    tensorflow::DataType dtype = ConvertDataType(io.data_type());
     outputs_.insert({io.name(), tensorflow::Tensor(dtype, shape)});
   }
 

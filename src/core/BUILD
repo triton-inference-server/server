@@ -121,6 +121,21 @@ serving_proto_library_py(
 )
 
 cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    hdrs = ["autofill.h"],
+    deps = [
+        ":constants",
+        ":logging",
+        ":model_config",
+        ":model_config_proto",
+        "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
     name = "constants",
     hdrs = ["constants.h"],
 )
@@ -299,7 +314,9 @@ cc_library(
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
     deps = [
+        ":autofill",
         ":constants",
+        ":logging",
         ":model_config_proto",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",

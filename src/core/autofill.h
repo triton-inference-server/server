@@ -23,52 +23,33 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorflow/savedmodel_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include <string>
+#include "src/core/model_config.pb.h"
+#include "tensorflow/core/lib/core/errors.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class SavedModelBundleTest : public ModelConfigTestBase {
+class AutoFill {
  public:
+  /// Create an AutoFill object for a specific model.
+  static tensorflow::Status Create(
+    const std::string& model_name, const std::string& model_path,
+    const ModelConfig& config, std::unique_ptr<AutoFill>* autofill);
+
+  /// Autofill settings in a configuration.
+  virtual tensorflow::Status Fix(ModelConfig* config) = 0;
+
+ protected:
+  AutoFill(const std::string& model_name) : model_name_(model_name) {}
+
+  static tensorflow::Status GetSubdirs(
+    const std::string& path, std::set<std::string>* subdirs);
+  static tensorflow::Status GetFiles(
+    const std::string& path, std::set<std::string>* files);
+
+  const std::string model_name_;
 };
 
-TEST_F(SavedModelBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<SavedModelBundle> bundle(new SavedModelBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::string> savedmodel_paths;
-
-      for (const auto& filename : std::vector<std::string>{
-             kTensorFlowSavedModelFilename, "vnetsavedmodel"}) {
-        const auto savedmodel_path = tensorflow::io::JoinPath(path, filename);
-        savedmodel_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(savedmodel_path));
-      }
-
-      tensorflow::ConfigProto session_config;
-      status =
-        bundle->CreateExecutionContexts(session_config, savedmodel_paths);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorFlowSavedModelPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorflow/testdata/"
-    "savedmodel_autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

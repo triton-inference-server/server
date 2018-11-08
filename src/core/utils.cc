@@ -28,94 +28,13 @@
 
 #include <cuda_runtime_api.h>
 #include "absl/strings/numbers.h"
+#include "src/core/autofill.h"
 #include "src/core/constants.h"
+#include "src/core/logging.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-tensorflow::Status
-GetAutoFillPlatform(
-  const tensorflow::StringPiece& model_name,
-  const tensorflow::StringPiece& path, std::string* platform)
-{
-  const std::string model_path(path);
-
-  // Find version subdirectories...
-  std::vector<std::string> versions;
-  TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->GetChildren(model_path, &versions));
-
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS. In such case we should filter out all non-direct
-  // descendants.
-  std::set<std::string> real_versions;
-  for (size_t i = 0; i < versions.size(); ++i) {
-    const std::string& version = versions[i];
-    real_versions.insert(version.substr(0, version.find_first_of('/')));
-  }
-
-  std::set<std::string> version_dirs;
-  for (const auto& version : real_versions) {
-    const auto vp = tensorflow::io::JoinPath(model_path, version);
-    if (tensorflow::Env::Default()->IsDirectory(vp).ok()) {
-      version_dirs.insert(version);
-    }
-  }
-
-  if (version_dirs.empty()) {
-    return tensorflow::errors::NotFound(
-      "no version sub-directories for model '", model_name, "'");
-  }
-
-  // If a default named file/directory exists in a version
-  // sub-directory then assume the corresponding platform.
-  for (const auto& version : version_dirs) {
-    const auto vp = tensorflow::io::JoinPath(model_path, version);
-
-    // TensorRT
-    if (tensorflow::Env::Default()
-          ->FileExists(tensorflow::io::JoinPath(vp, kTensorRTPlanFilename))
-          .ok()) {
-      *platform = kTensorRTPlanPlatform;
-      return tensorflow::Status::OK();
-    }
-
-    // TensorFlow
-    if (tensorflow::Env::Default()
-          ->FileExists(
-            tensorflow::io::JoinPath(vp, kTensorFlowSavedModelFilename))
-          .ok()) {
-      *platform = kTensorFlowSavedModelPlatform;
-      return tensorflow::Status::OK();
-    }
-    if (tensorflow::Env::Default()
-          ->FileExists(
-            tensorflow::io::JoinPath(vp, kTensorFlowGraphDefFilename))
-          .ok()) {
-      *platform = kTensorFlowGraphDefPlatform;
-      return tensorflow::Status::OK();
-    }
-
-    // Caffe2
-    if (tensorflow::Env::Default()
-          ->FileExists(tensorflow::io::JoinPath(vp, kCaffe2NetDefFilename))
-          .ok()) {
-      *platform = kCaffe2NetDefPlatform;
-      return tensorflow::Status::OK();
-    }
-  }
-
-  return tensorflow::errors::NotFound(
-    "unable to derive platform for model '", model_name, "', the model ",
-    "definition file must be named '", kTensorRTPlanFilename, "', '",
-    kTensorFlowGraphDefFilename, "', '", kTensorFlowSavedModelFilename,
-    "', or '", kCaffe2NetDefFilename, "'");
-}
-
-}  // namespace
 
 tensorflow::Status
 GetModelVersionFromPath(const tensorflow::StringPiece& path, uint32_t* version)
@@ -144,17 +63,20 @@ GetNormalizedModelConfig(
       ReadTextProto(tensorflow::Env::Default(), config_path, config));
   }
 
-  // Autofill the platform and name...
+  // Autofill if requested...
   if (autofill) {
     const std::string model_name(tensorflow::io::Basename(path));
-    if (config->name().empty()) {
-      config->set_name(model_name);
-    }
+    std::unique_ptr<AutoFill> af;
+    TF_RETURN_IF_ERROR(
+      AutoFill::Create(model_name, std::string(path), *config, &af));
+    TF_RETURN_IF_ERROR(af->Fix(config));
 
-    if (config->platform().empty()) {
-      TF_RETURN_IF_ERROR(
-        GetAutoFillPlatform(model_name, path, config->mutable_platform()));
-    }
+    LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
+  }
+
+  if (config->platform().empty()) {
+    return tensorflow::errors::InvalidArgument(
+      "must specify platform for model '", config->name(), "'");
   }
 
   // If 'default_model_filename' is not specified set it appropriately

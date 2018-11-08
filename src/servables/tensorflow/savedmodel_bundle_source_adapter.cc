@@ -68,9 +68,11 @@ CreateSavedModelBundle(
   std::unordered_map<std::string, std::string> savedmodel_paths;
   for (const auto& filename : children) {
     const auto savedmodel_path = tensorflow::io::JoinPath(path, filename);
-    savedmodel_paths.emplace(
-      std::piecewise_construct, std::make_tuple(filename),
-      std::make_tuple(savedmodel_path));
+    if (tensorflow::Env::Default()->IsDirectory(savedmodel_path).ok()) {
+      savedmodel_paths.emplace(
+        std::piecewise_construct, std::make_tuple(filename),
+        std::make_tuple(savedmodel_path));
+    }
   }
 
   bundle->reset(new SavedModelBundle);
