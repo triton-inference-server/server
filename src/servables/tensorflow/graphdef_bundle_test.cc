@@ -41,7 +41,24 @@ TEST_F(GraphDefBundleTest, ModelConfigSanity)
       const std::string& path,
       const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    return bundle->Init(path, config);
+    tensorflow::Status status = bundle->Init(path, config);
+    if (status.ok()) {
+      std::unordered_map<std::string, std::string> graphdef_paths;
+
+      for (const auto& filename : std::vector<std::string>{
+             kTensorFlowGraphDefFilename}) {
+        const auto graphdef_path = tensorflow::io::JoinPath(path, filename);
+        graphdef_paths.emplace(
+          std::piecewise_construct, std::make_tuple(filename),
+          std::make_tuple(graphdef_path));
+      }
+
+      tensorflow::ConfigProto session_config;
+      status =
+        bundle->CreateExecutionContexts(session_config, graphdef_paths);
+    }
+
+    return status;
   };
 
   // Standard testing...

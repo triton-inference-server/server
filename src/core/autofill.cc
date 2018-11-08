@@ -354,7 +354,11 @@ AutoFillGraphDef::Create(
   const auto graphdef_path =
     tensorflow::io::JoinPath(version_path, graphdef_file);
 
-  // FIXME better than just recognize by name
+  // If find a file named with the default graphdef name then assume
+  // it is a graphdef. We could be smarter here and try to parse to
+  // see if it really is a graphdef. We could also guess thae
+  // placeholders are inputs... but we have no way to know what the
+  // outputs are.
   if (graphdef_file != kTensorFlowGraphDefFilename) {
     return tensorflow::errors::Internal(
       "unable to autofill for '", model_name,
@@ -369,12 +373,12 @@ AutoFillGraphDef::Create(
 tensorflow::Status
 AutoFillGraphDef::Fix(ModelConfig* config)
 {
-  // Set name if not already set.
+  config->set_platform(kTensorFlowGraphDefPlatform);
+
   if (config->name().empty()) {
     config->set_name(model_name_);
   }
 
-  config->set_platform(kTensorFlowGraphDefPlatform);
   return tensorflow::Status::OK();
 }
 
