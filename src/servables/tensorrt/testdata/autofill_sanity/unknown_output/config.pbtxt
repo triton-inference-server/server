@@ -13,7 +13,7 @@ input [
 ]
 output [
   {
-    name: "OUTPUT0"
+    name: "OUTPUT_UNKNOWN"
     data_type: TYPE_FP32
     dims: [ 16, 1, 1 ]
   },

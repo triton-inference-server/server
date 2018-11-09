@@ -27,98 +27,18 @@
 #include "src/servables/tensorrt/plan_bundle.h"
 
 #include <NvInfer.h>
-#include <NvOnnxParserRuntime.h>
 #include <cuda_runtime_api.h>
 #include <stdint.h>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/model_config.h"
 #include "src/core/server_status.h"
 #include "src/core/utils.h"
-#include "src/servables/tensorrt/logging.h"
+#include "src/servables/tensorrt/loader.h"
+#include "src/servables/tensorrt/plan_utils.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-uint64_t
-GetSize(const int max_batch_size, const DataType& dtype, const DimsList& dims)
-{
-  size_t dt_size = nvidia::inferenceserver::GetSize(dtype, dims);
-  return std::max(1, max_batch_size) * dt_size;
-}
-
-DataType
-ConvertDatatype(nvinfer1::DataType trt_type)
-{
-  switch (trt_type) {
-    case nvinfer1::DataType::kFLOAT:
-      return TYPE_FP32;
-    case nvinfer1::DataType::kHALF:
-      return TYPE_FP16;
-    case nvinfer1::DataType::kINT8:
-      return TYPE_INT8;
-    case nvinfer1::DataType::kINT32:
-      return TYPE_INT32;
-  }
-
-  return TYPE_INVALID;
-}
-
-bool
-CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
-{
-  if (model_dims.nbDims != dims.size()) {
-    return false;
-  }
-
-  for (int i = 0; i < model_dims.nbDims; ++i) {
-    if (model_dims.d[i] != dims[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-const std::string
-DimsDebugString(const DimsList& dims)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.size(); ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims[i]));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-const std::string
-DimsDebugString(const nvinfer1::Dims& dims)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.nbDims; ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims.d[i]));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-}  // namespace
-
 
 PlanBundle::Context::Context(
   const std::string& name, const int gpu_device, const int max_batch_size)
@@ -303,22 +223,8 @@ PlanBundle::CreateExecutionContext(
       "unable to set device for ", Name(), ": ", cudaGetErrorString(cuerr));
   }
 
-  // Create plugin factory to provide onnx plugins. This should be
-  // generalized based on what the model requires [DLIS-54]
-  nvonnxparser::IPluginFactory* onnx_plugin_factory =
-    nvonnxparser::createPluginFactory(tensorrt_logger);
-
-  // Runtime and engine...
-  context.runtime_ = nvinfer1::createInferRuntime(tensorrt_logger);
-  if (context.runtime_ == nullptr) {
-    return tensorflow::errors::Internal("unable to create TensorRT runtime");
-  }
-
-  context.engine_ = context.runtime_->deserializeCudaEngine(
-    &((mn_itr->second)[0]), mn_itr->second.size(), onnx_plugin_factory);
-  if (context.engine_ == nullptr) {
-    return tensorflow::errors::Internal("unable to create TensorRT engine");
-  }
+  TF_RETURN_IF_ERROR(
+    LoadPlan(mn_itr->second, &context.runtime_, &context.engine_));
 
   if (context.max_batch_size_ > context.engine_->getMaxBatchSize()) {
     return tensorflow::errors::InvalidArgument(

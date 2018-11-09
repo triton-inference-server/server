@@ -1,0 +1,1 @@
+Invalid argument: input 'INPUT1' dims [16,1,1] don't match configuration dims [16,1] for bad_input_dims_0_gpu0

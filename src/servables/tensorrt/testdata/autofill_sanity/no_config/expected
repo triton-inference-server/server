@@ -1,4 +1,4 @@
-name: "no_name_platform"
+name: "no_config"
 platform: "tensorrt_plan"
 version_policy {
   latest {
@@ -35,7 +35,7 @@ output {
   dims: 1
 }
 instance_group {
-  name: "no_name_platform"
+  name: "no_config"
   count: 1
   gpus: 0
   kind: KIND_GPU

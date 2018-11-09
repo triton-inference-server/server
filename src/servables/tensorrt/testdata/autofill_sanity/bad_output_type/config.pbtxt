@@ -19,7 +19,7 @@ output [
   },
   {
     name: "OUTPUT1"
-    data_type: TYPE_FP32
+    data_type: TYPE_INT8
     dims: [ 16, 1, 1 ]
   }
 ]

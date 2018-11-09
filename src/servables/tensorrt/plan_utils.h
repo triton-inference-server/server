@@ -24,49 +24,22 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/tensorrt/plan_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#pragma once
 
-namespace nvidia { namespace inferenceserver { namespace test {
+#include <NvInfer.h>
+#include "src/core/model_config.h"
 
-class PlanBundleTest : public ModelConfigTestBase {
- public:
-};
+namespace nvidia { namespace inferenceserver {
 
-TEST_F(PlanBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<PlanBundle> bundle(new PlanBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::vector<char>> plan_blobs;
+uint64_t GetSize(
+  const int max_batch_size, const DataType& dtype, const DimsList& dims);
 
-      for (const auto& filename :
-           std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = tensorflow::io::JoinPath(path, filename);
-        tensorflow::string blob_str;
-        tensorflow::ReadFileToString(tensorflow::Env::Default(), plan_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        plan_blobs.emplace(filename, std::move(blob));
-      }
+DataType ConvertDatatype(nvinfer1::DataType trt_type);
 
-      status = bundle->CreateExecutionContexts(plan_blobs);
-    }
+bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 
-    return status;
-  };
+const std::string DimsDebugString(const DimsList& dims);
 
-  // Standard testing...
-  ValidateAll(kTensorRTPlanPlatform, init_func);
+const std::string DimsDebugString(const nvinfer1::Dims& dims);
 
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorrt/testdata/autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

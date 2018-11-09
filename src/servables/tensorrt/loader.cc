@@ -24,49 +24,38 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/tensorrt/plan_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include "src/servables/tensorrt/loader.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+#include <NvOnnxParserRuntime.h>
+#include "src/servables/tensorrt/logging.h"
 
-class PlanBundleTest : public ModelConfigTestBase {
- public:
-};
+namespace nvidia { namespace inferenceserver {
 
-TEST_F(PlanBundleTest, ModelConfigSanity)
+tensorflow::Status
+LoadPlan(
+  const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
+  nvinfer1::ICudaEngine** engine)
 {
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<PlanBundle> bundle(new PlanBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::vector<char>> plan_blobs;
+  *engine = nullptr;
+  *runtime = nullptr;
 
-      for (const auto& filename :
-           std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = tensorflow::io::JoinPath(path, filename);
-        tensorflow::string blob_str;
-        tensorflow::ReadFileToString(tensorflow::Env::Default(), plan_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        plan_blobs.emplace(filename, std::move(blob));
-      }
+  // Create plugin factory to provide onnx plugins. This should be
+  // generalized based on what the model requires [DLIS-54]
+  nvonnxparser::IPluginFactory* onnx_plugin_factory =
+    nvonnxparser::createPluginFactory(tensorrt_logger);
 
-      status = bundle->CreateExecutionContexts(plan_blobs);
-    }
+  *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
+  if (*runtime == nullptr) {
+    return tensorflow::errors::Internal("unable to create TensorRT runtime");
+  }
 
-    return status;
-  };
+  *engine = (*runtime)->deserializeCudaEngine(
+    &model_data[0], model_data.size(), onnx_plugin_factory);
+  if (*engine == nullptr) {
+    return tensorflow::errors::Internal("unable to create TensorRT engine");
+  }
 
-  // Standard testing...
-  ValidateAll(kTensorRTPlanPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorrt/testdata/autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
+  return tensorflow::Status::OK();
 }
 
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

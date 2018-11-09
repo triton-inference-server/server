@@ -146,7 +146,8 @@ cc_test(
     linkopts = [
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml"
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime",
     ],
     data = [
          ":tf_testdata"
@@ -167,7 +168,8 @@ cc_test(
     linkopts = [
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml"
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime",
     ],
     data = [
          ":tf_testdata"

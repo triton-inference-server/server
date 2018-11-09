@@ -23,50 +23,34 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorrt/plan_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include <string>
+#include "src/core/autofill.h"
+#include "src/core/model_config.pb.h"
+#include "tensorflow/core/lib/core/errors.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class PlanBundleTest : public ModelConfigTestBase {
+class AutoFillPlan : public AutoFill {
  public:
+  static tensorflow::Status Create(
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillPlan>* autofill);
+  tensorflow::Status Fix(ModelConfig* config) override;
+
+ private:
+  AutoFillPlan(
+    const std::string& model_name, const std::string& plan_filename,
+    const int32_t max_batch_size, const ModelConfig& config)
+      : AutoFill(model_name), plan_filename_(plan_filename),
+        max_batch_size_(max_batch_size), config_(config)
+  {
+  }
+
+  const std::string plan_filename_;
+  const int32_t max_batch_size_;
+  const ModelConfig config_;
 };
 
-TEST_F(PlanBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<PlanBundle> bundle(new PlanBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::vector<char>> plan_blobs;
-
-      for (const auto& filename :
-           std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = tensorflow::io::JoinPath(path, filename);
-        tensorflow::string blob_str;
-        tensorflow::ReadFileToString(tensorflow::Env::Default(), plan_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        plan_blobs.emplace(filename, std::move(blob));
-      }
-
-      status = bundle->CreateExecutionContexts(plan_blobs);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorRTPlanPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorrt/testdata/autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

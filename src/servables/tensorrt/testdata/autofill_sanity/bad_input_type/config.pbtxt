@@ -2,7 +2,7 @@ max_batch_size: 8
 input [
   {
     name: "INPUT0"
-    data_type: TYPE_FP32
+    data_type: TYPE_FP16
     dims: [ 16, 1, 1 ]
   },
   {

@@ -41,6 +41,28 @@ serving_proto_library(
 )
 
 cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    hdrs = ["autofill.h"],
+    deps = [
+        ":loader",
+        ":plan_utils",
+        "//src/core:autofill_header",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "loader",
+    srcs = ["loader.cc"],
+    hdrs = ["loader.h"],
+    deps = [
+        ":logging",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
     name = "logging",
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
@@ -50,16 +72,25 @@ cc_library(
 )
 
 cc_library(
+    name = "plan_utils",
+    srcs = ["plan_utils.cc"],
+    hdrs = ["plan_utils.h"],
+    deps = [
+        "//src/core:model_config",
+    ],
+)
+
+cc_library(
     name = "plan_bundle",
     srcs = ["plan_bundle.cc"],
     hdrs = ["plan_bundle.h"],
     deps = [
-        ":logging",
+        ":loader",
+        ":plan_utils",
         "//src/core:constants",
         "//src/core:infer",
         "//src/core:label_provider",
         "//src/core:model_config_proto",
-        "//src/core:model_config",
         "//src/core:server_status",
         "//src/core:utils",
         "@org_tensorflow//tensorflow/c:c_api",

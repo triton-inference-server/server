@@ -100,7 +100,8 @@ cc_test(
         "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml"
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime",
     ],
     data = [
         ":caffe2_testdata"

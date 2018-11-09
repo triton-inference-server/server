@@ -24,49 +24,82 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/tensorrt/plan_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include "src/servables/tensorrt/plan_utils.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class PlanBundleTest : public ModelConfigTestBase {
- public:
-};
-
-TEST_F(PlanBundleTest, ModelConfigSanity)
+uint64_t
+GetSize(const int max_batch_size, const DataType& dtype, const DimsList& dims)
 {
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<PlanBundle> bundle(new PlanBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::vector<char>> plan_blobs;
-
-      for (const auto& filename :
-           std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = tensorflow::io::JoinPath(path, filename);
-        tensorflow::string blob_str;
-        tensorflow::ReadFileToString(tensorflow::Env::Default(), plan_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        plan_blobs.emplace(filename, std::move(blob));
-      }
-
-      status = bundle->CreateExecutionContexts(plan_blobs);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorRTPlanPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorrt/testdata/autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
+  size_t dt_size = nvidia::inferenceserver::GetSize(dtype, dims);
+  return std::max(1, max_batch_size) * dt_size;
 }
 
-}}}  // namespace nvidia::inferenceserver::test
+DataType
+ConvertDatatype(nvinfer1::DataType trt_type)
+{
+  switch (trt_type) {
+    case nvinfer1::DataType::kFLOAT:
+      return TYPE_FP32;
+    case nvinfer1::DataType::kHALF:
+      return TYPE_FP16;
+    case nvinfer1::DataType::kINT8:
+      return TYPE_INT8;
+    case nvinfer1::DataType::kINT32:
+      return TYPE_INT32;
+  }
+
+  return TYPE_INVALID;
+}
+
+bool
+CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
+{
+  if (model_dims.nbDims != dims.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < model_dims.nbDims; ++i) {
+    if (model_dims.d[i] != dims[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+const std::string
+DimsDebugString(const DimsList& dims)
+{
+  bool first = true;
+  std::string str;
+  str.append("[");
+  for (int i = 0; i < dims.size(); ++i) {
+    if (!first) {
+      str.append(",");
+    }
+    str.append(std::to_string(dims[i]));
+    first = false;
+  }
+  str.append("]");
+  return str;
+}
+
+const std::string
+DimsDebugString(const nvinfer1::Dims& dims)
+{
+  bool first = true;
+  std::string str;
+  str.append("[");
+  for (int i = 0; i < dims.nbDims; ++i) {
+    if (!first) {
+      str.append(",");
+    }
+    str.append(std::to_string(dims.d[i]));
+    first = false;
+  }
+  str.append("]");
+  return str;
+}
+
+}}  // namespace nvidia::inferenceserver

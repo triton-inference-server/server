@@ -1,0 +1,1 @@
+Invalid argument: output 'OUTPUT1' datatype is TYPE_INT8, model specifies TYPE_FP32 for bad_output_type_0_gpu0

@@ -29,6 +29,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/servables/tensorrt/autofill.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
@@ -379,73 +380,6 @@ AutoFillGraphDef::Fix(ModelConfig* config)
     config->set_name(model_name_);
   }
 
-  return tensorflow::Status::OK();
-}
-
-//
-// AutoFillPlan
-//
-class AutoFillPlan : public AutoFill {
- public:
-  static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillPlan>* autofill);
-  tensorflow::Status Fix(ModelConfig* config);
-
- private:
-  AutoFillPlan(const std::string& model_name) : AutoFill(model_name) {}
-};
-
-tensorflow::Status
-AutoFillPlan::Create(
-  const std::string& model_name, const std::string& model_path,
-  std::unique_ptr<AutoFillPlan>* autofill)
-{
-  std::set<std::string> version_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
-
-  // There must be at least one version directory that we can inspect
-  // to attempt to determine the platform. For now we only handle the
-  // case where there is one version directory.
-  if (version_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "' due to multiple versions");
-  }
-
-  const auto version_path =
-    tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
-
-  // There must be a single plan file within the version directory...
-  std::set<std::string> plan_files;
-  TF_RETURN_IF_ERROR(GetFiles(version_path, &plan_files));
-  if (plan_files.size() != 1) {
-    return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "', unable to find plan file");
-  }
-
-  const std::string plan_file = *(plan_files.begin());
-  const auto plan_path = tensorflow::io::JoinPath(version_path, plan_file);
-
-  // FIXME better than just recognize by name
-  if (plan_file != kTensorRTPlanFilename) {
-    return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to find plan file named '", kTensorRTPlanFilename, "'");
-  }
-
-  autofill->reset(new AutoFillPlan(model_name));
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-AutoFillPlan::Fix(ModelConfig* config)
-{
-  // Set name if not already set.
-  if (config->name().empty()) {
-    config->set_name(model_name_);
-  }
-
-  config->set_platform(kTensorRTPlanPlatform);
   return tensorflow::Status::OK();
 }
 
