@@ -23,51 +23,52 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorflow/graphdef_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include <string>
+#include "src/core/autofill.h"
+#include "src/core/model_config.pb.h"
+#include "tensorflow/c/c_api.h"
+#include "tensorflow/cc/saved_model/loader.h"
+#include "tensorflow/cc/saved_model/tag_constants.h"
+#include "tensorflow/core/lib/core/errors.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class GraphDefBundleTest : public ModelConfigTestBase {
+//
+// AutoFillSavedModel
+//
+class AutoFillSavedModel : public AutoFill {
  public:
+  static tensorflow::Status Create(
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillSavedModel>* autofill);
+  tensorflow::Status Fix(ModelConfig* config) override;
+
+ private:
+  AutoFillSavedModel(
+    const std::string& model_name, const std::string& savedmodel_dirname,
+    const tensorflow::SignatureDef& sig)
+      : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname), sig_(sig)
+  {
+  }
+
+  const std::string savedmodel_dirname_;
+  const tensorflow::SignatureDef sig_;
 };
 
-TEST_F(GraphDefBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::string> graphdef_paths;
+//
+// AutoFillGraphDef
+//
+class AutoFillGraphDef : public AutoFill {
+ public:
+  static tensorflow::Status Create(
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillGraphDef>* autofill);
+  tensorflow::Status Fix(ModelConfig* config) override;
 
-      for (const auto& filename :
-           std::vector<std::string>{kTensorFlowGraphDefFilename}) {
-        const auto graphdef_path = tensorflow::io::JoinPath(path, filename);
-        graphdef_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(graphdef_path));
-      }
+ private:
+  AutoFillGraphDef(const std::string& model_name) : AutoFill(model_name) {}
+};
 
-      tensorflow::ConfigProto session_config;
-      status = bundle->CreateExecutionContexts(session_config, graphdef_paths);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorFlowGraphDefPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorflow/testdata/"
-    "graphdef_autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

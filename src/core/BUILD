@@ -138,9 +138,8 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
+        "//src/servables/tensorflow:autofill",
         "//src/servables/tensorrt:autofill",
-        "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
-        "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )

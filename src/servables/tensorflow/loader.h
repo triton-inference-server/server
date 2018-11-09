@@ -23,51 +23,26 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorflow/graphdef_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include "tensorflow/cc/saved_model/loader.h"
+#include "tensorflow/cc/saved_model/tag_constants.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class GraphDefBundleTest : public ModelConfigTestBase {
- public:
-};
+/// Load a SavedModel from a path and return the corresponding
+/// bundle.
+///
+/// \param model_name The name of the model
+/// \param model_path The path to the SavedModel directory
+/// \param session_options The options to use when creating the bundle
+/// \param bundle Returns the SavedModelBundle
+/// \param sig If non-nullptr returns the signature of the model
+/// \return Error status.
+tensorflow::Status LoadSavedModel(
+  const std::string& model_name, const std::string& model_path,
+  const tensorflow::SessionOptions& session_options,
+  std::unique_ptr<tensorflow::SavedModelBundle>* bundle,
+  tensorflow::SignatureDef* sig = nullptr);
 
-TEST_F(GraphDefBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::string> graphdef_paths;
-
-      for (const auto& filename :
-           std::vector<std::string>{kTensorFlowGraphDefFilename}) {
-        const auto graphdef_path = tensorflow::io::JoinPath(path, filename);
-        graphdef_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(graphdef_path));
-      }
-
-      tensorflow::ConfigProto session_config;
-      status = bundle->CreateExecutionContexts(session_config, graphdef_paths);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorFlowGraphDefPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorflow/testdata/"
-    "graphdef_autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

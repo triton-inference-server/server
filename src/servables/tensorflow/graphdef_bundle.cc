@@ -30,6 +30,7 @@
 #include "src/core/constants.h"
 #include "src/core/model_config.h"
 #include "src/core/utils.h"
+#include "src/servables/tensorflow/tf_utils.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/graph/default_device.h"
 #include "tensorflow/core/lib/io/path.h"

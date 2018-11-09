@@ -31,9 +31,9 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/utils.h"
+#include "src/servables/tensorflow/loader.h"
+#include "src/servables/tensorflow/tf_utils.h"
 #include "tensorflow/c/c_api.h"
-#include "tensorflow/cc/saved_model/loader.h"
-#include "tensorflow/cc/saved_model/tag_constants.h"
 #include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -75,42 +75,10 @@ SavedModelBundle::CreateSession(
       "/gpu:" + std::to_string(gpu_device));
   }
 
-  std::unique_ptr<tensorflow::SavedModelBundle> bundle(
-    new tensorflow::SavedModelBundle);
-
-  std::unordered_set<std::string> saved_model_tags;
-  saved_model_tags.insert(tensorflow::kSavedModelTagServe);
-
-  tensorflow::RunOptions run_options;
-  TF_RETURN_IF_ERROR(tensorflow::LoadSavedModel(
-    session_options, run_options, model_path, saved_model_tags, bundle.get()));
-
-  // Verify that the bundle has the "serve" tag
-  bool found_serve_tag = false;
-  for (const auto& tag : bundle->meta_graph_def.meta_info_def().tags()) {
-    if (tag == tensorflow::kSavedModelTagServe) {
-      found_serve_tag = true;
-      break;
-    }
-  }
-  if (!found_serve_tag) {
-    return tensorflow::errors::Internal(
-      "unable to load model '", Name(), "', expected '",
-      tensorflow::kSavedModelTagServe, "' tag");
-  }
-
-  // Verify that a "serving_default" signature exists, that is what
-  // will be used to verify the inputs and outputs.
-  static const std::string DEFAULT_SERVING_SIGNATURE_DEF_KEY("serving_default");
-  const auto& sig_itr = bundle->meta_graph_def.signature_def().find(
-    DEFAULT_SERVING_SIGNATURE_DEF_KEY);
-  if (sig_itr == bundle->meta_graph_def.signature_def().end()) {
-    return tensorflow::errors::InvalidArgument(
-      "unable to load model '", Name(), "', expected '",
-      DEFAULT_SERVING_SIGNATURE_DEF_KEY, "' signature");
-  }
-
-  const tensorflow::SignatureDef& sig = sig_itr->second;
+  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
+  tensorflow::SignatureDef sig;
+  TF_RETURN_IF_ERROR(
+    LoadSavedModel(Name(), model_path, session_options, &bundle, &sig));
 
   // Collect all the expected input and allowed output tensor names
   // based on the signature def.

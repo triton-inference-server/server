@@ -51,10 +51,48 @@ serving_proto_library(
 )
 
 cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    hdrs = ["autofill.h"],
+    deps = [
+        ":loader",
+        ":tf_utils",
+        "//src/core:autofill_header",
+        "//src/core:logging",
+        "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "tf_utils",
+    srcs = ["tf_utils.cc"],
+    hdrs = ["tf_utils.h"],
+    deps = [
+        "//src/core:model_config",
+        "//src/core:model_config_proto",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "loader",
+    srcs = ["loader.cc"],
+    hdrs = ["loader.h"],
+    deps = [
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
+    ],
+)
+
+cc_library(
     name = "base_bundle",
     srcs = ["base_bundle.cc"],
     hdrs = ["base_bundle.h"],
     deps = [
+        ":tf_utils",
         "//src/core:constants",
         "//src/core:infer",
         "//src/core:label_provider",
@@ -73,6 +111,7 @@ cc_library(
     hdrs = ["graphdef_bundle.h"],
     deps = [
         ":base_bundle",
+        ":tf_utils",
         "//src/core:model_config",
     ],
 )
@@ -106,8 +145,9 @@ cc_library(
     hdrs = ["savedmodel_bundle.h"],
     deps = [
         ":base_bundle",
+        ":loader",
+        ":tf_utils",
         "//src/core:model_config",
-        "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
     ],
 )
 

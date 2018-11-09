@@ -23,51 +23,37 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorflow/graphdef_bundle.h"
-#include "src/core/constants.h"
-#include "src/test/model_config_test_base.h"
+#include "src/core/model_config.h"
+#include "src/core/model_config.pb.h"
+#include "tensorflow/core/framework/tensor_shape.pb.h"
+#include "tensorflow/core/framework/types.pb.h"
+#include "tensorflow/core/lib/core/errors.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class GraphDefBundleTest : public ModelConfigTestBase {
- public:
-};
+/// \return true if a TensorFlow shape matches a model configuration
+/// shape.
+bool CompareDims(
+  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims);
 
-TEST_F(GraphDefBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
-    std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
-      std::unordered_map<std::string, std::string> graphdef_paths;
+/// \return true if a TensorFlow data-type matches a model
+/// configuration data-type.
+bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
 
-      for (const auto& filename :
-           std::vector<std::string>{kTensorFlowGraphDefFilename}) {
-        const auto graphdef_path = tensorflow::io::JoinPath(path, filename);
-        graphdef_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(graphdef_path));
-      }
+/// \return the string representation of a model configuration shape.
+const std::string DimsDebugString(const DimsList& dims);
 
-      tensorflow::ConfigProto session_config;
-      status = bundle->CreateExecutionContexts(session_config, graphdef_paths);
-    }
+/// \return the string representation of a TensorFlow shape.
+const std::string DimsDebugString(const tensorflow::TensorShapeProto& dims);
 
-    return status;
-  };
+/// \return the TensorFlow data-type that corresponds to a model
+/// configuration data-type.
+tensorflow::DataType ConvertDataType(DataType dtype);
 
-  // Standard testing...
-  ValidateAll(kTensorFlowGraphDefPlatform, init_func);
+/// \return the model configuration data-type that corresponds to a
+/// TensorFlow data-type.
+DataType ConvertDataType(tensorflow::DataType dtype);
 
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-    "inference_server/src/servables/tensorflow/testdata/"
-    "graphdef_autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver
