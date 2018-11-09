@@ -138,6 +138,7 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
+        "//src/servables/caffe2:autofill",
         "//src/servables/tensorflow:autofill",
         "//src/servables/tensorrt:autofill",
         "@org_tensorflow//tensorflow/core:lib",

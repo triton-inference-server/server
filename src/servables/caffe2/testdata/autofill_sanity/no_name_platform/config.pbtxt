@@ -1,15 +1,25 @@
-max_batch_size: 1
+max_batch_size: 8
 input [
   {
-    name: "input"
-    data_type: TYPE_FP32
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
     dims: [ 16 ]
   }
 ]
 output [
   {
-    name: "output"
-    data_type: TYPE_FP32
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
     dims: [ 16 ]
   }
 ]

@@ -40,6 +40,17 @@ serving_proto_library(
     ],
 )
 
+cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    hdrs = ["autofill.h"],
+    deps = [
+        "//src/core:autofill_header",
+        "//src/core:constants",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
 # netdef_bundle_c2 is copied into and built along with Caffe2 to
 # ensure that it uses the same protobuf as Caffe2.
 cc_library(

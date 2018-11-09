@@ -41,7 +41,26 @@ TEST_F(NetDefBundleTest, ModelConfigSanity)
       const std::string& path,
       const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<NetDefBundle> bundle(new NetDefBundle());
-    return bundle->Init(path, config);
+    tensorflow::Status status = bundle->Init(path, config);
+    if (status.ok()) {
+      std::unordered_map<std::string, std::vector<char>> netdef_blobs;
+
+      for (const auto& filename : std::vector<std::string>{
+             kCaffe2NetDefFilename,
+             std::string(kCaffe2NetDefInitFilenamePrefix) +
+               std::string(kCaffe2NetDefFilename)}) {
+        const auto netdef_path = tensorflow::io::JoinPath(path, filename);
+        tensorflow::string blob_str;
+        tensorflow::ReadFileToString(
+          tensorflow::Env::Default(), netdef_path, &blob_str);
+        std::vector<char> blob(blob_str.begin(), blob_str.end());
+        netdef_blobs.emplace(filename, std::move(blob));
+      }
+
+      status = bundle->CreateExecutionContexts(netdef_blobs);
+    }
+
+    return status;
   };
 
   // Standard testing...
