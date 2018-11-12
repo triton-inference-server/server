@@ -47,7 +47,14 @@ Before you can pull a container from the NGC container registry, you
 must have Docker and nvidia-docker installed. For DGX users, this is
 explained in `Preparing to use NVIDIA Containers Getting Started Guide
 <http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html>`_.
-
 For users other than DGX, follow the `nvidia-docker installation
 documentation <https://github.com/NVIDIA/nvidia-docker>`_ to install
 the most recent version of CUDA, Docker, and nvidia-docker.
+
+After performing the above setup, you can pull the TensorRT Inference
+Server container using the following command::
+
+  docker pull nvcr.io/nvidia/tensorrtserver:18.11-py3
+
+Replace *18.11* with the version of the inference server that you want
+to pull.

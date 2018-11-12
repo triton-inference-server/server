@@ -86,7 +86,7 @@ directory and then copy them out from within the container::
 You can now access the files from /tmp on the host system. To run the
 Python examples you will need to install the whl file::
 
-  $ pip install --upgrade /tmp/tensorrtserver-*.whl
+  $ pip install --user --upgrade /tmp/tensorrtserver-*.whl
 
 .. build-client-end-marker-do-not-remove
 
@@ -96,9 +96,11 @@ Image Classification Example Application
 ----------------------------------------
 
 The image classification example that uses the C++ client API is
-available at src/clients/c++/image\_client.cc. The Python version of
-the image classification client is available at
-src/clients/python/image\_client.py.
+available at `src/clients/c++/image\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/image_client.cc>`_. The
+Python version of the image classification client is available at
+`src/clients/python/image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/image_client.py>`_.
 
 To use image\_client (or image\_client.py) you must first have an
 inference server that is serving one or more image classification
@@ -113,16 +115,23 @@ to launch the inference server using the model repository. Once the
 server is running you can use the image\_client application to send
 inference requests to the server. You can specify a single image or a
 directory holding images. Here we send a request for the
-resnet50_netdef model from the :ref:`example model
-store<section-example-model-repository>` for an image from the
-qa/images directory::
+resnet50_netdef model from the :ref:`example model repository
+<section-example-model-repository>` for an image from the `qa/images
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
+directory::
 
   $ image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  Request 0, batch size 1
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
 
 The Python version of the application accepts the same command-line
 arguments::
 
   $ src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  Request 0, batch size 1
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.778078556061
 
 The image\_client and image\_client.py applications use the inference
 server client library to talk to the inference server. By default
@@ -132,6 +141,9 @@ providing the \-i flag. You must also use the \-u flag to point at the
 GRPC endpoint on the inference server::
 
   $ image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  Request 0, batch size 1
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
 
 By default the client prints the most probable classification for the
 image. Use the \-c flag to see more classifications::
@@ -160,18 +172,45 @@ batch::
       968 (CUP) = 0.213262036443
       967 (ESPRESSO) = 0.00293014757335
 
-The grpc\_image\_client.py application behaves the same as the
-image\_client except that instead of using the inference server client
-library it uses the GRPC generated client library to communicate with
-the inference server.
+Provide a directory instead of a single image to perform inferencing
+on all images in the directory::
+
+  $ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
+  Request 0, batch size 2
+  Image '../qa/images/car.jpg':
+      817 (SPORTS CAR) = 0.836187
+      511 (CONVERTIBLE) = 0.0708251
+      751 (RACER) = 0.0597549
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+      968 (CUP) = 0.270953
+      967 (ESPRESSO) = 0.00115996
+  Request 1, batch size 2
+  Image '../qa/images/vulture.jpeg':
+      23 (VULTURE) = 0.992326
+      8 (HEN) = 0.00231854
+      84 (PEACOCK) = 0.00201471
+  Image '../qa/images/car.jpg':
+      817 (SPORTS CAR) = 0.836187
+      511 (CONVERTIBLE) = 0.0708251
+      751 (RACER) = 0.0597549
+
+The grpc\_image\_client.py application at available at
+`src/clients/python/grpc\_image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/grpc_image_client.py>`_
+behaves the same as the image\_client except that instead of using the
+inference server client library it uses the GRPC generated client
+library to communicate with the inference server.
 
 Performance Example Application
 -------------------------------
 
 The perf\_client example application located at
-src/clients/c++/perf\_client.cc uses the C++ client API to send
-concurrent requests to the inference server to measure latency and
-inferences per second under varying client loads.
+`src/clients/c++/perf\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/perf_client.cc>`_
+uses the C++ client API to send concurrent requests to the inference
+server to measure latency and inferences per second under varying
+client loads.
 
 To use perf\_client you must first have an inference server that is
 serving one or more models. The perf\_client application works with
@@ -280,16 +319,22 @@ Client API
 
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
-is available at src/clients/c++/request.h and in the API Reference.
+is available at `src/clients/c++/request.h
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/request.h>`_
+and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
 API. The commented interface is available at
-src/clients/python/\_\_init\_\_.py and in the API Reference.
+`src/clients/python/\_\_init\_\_.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/__init__.py>`_
+and in the API Reference.
 
 A very simple C++ example application at
-src/clients/c++/simple\_client.cc and a Python version at
-src/clients/python/simple\_client.py demonstrate basic client API
-usage.
+`src/clients/c++/simple\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_client.cc>`_
+and a Python version at `src/clients/python/simple\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
+demonstrate basic client API usage.
 
 To run the the C++ version of the simple example, first build as
 described in :ref:`section-building-the-client-libraries-and-examples`
