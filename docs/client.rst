@@ -84,9 +84,15 @@ directory and then copy them out from within the container::
   # cp /opt/tensorrtserver/lib/librequest.* /tmp/host/.
 
 You can now access the files from /tmp on the host system. To run the
-Python examples you will need to install the whl file::
+C++ examples you must install some dependencies on your host system::
 
-  $ pip install --user --upgrade /tmp/tensorrtserver-*.whl
+  $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev python-pil
+
+To run the Python examples you will need to additionally install the
+client whl file and some other dependencies::
+
+  $ apt-get install python3 python3-pip
+  $ pip3 install --user --upgrade tensorrtserver-*.whl pillow
 
 .. build-client-end-marker-do-not-remove
 
