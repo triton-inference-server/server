@@ -39,7 +39,7 @@ server container.
 
 Next, use the :ref:`section-example-model-repository` section to
 create an example model repository containing a couple of models that
-you can make available with the inference server.
+you can serve with the inference server.
 
 Now that you have a model repository, follow the instructions in
 :ref:`section-running-the-inference-server` to start the inference

@@ -37,11 +37,13 @@ Before running the inference server, you must first set up a model
 repository containing the models that the inference server will make
 available for inferencing.
 
-An example model repository containing a Caffe2 ResNet50 and a
-TensorFlow Inception model are provided in the
-docs/examples/model_repository directory. Before using the example
-model repository you must fetch any missing model definition files
-from their public model zoos::
+An example model repository containing a Caffe2 ResNet50, a TensorFlow
+Inception model, and a simple TensorFlow GraphDef model (used by the
+:ref:`simple_client example <section-client-api>`) are provided in the
+`docs/examples/model_repository
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository>`_
+directory. Before using the example model repository you must fetch
+any missing model definition files from their public model zoos::
 
   $ cd docs/examples
   $ ./fetch_models.sh
@@ -63,6 +65,11 @@ Assuming the sample model repository is available in
 you pulled from NGC or built locally::
 
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
+
+Where *<tensorrtserver image name>* will be something like
+**nvcr.io/nvidia/tensorrtserver:18.11-py3** if you pulled the
+container from the NGC register, or **tensorrtserver** if you
+:ref:`built it from source <section-building-the-server>`.
 
 The nvidia-docker -v option maps /path/to/model/repository on the host
 into the container at /models, and the -\\-model-store option to the

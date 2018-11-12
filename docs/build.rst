@@ -76,6 +76,7 @@ of the C++ and Python client libraries and example executables with::
   # mkdir -p /opt/tensorrtserver/bin
   # cp bazel-bin/src/clients/c++/image_client /opt/tensorrtserver/bin/.
   # cp bazel-bin/src/clients/c++/perf_client /opt/tensorrtserver/bin/.
+  # cp bazel-bin/src/clients/c++/simple_client /opt/tensorrtserver/bin/.
   # mkdir -p /opt/tensorrtserver/lib
   # cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/.
   # cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/.
@@ -85,7 +86,8 @@ of the C++ and Python client libraries and example executables with::
 Some source changes seem to cause bazel to get confused and not
 correctly rebuild all required sources. You can force bazel to rebuild
 all the inference server source without requiring a complete rebuild
-by doing the following before issuing the above build command::
+of the TensorFlow and Caffe2 components by doing the following before
+issuing the above build command::
 
   # rm -fr bazel-bin/src
 
