@@ -55,11 +55,7 @@ GRPCInferRequestProvider::Create(
       "support batching");
   }
 
-  int version = -1;
-  if (!request.version().empty()) {
-    version = std::atoi(request.version().c_str());
-  }
-
+  const int version = (request.version() >= 0) ? request.version() : -1;
   infer_provider->reset(new GRPCInferRequestProvider(request, version));
   return tensorflow::Status::OK();
 }

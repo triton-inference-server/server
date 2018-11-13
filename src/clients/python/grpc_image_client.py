@@ -242,7 +242,9 @@ if __name__ == '__main__':
     # The meta data part can be reused across requests
     request = grpc_service_pb2.InferRequest()
     request.model_name = FLAGS.model_name
-    if FLAGS.model_version is not None:
+    if FLAGS.model_version is None:
+        request.version = -1
+    else:
         request.version = FLAGS.model_version
     request.meta_data.batch_size = FLAGS.batch_size
     output_message = api_pb2.InferRequestHeader.Output()

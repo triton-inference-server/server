@@ -2344,7 +2344,7 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 
   request_.Clear();
   request_.set_model_name(model_name_);
-  request_.set_version(std::to_string(model_version_));
+  request_.set_version(model_version_);
   request_.mutable_meta_data()->MergeFrom(infer_request_);
 
   size_t input_pos_idx = 0;
