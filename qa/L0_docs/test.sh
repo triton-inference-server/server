@@ -30,12 +30,9 @@ TEST_LOG="./docs.log"
 rm -f $TEST_LOG
 RET=0
 
-# FIXME. As of 10/22/2018 need to install sphinx version < 1.8 to
-# avoid bug related to exhale. But should remove that once bug is
-# fixed.
 apt-get update && \
     apt-get install -y --no-install-recommends doxygen && \
-    pip install --upgrade 'sphinx<1.8' sphinx-rtd-theme nbsphinx exhale && \
+    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
     pip install --upgrade /opt/tensorrtserver/pip/tensorrtserver-*.whl
 
 set +e

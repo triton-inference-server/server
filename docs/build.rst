@@ -104,13 +104,11 @@ is based on `Sphinx <http://www.sphinx-doc.org>`_. `Doxygen
 <https://github.com/svenevs/exhale>`_ is used for C++ API
 docuementation.
 
-To build the docs install the required dependencies. As of 10/22/2018
-need to install sphinx version < 1.8 to avoid a bug related to
-exhale::
+To build the docs install the required dependencies::
 
   $ apt-get update
   $ apt-get install -y --no-install-recommends doxygen
-  $ pip install --upgrade 'sphinx<1.8' sphinx-rtd-theme nbsphinx exhale
+  $ pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
 To get the Python client library API docs the TensorRT Inference
 Server Python package must be installed::
