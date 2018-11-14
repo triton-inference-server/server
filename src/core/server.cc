@@ -553,9 +553,9 @@ InferenceServer::InferenceServer()
   http_thread_cnt_ = 8;
   strict_model_config_ = true;
   strict_readiness_ = true;
-  model_load_unload_enabled_ = true;
   profiling_enabled_ = false;
-  file_system_poll_secs_ = 15;
+  poll_model_repository_enabled_ = true;
+  repository_poll_secs_ = 15;
   exit_timeout_secs_ = 30;
 
   inflight_request_counter_ = 0;
@@ -586,11 +586,11 @@ InferenceServer::Init(int argc, char** argv)
   bool exit_on_error = true;
   bool strict_model_config = strict_model_config_;
   bool strict_readiness = strict_readiness_;
-  bool allow_model_load_unload = model_load_unload_enabled_;
   bool allow_profiling = profiling_enabled_;
   bool tf_allow_soft_placement = true;
   float tf_gpu_memory_fraction = 0.0;
-  int32_t file_system_poll_secs = file_system_poll_secs_;
+  bool allow_poll_model_repository = poll_model_repository_enabled_;
+  int32_t repository_poll_secs = repository_poll_secs_;
   int32_t exit_timeout_secs = exit_timeout_secs_;
 
   bool allow_http = true;
@@ -637,10 +637,6 @@ InferenceServer::Init(int argc, char** argv)
       "/api/health/ready endpoint indicates ready if server is responsive even "
       "if some/all models are unavailable."),
     tensorflow::Flag(
-      "allow-model-load-unload", &allow_model_load_unload,
-      "Allow models to be loaded and unloaded dynamically based on changes "
-      "to the model store."),
-    tensorflow::Flag(
       "allow-profiling", &allow_profiling, "Allow server profiling."),
     tensorflow::Flag(
       "allow-http", &allow_http,
@@ -663,9 +659,15 @@ InferenceServer::Init(int argc, char** argv)
       "http-thread-count", &http_thread_cnt,
       "Number of threads handling HTTP requests."),
     tensorflow::Flag(
-      "file-system-poll-secs", &file_system_poll_secs,
-      "Interval in seconds between each poll of the file system for changes to "
-      "the model store."),
+      "allow-poll-model-repository", &allow_poll_model_repository,
+      "Poll the model repository to detect changes. The poll rate is "
+      "controlled by 'repository-poll-secs'."),
+    tensorflow::Flag(
+      "repository-poll-secs", &repository_poll_secs,
+      "Interval in seconds between each poll of the model repository to check "
+      "for changes. A value of zero indicates that the repository is checked "
+      "only a single time at startup. Valid only when "
+      "--allow-poll-model-repository=true is specified."),
     tensorflow::Flag(
       "exit-timeout-secs", &exit_timeout_secs,
       "Timeout (in seconds) when exiting to wait for in-flight inferences to "
@@ -708,10 +710,10 @@ InferenceServer::Init(int argc, char** argv)
   http_thread_cnt_ = http_thread_cnt;
   strict_model_config_ = strict_model_config;
   strict_readiness_ = strict_readiness;
-  model_load_unload_enabled_ = allow_model_load_unload;
   profiling_enabled_ = allow_profiling;
-  file_system_poll_secs_ = file_system_poll_secs;
-  exit_timeout_secs_ = exit_timeout_secs;
+  poll_model_repository_enabled_ = allow_poll_model_repository;
+  repository_poll_secs_ = std::max(0, repository_poll_secs);
+  exit_timeout_secs_ = std::max(0, exit_timeout_secs);
 
   if (argc != 1) {
     LOG_ERROR << "Unrecognized option: " << argv[1];
@@ -770,8 +772,12 @@ InferenceServer::Init(int argc, char** argv)
   options.aspired_version_policy = std::unique_ptr<tfs::AspiredVersionPolicy>(
     new tfs::AvailabilityPreservingPolicy);
 
+  // If not polling the model repository then set the poll secs to 0
+  // in TFS so that repository is only checked a single time at
+  // startup.
   options.max_num_load_retries = 0;
-  options.file_system_poll_wait_seconds = file_system_poll_secs;
+  options.file_system_poll_wait_seconds =
+    (allow_poll_model_repository) ? repository_poll_secs_ : 0;
 
   // Platform configuration
   if (platform_config_file.empty()) {
@@ -851,7 +857,7 @@ InferenceServer::Close()
   // Wait for all in-flight requests to complete and all loaded models
   // to unload, or for the exit timeout to expire.
   const tfs::ServableStateMonitor& monitor = *core_->servable_state_monitor();
-  int32_t exit_timeout_iters = exit_timeout_secs_;
+  uint32_t exit_timeout_iters = exit_timeout_secs_;
 
   while (true) {
     const auto& live_models = monitor.GetLiveServableStates();
@@ -889,7 +895,7 @@ InferenceServer::Wait()
   // If model load/unload is enabled for the model store, then
   // periodically look for changes and update the loaded model
   // configurations appropriately.
-  if (model_load_unload_enabled_) {
+  if (poll_model_repository_enabled_) {
     while (ready_state_ != ServerReadyState::SERVER_EXITING) {
       if (ready_state_ == ServerReadyState::SERVER_READY) {
         ModelConfigManager::ModelConfigMap mc;
@@ -921,7 +927,7 @@ InferenceServer::Wait()
       }
 
       tensorflow::Env::Default()->SleepForMicroseconds(
-        file_system_poll_secs_ * 1000 * 1000);
+        repository_poll_secs_ * 1000 * 1000);
     }
   }
 
@@ -1206,15 +1212,19 @@ InferenceServer::HandleInfer(
   if (status.ok()) {
     switch (platform) {
       case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-        status = core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
+        status =
+          core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
         if (status.ok()) {
-          state->is = static_cast<InferenceServable*>(state->graphdef_bundle.get());
+          state->is =
+            static_cast<InferenceServable*>(state->graphdef_bundle.get());
         }
         break;
       case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-        status = core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
+        status =
+          core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
         if (status.ok()) {
-          state->is = static_cast<InferenceServable*>(state->saved_model_bundle.get());
+          state->is =
+            static_cast<InferenceServable*>(state->saved_model_bundle.get());
         }
         break;
       case Platform::PLATFORM_TENSORRT_PLAN:
@@ -1226,7 +1236,8 @@ InferenceServer::HandleInfer(
       case Platform::PLATFORM_CAFFE2_NETDEF:
         status = core_->GetServableHandle(model_spec, &(state->netdef_bundle));
         if (status.ok()) {
-          state->is = static_cast<InferenceServable*>(state->netdef_bundle.get());
+          state->is =
+            static_cast<InferenceServable*>(state->netdef_bundle.get());
         }
         break;
       default:
@@ -1234,6 +1245,7 @@ InferenceServer::HandleInfer(
     }
   }
 
+  infer_stats->SetRequestedVersion(request_provider->ModelVersion());
   infer_stats->SetModelServable(state->is);
   infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 

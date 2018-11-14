@@ -152,10 +152,10 @@ class InferenceServer {
   int http_thread_cnt_;
   bool strict_model_config_;
   bool strict_readiness_;
-  bool model_load_unload_enabled_;
   bool profiling_enabled_;
-  int32_t file_system_poll_secs_;
-  int32_t exit_timeout_secs_;
+  bool poll_model_repository_enabled_;
+  uint32_t repository_poll_secs_;
+  uint32_t exit_timeout_secs_;
   uint64_t start_time_ns_;
 
   // Current state of the inference server.

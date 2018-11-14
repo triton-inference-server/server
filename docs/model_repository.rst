@@ -115,12 +115,13 @@ inference server is running:
 * New models can be added to the repository by adding a new model
   directory.
 
-Changes to the model repository may not be detected immediately by the
-inference server because it only polls the file system
-periodically. You can control the polling interval with the
--\\-file-system-poll-secs options. The console log or the :ref:`Status
-API <section-api-status>` can be used to determine when model repository
-changes have taken effect.
+Changes to the model repository will be recognized by default but can
+be disabled with -\\-allow-poll-model-repository=false. Changes to the
+model repository may not be detected immediately because the inference
+server polls the repository periodically. You can control the polling
+interval with the -\\-repository-poll-secs options. The console log or
+the :ref:`Status API <section-api-status>` can be used to determine
+when model repository changes have taken effect.
 
 Currently changes to the model configuration (config.pbtxt) will not
 be recognized by the inference server. To change a model's

@@ -31,7 +31,7 @@ SERVER_STATUS_TEST=server_status_test.py
 DATADIR=/data/inferenceserver
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--file-system-poll-secs=1 --model-store=`pwd`/models"
+SERVER_ARGS="--repository-poll-secs=1 --model-store=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

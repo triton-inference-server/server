@@ -121,7 +121,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-store=`pwd`/models --file-system-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_3.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -149,8 +149,8 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-model-load-unload=false \
-             --file-system-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
+             --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_4.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -161,6 +161,61 @@ fi
 
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_model_load_unload_disabled >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# LifeCycleTest.test_dynamic_version_load_unload
+rm -fr models
+mkdir models
+for i in graphdef ; do
+    cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
+done
+
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_5.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# LifeCycleTest.test_dynamic_version_load_unload_disabled
+rm -fr models
+mkdir models
+for i in graphdef ; do
+    cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
+done
+
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 \
+             --allow-poll-model-repository=false --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_5.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload_disabled >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

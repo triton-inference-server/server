@@ -1,0 +1,14 @@
+diff --git a/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto b/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto
+index 8fa7be5..700983a 100644
+--- a/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto
++++ b/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto
+@@ -63,7 +63,8 @@ message FileSystemStoragePathSourceConfig {
+   string base_path = 2 [deprecated = true];
+ 
+   // How long to wait between file-system polling to look for children of
+-  // 'base_path', in seconds.
++  // 'base_path', in seconds. A value of zero indicates that 'base_path'
++  // is checked once for children but no additional polling is performed.
+   //
+   // For testing use only: a negative value disables the polling thread.
+   int64 file_system_poll_wait_seconds = 3;

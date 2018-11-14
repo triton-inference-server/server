@@ -385,8 +385,9 @@ ModelInferStats::ScopedTimer::Stop()
 
 ModelInferStats::~ModelInferStats()
 {
-  const uint32_t model_version =
-    (model_servable_ == nullptr) ? 0 : model_servable_->Version();
+  const uint32_t model_version = (model_servable_ != nullptr)
+                                   ? model_servable_->Version()
+                                   : requested_model_version_;
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(

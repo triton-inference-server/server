@@ -367,6 +367,211 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_dynamic_version_load_unload(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+        graphdef_name = tu.get_model_name('graphdef', np.int32, np.int32, np.int32)
+
+        # There are 3 versions. Make sure that all have status and are
+        # ready.
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
+                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on version 1 to make sure it is available
+        try:
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+                           np.int32, np.int32, np.int32, swap=False,
+                           model_version=1)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Make sure version 1 has execution stats in the status.
+        expected_exec_cnt = 0
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
+                                "expected status for version 1 of model " + graphdef_name)
+
+                version_status = ss.model_status[graphdef_name].version_status[1]
+                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
+                self.assertGreater(version_status.model_execution_count, 0)
+                expected_exec_cnt = version_status.model_execution_count
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Remove version 1 from the model store and give it time to
+        # unload. Make sure that it has a status but is unavailable.
+        try:
+            shutil.rmtree("models/" + graphdef_name + "/1")
+            time.sleep(5) # wait for version to unload
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
+                                "expected status for version 1 of model " + graphdef_name)
+
+                version_status = ss.model_status[graphdef_name].version_status[1]
+                self.assertEqual(version_status.ready_state, server_status.MODEL_UNAVAILABLE)
+                self.assertEqual(version_status.model_execution_count, expected_exec_cnt)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Version is removed so inference should fail
+        try:
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+                           np.int32, np.int32, np.int32, swap=False,
+                           model_version=1)
+            self.assertTrue(False, "expected error for unavailable model " + graphdef_name)
+        except InferenceServerException as ex:
+            self.assertEqual("inference:0", ex.server_id())
+            self.assertGreater(ex.request_id(), 0)
+            self.assertTrue(
+                ex.message().startswith(
+                    "Servable not found for request: Specific(graphdef_int32_int32_int32, 1)"))
+
+        # Add back the same version. The status/stats should be
+        # retained for versions (note that this is different behavior
+        # than if a model is removed and then added back).
+        try:
+            shutil.copytree("models/" + graphdef_name + "/2",
+                            "models/" + graphdef_name + "/1")
+            time.sleep(5) # wait for model to load
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
+                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                    if k == 1:
+                        self.assertEqual(v.model_execution_count, expected_exec_cnt)
+                    else:
+                        self.assertEqual(v.model_execution_count, 0)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Add another version from the model store.
+        try:
+            shutil.copytree("models/" + graphdef_name + "/2",
+                            "models/" + graphdef_name + "/7")
+            time.sleep(5) # wait for version to load
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertTrue(7 in ss.model_status[graphdef_name].version_status,
+                                "expected status for version 7 of model " + graphdef_name)
+
+                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 4)
+                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_dynamic_version_load_unload_disabled(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+        graphdef_name = tu.get_model_name('graphdef', np.int32, np.int32, np.int32)
+
+        # Add a new version to the model store and give it time to
+        # load. But it shouldn't load because dynamic loading is
+        # disabled.
+        try:
+            shutil.copytree("models/" + graphdef_name + "/2",
+                            "models/" + graphdef_name + "/7")
+            time.sleep(5) # wait for model to load
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertFalse(7 in ss.model_status[graphdef_name].version_status,
+                                "unexpected status for version 7 of model " + graphdef_name)
+                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Remove one of the original versions from the model
+        # store. Unloading is disabled so it should remain available
+        # in the status.
+        try:
+            shutil.rmtree("models/" + graphdef_name + "/1")
+            time.sleep(5) # wait for version to unload (but it shouldn't)
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], graphdef_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(graphdef_name in ss.model_status,
+                                "expected status for model " + graphdef_name)
+                self.assertTrue(1 in ss.model_status[graphdef_name].version_status,
+                                "expected status for version 1 of model " + graphdef_name)
+
+                self.assertEqual(len(ss.model_status[graphdef_name].version_status), 3)
+                for (k, v) in iteritems(ss.model_status[graphdef_name].version_status):
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference to make sure model still being served even
+        # though version deleted from model store
+        try:
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+                           np.int32, np.int32, np.int32, swap=False,
+                           model_version=1)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()

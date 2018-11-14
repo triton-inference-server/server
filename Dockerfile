@@ -160,6 +160,12 @@ RUN sha1sum -c tools/patch/tensorflow/checksums && \
 RUN sha1sum -c tools/patch/tfs/checksums && \
     patch -i tools/patch/tfs/model_servers/server_core.cc \
           /workspace/serving/tensorflow_serving/model_servers/server_core.cc && \
+    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.cc \
+          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.cc && \
+    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.h \
+          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.h && \
+    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.proto \
+          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto && \
     patch -i tools/patch/tfs/util/retrier.cc \
           /workspace/serving/tensorflow_serving/util/retrier.cc && \
     patch -i tools/patch/tfs/util/BUILD \
