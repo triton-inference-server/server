@@ -306,14 +306,17 @@ NetDefBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
   return tensorflow::Status::OK();
 }
 
-tensorflow::Status
-NetDefBundle::Run(uint32_t runner_idx, std::vector<RunnerPayload>* payloads)
+void
+NetDefBundle::Run(
+  uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+  std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
-    return tensorflow::errors::Internal(
+    OnCompleteQueuedPayloads(tensorflow::errors::Internal(
       "unexpected runner index", runner_idx, ", max allowed ",
-      contexts_.size());
+      contexts_.size()));
+    return;
   }
 
   std::vector<ModelInferStats::ScopedTimer> compute_timers;
@@ -323,7 +326,7 @@ NetDefBundle::Run(uint32_t runner_idx, std::vector<RunnerPayload>* payloads)
     payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
   }
 
-  return contexts_[runner_idx].Run(payloads);
+  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
 }
 
 tensorflow::Status
@@ -423,7 +426,6 @@ NetDefBundle::Context::Run(std::vector<RunnerPayload>* payloads)
 
       const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
-      InferRequestProvider* request_provider = payload.request_provider_;
       const size_t expected_byte_size =
         request_header.batch_size() * batch1_byte_size;
 
@@ -434,8 +436,9 @@ NetDefBundle::Context::Run(std::vector<RunnerPayload>* payloads)
           while (payload.compute_status_.ok()) {
             const void* content;
             size_t content_byte_size;
-            payload.compute_status_ = request_provider->GetNextInputContent(
-              input_idx, &content, &content_byte_size, false);
+            payload.compute_status_ =
+              payload.request_provider_->GetNextInputContent(
+                input_idx, &content, &content_byte_size, false);
             if (!payload.compute_status_.ok()) {
               break;
             }

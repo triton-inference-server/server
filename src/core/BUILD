@@ -220,6 +220,7 @@ cc_library(
         ":server_status_header",
         ":server_status_proto",
         ":utils",
+        "//src/nvrpc:nvrpc",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",

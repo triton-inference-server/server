@@ -61,8 +61,9 @@ class BaseBundle : public InferenceServable {
   }
 
  protected:
-  tensorflow::Status Run(
-    uint32_t runner_idx, std::vector<RunnerPayload>* payloads) override;
+  void Run(
+    uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads) override;
 
   using IONameMap = std::unordered_map<std::string, std::string>;
 

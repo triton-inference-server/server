@@ -44,7 +44,7 @@ GRPCInferRequestProvider::GRPCInferRequestProvider(
 tensorflow::Status
 GRPCInferRequestProvider::Create(
   const InferRequest& request,
-  std::unique_ptr<GRPCInferRequestProvider>* infer_provider)
+  std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
 {
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
@@ -90,7 +90,7 @@ tensorflow::Status
 HTTPInferRequestProvider::Create(
   evbuffer* input_buffer, const std::string& model_name,
   const std::string& model_version_str, const std::string& request_header_str,
-  std::unique_ptr<HTTPInferRequestProvider>* infer_provider)
+  std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
 {
   int version = -1;
   if (!model_version_str.empty()) {
@@ -228,7 +228,7 @@ HTTPInferRequestProvider::GetNextInputContent(
 tensorflow::Status
 GRPCInferResponseProvider::Create(
   const InferRequestHeader& request_header, InferResponse* response,
-  std::unique_ptr<GRPCInferResponseProvider>* infer_provider)
+  std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
 {
   GRPCInferResponseProvider* provider =
     new GRPCInferResponseProvider(request_header, response);
@@ -273,7 +273,7 @@ HTTPInferResponseProvider::HTTPInferResponseProvider(
 tensorflow::Status
 HTTPInferResponseProvider::Create(
   evbuffer* output_buffer, const InferRequestHeader& request_header,
-  std::unique_ptr<HTTPInferResponseProvider>* infer_provider)
+  std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
 {
   HTTPInferResponseProvider* provider =
     new HTTPInferResponseProvider(output_buffer, request_header);
@@ -679,20 +679,47 @@ InferenceServable::SetRunnerCount(uint32_t cnt)
   return tensorflow::Status::OK();
 }
 
+void
+InferenceServable::AsyncRun(
+  std::shared_ptr<ModelInferStats> stats,
+  std::shared_ptr<InferRequestProvider> request_provider,
+  std::shared_ptr<InferResponseProvider> response_provider,
+  std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
+{
+  auto run_timer = std::make_shared<ModelInferStats::ScopedTimer>();
+  struct timespec queued_timestamp = stats->StartRunTimer(run_timer.get());
+  bool wake_runner = false;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    queue_.emplace_back(
+      queued_timestamp, stats, request_provider, response_provider,
+      [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
+        run_timer.reset();
+        OnCompleteHandleInfer(status);
+      });
+    wake_runner = (idle_runner_cnt_ > 0);
+  }
+  if (wake_runner) {
+    cv_.notify_one();
+  }
+}
+
 // Since callers are expecting synchronous behavior, this function
 // must wait until the request is processed and the response is
 // returned. This function can be simplified significantly once we
 // have [DLIS-124].
-tensorflow::Status
+void
 InferenceServable::Run(
-  ModelInferStats* stats, InferRequestProvider* request_provider,
-  InferResponseProvider* response_provider
-  /*, CompleteFunc completer */)
+  std::shared_ptr<ModelInferStats> stats,
+  std::shared_ptr<InferRequestProvider> request_provider,
+  std::shared_ptr<InferResponseProvider> response_provider,
+  std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
   // Since this call is synchronous right now we can just use a scoped
   // timer to measure the entire run time.
   ModelInferStats::ScopedTimer run_timer;
   struct timespec queued_timestamp = stats->StartRunTimer(&run_timer);
+
 
   std::mutex lmu;
   std::condition_variable lcv;
@@ -734,7 +761,7 @@ InferenceServable::Run(
     }
   }
 
-  return run_status;
+  OnCompleteHandleInfer(run_status);
 }
 
 void
@@ -754,12 +781,11 @@ InferenceServable::RunnerThread(const uint32_t runner_id)
 
   const uint64_t default_wait_microseconds = 500 * 1000;
   const bool dynamic_batching_enabled = config_.has_dynamic_batching();
-  std::vector<RunnerPayload> payloads;
 
   while (!runner_threads_exit_.load()) {
+    auto state = std::make_shared<RunnerThreadState>();
     bool wake_runner = false;
     uint64_t wait_microseconds = 0;
-    payloads.clear();
 
     // Hold the lock for as short a time as possible.
     {
@@ -777,7 +803,7 @@ InferenceServable::RunnerThread(const uint32_t runner_id)
         wait_microseconds = GetDynamicBatch(config_.dynamic_batching());
         if (wait_microseconds == 0) {
           for (size_t idx = 0; idx < pending_batch_queue_cnt_; ++idx) {
-            payloads.emplace_back(queue_.front());
+            state->payloads.emplace_back(queue_.front());
             queue_.pop_front();
           }
 
@@ -797,7 +823,7 @@ InferenceServable::RunnerThread(const uint32_t runner_id)
         }
       } else {
         // No batching... execute next request payload
-        payloads.emplace_back(queue_.front());
+        state->payloads.emplace_back(queue_.front());
         queue_.pop_front();
       }
 
@@ -815,28 +841,29 @@ InferenceServable::RunnerThread(const uint32_t runner_id)
       cv_.notify_one();
     }
 
-    if (!payloads.empty()) {
-      tensorflow::Status status = Run(runner_id, &payloads);
+    if (!state->payloads.empty()) {
+      auto OnCompleteQueuedPayloads = [state](tensorflow::Status status) {
+        bool found_success = false;
+        for (auto& payload : state->payloads) {
+          tensorflow::Status final_status =
+            status.ok() ? (payload.status_.ok() ? payload.compute_status_
+                                                : payload.status_)
+                        : status;
 
-      bool found_success = false;
-      for (auto& payload : payloads) {
-        tensorflow::Status final_status =
-          status.ok()
-            ? (payload.status_.ok() ? payload.compute_status_ : payload.status_)
-            : status;
-
-        // All the payloads executed together, so count 1 execution in
-        // the first successful payload. Other payloads stay at 0
-        // executions.
-        if (!found_success && final_status.ok()) {
-          payload.stats_->SetModelExecutionCount(1);
-          found_success = true;
+          // All the payloads executed together, so count 1 execution in
+          // the first successful payload. Other payloads stay at 0
+          // executions.
+          if (!found_success && final_status.ok()) {
+            payload.stats_->SetModelExecutionCount(1);
+            found_success = true;
+          }
+          payload.complete_function_(final_status);
         }
-
-        payload.complete_function_(final_status);
-      }
+      };
+      Run(runner_id, &(state->payloads), OnCompleteQueuedPayloads);
     }
-  }
+
+  }  // end runner loop
 
   LOG_INFO << "Stopping runner thread " << runner_id << "...";
 }

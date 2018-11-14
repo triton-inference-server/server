@@ -42,6 +42,7 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceServable;
 
+
 // Provide inference request inputs and meta-data
 class InferRequestProvider {
  public:
@@ -82,7 +83,7 @@ class GRPCInferRequestProvider : public InferRequestProvider {
   // Initialize based on gRPC request
   static tensorflow::Status Create(
     const InferRequest& request,
-    std::unique_ptr<GRPCInferRequestProvider>* infer_provider);
+    std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
 
   const InferRequestHeader& RequestHeader() const override
   {
@@ -107,7 +108,7 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   static tensorflow::Status Create(
     evbuffer* input_buffer, const std::string& model_name,
     const std::string& model_version_str, const std::string& request_header_str,
-    std::unique_ptr<HTTPInferRequestProvider>* infer_provider);
+    std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
   const InferRequestHeader& RequestHeader() const override
   {
@@ -184,7 +185,7 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   // Initialize based on gRPC request
   static tensorflow::Status Create(
     const InferRequestHeader& request_header, InferResponse* response,
-    std::unique_ptr<GRPCInferResponseProvider>* infer_provider);
+    std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override
   {
@@ -211,7 +212,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
  public:
   static tensorflow::Status Create(
     evbuffer* output_buffer, const InferRequestHeader& request_header,
-    std::unique_ptr<HTTPInferResponseProvider>* infer_provider);
+    std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override
   {
@@ -263,9 +264,21 @@ class InferenceServable {
 
   // Run inference using the provided request to produce outputs in
   // the provide response.
-  tensorflow::Status Run(
-    ModelInferStats* stats, InferRequestProvider* request_provider,
-    InferResponseProvider* response_provider);
+  // This method should be called by synchronous frontends
+  void Run(
+    std::shared_ptr<ModelInferStats> stats,
+    std::shared_ptr<InferRequestProvider> request_provider,
+    std::shared_ptr<InferResponseProvider> response_provider,
+    std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
+
+  // Run inference using the provided request to produce outputs in
+  // the provide response.
+  // This method should be called by asynchronous frontends
+  void AsyncRun(
+    std::shared_ptr<ModelInferStats> stats,
+    std::shared_ptr<InferRequestProvider> request_provider,
+    std::shared_ptr<InferResponseProvider> response_provider,
+    std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
 
   // Get a metric for the servable specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
@@ -298,9 +311,10 @@ class InferenceServable {
     RunnerPayload() = default;
     RunnerPayload(const RunnerPayload& payload) = default;
     RunnerPayload(
-      struct timespec queued_timestamp, ModelInferStats* stats,
-      InferRequestProvider* request_provider,
-      InferResponseProvider* response_provider, CompleteFunc complete_function)
+      struct timespec queued_timestamp, std::shared_ptr<ModelInferStats> stats,
+      std::shared_ptr<InferRequestProvider> request_provider,
+      std::shared_ptr<InferResponseProvider> response_provider,
+      CompleteFunc complete_function)
         : queued_timestamp_(queued_timestamp), stats_(stats),
           request_provider_(request_provider),
           response_provider_(response_provider),
@@ -311,12 +325,16 @@ class InferenceServable {
     }
 
     struct timespec queued_timestamp_;
-    ModelInferStats* stats_;
-    InferRequestProvider* request_provider_;
-    InferResponseProvider* response_provider_;
+    std::shared_ptr<ModelInferStats> stats_;
+    std::shared_ptr<InferRequestProvider> request_provider_;
+    std::shared_ptr<InferResponseProvider> response_provider_;
     CompleteFunc complete_function_;
     tensorflow::Status status_;
     tensorflow::Status compute_status_;
+  };
+
+  struct RunnerThreadState {
+    std::vector<RunnerPayload> payloads;
   };
 
   // Run inference as the runner specified by 'runner_idx' using the
@@ -325,10 +343,13 @@ class InferenceServable {
   // prevents any of the of requests from completing. If an error is
   // isolate to a single request payload it will be reported in that
   // payload.
-  virtual tensorflow::Status Run(
-    uint32_t runner_idx, std::vector<RunnerPayload>* payloads)
+  // This methods should be called if the backend executes synchronously
+  virtual void Run(
+    uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
   {
-    return tensorflow::errors::Unavailable("unable to serve model");
+    OnCompleteQueuedPayloads(
+      tensorflow::errors::Unavailable("unable to serve model"));
   }
 
  private:

@@ -44,6 +44,9 @@
 #include "tensorflow_serving/model_servers/server_core.h"
 #include "tensorflow_serving/util/net_http/server/public/httpserver.h"
 
+#include "src/nvrpc/Server.h"
+
+
 namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
@@ -75,8 +78,11 @@ class InferenceServer {
   // Perform inference on the given input for specified model and
   // update RequestStatus object with the status of the inference.
   void HandleInfer(
-    RequestStatus* request_status, InferRequestProvider* request_provider,
-    InferResponseProvider* response_provider, ModelInferStats* infer_stats);
+    RequestStatus* request_status,
+    std::shared_ptr<InferRequestProvider> request_provider,
+    std::shared_ptr<InferResponseProvider> response_provider,
+    std::shared_ptr<ModelInferStats> infer_stats,
+    std::function<void()> OnCompleteInferRPC, bool async_frontend);
 
   // Update the RequestStatus object and ServerStatus object with the
   // status of the model. If 'model_name' is empty, update with the
@@ -113,7 +119,9 @@ class InferenceServer {
  private:
   // Start server running and listening on gRPC and/or HTTP endpoints.
   void Start();
-  std::unique_ptr<grpc::Server> StartGrpcServer();
+
+  std::unique_ptr<nvrpc::Server> StartGrpcServer();
+
   std::unique_ptr<tfs::net_http::HTTPServerInterface> StartHttpServer();
 
   tensorflow::Status ParseProtoTextFile(
@@ -176,8 +184,9 @@ class InferenceServer {
   std::unique_ptr<tfs::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
 
-  std::unique_ptr<grpc::Server> grpc_server_;
   std::unique_ptr<tfs::net_http::HTTPServerInterface> http_server_;
+
+  std::unique_ptr<nvrpc::Server> grpc_server_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -58,8 +58,9 @@ class PlanBundle : public InferenceServable {
   }
 
  protected:
-  tensorflow::Status Run(
-    uint32_t runner_idx, std::vector<RunnerPayload>* payloads) override;
+  void Run(
+    uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads) override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(PlanBundle);

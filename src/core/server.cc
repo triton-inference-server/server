@@ -88,115 +88,143 @@
 #include "tensorflow_serving/util/net_http/server/public/server_request_interface.h"
 #include "tensorflow_serving/util/threadpool_executor.h"
 
+#include "src/nvrpc/Context.h"
+#include "src/nvrpc/Executor.h"
+#include "src/nvrpc/Resources.h"
+#include "src/nvrpc/Server.h"
+#include "src/nvrpc/Service.h"
+#include "src/nvrpc/ThreadPool.h"
+
+using nvrpc::Context;
+using nvrpc::ThreadPool;
+
 namespace nvidia { namespace inferenceserver {
+
 
 namespace {
 
-//
-// Handle GRPC requests
-//
-class GRPCServiceImpl final : public GRPCService::Service {
+class AsyncResources : public nvrpc::Resources {
  public:
-  explicit GRPCServiceImpl(InferenceServer* server) : server_(server) {}
+  explicit AsyncResources(
+    InferenceServer* server, int infer_threads, int mgmt_threads)
+      : m_Server(server), m_MgmtThreadPool(mgmt_threads),
+        m_InferThreadPool(infer_threads)
+  {
+  }
 
-  grpc::Status Status(
-    grpc::ServerContext* context, const StatusRequest* request,
-    StatusResponse* response);
-  grpc::Status Profile(
-    grpc::ServerContext* context, const ProfileRequest* request,
-    ProfileResponse* response);
-  grpc::Status Health(
-    grpc::ServerContext* context, const HealthRequest* request,
-    HealthResponse* response);
-  grpc::Status Infer(
-    grpc::ServerContext* context, const InferRequest* request,
-    InferResponse* response);
+  InferenceServer* GetServer() { return m_Server; }
+  ThreadPool& GetMgmtThreadPool() { return m_MgmtThreadPool; }
+  ThreadPool& GetInferThreadPool() { return m_InferThreadPool; }
 
  private:
-  InferenceServer* server_;
+  InferenceServer* m_Server;
+
+  // We can and should get specific on thread affinity.  It might not be as
+  // important on the frontend, but the backend threadpool should be aligned
+  // with the respective devices.
+  ThreadPool m_MgmtThreadPool;
+  ThreadPool m_InferThreadPool;
 };
 
-grpc::Status
-GRPCServiceImpl::Status(
-  grpc::ServerContext* context, const StatusRequest* request,
-  StatusResponse* response)
-{
-  ServerStatTimerScoped timer(
-    server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
+static std::shared_ptr<AsyncResources> g_Resources;
 
-  RequestStatus* request_status = response->mutable_request_status();
-  ServerStatus* server_status = response->mutable_server_status();
+class StatusContext final
+    : public Context<StatusRequest, StatusResponse, AsyncResources> {
+  void ExecuteRPC(
+    StatusRequest& request, StatusResponse& response) final override
+  {
+    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
+      ServerStatTimerScoped timer(
+        GetResources()->GetServer()->StatusManager(),
+        ServerStatTimerScoped::Kind::STATUS);
 
-  server_->HandleStatus(request_status, server_status, request->model_name());
-  return grpc::Status::OK;
-}
+      RequestStatus* request_status = response.mutable_request_status();
+      ServerStatus* server_status = response.mutable_server_status();
 
-grpc::Status
-GRPCServiceImpl::Profile(
-  grpc::ServerContext* context, const ProfileRequest* request,
-  ProfileResponse* response)
-{
-  ServerStatTimerScoped timer(
-    server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
+      GetResources()->GetServer()->HandleStatus(
+        request_status, server_status, request.model_name());
+      this->FinishResponse();
+    });
+  }
+};
 
-  RequestStatus* request_status = response->mutable_request_status();
+class InferContext final
+    : public Context<InferRequest, InferResponse, AsyncResources> {
+  void ExecuteRPC(InferRequest& request, InferResponse& response) final override
+  {
+    auto server = GetResources()->GetServer();
+    auto infer_stats = std::make_shared<ModelInferStats>(
+      server->StatusManager(), request.model_name());
+    auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
+    infer_stats->StartRequestTimer(timer.get());
 
-  server_->HandleProfile(request_status, request->cmd());
-  return grpc::Status::OK;
-}
+    RequestStatus* request_status = response.mutable_request_status();
 
-grpc::Status
-GRPCServiceImpl::Health(
-  grpc::ServerContext* context, const HealthRequest* request,
-  HealthResponse* response)
-{
-  ServerStatTimerScoped timer(
-    server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
-
-  RequestStatus* request_status = response->mutable_request_status();
-  bool health;
-
-  server_->HandleHealth(request_status, &health, request->mode());
-  response->set_health(health);
-
-  return grpc::Status::OK;
-}
-
-grpc::Status
-GRPCServiceImpl::Infer(
-  grpc::ServerContext* context, const InferRequest* request,
-  InferResponse* response)
-{
-  ModelInferStats infer_stats(server_->StatusManager(), request->model_name());
-  ModelInferStats::ScopedTimer timer;
-  infer_stats.StartRequestTimer(&timer);
-
-  RequestStatus* request_status = response->mutable_request_status();
-
-  std::unique_ptr<GRPCInferRequestProvider> request_provider;
-  tensorflow::Status status =
-    GRPCInferRequestProvider::Create(*request, &request_provider);
-  if (status.ok()) {
-    std::unique_ptr<GRPCInferResponseProvider> response_provider;
-    status = GRPCInferResponseProvider::Create(
-      request->meta_data(), response, &response_provider);
+    std::shared_ptr<GRPCInferRequestProvider> request_provider;
+    tensorflow::Status status =
+      GRPCInferRequestProvider::Create(request, &request_provider);
     if (status.ok()) {
-      server_->HandleInfer(
-        request_status, request_provider.get(), response_provider.get(),
-        &infer_stats);
+      std::shared_ptr<GRPCInferResponseProvider> response_provider;
+      status = GRPCInferResponseProvider::Create(
+        request.meta_data(), &response, &response_provider);
+      if (status.ok()) {
+        server->HandleInfer(
+          request_status, request_provider, response_provider, infer_stats,
+          [this, infer_stats, timer]() mutable {
+            timer.reset();
+            this->FinishResponse();
+          },
+          true  // async_frontend
+        );
+      }
+    }
+
+    if (!status.ok()) {
+      LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
+      infer_stats->SetFailed(true);
+      RequestStatusFactory::Create(
+        request_status, 0 /* request_id */, server->Id(), status);
+      this->FinishResponse();
     }
   }
+};
 
-  if (!status.ok()) {
-    LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
-    infer_stats.SetFailed(true);
-    RequestStatusFactory::Create(
-      request_status, 0 /* request_id */, server_->Id(), status);
+class ProfileContext final
+    : public Context<ProfileRequest, ProfileResponse, AsyncResources> {
+  void ExecuteRPC(
+    ProfileRequest& request, ProfileResponse& response) final override
+  {
+    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
+      auto server = GetResources()->GetServer();
+      ServerStatTimerScoped timer(
+        server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
+
+      RequestStatus* request_status = response.mutable_request_status();
+      server->HandleProfile(request_status, request.cmd());
+      this->FinishResponse();
+    });
   }
+};
 
-  return grpc::Status::OK;
-}
+class HealthContext final
+    : public Context<HealthRequest, HealthResponse, AsyncResources> {
+  void ExecuteRPC(
+    HealthRequest& request, HealthResponse& response) final override
+  {
+    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
+      auto server = GetResources()->GetServer();
+      ServerStatTimerScoped timer(
+        server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
 
+      RequestStatus* request_status = response.mutable_request_status();
+      bool health;
+
+      server->HandleHealth(request_status, &health, request.mode());
+      response.set_health(health);
+      this->FinishResponse();
+    });
+  }
+};
 
 //
 // Handle HTTP requests
@@ -355,9 +383,10 @@ HTTPServiceImpl::Infer(
     }
   }
 
-  ModelInferStats infer_stats(server_->StatusManager(), model_name);
-  ModelInferStats::ScopedTimer timer;
-  infer_stats.StartRequestTimer(&timer);
+  auto infer_stats =
+    std::make_shared<ModelInferStats>(server_->StatusManager(), model_name);
+  auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
+  infer_stats->StartRequestTimer(timer.get());
 
   absl::string_view infer_request_header =
     req->GetRequestHeader(kInferRequestHTTPHeader);
@@ -366,46 +395,51 @@ HTTPServiceImpl::Infer(
 
   RequestStatus request_status;
 
-  std::unique_ptr<HTTPInferRequestProvider> request_provider;
+  std::shared_ptr<HTTPInferRequestProvider> request_provider;
   tensorflow::Status status = HTTPInferRequestProvider::Create(
     req->InputBuffer(), model_name, model_version_str, infer_request_header_str,
     &request_provider);
   if (status.ok()) {
-    std::unique_ptr<HTTPInferResponseProvider> response_provider;
+    std::shared_ptr<HTTPInferResponseProvider> response_provider;
     status = HTTPInferResponseProvider::Create(
       req->OutputBuffer(), request_provider->RequestHeader(),
       &response_provider);
     if (status.ok()) {
       server_->HandleInfer(
-        &request_status, request_provider.get(), response_provider.get(),
-        &infer_stats);
-      if (request_status.code() == RequestStatusCode::SUCCESS) {
-        std::string format;
-        if (!req->QueryParam("format", &format)) {
-          format = "text";
-        }
+        &request_status, request_provider, response_provider, infer_stats,
+        [&request_status, request_provider, response_provider, infer_stats,
+         req]() mutable {
+          if (request_status.code() == RequestStatusCode::SUCCESS) {
+            std::string format;
+            if (!req->QueryParam("format", &format)) {
+              format = "text";
+            }
 
-        const InferResponseHeader& response_header =
-          response_provider->ResponseHeader();
+            const InferResponseHeader& response_header =
+              response_provider->ResponseHeader();
 
-        std::string rstr;
-        if (format == "binary") {
-          response_header.SerializeToString(&rstr);
-        } else {
-          rstr = response_header.DebugString();
-        }
-        req->WriteResponseBytes(rstr.c_str(), rstr.size());
-      }
+            std::string rstr;
+            if (format == "binary") {
+              response_header.SerializeToString(&rstr);
+            } else {
+              rstr = response_header.DebugString();
+            }
+            req->WriteResponseBytes(rstr.c_str(), rstr.size());
+          }
+        },
+        false  // async frontend
+      );
     }
   }
 
   if (!status.ok()) {
     LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
-    infer_stats.SetFailed(true);
+    infer_stats->SetFailed(true);
     RequestStatusFactory::Create(
       &request_status, 0 /* request_id */, server_->Id(), status);
   }
 
+  // this part still needs to be implemented in teh completer
   req->OverwriteResponseHeader(
     kStatusHTTPHeader, request_status.ShortDebugString());
   req->OverwriteResponseHeader("Content-Type", "application/octet-stream");
@@ -631,6 +665,7 @@ InferenceServer::Init(int argc, char** argv)
     return false;
   }
 
+
   LOG_ENABLE_INFO(log_info);
   LOG_ENABLE_WARNING(log_warn);
   LOG_ENABLE_ERROR(log_error);
@@ -737,9 +772,11 @@ InferenceServer::Init(int argc, char** argv)
 
   // Create the server status object.
   status_manager_->InitModelConfigs(active_model_configs_);
+  LOG_VERBOSE(1) << "Server Status Object Created";
 
   // Create the server core.
   status = tfs::ServerCore::Create(std::move(options), &core_);
+  LOG_VERBOSE(1) << "ServerCore Created";
 
   if (!status.ok()) {
     // We assume that any failure is due to a model not loading
@@ -851,29 +888,65 @@ InferenceServer::Wait()
     }
   }
 
+  if (grpc_server_) {
+    grpc_server_->Shutdown();
+  }
+
   if (http_server_ != nullptr) {
     http_server_->WaitForTermination();
   }
-
-  if (grpc_server_ != nullptr) {
-    grpc_server_->Wait();
-  }
 }
 
-std::unique_ptr<grpc::Server>
+std::unique_ptr<nvrpc::Server>
 InferenceServer::StartGrpcServer()
 {
-  grpc::ServerBuilder builder;
+  // DLIS-162 - provide global defaults and cli overridable options
+  g_Resources = std::make_shared<AsyncResources>(
+    this,  // InferenceServer*,
+    1,     // infer threads
+    1      // mgmt threads
+  );
+  // PlanBundle::SetInferenceManager(g_Resources);
+
+  LOG_INFO << "Building nvrpc server";
   const std::string addr = "0.0.0.0:" + std::to_string(grpc_port_);
-  std::shared_ptr<grpc::ServerCredentials> creds =
-    grpc::InsecureServerCredentials();
-  builder.AddListeningPort(addr, creds);
+  auto server = nvrpc::make_unique<nvrpc::Server>(addr);
 
-  GRPCServiceImpl* grpc_service = new GRPCServiceImpl(this);
-  builder.RegisterService(grpc_service);
-  builder.SetMaxMessageSize(tensorflow::kint32max);
+  server->GetBuilder().SetMaxMessageSize(tensorflow::kint32max);
 
-  return std::move(builder.BuildAndStart());
+  LOG_INFO << "Register TensorRT GRPCService";
+  auto inferenceService = server->RegisterAsyncService<GRPCService>();
+
+  LOG_INFO << "Register Infer RPC";
+  auto rpcInfer = inferenceService->RegisterRPC<InferContext>(
+    &GRPCService::AsyncService::RequestInfer);
+
+  LOG_INFO << "Register Status RPC";
+  auto rpcStatus = inferenceService->RegisterRPC<StatusContext>(
+    &GRPCService::AsyncService::RequestStatus);
+
+  LOG_INFO << "Register Profile RPC";
+  auto rpcProfile = inferenceService->RegisterRPC<ProfileContext>(
+    &GRPCService::AsyncService::RequestProfile);
+
+  LOG_INFO << "Register Health RPC";
+  auto rpcHealth = inferenceService->RegisterRPC<HealthContext>(
+    &GRPCService::AsyncService::RequestHealth);
+
+  LOG_INFO << "Register Executor";
+  auto executor = server->RegisterExecutor(new ::nvrpc::Executor(1));
+
+  // You can register RPC execution contexts from any registered RPC on any
+  // executor.
+  executor->RegisterContexts(
+    rpcInfer, g_Resources, 1000);  // Configurable DLIS-161
+  executor->RegisterContexts(rpcStatus, g_Resources, 1);
+  executor->RegisterContexts(rpcHealth, g_Resources, 1);
+  executor->RegisterContexts(rpcProfile, g_Resources, 1);
+
+  server->AsyncRun();
+
+  return std::move(server);
 }
 
 namespace {
@@ -1045,15 +1118,31 @@ InferenceServer::HandleProfile(
   }
 }
 
+namespace {
+
+// Use the servable appropriate for the requested model's platform.
+struct AsyncState {
+  InferenceServable* is = nullptr;
+  tfs::ServableHandle<GraphDefBundle> graphdef_bundle;
+  tfs::ServableHandle<PlanBundle> plan_bundle;
+  tfs::ServableHandle<NetDefBundle> netdef_bundle;
+  tfs::ServableHandle<SavedModelBundle> saved_model_bundle;
+};
+}  // namespace
+
 void
 InferenceServer::HandleInfer(
-  RequestStatus* request_status, InferRequestProvider* request_provider,
-  InferResponseProvider* response_provider, ModelInferStats* infer_stats)
+  RequestStatus* request_status,
+  std::shared_ptr<InferRequestProvider> request_provider,
+  std::shared_ptr<InferResponseProvider> response_provider,
+  std::shared_ptr<ModelInferStats> infer_stats,
+  std::function<void()> OnCompleteInferRPC, bool async_frontend)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     RequestStatusFactory::Create(
       request_status, 0, id_, RequestStatusCode::UNAVAILABLE,
       "Server not ready");
+    OnCompleteInferRPC();
     return;
   }
 
@@ -1070,66 +1159,84 @@ InferenceServer::HandleInfer(
     model_spec.mutable_version()->set_value(request_provider->ModelVersion());
   }
 
-  // Use the servable appropriate for the requested model's platform.
-  InferenceServable* is = nullptr;
-  tfs::ServableHandle<GraphDefBundle> graphdef_bundle;
-  tfs::ServableHandle<PlanBundle> plan_bundle;
-  tfs::ServableHandle<NetDefBundle> netdef_bundle;
-  tfs::ServableHandle<SavedModelBundle> saved_model_bundle;
+  auto state = std::make_shared<AsyncState>();
+
+  std::function<void()> handle;
 
   const auto& pf_itr = model_platform_map_.find(request_provider->ModelName());
   if (pf_itr != model_platform_map_.end()) {
     const auto& platform = pf_itr->second;
 
     if (platform == kTensorFlowGraphDefPlatform) {
-      status = core_->GetServableHandle(model_spec, &graphdef_bundle);
+      status = core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
       if (status.ok()) {
-        is = static_cast<InferenceServable*>(graphdef_bundle.get());
+        state->is =
+          static_cast<InferenceServable*>(state->graphdef_bundle.get());
       }
     } else if (platform == kTensorFlowSavedModelPlatform) {
-      status = core_->GetServableHandle(model_spec, &saved_model_bundle);
+      status =
+        core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
       if (status.ok()) {
-        is = static_cast<InferenceServable*>(saved_model_bundle.get());
+        state->is =
+          static_cast<InferenceServable*>(state->saved_model_bundle.get());
       }
     } else if (platform == kTensorRTPlanPlatform) {
-      status = core_->GetServableHandle(model_spec, &plan_bundle);
+      status = core_->GetServableHandle(model_spec, &(state->plan_bundle));
       if (status.ok()) {
-        is = static_cast<InferenceServable*>(plan_bundle.get());
+        state->is = static_cast<InferenceServable*>(state->plan_bundle.get());
       }
     } else if (platform == kCaffe2NetDefPlatform) {
-      status = core_->GetServableHandle(model_spec, &netdef_bundle);
+      status = core_->GetServableHandle(model_spec, &(state->netdef_bundle));
       if (status.ok()) {
-        is = static_cast<InferenceServable*>(netdef_bundle.get());
+        state->is = static_cast<InferenceServable*>(state->netdef_bundle.get());
       }
     }
   }
 
-  infer_stats->SetModelServable(is);
+  infer_stats->SetModelServable(state->is);
   infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
-  if (status.ok() && (is == nullptr)) {
+  if (status.ok() && (state->is == nullptr)) {
     status = tensorflow::errors::InvalidArgument(
       "unable to find platform for requested model '",
       request_provider->ModelName(), "'");
   }
 
-  if (status.ok()) {
-    status = is->Run(infer_stats, request_provider, response_provider);
-    if (status.ok()) {
-      status = response_provider->FinalizeResponse(*is);
+
+  auto OnCompleteHandleInfer =
+    [this, OnCompleteInferRPC, state, response_provider, request_status,
+     request_id, infer_stats](tensorflow::Status status) mutable {
       if (status.ok()) {
-        RequestStatusFactory::Create(request_status, request_id, id_, status);
-        return;
+        auto status = response_provider->FinalizeResponse(*(state->is));
+        if (status.ok()) {
+          RequestStatusFactory::Create(request_status, request_id, id_, status);
+          OnCompleteInferRPC();
+          return;
+        }
       }
+      // Report only stats that are relevant for a failed inference run.
+      infer_stats->SetFailed(true);
+      LOG_VERBOSE(1) << "Infer failed: "
+                     << status.error_message();  // should logged as an error
+      RequestStatusFactory::Create(request_status, request_id, id_, status);
+      OnCompleteInferRPC();
+    };
+
+  if (status.ok()) {
+    // we need to capture the servable handle to keep it alive
+    // it goes away when it goes out of scope
+    if (async_frontend) {
+      state->is->AsyncRun(
+        infer_stats, request_provider, response_provider,
+        OnCompleteHandleInfer);
+    } else {
+      state->is->Run(
+        infer_stats, request_provider, response_provider,
+        OnCompleteHandleInfer);
     }
+  } else {
+    OnCompleteHandleInfer(status);
   }
-
-  // Report only stats that are relevant for a failed inference run.
-  infer_stats->SetFailed(true);
-
-  LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
-
-  RequestStatusFactory::Create(request_status, request_id, id_, status);
 }
 
 void
