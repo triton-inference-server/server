@@ -62,14 +62,19 @@ NVIDIA Inference Server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The User Guide, Developer Guide, and API Reference documentation
-provide guidance on installing, building and running the inference
-server. You can view the documentation for the `current release
+The current release of the TensorRT Inference Server is 0.8.0 beta and
+corresponds to the 18.11 release of the tensorrtserver container on
+`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
+this release is `r18.11
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_. The
+User Guide, Developer Guide, and API Reference `documentation
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-or for the `master branch
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_.
+provide guidance on installing, building and running the inference
+server.
 
-Documentation for earlier releases is archived `here
+You can also view the documentation for the `master branch
+<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
+and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
 
 Contributing
