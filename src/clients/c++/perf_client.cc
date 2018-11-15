@@ -772,10 +772,6 @@ class ConcurrencyManager {
       }
       // Stop inferencing if an early exit has been signaled.
     } while (!early_exit);
-    if (verbose_) {
-      std::cout << "Thread [" << thread_index << "] received exit signal"
-                << std::endl;
-    }
   }
 
   // Function for worker threads
@@ -919,9 +915,6 @@ class ConcurrencyManager {
 
       // Stop inferencing if an early exit has been signaled.
     } while (!early_exit);
-    if (verbose_) {
-      std::cout << "Async worker thread received exit signal" << std::endl;
-    }
   }
 
   // Used for measurement
