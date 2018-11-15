@@ -93,7 +93,7 @@ ServerStatusManager::ServerStatusManager(const std::string& server_version)
 
 tensorflow::Status
 ServerStatusManager::InitModelConfigs(
-  const ModelConfigManager::ModelConfigMap& model_configs)
+  const ModelRepositoryManager::ModelConfigMap& model_configs)
 {
   for (const auto& p : model_configs) {
     const ModelConfig& model = p.second;
@@ -106,7 +106,7 @@ ServerStatusManager::InitModelConfigs(
 
 tensorflow::Status
 ServerStatusManager::UpdateModelConfigs(
-  const ModelConfigManager::ModelConfigMap& model_configs,
+  const ModelRepositoryManager::ModelConfigMap& model_configs,
   const std::set<std::string>& added, const std::set<std::string>& removed)
 {
   std::lock_guard<std::mutex> lock(mu_);

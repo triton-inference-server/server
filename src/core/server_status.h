@@ -28,7 +28,7 @@
 #include <time.h>
 #include <mutex>
 #include "src/core/model_config.pb.h"
-#include "src/core/model_config_manager.h"
+#include "src/core/model_repository_manager.h"
 #include "src/core/server_status.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow_serving/core/servable_state_monitor.h"
@@ -166,12 +166,12 @@ class ServerStatusManager {
 
   // Initialize status for a set of model configurations
   tensorflow::Status InitModelConfigs(
-    const ModelConfigManager::ModelConfigMap& model_configs);
+    const ModelRepositoryManager::ModelConfigMap& model_configs);
 
   // Update status as appropriate for a set of model configurations
   // with a given set of added and removed configurations.
   tensorflow::Status UpdateModelConfigs(
-    const ModelConfigManager::ModelConfigMap& model_configs,
+    const ModelRepositoryManager::ModelConfigMap& model_configs,
     const std::set<std::string>& added, const std::set<std::string>& removed);
 
   // Get the entire server status, including status for all models.

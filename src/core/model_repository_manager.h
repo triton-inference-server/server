@@ -36,11 +36,10 @@ namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
-// A singleton to manage the model configurations active in the
-// server. A singleton is used because the servables have no
-// connection to the server itself but they need to have access to the
-// configuration.
-class ModelConfigManager {
+// A singleton to manage the model repository active in the server. A
+// singleton is used because the servables have no connection to the
+// server itself but they need to have access to the configuration.
+class ModelRepositoryManager {
  public:
   // Map from model name to a model configuration.
   using ModelConfigMap = std::unordered_map<std::string, ModelConfig>;
@@ -52,7 +51,7 @@ class ModelConfigManager {
 
   // Get the platform for a named model. Return OK if found, NO_FOUND
   // otherwise.
-  static tensorflow::Status GetModelConfigPlatform(
+  static tensorflow::Status GetModelPlatform(
     const std::string& name, Platform* platform);
 
   // Set the model configurations, removing any existing model
@@ -71,9 +70,9 @@ class ModelConfigManager {
     std::set<std::string>* removed);
 
  private:
-  ModelConfigManager() = default;
-  ~ModelConfigManager() = default;
-  static ModelConfigManager* GetSingleton();
+  ModelRepositoryManager() = default;
+  ~ModelRepositoryManager() = default;
+  static ModelRepositoryManager* GetSingleton();
   tensorflow::Status GetModelConfigInternal(
     const std::string& name, ModelConfig* model_config);
 

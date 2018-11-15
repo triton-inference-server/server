@@ -49,7 +49,8 @@ TEST_F(PlanBundleTest, ModelConfigSanity)
            std::vector<std::string>{kTensorRTPlanFilename}) {
         const auto plan_path = tensorflow::io::JoinPath(path, filename);
         tensorflow::string blob_str;
-        tensorflow::ReadFileToString(tensorflow::Env::Default(), plan_path, &blob_str);
+        tensorflow::ReadFileToString(
+          tensorflow::Env::Default(), plan_path, &blob_str);
         std::vector<char> blob(blob_str.begin(), blob_str.end());
         plan_blobs.emplace(filename, std::move(blob));
       }

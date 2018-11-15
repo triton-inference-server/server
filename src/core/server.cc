@@ -56,7 +56,7 @@
 #include "src/core/metrics.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/core/model_config_manager.h"
+#include "src/core/model_repository_manager.h"
 #include "src/core/profile.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
@@ -795,8 +795,8 @@ InferenceServer::Init(int argc, char** argv)
 
   // Create the model configuration for all the models in the model
   // store.
-  ModelConfigManager::ModelConfigMap model_configs;
-  status = ModelConfigManager::ReadModelConfigs(
+  ModelRepositoryManager::ModelConfigMap model_configs;
+  status = ModelRepositoryManager::ReadModelConfigs(
     model_store_path_, !strict_model_config_, &model_configs,
     &options.model_server_config);
   if (!status.ok()) {
@@ -806,7 +806,7 @@ InferenceServer::Init(int argc, char** argv)
   LOG_VERBOSE(1) << options.model_server_config.DebugString();
 
   // Register the configurations with the manager.
-  status = ModelConfigManager::SetModelConfigs(model_configs);
+  status = ModelRepositoryManager::SetModelConfigs(model_configs);
   if (!status.ok()) {
     LogInitError(status.error_message());
     return !exit_on_error;
@@ -898,9 +898,9 @@ InferenceServer::Wait()
   if (poll_model_repository_enabled_) {
     while (ready_state_ != ServerReadyState::SERVER_EXITING) {
       if (ready_state_ == ServerReadyState::SERVER_READY) {
-        ModelConfigManager::ModelConfigMap mc;
+        ModelRepositoryManager::ModelConfigMap mc;
         tfs::ModelServerConfig msc;
-        tensorflow::Status status = ModelConfigManager::ReadModelConfigs(
+        tensorflow::Status status = ModelRepositoryManager::ReadModelConfigs(
           model_store_path_, !strict_model_config_, &mc, &msc);
         if (!status.ok()) {
           LOG_ERROR << "Failed to build new model configurations: "
@@ -912,8 +912,9 @@ InferenceServer::Wait()
           // there is any change then need to reload the model
           // configs.
           std::set<std::string> added, removed;
-          if (ModelConfigManager::CompareModelConfigs(mc, &added, &removed)) {
-            ModelConfigManager::SetModelConfigs(mc);
+          if (ModelRepositoryManager::CompareModelConfigs(
+                mc, &added, &removed)) {
+            ModelRepositoryManager::SetModelConfigs(mc);
             status = core_->ReloadConfig(msc);
             if (!status.ok()) {
               LOG_ERROR << "Failed to reload new model configurations: "
@@ -1207,7 +1208,7 @@ InferenceServer::HandleInfer(
   std::function<void()> handle;
 
   Platform platform;
-  status = ModelConfigManager::GetModelConfigPlatform(
+  status = ModelRepositoryManager::GetModelPlatform(
     request_provider->ModelName(), &platform);
   if (status.ok()) {
     switch (platform) {

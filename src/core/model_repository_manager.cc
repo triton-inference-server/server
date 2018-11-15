@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include "src/core/model_config_manager.h"
+#include "src/core/model_repository_manager.h"
 
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -36,27 +36,27 @@
 
 namespace nvidia { namespace inferenceserver {
 
-ModelConfigManager*
-ModelConfigManager::GetSingleton()
+ModelRepositoryManager*
+ModelRepositoryManager::GetSingleton()
 {
-  static ModelConfigManager singleton;
+  static ModelRepositoryManager singleton;
   return &singleton;
 }
 
 tensorflow::Status
-ModelConfigManager::GetModelConfig(
+ModelRepositoryManager::GetModelConfig(
   const std::string& name, ModelConfig* model_config)
 {
-  ModelConfigManager* singleton = GetSingleton();
+  ModelRepositoryManager* singleton = GetSingleton();
   std::lock_guard<std::mutex> lock(singleton->mu_);
   return singleton->GetModelConfigInternal(name, model_config);
 }
 
 tensorflow::Status
-ModelConfigManager::GetModelConfigPlatform(
+ModelRepositoryManager::GetModelPlatform(
   const std::string& name, Platform* platform)
 {
-  ModelConfigManager* singleton = GetSingleton();
+  ModelRepositoryManager* singleton = GetSingleton();
   std::lock_guard<std::mutex> lock(singleton->mu_);
 
   // Lazily initialize the platform map...
@@ -79,9 +79,9 @@ ModelConfigManager::GetModelConfigPlatform(
 }
 
 tensorflow::Status
-ModelConfigManager::SetModelConfigs(const ModelConfigMap& model_configs)
+ModelRepositoryManager::SetModelConfigs(const ModelConfigMap& model_configs)
 {
-  ModelConfigManager* singleton = GetSingleton();
+  ModelRepositoryManager* singleton = GetSingleton();
   std::lock_guard<std::mutex> lock(singleton->mu_);
   singleton->configs_ = model_configs;
   singleton->platforms_.clear();
@@ -89,7 +89,7 @@ ModelConfigManager::SetModelConfigs(const ModelConfigMap& model_configs)
 }
 
 tensorflow::Status
-ModelConfigManager::ReadModelConfigs(
+ModelRepositoryManager::ReadModelConfigs(
   const std::string& model_store_path, const bool autofill,
   ModelConfigMap* model_configs, tfs::ModelServerConfig* tfs_model_configs)
 {
@@ -175,11 +175,11 @@ ModelConfigManager::ReadModelConfigs(
 }
 
 bool
-ModelConfigManager::CompareModelConfigs(
+ModelRepositoryManager::CompareModelConfigs(
   const ModelConfigMap& next, std::set<std::string>* added,
   std::set<std::string>* removed)
 {
-  ModelConfigManager* singleton = GetSingleton();
+  ModelRepositoryManager* singleton = GetSingleton();
   std::lock_guard<std::mutex> lock(singleton->mu_);
 
   std::set<std::string> current_names, next_names;
@@ -206,7 +206,7 @@ ModelConfigManager::CompareModelConfigs(
 }
 
 tensorflow::Status
-ModelConfigManager::GetModelConfigInternal(
+ModelRepositoryManager::GetModelConfigInternal(
   const std::string& name, ModelConfig* model_config)
 {
   const auto itr = configs_.find(name);

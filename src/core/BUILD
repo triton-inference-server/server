@@ -220,9 +220,9 @@ cc_library(
 )
 
 cc_library(
-    name = "model_config_manager",
-    srcs = ["model_config_manager.cc"],
-    hdrs = ["model_config_manager.h"],
+    name = "model_repository_manager",
+    srcs = ["model_repository_manager.cc"],
+    hdrs = ["model_repository_manager.h"],
     deps = [
         ":constants",
         ":logging",
@@ -255,8 +255,8 @@ cc_library(
         ":infer_header",
         ":logging",
         ":model_config",
-        ":model_config_manager",
         ":model_config_proto",
+        ":model_repository_manager",
         ":profile",
         ":request_status",
         ":request_status_proto",
@@ -287,8 +287,8 @@ cc_library(
     name = "server_status_header",
     hdrs = ["server_status.h"],
     deps = [
-        ":model_config_manager",
         ":model_config_proto",
+        ":model_repository_manager",
         ":server_status_proto",
         "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",

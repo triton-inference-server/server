@@ -33,7 +33,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
-#include "src/core/model_config_manager.h"
+#include "src/core/model_repository_manager.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/env.h"
@@ -51,8 +51,8 @@ CreatePlanBundle(
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(
-    ModelConfigManager::GetModelConfig(std::string(model_name), &model_config));
+  TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
+    std::string(model_name), &model_config));
 
   // Read all the plan files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all
