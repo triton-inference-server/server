@@ -125,7 +125,8 @@ class LifeCycleTest(unittest.TestCase):
             self.assertEqual("inference:0", ex.server_id())
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
-                ex.message().startswith("Servable not found for request"))
+                ex.message().startswith(
+                    "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
     def test_dynamic_model_load_unload(self):
         input_size = 16
@@ -231,7 +232,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
-                    "no configuration for model 'savedmodel_float32_float32_float32'"))
+                    "Inference request for unknown model 'savedmodel_float32_float32_float32'"))
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -287,7 +288,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
-                    "no configuration for model 'netdef_float32_float32_float32'"))
+                    "Inference request for unknown model 'netdef_float32_float32_float32'"))
 
     def test_dynamic_model_load_unload_disabled(self):
         input_size = 16
@@ -457,7 +458,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
-                    "Servable not found for request: Specific(graphdef_int32_int32_int32, 1)"))
+                    "Inference request for unknown model 'graphdef_int32_int32_int32'"))
 
         # Add back the same version. The status/stats should be
         # retained for versions (note that this is different behavior
@@ -572,6 +573,92 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_dynamic_model_modify(self):
+        input_size = 16
+        models_base = ('savedmodel', 'plan')
+        models_shape = ((input_size,), (input_size, 1, 1))
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on the model, both versions 1 and 3
+        for version in (1, 3):
+            for model_name, model_shape in zip(models_base, models_shape):
+                try:
+                    iu.infer_exact(self, model_name, model_shape, 1, True,
+                                   np.float32, np.float32, np.float32, swap=(version == 3),
+                                   model_version=version)
+                except InferenceServerException as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Change the model configuration to have the default version
+        # policy (so that only version 3) if available.
+        for base_name, model_name in zip(models_base, models):
+            shutil.copyfile("config.pbtxt." + base_name, "models/" + model_name + "/config.pbtxt")
+
+        time.sleep(5) # wait for models to reload
+        for model_name in models:
+            try:
+                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    self.assertTrue(1 in ss.model_status[model_name].version_status,
+                                    "expected status for version 1 of model " + model_name)
+                    self.assertTrue(3 in ss.model_status[model_name].version_status,
+                                    "expected status for version 3 of model " + model_name)
+                    self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
+                                     server_status.MODEL_UNAVAILABLE)
+                    self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
+                                     server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Attempt inferencing using version 1, should fail since
+        # change in model policy makes that no longer available.
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(self, model_name, model_shape, 1, True,
+                               np.float32, np.float32, np.float32, swap=False,
+                               model_version=1)
+                self.assertTrue(False, "expected error for unavailable model " + model_name)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertGreater(ex.request_id(), 0)
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
+
+        # Version 3 should continue to work...
+        for model_name, model_shape in zip(models_base, models_shape):
+            try:
+                iu.infer_exact(self, model_name, model_shape, 1, True,
+                               np.float32, np.float32, np.float32, swap=True,
+                               model_version=3)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
     unittest.main()

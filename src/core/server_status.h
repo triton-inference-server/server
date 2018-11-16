@@ -164,15 +164,8 @@ class ServerStatusManager {
   // Create a manager for server status
   explicit ServerStatusManager(const std::string& server_version);
 
-  // Initialize status for a set of model configurations
-  tensorflow::Status InitModelConfigs(
-    const ModelRepositoryManager::ModelConfigMap& model_configs);
-
-  // Update status as appropriate for a set of model configurations
-  // with a given set of added and removed configurations.
-  tensorflow::Status UpdateModelConfigs(
-    const ModelRepositoryManager::ModelConfigMap& model_configs,
-    const std::set<std::string>& added, const std::set<std::string>& removed);
+  // Initialize status for a model.
+  tensorflow::Status InitForModel(const std::string& model_name);
 
   // Get the entire server status, including status for all models.
   tensorflow::Status Get(

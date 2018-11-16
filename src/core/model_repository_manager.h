@@ -36,49 +36,77 @@ namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
-// A singleton to manage the model repository active in the server. A
-// singleton is used because the servables have no connection to the
-// server itself but they need to have access to the configuration.
+/// A singleton to manage the model repository active in the server. A
+/// singleton is used because the servables have no connection to the
+/// server itself but they need to have access to the configuration.
 class ModelRepositoryManager {
  public:
-  // Map from model name to a model configuration.
-  using ModelConfigMap = std::unordered_map<std::string, ModelConfig>;
+  /// Create a manager for a repository.
+  /// \param repositpory_path The file-system path of the repository.
+  /// \param autofill If true attempt to autofill missing required
+  /// information in each model configuration.
+  /// \return The error status.
+  static tensorflow::Status Create(
+    const std::string& repository_path, const bool autofill);
 
-  // Get the configuration for a named model. Return OK if found,
-  // NOT_FOUND otherwise.
+  /// Poll the model repository to determine the new set of models and
+  /// compare with the current set. Return the additions, deletions,
+  /// and modifications that have occurred since the last Poll().
+  /// \param added The names of the models added to the repository.
+  /// \param deleted The names of the models removed from the repository.
+  /// \param modified The names of the models remaining in the
+  /// repository that have been changed.
+  /// \param unmodified The names of the models remaining in the
+  /// repository that have not changed.
+  /// \return The error status.
+  static tensorflow::Status Poll(
+    std::set<std::string>* added, std::set<std::string>* deleted,
+    std::set<std::string>* modified, std::set<std::string>* unmodified);
+
+  /// Get the configuration for a named model.
+  /// \param name The model name.
+  /// \param model_config Returns the model configuration.
+  /// \return OK if found, NOT_FOUND otherwise.
   static tensorflow::Status GetModelConfig(
     const std::string& name, ModelConfig* model_config);
 
-  // Get the platform for a named model. Return OK if found, NO_FOUND
-  // otherwise.
+  /// Get TFS-style configuration for a named model.
+  /// \param name The model name.
+  /// \param tfs_model_config Returns the TFS-style model configuration.
+  /// \return OK if found, NOT_FOUND otherwise.
+  static tensorflow::Status GetTFSModelConfig(
+    const std::string& name, tfs::ModelConfig* tfs_model_config);
+
+  /// Get the platform for a named model.
+  /// \param name The model name.
+  /// \param platform Returns the Platform.
+  /// \return OK if found, NOT_FOUND otherwise.
   static tensorflow::Status GetModelPlatform(
     const std::string& name, Platform* platform);
 
-  // Set the model configurations, removing any existing model
-  // configurations.
-  static tensorflow::Status SetModelConfigs(
-    const ModelConfigMap& model_configs);
-
-  // Read the model configurations from all models in a model
-  // repository.
-  static tensorflow::Status ReadModelConfigs(
-    const std::string& model_store_path, const bool autofill,
-    ModelConfigMap* model_configs, tfs::ModelServerConfig* tfs_model_configs);
-
-  static bool CompareModelConfigs(
-    const ModelConfigMap& next, std::set<std::string>* added,
-    std::set<std::string>* removed);
-
  private:
-  ModelRepositoryManager() = default;
-  ~ModelRepositoryManager() = default;
-  static ModelRepositoryManager* GetSingleton();
-  tensorflow::Status GetModelConfigInternal(
-    const std::string& name, ModelConfig* model_config);
+  struct ModelInfo {
+    int64_t mtime_nsec_;
+    ModelConfig model_config_;
+    tfs::ModelConfig tfs_model_config_;
+    Platform platform_;
+  };
 
-  std::mutex mu_;
-  ModelConfigMap configs_;
-  std::map<std::string, Platform> platforms_;
+  // Map from model name to information about the model.
+  using ModelInfoMap = std::unordered_map<std::string, ModelInfo>;
+
+  ModelRepositoryManager(
+    const std::string& repository_path, const bool autofill);
+  ~ModelRepositoryManager() = default;
+
+  static ModelRepositoryManager* singleton;
+
+  const std::string repository_path_;
+  const bool autofill_;
+
+  std::mutex poll_mu_;
+  std::mutex infos_mu_;
+  ModelInfoMap infos_;
 };
 
 }}  // namespace nvidia::inferenceserver

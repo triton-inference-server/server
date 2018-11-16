@@ -125,7 +125,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1, True,
@@ -135,7 +135,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
             iu.infer_exact(self, platform, tensor_shape, 1, True,
                            np.int8, np.int8, np.int8,
@@ -156,7 +156,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
             iu.infer_exact(self, platform, tensor_shape, 1, True,
                            np.int16, np.int16, np.int16,
@@ -201,7 +201,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
             try:
                 iu.infer_exact(self, platform, tensor_shape, 1, True,
@@ -211,7 +211,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
     def test_raw_version_specific_1_3(self):
         input_size = 16
@@ -232,7 +232,7 @@ class InferTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("Servable not found for request"))
+                    ex.message().startswith("Inference request for unknown model"))
 
             iu.infer_exact(self, platform, tensor_shape, 1, True,
                            np.float32, np.float32, np.float32,

@@ -793,31 +793,46 @@ InferenceServer::Init(int argc, char** argv)
   }
   LOG_VERBOSE(1) << options.platform_config_map.DebugString();
 
-  // Create the model configuration for all the models in the model
-  // store.
-  ModelRepositoryManager::ModelConfigMap model_configs;
-  status = ModelRepositoryManager::ReadModelConfigs(
-    model_store_path_, !strict_model_config_, &model_configs,
-    &options.model_server_config);
+  // Create the global manager for the repository. Add all models'
+  // into the server core 'options' so that they are eagerly loaded
+  // below when ServerCore is created.
+  status =
+    ModelRepositoryManager::Create(model_store_path_, !strict_model_config_);
   if (!status.ok()) {
     LogInitError(status.error_message());
     return !exit_on_error;
   }
+
+  std::set<std::string> added, deleted, modified, unmodified;
+  status =
+    ModelRepositoryManager::Poll(&added, &deleted, &modified, &unmodified);
+  if (!status.ok()) {
+    LogInitError(status.error_message());
+    return !exit_on_error;
+  }
+
+  if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
+    LogInitError("Unexpected initial state for model repository");
+    return !exit_on_error;
+  }
+
+  for (const auto& name : added) {
+    tfs::ModelConfig* tfs_config =
+      options.model_server_config.mutable_model_config_list()->add_config();
+    status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
+    if (!status.ok()) {
+      LogInitError("Internal: model repository manager inconsistency");
+      return !exit_on_error;
+    }
+
+    status = status_manager_->InitForModel(name);
+    if (!status.ok()) {
+      LogInitError(status.error_message());
+      return !exit_on_error;
+    }
+  }
+
   LOG_VERBOSE(1) << options.model_server_config.DebugString();
-
-  // Register the configurations with the manager.
-  status = ModelRepositoryManager::SetModelConfigs(model_configs);
-  if (!status.ok()) {
-    LogInitError(status.error_message());
-    return !exit_on_error;
-  }
-
-  // Create the server status object.
-  status = status_manager_->InitModelConfigs(model_configs);
-  if (!status.ok()) {
-    LogInitError(status.error_message());
-    return !exit_on_error;
-  }
 
   // Create the server core. We assume that any failure is due to a
   // model not loading correctly so we just continue if not exiting on
@@ -892,41 +907,100 @@ InferenceServer::Close()
 void
 InferenceServer::Wait()
 {
+  tensorflow::Status status;
+
   // If model load/unload is enabled for the model store, then
   // periodically look for changes and update the loaded model
   // configurations appropriately.
   if (poll_model_repository_enabled_) {
     while (ready_state_ != ServerReadyState::SERVER_EXITING) {
       if (ready_state_ == ServerReadyState::SERVER_READY) {
-        ModelRepositoryManager::ModelConfigMap mc;
-        tfs::ModelServerConfig msc;
-        tensorflow::Status status = ModelRepositoryManager::ReadModelConfigs(
-          model_store_path_, !strict_model_config_, &mc, &msc);
+        std::set<std::string> added, deleted, modified, unmodified;
+        status = ModelRepositoryManager::Poll(
+          &added, &deleted, &modified, &unmodified);
         if (!status.ok()) {
-          LOG_ERROR << "Failed to build new model configurations: "
+          LOG_ERROR << "Failed to poll model repository: "
                     << status.error_message();
-        } else {
-          // Determine if there is any change in the models in the
-          // model store. We simply compare the names of the active
-          // models against those currently in the model store. If
-          // there is any change then need to reload the model
-          // configs.
-          std::set<std::string> added, removed;
-          if (ModelRepositoryManager::CompareModelConfigs(
-                mc, &added, &removed)) {
-            ModelRepositoryManager::SetModelConfigs(mc);
-            status = core_->ReloadConfig(msc);
-            if (!status.ok()) {
-              LOG_ERROR << "Failed to reload new model configurations: "
-                        << status.error_message();
-            }
+          goto next;
+        }
 
-            // Update status to match new model configuration.
-            status_manager_->UpdateModelConfigs(mc, added, removed);
+        // Nothing to do if no model adds, deletes or modifies.
+        if (added.empty() && deleted.empty() && modified.empty()) {
+          goto next;
+        }
+
+        // There was a change in the model repository so need to
+        // create a new TFS model configuration and reload it into the
+        // server to cause the appropriate models to be loaded and
+        // unloaded.
+        tfs::ModelServerConfig msc;
+        msc.mutable_model_config_list();
+
+        // Added models should be loaded and be initialized for status
+        // reporting.
+        for (const auto& name : added) {
+          tfs::ModelConfig* tfs_config =
+            msc.mutable_model_config_list()->add_config();
+          status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
+          if (!status.ok()) {
+            LOG_ERROR << "Failed to create server config for '" << name
+                      << "': " << status.error_message();
+            goto next;
+          }
+
+          status = status_manager_->InitForModel(name);
+          if (!status.ok()) {
+            LOG_ERROR << "Failed to initialize status for '" << name
+                      << "': " << status.error_message();
+            goto next;
+          }
+        }
+
+        // Keep unmodified models...
+        for (const auto& name : unmodified) {
+          tfs::ModelConfig* tfs_config =
+            msc.mutable_model_config_list()->add_config();
+          status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
+          if (!status.ok()) {
+            LOG_ERROR << "Failed to create server config for '" << name
+                      << "': " << status.error_message();
+            goto next;
+          }
+        }
+
+        status = core_->ReloadConfig(msc);
+        if (!status.ok()) {
+          LOG_ERROR << "Failed to reload model configurations: "
+                    << status.error_message();
+          goto next;
+        }
+
+        // If there are any modified model, (re)load them to pick up
+        // the changes. We want to keep the current status information
+        // so don't re-init it.
+        if (!modified.empty()) {
+          for (const auto& name : modified) {
+            tfs::ModelConfig* tfs_config =
+              msc.mutable_model_config_list()->add_config();
+            status =
+              ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
+            if (!status.ok()) {
+              LOG_ERROR << "Failed to create server config for '" << name
+                        << "': " << status.error_message();
+              goto next;
+            }
+          }
+
+          status = core_->ReloadConfig(msc);
+          if (!status.ok()) {
+            LOG_ERROR << "Failed to reload modified model configurations: "
+                      << status.error_message();
+            goto next;
           }
         }
       }
 
+    next:
       tensorflow::Env::Default()->SleepForMicroseconds(
         repository_poll_secs_ * 1000 * 1000);
     }
@@ -1250,12 +1324,11 @@ InferenceServer::HandleInfer(
   infer_stats->SetModelServable(state->is);
   infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
-  if (status.ok() && (state->is == nullptr)) {
-    status = tensorflow::errors::InvalidArgument(
-      "unable to find platform for requested model '",
-      request_provider->ModelName(), "'");
+  if (!status.ok() || (state->is == nullptr)) {
+    status = tensorflow::errors::Unavailable(
+      "Inference request for unknown model '", request_provider->ModelName(),
+      "'");
   }
-
 
   auto OnCompleteHandleInfer =
     [this, OnCompleteInferRPC, state, response_provider, request_status,
