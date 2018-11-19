@@ -30,7 +30,6 @@
 #include <stdint.h>
 #include "caffe2/core/context_gpu.h"
 #include "caffe2/core/init.h"
-#include "caffe2/core/typeid.h"
 #include "caffe2/core/types.h"
 #include "caffe2/core/workspace.h"
 
@@ -124,7 +123,7 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
 namespace {
 
 const std::string
-DimsDebugString(const std::vector<int64_t>& dims)
+DimsDebugString(const at::IntList& dims)
 {
   bool first = true;
   std::string str;
@@ -291,7 +290,7 @@ Caffe2WorkspaceCreate(
     device_option.set_device_type(static_cast<int>(caffe2::CPU));
   } else {
     device_option.set_device_type(static_cast<int>(caffe2::CUDA));
-    device_option.set_cuda_gpu_id(gpu_device);
+    device_option.set_device_id(gpu_device);
   }
 
   netdef_init.mutable_device_option()->CopyFrom(device_option);
@@ -509,7 +508,7 @@ Caffe2WorkspaceImpl::SetInputTensor(
 
   // If model supports batching then prepend the batch dimension onto
   // the input shape.
-  std::vector<int64_t> dims;
+  std::vector<long int> dims;
   if (max_batch_size_ != NO_BATCHING) {
     dims.push_back(batch_size);
   }
@@ -601,7 +600,7 @@ Caffe2WorkspaceImpl::GetOutputTensor(
 
   // If model supports batching then prepend the batch dimension onto
   // the output shape.
-  std::vector<int64_t> expected_dims;
+  std::vector<long int> expected_dims;
   if (max_batch_size_ != NO_BATCHING) {
     expected_dims.push_back(batch_size);
   }

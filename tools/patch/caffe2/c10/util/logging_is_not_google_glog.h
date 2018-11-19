@@ -1,6 +1,8 @@
---- pytorch/caffe2/core/logging_is_not_google_glog.h	2018-11-02 12:29:48.223056985 -0700
-+++ ../tensorrtserver/tools/patch/caffe2/core/logging_is_not_google_glog.h	2018-10-12 16:39:38.071855234 -0700
-@@ -40,6 +40,8 @@
+diff --git a/c10/util/logging_is_not_google_glog.h b/c10/util/logging_is_not_google_glog.h
+index 8d8f7f6..756d199 100644
+--- a/c10/util/logging_is_not_google_glog.h
++++ b/c10/util/logging_is_not_google_glog.h
+@@ -45,6 +45,8 @@ class C10_API MessageLogger {
  
    const char* tag_;
    std::stringstream stream_;
@@ -9,15 +11,15 @@
    int severity_;
  };
  
-@@ -91,14 +93,40 @@
- #define LOG(n) \
+@@ -96,14 +98,40 @@ static_assert(
+ #define LOG(n)                   \
    if (n >= CAFFE2_LOG_THRESHOLD) \
-     ::caffe2::MessageLogger((char*)__FILE__, __LINE__, n).stream()
+   ::c10::MessageLogger((char*)__FILE__, __LINE__, n).stream()
 -#define VLOG(n) LOG((-n))
  
  #define LOG_IF(n, condition)                    \
    if (n >= CAFFE2_LOG_THRESHOLD && (condition)) \
-   ::caffe2::MessageLogger((char*)__FILE__, __LINE__, n).stream()
+   ::c10::MessageLogger((char*)__FILE__, __LINE__, n).stream()
 -#define VLOG_IF(n, condition) LOG_IF((-n), (condition))
  
 -#define VLOG_IS_ON(verboselevel) (CAFFE2_LOG_THRESHOLD <= -(verboselevel))
@@ -52,4 +54,4 @@
 +    ::caffe2::MessageLogger((char*)__FILE__, __LINE__, INFO).stream()
  
  // Log only if condition is met.  Otherwise evaluates to void.
- #define FATAL_IF(condition) \
+ #define FATAL_IF(condition)            \
