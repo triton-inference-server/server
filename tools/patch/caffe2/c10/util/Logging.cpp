@@ -1,9 +1,11 @@
---- pytorch/caffe2/core/logging.cc	2018-11-02 12:29:48.223056985 -0700
-+++ ../tensorrtserver/tools/patch/caffe2/core/logging.cc	2018-10-12 16:39:38.071855234 -0700
-@@ -180,8 +180,25 @@
+diff --git a/c10/util/Logging.cpp b/c10/util/Logging.cpp
+index 2540576..9fd3c97 100644
+--- a/c10/util/Logging.cpp
++++ b/c10/util/Logging.cpp
+@@ -183,8 +183,25 @@ void ShowLogInfoToStderr() {
    FLAGS_caffe2_log_level = INFO;
  }
-
+ 
 +// NVIDIA
 +//
 +// Update to deliver the message via tensorrtserver logger. The
@@ -16,8 +18,8 @@
 +extern "C" void DelegatedLogMessage(
 +  int level, const char* file, int line, const std::string& msg) __attribute__((weak));
 +
- MessageLogger::MessageLogger(const char *file, int line, int severity)
--  : severity_(severity) {
+ MessageLogger::MessageLogger(const char* file, int line, int severity)
+-    : severity_(severity) {
 +  : file_(file), line_(line), severity_(severity) {
 +
 +  if (DelegatedLogMessage) {
@@ -27,8 +29,8 @@
    if (severity_ < FLAGS_caffe2_log_level) {
      // Nothing needs to be logged.
      return;
-@@ -212,6 +229,19 @@
-
+@@ -217,6 +234,19 @@ MessageLogger::MessageLogger(const char* file, int line, int severity)
+ 
  // Output the contents of the stream to the proper channel on destruction.
  MessageLogger::~MessageLogger() {
 +
