@@ -57,10 +57,10 @@ COPY src/servables/caffe2/netdef_bundle_c2.* \
 # update the patch/checksum as necessary.
 COPY tools/patch/caffe2 /tmp/patch/caffe2
 RUN sha1sum -c /tmp/patch/caffe2/checksums && \
-    patch -i /tmp/patch/caffe2/core/logging.cc \
-          /opt/pytorch/pytorch/caffe2/core/logging.cc && \
-    patch -i /tmp/patch/caffe2/core/logging_is_not_google_glog.h \
-          /opt/pytorch/pytorch/caffe2/core/logging_is_not_google_glog.h && \
+    patch -i /tmp/patch/caffe2/c10/util/Logging.cpp \
+          /opt/pytorch/pytorch/c10/util/Logging.cpp && \
+    patch -i /tmp/patch/caffe2/c10/util/logging_is_not_google_glog.h \
+          /opt/pytorch/pytorch/c10/util/logging_is_not_google_glog.h && \
     patch -i /tmp/patch/caffe2/core/context_gpu.cu \
           /opt/pytorch/pytorch/caffe2/core/context_gpu.cu
 
@@ -83,11 +83,14 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
+               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0; \
                touch /opt/conda/lib/libmkl_avx2.so; \
                touch /opt/conda/lib/libmkl_core.so; \
                touch /opt/conda/lib/libmkl_def.so; \
                touch /opt/conda/lib/libmkl_gnu_thread.so; \
-               touch /opt/conda/lib/libmkl_intel_lp64.so; fi'
+               touch /opt/conda/lib/libmkl_intel_lp64.so; \
+               touch /opt/conda/lib/libmkl_rt.so; \
+               touch /opt/conda/lib/libmkl_vml_def.so; fi'
 
 ############################################################################
 ## Build stage: Build inference server based on TensorFlow container
@@ -130,11 +133,16 @@ COPY --from=trtserver_caffe2 \
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
      /opt/tensorrtserver/lib/
+COPY --from=trtserver_caffe2 \
+     /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0 \
+     /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_def.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_gnu_thread.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_intel_lp64.so /opt/tensorrtserver/lib/
+COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib/
+COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on

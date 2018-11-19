@@ -61,6 +61,11 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 cc_library(
+    name = "libmkldnn",
+    srcs = ["libmkldnn.so.0"],
+    visibility = ["//visibility:public"],
+)
+cc_library(
     name = "libmkl_core",
     srcs = ["libmkl_core.so"],
     visibility = ["//visibility:public"],
@@ -83,6 +88,16 @@ cc_library(
 cc_library(
     name = "libmkl_intel_lp64",
     srcs = ["libmkl_intel_lp64.so"],
+    visibility = ["//visibility:public"],
+)
+cc_library(
+    name = "libmkl_rt",
+    srcs = ["libmkl_rt.so"],
+    visibility = ["//visibility:public"],
+)
+cc_library(
+    name = "libmkl_vml_def",
+    srcs = ["libmkl_vml_def.so"],
     visibility = ["//visibility:public"],
 )
 """,
