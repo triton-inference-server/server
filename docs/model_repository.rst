@@ -84,7 +84,7 @@ subdirectory there are one or more model definition files. For more
 information about the model definition files contained in each version
 subdirectory see :ref:`section-model-definition`.
 
-The *_labels.txt files are optional and are used to provide labels for
+The \*_labels.txt files are optional and are used to provide labels for
 outputs that represent classifications. The label file must be
 specified in the :cpp:var:`label_filename
 <nvidia::inferenceserver::ModelOutput::label_filename>` property of
@@ -96,8 +96,18 @@ the output it corresponds to in the :ref:`model configuration
 Modifying the Model Repository
 ------------------------------
 
-Some types of changes to the model repository are allowed while the
-inference server is running:
+By default, changes to the model repository will be detected by a
+running inference server and the server will attempt to add, remove,
+and reload models as necessary based on those changes. Changes to the
+model repository may not be detected immediately because the inference
+server polls the repository periodically. You can control the polling
+interval with the -\\-repository-poll-secs options. The console log or
+the :ref:`Status API <section-api-status>` can be used to determine
+when model repository changes have taken effect. You can disable the
+server from responding to repository changes by using the
+-\\-allow-poll-model-repository=false option.
+
+The inference server responds to the following changes:
 
 * Versions may be added and removed from models by adding and removing
   the corresponding version subdirectory. The inference server will
@@ -115,18 +125,18 @@ inference server is running:
 * New models can be added to the repository by adding a new model
   directory.
 
-Changes to the model repository will be recognized by default but can
-be disabled with -\\-allow-poll-model-repository=false. Changes to the
-model repository may not be detected immediately because the inference
-server polls the repository periodically. You can control the polling
-interval with the -\\-repository-poll-secs options. The console log or
-the :ref:`Status API <section-api-status>` can be used to determine
-when model repository changes have taken effect.
+* The :ref:`model configuration <section-model-configuration>`
+  (config.pbtxt) can be changed and the inference server will unload
+  and reload the model to pick up the new model configuration.
 
-Currently changes to the model configuration (config.pbtxt) will not
-be recognized by the inference server. To change a model's
-configuration you must delete the model, wait for it to unload, and
-then add-back the model with the new configuration.
+* Labels files providing labels for outputs that represent
+  classifications can be added, removed, or modified and the inference
+  server will unload and reload the model to pick up the new
+  labels. If a label file is added or removed the corresponding edit
+  to the :cpp:var:`label_filename
+  <nvidia::inferenceserver::ModelOutput::label_filename>` property of
+  the output it corresponds to in the :ref:`model configuration
+  <section-model-configuration>` must be performed at the same time.
 
 .. _section-model-versions:
 
