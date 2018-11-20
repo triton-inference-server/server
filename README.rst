@@ -30,6 +30,13 @@
 NVIDIA TensorRT Inference Server
 ================================
 
+
+    **NOTE: You are currently on the master branch which tracks
+    under-development progress towards the next release. The latest
+    release of the TensorRT Inference Server is 0.8.0 beta and is
+    available on branch** `r18.11
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_.
+
 .. overview-begin-marker-do-not-remove
 
 The NVIDIA TensorRT Inference Server provides a cloud inferencing
