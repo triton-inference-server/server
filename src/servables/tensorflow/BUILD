@@ -81,6 +81,7 @@ cc_library(
     srcs = ["loader.cc"],
     hdrs = ["loader.h"],
     deps = [
+        "//src/core:logging",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",

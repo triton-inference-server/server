@@ -26,6 +26,8 @@
 
 #include "src/servables/tensorflow/loader.h"
 
+#include "src/core/logging.h"
+
 namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
@@ -43,6 +45,9 @@ LoadSavedModel(
   tensorflow::RunOptions run_options;
   TF_RETURN_IF_ERROR(tensorflow::LoadSavedModel(
     session_options, run_options, model_path, saved_model_tags, bundle->get()));
+
+  LOG_VERBOSE(1) << "Loaded saved-model: "
+                 << (*bundle)->meta_graph_def.DebugString();
 
   // Verify that the bundle has the "serve" tag
   bool found_serve_tag = false;

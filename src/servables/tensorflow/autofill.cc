@@ -104,12 +104,19 @@ AutoFillSavedModel::Fix(ModelConfig* config)
     for (const auto& sin : sig_.inputs()) {
       ModelInput* config_input = config->add_input();
       config_input->set_name(sin.first);
-      config_input->set_data_type(ConvertDataType(sin.second.dtype()));
 
+      const DataType dt = ConvertDataType(sin.second.dtype());
+      if (dt == DataType::TYPE_INVALID) {
+        return tensorflow::errors::Internal(
+          "unable to autofill for '", model_name_, "', unsupported data-type '",
+          tensorflow::DataType_Name(sin.second.dtype()), "'");
+      }
+
+      config_input->set_data_type(dt);
 
       // The first model dimension can be -1 to serve as a placeholder
-      // for batch. The batch dim doesn't appear in the configuration
-      // 'dims'.
+      // for batch. This batch dim doesn't appear in the model
+      // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
       const bool has_batch_dim =
         (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
@@ -127,12 +134,19 @@ AutoFillSavedModel::Fix(ModelConfig* config)
     for (const auto& sout : sig_.outputs()) {
       ModelOutput* config_output = config->add_output();
       config_output->set_name(sout.first);
-      config_output->set_data_type(ConvertDataType(sout.second.dtype()));
 
+      const DataType dt = ConvertDataType(sout.second.dtype());
+      if (dt == DataType::TYPE_INVALID) {
+        return tensorflow::errors::Internal(
+          "unable to autofill for '", model_name_, "', unsupported data-type '",
+          tensorflow::DataType_Name(sout.second.dtype()), "'");
+      }
+
+      config_output->set_data_type(dt);
 
       // The first model dimension can be -1 to serve as a placeholder
-      // for batch. The batch dim doesn't appear in the configuration
-      // 'dims'.
+      // for batch. The batch dim doesn't appear in the model
+      // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
       const bool has_batch_dim =
         (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
