@@ -63,13 +63,13 @@ An example of a typical model repository layout is shown below::
         model.graphdef
 
 Any number of models may be specified and the inference server will
-attempt to load all models into CPU and GPU when the server
+attempt to load all models into the CPU and GPU when the server
 starts. The :ref:`Status API <section-api-status>` can be used to
 determine if any models failed to load successfully. The server's
 console log will also show the reason for any failures during startup.
 
 The name of the model directory (model_0 and model_1 in the above
-example) must match the name of the model specified in the required
+example) must match the name of the model specified in the
 :ref:`model configuration file <section-model-configuration>`,
 config.pbtxt. The model name is used in the :ref:`client API
 <section-client-api>` and :ref:`server API
@@ -178,6 +178,8 @@ configuration <section-model-configuration>` for description of how to
 specify different model definitions for different compute
 capabilities.
 
+.. _section-tensorrt-models:
+
 TensorRT Models
 ^^^^^^^^^^^^^^^
 
@@ -196,6 +198,17 @@ like::
       config.pbtxt
       1/
         model.plan
+
+As described in :ref:`section-generated-model-configuration` the
+config.pbtxt is optional for some models. In cases where it is not
+required the minimal model repository would look like::
+
+  models/
+    <model-name>/
+      1/
+        model.plan
+
+.. _section-tensorflow-models:
 
 TensorFlow Models
 ^^^^^^^^^^^^^^^^^
@@ -228,6 +241,16 @@ repository for a single TensorFlow SavedModel model would look like::
   models/
     <model-name>/
       config.pbtxt
+      1/
+        model.savedmodel/
+           <saved-model files>
+
+As described in :ref:`section-generated-model-configuration` the
+config.pbtxt is optional for some models. In cases where it is not
+required the minimal model repository would look like::
+
+  models/
+    <model-name>/
       1/
         model.savedmodel/
            <saved-model files>

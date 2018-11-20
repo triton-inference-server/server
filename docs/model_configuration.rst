@@ -30,10 +30,14 @@
 Model Configuration
 ===================
 
-Each model in a :ref:`section-model-repository` must include a file
-called config.pbtxt that contains the configuration information for
-the model. The model configuration must be specified as
-:doc:`ModelConfig <protobuf_api/model_config.proto>` protobuf.
+Each model in a :ref:`section-model-repository` must include a model
+configuration that provides required and optional information about
+the model. Typically, this configuration is provided in a config.pbtxt
+file specified as :doc:`ModelConfig <protobuf_api/model_config.proto>`
+protobuf. In some cases, discussed in
+:ref:`section-generated-model-configuration`, the model configuration
+can be generated automatically by the inference server and so does not
+need to be provided explicitly.
 
 A minimal model configuration must specify :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>`, :cpp:var:`platform
@@ -92,6 +96,52 @@ zero. If the above example specified a :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero the
 inference server would expect to receive input tensors with shape **[
 16 ]**, and would produce an output tensor with shape **[ 16 ]**.
+
+.. _section-generated-model-configuration:
+
+Generated Model Configuration
+-----------------------------
+
+By default, the model configuration file containing the required
+settings must be provided with each model. However, if the inference
+server is started with the -\\-strict-model-config=false option, then
+in some cases the required portions of the model configuration file
+can be generated automatically by the inference server. The required
+portion of the model configuration are those settings shown in the
+example minimal configuration above. Specifically:
+
+* :ref:`TensorRT Plan <section-tensorrt-models>` models do not require
+  a model configuration file because the inference server can derive
+  all the required settings automatically.
+
+* Some :ref:`TensorFlow SavedModel <section-tensorflow-models>` models
+  do not require a model configuration file. The models must specify
+  all inputs and outputs as fixed-size tensors (with an optional
+  initial batch dimension) for the model configuration to be generated
+  automatically. The easiest way to determine if a particular
+  SavedModel is supported is to try it with the inference server and
+  check the console log and :ref:`Status API <section-api-status>` to
+  determine if the model loaded successfully.
+
+When using -\\-strict-model-config=false you can see the model
+configuration that was generated for a model by using the :ref:`Status
+API <section-api-status>`.
+
+The inference server only generates the required portion of the model
+configuration file. You must still provide the optional portions of
+the model configuration if necessary, such as :cpp:var:`version_policy
+<nvidia::inferenceserver::ModelConfig::version_policy>`,
+:cpp:var:`optimization
+<nvidia::inferenceserver::ModelConfig::optimization>`,
+:cpp:var:`dynamic_batching
+<nvidia::inferenceserver::ModelConfig::dynamic_batching>`,
+:cpp:var:`instance_group
+<nvidia::inferenceserver::ModelConfig::instance_group>`,
+:cpp:var:`default_model_filename
+<nvidia::inferenceserver::ModelConfig::default_model_filename>`,
+:cpp:var:`cc_model_filenames
+<nvidia::inferenceserver::ModelConfig::cc_model_filenames>`, and
+:cpp:var:`tags <nvidia::inferenceserver::ModelConfig::tags>`.
 
 .. _section-version-policy:
 
