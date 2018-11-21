@@ -36,51 +36,57 @@ metrics are available at http://localhost:8002/metrics. The inference
 server -\\-metrics-port option can be used to select a different
 port. The following table describes the available metrics.
 
-+------------+----------------+---------------------------------------+-----------+-----------+
-|Category    |Metric          |Description                            |Granularity|Frequency  |
-|            |                |                                       |           |           |
-+============+================+=======================================+===========+===========+
-|Utilization |Power Usage     |GPU instantaneous power                |Per GPU    |Per second |
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |Power Limit     |Maximum GPU power limit                |Per GPU    |Per second |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            || Energy        || GPU energy consumption in joules     |Per GPU    |Per second |
-|            || Consumption   || since the server started             |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |GPU Utilization || GPU utilization rate                 |Per GPU    |Per second |
-|            |                || (0.0 - 1.0)                          |           |           |
-+------------+----------------+---------------------------------------+-----------+-----------+
-|Count       |Request Count   || Number of inference requests         |Per model  |Per request|
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |Execution Count || Number of inference executions       |Per model  |Per request|
-|            |                || (request count / execution count     |           |           |
-|            |                || = average dynamic batch size)        |           |           |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |Inference Count || Number of inferences performed       |Per model  |Per request|
-|            |                || (one request counts as               |           |           |
-|            |                || "batch size" inferences)             |           |           |
-|            |                |                                       |           |           |
-+------------+----------------+---------------------------------------+-----------+-----------+
-|Latency     |Request Time    || End-to-end inference request         |Per model  |Per request|
-|            |                || handling time                        |           |           |
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |Compute Time    || Time a request spends executing      |Per model  |Per request|
-|            |                || the inference model (in the          |           |           |
-|            |                || framework backend)                   |           |           |
-|            |                |                                       |           |           |
-+            +----------------+---------------------------------------+-----------+-----------+
-|            |Queue Time      || Time a request spends waiting        |Per model  |Per request|
-|            |                || in the queue                         |           |           |
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-|            |                |                                       |           |           |
-+------------+----------------+---------------------------------------+-----------+-----------+
++--------------+----------------+---------------------------------------+-----------+-----------+
+|Category      |Metric          |Description                            |Granularity|Frequency  |
+|              |                |                                       |           |           |
++==============+================+=======================================+===========+===========+
+|| GPU         |Power Usage     |GPU instantaneous power                |Per GPU    |Per second |
+|| Utilization |                |                                       |           |           |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |Power Limit     |Maximum GPU power limit                |Per GPU    |Per second |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              || Energy        || GPU energy consumption in joules     |Per GPU    |Per second |
+|              || Consumption   || since the server started             |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |GPU Utilization || GPU utilization rate                 |Per GPU    |Per second |
+|              |                || (0.0 - 1.0)                          |           |           |
++--------------+----------------+---------------------------------------+-----------+-----------+
+|| GPU         || GPU Total     || Total GPU memory, in bytes           |Per GPU    |Per second |
+|| Memory      || Memory        |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              || GPU Used      || Used GPU memory, in bytes            |Per GPU    |Per second |
+|              || Memory        |                                       |           |           |
++--------------+----------------+---------------------------------------+-----------+-----------+
+|Count         |Request Count   || Number of inference requests         |Per model  |Per request|
+|              |                |                                       |           |           |
+|              |                |                                       |           |           |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |Execution Count || Number of inference executions       |Per model  |Per request|
+|              |                || (request count / execution count     |           |           |
+|              |                || = average dynamic batch size)        |           |           |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |Inference Count || Number of inferences performed       |Per model  |Per request|
+|              |                || (one request counts as               |           |           |
+|              |                || "batch size" inferences)             |           |           |
+|              |                |                                       |           |           |
++--------------+----------------+---------------------------------------+-----------+-----------+
+|Latency       |Request Time    || End-to-end inference request         |Per model  |Per request|
+|              |                || handling time                        |           |           |
+|              |                |                                       |           |           |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |Compute Time    || Time a request spends executing      |Per model  |Per request|
+|              |                || the inference model (in the          |           |           |
+|              |                || framework backend)                   |           |           |
+|              |                |                                       |           |           |
++              +----------------+---------------------------------------+-----------+-----------+
+|              |Queue Time      || Time a request spends waiting        |Per model  |Per request|
+|              |                || in the queue                         |           |           |
+|              |                |                                       |           |           |
+|              |                |                                       |           |           |
+|              |                |                                       |           |           |
++--------------+----------------+---------------------------------------+-----------+-----------+

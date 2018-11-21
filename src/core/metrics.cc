@@ -77,6 +77,14 @@ Metrics::Metrics()
                                 .Name("nv_gpu_utilization")
                                 .Help("GPU utilization rate [0.0 - 1.0)")
                                 .Register(*registry_)),
+      gpu_memory_total_family_(prometheus::BuildGauge()
+                                .Name("nv_gpu_memory_total_bytes")
+                                .Help("GPU total memory, in bytes")
+                                .Register(*registry_)),
+      gpu_memory_used_family_(prometheus::BuildGauge()
+                                .Name("nv_gpu_memory_used_bytes")
+                                .Help("GPU used memory, in bytes")
+                                .Register(*registry_)),
       gpu_power_usage_family_(prometheus::BuildGauge()
                                 .Name("nv_gpu_power_usage")
                                 .Help("GPU power usage in watts")
@@ -169,6 +177,8 @@ Metrics::InitializeNvmlMetrics()
       kMetricsLabelGpuUuid, uuid));
 
     gpu_utilization_.push_back(&gpu_utilization_family_.Add(gpu_labels));
+    gpu_memory_total_.push_back(&gpu_memory_total_family_.Add(gpu_labels));
+    gpu_memory_used_.push_back(&gpu_memory_used_family_.Add(gpu_labels));
     gpu_power_usage_.push_back(&gpu_power_usage_family_.Add(gpu_labels));
     gpu_power_limit_.push_back(&gpu_power_limit_family_.Add(gpu_labels));
     gpu_energy_consumption_.push_back(
@@ -247,6 +257,20 @@ Metrics::InitializeNvmlMetrics()
                 util.gpu = 0;
               }
               gpu_utilization_[didx]->Set((double)util.gpu * 0.01);
+            }
+
+            // Memory
+            {
+              nvmlMemory_t mem;
+              nvmlReturn_t nvmlerr = nvmlDeviceGetMemoryInfo(gpu, &mem);
+              if (nvmlerr != NVML_SUCCESS) {
+                LOG_ERROR << "failed to get memory for GPU " << didx
+                          << ", NVML_ERROR " << nvmlerr;
+                mem.total = 0;
+                mem.used = 0;
+              }
+              gpu_memory_total_[didx]->Set(mem.total);
+              gpu_memory_used_[didx]->Set(mem.used);
             }
           }
         }

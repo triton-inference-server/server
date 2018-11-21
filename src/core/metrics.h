@@ -117,11 +117,15 @@ class Metrics {
   prometheus::Family<prometheus::Counter>& inf_queue_duration_us_family_;
   prometheus::Family<prometheus::Histogram>& inf_load_ratio_family_;
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
+  prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
+  prometheus::Family<prometheus::Gauge>& gpu_memory_used_family_;
   prometheus::Family<prometheus::Gauge>& gpu_power_usage_family_;
   prometheus::Family<prometheus::Gauge>& gpu_power_limit_family_;
   prometheus::Family<prometheus::Counter>& gpu_energy_consumption_family_;
 
   std::vector<prometheus::Gauge*> gpu_utilization_;
+  std::vector<prometheus::Gauge*> gpu_memory_total_;
+  std::vector<prometheus::Gauge*> gpu_memory_used_;
   std::vector<prometheus::Gauge*> gpu_power_usage_;
   std::vector<prometheus::Gauge*> gpu_power_limit_;
   std::vector<prometheus::Counter*> gpu_energy_consumption_;
