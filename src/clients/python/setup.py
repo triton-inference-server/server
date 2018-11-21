@@ -24,10 +24,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 from setuptools import find_packages
 from setuptools import setup, dist
 
-VERSION = '0.8.0'
+if 'VERSION' not in os.environ:
+    raise Exception('envvar VERSION must be specified')
+
+VERSION = os.environ['VERSION']
 
 REQUIRED = [
     'future',

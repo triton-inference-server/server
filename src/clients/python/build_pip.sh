@@ -49,10 +49,16 @@ function main() {
   fi
 
   if [[ ! -d "bazel-bin/src/clients/python" ]]; then
-    echo "Could not find bazel-bin/src/clients/python."
+    echo "Could not find bazel-bin/src/clients/python"
     exit 1
   fi
 
+  if [[ ! -f "VERSION" ]]; then
+    echo "Could not find VERSION"
+    exit 1
+  fi
+
+  VERSION=`cat VERSION`
   DEST="$1"
   TMPDIR="$(mktemp -d)"
 
@@ -84,7 +90,7 @@ function main() {
 
   pushd "${TMPDIR}"
   echo $(date) : "=== Building wheel"
-  python${PYVER} setup.py bdist_wheel # >/dev/null
+  VERSION=$VERSION python${PYVER} setup.py bdist_wheel # >/dev/null
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd
