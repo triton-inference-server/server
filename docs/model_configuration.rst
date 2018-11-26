@@ -299,6 +299,7 @@ Optimization Policy
 
 The model configuration :cpp:var:`ModelOptimizationPolicy
 <nvidia::inferenceserver::ModelOptimizationPolicy>` is used to specify
-optimization settings for a model. These settings control if/how a
-model is optimized by the backend framework. See the protobuf
-documentation for the currently available settings.
+optimization and prioritization settings for a model. These settings
+control if/how a model is optimized by the backend framework and how
+it is scheduled and executed by TRTIS. See the protobuf documentation
+for the currently available settings.

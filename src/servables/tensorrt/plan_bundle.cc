@@ -259,12 +259,19 @@ PlanBundle::CreateExecutionContext(
     return tensorflow::errors::Internal("unable to create TensorRT context");
   }
 
-  // Create CUDA objects needed for inference run
-  cuerr = cudaStreamCreate(&context.stream_);
+  // Create CUDA stream associated with the execution context
+  int cuda_stream_priority = 0;
+  TF_RETURN_IF_ERROR(
+    GetCudaPriority(Config().optimization().priority(), &cuda_stream_priority));
+  cuerr = cudaStreamCreateWithPriority(
+    &context.stream_, cudaStreamDefault, cuda_stream_priority);
   if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
       "unable to create stream for ", Name(), ": ", cudaGetErrorString(cuerr));
   }
+
+  LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
+           << " (" << cc << ") with stream priority " << cuda_stream_priority;
 
   return tensorflow::Status::OK();
 }

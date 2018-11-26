@@ -30,37 +30,72 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// Get version of a model from the path containing the model file.
+/// Get the CUDA stream priority for a given ModelPriority
+/// \param priority The ModelOptimizationPolicy::ModelPriority priority.
+/// \param cuda_stream_priority Returns the CUDA stream priority.
+/// \return The error status.
+tensorflow::Status GetCudaPriority(
+  ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority);
+
+/// Get version of a model from the path containing the model
+/// definition file.
+/// \param path The path to the model definition file.
+/// \param version Returns the version.
+/// \return The error status.
 tensorflow::Status GetModelVersionFromPath(
   const tensorflow::StringPiece& path, uint32_t* version);
 
-// Read a ModelConfig and normalize it as expected by model servables.
-// 'path' should be the full-path to the directory containing the
-// model configuration. If 'autofill' then attempt to determine any
-// missing required configuration from the model definition.
+/// Read a ModelConfig and normalize it as expected by model servables.
+/// \param path The full-path to the directory containing the
+/// model configuration.
+/// \param autofill If true attempt to determine any missing required
+/// configuration from the model definition.
+/// \param config Returns the normalized model configuration.
+/// \return The error status.
 tensorflow::Status GetNormalizedModelConfig(
   const tensorflow::StringPiece& path, const bool autofill,
   ModelConfig* config);
 
-// Validate that a model is specified correctly (excluding inputs and
-// outputs which are validated via ValidateModelInput() and
-// ValidateModelOutput()). If 'expected_platform' is non-empty the
-// model will be checked to make sure it matches that platform.
+/// Validate that a model is specified correctly (excluding inputs and
+/// outputs which are validated via ValidateModelInput() and
+/// ValidateModelOutput()).
+/// \param config The model configuration to validate.
+/// \param expected_platform If non-empty the model will be checked
+/// to make sure its platform matches this value.
+/// \return The error status. A non-OK status indicates the configuration
+/// is not valid.
 tensorflow::Status ValidateModelConfig(
   const ModelConfig& config, const std::string& expected_platform);
 
-// Validate that input is specified correctly in a model
-// configuration. 'allowed' is the set of allowed input names, or
-// empty if inputs names should not be checked against an allowed set.
+/// Validate that input is specified correctly in a model
+/// configuration.
+/// \param io The model input.
+/// \return The error status. A non-OK status indicates the input
+/// is not valid.
 tensorflow::Status ValidateModelInput(const ModelInput& io);
+
+/// Validate that an input is specified correctly in a model
+/// configuration and matches one of the allowed input names.
+/// \param io The model input.
+/// \param allowed The set of allowed input names.
+/// \return The error status. A non-OK status indicates the input
+/// is not valid.
 tensorflow::Status ValidateModelInput(
   const ModelInput& io, const std::set<std::string>& allowed);
 
-// Validate that output is specified correctly in a model
-// configuration. 'allowed' is the set of allowed output names, or
-// empty if outputs names should not be checked against an allowed
-// set.
+/// Validate that an output is specified correctly in a model
+/// configuration.
+/// \param io The model output.
+/// \return The error status. A non-OK status indicates the output
+/// is not valid.
 tensorflow::Status ValidateModelOutput(const ModelOutput& io);
+
+/// Validate that an output is specified correctly in a model
+/// configuration and matches one of the allowed output names.
+/// \param io The model output.
+/// \param allowed The set of allowed output names.
+/// \return The error status. A non-OK status indicates the output
+/// is not valid.
 tensorflow::Status ValidateModelOutput(
   const ModelOutput& io, const std::set<std::string>& allowed);
 
