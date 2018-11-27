@@ -30,29 +30,27 @@
 Client Libraries and Examples
 =============================
 
-The TensorRT Inference Server client libraries make it easy to
-communicate with the inference server from you C++ or Python
-application. Using these libraries you can send either HTTP or GRPC
-requests to an inference server to check server status or health and
-to make inference requests.
+The TRTIS *client libraries* make it easy to communicate with the
+TensorRT Inference Server from you C++ or Python application. Using
+these libraries you can send either HTTP or GRPC requests to TRTIS to
+check server status or health and to make inference requests.
 
 A couple of example applications show how to use the client libraries
 to perform image classification and to test performance:
 
 * C++ and Python versions of *image\_client*, an example application
   that uses the C++ or Python client library to execute image
-  classification models on the inference server.
+  classification models on the TensorRT Inference Server.
 
 * Python version of *grpc\_image\_client*, an example application that
   is functionally equivalent to *image\_client* but that uses GRPC
-  generated client code to communicate with the inference server
-  (instead of the client library).
+  generated client code to communicate with TRTIS (instead of the
+  client library).
 
 * C++ version of *perf\_client*, an example application that issues a
-  large number of concurrent requests to the inference server to
-  measure latency and throughput for a given model. You can use this
-  to experiment with different model configuration settings for your
-  models.
+  large number of concurrent requests to TRTIS to measure latency and
+  throughput for a given model. You can use this to experiment with
+  different model configuration settings for your models.
 
 .. build-client-begin-marker-do-not-remove
 
@@ -108,8 +106,8 @@ Python version of the image classification client is available at
 `src/clients/python/image\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/image_client.py>`_.
 
-To use image\_client (or image\_client.py) you must first have an
-inference server that is serving one or more image classification
+To use image\_client (or image\_client.py) you must first have a
+running TRTIS that is serving one or more image classification
 models. The image\_client application requires that the model have a
 single image input and produce a single classification output. If you
 don't have a model repository with image classification models see
@@ -117,12 +115,12 @@ don't have a model repository with image classification models see
 create one.
 
 Follow the instructions in :ref:`section-running-the-inference-server`
-to launch the inference server using the model repository. Once the
-server is running you can use the image\_client application to send
-inference requests to the server. You can specify a single image or a
-directory holding images. Here we send a request for the
-resnet50_netdef model from the :ref:`example model repository
-<section-example-model-repository>` for an image from the `qa/images
+to launch TRTIS using the model repository. Once the server is running
+you can use the image\_client application to send inference requests
+to the server. You can specify a single image or a directory holding
+images. Here we send a request for the resnet50_netdef model from the
+:ref:`example model repository <section-example-model-repository>` for
+an image from the `qa/images
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
 directory::
 
@@ -139,12 +137,11 @@ arguments::
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
 
-The image\_client and image\_client.py applications use the inference
-server client library to talk to the inference server. By default
-image\_client instructs the client library to use HTTP protocol to
-talk to the inference server, but you can use GRPC protocol by
-providing the \-i flag. You must also use the \-u flag to point at the
-GRPC endpoint on the inference server::
+The image\_client and image\_client.py applications use the TRTIS
+client library to talk to the server. By default image\_client
+instructs the client library to use HTTP protocol to talk to TRTIS,
+but you can use GRPC protocol by providing the \-i flag. You must also
+use the \-u flag to point at the GRPC endpoint on TRTIS::
 
   $ image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
@@ -205,8 +202,8 @@ The grpc\_image\_client.py application at available at
 `src/clients/python/grpc\_image\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/grpc_image_client.py>`_
 behaves the same as the image\_client except that instead of using the
-inference server client library it uses the GRPC generated client
-library to communicate with the inference server.
+TRTIS client library it uses the GRPC generated client library to
+communicate with TRTIS.
 
 Performance Example Application
 -------------------------------
@@ -214,11 +211,10 @@ Performance Example Application
 The perf\_client example application located at
 `src/clients/c++/perf\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/perf_client.cc>`_
-uses the C++ client API to send concurrent requests to the inference
-server to measure latency and inferences per second under varying
-client loads.
+uses the C++ client API to send concurrent requests to TRTIS to
+measure latency and inferences per second under varying client loads.
 
-To use perf\_client you must first have an inference server that is
+To use perf\_client you must first have a running TRTIS that is
 serving one or more models. The perf\_client application works with
 any type of model by sending random data for all input tensors and by
 reading and ignoring all output tensors. If you don't have a model
@@ -226,14 +222,14 @@ repository see :ref:`section-example-model-repository` for
 instructions on how to create one.
 
 Follow the instructions in :ref:`section-running-the-inference-server`
-to launch the inference server using the model repository.
+to launch TRTIS using the model repository.
 
 The perf\_client application has two major modes. In the first mode
 you specify how many concurrent clients you want to simulate and
 perf\_client finds a stable latency and inferences/second for that
 level of concurrency. Use the \-t flag to control concurrency and \-v
 to see verbose output. The following example simulates four clients
-continuously sending requests to the inference server::
+continuously sending requests to TRTIS::
 
   $ perf_client -m resnet50_netdef -p3000 -t4 -v
   *** Measurement Settings ***

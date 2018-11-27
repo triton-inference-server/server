@@ -30,11 +30,12 @@
 Metrics
 =======
 
-The inference server provides `Prometheus <https://prometheus.io/>`_
-metrics indicating GPU and request statistics. By default, these
-metrics are available at http://localhost:8002/metrics. The inference
-server -\\-metrics-port option can be used to select a different
-port. The following table describes the available metrics.
+The TensorRT Inference server provides `Prometheus
+<https://prometheus.io/>`_ metrics indicating GPU and request
+statistics. By default, these metrics are available at
+http://localhost:8002/metrics. The TRTIS -\\-metrics-port option can
+be used to select a different port. The following table describes the
+available metrics.
 
 +--------------+----------------+---------------------------------------+-----------+-----------+
 |Category      |Metric          |Description                            |Granularity|Frequency  |

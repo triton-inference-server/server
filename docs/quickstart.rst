@@ -28,27 +28,25 @@
 Quickstart
 ==========
 
-To quickly get the inference server up and running follow these
-steps. After you've seen the inference server in action you can
-revisit the rest of the User Guide to learn more about all the
-inference server features.
+To quickly get the TensorRT Inference Server (TRTIS) up and running
+follow these steps. After you've seen TRTIS in action you can revisit
+the rest of the User Guide to learn more about its features.
 
 First, follow the instructions in
-:ref:`section-installing-prebuilt-containers` to install the inference
-server container.
+:ref:`section-installing-prebuilt-containers` to install the TRTIS
+container.
 
 Next, use the :ref:`section-example-model-repository` section to
 create an example model repository containing a couple of models that
-you can serve with the inference server.
+you can serve with TRTIS.
 
 Now that you have a model repository, follow the instructions in
-:ref:`section-running-the-inference-server` to start the inference
-server. Use the server's *Status* endpoint to :ref:`make sure the
-server and the models are ready for
+:ref:`section-running-the-inference-server` to start TRTIS. Use the
+server's *Status* endpoint to :ref:`make sure the server and the
+models are ready for
 inferencing<section-checking-inference-server-status>`.
 
 Finally,
 :ref:`build<section-building-the-client-libraries-and-examples>` and
 :ref:`run<section-image_classification_example>` the example
-image-client application to perform image classification using the
-models on the inference server.
+image-client application to perform image classification using TRTIS.

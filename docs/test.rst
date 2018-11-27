@@ -29,7 +29,8 @@ Testing
 =======
 
 Currently there is no CI testing enabled for the open-source version
-of the inference server. We will enable CI testing in a future update.
+of the TensorRT Inference Server. We will enable CI testing in a
+future update.
 
 There is a set of tests in the qa/ directory that can be run manually
 to provide some testing. Before running these tests you must first
@@ -40,8 +41,7 @@ Generate QA Model Repository
 ----------------------------
 
 The QA model repository contains some simple models that are used to
-verify the correctness of the inference server. To generate the QA
-model repository::
+verify the correctness of TRTIS. To generate the QA model repository::
 
   $ cd tools
   $ ./gen_unit_test_models
@@ -55,12 +55,11 @@ specific GPU.
 Build QA Container
 ------------------
 
-Next you need to build a QA version of the inference server
-container. This container will contain the inference server, the QA
-tests, and all the dependencies needed to run the QA tests. You must
-first build the tensorrtserver_build and tensorrtserver containers as
-described in :ref:`section-building-the-server` and then build the QA
-container::
+Next you need to build a QA version of the TRTIS container. This
+container will contain TRTIS, the QA tests, and all the dependencies
+needed to run the QA tests. You must first build the
+tensorrtserver_build and tensorrtserver containers as described in
+:ref:`section-building-the-server` and then build the QA container::
 
   $ docker build -t tensorrtserver_qa -f Dockerfile.QA .
 

@@ -36,8 +36,8 @@ the model. Typically, this configuration is provided in a config.pbtxt
 file specified as :doc:`ModelConfig <protobuf_api/model_config.proto>`
 protobuf. In some cases, discussed in
 :ref:`section-generated-model-configuration`, the model configuration
-can be generated automatically by the inference server and so does not
-need to be provided explicitly.
+can be generated automatically by TRTIS and so does not need to be
+provided explicitly.
 
 A minimal model configuration must specify :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>`, :cpp:var:`platform
@@ -83,9 +83,9 @@ or **caffe2_netdef**.
 
 For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
->= 1. The inference server assumes that the batching occurs along a
-first dimension that is not listed in the inputs or outputs. For the
-above example the inference server expects to receive input tensors
+>= 1. The TensorRT Inference Server assumes that the batching occurs
+along a first dimension that is not listed in the inputs or
+outputs. For the above example TRTIS expects to receive input tensors
 with shape **[ x, 16 ]** and produces an output tensor with shape **[
 x, 16 ]**, where **x** is the batch size of the request.
 
@@ -93,9 +93,9 @@ For models that do not support batched inputs the
 :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
 zero. If the above example specified a :cpp:var:`max_batch_size
-<nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero the
-inference server would expect to receive input tensors with shape **[
-16 ]**, and would produce an output tensor with shape **[ 16 ]**.
+<nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero, TRTIS
+would expect to receive input tensors with shape **[ 16 ]**, and would
+produce an output tensor with shape **[ 16 ]**.
 
 .. _section-generated-model-configuration:
 
@@ -103,33 +103,34 @@ Generated Model Configuration
 -----------------------------
 
 By default, the model configuration file containing the required
-settings must be provided with each model. However, if the inference
-server is started with the -\\-strict-model-config=false option, then
-in some cases the required portions of the model configuration file
-can be generated automatically by the inference server. The required
-portion of the model configuration are those settings shown in the
-example minimal configuration above. Specifically:
+settings must be provided with each model. However, if TRTIS is
+started with the -\\-strict-model-config=false option, then in some
+cases the required portions of the model configuration file can be
+generated automatically by TRTIS. The required portion of the model
+configuration are those settings shown in the example minimal
+configuration above. Specifically:
 
 * :ref:`TensorRT Plan <section-tensorrt-models>` models do not require
-  a model configuration file because the inference server can derive
-  all the required settings automatically.
+  a model configuration file because TRTIS can derive all the required
+  settings automatically.
 
 * Some :ref:`TensorFlow SavedModel <section-tensorflow-models>` models
   do not require a model configuration file. The models must specify
   all inputs and outputs as fixed-size tensors (with an optional
   initial batch dimension) for the model configuration to be generated
   automatically. The easiest way to determine if a particular
-  SavedModel is supported is to try it with the inference server and
-  check the console log and :ref:`Status API <section-api-status>` to
-  determine if the model loaded successfully.
+  SavedModel is supported is to try it with TRTIS and check the
+  console log and :ref:`Status API <section-api-status>` to determine
+  if the model loaded successfully.
 
 When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the :ref:`Status
 API <section-api-status>`.
 
-The inference server only generates the required portion of the model
-configuration file. You must still provide the optional portions of
-the model configuration if necessary, such as :cpp:var:`version_policy
+The TensorRT Inference Server only generates the required portion of
+the model configuration file. You must still provide the optional
+portions of the model configuration if necessary, such as
+:cpp:var:`version_policy
 <nvidia::inferenceserver::ModelConfig::version_policy>`,
 :cpp:var:`optimization
 <nvidia::inferenceserver::ModelConfig::optimization>`,
@@ -172,14 +173,13 @@ the following policies.
 If no version policy is specified, then :cpp:var:`Latest
 <nvidia::inferenceserver::ModelVersionPolicy::Latest>` (with
 num_version = 1) is used as the default, indicating that only the most
-recent version of the model is made available by the inference
-server. In all cases, the addition or removal of version
-subdirectories from the model repository can change which model
-version is used on subsequent inference requests.
+recent version of the model is made available by TRTIS. In all cases,
+the addition or removal of version subdirectories from the model
+repository can change which model version is used on subsequent
+inference requests.
 
 Continuing the above example, the following configuration specifies
-that all versions of the model will be available from the inference
-server::
+that all versions of the model will be available from TRTIS::
 
   name: "mymodel"
   platform: "tensorrt_plan"
@@ -210,9 +210,9 @@ server::
 Instance Groups
 ---------------
 
-The inference server can provide multiple :ref:`execution instances
-<section-concurrent-model-execution>` of a model so that multiple
-simultaneous inference requests for that model can be handled
+The TensorRT Inference Server can provide multiple :ref:`execution
+instances <section-concurrent-model-execution>` of a model so that
+multiple simultaneous inference requests for that model can be handled
 simultaneously. The model configuration :cpp:var:`ModelInstanceGroup
 <nvidia::inferenceserver::ModelInstanceGroup>` is used to specify the
 number of execution instances that should be made available and what
@@ -263,18 +263,18 @@ on the CPU. The following places two execution instances on the CPU::
 Dynamic Batching
 ----------------
 
-The inference server supports batch inferencing by allowing individual
-inference requests to specify a batch of inputs. The inferencing for a
-batch of inputs is processed at the same time which is especially
-important for GPUs since it can greatly increase inferencing
-throughput. In many use-cases the individual inference requests are
-not batched, therefore, they do not benefit from the throughput
-benefits of batching.
+The TensorRT Inference Server supports batch inferencing by allowing
+individual inference requests to specify a batch of inputs. The
+inferencing for a batch of inputs is processed at the same time which
+is especially important for GPUs since it can greatly increase
+inferencing throughput. In many use-cases the individual inference
+requests are not batched, therefore, they do not benefit from the
+throughput benefits of batching.
 
-Dynamic batching is a feature of the inference server that allows
-non-batched inference requests to be combined by the inference server,
-so that a batch is created dynamically, resulting in the same
-increased throughput seen for batched inference requests.
+Dynamic batching is a feature of TRTIS that allows non-batched
+inference requests to be combined by TRTIS, so that a batch is created
+dynamically, resulting in the same increased throughput seen for
+batched inference requests.
 
 Dynamic batching is enabled and configured independently for each
 model using the :cpp:var:`ModelDynamicBatching
