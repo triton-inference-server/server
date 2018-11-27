@@ -45,26 +45,25 @@ service via an HTTP or gRPC endpoint, allowing remote clients to
 request inferencing for any model being managed by the server. The
 NVIDIA Inference Server provides the following features:
 
-* Multiple model support. The server can manage any number and mix of
+* `Multiple framework support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The server can manage any number and mix of
   models (limited by system disk and memory resources). Supports
   TensorRT, TensorFlow GraphDef, TensorFlow SavedModel and Caffe2
   NetDef model formats. Also supports TensorFlow-TensorRT integrated
   models.
 * Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
-* Multi-tenancy support. Multiple models (or multiple instances of the
+* `Concurrent model execution support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple models (or multiple instances of the
   same model) can run simultaneously on the same GPU.
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. The server also supports *dynamic
-  batching* where individual inference requests are dynamically
+  corresponding batch of outputs. The server also supports `*dynamic
+  batching* <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_ where individual inference requests are dynamically
   combined together to improve inference throughput. Dynamic batching
   is transparent to the client requesting inference.
-* Model repositories may reside on a locally accessible file system or
+* `Model repositories <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_ may reside on a locally accessible file system (e.g. NFS) or
   in Google Cloud Storage.
-* Readiness and liveness health endpoints suitable for
-  Kubernetes-style orchestration.
-* Metrics indicating GPU utiliization, server throughput, and server
+* Readiness and liveness `health endpoints <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_ suitable for any orchestration microservice such as Kubernetes.
+* `Metrics <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_ indicating GPU utiliization, server throughput, and server
   latency.
 
 .. overview-end-marker-do-not-remove
