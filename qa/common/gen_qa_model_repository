@@ -57,8 +57,8 @@ mkdir -p $HOST_DESTDIR
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
-cp ./gen_qa_model_repository.py $HOST_SRCDIR/.
-cp ../qa/common/test_util.py $HOST_SRCDIR/.
+cp ./gen_qa_models.py $HOST_SRCDIR/.
+cp ./test_util.py $HOST_SRCDIR/.
 
 C2SCRIPT=c2_gen.cmds
 TFSCRIPT=tf_gen.cmds
@@ -73,7 +73,7 @@ cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_model_repository.py --netdef=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --netdef=True --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 EOF
 
@@ -99,7 +99,7 @@ cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_model_repository.py --graphdef=True --savedmodel=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --graphdef=True --savedmodel=True --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 EOF
 
@@ -125,7 +125,7 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_model_repository.py --tensorrt=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --tensorrt=True --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 EOF
 

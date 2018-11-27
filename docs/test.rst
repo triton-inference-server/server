@@ -43,8 +43,8 @@ Generate QA Model Repository
 The QA model repository contains some simple models that are used to
 verify the correctness of TRTIS. To generate the QA model repository::
 
-  $ cd tools
-  $ ./gen_unit_test_models
+  $ cd qa/common
+  $ ./gen_qa_model_repository
 
 This will generate the model repository in /tmp/qa_model_repository.
 The TensorRT models will be created for the GPU on the system that
