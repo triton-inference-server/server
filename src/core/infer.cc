@@ -26,6 +26,11 @@
 
 #include "src/core/infer.h"
 
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <chrono>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -666,10 +671,26 @@ InferenceServable::SetRunnerCount(uint32_t cnt)
 
   runner_cnt_ = cnt;
 
+  // Set default nice level unless overridden by model priority
+  int nice = SCHEDULER_DEFAULT_NICE;
+  if (config_.has_optimization()) {
+    switch (config_.optimization().priority()) {
+      case ModelOptimizationPolicy::PRIORITY_MAX:
+        nice = 0;
+        break;
+      case ModelOptimizationPolicy::PRIORITY_MIN:
+        nice = 19;
+        break;
+      default:
+        nice = SCHEDULER_DEFAULT_NICE;
+        break;
+    }
+  }
+
   // Create the runner threads for this servable.
   for (uint32_t c = 0; c < runner_cnt_; ++c) {
     runner_threads_.emplace_back(
-      new std::thread([this, c]() { RunnerThread(c); }));
+      new std::thread([this, c, nice]() { RunnerThread(c, nice); }));
   }
 
   return tensorflow::Status::OK();
@@ -761,9 +782,15 @@ InferenceServable::Run(
 }
 
 void
-InferenceServable::RunnerThread(const uint32_t runner_id)
+InferenceServable::RunnerThread(const uint32_t runner_id, const int nice)
 {
-  LOG_INFO << "Starting runner thread " << runner_id << "...";
+  if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
+    LOG_INFO << "Starting runner thread " << runner_id << " at nice " << nice
+             << "...";
+  } else {
+    LOG_ERROR << "Starting runner thread " << runner_id
+              << " at default nice (requested nice " << nice << " failed)...";
+  }
 
   // For debugging delay start of runner threads until the queue
   // contains the specified number of entries.

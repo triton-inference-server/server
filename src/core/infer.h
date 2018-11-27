@@ -300,9 +300,9 @@ class InferenceServable {
   // dynamically adjust the number of runners.
   tensorflow::Status SetRunnerCount(uint32_t cnt);
 
-  // Called by runer thread when a request has been completed with the
-  // result status for the request. If successful the ResponseProvider
-  // will have been updated with the response.
+  // Called by runner thread when a request has been completed with
+  // the result status for the request. If successful the
+  // ResponseProvider will have been updated with the response.
   using CompleteFunc = std::function<void(tensorflow::Status)>;
 
   struct RunnerPayload {
@@ -377,7 +377,7 @@ class InferenceServable {
   std::vector<std::unique_ptr<std::thread>> runner_threads_;
   std::atomic<bool> runner_threads_exit_;
 
-  void RunnerThread(const uint32_t runner_id);
+  void RunnerThread(const uint32_t runner_id, const int nice);
   uint64_t GetDynamicBatch(const ModelDynamicBatching& batching_config);
 
   size_t max_preferred_batch_size_;
