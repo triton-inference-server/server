@@ -56,8 +56,8 @@ NVIDIA Inference Server provides the following features:
   same model) can run simultaneously on the same GPU.
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. The server also supports `*dynamic
-  batching* <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_ where individual inference requests are dynamically
+  corresponding batch of outputs. The server also supports `dynamic
+  batching <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_ where individual inference requests are dynamically
   combined together to improve inference throughput. Dynamic batching
   is transparent to the client requesting inference.
 * `Model repositories <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_ may reside on a locally accessible file system (e.g. NFS) or
