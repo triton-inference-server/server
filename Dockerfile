@@ -211,8 +211,8 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     rm -rf /root/.cache/bazel && \
     rm -rf /tmp/*
 
-ENV TENSORRT_SERVER_VERSION 0.8.0
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.11
+ENV TENSORRT_SERVER_VERSION 0.10.0dev
+ENV NVIDIA_TENSORRT_SERVER_VERSION 19.01dev
 ENV PYVER ${PYVER}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
@@ -225,9 +225,9 @@ FROM ${BASE_IMAGE}
 
 ARG PYVER=3.5
 
-ENV TENSORRT_SERVER_VERSION 0.8.0
+ENV TENSORRT_SERVER_VERSION 0.10.0dev
 LABEL com.nvidia.tensorrtserver.version="${TENSORRT_SERVER_VERSION}"
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.11
+ENV NVIDIA_TENSORRT_SERVER_VERSION 19.01dev
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
