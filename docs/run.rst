@@ -33,9 +33,9 @@ Running the Server
 Example Model Repository
 ------------------------
 
-Before running the inference server, you must first set up a model
-repository containing the models that the inference server will make
-available for inferencing.
+Before running the TensorRT Inference Server, you must first set up a
+model repository containing the models that TRTIS will make available
+for inferencing.
 
 An example model repository containing a Caffe2 ResNet50, a TensorFlow
 Inception model, and a simple TensorFlow GraphDef model (used by the
@@ -53,10 +53,10 @@ any missing model definition files from their public model zoos::
 Running The Inference Server
 ----------------------------
 
-Before running the inference server, you must first set up a model
-repository containing the models that the inference server will make
-available for inferencing. Section :ref:`section-model-repository`
-describes how to create your own model repository. You can also use
+Before running TRTIS, you must first set up a model repository
+containing the models that TRTIS will make available
+for inferencing. Section :ref:`section-model-repository` describes how
+to create your own model repository. You can also use
 :ref:`section-example-model-repository` to set up an example model
 repository.
 
@@ -72,16 +72,16 @@ container from the NGC register, or **tensorrtserver** if you
 :ref:`built it from source <section-building-the-server>`.
 
 The nvidia-docker -v option maps /path/to/model/repository on the host
-into the container at /models, and the -\\-model-store option to the
-inference server is used to point to /models as the model repository.
+into the container at /models, and the -\\-model-store option to TRTIS
+is used to point to /models as the model repository.
 
-The -p flags expose the container ports where the inference server
-listens for HTTP requests (port 8000), listens for GRPC requests (port
-8001), and reports Prometheus metrics (port 8002).
+The -p flags expose the container ports where TRTIS listens for HTTP
+requests (port 8000), listens for GRPC requests (port 8001), and
+reports Prometheus metrics (port 8002).
 
-The -\\-shm-size and -\\-ulimit flags are recommended to improve inference
-server performance. For -\\-shm-size the minimum recommended size is 1g
-but larger sizes may be necessary depending on the number and size of
+The -\\-shm-size and -\\-ulimit flags are recommended to improve TRTIS
+performance. For -\\-shm-size the minimum recommended size is 1g but
+larger sizes may be necessary depending on the number and size of
 models being served.
 
 For more information on the Prometheus metrics provided by the
@@ -92,11 +92,11 @@ inference server see :ref:`section-metrics`.
 Checking Inference Server Status
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The simplest way to verify that the inference server is running
-correctly is to use the Status API to query the server’s status. From
-the host system use *curl* to access the HTTP endpoint to request
-server status. The response is protobuf text showing the status for
-the server and for each model being served, for example::
+The simplest way to verify that TRTIS is running correctly is to use
+the Status API to query the server’s status. From the host system use
+*curl* to access the HTTP endpoint to request server status. The
+response is protobuf text showing the status for the server and for
+each model being served, for example::
 
   $ curl localhost:8000/api/status
   id: "inference:0"
@@ -122,6 +122,6 @@ the server and for each model being served, for example::
 
 This status shows configuration information as well as indicating that
 version 1 of the resnet50_netdef model is MODEL_READY. This means that
-the inference server is ready to accept inferencing requests for
-version 1 of that model. A model version ready_state will show up as
-MODEL_UNAVAILABLE if the model failed to load for some reason.
+TRTIS is ready to accept inferencing requests for version 1 of that
+model. A model version ready_state will show up as MODEL_UNAVAILABLE
+if the model failed to load for some reason.

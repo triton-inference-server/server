@@ -39,11 +39,11 @@ NVIDIA TensorRT Inference Server
 
 .. overview-begin-marker-do-not-remove
 
-The NVIDIA TensorRT Inference Server provides a cloud inferencing
-solution optimized for NVIDIA GPUs. The server provides an inference
-service via an HTTP or gRPC endpoint, allowing remote clients to
-request inferencing for any model being managed by the server. The
-TensorRT Inference Server provides the following features:
+The NVIDIA TensorRT Inference Server (TRTIS) provides a cloud
+inferencing solution optimized for NVIDIA GPUs. The server provides an
+inference service via an HTTP or gRPC endpoint, allowing remote
+clients to request inferencing for any model being managed by the
+server. TRTIS provides the following features:
 
 * `Multiple framework support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The server can manage any number and mix of
   models (limited by system disk and memory resources). Supports
@@ -75,8 +75,7 @@ this release is `r18.11
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_. The
 User Guide, Developer Guide, and API Reference `documentation
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building and running the inference
-server.
+provide guidance on installing, building and running TRTIS.
 
 You can also view the documentation for the `master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_

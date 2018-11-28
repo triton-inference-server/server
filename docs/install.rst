@@ -56,5 +56,4 @@ Server container using the following command::
 
   docker pull nvcr.io/nvidia/tensorrtserver:18.11-py3
 
-Replace *18.11* with the version of the inference server that you want
-to pull.
+Replace *18.11* with the version of TRTIS that you want to pull.

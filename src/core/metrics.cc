@@ -78,9 +78,9 @@ Metrics::Metrics()
                                 .Help("GPU utilization rate [0.0 - 1.0)")
                                 .Register(*registry_)),
       gpu_memory_total_family_(prometheus::BuildGauge()
-                                .Name("nv_gpu_memory_total_bytes")
-                                .Help("GPU total memory, in bytes")
-                                .Register(*registry_)),
+                                 .Name("nv_gpu_memory_total_bytes")
+                                 .Help("GPU total memory, in bytes")
+                                 .Register(*registry_)),
       gpu_memory_used_family_(prometheus::BuildGauge()
                                 .Name("nv_gpu_memory_used_bytes")
                                 .Help("GPU used memory, in bytes")

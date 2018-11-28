@@ -313,7 +313,8 @@ message ModelVersionPolicy
 //@@.. cpp:var:: message ModelOptimizationPolicy
 //@@
 //@@   Optimization settings for a model. These settings control if/how a
-//@@   model is optimized by the backend framework when it is loaded.
+//@@   model is optimized and prioritized by the backend framework when
+//@@   it is loaded.
 //@@
 message ModelOptimizationPolicy
 {
@@ -324,9 +325,9 @@ message ModelOptimizationPolicy
   //@@     the framework's default level of optimization is used. Currently
   //@@     only supported for TensorFlow graphdef and savedmodel models and
   //@@     causes XLA to be enabled/disabled for the model.
+  //@@
   message Graph
   {
-    //@@
     //@@    .. cpp:var:: int32 level
     //@@
     //@@       The optimization level. Defaults to 0 (zero) if not specified.
@@ -340,11 +341,43 @@ message ModelOptimizationPolicy
   }
 
   //@@
+  //@@  .. cpp:enum:: ModelPriority
+  //@@
+  //@@     Model priorities. A model will be given scheduling and execution
+  //@@     preference over models at lower priorities. Current model
+  //@@     priorities only work for TensorRT models.
+  //@@
+  enum ModelPriority {
+    //@@    .. cpp:enumerator:: ModelPriority::PRIORITY_DEFAULT = 0
+    //@@
+    //@@       The default model priority.
+    //@@
+    PRIORITY_DEFAULT = 0;
+
+    //@@    .. cpp:enumerator:: ModelPriority::PRIORITY_MAX = 1
+    //@@
+    //@@       The maximum model priority.
+    //@@
+    PRIORITY_MAX = 1;
+
+    //@@    .. cpp:enumerator:: ModelPriority::PRIORITY_MIN = 2
+    //@@
+    //@@       The minimum model priority.
+    //@@
+    PRIORITY_MIN = 2;
+  }
+
   //@@  .. cpp:var:: Graph graph
   //@@
   //@@     The graph optimization setting for the model. Optional.
   //@@
   Graph graph = 1;
+
+  //@@  .. cpp:var:: ModelPriority priority
+  //@@
+  //@@     The priority setting for the model. Optional.
+  //@@
+  ModelPriority priority = 2;
 }
 
 //@@
@@ -355,7 +388,6 @@ message ModelOptimizationPolicy
 //@@
 message ModelDynamicBatching
 {
-  //@@
   //@@  .. cpp:var:: int32 preferred_batch_size (repeated)
   //@@
   //@@     Preferred batch sizes for dynamic batching. If a batch of one of
@@ -365,7 +397,6 @@ message ModelDynamicBatching
   //@@
   repeated int32 preferred_batch_size = 1;
 
-  //@@
   //@@  .. cpp:var:: int32 max_queue_delay_microseconds
   //@@
   //@@     The maximum time, in microseconds, a request will be delayed in
