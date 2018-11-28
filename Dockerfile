@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:18.11-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:18.11-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:18.11-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:18.12-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:18.12-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:18.12-py3
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
@@ -211,8 +211,8 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     rm -rf /root/.cache/bazel && \
     rm -rf /tmp/*
 
-ENV TENSORRT_SERVER_VERSION 0.8.0
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.11
+ENV TENSORRT_SERVER_VERSION 0.9.0dev
+ENV NVIDIA_TENSORRT_SERVER_VERSION 18.12dev
 ENV PYVER ${PYVER}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
@@ -225,9 +225,9 @@ FROM ${BASE_IMAGE}
 
 ARG PYVER=3.5
 
-ENV TENSORRT_SERVER_VERSION 0.8.0
+ENV TENSORRT_SERVER_VERSION 0.9.0dev
 LABEL com.nvidia.tensorrtserver.version="${TENSORRT_SERVER_VERSION}"
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.11
+ENV NVIDIA_TENSORRT_SERVER_VERSION 18.12dev
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
