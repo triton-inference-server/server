@@ -62,7 +62,7 @@ TensorRT Inference Server provides the following features:
   is transparent to the client requesting inference.
 * `Model repositories <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_ may reside on a locally accessible file system (e.g. NFS) or
   in Google Cloud Storage.
-* Readiness and liveness `health endpoints <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_ suitable for any orchestration microservice such as Kubernetes.
+* Readiness and liveness `health endpoints <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_ suitable for any orchestration or deployment framework, such as Kubernetes.
 * `Metrics <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_ indicating GPU utiliization, server throughput, and server
   latency.
 
