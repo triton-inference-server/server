@@ -43,7 +43,7 @@ The NVIDIA TensorRT Inference Server provides a cloud inferencing
 solution optimized for NVIDIA GPUs. The server provides an inference
 service via an HTTP or gRPC endpoint, allowing remote clients to
 request inferencing for any model being managed by the server. The
-NVIDIA Inference Server provides the following features:
+TensorRT Inference Server provides the following features:
 
 * `Multiple framework support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The server can manage any number and mix of
   models (limited by system disk and memory resources). Supports
