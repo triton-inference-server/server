@@ -30,7 +30,6 @@
 NVIDIA TensorRT Inference Server
 ================================
 
-
     **NOTE: You are currently on the master branch which tracks
     under-development progress towards the next release. The latest
     release of the TensorRT Inference Server is 0.8.0 beta and is
@@ -45,26 +44,37 @@ inference service via an HTTP or gRPC endpoint, allowing remote
 clients to request inferencing for any model being managed by the
 server. TRTIS provides the following features:
 
-* `Multiple framework support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The server can manage any number and mix of
-  models (limited by system disk and memory resources). Supports
-  TensorRT, TensorFlow GraphDef, TensorFlow SavedModel and Caffe2
-  NetDef model formats. Also supports TensorFlow-TensorRT integrated
-  models.
+* `Multiple framework support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The
+  server can manage any number and mix of models (limited by system
+  disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
+  TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
+  TensorFlow-TensorRT integrated models.
 * Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
-* `Concurrent model execution support <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple models (or multiple instances of the
-  same model) can run simultaneously on the same GPU.
+* `Concurrent model execution support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple
+  models (or multiple instances of the same model) can run
+  simultaneously on the same GPU.
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
   corresponding batch of outputs. The server also supports `dynamic
-  batching <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_ where individual inference requests are dynamically
-  combined together to improve inference throughput. Dynamic batching
-  is transparent to the client requesting inference.
-* `Model repositories <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_ may reside on a locally accessible file system (e.g. NFS) or
-  in Google Cloud Storage.
-* Readiness and liveness `health endpoints <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_ suitable for any orchestration or deployment framework, such as Kubernetes.
-* `Metrics <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_ indicating GPU utiliization, server throughput, and server
-  latency.
+  batching
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_
+  where individual inference requests are dynamically combined
+  together to improve inference throughput. Dynamic batching is
+  transparent to the client requesting inference.
+* `Model repositories
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
+  may reside on a locally accessible file system (e.g. NFS) or in
+  Google Cloud Storage.
+* Readiness and liveness `health endpoints
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_
+  suitable for any orchestration or deployment framework, such as
+  Kubernetes.
+* `Metrics
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_
+  indicating GPU utiliization, server throughput, and server latency.
 
 .. overview-end-marker-do-not-remove
 
@@ -81,6 +91,13 @@ You can also view the documentation for the `master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
 and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
+
+The `Release Notes
+<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_
+and `Support Matrix
+<https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
+indicate the required versions of the NVIDIA Driver and CUDA, and also
+describe which GPUs are supported by TRTIS.
 
 Contributing
 ------------
