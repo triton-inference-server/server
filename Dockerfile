@@ -97,6 +97,8 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 
+ARG TRTIS_VERSION=0.9.0dev
+ARG TRTIS_CONTAINER_VERSION=18.12dev
 ARG PYVER=3.5
 ARG BUILD_CLIENTS_ONLY=0
 
@@ -219,8 +221,8 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     rm -rf /root/.cache/bazel && \
     rm -rf /tmp/*
 
-ENV TENSORRT_SERVER_VERSION 0.9.0dev
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.12dev
+ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
+ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
 ENV PYVER ${PYVER}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
@@ -231,11 +233,13 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
+ARG TRTIS_VERSION=0.9.0dev
+ARG TRTIS_CONTAINER_VERSION=18.12dev
 ARG PYVER=3.5
 
-ENV TENSORRT_SERVER_VERSION 0.9.0dev
+ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
+ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
 LABEL com.nvidia.tensorrtserver.version="${TENSORRT_SERVER_VERSION}"
-ENV NVIDIA_TENSORRT_SERVER_VERSION 18.12dev
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
