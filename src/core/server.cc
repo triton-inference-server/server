@@ -1030,7 +1030,7 @@ InferenceServer::StartGrpcServer()
   const std::string addr = "0.0.0.0:" + std::to_string(grpc_port_);
   auto server = nvrpc::make_unique<nvrpc::Server>(addr);
 
-  server->GetBuilder().SetMaxMessageSize(tensorflow::kint32max);
+  server->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
 
   LOG_INFO << "Register TensorRT GRPCService";
   auto inferenceService = server->RegisterAsyncService<GRPCService>();
