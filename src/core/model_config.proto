@@ -285,8 +285,11 @@ message ModelVersionPolicy
     repeated int64 versions = 1;
   }
 
-  // Each model must implement only a single policy. The default
-  // policy is 'Latest'.
+  //@@  .. cpp:var:: oneof policy_choice
+  //@@
+  //@@     Each model must implement only a single version policy. The
+  //@@     default policy is 'Latest'.
+  //@@
   oneof policy_choice
   {
     //@@    .. cpp:var:: Latest latest
@@ -383,7 +386,7 @@ message ModelOptimizationPolicy
 //@@
 //@@.. cpp:var:: message ModelDynamicBatching
 //@@
-//@@   Dynamic batching configuration. These settings control if/how dynamic
+//@@   Dynamic batching configuration. These settings control how dynamic
 //@@   batching operates for the model.
 //@@
 message ModelDynamicBatching
@@ -404,6 +407,23 @@ message ModelDynamicBatching
   //@@     batching. Default is 0.
   //@@
   int32 max_queue_delay_microseconds = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ModelSequenceBatching
+//@@
+//@@   Sequence batching configuration. These settings control how sequence
+//@@   batching operates for the model.
+//@@
+message ModelSequenceBatching
+{
+  //@@  .. cpp:var:: uint32 max_queue_delay_microseconds
+  //@@
+  //@@     The maximum time, in microseconds, a request will be delayed in
+  //@@     the scheduling queue to wait for additional requests for
+  //@@     batching. Default is 0.
+  //@@
+  int32 max_queue_delay_microseconds = 1;
 }
 
 //@@
@@ -471,12 +491,34 @@ message ModelConfig
   //@@
   ModelOptimizationPolicy optimization = 12;
 
-  //@@  .. cpp:var:: ModelDynamicBatching dynamic_batching
+  //@@  .. cpp:var:: oneof scheduling_choice
   //@@
-  //@@     Dynamic batching configuration for the model. If not specified
-  //@@     then dynamic batching is disabled for the model.
+  //@@     The scheduling policy for the model. If not specified the
+  //@@     default scheduling policy is used for the model. The default
+  //@@     policy is to execute each inference request independently.
   //@@
-  ModelDynamicBatching dynamic_batching = 11;
+  oneof scheduling_choice
+  {
+    //@@    .. cpp:var:: ModelDynamicBatching dynamic_batching
+    //@@
+    //@@       If specified, enables the dynamic-batching scheduling
+    //@@       policy. With dynamic-batching the scheduler may group
+    //@@       together independent requests into a single batch to
+    //@@       improve inference throughput.
+    //@@
+    ModelDynamicBatching dynamic_batching = 11;
+
+    //@@    .. cpp:var:: ModelSequenceBatching sequence_batching
+    //@@
+    //@@       If specified, enables the sequence-batching scheduling
+    //@@       policy. With sequence-batching, inference requests
+    //@@       with the same correlation ID are routed to the same
+    //@@       model instance. Multiple sequences of inference requests
+    //@@       may be batched together into a single batch to
+    //@@       improve inference throughput.
+    //@@
+    ModelSequenceBatching sequence_batching = 13;
+  }
 
   //@@  .. cpp:var:: ModelInstanceGroup instance_group (repeated)
   //@@
