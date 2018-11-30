@@ -714,8 +714,13 @@ InferenceServable::AsyncRun(
         run_timer.reset();
         OnCompleteHandleInfer(status);
       });
+
+    // If there are any idle runners then wake one up to service this
+    // request. We do the actual wake outside of the lock to avoid
+    // having the woken thread immediately block on the lock
     wake_runner = (idle_runner_cnt_ > 0);
   }
+
   if (wake_runner) {
     cv_.notify_one();
   }
@@ -792,7 +797,7 @@ InferenceServable::RunnerThread(const uint32_t runner_id, const int nice)
               << " at default nice (requested nice " << nice << " failed)...";
   }
 
-  // For debugging delay start of runner threads until the queue
+  // For testing, delay start of runner threads until the queue
   // contains the specified number of entries.
   const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
@@ -814,7 +819,7 @@ InferenceServable::RunnerThread(const uint32_t runner_id, const int nice)
     {
       std::unique_lock<std::mutex> lock(mu_);
       if (delay_cnt > 0) {
-        // Debugging... wait until queue contains 'delay_cnt' items...
+        // Testing... wait until queue contains 'delay_cnt' items...
         wait_microseconds = 10 * 1000;
         if (queue_.size() >= delay_cnt) {
           delay_cnt = 0;
