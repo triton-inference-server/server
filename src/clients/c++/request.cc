@@ -130,6 +130,9 @@ class OptionsImpl : public InferContext::Options {
   OptionsImpl();
   ~OptionsImpl() = default;
 
+  uint64_t CorrelationId() const override { return correlation_id_; }
+  void SetCorrelationId(uint64_t correlation_id) override { correlation_id_ = correlation_id; }
+
   size_t BatchSize() const override { return batch_size_; }
   void SetBatchSize(size_t batch_size) override { batch_size_ = batch_size; }
 
@@ -154,11 +157,12 @@ class OptionsImpl : public InferContext::Options {
   const std::vector<OutputOptionsPair>& Outputs() const { return outputs_; }
 
  private:
+  uint64_t correlation_id_;
   size_t batch_size_;
   std::vector<OutputOptionsPair> outputs_;
 };
 
-OptionsImpl::OptionsImpl() : batch_size_(0) {}
+OptionsImpl::OptionsImpl() : correlation_id_(0), batch_size_(0) {}
 
 Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
@@ -842,6 +846,7 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
   infer_request_.Clear();
 
   infer_request_.set_batch_size(batch_size_);
+  infer_request_.set_correlation_id(options.CorrelationId());
 
   for (const auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->SetBatchSize(batch_size_);

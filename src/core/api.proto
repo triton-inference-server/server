@@ -107,6 +107,16 @@ message InferRequestHeader
     Class cls = 3;
   }
 
+  //@@  .. cpp:var:: uint64 correlation_id
+  //@@
+  //@@     The correlation ID of the inference request. Default is 0, which
+  //@@     indictes that the request has no correlation ID. The correlation ID
+  //@@     is used to indicate two or more inference request are related to
+  //@@     each other. How this relationship is handled by the inference
+  //@@     server is determined by the model's scheduling policy.
+  //@@
+  uint64 correlation_id = 4;
+
   //@@  .. cpp:var:: uint32 batch_size
   //@@
   //@@     The batch size of the inference request. This must be >= 1. For

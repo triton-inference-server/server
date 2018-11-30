@@ -421,6 +421,17 @@ class InferContext {
     /// \return Error object indicating success or failure.
     static Error Create(std::unique_ptr<Options>* options);
 
+    /// \return The correlation ID to use for all subsequent
+    /// inferences. A value of 0 indicates the subsequent inferences
+    /// have no correlation ID.
+    virtual uint64_t CorrelationId() const = 0;
+
+    /// Set the correlation ID to use for all subsequent inferences.
+    /// Set to 0 to indicate that subsequent inferences should have no
+    /// correlation ID.
+    /// \param correlation_id The correlation ID.
+    virtual void SetCorrelationId(uint64_t correlation_id) = 0;
+
     /// \return The batch size to use for all subsequent inferences.
     virtual size_t BatchSize() const = 0;
 
