@@ -112,7 +112,7 @@ _crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_uint
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
-_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint64]
+_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint64, c_uint64]
 _crequest_infer_ctx_options_del = _crequest.InferContextOptionsDelete
 _crequest_infer_ctx_options_del.argtypes = [c_void_p]
 _crequest_infer_ctx_options_add_raw = _crequest.InferContextOptionsAddRaw
@@ -580,7 +580,7 @@ class InferContext:
             return np.float64
         _raise_error("unknown result datatype " + ctype.value)
 
-    def _prepare_request(self, inputs, outputs, batch_size, contiguous_input_values):
+    def _prepare_request(self, inputs, outputs, correlation_id, batch_size, contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
@@ -588,12 +588,13 @@ class InferContext:
         for inp_name, inp in inputs.items():
             if not isinstance(inp, (list, tuple)):
                 _raise_error("input '" + inp_name +
-                             "' values must be specified as a list or numpy arrays")
+                             "' values must be specified as a list of numpy arrays")
 
         # Set run options using formats specified in 'outputs'
         options = c_void_p()
         try:
-            _raise_if_error(c_void_p(_crequest_infer_ctx_options_new(byref(options), batch_size)))
+            _raise_if_error(c_void_p(
+                _crequest_infer_ctx_options_new(byref(options), correlation_id, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if output_format == InferContext.ResultFormat.RAW:
@@ -717,7 +718,7 @@ class InferContext:
         _crequest_infer_ctx_del(self._ctx)
         self._ctx = None
 
-    def run(self, inputs, outputs, batch_size=1):
+    def run(self, inputs, outputs, batch_size=1, correlation_id=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -741,6 +742,10 @@ class InferContext:
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
+
+        correlation_id : int
+            The correlation ID for the inference. If not specified (or if
+            specified as 0), the inference will have no correlation ID.
 
         Returns
         -------
@@ -772,14 +777,14 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, correlation_id, batch_size, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, inputs, outputs, batch_size=1):
+    def async_run(self, inputs, outputs, batch_size=1, correlation_id=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -809,6 +814,9 @@ class InferContext:
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
 
+        correlation_id : int
+            The correlation ID for the inference. If not specified (or if
+            specified as 0), the inference will have no correlation ID.
 
         Returns
         -------
@@ -830,7 +838,7 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, correlation_id, batch_size, contiguous_input)
 
         # Run asynchronous inference...
         c_request_id = c_uint64()
