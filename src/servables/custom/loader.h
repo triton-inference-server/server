@@ -25,45 +25,32 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/model_config.pb.h"
+#include "src/servables/custom/custom.h"
+#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+/// Load a Custom shared library from a path.
+///
+/// \param path The path to the shared library.
+/// \param dlhandle Returns the opaque library handle.
+/// \param InializeFn Returns the initalize function from the custom
+/// library.
+/// \param FinalizeFn Returns the finalize function from the custom
+/// library.
+/// \param ErrorStringFn Returns the error-string function from the
+/// custom library.
+/// \param ExecuteFn Returns the execute function from the custom
+/// library.
+/// \return Error status.
+tensorflow::Status LoadCustom(
+  const std::string& path, void** dlhandle, CustomInitializeFn_t* InitializeFn,
+  CustomFinalizeFn_t* FinalizeFn, CustomErrorStringFn_t* ErrorStringFn,
+  CustomExecuteFn_t* ExecuteFn);
 
-// Enumeration for the different platform types
-enum Platform {
-  PLATFORM_UNKNOWN = 0,
-  PLATFORM_TENSORRT_PLAN = 1,
-  PLATFORM_TENSORFLOW_GRAPHDEF = 2,
-  PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
-  PLATFORM_CAFFE2_NETDEF = 4,
-  PLATFORM_CUSTOM = 5
-};
-
-// Get the size of a datatype in bytes. Return 0 if unable to
-// determine the size of the data type.
-size_t GetDataTypeByteSize(const DataType dtype);
-
-// Get the size, in bytes, of a tensor based on datatype and
-// dimensions. Return 0 if unable to determine the size of the data
-// type.
-uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
-
-// Get the size, in bytes, of a tensor based on ModelInput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelInput& mio);
-
-// Get the size, in bytes, of a tensor based on ModelOutput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelOutput& mio);
-
-// Get the Platform value for a platform string or Platform::UNKNOWN
-// if the platform string is not recognized.
-Platform GetPlatform(const std::string& platform_str);
-
-// Compare two model configuration shapes. Return true if equal, false
-// is not equal.
-bool CompareDims(const DimsList& dims0, const DimsList& dims1);
+/// Unload custom shared library.
+///
+/// \param handle The library handle.
+void UnloadCustom(void* handle);
 
 }}  // namespace nvidia::inferenceserver

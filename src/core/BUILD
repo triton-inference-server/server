@@ -268,6 +268,7 @@ cc_library(
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
         "//src/servables/tensorrt:plan_bundle_source_adapter",
+        "//src/servables/custom:custom_bundle_source_adapter",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",

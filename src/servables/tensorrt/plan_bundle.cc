@@ -316,7 +316,7 @@ PlanBundle::Context::InitializeInputBindings(
         name_);
     }
 
-    const uint64_t byte_size = GetSize(max_batch_size_, dt, io.dims());
+    const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
     if (byte_size == 0) {
       return tensorflow::errors::Internal(
         "unable to calculate size for input '", io.name(), " for ", name_);
@@ -379,7 +379,7 @@ PlanBundle::Context::InitializeOutputBindings(
         name_);
     }
 
-    const uint64_t byte_size = GetSize(max_batch_size_, dt, io.dims());
+    const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
     if (byte_size == 0) {
       return tensorflow::errors::Internal(
         "unable to calculate size for output '", io.name(), " for ", name_);
