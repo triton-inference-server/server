@@ -82,10 +82,15 @@ The current release of the TensorRT Inference Server is 0.8.0 beta and
 corresponds to the 18.11 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
 this release is `r18.11
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_. The
-User Guide, Developer Guide, and API Reference `documentation
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_.
+
+Documentation
+-------------
+
+The User Guide, Developer Guide, and API Reference `documentation
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building and running TRTIS.
+provide guidance on installing, building and running the latest
+release of the TensorRT Inference Server.
 
 You can also view the documentation for the `master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
