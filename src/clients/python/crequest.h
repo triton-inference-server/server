@@ -28,6 +28,7 @@
 #include <stddef.h>
 #include "src/clients/c++/request.h"
 
+namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
 #ifdef __cplusplus
@@ -71,7 +72,8 @@ nic::Error* ServerStatusContextGetServerStatus(
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int model_version, bool verbose);
+    const char* model_name, int model_version, ni::CorrelationID correlation_id,
+    bool verbose);
 void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
@@ -85,8 +87,7 @@ nic::Error* InferContextGetReadyAsyncRequest(
 //==============================================================================
 // InferContext::Options
 nic::Error* InferContextOptionsNew(
-    nic::InferContext::Options** ctx, uint64_t correlation_id,
-    uint64_t batch_size);
+    nic::InferContext::Options** ctx, uint64_t batch_size);
 void InferContextOptionsDelete(nic::InferContext::Options* ctx);
 nic::Error* InferContextOptionsAddRaw(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,

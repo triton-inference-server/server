@@ -91,7 +91,7 @@ _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
-_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int, c_bool]
+_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int, c_uint64, c_bool]
 _crequest_infer_ctx_del = _crequest.InferContextDelete
 _crequest_infer_ctx_del.argtypes = [c_void_p]
 _crequest_infer_ctx_set_options = _crequest.InferContextSetOptions
@@ -112,7 +112,7 @@ _crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_uint
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
-_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint64, c_uint64]
+_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint64]
 _crequest_infer_ctx_options_del = _crequest.InferContextOptionsDelete
 _crequest_infer_ctx_options_del.argtypes = [c_void_p]
 _crequest_infer_ctx_options_add_raw = _crequest.InferContextOptionsAddRaw
@@ -506,6 +506,10 @@ class InferContext:
         or None to indicate that the latest (i.e. highest version number)
         version should be used.
 
+    correlation_id : int
+        The correlation ID for the inference. If not specified (or if
+        specified as 0), the inference will have no correlation ID.
+
     verbose : bool
         If True generate verbose output.
 
@@ -525,7 +529,7 @@ class InferContext:
         RAW = 1,
         CLASS = 2
 
-    def __init__(self, url, protocol, model_name, model_version=None, verbose=False):
+    def __init__(self, url, protocol, model_name, model_version=None, verbose=False, correlation_id=0):
         self._last_request_id = None
         self._last_request_model_name = None
         self._last_request_model_version = None
@@ -537,7 +541,7 @@ class InferContext:
             c_void_p(
                 _crequest_infer_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    model_name, imodel_version, verbose)))
+                    model_name, imodel_version, correlation_id, verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -580,7 +584,7 @@ class InferContext:
             return np.float64
         _raise_error("unknown result datatype " + ctype.value)
 
-    def _prepare_request(self, inputs, outputs, correlation_id, batch_size, contiguous_input_values):
+    def _prepare_request(self, inputs, outputs, batch_size, contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
@@ -594,7 +598,7 @@ class InferContext:
         options = c_void_p()
         try:
             _raise_if_error(c_void_p(
-                _crequest_infer_ctx_options_new(byref(options), correlation_id, batch_size)))
+                _crequest_infer_ctx_options_new(byref(options), batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if output_format == InferContext.ResultFormat.RAW:
@@ -718,7 +722,7 @@ class InferContext:
         _crequest_infer_ctx_del(self._ctx)
         self._ctx = None
 
-    def run(self, inputs, outputs, batch_size=1, correlation_id=0):
+    def run(self, inputs, outputs, batch_size=1):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -742,10 +746,6 @@ class InferContext:
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
-
-        correlation_id : int
-            The correlation ID for the inference. If not specified (or if
-            specified as 0), the inference will have no correlation ID.
 
         Returns
         -------
@@ -777,14 +777,14 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, correlation_id, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, inputs, outputs, batch_size=1, correlation_id=0):
+    def async_run(self, inputs, outputs, batch_size=1):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -814,10 +814,6 @@ class InferContext:
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
 
-        correlation_id : int
-            The correlation ID for the inference. If not specified (or if
-            specified as 0), the inference will have no correlation ID.
-
         Returns
         -------
         int
@@ -838,7 +834,7 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, correlation_id, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
 
         # Run asynchronous inference...
         c_request_id = c_uint64()

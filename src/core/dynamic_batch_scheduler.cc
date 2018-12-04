@@ -127,8 +127,8 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
                    << " failed)...";
   }
 
-  // For debugging delay start of threads until the queue contains the
-  // specified number of entries.
+  // For debugging, delay start of threads until the queue contains
+  // the specified number of entries.
   const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
