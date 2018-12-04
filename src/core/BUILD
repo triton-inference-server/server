@@ -159,6 +159,7 @@ cc_library(
         ":label_provider",
         ":metrics",
         ":model_config_proto",
+        ":scheduler",
         ":server_status_header",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
@@ -170,6 +171,7 @@ cc_library(
     srcs = ["infer.cc"],
     deps = [
         ":constants",
+        ":dynamic_batch_scheduler",
         ":infer_header",
         ":logging",
         ":utils",
@@ -245,6 +247,32 @@ cc_library(
 )
 
 cc_library(
+    name = "scheduler",
+    hdrs = ["scheduler.h"],
+    deps = [
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "dynamic_batch_scheduler",
+    srcs = ["dynamic_batch_scheduler.cc"],
+    hdrs = ["dynamic_batch_scheduler.h"],
+    deps = [
+        ":constants",
+        ":infer_header",
+        ":logging",
+        ":model_config",
+        ":model_config_proto",
+        ":scheduler",
+        ":server_status_header",
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
     name = "server",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
@@ -252,7 +280,7 @@ cc_library(
         ":api_proto",
         ":constants",
         ":grpc_service_proto",
-        ":infer_header",
+        ":infer",
         ":logging",
         ":model_config",
         ":model_config_proto",

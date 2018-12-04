@@ -25,14 +25,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <condition_variable>
-#include <mutex>
 #include "libevent/include/event2/buffer.h"
 #include "src/core/api.pb.h"
 #include "src/core/grpc_service.pb.h"
 #include "src/core/label_provider.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/scheduler.h"
 #include "src/core/server_status.h"
 #include "tensorflow/core/lib/core/errors.h"
 
@@ -235,11 +234,11 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   size_t total_raw_byte_size_;
 };
 
-// Interface for servables that handle generic inference requests.
+// Interface for servables that handle inference requests.
 class InferenceServable {
  public:
-  InferenceServable();
-  virtual ~InferenceServable();
+  InferenceServable() = default;
+  virtual ~InferenceServable() {}
 
   // Get the name of model being served.
   const std::string& Name() const { return config_.name(); }
@@ -261,8 +260,8 @@ class InferenceServable {
   virtual const LabelProvider& GetLabelProvider() const = 0;
 
   // Run inference using the provided request to produce outputs in
-  // the provide response.
-  // This method should be called by synchronous frontends
+  // the provide response. This method should be called by synchronous
+  // frontends.
   void Run(
     std::shared_ptr<ModelInferStats> stats,
     std::shared_ptr<InferRequestProvider> request_provider,
@@ -270,8 +269,8 @@ class InferenceServable {
     std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
 
   // Run inference using the provided request to produce outputs in
-  // the provide response.
-  // This method should be called by asynchronous frontends
+  // the provide response. This method should be called by
+  // asynchronous frontends.
   void AsyncRun(
     std::shared_ptr<ModelInferStats> stats,
     std::shared_ptr<InferRequestProvider> request_provider,
@@ -294,61 +293,14 @@ class InferenceServable {
   tensorflow::Status SetModelConfig(
     const tensorflow::StringPiece& path, const ModelConfig& config);
 
-  // Set the number of runners to use for executing requests to this
-  // servable. Currently this method may be called only once but in
-  // the future could allow it to be called multiple times to
-  // dynamically adjust the number of runners.
-  tensorflow::Status SetRunnerCount(uint32_t cnt);
+  // Explicitly set the scheduler to use for inference requests to the
+  // model. The scheduler can only be set once for a servable.
+  tensorflow::Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
 
-  // Called by runner thread when a request has been completed with
-  // the result status for the request. If successful the
-  // ResponseProvider will have been updated with the response.
-  using CompleteFunc = std::function<void(tensorflow::Status)>;
-
-  struct RunnerPayload {
-    RunnerPayload() = default;
-    RunnerPayload(const RunnerPayload& payload) = default;
-    RunnerPayload(
-      struct timespec queued_timestamp, std::shared_ptr<ModelInferStats> stats,
-      std::shared_ptr<InferRequestProvider> request_provider,
-      std::shared_ptr<InferResponseProvider> response_provider,
-      CompleteFunc complete_function)
-        : queued_timestamp_(queued_timestamp), stats_(stats),
-          request_provider_(request_provider),
-          response_provider_(response_provider),
-          complete_function_(complete_function),
-          status_(tensorflow::Status::OK()),
-          compute_status_(tensorflow::Status::OK())
-    {
-    }
-
-    struct timespec queued_timestamp_;
-    std::shared_ptr<ModelInferStats> stats_;
-    std::shared_ptr<InferRequestProvider> request_provider_;
-    std::shared_ptr<InferResponseProvider> response_provider_;
-    CompleteFunc complete_function_;
-    tensorflow::Status status_;
-    tensorflow::Status compute_status_;
-  };
-
-  struct RunnerThreadState {
-    std::vector<RunnerPayload> payloads;
-  };
-
-  // Run inference as the runner specified by 'runner_idx' using the
-  // provided request payloads to produce outputs in the provided
-  // response. A non-OK return status indicates an internal error that
-  // prevents any of the of requests from completing. If an error is
-  // isolate to a single request payload it will be reported in that
-  // payload.
-  // This methods should be called if the backend executes synchronously
-  virtual void Run(
-    uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
-    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
-  {
-    OnCompleteQueuedPayloads(
-      tensorflow::errors::Unavailable("unable to serve model"));
-  }
+  // Set the scheduler based on the model configuration. The scheduler
+  // can only be set once for a servable.
+  tensorflow::Status SetConfiguredScheduler(
+    const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun);
 
  private:
   // Configuration of the model that this servable represents.
@@ -357,34 +309,11 @@ class InferenceServable {
   // Version of the model that this servable represents.
   uint32_t version_;
 
+  // The scheduler to use for this servable.
+  std::unique_ptr<Scheduler> scheduler_;
+
   // Tags of the model that this servable represents.
   std::map<std::string, std::string> tags_;
-
-  // The number of runner threads for this servable.
-  uint32_t runner_cnt_;
-
-  // The number of runner threads currently idle.
-  uint32_t idle_runner_cnt_;
-
-  // Mutex and condvar protecting the scheduling queue.
-  std::mutex mu_;
-  std::condition_variable cv_;
-
-  // Queue holding inference requests for the model represented by
-  // this servable.
-  std::deque<RunnerPayload> queue_;
-
-  std::vector<std::unique_ptr<std::thread>> runner_threads_;
-  std::atomic<bool> runner_threads_exit_;
-
-  void RunnerThread(const uint32_t runner_id, const int nice);
-  uint64_t GetDynamicBatch(const ModelDynamicBatching& batching_config);
-
-  size_t max_preferred_batch_size_;
-  std::set<int32_t> preferred_batch_sizes_;
-  uint64_t pending_batch_delay_ns_;
-  size_t pending_batch_size_;
-  size_t pending_batch_queue_cnt_;
 
   void GetMetricLabels(
     std::map<std::string, std::string>* labels, const int gpu_device) const;

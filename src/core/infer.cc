@@ -26,13 +26,9 @@
 
 #include "src/core/infer.h"
 
-#include <sys/resource.h>
-#include <sys/syscall.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <chrono>
 #include "src/core/constants.h"
+#include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -498,29 +494,6 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
   return tensorflow::Status::OK();
 }
 
-
-InferenceServable::InferenceServable()
-    : runner_cnt_(0), idle_runner_cnt_(0), max_preferred_batch_size_(0),
-      pending_batch_delay_ns_(0), pending_batch_size_(0),
-      pending_batch_queue_cnt_(0)
-{
-  runner_threads_exit_.store(false);
-}
-
-InferenceServable::~InferenceServable()
-{
-  // Signal the runner threads to exit and then wait for them...
-  {
-    std::unique_lock<std::mutex> lock(mu_);
-    runner_threads_exit_.store(true);
-    cv_.notify_all();
-  }
-
-  for (auto& runner : runner_threads_) {
-    runner->join();
-  }
-}
-
 void
 InferenceServable::GetMetricLabels(
   std::map<std::string, std::string>* labels, const int gpu_device) const
@@ -646,54 +619,31 @@ InferenceServable::SetModelConfig(
       std::map<std::string, std::string>::value_type(tag.first, tag.second));
   }
 
-  max_preferred_batch_size_ = 0;
-  preferred_batch_sizes_.clear();
-  for (const auto size : config.dynamic_batching().preferred_batch_size()) {
-    max_preferred_batch_size_ =
-      std::max(max_preferred_batch_size_, (size_t)size);
-    preferred_batch_sizes_.insert(size);
-  }
-
-  pending_batch_delay_ns_ =
-    (uint64_t)config.dynamic_batching().max_queue_delay_microseconds() * 1000;
-
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-InferenceServable::SetRunnerCount(uint32_t cnt)
+InferenceServable::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 {
-  if (runner_cnt_ != 0) {
+  if (scheduler_ != nullptr) {
     return tensorflow::errors::Internal(
-      "Attempt to change runner count from ", runner_cnt_, " to ", cnt,
-      " not allowed");
+      "Attempt to change scheduler not allowed");
   }
 
-  runner_cnt_ = cnt;
-
-  // Set default nice level unless overridden by model priority
-  int nice = SCHEDULER_DEFAULT_NICE;
-  if (config_.has_optimization()) {
-    switch (config_.optimization().priority()) {
-      case ModelOptimizationPolicy::PRIORITY_MAX:
-        nice = 0;
-        break;
-      case ModelOptimizationPolicy::PRIORITY_MIN:
-        nice = 19;
-        break;
-      default:
-        nice = SCHEDULER_DEFAULT_NICE;
-        break;
-    }
-  }
-
-  // Create the runner threads for this servable.
-  for (uint32_t c = 0; c < runner_cnt_; ++c) {
-    runner_threads_.emplace_back(
-      new std::thread([this, c, nice]() { RunnerThread(c, nice); }));
-  }
-
+  scheduler_ = std::move(scheduler);
   return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+InferenceServable::SetConfiguredScheduler(
+  const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun)
+{
+  std::unique_ptr<Scheduler> scheduler;
+
+  // Use the default DynamicBatchScheduler.
+  scheduler.reset(new DynamicBatchScheduler(config_, runner_cnt, OnRun));
+
+  return SetScheduler(std::move(scheduler));
 }
 
 void
@@ -704,26 +654,14 @@ InferenceServable::AsyncRun(
   std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
   auto run_timer = std::make_shared<ModelInferStats::ScopedTimer>();
-  struct timespec queued_timestamp = stats->StartRunTimer(run_timer.get());
-  bool wake_runner = false;
-  {
-    std::lock_guard<std::mutex> lock(mu_);
-    queue_.emplace_back(
-      queued_timestamp, stats, request_provider, response_provider,
-      [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
-        run_timer.reset();
-        OnCompleteHandleInfer(status);
-      });
+  stats->StartRunTimer(run_timer.get());
 
-    // If there are any idle runners then wake one up to service this
-    // request. We do the actual wake outside of the lock to avoid
-    // having the woken thread immediately block on the lock
-    wake_runner = (idle_runner_cnt_ > 0);
-  }
-
-  if (wake_runner) {
-    cv_.notify_one();
-  }
+  scheduler_->Enqueue(
+    stats, request_provider, response_provider,
+    [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
+      run_timer.reset();
+      OnCompleteHandleInfer(status);
+    });
 }
 
 // Since callers are expecting synchronous behavior, this function
@@ -737,23 +675,20 @@ InferenceServable::Run(
   std::shared_ptr<InferResponseProvider> response_provider,
   std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
-  // Since this call is synchronous right now we can just use a scoped
-  // timer to measure the entire run time.
+  // Since this call is synchronous we can just use a scoped timer to
+  // measure the entire run time.
   ModelInferStats::ScopedTimer run_timer;
-  struct timespec queued_timestamp = stats->StartRunTimer(&run_timer);
-
+  stats->StartRunTimer(&run_timer);
 
   std::mutex lmu;
   std::condition_variable lcv;
   tensorflow::Status run_status;
   bool run_completed = false;
-  bool wake_runner = false;
 
   // Add request to queue...
   {
-    std::lock_guard<std::mutex> lock(mu_);
-    queue_.emplace_back(
-      queued_timestamp, stats, request_provider, response_provider,
+    scheduler_->Enqueue(
+      stats, request_provider, response_provider,
       [&lmu, &lcv, &run_status, &run_completed](tensorflow::Status status) {
         // signal complete and propagate status
         {
@@ -763,15 +698,6 @@ InferenceServable::Run(
         }
         lcv.notify_one();
       });
-
-    // If there are any idle runners then wake one up to service this
-    // request. We do the actual wake outside of the lock to avoid
-    // having the woken thread immediately block on the lock
-    wake_runner = (idle_runner_cnt_ > 0);
-  }
-
-  if (wake_runner) {
-    cv_.notify_one();
   }
 
   // [DLIS-124] must wait for request to indicate complete...
@@ -784,218 +710,6 @@ InferenceServable::Run(
   }
 
   OnCompleteHandleInfer(run_status);
-}
-
-void
-InferenceServable::RunnerThread(const uint32_t runner_id, const int nice)
-{
-  if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
-    LOG_INFO << "Starting runner thread " << runner_id << " at nice " << nice
-             << "...";
-  } else {
-    LOG_ERROR << "Starting runner thread " << runner_id
-              << " at default nice (requested nice " << nice << " failed)...";
-  }
-
-  // For testing, delay start of runner threads until the queue
-  // contains the specified number of entries.
-  const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
-  size_t delay_cnt = 0;
-  if (dstr != nullptr) {
-    delay_cnt = atoi(dstr);
-    LOG_INFO << "Delaying runner thread " << runner_id << " until " << delay_cnt
-             << " queued payloads...";
-  }
-
-  const uint64_t default_wait_microseconds = 500 * 1000;
-  const bool dynamic_batching_enabled = config_.has_dynamic_batching();
-
-  while (!runner_threads_exit_.load()) {
-    auto state = std::make_shared<RunnerThreadState>();
-    bool wake_runner = false;
-    uint64_t wait_microseconds = 0;
-
-    // Hold the lock for as short a time as possible.
-    {
-      std::unique_lock<std::mutex> lock(mu_);
-      if (delay_cnt > 0) {
-        // Testing... wait until queue contains 'delay_cnt' items...
-        wait_microseconds = 10 * 1000;
-        if (queue_.size() >= delay_cnt) {
-          delay_cnt = 0;
-        }
-      } else if (queue_.empty()) {
-        wait_microseconds = default_wait_microseconds;
-      } else if (dynamic_batching_enabled) {
-        // Use dynamic batching to get request payload(s) to execute.
-        wait_microseconds = GetDynamicBatch(config_.dynamic_batching());
-        if (wait_microseconds == 0) {
-          for (size_t idx = 0; idx < pending_batch_queue_cnt_; ++idx) {
-            state->payloads.emplace_back(queue_.front());
-            queue_.pop_front();
-          }
-
-          pending_batch_size_ = 0;
-          pending_batch_queue_cnt_ = 0;
-
-          // If there are still requests in the queue after removing
-          // the pending batch and if there are any idle runners
-          // then wake one up to service the requests remaining in
-          // the queue. We need this special wake logic for the
-          // dynamic batching case because we may delay handling
-          // requests in the queue and so idle the runners that
-          // would normally be handling those requests. We do the
-          // actual wake outside of the lock to avoid having the
-          // woken thread immediately block on the lock.
-          wake_runner = !queue_.empty() && (idle_runner_cnt_ > 0);
-        }
-      } else {
-        // No batching... execute next request payload
-        state->payloads.emplace_back(queue_.front());
-        queue_.pop_front();
-      }
-
-      // If no requests are to be handled, wait for notification or
-      // for the specified timeout before checking the queue again.
-      if (wait_microseconds > 0) {
-        idle_runner_cnt_++;
-        std::chrono::microseconds wait_timeout(wait_microseconds);
-        cv_.wait_for(lock, wait_timeout);
-        idle_runner_cnt_--;
-      }
-    }
-
-    if (wake_runner) {
-      cv_.notify_one();
-    }
-
-    if (!state->payloads.empty()) {
-      auto OnCompleteQueuedPayloads = [state](tensorflow::Status status) {
-        bool found_success = false;
-        for (auto& payload : state->payloads) {
-          tensorflow::Status final_status =
-            status.ok() ? (payload.status_.ok() ? payload.compute_status_
-                                                : payload.status_)
-                        : status;
-
-          // All the payloads executed together, so count 1 execution in
-          // the first successful payload. Other payloads stay at 0
-          // executions.
-          if (!found_success && final_status.ok()) {
-            payload.stats_->SetModelExecutionCount(1);
-            found_success = true;
-          }
-          payload.complete_function_(final_status);
-        }
-      };
-      Run(runner_id, &(state->payloads), OnCompleteQueuedPayloads);
-    }
-
-  }  // end runner loop
-
-  LOG_INFO << "Stopping runner thread " << runner_id << "...";
-}
-
-uint64_t
-InferenceServable::GetDynamicBatch(const ModelDynamicBatching& batching_config)
-{
-  // 'mu_' mutex must be held when this function is called. queue_
-  // must not be empty.
-
-  // Handle the cases where the pending batch or request must be
-  // executed immediately.
-  //
-  //   1) if next request would make pending batch larger than the max
-  //   preferred batch size then must execute the pending patch
-  //   immediately
-  //
-  //   2) if no pending batch and next request on its own has batch
-  //   size larger than the max preferred batch size then must execute
-  //   immediately
-  {
-    const auto batch_size =
-      queue_.front().request_provider_->RequestHeader().batch_size();
-    if ((pending_batch_size_ + batch_size) >= max_preferred_batch_size_) {
-      if (pending_batch_queue_cnt_ == 0) {
-        pending_batch_size_ = batch_size;
-        pending_batch_queue_cnt_ = 1;
-      }
-      return 0;
-    }
-  }
-
-  // Examine the new requests. If adding these new requests to the
-  // pending batch allows a preferred batch size then execute it
-  // immediately. Stop examining requests if the maximum preferred
-  // batch size would be exceeded.
-  size_t best_preferred_batch_size = 0;
-  size_t best_preferred_batch_cnt = 0;
-  size_t search_batch_size = pending_batch_size_;
-  size_t search_batch_cnt = pending_batch_queue_cnt_;
-  for (auto idx = pending_batch_queue_cnt_; idx < queue_.size(); ++idx) {
-    const auto batch_size =
-      queue_[idx].request_provider_->RequestHeader().batch_size();
-
-    if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
-      break;
-    }
-
-    search_batch_size += batch_size;
-    search_batch_cnt++;
-
-    if (
-      preferred_batch_sizes_.find(search_batch_size) !=
-      preferred_batch_sizes_.end()) {
-      best_preferred_batch_size = search_batch_size;
-      best_preferred_batch_cnt = search_batch_cnt;
-    }
-  }
-
-  // If we found a preferred batch size then execute that.
-  if (best_preferred_batch_size != 0) {
-    pending_batch_size_ = best_preferred_batch_size;
-    pending_batch_queue_cnt_ = best_preferred_batch_cnt;
-    return 0;
-  }
-
-  pending_batch_size_ = search_batch_size;
-  pending_batch_queue_cnt_ = search_batch_cnt;
-
-  // Should always have at least one request in the pending batch at
-  // this point.
-  if (pending_batch_queue_cnt_ == 0) {
-    LOG_ERROR << "unexpected pending batch size 0";
-    return 0;
-  }
-
-  // If there is no batch queuing delay then just immediately
-  // execute whatever is pending.
-  if (pending_batch_delay_ns_ == 0) {
-    return 0;
-  }
-
-  // Compare the age of the oldest pending request to the maximum
-  // batch queuing delay and execute now if queuing delay is
-  // exceeded. If queuing delay not exceeded create a timer to wakeup
-  // a thread to check again at the maximum allowed delay.
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  struct timespec& queued = queue_.front().queued_timestamp_;
-  uint64_t delay_ns = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) -
-                      (queued.tv_sec * NANOS_PER_SECOND + queued.tv_nsec);
-
-  if (delay_ns >= pending_batch_delay_ns_) {
-    return 0;
-  }
-
-  // Return non-zero wait microseconds to cause this runner to wait
-  // until the queue delay has expired. Another thread may be awaken
-  // due to incoming request to handle the pending batch before this
-  // thread wakes and that is ok. But if no other request comes in
-  // then this thread will wake and revist the pending batch (and at
-  // that time will then see the delay has been exceeded and will send
-  // the batch).
-  return (pending_batch_delay_ns_ - delay_ns) / 1000;
 }
 
 }}  // namespace nvidia::inferenceserver
