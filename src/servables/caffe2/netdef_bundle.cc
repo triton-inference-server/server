@@ -156,9 +156,15 @@ NetDefBundle::CreateExecutionContexts(
     }
   }
 
-  // Create one runner for each context available for this
-  // model. Each runner is exclusively tied to the context.
-  TF_RETURN_IF_ERROR(SetRunnerCount(total_context_cnt));
+  // Create a scheduler with one thread for each context available for
+  // this model. Each runner is exclusively tied to the context.
+  TF_RETURN_IF_ERROR(SetConfiguredScheduler(
+    total_context_cnt,
+    [this](
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(tensorflow::Status)> func) {
+      Run(runner_idx, payloads, func);
+    }));
 
   LOG_VERBOSE(1) << "netdef bundle for " << Name() << std::endl << *this;
   return tensorflow::Status::OK();
@@ -308,7 +314,7 @@ NetDefBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
 
 void
 NetDefBundle::Run(
-  uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+  uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
   std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
@@ -330,7 +336,7 @@ NetDefBundle::Run(
 }
 
 tensorflow::Status
-NetDefBundle::Context::Run(std::vector<RunnerPayload>* payloads)
+NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";

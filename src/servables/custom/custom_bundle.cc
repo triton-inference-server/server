@@ -133,9 +133,15 @@ CustomBundle::CreateExecutionContexts(
     }
   }
 
-  // Create one runner for each context available for this
-  // model. Each runner is exclusively tied to the context.
-  TF_RETURN_IF_ERROR(SetRunnerCount(total_context_cnt));
+  // Create a scheduler with one thread for each context available for
+  // this model. Each runner is exclusively tied to the context.
+  TF_RETURN_IF_ERROR(SetConfiguredScheduler(
+    total_context_cnt,
+    [this](
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(tensorflow::Status)> func) {
+      Run(runner_idx, payloads, func);
+    }));
 
   LOG_VERBOSE(1) << "custom bundle for " << Name() << std::endl << *this;
   return tensorflow::Status::OK();
@@ -237,7 +243,7 @@ CustomBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
 
 void
 CustomBundle::Run(
-  uint32_t runner_idx, std::vector<RunnerPayload>* payloads,
+  uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
   std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
@@ -259,7 +265,7 @@ CustomBundle::Run(
 }
 
 tensorflow::Status
-CustomBundle::Context::Run(std::vector<RunnerPayload>* payloads)
+CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -425,7 +431,7 @@ CustomBundle::Context::GetNextInput(
   uint64_t* content_byte_size)
 {
   const std::string name(cname);
-  RunnerPayload* payload = input_context->payload_;
+  Scheduler::Payload* payload = input_context->payload_;
 
   *content = nullptr;
   *content_byte_size = 0;
@@ -464,7 +470,7 @@ CustomBundle::Context::GetOutput(
   uint64_t content_byte_size, void** content)
 {
   const std::string name(cname);
-  RunnerPayload* payload = output_context->payload_;
+  Scheduler::Payload* payload = output_context->payload_;
 
   *content = nullptr;
 
