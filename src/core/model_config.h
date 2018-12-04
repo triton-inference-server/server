@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <stdint.h>
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -61,6 +62,10 @@ uint64_t GetByteSize(const ModelOutput& mio);
 // Get the Platform value for a platform string or Platform::UNKNOWN
 // if the platform string is not recognized.
 Platform GetPlatform(const std::string& platform_str);
+
+// Get the CPU thread nice level associate with a model configurations
+// priority.
+int GetPriorityNiceLevel(const ModelConfig& config);
 
 // Compare two model configuration shapes. Return true if equal, false
 // is not equal.
