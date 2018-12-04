@@ -30,6 +30,7 @@
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
+#include "src/core/sequence_batch_scheduler.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 
@@ -639,8 +640,13 @@ InferenceServable::SetConfiguredScheduler(
 {
   std::unique_ptr<Scheduler> scheduler;
 
-  // Use the default DynamicBatchScheduler.
-  scheduler.reset(new DynamicBatchScheduler(config_, runner_cnt, OnRun));
+  // If 'sequence_batching' is configured use the SequenceBatchScheduler,
+  // otherwise use the default DynamicBatchScheduler.
+  if (config_.has_sequence_batching()) {
+    scheduler.reset(new SequenceBatchScheduler(config_, runner_cnt, OnRun));
+  } else {
+    scheduler.reset(new DynamicBatchScheduler(config_, runner_cnt, OnRun));
+  }
 
   return SetScheduler(std::move(scheduler));
 }

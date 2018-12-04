@@ -212,6 +212,7 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     cp bazel-bin/src/clients/c++/image_client /opt/tensorrtserver/bin/. && \
     cp bazel-bin/src/clients/c++/perf_client /opt/tensorrtserver/bin/. && \
     cp bazel-bin/src/clients/c++/simple_client /opt/tensorrtserver/bin/. && \
+    cp bazel-bin/src/clients/c++/simple_sequence_client /opt/tensorrtserver/bin/. && \
     mkdir -p /opt/tensorrtserver/lib && \
     cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/. && \
     cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/. && \
@@ -222,6 +223,7 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
                cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
                mkdir -p /opt/tensorrtserver/custom; \
                cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/.; \
+               cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/.; \
              fi' && \
     bazel clean --expunge && \
     rm -rf /root/.cache/bazel && \

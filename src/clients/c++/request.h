@@ -105,7 +105,7 @@ class Error {
 /// A ServerHealthContext object is used to query an inference server
 /// for health information. Once created a ServerHealthContext object
 /// can be used repeatedly to get health from the server. A
-/// ServerHealthContext object can use either HTTP protocol or gRPC
+/// ServerHealthContext object can use either HTTP protocol or GRPC
 /// protocol depending on the Create function
 /// (ServerHealthHttpContext::Create or
 /// ServerHealthGrpcContext::Create). For example:
@@ -151,7 +151,7 @@ class ServerHealthContext {
 /// for status information, including information about the models
 /// available on that server. Once created a ServerStatusContext object
 /// can be used repeatedly to get status from the server.
-/// A ServerStatusContext object can use either HTTP protocol or gRPC protocol
+/// A ServerStatusContext object can use either HTTP protocol or GRPC protocol
 /// depending on the Create function (ServerStatusHttpContext::Create or
 /// ServerStatusGrpcContext::Create). For example:
 ///
@@ -192,7 +192,7 @@ class ServerStatusContext {
 /// model. Options that control how inference is performed can be
 /// changed in between inference runs.
 ///
-/// A InferContext object can use either HTTP protocol or gRPC protocol
+/// A InferContext object can use either HTTP protocol or GRPC protocol
 /// depending on the Create function (InferHttpContext::Create or
 /// InferGrpcContext::Create). For example:
 ///
@@ -421,17 +421,6 @@ class InferContext {
     /// \return Error object indicating success or failure.
     static Error Create(std::unique_ptr<Options>* options);
 
-    /// \return The correlation ID to use for all subsequent
-    /// inferences. A value of 0 indicates the subsequent inferences
-    /// have no correlation ID.
-    virtual uint64_t CorrelationId() const = 0;
-
-    /// Set the correlation ID to use for all subsequent inferences.
-    /// Set to 0 to indicate that subsequent inferences should have no
-    /// correlation ID.
-    /// \param correlation_id The correlation ID.
-    virtual void SetCorrelationId(uint64_t correlation_id) = 0;
-
     /// \return The batch size to use for all subsequent inferences.
     virtual size_t BatchSize() const = 0;
 
@@ -471,7 +460,7 @@ class InferContext {
   /// Cumulative statistic of the InferContext.
   ///
   /// \note
-  ///   For gRPC protocol, 'cumulative_send_time_ns' represents the
+  ///   For GRPC protocol, 'cumulative_send_time_ns' represents the
   ///   time for marshaling infer request.
   ///   'cumulative_receive_time_ns' represents the time for
   ///   unmarshaling infer response.
@@ -639,7 +628,7 @@ class InferContext {
       std::shared_ptr<Request>* async_request, bool wait);
 
  protected:
-  InferContext(const std::string&, int, bool);
+  InferContext(const std::string&, int, uint64_t, bool);
 
   // Function for worker thread to proceed the data transfer for all requests
   virtual void AsyncTransfer() = 0;
@@ -667,6 +656,10 @@ class InferContext {
 
   // Model version
   const int model_version_;
+
+  // The correlation ID to use with all inference requests using this
+  // context. A value of 0 (zero) indicates no correlation ID.
+  const CorrelationID correlation_id_;
 
   // If true print verbose output
   const bool verbose_;
@@ -721,7 +714,7 @@ class InferContext {
 /// inference server. Once created a ProfileContext object can be used
 /// repeatedly.
 ///
-/// A ProfileContext object can use either HTTP protocol or gRPC protocol
+/// A ProfileContext object can use either HTTP protocol or GRPC protocol
 /// depending on the Create function (ProfileHttpContext::Create or
 /// ProfileGrpcContext::Create). For example:
 ///
@@ -842,7 +835,9 @@ class InferHttpContext : public InferContext {
  public:
   ~InferHttpContext() override;
 
-  /// Create context that performs inference for a model using HTTP protocol.
+  /// Create context that performs inference for a non-sequence model
+  /// using HTTP protocol.
+  ///
   /// \param ctx Returns a new InferHttpContext object.
   /// \param server_url The inference server name and port.
   /// \param model_name The name of the model to get status for.
@@ -857,6 +852,26 @@ class InferHttpContext : public InferContext {
       const std::string& model_name, int model_version = -1,
       bool verbose = false);
 
+  /// Create context that performs inference for a sequence model
+  /// using a given correlation ID and the HTTP protocol.
+  ///
+  /// \param ctx Returns a new InferHttpContext object.
+  /// \param correlation_id The correlation ID to use for all
+  /// inferences performed with this context. A value of 0 (zero)
+  /// indicates that no correlation ID should be used.
+  /// \param server_url The inference server name and port.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+      const std::string& server_url, const std::string& model_name,
+      int model_version = -1, bool verbose = false);
+
   Error Run(std::vector<std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
@@ -868,7 +883,7 @@ class InferHttpContext : public InferContext {
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
-  InferHttpContext(const std::string&, const std::string&, int, bool);
+  InferHttpContext(const std::string&, const std::string&, int, uint64_t, bool);
 
   // @see InferContext.AsyncTransfer()
   void AsyncTransfer() override;
@@ -919,7 +934,7 @@ class ProfileHttpContext : public ProfileContext {
 };
 
 //==============================================================================
-/// ServerHealthGrpcContext is the gRPC instantiation of
+/// ServerHealthGrpcContext is the GRPC instantiation of
 /// ServerHealthContext.
 ///
 class ServerHealthGrpcContext : public ServerHealthContext {
@@ -941,18 +956,18 @@ class ServerHealthGrpcContext : public ServerHealthContext {
   ServerHealthGrpcContext(const std::string&, bool);
   Error GetHealth(const std::string& mode, bool* health);
 
-  // gRPC end point.
+  // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
 };
 
 //==============================================================================
-/// ServerStatusGrpcContext is the gRPC instantiation of
+/// ServerStatusGrpcContext is the GRPC instantiation of
 /// ServerStatusContext.
 ///
 class ServerStatusGrpcContext : public ServerStatusContext {
  public:
   /// Create a context that returns information about an inference
-  /// server and all models on the server using gRPC protocol.
+  /// server and all models on the server using GRPC protocol.
   /// \param ctx Returns a new ServerStatusGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param verbose If true generate verbose output when contacting
@@ -963,7 +978,7 @@ class ServerStatusGrpcContext : public ServerStatusContext {
       bool verbose = false);
 
   /// Create a context that returns information about an inference
-  /// server and one model on the sever using gRPC protocol.
+  /// server and one model on the sever using GRPC protocol.
   /// \param ctx Returns a new ServerStatusGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param model_name The name of the model to get status for.
@@ -986,18 +1001,20 @@ class ServerStatusGrpcContext : public ServerStatusContext {
   // Model name
   const std::string model_name_;
 
-  // gRPC end point.
+  // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
 };
 
 //==============================================================================
-/// InferGrpcContext is the gRPC instantiation of InferContext.
+/// InferGrpcContext is the GRPC instantiation of InferContext.
 ///
 class InferGrpcContext : public InferContext {
  public:
   ~InferGrpcContext() override;
 
-  /// Create context that performs inference for a model using gRPC protocol.
+  /// Create context that performs inference for a non-sequence model
+  /// using the GRPC protocol.
+  ///
   /// \param ctx Returns a new InferGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param model_name The name of the model to get status for.
@@ -1012,6 +1029,26 @@ class InferGrpcContext : public InferContext {
       const std::string& model_name, int model_version = -1,
       bool verbose = false);
 
+  /// Create context that performs inference for a sequence model
+  /// using a given correlation ID and the GRPC protocol.
+  ///
+  /// \param ctx Returns a new InferGrpcContext object.
+  /// \param correlation_id The correlation ID to use for all
+  /// inferences performed with this context. A value of 0 (zero)
+  /// indicates that no correlation ID should be used.
+  /// \param server_url The inference server name and port.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+      const std::string& server_url, const std::string& model_name,
+      int model_version = -1, bool verbose = false);
+
   Error Run(std::vector<std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
@@ -1019,7 +1056,7 @@ class InferGrpcContext : public InferContext {
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
-  InferGrpcContext(const std::string&, const std::string&, int, bool);
+  InferGrpcContext(const std::string&, const std::string&, int, uint64_t, bool);
 
   // @see InferContext.AsyncTransfer()
   void AsyncTransfer() override;
@@ -1032,23 +1069,23 @@ class InferGrpcContext : public InferContext {
   std::vector<uintptr_t> reusable_slot_;
 
   // The producer-consumer queue used to communicate asynchronously with
-  // the gRPC runtime.
+  // the GRPC runtime.
   grpc::CompletionQueue async_request_completion_queue_;
 
-  // gRPC end point.
+  // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
 
-  // request for gRPC call, one request object can be used for multiple calls
-  // since it can be overwritten as soon as the gRPC send finishes.
+  // request for GRPC call, one request object can be used for multiple calls
+  // since it can be overwritten as soon as the GRPC send finishes.
   InferRequest request_;
 };
 
 //==============================================================================
-//// ProfileGrpcContext is the gRPC instantiation of ProfileContext.
+//// ProfileGrpcContext is the GRPC instantiation of ProfileContext.
 ////
 class ProfileGrpcContext : public ProfileContext {
  public:
-  /// Create context that controls profiling on a server using gRPC
+  /// Create context that controls profiling on a server using GRPC
   /// protocol.
   /// \param ctx Returns the new ProfileContext object.
   /// \param server_url The inference server name and port.
@@ -1063,7 +1100,7 @@ class ProfileGrpcContext : public ProfileContext {
   ProfileGrpcContext(const std::string&, bool);
   Error SendCommand(const std::string& cmd_str) override;
 
-  // gRPC end point.
+  // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
 };
 
