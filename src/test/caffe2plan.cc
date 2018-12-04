@@ -268,7 +268,7 @@ CaffeToPlan(
   const std::string& output_filename, const std::string& prototxt_filename,
   const std::string& model_filename,
   const std::vector<std::string>& output_names,
-  const nvinfer1::DataType model_dtype, const std::string& calibration_filename,
+  nvinfer1::DataType model_dtype, const std::string& calibration_filename,
   const size_t max_batch_size, const size_t max_workspace_size)
 {
   nvinfer1::IBuilder* builder = nvinfer1::createInferBuilder(gLogger);
@@ -276,11 +276,15 @@ CaffeToPlan(
   nvcaffeparser1::ICaffeParser* parser = nvcaffeparser1::createCaffeParser();
 
   if (
-    ((model_dtype == nvinfer1::DataType::kINT8) &&
-     !builder->platformHasFastInt8()) ||
-    ((model_dtype == nvinfer1::DataType::kHALF) &&
-     !builder->platformHasFastFp16())) {
-    return false;
+    (model_dtype == nvinfer1::DataType::kINT8) &&
+    !builder->platformHasFastInt8()) {
+    std::cerr << "WARNING: GPU does not support int8, using fp32" << std::endl;
+    model_dtype = nvinfer1::DataType::kFLOAT;
+  } else if (
+    (model_dtype == nvinfer1::DataType::kHALF) &&
+    !builder->platformHasFastFp16()) {
+    std::cerr << "WARNING: GPU does not support fp16, using fp32" << std::endl;
+    model_dtype = nvinfer1::DataType::kFLOAT;
   }
 
   const nvcaffeparser1::IBlobNameToTensor* name_to_tensor = parser->parse(
