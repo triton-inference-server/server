@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -105,7 +106,7 @@ typedef bool (*CustomGetOutputFn_t)(
     void** content);
 
 /// Type for the CustomInitialize function.
-typedef int (*CustomInitializeFn_t)(const char*, int, void**);
+typedef int (*CustomInitializeFn_t)(const char*, size_t, int, void**);
 
 /// Type for the CustomFinalize function.
 typedef int (*CustomFinalizeFn_t)(void*);
@@ -125,6 +126,8 @@ typedef int (*CustomExecuteFn_t)(
 /// model configuration to use for initialization. This serialization
 /// is owned by the caller and so must be copied if a persistent
 /// copy of required by the shared library.
+/// \param serialized_model_config_size The size of serialized_model_config,
+/// in bytes.
 /// \param gpu_device_id The GPU device ID to initialize for, or
 /// CUSTOM_NO_GPU_DEVICE if should initialize for CPU.
 /// \param custom_context Returns the opaque handle to the custom
@@ -134,8 +137,8 @@ typedef int (*CustomExecuteFn_t)(
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
 int CustomInitialize(
-    const char* serialized_model_config, int gpu_device_id,
-    void** custom_context);
+    const char* serialized_model_config, size_t serialized_model_config_size,
+    int gpu_device_id, void** custom_context);
 
 /// Finalize a custom context. All state associated with the context
 /// should be freed.

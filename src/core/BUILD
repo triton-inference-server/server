@@ -174,6 +174,7 @@ cc_library(
         ":dynamic_batch_scheduler",
         ":infer_header",
         ":logging",
+        ":sequence_batch_scheduler",
         ":utils",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
@@ -269,6 +270,23 @@ cc_library(
     name = "dynamic_batch_scheduler",
     srcs = ["dynamic_batch_scheduler.cc"],
     hdrs = ["dynamic_batch_scheduler.h"],
+    deps = [
+        ":constants",
+        ":infer_header",
+        ":logging",
+        ":model_config",
+        ":model_config_proto",
+        ":scheduler",
+        ":server_status_header",
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "sequence_batch_scheduler",
+    srcs = ["sequence_batch_scheduler.cc"],
+    hdrs = ["sequence_batch_scheduler.h"],
     deps = [
         ":constants",
         ":infer_header",

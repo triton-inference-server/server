@@ -189,6 +189,7 @@ CustomBundle::CreateExecutionContext(
     LOG_INFO << "Creating instance " << instance_name << " on GPU "
              << gpu_device << " (" << cc << ") using " << cc_model_filename;
   }
+  LOG_VERBOSE(1) << Config().DebugString();
 
   // Max batch size. A value of 0 in the config becomes NO_BATCHING.
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
@@ -218,7 +219,8 @@ CustomBundle::CreateExecutionContext(
   std::string serialized_config;
   Config().SerializeToString(&serialized_config);
   int err = context.InitializeFn_(
-      serialized_config.c_str(), gpu_device, &context.library_context_handle_);
+      serialized_config.c_str(), serialized_config.size(), gpu_device,
+      &context.library_context_handle_);
   if (err != 0) {
     return tensorflow::errors::Internal(
         "initialize error for '", Name(), "': (", err, ") ",

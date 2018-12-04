@@ -128,13 +128,14 @@ ModelConfigTestBase::ValidateOne(
       for (const auto& child : children) {
         std::string real_child = child.substr(0, child.find_first_of('/'));
         if (real_child.find("expected") == 0) {
-          const auto expected_path = tensorflow::io::JoinPath(model_path, real_child);
+          const auto expected_path =
+              tensorflow::io::JoinPath(model_path, real_child);
           LOG_INFO << "Comparing with " << expected_path;
 
           std::ifstream expected_file(expected_path);
           std::string expected(
-            (std::istreambuf_iterator<char>(expected_file)),
-            (std::istreambuf_iterator<char>()));
+              (std::istreambuf_iterator<char>(expected_file)),
+              (std::istreambuf_iterator<char>()));
           std::string truncated_actual;
           if (expected.size() < actual.size()) {
             truncated_actual = actual.substr(0, expected.size());

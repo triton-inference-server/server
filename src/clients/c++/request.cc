@@ -67,7 +67,7 @@ static CurlGlobal curl_global;
 
 //==============================================================================
 
-// Use map to keep track of gRPC channels. <key, value> : <url, Channel*>
+// Use map to keep track of GRPC channels. <key, value> : <url, Channel*>
 // If context is created on url that has established Channel, then reuse it.
 std::map<std::string, std::shared_ptr<grpc::Channel>> grpc_channel_map_;
 std::shared_ptr<grpc::Channel>
@@ -130,12 +130,6 @@ class OptionsImpl : public InferContext::Options {
   OptionsImpl();
   ~OptionsImpl() = default;
 
-  uint64_t CorrelationId() const override { return correlation_id_; }
-  void SetCorrelationId(uint64_t correlation_id) override
-  {
-    correlation_id_ = correlation_id;
-  }
-
   size_t BatchSize() const override { return batch_size_; }
   void SetBatchSize(size_t batch_size) override { batch_size_ = batch_size; }
 
@@ -160,12 +154,11 @@ class OptionsImpl : public InferContext::Options {
   const std::vector<OutputOptionsPair>& Outputs() const { return outputs_; }
 
  private:
-  uint64_t correlation_id_;
   size_t batch_size_;
   std::vector<OutputOptionsPair> outputs_;
 };
 
-OptionsImpl::OptionsImpl() : correlation_id_(0), batch_size_(0) {}
+OptionsImpl::OptionsImpl() : batch_size_(0) {}
 
 Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
@@ -785,8 +778,10 @@ RequestImpl::PostRunProcessing(
 //==============================================================================
 
 InferContext::InferContext(
-    const std::string& model_name, int model_version, bool verbose)
-    : model_name_(model_name), model_version_(model_version), verbose_(verbose),
+    const std::string& model_name, int model_version,
+    CorrelationID correlation_id, bool verbose)
+    : model_name_(model_name), model_version_(model_version),
+      correlation_id_(correlation_id), verbose_(verbose),
       total_input_byte_size_(0), batch_size_(0), async_request_id_(0),
       worker_(), exiting_(true)
 {
@@ -849,9 +844,8 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
   // Create the InferRequestHeader protobuf. This protobuf will be
   // used for all subsequent requests.
   infer_request_.Clear();
-
   infer_request_.set_batch_size(batch_size_);
-  infer_request_.set_correlation_id(options.CorrelationId());
+  infer_request_.set_correlation_id(correlation_id_);
 
   for (const auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->SetBatchSize(batch_size_);
@@ -1463,8 +1457,19 @@ InferHttpContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
     const std::string& model_name, int model_version, bool verbose)
 {
-  InferHttpContext* ctx_ptr =
-      new InferHttpContext(server_url, model_name, model_version, verbose);
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
+      verbose);
+}
+
+Error
+InferHttpContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url, const std::string& model_name,
+    int model_version, bool verbose)
+{
+  InferHttpContext* ctx_ptr = new InferHttpContext(
+      server_url, model_name, model_version, correlation_id, verbose);
 
   // Get status of the model and create the inputs and outputs.
   std::unique_ptr<ServerStatusContext> sctx;
@@ -1511,8 +1516,8 @@ InferHttpContext::Create(
 
 InferHttpContext::InferHttpContext(
     const std::string& server_url, const std::string& model_name,
-    int model_version, bool verbose)
-    : InferContext(model_name, model_version, verbose),
+    int model_version, CorrelationID correlation_id, bool verbose)
+    : InferContext(model_name, model_version, correlation_id, verbose),
       multi_handle_(curl_multi_init())
 {
   // Process url for HTTP request
@@ -1965,10 +1970,10 @@ ServerHealthGrpcContext::GetHealth(const std::string& mode, bool* health)
     *health = response.health();
     err = Error(response.request_status());
   } else {
-    // Something wrong with the gRPC conncection
+    // Something wrong with the GRPC conncection
     err = Error(
         RequestStatusCode::INTERNAL,
-        "gRPC client failed: " + std::to_string(grpc_status.error_code()) +
+        "GRPC client failed: " + std::to_string(grpc_status.error_code()) +
             ": " + grpc_status.error_message());
   }
 
@@ -2044,10 +2049,10 @@ ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
     server_status->Swap(response.mutable_server_status());
     grpc_status = Error(response.request_status());
   } else {
-    // Something wrong with the gRPC conncection
+    // Something wrong with the GRPC conncection
     grpc_status = Error(
         RequestStatusCode::INTERNAL,
-        "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
 
@@ -2074,7 +2079,7 @@ class GrpcRequestImpl : public RequestImpl {
 
   friend class InferGrpcContext;
 
-  // Variables for gRPC call
+  // Variables for GRPC call
   grpc::ClientContext grpc_context_;
   grpc::Status grpc_status_;
   InferResponse grpc_response_;
@@ -2139,14 +2144,14 @@ GrpcRequestImpl::GetResults(
       }
     }
   } else {
-    // Something wrong with the gRPC conncection
+    // Something wrong with the GRPC conncection
     err = Error(
         RequestStatusCode::INTERNAL,
-        "gRPC client failed: " + std::to_string(grpc_status_.error_code()) +
+        "GRPC client failed: " + std::to_string(grpc_status_.error_code()) +
             ": " + grpc_status_.error_message());
   }
 
-  // Only continue to process result if gRPC status is SUCCESS
+  // Only continue to process result if GRPC status is SUCCESS
   if (err.Code() == RequestStatusCode::SUCCESS) {
     PostRunProcessing(requested_results_, infer_response);
     results->swap(requested_results_);
@@ -2162,8 +2167,19 @@ InferGrpcContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
     const std::string& model_name, int model_version, bool verbose)
 {
-  InferGrpcContext* ctx_ptr =
-      new InferGrpcContext(server_url, model_name, model_version, verbose);
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
+      verbose);
+}
+
+Error
+InferGrpcContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url, const std::string& model_name,
+    int model_version, bool verbose)
+{
+  InferGrpcContext* ctx_ptr = new InferGrpcContext(
+      server_url, model_name, model_version, correlation_id, verbose);
 
   // Create request context for synchronous request.
   ctx_ptr->sync_request_.reset(
@@ -2210,8 +2226,8 @@ InferGrpcContext::Create(
 
 InferGrpcContext::InferGrpcContext(
     const std::string& server_url, const std::string& model_name,
-    int model_version, bool verbose)
-    : InferContext(model_name, model_version, verbose),
+    int model_version, CorrelationID correlation_id, bool verbose)
+    : InferContext(model_name, model_version, correlation_id, verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
 }
@@ -2394,7 +2410,7 @@ InferGrpcContext::AsyncTransfer()
       return false;
     });
     lock.unlock();
-    // gRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
+    // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
     if (!exiting_) {
       size_t got;
       bool ok = true;
@@ -2458,10 +2474,10 @@ ProfileGrpcContext::SendCommand(const std::string& cmd_str)
   if (status.ok()) {
     return Error(response.request_status());
   } else {
-    // Something wrong with the gRPC conncection
+    // Something wrong with the GRPC conncection
     return Error(
         RequestStatusCode::INTERNAL,
-        "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
 }

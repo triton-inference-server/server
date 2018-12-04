@@ -589,12 +589,13 @@ extern "C" {
 
 int
 CustomInitialize(
-    const char* serialized_model_config, int gpu_device_id,
-    void** custom_context)
+    const char* serialized_model_config, size_t serialized_model_config_size,
+    int gpu_device_id, void** custom_context)
 {
   // Convert the serialized model config to a ModelConfig object.
   ModelConfig model_config;
-  if (!model_config.ParseFromString(serialized_model_config)) {
+  if (!model_config.ParseFromString(
+          std::string(serialized_model_config, serialized_model_config_size))) {
     return kInvalidModelConfig;
   }
 

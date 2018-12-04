@@ -242,7 +242,8 @@ struct InferContextCtx {
 nic::Error*
 InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int model_version, bool verbose)
+    const char* model_name, int model_version, ni::CorrelationID correlation_id,
+    bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -251,12 +252,12 @@ InferContextNew(
     InferContextCtx* lctx = new InferContextCtx;
     if (protocol == ProtocolType::HTTP) {
       err = nic::InferHttpContext::Create(
-          &(lctx->ctx), std::string(url), std::string(model_name),
-          model_version, verbose);
+          &(lctx->ctx), correlation_id, std::string(url),
+          std::string(model_name), model_version, verbose);
     } else {
       err = nic::InferGrpcContext::Create(
-          &(lctx->ctx), std::string(url), std::string(model_name),
-          model_version, verbose);
+          &(lctx->ctx), correlation_id, std::string(url),
+          std::string(model_name), model_version, verbose);
     }
 
     if (err.IsOk()) {
@@ -335,15 +336,12 @@ InferContextGetReadyAsyncRequest(
 
 //==============================================================================
 nic::Error*
-InferContextOptionsNew(
-    nic::InferContext::Options** ctx, uint64_t correlation_id,
-    uint64_t batch_size)
+InferContextOptionsNew(nic::InferContext::Options** ctx, uint64_t batch_size)
 {
   std::unique_ptr<nic::InferContext::Options> uctx;
   nic::Error err = nic::InferContext::Options::Create(&uctx);
   if (err.IsOk()) {
     *ctx = uctx.release();
-    (*ctx)->SetCorrelationId(correlation_id);
     (*ctx)->SetBatchSize(batch_size);
     return nullptr;
   }

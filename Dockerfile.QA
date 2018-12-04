@@ -41,15 +41,19 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp src/clients/python/grpc_image_client.py qa/clients/. && \
     cp src/clients/python/image_client.py qa/clients/. && \
     cp src/clients/python/simple_client.py qa/clients/. && \
+    cp src/clients/python/simple_sequence_client.py qa/clients/. && \
     cp /opt/tensorrtserver/bin/image_client qa/clients/. && \
     cp /opt/tensorrtserver/bin/perf_client qa/clients/. && \
     cp /opt/tensorrtserver/bin/simple_client qa/clients/. && \
+    cp /opt/tensorrtserver/bin/simple_sequence_client qa/clients/. && \
     cp /opt/tensorrtserver/bin/caffe2plan qa/common/. && \
     cp /opt/tensorrtserver/pip/tensorrtserver*.whl qa/pkgs/. && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/. && \
+    mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
+    cp /opt/tensorrtserver/custom/libsequence.so qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so qa/custom_models/custom_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
