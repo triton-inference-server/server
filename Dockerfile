@@ -191,7 +191,11 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     (cd tools && mv bazel.rc bazel.orig && \
      cat bazel.orig /opt/tensorflow/.tf_configure.bazelrc > bazel.rc) && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
-               bazel build -c opt --config=cuda src/servers/trtserver src/clients/... src/test/...; \
+               bazel build -c opt --config=cuda \
+                     src/servers/trtserver \
+                     src/custom/... \
+                     src/clients/... \
+                     src/test/...; \
              else \
                bazel build -c opt src/clients/...; \
              fi' && \
@@ -203,6 +207,8 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mkdir -p /opt/tensorrtserver/lib && \
     cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/. && \
     cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/. && \
+    mkdir -p /opt/tensorrtserver/custom && \
+    cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
     mkdir -p /opt/tensorrtserver/pip && \
     bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/pip/. && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \

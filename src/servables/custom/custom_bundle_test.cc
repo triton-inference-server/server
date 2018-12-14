@@ -23,47 +23,43 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/core/model_config.pb.h"
+#include "src/servables/custom/custom_bundle.h"
+#include "src/core/constants.h"
+#include "src/test/model_config_test_base.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia { namespace inferenceserver { namespace test {
 
-using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
-
-// Enumeration for the different platform types
-enum Platform {
-  PLATFORM_UNKNOWN = 0,
-  PLATFORM_TENSORRT_PLAN = 1,
-  PLATFORM_TENSORFLOW_GRAPHDEF = 2,
-  PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
-  PLATFORM_CAFFE2_NETDEF = 4,
-  PLATFORM_CUSTOM = 5
+class CustomBundleTest : public ModelConfigTestBase {
+ public:
 };
 
-// Get the size of a datatype in bytes. Return 0 if unable to
-// determine the size of the data type.
-size_t GetDataTypeByteSize(const DataType dtype);
+TEST_F(CustomBundleTest, ModelConfigSanity)
+{
+  BundleInitFunc init_func =
+    [](
+      const std::string& path,
+      const ModelConfig& config) -> tensorflow::Status {
+    std::unique_ptr<CustomBundle> bundle(new CustomBundle());
+    tensorflow::Status status = bundle->Init(path, config);
+    if (status.ok()) {
+      std::unordered_map<std::string, std::string> custom_paths;
 
-// Get the size, in bytes, of a tensor based on datatype and
-// dimensions. Return 0 if unable to determine the size of the data
-// type.
-uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
+      for (const auto& filename : std::vector<std::string>{kCustomFilename}) {
+        const auto custom_path = tensorflow::io::JoinPath(path, filename);
+        custom_paths.emplace(
+          std::piecewise_construct, std::make_tuple(filename),
+          std::make_tuple(custom_path));
+      }
 
-// Get the size, in bytes, of a tensor based on ModelInput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelInput& mio);
+      status = bundle->CreateExecutionContexts(custom_paths);
+    }
 
-// Get the size, in bytes, of a tensor based on ModelOutput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelOutput& mio);
+    return status;
+  };
 
-// Get the Platform value for a platform string or Platform::UNKNOWN
-// if the platform string is not recognized.
-Platform GetPlatform(const std::string& platform_str);
+  // Standard testing...
+  ValidateAll(kCustomPlatform, init_func);
+}
 
-// Compare two model configuration shapes. Return true if equal, false
-// is not equal.
-bool CompareDims(const DimsList& dims0, const DimsList& dims1);
-
-}}  // namespace nvidia::inferenceserver
+}}}  // namespace nvidia::inferenceserver::test

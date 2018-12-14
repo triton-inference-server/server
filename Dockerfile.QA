@@ -47,7 +47,9 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp /opt/tensorrtserver/bin/caffe2plan qa/common/. && \
     cp /opt/tensorrtserver/pip/tensorrtserver*.whl qa/pkgs/. && \
     mkdir qa/L0_simple_example/models && \
-    cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/.
+    cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
+    mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
+    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/.
 
 ############################################################################
 ## Create CI enabled image

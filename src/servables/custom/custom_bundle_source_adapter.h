@@ -25,45 +25,46 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/model_config.pb.h"
+#include "src/servables/custom/custom_bundle.h"
+#include "src/servables/custom/custom_bundle.pb.h"
+#include "tensorflow/core/lib/core/status.h"
+#include "tensorflow/core/platform/macros.h"
+#include "tensorflow_serving/core/loader.h"
+#include "tensorflow_serving/core/simple_loader.h"
+#include "tensorflow_serving/core/source_adapter.h"
+#include "tensorflow_serving/core/storage_path.h"
+
+namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
-using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+// Adapter that converts storage paths pointing to custom files into
+// the corresponding custom bundle.
+class CustomBundleSourceAdapter final
+    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle> {
+ public:
+  static tensorflow::Status Create(
+    const CustomBundleSourceAdapterConfig& config,
+    std::unique_ptr<
+      tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+      adapter);
 
-// Enumeration for the different platform types
-enum Platform {
-  PLATFORM_UNKNOWN = 0,
-  PLATFORM_TENSORRT_PLAN = 1,
-  PLATFORM_TENSORFLOW_GRAPHDEF = 2,
-  PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
-  PLATFORM_CAFFE2_NETDEF = 4,
-  PLATFORM_CUSTOM = 5
+  ~CustomBundleSourceAdapter() override;
+
+ private:
+  TF_DISALLOW_COPY_AND_ASSIGN(CustomBundleSourceAdapter);
+  using SimpleSourceAdapter =
+    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle>;
+
+  CustomBundleSourceAdapter(
+    const CustomBundleSourceAdapterConfig& config,
+    typename SimpleSourceAdapter::Creator creator,
+    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
+  {
+  }
+
+  const CustomBundleSourceAdapterConfig config_;
 };
-
-// Get the size of a datatype in bytes. Return 0 if unable to
-// determine the size of the data type.
-size_t GetDataTypeByteSize(const DataType dtype);
-
-// Get the size, in bytes, of a tensor based on datatype and
-// dimensions. Return 0 if unable to determine the size of the data
-// type.
-uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
-
-// Get the size, in bytes, of a tensor based on ModelInput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelInput& mio);
-
-// Get the size, in bytes, of a tensor based on ModelOutput. Return 0
-// if unable to determine the size of the data type.
-uint64_t GetByteSize(const ModelOutput& mio);
-
-// Get the Platform value for a platform string or Platform::UNKNOWN
-// if the platform string is not recognized.
-Platform GetPlatform(const std::string& platform_str);
-
-// Compare two model configuration shapes. Return true if equal, false
-// is not equal.
-bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 
 }}  // namespace nvidia::inferenceserver

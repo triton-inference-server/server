@@ -66,7 +66,7 @@ GetDataTypeByteSize(const DataType dtype)
 }
 
 uint64_t
-GetSize(const DataType& dtype, const DimsList& dims)
+GetByteSize(const DataType& dtype, const DimsList& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
   if (dt_size <= 0) {
@@ -86,15 +86,15 @@ GetSize(const DataType& dtype, const DimsList& dims)
 }
 
 uint64_t
-GetSize(const ModelInput& mio)
+GetByteSize(const ModelInput& mio)
 {
-  return GetSize(mio.data_type(), mio.dims());
+  return GetByteSize(mio.data_type(), mio.dims());
 }
 
 uint64_t
-GetSize(const ModelOutput& mio)
+GetByteSize(const ModelOutput& mio)
 {
-  return GetSize(mio.data_type(), mio.dims());
+  return GetByteSize(mio.data_type(), mio.dims());
 }
 
 Platform
@@ -108,9 +108,27 @@ GetPlatform(const std::string& platform_str)
     return Platform::PLATFORM_TENSORRT_PLAN;
   } else if (platform_str == kCaffe2NetDefPlatform) {
     return Platform::PLATFORM_CAFFE2_NETDEF;
+  } else if (platform_str == kCustomPlatform) {
+    return Platform::PLATFORM_CUSTOM;
   }
 
   return Platform::PLATFORM_UNKNOWN;
+}
+
+bool
+CompareDims(const DimsList& dims0, const DimsList& dims1)
+{
+  if (dims0.size() != dims1.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < dims0.size(); ++i) {
+    if (dims0[i] != dims1[i]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 }}  // namespace nvidia::inferenceserver
