@@ -31,7 +31,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-uint64_t GetSize(
+uint64_t GetByteSize(
   const int max_batch_size, const DataType& dtype, const DimsList& dims);
 
 DataType ConvertDatatype(nvinfer1::DataType trt_type);

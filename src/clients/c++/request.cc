@@ -225,7 +225,7 @@ class InputImpl : public InferContext::Input {
 };
 
 InputImpl::InputImpl(const ModelInput& mio)
-    : mio_(mio), byte_size_(GetSize(mio)), batch_size_(0), bufs_idx_(0),
+    : mio_(mio), byte_size_(GetByteSize(mio)), batch_size_(0), bufs_idx_(0),
       buf_pos_(0)
 {
 }
@@ -369,7 +369,7 @@ class OutputImpl : public InferContext::Output {
 };
 
 OutputImpl::OutputImpl(const ModelOutput& mio)
-    : mio_(mio), byte_size_(GetSize(mio)),
+    : mio_(mio), byte_size_(GetByteSize(mio)),
       result_format_(InferContext::Result::ResultFormat::RAW)
 {
 }

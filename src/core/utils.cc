@@ -120,6 +120,8 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kTensorRTPlanFilename);
     } else if (config->platform() == kCaffe2NetDefPlatform) {
       config->set_default_model_filename(kCaffe2NetDefFilename);
+    } else if (config->platform() == kCustomPlatform) {
+      config->set_default_model_filename(kCustomFilename);
     } else {
       return tensorflow::errors::Internal(
         "unexpected platform type ", config->platform(), " for ",

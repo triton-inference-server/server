@@ -64,6 +64,8 @@
 #include "src/core/utils.h"
 #include "src/servables/caffe2/netdef_bundle.h"
 #include "src/servables/caffe2/netdef_bundle.pb.h"
+#include "src/servables/custom/custom_bundle.h"
+#include "src/servables/custom/custom_bundle.pb.h"
 #include "src/servables/tensorflow/graphdef_bundle.h"
 #include "src/servables/tensorflow/graphdef_bundle.pb.h"
 #include "src/servables/tensorflow/savedmodel_bundle.h"
@@ -1245,6 +1247,7 @@ struct AsyncState {
   tfs::ServableHandle<PlanBundle> plan_bundle;
   tfs::ServableHandle<NetDefBundle> netdef_bundle;
   tfs::ServableHandle<SavedModelBundle> saved_model_bundle;
+  tfs::ServableHandle<CustomBundle> custom_bundle;
 };
 }  // namespace
 
@@ -1313,6 +1316,13 @@ InferenceServer::HandleInfer(
         if (status.ok()) {
           state->is =
             static_cast<InferenceServable*>(state->netdef_bundle.get());
+        }
+        break;
+      case Platform::PLATFORM_CUSTOM:
+        status = core_->GetServableHandle(model_spec, &(state->custom_bundle));
+        if (status.ok()) {
+          state->is =
+            static_cast<InferenceServable*>(state->custom_bundle.get());
         }
         break;
       default:
@@ -1437,6 +1447,7 @@ InferenceServer::BuildPlatformConfigMap(
   ::google::protobuf::Any saved_model_source_adapter_config;
   ::google::protobuf::Any plan_source_adapter_config;
   ::google::protobuf::Any netdef_source_adapter_config;
+  ::google::protobuf::Any custom_source_adapter_config;
 
   //// Tensorflow GraphDef
   {
@@ -1495,6 +1506,12 @@ InferenceServer::BuildPlatformConfigMap(
     plan_source_adapter_config.PackFrom(plan_config);
   }
 
+  //// Custom
+  {
+    CustomBundleSourceAdapterConfig custom_config;
+    custom_source_adapter_config.PackFrom(custom_config);
+  }
+
   tfs::PlatformConfigMap platform_config_map;
 
   (*(*platform_config_map
@@ -1507,6 +1524,8 @@ InferenceServer::BuildPlatformConfigMap(
       .mutable_source_adapter_config()) = netdef_source_adapter_config;
   (*(*platform_config_map.mutable_platform_configs())[kTensorRTPlanPlatform]
       .mutable_source_adapter_config()) = plan_source_adapter_config;
+  (*(*platform_config_map.mutable_platform_configs())[kCustomPlatform]
+      .mutable_source_adapter_config()) = custom_source_adapter_config;
 
   return platform_config_map;
 }
