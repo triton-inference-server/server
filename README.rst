@@ -45,12 +45,19 @@ clients to request inferencing for any model being managed by the
 server. TRTIS provides the following features:
 
 * `Multiple framework support
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#model-definition>`_. The
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
   TensorFlow-TensorRT integrated models.
-* Multi-GPU support. The server can distribute inferencing across all
+* `Custom backend support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. TRTIS
+  allows individual models to be implemented with custom backends
+  instead of by a deep-learning framework. With a custom backend a
+  model can implement any logic desired, while still benefiting from
+  the GPU support, concurrent execution, dynamic batching and other
+  features provided by TRTIS.
+* Multi-GPU support. TRTIS can distribute inferencing across all
   system GPUs.
 * `Concurrent model execution support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple
@@ -58,7 +65,7 @@ server. TRTIS provides the following features:
   simultaneously on the same GPU.
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. The server also supports `dynamic
+  corresponding batch of outputs. TRTIS also supports `dynamic
   batching
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_
   where individual inference requests are dynamically combined

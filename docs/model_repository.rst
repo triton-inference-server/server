@@ -80,9 +80,11 @@ corresponding to the directory name.
 
 For more information about how the model versions are handled by the
 server see :ref:`section-model-versions`.  Within each version
-subdirectory there are one or more model definition files. For more
-information about the model definition files contained in each version
-subdirectory see :ref:`section-model-definition`.
+subdirectory there are one or more model definition files that specify
+the actual model. The model definition can be either a
+:ref:`framework-specific model file
+<section-framework-model-definition>` or a shared library implementing
+a :ref:`custom backend <section-custom-backends>`.
 
 The \*_labels.txt files are optional and are used to provide labels for
 outputs that represent classifications. The label file must be
@@ -150,10 +152,10 @@ version number of the model. Each model specifies a :ref:`version
 policy <section-version-policy>` that controls which of the versions
 in the model repository are made available by TRTIS at any given time.
 
-.. _section-model-definition:
+.. _section-framework-model-definition:
 
-Model Definition
-----------------
+Framework Model Definition
+--------------------------
 
 Each model version subdirectory must contain at least one model
 definition. By default, the name of this file or directory must be:
@@ -295,3 +297,40 @@ included in TensorRT or the `open-source TensorRT backend for ONNX
 <https://github.com/onnx/onnx-tensorrt>`_. Another option is to
 convert your ONNX model to Caffe2 NetDef `as described here
 <https://github.com/pytorch/pytorch/tree/master/caffe2/python/onnx>`_.
+
+.. _section-custom-backends:
+
+Custom Backends
+---------------
+
+A model using a custom backend is represented in the model repository
+in the same way as models using a deep-learning framework backend.
+Each model version subdirectory must contain at least one shared
+library that implements the custom model backend. By default, the name
+of this shared library must be **libcustom.so** but the default name
+can be overridden using the *default_model_filename* property in the
+:ref:`model configuration <section-model-configuration>`.
+
+Optionally, a model can provide multiple shared libraries, each
+targeted at a GPU with a different `Compute Capability
+<https://developer.nvidia.com/cuda-gpus>`_. See the
+*cc_model_filenames* property in the :ref:`model configuration
+<section-model-configuration>` for description of how to specify
+different shared libraries for different compute capabilities.
+
+Custom Backend API
+^^^^^^^^^^^^^^^^^^
+
+A custom backend must implement the C interface defined in `custom.h
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_. The
+interface is also documented in the `API Reference
+<file:///home/david/dev/github/NVIDIA/tensorrt-inference-server/docs/build/html/cpp_api/file_src_servables_custom_custom.h.html>`_.
+
+Example Custom Backend
+^^^^^^^^^^^^^^^^^^^^^^
+
+An example of a custom backend can be found in the `addsum backend
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/addsub/addsub.cc>`_. You
+can see the custom backend being used as part of CI testing in
+`L0_infer
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/L0_infer>`_.

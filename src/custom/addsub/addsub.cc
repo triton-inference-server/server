@@ -194,8 +194,7 @@ Context::GetInputTensor(
       static_cast<const int32_t*>(content) + content_elements);
   }
 
-  // Make sure we don't end up with exactly the amount of input we
-  // expect.
+  // Make sure we end up with exactly the amount of input we expect.
   if (total_content_byte_size != expected_byte_size) {
     return kInputSize;
   }

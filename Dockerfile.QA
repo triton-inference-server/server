@@ -49,7 +49,11 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/.
+    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/. && \
+    mkdir -p qa/L0_infer/custom_models/custom_int32_int32_int32/1 && \
+    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_infer/custom_models/custom_int32_int32_int32/1/. && \
+    mkdir -p qa/L0_infer/custom_models/custom_nobatch_int32_int32_int32/1 && \
+    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_infer/custom_models/custom_nobatch_int32_int32_int32/1/.
 
 ############################################################################
 ## Create CI enabled image
