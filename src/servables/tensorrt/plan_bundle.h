@@ -41,18 +41,18 @@ class PlanBundle : public InferenceServable {
   PlanBundle(PlanBundle&&) = default;
 
   tensorflow::Status Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config);
+      const tensorflow::StringPiece& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   tensorflow::Status CreateExecutionContexts(
-    const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::vector<char>>& models);
   tensorflow::Status CreateExecutionContext(
-    const std::string& instance_name, const int gpu_device,
-    const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::string& instance_name, const int gpu_device,
+      const std::unordered_map<std::string, std::vector<char>>& models);
 
   tensorflow::Status GetOutputDataType(
-    const std::string& name, DataType* dtype) const override;
+      const std::string& name, DataType* dtype) const override;
   const LabelProvider& GetLabelProvider() const override
   {
     return label_provider_;
@@ -62,8 +62,8 @@ class PlanBundle : public InferenceServable {
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(PlanBundle);
@@ -86,16 +86,17 @@ class PlanBundle : public InferenceServable {
     static constexpr int NO_BATCHING = 0;
 
     Context(
-      const std::string& name, const int gpu_device, const int max_batch_size);
+        const std::string& name, const int gpu_device,
+        const int max_batch_size);
     Context(Context&& o);
     ~Context();
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
     tensorflow::Status InitializeInputBindings(
-      const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     tensorflow::Status InitializeOutputBindings(
-      const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that

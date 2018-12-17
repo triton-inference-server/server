@@ -44,22 +44,22 @@ class PlanBundleSourceAdapter final
     : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle> {
  public:
   static tensorflow::Status Create(
-    const PlanBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-      adapter);
+      const PlanBundleSourceAdapterConfig& config,
+      std::unique_ptr<
+          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+          adapter);
 
   ~PlanBundleSourceAdapter() override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(PlanBundleSourceAdapter);
   using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle>;
+      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle>;
 
   PlanBundleSourceAdapter(
-    const PlanBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      const PlanBundleSourceAdapterConfig& config,
+      typename SimpleSourceAdapter::Creator creator,
+      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
       : SimpleSourceAdapter(creator, resource_estimator), config_(config)
   {
   }

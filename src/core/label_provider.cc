@@ -56,12 +56,12 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
 {
   std::unique_ptr<tensorflow::RandomAccessFile> label_file;
   TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->NewRandomAccessFile(filepath, &label_file));
+      tensorflow::Env::Default()->NewRandomAccessFile(filepath, &label_file));
 
   auto p = label_map_.insert(std::make_pair(name, std::vector<std::string>()));
   if (!p.second) {
     return tensorflow::errors::Internal(
-      "multiple label files for '", name, "'");
+        "multiple label files for '", name, "'");
   }
 
   auto itr = p.first;

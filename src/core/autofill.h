@@ -35,8 +35,8 @@ class AutoFill {
  public:
   /// Create an AutoFill object for a specific model.
   static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    const ModelConfig& config, std::unique_ptr<AutoFill>* autofill);
+      const std::string& model_name, const std::string& model_path,
+      const ModelConfig& config, std::unique_ptr<AutoFill>* autofill);
 
   /// Autofill settings in a configuration.
   virtual tensorflow::Status Fix(ModelConfig* config) = 0;
@@ -45,9 +45,9 @@ class AutoFill {
   AutoFill(const std::string& model_name) : model_name_(model_name) {}
 
   static tensorflow::Status GetSubdirs(
-    const std::string& path, std::set<std::string>* subdirs);
+      const std::string& path, std::set<std::string>* subdirs);
   static tensorflow::Status GetFiles(
-    const std::string& path, std::set<std::string>* files);
+      const std::string& path, std::set<std::string>* files);
 
   const std::string model_name_;
 };

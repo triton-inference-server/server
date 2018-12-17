@@ -40,10 +40,10 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 SavedModelBundle::Init(
-  const tensorflow::StringPiece& path, const ModelConfig& config)
+    const tensorflow::StringPiece& path, const ModelConfig& config)
 {
   TF_RETURN_IF_ERROR(
-    ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
+      ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
   TF_RETURN_IF_ERROR(BaseBundle::Init(path, config));
 
   return tensorflow::Status::OK();
@@ -51,9 +51,9 @@ SavedModelBundle::Init(
 
 tensorflow::Status
 SavedModelBundle::CreateSession(
-  const tensorflow::SessionOptions& options, const int gpu_device,
-  const std::string& model_path, tensorflow::Session** session,
-  IONameMap* input_name_map, IONameMap* output_name_map)
+    const tensorflow::SessionOptions& options, const int gpu_device,
+    const std::string& model_path, tensorflow::Session** session,
+    IONameMap* input_name_map, IONameMap* output_name_map)
 {
   // Set the default device to control the CPU/GPU that the graph runs
   // on. This isn't foolproof since individual operations in the graph
@@ -69,16 +69,16 @@ SavedModelBundle::CreateSession(
   tensorflow::SessionOptions session_options = options;
   if (gpu_device == Context::NO_GPU_DEVICE) {
     session_options.config.mutable_gpu_options()->set_visible_device_list(
-      "/cpu:0");
+        "/cpu:0");
   } else {
     session_options.config.mutable_gpu_options()->set_visible_device_list(
-      "/gpu:" + std::to_string(gpu_device));
+        "/gpu:" + std::to_string(gpu_device));
   }
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
   tensorflow::SignatureDef sig;
   TF_RETURN_IF_ERROR(
-    LoadSavedModel(Name(), model_path, session_options, &bundle, &sig));
+      LoadSavedModel(Name(), model_path, session_options, &bundle, &sig));
 
   // Collect all the expected input and allowed output tensor names
   // based on the signature def.
@@ -96,9 +96,9 @@ SavedModelBundle::CreateSession(
   // is expected by the signature def.
   if (expected_inputs.size() != (size_t)Config().input().size()) {
     return tensorflow::errors::InvalidArgument(
-      "unable to load model '", Name(), "', configuration expects ",
-      Config().input().size(), " inputs, model provides ",
-      expected_inputs.size());
+        "unable to load model '", Name(), "', configuration expects ",
+        Config().input().size(), " inputs, model provides ",
+        expected_inputs.size());
   }
 
   for (const auto& io : Config().input()) {
@@ -107,21 +107,21 @@ SavedModelBundle::CreateSession(
     const auto& iitr = sig.inputs().find(io.name());
     if (iitr == sig.inputs().end()) {
       return tensorflow::errors::Internal(
-        "unexpected inference input '", io.name(), "'");
+          "unexpected inference input '", io.name(), "'");
     }
 
     if (!CompareDims(iitr->second.tensor_shape(), io.dims())) {
       return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', input '", io.name(), "' dims ",
-        DimsDebugString(iitr->second.tensor_shape()),
-        " don't match configuration dims ", DimsDebugString(io.dims()));
+          "unable to load model '", Name(), "', input '", io.name(), "' dims ",
+          DimsDebugString(iitr->second.tensor_shape()),
+          " don't match configuration dims ", DimsDebugString(io.dims()));
     }
     if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
       return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', input '", io.name(),
-        "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
-        " doesn't match configuration data-type ",
-        DataType_Name(io.data_type()));
+          "unable to load model '", Name(), "', input '", io.name(),
+          "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
+          " doesn't match configuration data-type ",
+          DataType_Name(io.data_type()));
     }
   }
 
@@ -131,21 +131,21 @@ SavedModelBundle::CreateSession(
     const auto& oitr = sig.outputs().find(io.name());
     if (oitr == sig.outputs().end()) {
       return tensorflow::errors::Internal(
-        "unexpected inference output '", io.name(), "'");
+          "unexpected inference output '", io.name(), "'");
     }
 
     if (!CompareDims(oitr->second.tensor_shape(), io.dims())) {
       return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', output '", io.name(), "' dims ",
-        DimsDebugString(oitr->second.tensor_shape()),
-        " don't match configuration dims ", DimsDebugString(io.dims()));
+          "unable to load model '", Name(), "', output '", io.name(), "' dims ",
+          DimsDebugString(oitr->second.tensor_shape()),
+          " don't match configuration dims ", DimsDebugString(io.dims()));
     }
     if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
       return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', output '", io.name(),
-        "' data-type ", tensorflow::DataType_Name(oitr->second.dtype()),
-        " doesn't match configuration data-type ",
-        DataType_Name(io.data_type()));
+          "unable to load model '", Name(), "', output '", io.name(),
+          "' data-type ", tensorflow::DataType_Name(oitr->second.dtype()),
+          " doesn't match configuration data-type ",
+          DataType_Name(io.data_type()));
     }
   }
 

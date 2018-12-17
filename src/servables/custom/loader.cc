@@ -42,12 +42,12 @@ GetEntrypoint(void* handle, const std::string& name, void** fn)
   if (dlsym_error != nullptr) {
     std::string errstr(dlsym_error);  // need copy as dlclose overwrites
     return tensorflow::errors::NotFound(
-      "unable to find '", name, "' entrypoint in custom library: ", errstr);
+        "unable to find '", name, "' entrypoint in custom library: ", errstr);
   }
 
   if (*fn == nullptr) {
     return tensorflow::errors::NotFound(
-      "unable to find '", name, "' entrypoint in custom library");
+        "unable to find '", name, "' entrypoint in custom library");
   }
 
   return tensorflow::Status::OK();
@@ -57,9 +57,9 @@ GetEntrypoint(void* handle, const std::string& name, void** fn)
 
 tensorflow::Status
 LoadCustom(
-  const std::string& path, void** dlhandle, CustomInitializeFn_t* InitializeFn,
-  CustomFinalizeFn_t* FinalizeFn, CustomErrorStringFn_t* ErrorStringFn,
-  CustomExecuteFn_t* ExecuteFn)
+    const std::string& path, void** dlhandle,
+    CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
+    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn)
 {
   *dlhandle = nullptr;
   *InitializeFn = nullptr;
@@ -71,7 +71,7 @@ LoadCustom(
   void* handle = dlopen(path.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
     return tensorflow::errors::NotFound(
-      "unable to load custom library: ", dlerror());
+        "unable to load custom library: ", dlerror());
   }
 
   tensorflow::Status status;

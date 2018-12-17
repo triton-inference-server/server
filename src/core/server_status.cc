@@ -40,7 +40,7 @@ namespace {
 
 void
 SetModelVersionReadyState(
-  const tensorflow::serving::ServableStateMonitor& monitor, ModelStatus& ms)
+    const tensorflow::serving::ServableStateMonitor& monitor, ModelStatus& ms)
 {
   const std::string& model_name = ms.config().name();
 
@@ -52,11 +52,11 @@ SetModelVersionReadyState(
   }
 
   const tensorflow::serving::ServableStateMonitor::VersionMap
-    versions_and_states = monitor.GetVersionStates(model_name);
+      versions_and_states = monitor.GetVersionStates(model_name);
   for (const auto& version_and_state : versions_and_states) {
     const int32_t version = version_and_state.first;
     const tensorflow::serving::ServableState& servable_state =
-      version_and_state.second.state;
+        version_and_state.second.state;
 
     ModelReadyState ready_state = ModelReadyState::MODEL_UNKNOWN;
     switch (servable_state.manager_state) {
@@ -96,7 +96,7 @@ ServerStatusManager::InitForModel(const std::string& model_name)
 {
   ModelConfig model_config;
   TF_RETURN_IF_ERROR(
-    ModelRepositoryManager::GetModelConfig(model_name, &model_config));
+      ModelRepositoryManager::GetModelConfig(model_name, &model_config));
 
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -115,9 +115,9 @@ ServerStatusManager::InitForModel(const std::string& model_name)
 
 tensorflow::Status
 ServerStatusManager::Get(
-  ServerStatus* server_status, const std::string& server_id,
-  ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-  const tensorflow::serving::ServableStateMonitor* monitor) const
+    ServerStatus* server_status, const std::string& server_id,
+    ServerReadyState server_ready_state, uint64_t server_uptime_ns,
+    const tensorflow::serving::ServableStateMonitor* monitor) const
 {
   std::lock_guard<std::mutex> lock(mu_);
   server_status->CopyFrom(server_status_);
@@ -136,10 +136,10 @@ ServerStatusManager::Get(
 
 tensorflow::Status
 ServerStatusManager::Get(
-  ServerStatus* server_status, const std::string& server_id,
-  ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-  const std::string& model_name,
-  const tensorflow::serving::ServableStateMonitor* monitor) const
+    ServerStatus* server_status, const std::string& server_id,
+    ServerReadyState server_ready_state, uint64_t server_uptime_ns,
+    const std::string& model_name,
+    const tensorflow::serving::ServableStateMonitor* monitor) const
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -152,7 +152,7 @@ ServerStatusManager::Get(
   const auto& itr = server_status_.model_status().find(model_name);
   if (itr == server_status_.model_status().end()) {
     return tensorflow::errors::InvalidArgument(
-      "no status available for unknown model '", model_name, "'");
+        "no status available for unknown model '", model_name, "'");
   }
 
   auto& ms = *server_status->mutable_model_status();
@@ -166,14 +166,14 @@ ServerStatusManager::Get(
 
 void
 ServerStatusManager::UpdateServerStat(
-  uint64_t duration, ServerStatTimerScoped::Kind kind)
+    uint64_t duration, ServerStatTimerScoped::Kind kind)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
   switch (kind) {
     case ServerStatTimerScoped::Kind::STATUS: {
       StatDuration* d =
-        server_status_.mutable_status_stats()->mutable_success();
+          server_status_.mutable_status_stats()->mutable_success();
       d->set_count(d->count() + 1);
       d->set_total_time_ns(d->total_time_ns() + duration);
       break;
@@ -181,7 +181,7 @@ ServerStatusManager::UpdateServerStat(
 
     case ServerStatTimerScoped::Kind::PROFILE: {
       StatDuration* d =
-        server_status_.mutable_profile_stats()->mutable_success();
+          server_status_.mutable_profile_stats()->mutable_success();
       d->set_count(d->count() + 1);
       d->set_total_time_ns(d->total_time_ns() + duration);
       break;
@@ -189,7 +189,7 @@ ServerStatusManager::UpdateServerStat(
 
     case ServerStatTimerScoped::Kind::HEALTH: {
       StatDuration* d =
-        server_status_.mutable_health_stats()->mutable_success();
+          server_status_.mutable_health_stats()->mutable_success();
       d->set_count(d->count() + 1);
       d->set_total_time_ns(d->total_time_ns() + duration);
       break;
@@ -199,8 +199,8 @@ ServerStatusManager::UpdateServerStat(
 
 void
 ServerStatusManager::UpdateFailedInferStats(
-  const std::string& model_name, const uint32_t model_version,
-  size_t batch_size, uint64_t request_duration_ns)
+    const std::string& model_name, const uint32_t model_version,
+    size_t batch_size, uint64_t request_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -218,7 +218,7 @@ ServerStatusManager::UpdateFailedInferStats(
     if (mvs_itr == mvs.end()) {
       ModelVersionStatus& version_status = mvs[model_version];
       InferRequestStats& stats =
-        (*version_status.mutable_infer_stats())[batch_size];
+          (*version_status.mutable_infer_stats())[batch_size];
       stats.mutable_failed()->set_count(1);
       stats.mutable_failed()->set_total_time_ns(request_duration_ns);
     } else {
@@ -233,7 +233,7 @@ ServerStatusManager::UpdateFailedInferStats(
         InferRequestStats& stats = is_itr->second;
         stats.mutable_failed()->set_count(stats.failed().count() + 1);
         stats.mutable_failed()->set_total_time_ns(
-          stats.failed().total_time_ns() + request_duration_ns);
+            stats.failed().total_time_ns() + request_duration_ns);
       }
     }
   }
@@ -241,9 +241,9 @@ ServerStatusManager::UpdateFailedInferStats(
 
 void
 ServerStatusManager::UpdateSuccessInferStats(
-  const std::string& model_name, const uint32_t model_version,
-  size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-  uint64_t run_duration_ns, uint64_t compute_duration_ns)
+    const std::string& model_name, const uint32_t model_version,
+    size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
+    uint64_t run_duration_ns, uint64_t compute_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -268,9 +268,9 @@ ServerStatusManager::UpdateSuccessInferStats(
     } else {
       ModelVersionStatus& version_status = mvs_itr->second;
       version_status.set_model_inference_count(
-        version_status.model_inference_count() + batch_size);
+          version_status.model_inference_count() + batch_size);
       version_status.set_model_execution_count(
-        version_status.model_execution_count() + execution_cnt);
+          version_status.model_execution_count() + execution_cnt);
 
       auto& is = *version_status.mutable_infer_stats();
       auto is_itr = is.find(batch_size);
@@ -288,19 +288,19 @@ ServerStatusManager::UpdateSuccessInferStats(
       new_stats->mutable_compute()->set_total_time_ns(compute_duration_ns);
       new_stats->mutable_queue()->set_count(1);
       new_stats->mutable_queue()->set_total_time_ns(
-        run_duration_ns - compute_duration_ns);
+          run_duration_ns - compute_duration_ns);
     } else if (existing_stats != nullptr) {
       InferRequestStats& stats = *existing_stats;
       stats.mutable_success()->set_count(stats.success().count() + 1);
       stats.mutable_success()->set_total_time_ns(
-        stats.success().total_time_ns() + request_duration_ns);
+          stats.success().total_time_ns() + request_duration_ns);
       stats.mutable_compute()->set_count(stats.compute().count() + 1);
       stats.mutable_compute()->set_total_time_ns(
-        stats.compute().total_time_ns() + compute_duration_ns);
+          stats.compute().total_time_ns() + compute_duration_ns);
       stats.mutable_queue()->set_count(stats.queue().count() + 1);
       stats.mutable_queue()->set_total_time_ns(
-        stats.queue().total_time_ns() +
-        (run_duration_ns - compute_duration_ns));
+          stats.queue().total_time_ns() +
+          (run_duration_ns - compute_duration_ns));
     } else {
       LOG_ERROR << "Internal error logging INFER stats for " << model_name;
     }
@@ -364,12 +364,12 @@ ModelInferStats::ScopedTimer::Stop()
 ModelInferStats::~ModelInferStats()
 {
   const uint32_t model_version = (model_servable_ != nullptr)
-                                   ? model_servable_->Version()
-                                   : requested_model_version_;
+                                     ? model_servable_->Version()
+                                     : requested_model_version_;
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
-      model_name_, model_version, batch_size_, request_duration_ns_);
+        model_name_, model_version, batch_size_, request_duration_ns_);
     if (model_servable_ == nullptr) {
       LOG_ERROR << "Unable to collect inference metrics for nullptr servable";
     } else {
@@ -377,8 +377,8 @@ ModelInferStats::~ModelInferStats()
     }
   } else {
     status_manager_->UpdateSuccessInferStats(
-      model_name_, model_version, batch_size_, execution_count_,
-      request_duration_ns_, run_duration_ns_, compute_duration_ns_);
+        model_name_, model_version, batch_size_, execution_count_,
+        request_duration_ns_, run_duration_ns_, compute_duration_ns_);
 
     if (model_servable_ == nullptr) {
       LOG_ERROR << "Unable to collect inference metrics for nullptr servable";
@@ -387,20 +387,20 @@ ModelInferStats::~ModelInferStats()
       model_servable_->MetricInferenceCount(gpu_device_).Increment(batch_size_);
       if (execution_count_ > 0) {
         model_servable_->MetricInferenceExecutionCount(gpu_device_)
-          .Increment(execution_count_);
+            .Increment(execution_count_);
       }
 
       model_servable_->MetricInferenceRequestDuration(gpu_device_)
-        .Increment(request_duration_ns_ / 1000);
+          .Increment(request_duration_ns_ / 1000);
       model_servable_->MetricInferenceComputeDuration(gpu_device_)
-        .Increment(compute_duration_ns_ / 1000);
+          .Increment(compute_duration_ns_ / 1000);
       model_servable_->MetricInferenceQueueDuration(gpu_device_)
-        .Increment((run_duration_ns_ - compute_duration_ns_) / 1000);
+          .Increment((run_duration_ns_ - compute_duration_ns_) / 1000);
 
       model_servable_->MetricInferenceLoadRatio(gpu_device_)
-        .Observe(
-          (double)request_duration_ns_ /
-          std::max(1.0, (double)compute_duration_ns_));
+          .Observe(
+              (double)request_duration_ns_ /
+              std::max(1.0, (double)compute_duration_ns_));
     }
   }
 }

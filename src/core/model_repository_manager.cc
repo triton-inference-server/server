@@ -103,18 +103,18 @@ IsModified(const std::string& path, int64_t* last_ns)
 ModelRepositoryManager* ModelRepositoryManager::singleton = nullptr;
 
 ModelRepositoryManager::ModelRepositoryManager(
-  const std::string& repository_path, const bool autofill)
+    const std::string& repository_path, const bool autofill)
     : repository_path_(repository_path), autofill_(autofill)
 {
 }
 
 tensorflow::Status
 ModelRepositoryManager::Create(
-  const std::string& repository_path, const bool autofill)
+    const std::string& repository_path, const bool autofill)
 {
   if (singleton != nullptr) {
     return tensorflow::errors::AlreadyExists(
-      "ModelRepositoryManager singleton already created");
+        "ModelRepositoryManager singleton already created");
   }
 
   singleton = new ModelRepositoryManager(repository_path, autofill);
@@ -124,14 +124,14 @@ ModelRepositoryManager::Create(
 
 tensorflow::Status
 ModelRepositoryManager::GetModelConfig(
-  const std::string& name, ModelConfig* model_config)
+    const std::string& name, ModelConfig* model_config)
 {
   std::lock_guard<std::mutex> lock(singleton->infos_mu_);
 
   const auto itr = singleton->infos_.find(name);
   if (itr == singleton->infos_.end()) {
     return tensorflow::errors::NotFound(
-      "no configuration for model '", name, "'");
+        "no configuration for model '", name, "'");
   }
 
   *model_config = itr->second.model_config_;
@@ -140,14 +140,14 @@ ModelRepositoryManager::GetModelConfig(
 
 tensorflow::Status
 ModelRepositoryManager::GetTFSModelConfig(
-  const std::string& name, tfs::ModelConfig* tfs_model_config)
+    const std::string& name, tfs::ModelConfig* tfs_model_config)
 {
   std::lock_guard<std::mutex> lock(singleton->infos_mu_);
 
   const auto itr = singleton->infos_.find(name);
   if (itr == singleton->infos_.end()) {
     return tensorflow::errors::NotFound(
-      "no TFS configuration for model '", name, "'");
+        "no TFS configuration for model '", name, "'");
   }
 
   *tfs_model_config = itr->second.tfs_model_config_;
@@ -156,7 +156,7 @@ ModelRepositoryManager::GetTFSModelConfig(
 
 tensorflow::Status
 ModelRepositoryManager::GetModelPlatform(
-  const std::string& name, Platform* platform)
+    const std::string& name, Platform* platform)
 {
   std::lock_guard<std::mutex> lock(singleton->infos_mu_);
 
@@ -169,7 +169,7 @@ ModelRepositoryManager::GetModelPlatform(
 
   if (*platform == Platform::PLATFORM_UNKNOWN) {
     return tensorflow::errors::NotFound(
-      "unknown platform for model '", name, "'");
+        "unknown platform for model '", name, "'");
   }
 
   return tensorflow::Status::OK();
@@ -177,8 +177,8 @@ ModelRepositoryManager::GetModelPlatform(
 
 tensorflow::Status
 ModelRepositoryManager::Poll(
-  std::set<std::string>* added, std::set<std::string>* deleted,
-  std::set<std::string>* modified, std::set<std::string>* unmodified)
+    std::set<std::string>* added, std::set<std::string>* deleted,
+    std::set<std::string>* modified, std::set<std::string>* unmodified)
 {
   // Serialize all polling operation...
   std::lock_guard<std::mutex> lock(singleton->poll_mu_);
@@ -197,7 +197,7 @@ ModelRepositoryManager::Poll(
   // which we read the model configuration.
   std::vector<std::string> children;
   TF_RETURN_IF_ERROR(tensorflow::Env::Default()->GetChildren(
-    singleton->repository_path_, &children));
+      singleton->repository_path_, &children));
 
   // GetChildren() returns all descendants instead for cloud storage
   // like GCS.  In such case we should filter out all non-direct
@@ -210,7 +210,7 @@ ModelRepositoryManager::Poll(
 
   for (const auto& child : real_children) {
     const auto full_path =
-      tensorflow::io::JoinPath(singleton->repository_path_, child);
+        tensorflow::io::JoinPath(singleton->repository_path_, child);
     if (!tensorflow::Env::Default()->IsDirectory(full_path).ok()) {
       continue;
     }
@@ -235,7 +235,7 @@ ModelRepositoryManager::Poll(
         const auto& ret = new_infos.emplace(child, iitr->second);
         if (!ret.second) {
           return tensorflow::errors::AlreadyExists(
-            "unexpected model info for model '", child, "'");
+              "unexpected model info for model '", child, "'");
         }
       }
     }
@@ -244,7 +244,7 @@ ModelRepositoryManager::Poll(
       const auto& ret = new_infos.emplace(child, ModelInfo{});
       if (!ret.second) {
         return tensorflow::errors::AlreadyExists(
-          "unexpected model info for model '", child, "'");
+            "unexpected model info for model '", child, "'");
       }
 
       ModelInfo& model_info = ret.first->second;
@@ -256,7 +256,7 @@ ModelRepositoryManager::Poll(
       // the model configuration (autofill) from the model
       // definition. In all cases normalize and validate the config.
       TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
-        full_path, singleton->autofill_, &model_config));
+          full_path, singleton->autofill_, &model_config));
       TF_RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
 
       model_info.platform_ = GetPlatform(model_config.platform());
@@ -268,8 +268,8 @@ ModelRepositoryManager::Poll(
       // same name.
       if (model_config.name() != child) {
         return tensorflow::errors::InvalidArgument(
-          "unexpected directory name '", child, "' for model '",
-          model_config.name(), "', directory name must equal model name");
+            "unexpected directory name '", child, "' for model '",
+            model_config.name(), "', directory name must equal model name");
       }
 
       tfs_config.set_name(model_config.name());
@@ -280,24 +280,24 @@ ModelRepositoryManager::Poll(
       // configuration policy.
       if (model_config.version_policy().has_latest()) {
         tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::Latest
-          latest;
+            latest;
         latest.set_num_versions(
-          model_config.version_policy().latest().num_versions());
+            model_config.version_policy().latest().num_versions());
         tfs_config.mutable_model_version_policy()->mutable_latest()->CopyFrom(
-          latest);
+            latest);
       } else if (model_config.version_policy().has_all()) {
         tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::All all;
         tfs_config.mutable_model_version_policy()->mutable_all()->CopyFrom(all);
       } else if (model_config.version_policy().has_specific()) {
         tfs::FileSystemStoragePathSourceConfig::ServableVersionPolicy::Specific
-          specific;
+            specific;
         specific.mutable_versions()->CopyFrom(
-          model_config.version_policy().specific().versions());
+            model_config.version_policy().specific().versions());
         tfs_config.mutable_model_version_policy()->mutable_specific()->CopyFrom(
-          specific);
+            specific);
       } else {
         return tensorflow::errors::Internal(
-          "expected version policy for model '", model_config.name());
+            "expected version policy for model '", model_config.name());
       }
     }
   }
@@ -305,10 +305,9 @@ ModelRepositoryManager::Poll(
   // Anything in 'infos_' that is not in "added", "modified", or
   // "unmodified" is deleted.
   for (const auto& pr : singleton->infos_) {
-    if (
-      (added->find(pr.first) == added->end()) &&
-      (modified->find(pr.first) == modified->end()) &&
-      (unmodified->find(pr.first) == unmodified->end())) {
+    if ((added->find(pr.first) == added->end()) &&
+        (modified->find(pr.first) == modified->end()) &&
+        (unmodified->find(pr.first) == unmodified->end())) {
       deleted->insert(pr.first);
     }
   }

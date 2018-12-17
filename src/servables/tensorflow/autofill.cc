@@ -41,8 +41,8 @@ namespace nvidia { namespace inferenceserver {
 //
 tensorflow::Status
 AutoFillSavedModel::Create(
-  const std::string& model_name, const std::string& model_path,
-  std::unique_ptr<AutoFillSavedModel>* autofill)
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillSavedModel>* autofill)
 {
   std::set<std::string> version_dirs;
   TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -52,11 +52,11 @@ AutoFillSavedModel::Create(
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "' due to multiple versions");
+        "unable to autofill for '", model_name, "' due to multiple versions");
   }
 
   const auto version_path =
-    tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
 
   // There must be a single savedmodel directory within the version
   // directory...
@@ -64,19 +64,19 @@ AutoFillSavedModel::Create(
   TF_RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
   if (savedmodel_dirs.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to find savedmodel directory");
+        "unable to autofill for '", model_name,
+        "', unable to find savedmodel directory");
   }
 
   const std::string savedmodel_dir = *(savedmodel_dirs.begin());
   const auto savedmodel_path =
-    tensorflow::io::JoinPath(version_path, savedmodel_dir);
+      tensorflow::io::JoinPath(version_path, savedmodel_dir);
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
   tensorflow::SessionOptions session_options;
   tensorflow::SignatureDef sig;
   TF_RETURN_IF_ERROR(LoadSavedModel(
-    model_name, savedmodel_path, session_options, &bundle, &sig));
+      model_name, savedmodel_path, session_options, &bundle, &sig));
 
   autofill->reset(new AutoFillSavedModel(model_name, savedmodel_dir, sig));
   return tensorflow::Status::OK();
@@ -108,8 +108,9 @@ AutoFillSavedModel::Fix(ModelConfig* config)
       const DataType dt = ConvertDataType(sin.second.dtype());
       if (dt == DataType::TYPE_INVALID) {
         return tensorflow::errors::Internal(
-          "unable to autofill for '", model_name_, "', unsupported data-type '",
-          tensorflow::DataType_Name(sin.second.dtype()), "'");
+            "unable to autofill for '", model_name_,
+            "', unsupported data-type '",
+            tensorflow::DataType_Name(sin.second.dtype()), "'");
       }
 
       config_input->set_data_type(dt);
@@ -119,7 +120,7 @@ AutoFillSavedModel::Fix(ModelConfig* config)
       // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
       const bool has_batch_dim =
-        (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
+          (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
 
       for (int i = (has_batch_dim ? 1 : 0); i < shape.dim().size(); ++i) {
         config_input->mutable_dims()->Add(shape.dim(i).size());
@@ -138,8 +139,9 @@ AutoFillSavedModel::Fix(ModelConfig* config)
       const DataType dt = ConvertDataType(sout.second.dtype());
       if (dt == DataType::TYPE_INVALID) {
         return tensorflow::errors::Internal(
-          "unable to autofill for '", model_name_, "', unsupported data-type '",
-          tensorflow::DataType_Name(sout.second.dtype()), "'");
+            "unable to autofill for '", model_name_,
+            "', unsupported data-type '",
+            tensorflow::DataType_Name(sout.second.dtype()), "'");
       }
 
       config_output->set_data_type(dt);
@@ -149,7 +151,7 @@ AutoFillSavedModel::Fix(ModelConfig* config)
       // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
       const bool has_batch_dim =
-        (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
+          (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
 
       for (int i = (has_batch_dim ? 1 : 0); i < shape.dim().size(); ++i) {
         config_output->mutable_dims()->Add(shape.dim(i).size());
@@ -173,8 +175,8 @@ AutoFillSavedModel::Fix(ModelConfig* config)
 //
 tensorflow::Status
 AutoFillGraphDef::Create(
-  const std::string& model_name, const std::string& model_path,
-  std::unique_ptr<AutoFillGraphDef>* autofill)
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillGraphDef>* autofill)
 {
   std::set<std::string> version_dirs;
   TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -184,11 +186,11 @@ AutoFillGraphDef::Create(
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "' due to multiple versions");
+        "unable to autofill for '", model_name, "' due to multiple versions");
   }
 
   const auto version_path =
-    tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
 
   // There must be a single graphdef file within the version
   // directory...
@@ -196,13 +198,13 @@ AutoFillGraphDef::Create(
   TF_RETURN_IF_ERROR(GetFiles(version_path, &graphdef_files));
   if (graphdef_files.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to find graphdef file");
+        "unable to autofill for '", model_name,
+        "', unable to find graphdef file");
   }
 
   const std::string graphdef_file = *(graphdef_files.begin());
   const auto graphdef_path =
-    tensorflow::io::JoinPath(version_path, graphdef_file);
+      tensorflow::io::JoinPath(version_path, graphdef_file);
 
   // If find a file named with the default graphdef name then assume
   // it is a graphdef. We could be smarter here and try to parse to
@@ -211,9 +213,9 @@ AutoFillGraphDef::Create(
   // outputs are.
   if (graphdef_file != kTensorFlowGraphDefFilename) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to find graphdef file named '", kTensorFlowGraphDefFilename,
-      "'");
+        "unable to autofill for '", model_name,
+        "', unable to find graphdef file named '", kTensorFlowGraphDefFilename,
+        "'");
   }
 
   autofill->reset(new AutoFillGraphDef(model_name));

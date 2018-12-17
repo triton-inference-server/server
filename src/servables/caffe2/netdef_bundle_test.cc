@@ -37,22 +37,21 @@ class NetDefBundleTest : public ModelConfigTestBase {
 TEST_F(NetDefBundleTest, ModelConfigSanity)
 {
   BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
+      [](const std::string& path,
+         const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<NetDefBundle> bundle(new NetDefBundle());
     tensorflow::Status status = bundle->Init(path, config);
     if (status.ok()) {
       std::unordered_map<std::string, std::vector<char>> netdef_blobs;
 
       for (const auto& filename : std::vector<std::string>{
-             kCaffe2NetDefFilename,
-             std::string(kCaffe2NetDefInitFilenamePrefix) +
-               std::string(kCaffe2NetDefFilename)}) {
+               kCaffe2NetDefFilename,
+               std::string(kCaffe2NetDefInitFilenamePrefix) +
+                   std::string(kCaffe2NetDefFilename)}) {
         const auto netdef_path = tensorflow::io::JoinPath(path, filename);
         tensorflow::string blob_str;
         tensorflow::ReadFileToString(
-          tensorflow::Env::Default(), netdef_path, &blob_str);
+            tensorflow::Env::Default(), netdef_path, &blob_str);
         std::vector<char> blob(blob_str.begin(), blob_str.end());
         netdef_blobs.emplace(filename, std::move(blob));
       }
@@ -68,8 +67,8 @@ TEST_F(NetDefBundleTest, ModelConfigSanity)
 
   // Sanity tests with autofill and not providing the platform.
   ValidateOne(
-    "inference_server/src/servables/caffe2/testdata/autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
+      "inference_server/src/servables/caffe2/testdata/autofill_sanity",
+      true /* autofill */, std::string() /* platform */, init_func);
 }
 
 }}}  // namespace nvidia::inferenceserver::test

@@ -34,7 +34,7 @@ Server::Server(std::string server_address)
     : m_ServerAddress(server_address), m_Running(false)
 {
   m_Builder.AddListeningPort(
-    m_ServerAddress, ::grpc::InsecureServerCredentials());
+      m_ServerAddress, ::grpc::InsecureServerCredentials());
 }
 
 ::grpc::ServerBuilder&
@@ -42,7 +42,7 @@ Server::GetBuilder()
 {
   if (m_Running) {
     throw std::runtime_error(
-      "Unable to access Builder after the Server is running.");
+        "Unable to access Builder after the Server is running.");
   }
   return m_Builder;
 }

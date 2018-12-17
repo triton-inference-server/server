@@ -37,9 +37,8 @@ class GraphDefBundleTest : public ModelConfigTestBase {
 TEST_F(GraphDefBundleTest, ModelConfigSanity)
 {
   BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
+      [](const std::string& path,
+         const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
     tensorflow::Status status = bundle->Init(path, config);
     if (status.ok()) {
@@ -49,8 +48,8 @@ TEST_F(GraphDefBundleTest, ModelConfigSanity)
            std::vector<std::string>{kTensorFlowGraphDefFilename}) {
         const auto graphdef_path = tensorflow::io::JoinPath(path, filename);
         graphdef_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(graphdef_path));
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(graphdef_path));
       }
 
       tensorflow::ConfigProto session_config;
@@ -65,9 +64,9 @@ TEST_F(GraphDefBundleTest, ModelConfigSanity)
 
   // Sanity tests with autofill and not providing the platform.
   ValidateOne(
-    "inference_server/src/servables/tensorflow/testdata/"
-    "graphdef_autofill_sanity",
-    true /* autofill */, std::string() /* platform */, init_func);
+      "inference_server/src/servables/tensorflow/testdata/"
+      "graphdef_autofill_sanity",
+      true /* autofill */, std::string() /* platform */, init_func);
 }
 
 }}}  // namespace nvidia::inferenceserver::test

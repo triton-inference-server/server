@@ -40,18 +40,18 @@ class CustomBundle : public InferenceServable {
   CustomBundle(CustomBundle&&) = default;
 
   tensorflow::Status Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config);
+      const tensorflow::StringPiece& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the custom
   // 'models'.
   tensorflow::Status CreateExecutionContexts(
-    const std::unordered_map<std::string, std::string>& libraries);
+      const std::unordered_map<std::string, std::string>& libraries);
   tensorflow::Status CreateExecutionContext(
-    const std::string& instance_name, const int gpu_device,
-    const std::unordered_map<std::string, std::string>& libraries);
+      const std::string& instance_name, const int gpu_device,
+      const std::unordered_map<std::string, std::string>& libraries);
 
   tensorflow::Status GetOutputDataType(
-    const std::string& name, DataType* dtype) const override;
+      const std::string& name, DataType* dtype) const override;
   const LabelProvider& GetLabelProvider() const override
   {
     return label_provider_;
@@ -61,8 +61,8 @@ class CustomBundle : public InferenceServable {
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(CustomBundle);
@@ -88,7 +88,8 @@ class CustomBundle : public InferenceServable {
     using IOSizeMap = std::unordered_map<std::string, size_t>;
 
     Context(
-      const std::string& name, const int gpu_device, const int max_batch_size);
+        const std::string& name, const int gpu_device,
+        const int max_batch_size);
     Context(Context&& o);
     ~Context();
 
@@ -107,7 +108,7 @@ class CustomBundle : public InferenceServable {
 
     struct GetInputOutputContext {
       GetInputOutputContext(
-        CustomBundle::Context* context, Scheduler::Payload* payload)
+          CustomBundle::Context* context, Scheduler::Payload* payload)
           : context_(context), payload_(payload)
       {
       }
@@ -118,14 +119,14 @@ class CustomBundle : public InferenceServable {
     // Callback used by custom backends to get the next block of input
     // for a 'name'd input tensor.
     bool GetNextInput(
-      GetInputOutputContext* input_context, const char* name,
-      const void** content, uint64_t* content_byte_size);
+        GetInputOutputContext* input_context, const char* name,
+        const void** content, uint64_t* content_byte_size);
 
     // Callback used by custom backends to get the output buffer for a
     // 'name'd output tensor.
     bool GetOutput(
-      GetInputOutputContext* output_context, const char* name,
-      uint64_t content_byte_size, void** content);
+        GetInputOutputContext* output_context, const char* name,
+        uint64_t content_byte_size, void** content);
 
     // Name of the model instance
     std::string name_;
@@ -164,13 +165,13 @@ std::ostream& operator<<(std::ostream& out, const CustomBundle& pb);
 // Callback used by custom backends to get the next block of input for
 // a 'name'd input tensor.
 bool CustomGetNextInput(
-  void* input_context, const char* name, const void** content,
-  uint64_t* content_byte_size);
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size);
 
 // Callback used by custom backends to get the output buffer for a
 // 'name'd output tensor.
 bool CustomGetOutput(
-  void* output_context, const char* name, uint64_t content_byte_size,
-  void** content);
+    void* output_context, const char* name, uint64_t content_byte_size,
+    void** content);
 
 }}  // namespace nvidia::inferenceserver

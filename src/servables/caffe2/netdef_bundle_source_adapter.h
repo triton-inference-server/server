@@ -44,22 +44,22 @@ class NetDefBundleSourceAdapter final
     : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle> {
  public:
   static tensorflow::Status Create(
-    const NetDefBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-      adapter);
+      const NetDefBundleSourceAdapterConfig& config,
+      std::unique_ptr<
+          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+          adapter);
 
   ~NetDefBundleSourceAdapter() override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(NetDefBundleSourceAdapter);
   using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle>;
+      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle>;
 
   NetDefBundleSourceAdapter(
-    const NetDefBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      const NetDefBundleSourceAdapterConfig& config,
+      typename SimpleSourceAdapter::Creator creator,
+      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
       : SimpleSourceAdapter(creator, resource_estimator), config_(config)
   {
   }

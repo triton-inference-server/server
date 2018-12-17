@@ -36,15 +36,15 @@ namespace nvidia { namespace inferenceserver { namespace test {
 class ModelConfigTestBase : public ::testing::Test {
  public:
   using BundleInitFunc =
-    std::function<tensorflow::Status(const std::string&, const ModelConfig&)>;
+      std::function<tensorflow::Status(const std::string&, const ModelConfig&)>;
 
   bool ValidateInit(
-    const std::string& path, bool autofill, BundleInitFunc init_func,
-    std::string* result);
+      const std::string& path, bool autofill, BundleInitFunc init_func,
+      std::string* result);
   void ValidateAll(const std::string& platform, BundleInitFunc init_func);
   void ValidateOne(
-    const std::string& test_repository_rpath, bool autofill,
-    const std::string& platform, BundleInitFunc init_func);
+      const std::string& test_repository_rpath, bool autofill,
+      const std::string& platform, BundleInitFunc init_func);
 };
 
 }}}  // namespace nvidia::inferenceserver::test

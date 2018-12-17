@@ -84,7 +84,7 @@ ConvertDatatype(DataType dtype)
 
 
 NetDefBundle::Context::Context(
-  const std::string& name, const int gpu_device, const int max_batch_size)
+    const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
 {
 }
@@ -105,7 +105,7 @@ NetDefBundle::Context::~Context()
 
 tensorflow::Status
 NetDefBundle::Init(
-  const tensorflow::StringPiece& path, const ModelConfig& config)
+    const tensorflow::StringPiece& path, const ModelConfig& config)
 {
   TF_RETURN_IF_ERROR(ValidateModelConfig(config, kCaffe2NetDefPlatform));
   TF_RETURN_IF_ERROR(SetModelConfig(path, config));
@@ -117,7 +117,7 @@ NetDefBundle::Init(
 
     if (!io.label_filename().empty()) {
       const auto label_path =
-        tensorflow::io::JoinPath(model_dir, io.label_filename());
+          tensorflow::io::JoinPath(model_dir, io.label_filename());
       TF_RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
     }
   }
@@ -127,7 +127,7 @@ NetDefBundle::Init(
 
 tensorflow::Status
 NetDefBundle::CreateExecutionContexts(
-  const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::unordered_map<std::string, std::vector<char>>& models)
 {
   uint32_t total_context_cnt = 0;
 
@@ -139,16 +139,16 @@ NetDefBundle::CreateExecutionContexts(
     for (int c = 0; c < group.count(); c++) {
       if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
-          group.name() + "_" + std::to_string(c) + "_cpu";
+            group.name() + "_" + std::to_string(c) + "_cpu";
         TF_RETURN_IF_ERROR(CreateExecutionContext(
-          instance_name, Context::NO_GPU_DEVICE, models));
+            instance_name, Context::NO_GPU_DEVICE, models));
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           TF_RETURN_IF_ERROR(
-            CreateExecutionContext(instance_name, gpu_device, models));
+              CreateExecutionContext(instance_name, gpu_device, models));
         }
       }
 
@@ -159,12 +159,12 @@ NetDefBundle::CreateExecutionContexts(
   // Create a scheduler with one thread for each context available for
   // this model. Each runner is exclusively tied to the context.
   TF_RETURN_IF_ERROR(SetConfiguredScheduler(
-    total_context_cnt,
-    [this](
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> func) {
-      Run(runner_idx, payloads, func);
-    }));
+      total_context_cnt,
+      [this](
+          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+          std::function<void(tensorflow::Status)> func) {
+        Run(runner_idx, payloads, func);
+      }));
 
   LOG_VERBOSE(1) << "netdef bundle for " << Name() << std::endl << *this;
   return tensorflow::Status::OK();
@@ -172,8 +172,8 @@ NetDefBundle::CreateExecutionContexts(
 
 tensorflow::Status
 NetDefBundle::CreateExecutionContext(
-  const std::string& instance_name, const int gpu_device,
-  const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::string& instance_name, const int gpu_device,
+    const std::unordered_map<std::string, std::vector<char>>& models)
 {
   cudaError_t cuerr;
 
@@ -188,33 +188,33 @@ NetDefBundle::CreateExecutionContext(
     cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "unable to get CUDA device properties for ", Name(), ": ",
-        cudaGetErrorString(cuerr));
+          "unable to get CUDA device properties for ", Name(), ": ",
+          cudaGetErrorString(cuerr));
     }
 
     cc = std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
     const auto& cc_itr = Config().cc_model_filenames().find(cc);
     cc_model_filename = (cc_itr == Config().cc_model_filenames().end())
-                          ? Config().default_model_filename()
-                          : cc_itr->second;
+                            ? Config().default_model_filename()
+                            : cc_itr->second;
   }
 
 
   const auto& mn_itr = models.find(cc_model_filename);
   if (mn_itr == models.end()) {
     return tensorflow::errors::Internal(
-      "unable to find NetDef model '", cc_model_filename, "' for ", Name());
+        "unable to find NetDef model '", cc_model_filename, "' for ", Name());
   }
 
   // NetDef also requires an init network, the name of which is always
   // derived from 'cc_model_filename'.
   const std::string& cc_init_filename =
-    kCaffe2NetDefInitFilenamePrefix + cc_model_filename;
+      kCaffe2NetDefInitFilenamePrefix + cc_model_filename;
   const auto& imn_itr = models.find(cc_init_filename);
   if (imn_itr == models.end()) {
     return tensorflow::errors::Internal(
-      "unable to find NetDef initialization model '", cc_init_filename,
-      "' for ", Name());
+        "unable to find NetDef initialization model '", cc_init_filename,
+        "' for ", Name());
   }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -247,8 +247,8 @@ NetDefBundle::CreateExecutionContext(
 
   Caffe2Workspace* c2ws;
   Caffe2Workspace::Error err = Caffe2WorkspaceCreate(
-    &c2ws, Config().name(), Config().max_batch_size(), input_names,
-    output_names, gpu_device, imn_itr->second, mn_itr->second);
+      &c2ws, Config().name(), Config().max_batch_size(), input_names,
+      output_names, gpu_device, imn_itr->second, mn_itr->second);
   if (!err.IsOk()) {
     return tensorflow::errors::Internal(err.Message());
   }
@@ -263,15 +263,15 @@ NetDefBundle::CreateExecutionContext(
 
 tensorflow::Status
 NetDefBundle::Context::InitializeInputs(
-  const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(
-      ValidateModelInput(io, workspace_->PotentialInputNames()));
+        ValidateModelInput(io, workspace_->PotentialInputNames()));
 
     std::vector<int> dims(io.dims().begin(), io.dims().end());
     Caffe2Workspace::Error err = workspace_->AddInputTensor(
-      io.name(), ConvertDatatype(io.data_type()), dims);
+        io.name(), ConvertDatatype(io.data_type()), dims);
     if (!err.IsOk()) {
       return tensorflow::errors::Internal(err.Message());
     }
@@ -282,15 +282,15 @@ NetDefBundle::Context::InitializeInputs(
 
 tensorflow::Status
 NetDefBundle::Context::InitializeOutputs(
-  const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(
-      ValidateModelOutput(io, workspace_->PotentialOutputNames()));
+        ValidateModelOutput(io, workspace_->PotentialOutputNames()));
 
     std::vector<int> dims(io.dims().begin(), io.dims().end());
     Caffe2Workspace::Error err = workspace_->AddOutputTensor(
-      io.name(), ConvertDatatype(io.data_type()), dims);
+        io.name(), ConvertDatatype(io.data_type()), dims);
     if (!err.IsOk()) {
       return tensorflow::errors::Internal(err.Message());
     }
@@ -305,7 +305,7 @@ NetDefBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
   const auto itr = output_dtype_map_.find(name);
   if (itr == output_dtype_map_.end()) {
     return tensorflow::errors::Internal(
-      "unable to find datatype for output '", name, "'");
+        "unable to find datatype for output '", name, "'");
   }
 
   *dtype = itr->second;
@@ -314,14 +314,14 @@ NetDefBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
 
 void
 NetDefBundle::Run(
-  uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-  std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
+    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
     OnCompleteQueuedPayloads(tensorflow::errors::Internal(
-      "unexpected runner index", runner_idx, ", max allowed ",
-      contexts_.size()));
+        "unexpected runner index", runner_idx, ", max allowed ",
+        contexts_.size()));
     return;
   }
 
@@ -346,12 +346,12 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
-      payload.request_provider_->RequestHeader();
+        payload.request_provider_->RequestHeader();
 
     if ((size_t)request_header.input().size() != workspace_->Inputs().size()) {
       payload.status_ = tensorflow::errors::InvalidArgument(
-        "expected ", workspace_->Inputs().size(), " inputs but got ",
-        request_header.input().size());
+          "expected ", workspace_->Inputs().size(), " inputs but got ",
+          request_header.input().size());
       continue;
     }
 
@@ -360,8 +360,8 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     const size_t batch_size = request_header.batch_size();
     if ((batch_size != 1) && ((int)batch_size > max_batch_size_)) {
       payload.status_ = tensorflow::errors::InvalidArgument(
-        "unexpected batch size ", batch_size, " for '", name_,
-        "', max allowed is ", max_batch_size_);
+          "unexpected batch size ", batch_size, " for '", name_,
+          "', max allowed is ", max_batch_size_);
       continue;
     }
 
@@ -371,15 +371,15 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       const auto& itr = workspace_->Inputs().find(name);
       if (itr == workspace_->Inputs().end()) {
         payload.status_ = tensorflow::errors::InvalidArgument(
-          "unexpected inference input '", name, "'");
+            "unexpected inference input '", name, "'");
         break;
       }
 
       const size_t expected_byte_size = itr->second;
       if (input.byte_size() != expected_byte_size) {
         payload.status_ = tensorflow::errors::InvalidArgument(
-          "unexpected size ", input.byte_size(), " for inference input '", name,
-          "', expecting ", expected_byte_size);
+            "unexpected size ", input.byte_size(), " for inference input '",
+            name, "', expecting ", expected_byte_size);
         break;
       }
     }
@@ -402,8 +402,8 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
     return tensorflow::errors::Internal(
-      "dynamic batch size ", total_batch_size, " for '", name_,
-      "', max allowed is ", max_batch_size_);
+        "dynamic batch size ", total_batch_size, " for '", name_,
+        "', max allowed is ", max_batch_size_);
   }
 
   // For each input allocate and populate a buffer containing all the
@@ -431,9 +431,9 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       }
 
       const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+          payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
+          request_header.batch_size() * batch1_byte_size;
 
       int input_idx = 0;
       for (const auto& input : request_header.input()) {
@@ -443,8 +443,8 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
             const void* content;
             size_t content_byte_size;
             payload.compute_status_ =
-              payload.request_provider_->GetNextInputContent(
-                input_idx, &content, &content_byte_size, false);
+                payload.request_provider_->GetNextInputContent(
+                    input_idx, &content, &content_byte_size, false);
             if (!payload.compute_status_.ok()) {
               break;
             }
@@ -454,30 +454,29 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
               break;
             }
 
-            if (
-              (buffer_copy_offset + copied_byte_size + content_byte_size) >
-              total_byte_size) {
+            if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
+                total_byte_size) {
               payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ",
-                buffer_copy_offset + copied_byte_size + content_byte_size,
-                " for inference input '", name, "', expecting ",
-                total_byte_size);
+                  "unexpected size ",
+                  buffer_copy_offset + copied_byte_size + content_byte_size,
+                  " for inference input '", name, "', expecting ",
+                  total_byte_size);
               break;
             }
 
             memcpy(
-              static_cast<char*>(buffer) + buffer_copy_offset +
-                copied_byte_size,
-              content, content_byte_size);
+                static_cast<char*>(buffer) + buffer_copy_offset +
+                    copied_byte_size,
+                content, content_byte_size);
             copied_byte_size += content_byte_size;
           }
 
-          if (
-            payload.compute_status_.ok() &&
-            (copied_byte_size != expected_byte_size)) {
+          if (payload.compute_status_.ok() &&
+              (copied_byte_size != expected_byte_size)) {
             payload.compute_status_ = tensorflow::errors::Internal(
-              "expected ", expected_byte_size, " of data for inference input '",
-              name, "', got ", copied_byte_size);
+                "expected ", expected_byte_size,
+                " of data for inference input '", name, "', got ",
+                copied_byte_size);
           }
 
           break;
@@ -490,8 +489,8 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
 
     Caffe2Workspace::Error err = workspace_->SetInputTensor(
-      name, total_batch_size, static_cast<const char*>(buffer),
-      total_byte_size);
+        name, total_batch_size, static_cast<const char*>(buffer),
+        total_byte_size);
     if (!err.IsOk()) {
       return tensorflow::errors::Internal(err.Message());
     }
@@ -512,7 +511,7 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
     const char* output_tensor;
     Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-      name, total_batch_size, &output_tensor, total_byte_size);
+        name, total_batch_size, &output_tensor, total_byte_size);
     if (!err.IsOk()) {
       return tensorflow::errors::Internal(err.Message());
     }
@@ -528,32 +527,32 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       // 'output_tensor'. If it did not request this output then just
       // skip it in the 'output_tensor'.
       const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+          payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
+          request_header.batch_size() * batch1_byte_size;
 
       int output_idx = 0;
       for (const auto& output : request_header.output()) {
         if (output.name() == name) {
           void* content;
           tensorflow::Status status =
-            payload.response_provider_->GetOutputBuffer(
-              output_idx, &content, expected_byte_size);
+              payload.response_provider_->GetOutputBuffer(
+                  output_idx, &content, expected_byte_size);
           if (!status.ok()) {
             payload.compute_status_ = status;
           } else if (content == nullptr) {
             payload.compute_status_ = tensorflow::errors::Internal(
-              "no buffer to accept output values for output '", name, "'");
+                "no buffer to accept output values for output '", name, "'");
           } else {
             if ((buffer_copy_offset + expected_byte_size) > total_byte_size) {
               payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ", buffer_copy_offset + expected_byte_size,
-                " for inference output '", name, "', expecting maximum",
-                total_byte_size);
+                  "unexpected size ", buffer_copy_offset + expected_byte_size,
+                  " for inference output '", name, "', expecting maximum",
+                  total_byte_size);
             } else {
               memcpy(
-                content, output_tensor + buffer_copy_offset,
-                expected_byte_size);
+                  content, output_tensor + buffer_copy_offset,
+                  expected_byte_size);
             }
           }
 
@@ -578,8 +577,8 @@ operator<<(std::ostream& out, const NetDefBundle& pb)
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context.name_ << ", gpu="
         << ((context.gpu_device_ == NetDefBundle::Context::NO_GPU_DEVICE)
-              ? "<none>"
-              : std::to_string(context.gpu_device_));
+                ? "<none>"
+                : std::to_string(context.gpu_device_));
   }
 
   return out;

@@ -35,7 +35,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param cuda_stream_priority Returns the CUDA stream priority.
 /// \return The error status.
 tensorflow::Status GetCudaPriority(
-  ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority);
+    ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority);
 
 /// Get version of a model from the path containing the model
 /// definition file.
@@ -43,7 +43,7 @@ tensorflow::Status GetCudaPriority(
 /// \param version Returns the version.
 /// \return The error status.
 tensorflow::Status GetModelVersionFromPath(
-  const tensorflow::StringPiece& path, uint32_t* version);
+    const tensorflow::StringPiece& path, uint32_t* version);
 
 /// Read a ModelConfig and normalize it as expected by model servables.
 /// \param path The full-path to the directory containing the
@@ -53,8 +53,8 @@ tensorflow::Status GetModelVersionFromPath(
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 tensorflow::Status GetNormalizedModelConfig(
-  const tensorflow::StringPiece& path, const bool autofill,
-  ModelConfig* config);
+    const tensorflow::StringPiece& path, const bool autofill,
+    ModelConfig* config);
 
 /// Validate that a model is specified correctly (excluding inputs and
 /// outputs which are validated via ValidateModelInput() and
@@ -65,7 +65,7 @@ tensorflow::Status GetNormalizedModelConfig(
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 tensorflow::Status ValidateModelConfig(
-  const ModelConfig& config, const std::string& expected_platform);
+    const ModelConfig& config, const std::string& expected_platform);
 
 /// Validate that input is specified correctly in a model
 /// configuration.
@@ -81,7 +81,7 @@ tensorflow::Status ValidateModelInput(const ModelInput& io);
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
 tensorflow::Status ValidateModelInput(
-  const ModelInput& io, const std::set<std::string>& allowed);
+    const ModelInput& io, const std::set<std::string>& allowed);
 
 /// Validate that an output is specified correctly in a model
 /// configuration.
@@ -97,6 +97,6 @@ tensorflow::Status ValidateModelOutput(const ModelOutput& io);
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
 tensorflow::Status ValidateModelOutput(
-  const ModelOutput& io, const std::set<std::string>& allowed);
+    const ModelOutput& io, const std::set<std::string>& allowed);
 
 }}  // namespace nvidia::inferenceserver

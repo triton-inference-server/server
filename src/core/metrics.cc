@@ -38,66 +38,67 @@ namespace nvidia { namespace inferenceserver {
 Metrics::Metrics()
     : registry_(std::make_shared<prometheus::Registry>()),
       inf_success_family_(
-        prometheus::BuildCounter()
-          .Name("nv_inference_request_success")
-          .Help("Number of successful inference requests, all batch sizes")
-          .Register(*registry_)),
+          prometheus::BuildCounter()
+              .Name("nv_inference_request_success")
+              .Help("Number of successful inference requests, all batch sizes")
+              .Register(*registry_)),
       inf_failure_family_(
-        prometheus::BuildCounter()
-          .Name("nv_inference_request_failure")
-          .Help("Number of failed inference requests, all batch sizes")
-          .Register(*registry_)),
+          prometheus::BuildCounter()
+              .Name("nv_inference_request_failure")
+              .Help("Number of failed inference requests, all batch sizes")
+              .Register(*registry_)),
       inf_count_family_(prometheus::BuildCounter()
-                          .Name("nv_inference_count")
-                          .Help("Number of inferences performed")
-                          .Register(*registry_)),
+                            .Name("nv_inference_count")
+                            .Help("Number of inferences performed")
+                            .Register(*registry_)),
       inf_count_exec_family_(prometheus::BuildCounter()
-                               .Name("nv_inference_exec_count")
-                               .Help("Number of model executions performed")
-                               .Register(*registry_)),
-      inf_request_duration_us_family_(
-        prometheus::BuildCounter()
-          .Name("nv_inference_request_duration_us")
-          .Help("Cummulative inference request duration in microseconds")
-          .Register(*registry_)),
-      inf_compute_duration_us_family_(
-        prometheus::BuildCounter()
-          .Name("nv_inference_compute_duration_us")
-          .Help("Cummulative inference compute duration in microseconds")
-          .Register(*registry_)),
-      inf_queue_duration_us_family_(
-        prometheus::BuildCounter()
-          .Name("nv_inference_queue_duration_us")
-          .Help("Cummulative inference queuing duration in microseconds")
-          .Register(*registry_)),
-      inf_load_ratio_family_(prometheus::BuildHistogram()
-                               .Name("nv_inference_load_ratio")
-                               .Register(*registry_)),
-      gpu_utilization_family_(prometheus::BuildGauge()
-                                .Name("nv_gpu_utilization")
-                                .Help("GPU utilization rate [0.0 - 1.0)")
-                                .Register(*registry_)),
-      gpu_memory_total_family_(prometheus::BuildGauge()
-                                 .Name("nv_gpu_memory_total_bytes")
-                                 .Help("GPU total memory, in bytes")
+                                 .Name("nv_inference_exec_count")
+                                 .Help("Number of model executions performed")
                                  .Register(*registry_)),
+      inf_request_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_request_duration_us")
+              .Help("Cummulative inference request duration in microseconds")
+              .Register(*registry_)),
+      inf_compute_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_compute_duration_us")
+              .Help("Cummulative inference compute duration in microseconds")
+              .Register(*registry_)),
+      inf_queue_duration_us_family_(
+          prometheus::BuildCounter()
+              .Name("nv_inference_queue_duration_us")
+              .Help("Cummulative inference queuing duration in microseconds")
+              .Register(*registry_)),
+      inf_load_ratio_family_(prometheus::BuildHistogram()
+                                 .Name("nv_inference_load_ratio")
+                                 .Register(*registry_)),
+      gpu_utilization_family_(prometheus::BuildGauge()
+                                  .Name("nv_gpu_utilization")
+                                  .Help("GPU utilization rate [0.0 - 1.0)")
+                                  .Register(*registry_)),
+      gpu_memory_total_family_(prometheus::BuildGauge()
+                                   .Name("nv_gpu_memory_total_bytes")
+                                   .Help("GPU total memory, in bytes")
+                                   .Register(*registry_)),
       gpu_memory_used_family_(prometheus::BuildGauge()
-                                .Name("nv_gpu_memory_used_bytes")
-                                .Help("GPU used memory, in bytes")
-                                .Register(*registry_)),
+                                  .Name("nv_gpu_memory_used_bytes")
+                                  .Help("GPU used memory, in bytes")
+                                  .Register(*registry_)),
       gpu_power_usage_family_(prometheus::BuildGauge()
-                                .Name("nv_gpu_power_usage")
-                                .Help("GPU power usage in watts")
-                                .Register(*registry_)),
+                                  .Name("nv_gpu_power_usage")
+                                  .Help("GPU power usage in watts")
+                                  .Register(*registry_)),
       gpu_power_limit_family_(prometheus::BuildGauge()
-                                .Name("nv_gpu_power_limit")
-                                .Help("GPU power management limit in watts")
-                                .Register(*registry_)),
+                                  .Name("nv_gpu_power_limit")
+                                  .Help("GPU power management limit in watts")
+                                  .Register(*registry_)),
       gpu_energy_consumption_family_(
-        prometheus::BuildCounter()
-          .Name("nv_energy_consumption")
-          .Help("GPU energy consumption in joules since the trtserver started")
-          .Register(*registry_))
+          prometheus::BuildCounter()
+              .Name("nv_energy_consumption")
+              .Help("GPU energy consumption in joules since the trtserver "
+                    "started")
+              .Register(*registry_))
 {
 }
 
@@ -152,9 +153,8 @@ Metrics::InitializeNvmlMetrics()
     nvmlReturn_t nvmlerr = nvmlDeviceGetHandleByIndex(didx, &gpu);
     if (nvmlerr == NVML_SUCCESS) {
       char name[NVML_DEVICE_NAME_BUFFER_SIZE + 1];
-      if (
-        nvmlDeviceGetName(gpu, name, NVML_DEVICE_NAME_BUFFER_SIZE) ==
-        NVML_SUCCESS) {
+      if (nvmlDeviceGetName(gpu, name, NVML_DEVICE_NAME_BUFFER_SIZE) ==
+          NVML_SUCCESS) {
         LOG_INFO << "  GPU " << didx << ": " << name;
       }
     } else {
@@ -174,7 +174,7 @@ Metrics::InitializeNvmlMetrics()
 
     std::map<std::string, std::string> gpu_labels;
     gpu_labels.insert(std::map<std::string, std::string>::value_type(
-      kMetricsLabelGpuUuid, uuid));
+        kMetricsLabelGpuUuid, uuid));
 
     gpu_utilization_.push_back(&gpu_utilization_family_.Add(gpu_labels));
     gpu_memory_total_.push_back(&gpu_memory_total_family_.Add(gpu_labels));
@@ -182,7 +182,7 @@ Metrics::InitializeNvmlMetrics()
     gpu_power_usage_.push_back(&gpu_power_usage_family_.Add(gpu_labels));
     gpu_power_limit_.push_back(&gpu_power_limit_family_.Add(gpu_labels));
     gpu_energy_consumption_.push_back(
-      &gpu_energy_consumption_family_.Add(gpu_labels));
+        &gpu_energy_consumption_family_.Add(gpu_labels));
   }
 
   // Periodically send the NVML metrics...
@@ -208,7 +208,7 @@ Metrics::InitializeNvmlMetrics()
             {
               unsigned int power_limit;
               nvmlReturn_t nvmlerr =
-                nvmlDeviceGetPowerManagementLimit(gpu, &power_limit);
+                  nvmlDeviceGetPowerManagementLimit(gpu, &power_limit);
               if (nvmlerr != NVML_SUCCESS) {
                 LOG_ERROR << "failed to get power limit for GPU " << didx
                           << ", NVML_ERROR " << nvmlerr;
@@ -233,7 +233,7 @@ Metrics::InitializeNvmlMetrics()
             {
               unsigned long long energy;
               nvmlReturn_t nvmlerr =
-                nvmlDeviceGetTotalEnergyConsumption(gpu, &energy);
+                  nvmlDeviceGetTotalEnergyConsumption(gpu, &energy);
               if (nvmlerr != NVML_SUCCESS) {
                 LOG_ERROR << "failed to get energy consumption for GPU " << didx
                           << ", NVML_ERROR " << nvmlerr;
@@ -242,7 +242,7 @@ Metrics::InitializeNvmlMetrics()
                   last_energy[didx] = energy;
                 }
                 gpu_energy_consumption_[didx]->Increment(
-                  (double)(energy - last_energy[didx]) * 0.001);
+                    (double)(energy - last_energy[didx]) * 0.001);
                 last_energy[didx] = energy;
               }
             }
@@ -285,8 +285,8 @@ bool
 Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
 {
   char pcibusid_str[64];
-  cudaError_t cuerr =
-    cudaDeviceGetPCIBusId(pcibusid_str, sizeof(pcibusid_str) - 1, cuda_device);
+  cudaError_t cuerr = cudaDeviceGetPCIBusId(
+      pcibusid_str, sizeof(pcibusid_str) - 1, cuda_device);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "failed to get PCI Bus ID for CUDA device " << cuda_device
               << ": " << cudaGetErrorString(cuerr);

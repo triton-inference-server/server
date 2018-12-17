@@ -41,7 +41,7 @@
 namespace nvidia { namespace inferenceserver {
 
 PlanBundle::Context::Context(
-  const std::string& name, const int gpu_device, const int max_batch_size)
+    const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       runtime_(nullptr), engine_(nullptr), context_(nullptr), num_inputs_(0),
       byte_sizes_(nullptr), buffers_(nullptr), stream_(nullptr)
@@ -121,7 +121,7 @@ PlanBundle::Init(const tensorflow::StringPiece& path, const ModelConfig& config)
 
     if (!io.label_filename().empty()) {
       const auto label_path =
-        tensorflow::io::JoinPath(model_dir, io.label_filename());
+          tensorflow::io::JoinPath(model_dir, io.label_filename());
       TF_RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
     }
   }
@@ -131,7 +131,7 @@ PlanBundle::Init(const tensorflow::StringPiece& path, const ModelConfig& config)
 
 tensorflow::Status
 PlanBundle::CreateExecutionContexts(
-  const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::unordered_map<std::string, std::vector<char>>& models)
 {
   // TensorRT engine creation is not thread-safe, so multiple creations
   // are serialized with a global lock.
@@ -147,12 +147,11 @@ PlanBundle::CreateExecutionContexts(
   // access to the same GPU.
   for (const auto& group : Config().instance_group()) {
     // TensorRT requires that every context have a GPU.
-    if (
-      (group.kind() != ModelInstanceGroup::KIND_GPU) ||
-      (group.gpus().size() == 0)) {
+    if ((group.kind() != ModelInstanceGroup::KIND_GPU) ||
+        (group.gpus().size() == 0)) {
       return tensorflow::errors::InvalidArgument(
-        "instance group ", group.name(), " of model ", Name(),
-        " must be KIND_GPU and must specify at least on GPU id");
+          "instance group ", group.name(), " of model ", Name(),
+          " must be KIND_GPU and must specify at least on GPU id");
     }
 
     for (int c = 0; c < group.count(); c++) {
@@ -161,7 +160,7 @@ PlanBundle::CreateExecutionContexts(
                                           std::to_string(c) + "_gpu" +
                                           std::to_string(gpu_device);
         TF_RETURN_IF_ERROR(
-          CreateExecutionContext(instance_name, gpu_device, models));
+            CreateExecutionContext(instance_name, gpu_device, models));
         total_context_cnt++;
       }
     }
@@ -170,12 +169,12 @@ PlanBundle::CreateExecutionContexts(
   // Create a scheduler with one thread for each context available for
   // this model. Each runner is exclusively tied to the context.
   TF_RETURN_IF_ERROR(SetConfiguredScheduler(
-    total_context_cnt,
-    [this](
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> func) {
-      Run(runner_idx, payloads, func);
-    }));
+      total_context_cnt,
+      [this](
+          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+          std::function<void(tensorflow::Status)> func) {
+        Run(runner_idx, payloads, func);
+      }));
 
   LOG_VERBOSE(1) << "plan bundle for " << Name() << std::endl << *this;
 
@@ -184,8 +183,8 @@ PlanBundle::CreateExecutionContexts(
 
 tensorflow::Status
 PlanBundle::CreateExecutionContext(
-  const std::string& instance_name, const int gpu_device,
-  const std::unordered_map<std::string, std::vector<char>>& models)
+    const std::string& instance_name, const int gpu_device,
+    const std::unordered_map<std::string, std::vector<char>>& models)
 {
   cudaError_t cuerr;
 
@@ -194,22 +193,22 @@ PlanBundle::CreateExecutionContext(
   cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
   if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "unable to get CUDA device properties for ", Name(), ": ",
-      cudaGetErrorString(cuerr));
+        "unable to get CUDA device properties for ", Name(), ": ",
+        cudaGetErrorString(cuerr));
   }
 
   const std::string cc =
-    std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
+      std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
   const auto& cc_itr = Config().cc_model_filenames().find(cc);
   const std::string& cc_model_filename =
-    (cc_itr == Config().cc_model_filenames().end())
-      ? Config().default_model_filename()
-      : cc_itr->second;
+      (cc_itr == Config().cc_model_filenames().end())
+          ? Config().default_model_filename()
+          : cc_itr->second;
 
   const auto& mn_itr = models.find(cc_model_filename);
   if (mn_itr == models.end()) {
     return tensorflow::errors::Internal(
-      "unable to find PLAN model '", cc_model_filename, "' for ", Name());
+        "unable to find PLAN model '", cc_model_filename, "' for ", Name());
   }
 
   LOG_INFO << "Creating instance " << instance_name << " on GPU " << gpu_device
@@ -226,17 +225,17 @@ PlanBundle::CreateExecutionContext(
   cuerr = cudaSetDevice(gpu_device);
   if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "unable to set device for ", Name(), ": ", cudaGetErrorString(cuerr));
+        "unable to set device for ", Name(), ": ", cudaGetErrorString(cuerr));
   }
 
   TF_RETURN_IF_ERROR(
-    LoadPlan(mn_itr->second, &context.runtime_, &context.engine_));
+      LoadPlan(mn_itr->second, &context.runtime_, &context.engine_));
 
   if (context.max_batch_size_ > context.engine_->getMaxBatchSize()) {
     return tensorflow::errors::InvalidArgument(
-      "unexpected configuration maximum batch size ", Config().max_batch_size(),
-      " for '", Name(), "', model maximum is ",
-      context.engine_->getMaxBatchSize());
+        "unexpected configuration maximum batch size ",
+        Config().max_batch_size(), " for '", Name(), "', model maximum is ",
+        context.engine_->getMaxBatchSize());
   }
 
   // Initialize the inputs and outputs. Make sure the model matches
@@ -253,9 +252,9 @@ PlanBundle::CreateExecutionContext(
   for (int i = 0; i < num_expected_bindings; ++i) {
     if (context.buffers_[i] == nullptr) {
       return tensorflow::errors::InvalidArgument(
-        "expected configuration for ",
-        (context.engine_->bindingIsInput(i) ? "input" : "output"), " '",
-        context.engine_->getBindingName(i), "' for ", Name());
+          "expected configuration for ",
+          (context.engine_->bindingIsInput(i) ? "input" : "output"), " '",
+          context.engine_->getBindingName(i), "' for ", Name());
     }
   }
 
@@ -267,13 +266,14 @@ PlanBundle::CreateExecutionContext(
 
   // Create CUDA stream associated with the execution context
   int cuda_stream_priority = 0;
-  TF_RETURN_IF_ERROR(
-    GetCudaPriority(Config().optimization().priority(), &cuda_stream_priority));
+  TF_RETURN_IF_ERROR(GetCudaPriority(
+      Config().optimization().priority(), &cuda_stream_priority));
   cuerr = cudaStreamCreateWithPriority(
-    &context.stream_, cudaStreamDefault, cuda_stream_priority);
+      &context.stream_, cudaStreamDefault, cuda_stream_priority);
   if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "unable to create stream for ", Name(), ": ", cudaGetErrorString(cuerr));
+        "unable to create stream for ", Name(), ": ",
+        cudaGetErrorString(cuerr));
   }
 
   LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
@@ -284,7 +284,7 @@ PlanBundle::CreateExecutionContext(
 
 tensorflow::Status
 PlanBundle::Context::InitializeInputBindings(
-  const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(ValidateModelInput(io));
@@ -292,40 +292,40 @@ PlanBundle::Context::InitializeInputBindings(
     int index = engine_->getBindingIndex(io.name().c_str());
     if (index < 0) {
       return tensorflow::errors::NotFound(
-        "input '", io.name(), "' not found for ", name_);
+          "input '", io.name(), "' not found for ", name_);
     }
 
     if (buffers_[index] != nullptr) {
       return tensorflow::errors::InvalidArgument(
-        "input '", io.name(), "' has already appeared as an ",
-        "input or output for ", name_);
+          "input '", io.name(), "' has already appeared as an ",
+          "input or output for ", name_);
     }
 
     if (!engine_->bindingIsInput(index)) {
       return tensorflow::errors::InvalidArgument(
-        "input '", io.name(), "' is expected to be an output in model for ",
-        name_);
+          "input '", io.name(), "' is expected to be an output in model for ",
+          name_);
     }
 
     DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
     if (dt != io.data_type()) {
       return tensorflow::errors::InvalidArgument(
-        "input '", io.name(), "' datatype is ", DataType_Name(io.data_type()),
-        ", model specifies ", DataType_Name(dt), " for ", name_);
+          "input '", io.name(), "' datatype is ", DataType_Name(io.data_type()),
+          ", model specifies ", DataType_Name(dt), " for ", name_);
     }
 
     nvinfer1::Dims dims = engine_->getBindingDimensions(index);
     if (!CompareDims(dims, io.dims())) {
       return tensorflow::errors::InvalidArgument(
-        "input '", io.name(), "' dims ", DimsDebugString(dims),
-        " don't match configuration dims ", DimsDebugString(io.dims()), " for ",
-        name_);
+          "input '", io.name(), "' dims ", DimsDebugString(dims),
+          " don't match configuration dims ", DimsDebugString(io.dims()),
+          " for ", name_);
     }
 
     const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
     if (byte_size == 0) {
       return tensorflow::errors::Internal(
-        "unable to calculate size for input '", io.name(), " for ", name_);
+          "unable to calculate size for input '", io.name(), " for ", name_);
     }
 
     // Allocate CUDA memory
@@ -333,8 +333,8 @@ PlanBundle::Context::InitializeInputBindings(
     cudaError_t err = cudaMalloc(&buffer, byte_size);
     if (err != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "unable to allocate memory for input '", io.name(), " for ", name_,
-        ": ", cudaGetErrorString(err));
+          "unable to allocate memory for input '", io.name(), " for ", name_,
+          ": ", cudaGetErrorString(err));
     }
 
     byte_sizes_[index] = byte_size;
@@ -347,7 +347,7 @@ PlanBundle::Context::InitializeInputBindings(
 
 tensorflow::Status
 PlanBundle::Context::InitializeOutputBindings(
-  const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(ValidateModelOutput(io));
@@ -355,40 +355,41 @@ PlanBundle::Context::InitializeOutputBindings(
     int index = engine_->getBindingIndex(io.name().c_str());
     if (index < 0) {
       return tensorflow::errors::NotFound(
-        "output '", io.name(), "' not found for ", name_);
+          "output '", io.name(), "' not found for ", name_);
     }
 
     if (buffers_[index] != nullptr) {
       return tensorflow::errors::InvalidArgument(
-        "output '", io.name(), "' has already appeared as an ",
-        "input or output for ", name_);
+          "output '", io.name(), "' has already appeared as an ",
+          "input or output for ", name_);
     }
 
     if (engine_->bindingIsInput(index)) {
       return tensorflow::errors::InvalidArgument(
-        "output '", io.name(), "' is expected to be an input in model for ",
-        name_);
+          "output '", io.name(), "' is expected to be an input in model for ",
+          name_);
     }
 
     DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
     if (dt != io.data_type()) {
       return tensorflow::errors::InvalidArgument(
-        "output '", io.name(), "' datatype is ", DataType_Name(io.data_type()),
-        ", model specifies ", DataType_Name(dt), " for ", name_);
+          "output '", io.name(), "' datatype is ",
+          DataType_Name(io.data_type()), ", model specifies ",
+          DataType_Name(dt), " for ", name_);
     }
 
     nvinfer1::Dims dims = engine_->getBindingDimensions(index);
     if (!CompareDims(dims, io.dims())) {
       return tensorflow::errors::InvalidArgument(
-        "output '", io.name(), "' dims ", DimsDebugString(dims),
-        " don't match configuration dims ", DimsDebugString(io.dims()), " for ",
-        name_);
+          "output '", io.name(), "' dims ", DimsDebugString(dims),
+          " don't match configuration dims ", DimsDebugString(io.dims()),
+          " for ", name_);
     }
 
     const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
     if (byte_size == 0) {
       return tensorflow::errors::Internal(
-        "unable to calculate size for output '", io.name(), " for ", name_);
+          "unable to calculate size for output '", io.name(), " for ", name_);
     }
 
     // Allocate CUDA memory
@@ -396,8 +397,8 @@ PlanBundle::Context::InitializeOutputBindings(
     cudaError_t err = cudaMalloc(&buffer, byte_size);
     if (err != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "unable to allocate memory for input '", io.name(), " for ", name_,
-        ": ", cudaGetErrorString(err));
+          "unable to allocate memory for input '", io.name(), " for ", name_,
+          ": ", cudaGetErrorString(err));
     }
 
     byte_sizes_[index] = byte_size;
@@ -413,7 +414,7 @@ PlanBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
   const auto itr = output_dtype_map_.find(name);
   if (itr == output_dtype_map_.end()) {
     return tensorflow::errors::Internal(
-      "unable to find datatype for output '", name, "'");
+        "unable to find datatype for output '", name, "'");
   }
 
   *dtype = itr->second;
@@ -422,14 +423,14 @@ PlanBundle::GetOutputDataType(const std::string& name, DataType* dtype) const
 
 void
 PlanBundle::Run(
-  uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-  std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
+    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
     OnCompleteQueuedPayloads(tensorflow::errors::Internal(
-      "unexpected runner index", runner_idx, ", max allowed ",
-      contexts_.size()));
+        "unexpected runner index", runner_idx, ", max allowed ",
+        contexts_.size()));
     return;
   }
 
@@ -456,12 +457,12 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
-      payload.request_provider_->RequestHeader();
+        payload.request_provider_->RequestHeader();
 
     if ((size_t)request_header.input().size() != num_inputs_) {
       payload.status_ = tensorflow::errors::InvalidArgument(
-        "expected ", num_inputs_, " inputs but got ",
-        request_header.input().size());
+          "expected ", num_inputs_, " inputs but got ",
+          request_header.input().size());
       continue;
     }
 
@@ -470,8 +471,8 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     const size_t batch_size = request_header.batch_size();
     if ((batch_size != 1) && ((int)batch_size > max_batch_size_)) {
       payload.status_ = tensorflow::errors::InvalidArgument(
-        "unexpected batch size ", batch_size, " for '", name_,
-        "', max allowed is ", max_batch_size_);
+          "unexpected batch size ", batch_size, " for '", name_,
+          "', max allowed is ", max_batch_size_);
       continue;
     }
 
@@ -481,16 +482,16 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       const int bindex = engine_->getBindingIndex(name.c_str());
       if ((bindex < 0) || !engine_->bindingIsInput(bindex)) {
         payload.status_ = tensorflow::errors::InvalidArgument(
-          "unexpected inference input '", name, "'");
+            "unexpected inference input '", name, "'");
         break;
       }
 
       const size_t expected_byte_size =
-        (byte_sizes_[bindex] / std::max(1, max_batch_size_));
+          (byte_sizes_[bindex] / std::max(1, max_batch_size_));
       if (input.byte_size() != expected_byte_size) {
         payload.status_ = tensorflow::errors::InvalidArgument(
-          "unexpected size ", input.byte_size(), " for inference input '", name,
-          "', expecting ", expected_byte_size);
+            "unexpected size ", input.byte_size(), " for inference input '",
+            name, "', expecting ", expected_byte_size);
         break;
       }
     }
@@ -513,8 +514,8 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
     return tensorflow::errors::Internal(
-      "dynamic batch size ", total_batch_size, " for '", name_,
-      "', max allowed is ", max_batch_size_);
+        "dynamic batch size ", total_batch_size, " for '", name_,
+        "', max allowed is ", max_batch_size_);
   }
 
   // For each input, concatenate input values from each payload into
@@ -526,7 +527,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
     const std::string& name = engine_->getBindingName(bindex);
     const size_t batch1_byte_size =
-      byte_sizes_[bindex] / std::max(1, max_batch_size_);
+        byte_sizes_[bindex] / std::max(1, max_batch_size_);
     size_t binding_copy_offset = 0;
 
     // Visit the payloads in order and copy the input tensors to
@@ -538,9 +539,9 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       }
 
       const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+          payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
+          request_header.batch_size() * batch1_byte_size;
 
       int input_idx = 0;
       for (const auto& input : request_header.input()) {
@@ -550,8 +551,8 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
             const void* content;
             size_t content_byte_size;
             payload.compute_status_ =
-              payload.request_provider_->GetNextInputContent(
-                input_idx, &content, &content_byte_size, false);
+                payload.request_provider_->GetNextInputContent(
+                    input_idx, &content, &content_byte_size, false);
             if (!payload.compute_status_.ok()) {
               break;
             }
@@ -561,37 +562,36 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
               break;
             }
 
-            if (
-              (binding_copy_offset + copied_byte_size + content_byte_size) >
-              byte_sizes_[bindex]) {
+            if ((binding_copy_offset + copied_byte_size + content_byte_size) >
+                byte_sizes_[bindex]) {
               payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ",
-                binding_copy_offset + copied_byte_size + content_byte_size,
-                " for inference input '", name, "', expecting ",
-                byte_sizes_[bindex]);
+                  "unexpected size ",
+                  binding_copy_offset + copied_byte_size + content_byte_size,
+                  " for inference input '", name, "', expecting ",
+                  byte_sizes_[bindex]);
               break;
             }
 
             cudaError_t err = cudaMemcpyAsync(
-              static_cast<char*>(buffers_[bindex]) + binding_copy_offset +
-                copied_byte_size,
-              content, content_byte_size, cudaMemcpyHostToDevice, stream_);
+                static_cast<char*>(buffers_[bindex]) + binding_copy_offset +
+                    copied_byte_size,
+                content, content_byte_size, cudaMemcpyHostToDevice, stream_);
             if (err != cudaSuccess) {
               payload.compute_status_ = tensorflow::errors::Internal(
-                "failed to copy input values to GPU for input '", name,
-                "': ", cudaGetErrorString(err));
+                  "failed to copy input values to GPU for input '", name,
+                  "': ", cudaGetErrorString(err));
               break;
             }
 
             copied_byte_size += content_byte_size;
           }
 
-          if (
-            payload.compute_status_.ok() &&
-            (copied_byte_size != expected_byte_size)) {
+          if (payload.compute_status_.ok() &&
+              (copied_byte_size != expected_byte_size)) {
             payload.compute_status_ = tensorflow::errors::Internal(
-              "expected ", expected_byte_size, " of data for inference input '",
-              name, "', got ", copied_byte_size);
+                "expected ", expected_byte_size,
+                " of data for inference input '", name, "', got ",
+                copied_byte_size);
           }
 
           break;
@@ -608,7 +608,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   if (!context_->enqueue(total_batch_size, buffers_, stream_, nullptr)) {
     cudaStreamSynchronize(stream_);
     return tensorflow::errors::Internal(
-      "unable to enqueue for inference ", name_);
+        "unable to enqueue for inference ", name_);
   }
 
   // For each requested output verify that the output can accept the
@@ -620,7 +620,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
     const std::string& name = engine_->getBindingName(bindex);
     const size_t batch1_byte_size =
-      (byte_sizes_[bindex] / std::max(1, max_batch_size_));
+        (byte_sizes_[bindex] / std::max(1, max_batch_size_));
     size_t binding_copy_offset = 0;
 
     for (auto& payload : *payloads) {
@@ -632,39 +632,38 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       // GPU. If it did not request this output then just skip it in
       // the output buffer.
       const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
+          payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
+          request_header.batch_size() * batch1_byte_size;
 
       int output_idx = 0;
       for (const auto& output : request_header.output()) {
         if (output.name() == name) {
           void* content;
           tensorflow::Status status =
-            payload.response_provider_->GetOutputBuffer(
-              output_idx, &content, expected_byte_size);
+              payload.response_provider_->GetOutputBuffer(
+                  output_idx, &content, expected_byte_size);
           if (!status.ok()) {
             payload.compute_status_ = status;
           } else if (content == nullptr) {
             payload.compute_status_ = tensorflow::errors::Internal(
-              "no buffer to accept output values for output '", name, "'");
+                "no buffer to accept output values for output '", name, "'");
           } else {
-            if (
-              (binding_copy_offset + expected_byte_size) >
-              byte_sizes_[bindex]) {
+            if ((binding_copy_offset + expected_byte_size) >
+                byte_sizes_[bindex]) {
               payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ", binding_copy_offset + expected_byte_size,
-                " for inference output '", name, "', expecting maximum",
-                byte_sizes_[bindex]);
+                  "unexpected size ", binding_copy_offset + expected_byte_size,
+                  " for inference output '", name, "', expecting maximum",
+                  byte_sizes_[bindex]);
             } else {
               cudaError_t err = cudaMemcpyAsync(
-                content,
-                static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
-                expected_byte_size, cudaMemcpyDeviceToHost, stream_);
+                  content,
+                  static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
+                  expected_byte_size, cudaMemcpyDeviceToHost, stream_);
               if (err != cudaSuccess) {
                 payload.compute_status_ = tensorflow::errors::Internal(
-                  "failed to copy output values from GPU for output '", name,
-                  "': ", cudaGetErrorString(err));
+                    "failed to copy output values from GPU for output '", name,
+                    "': ", cudaGetErrorString(err));
               }
             }
           }
@@ -692,12 +691,12 @@ operator<<(std::ostream& out, const PlanBundle& pb)
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context.name_ << ", gpu="
         << ((context.gpu_device_ == PlanBundle::Context::NO_GPU_DEVICE)
-              ? "<none>"
-              : std::to_string(context.gpu_device_))
+                ? "<none>"
+                : std::to_string(context.gpu_device_))
         << ", max_batch_size="
         << ((context.max_batch_size_ == PlanBundle::Context::NO_BATCHING)
-              ? "<none>"
-              : std::to_string(context.max_batch_size_))
+                ? "<none>"
+                : std::to_string(context.max_batch_size_))
         << std::endl
         << "  bindings:" << std::endl;
 

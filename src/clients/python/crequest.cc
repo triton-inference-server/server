@@ -90,8 +90,8 @@ ParseProtocol(ProtocolType* protocol, const int protocol_int)
     return nic::Error::Success;
   }
   return nic::Error(
-    ni::RequestStatusCode::INVALID_ARG,
-    "unexpected protocol integer, expecting 0 for HTTP or 1 for gRPC");
+      ni::RequestStatusCode::INVALID_ARG,
+      "unexpected protocol integer, expecting 0 for HTTP or 1 for gRPC");
 }
 
 }  // namespace
@@ -103,7 +103,8 @@ struct ServerHealthContextCtx {
 
 nic::Error*
 ServerHealthContextNew(
-  ServerHealthContextCtx** ctx, const char* url, int protocol_int, bool verbose)
+    ServerHealthContextCtx** ctx, const char* url, int protocol_int,
+    bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -112,10 +113,10 @@ ServerHealthContextNew(
     ServerHealthContextCtx* lctx = new ServerHealthContextCtx;
     if (protocol == ProtocolType::HTTP) {
       err = nic::ServerHealthHttpContext::Create(
-        &(lctx->ctx), std::string(url), verbose);
+          &(lctx->ctx), std::string(url), verbose);
     } else {
       err = nic::ServerHealthGrpcContext::Create(
-        &(lctx->ctx), std::string(url), verbose);
+          &(lctx->ctx), std::string(url), verbose);
     }
 
     if (err.IsOk()) {
@@ -166,8 +167,8 @@ struct ServerStatusContextCtx {
 
 nic::Error*
 ServerStatusContextNew(
-  ServerStatusContextCtx** ctx, const char* url, int protocol_int,
-  const char* model_name, bool verbose)
+    ServerStatusContextCtx** ctx, const char* url, int protocol_int,
+    const char* model_name, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -177,18 +178,18 @@ ServerStatusContextNew(
     if (model_name == nullptr) {
       if (protocol == ProtocolType::HTTP) {
         err = nic::ServerStatusHttpContext::Create(
-          &(lctx->ctx), std::string(url), verbose);
+            &(lctx->ctx), std::string(url), verbose);
       } else {
         err = nic::ServerStatusGrpcContext::Create(
-          &(lctx->ctx), std::string(url), verbose);
+            &(lctx->ctx), std::string(url), verbose);
       }
     } else {
       if (protocol == ProtocolType::HTTP) {
         err = nic::ServerStatusHttpContext::Create(
-          &(lctx->ctx), std::string(url), std::string(model_name), verbose);
+            &(lctx->ctx), std::string(url), std::string(model_name), verbose);
       } else {
         err = nic::ServerStatusGrpcContext::Create(
-          &(lctx->ctx), std::string(url), std::string(model_name), verbose);
+            &(lctx->ctx), std::string(url), std::string(model_name), verbose);
       }
     }
 
@@ -212,7 +213,7 @@ ServerStatusContextDelete(ServerStatusContextCtx* ctx)
 
 nic::Error*
 ServerStatusContextGetServerStatus(
-  ServerStatusContextCtx* ctx, char** status, uint32_t* status_len)
+    ServerStatusContextCtx* ctx, char** status, uint32_t* status_len)
 {
   ctx->status_buf.clear();
 
@@ -224,7 +225,7 @@ ServerStatusContextGetServerStatus(
       *status_len = ctx->status_buf.size();
     } else {
       err = nic::Error(
-        ni::RequestStatusCode::INTERNAL, "failed to parse server status");
+          ni::RequestStatusCode::INTERNAL, "failed to parse server status");
     }
   }
 
@@ -240,8 +241,8 @@ struct InferContextCtx {
 
 nic::Error*
 InferContextNew(
-  InferContextCtx** ctx, const char* url, int protocol_int,
-  const char* model_name, int model_version, bool verbose)
+    InferContextCtx** ctx, const char* url, int protocol_int,
+    const char* model_name, int model_version, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -250,12 +251,12 @@ InferContextNew(
     InferContextCtx* lctx = new InferContextCtx;
     if (protocol == ProtocolType::HTTP) {
       err = nic::InferHttpContext::Create(
-        &(lctx->ctx), std::string(url), std::string(model_name), model_version,
-        verbose);
+          &(lctx->ctx), std::string(url), std::string(model_name),
+          model_version, verbose);
     } else {
       err = nic::InferGrpcContext::Create(
-        &(lctx->ctx), std::string(url), std::string(model_name), model_version,
-        verbose);
+          &(lctx->ctx), std::string(url), std::string(model_name),
+          model_version, verbose);
     }
 
     if (err.IsOk()) {
@@ -277,7 +278,7 @@ InferContextDelete(InferContextCtx* ctx)
 
 nic::Error*
 InferContextSetOptions(
-  InferContextCtx* ctx, nic::InferContext::Options* options)
+    InferContextCtx* ctx, nic::InferContext::Options* options)
 {
   nic::Error err = ctx->ctx->SetRunOptions(*options);
   return new nic::Error(err);
@@ -303,7 +304,7 @@ InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id)
 
 nic::Error*
 InferContextGetAsyncRunResults(
-  InferContextCtx* ctx, size_t request_id, bool wait)
+    InferContextCtx* ctx, size_t request_id, bool wait)
 {
   for (auto itr = ctx->requests.begin(); itr != ctx->requests.end(); itr++) {
     if ((*itr)->Id() == request_id) {
@@ -316,13 +317,13 @@ InferContextGetAsyncRunResults(
     }
   }
   return new nic::Error(
-    ni::RequestStatusCode::INVALID_ARG,
-    "The request ID doesn't match any existing asynchrnous requests");
+      ni::RequestStatusCode::INVALID_ARG,
+      "The request ID doesn't match any existing asynchrnous requests");
 }
 
 nic::Error*
 InferContextGetReadyAsyncRequest(
-  InferContextCtx* ctx, size_t* request_id, bool wait)
+    InferContextCtx* ctx, size_t* request_id, bool wait)
 {
   // Here we assume that all asynchronous request is created by calling
   // InferContextAsyncRun(). Thus we don't need to check ctx->requests.
@@ -335,7 +336,8 @@ InferContextGetReadyAsyncRequest(
 //==============================================================================
 nic::Error*
 InferContextOptionsNew(
-  nic::InferContext::Options** ctx, uint64_t correlation_id, uint64_t batch_size)
+    nic::InferContext::Options** ctx, uint64_t correlation_id,
+    uint64_t batch_size)
 {
   std::unique_ptr<nic::InferContext::Options> uctx;
   nic::Error err = nic::InferContext::Options::Create(&uctx);
@@ -358,8 +360,8 @@ InferContextOptionsDelete(nic::InferContext::Options* ctx)
 
 nic::Error*
 InferContextOptionsAddRaw(
-  InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-  const char* output_name)
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name)
 {
   std::shared_ptr<nic::InferContext::Output> output;
   nic::Error err = infer_ctx->ctx->GetOutput(std::string(output_name), &output);
@@ -372,8 +374,8 @@ InferContextOptionsAddRaw(
 
 nic::Error*
 InferContextOptionsAddClass(
-  InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-  const char* output_name, uint64_t count)
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, uint64_t count)
 {
   std::shared_ptr<nic::InferContext::Output> output;
   nic::Error err = infer_ctx->ctx->GetOutput(std::string(output_name), &output);
@@ -391,12 +393,12 @@ struct InferContextInputCtx {
 
 nic::Error*
 InferContextInputNew(
-  InferContextInputCtx** ctx, InferContextCtx* infer_ctx,
-  const char* input_name)
+    InferContextInputCtx** ctx, InferContextCtx* infer_ctx,
+    const char* input_name)
 {
   InferContextInputCtx* lctx = new InferContextInputCtx;
   nic::Error err =
-    infer_ctx->ctx->GetInput(std::string(input_name), &lctx->input);
+      infer_ctx->ctx->GetInput(std::string(input_name), &lctx->input);
   if (err.IsOk()) {
     lctx->input->Reset();
   }
@@ -412,10 +414,10 @@ InferContextInputDelete(InferContextInputCtx* ctx)
 
 nic::Error*
 InferContextInputSetRaw(
-  InferContextInputCtx* ctx, const void* data, uint64_t byte_size)
+    InferContextInputCtx* ctx, const void* data, uint64_t byte_size)
 {
   nic::Error err =
-    ctx->input->SetRaw(reinterpret_cast<const uint8_t*>(data), byte_size);
+      ctx->input->SetRaw(reinterpret_cast<const uint8_t*>(data), byte_size);
   return new nic::Error(err);
 }
 
@@ -427,8 +429,8 @@ struct InferContextResultCtx {
 
 nic::Error*
 InferContextResultNew(
-  InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
-  const char* result_name)
+    InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
+    const char* result_name)
 {
   InferContextResultCtx* lctx = new InferContextResultCtx;
   for (auto& r : infer_ctx->results) {
@@ -440,8 +442,8 @@ InferContextResultNew(
 
   if (lctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "unable to find result for output '" + std::string(result_name) + "'");
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find result for output '" + std::string(result_name) + "'");
   }
 
   *ctx = lctx;
@@ -459,8 +461,8 @@ InferContextResultModelName(InferContextResultCtx* ctx, const char** model_name)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "model name not available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "model name not available for empty result");
   }
 
   *model_name = ctx->result->ModelName().c_str();
@@ -469,12 +471,12 @@ InferContextResultModelName(InferContextResultCtx* ctx, const char** model_name)
 
 nic::Error*
 InferContextResultModelVersion(
-  InferContextResultCtx* ctx, uint32_t* model_version)
+    InferContextResultCtx* ctx, uint32_t* model_version)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "model version not available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "model version not available for empty result");
   }
 
   *model_version = ctx->result->ModelVersion();
@@ -486,8 +488,8 @@ InferContextResultDataType(InferContextResultCtx* ctx, uint32_t* dtype)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "datatype not available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "datatype not available for empty result");
   }
 
   ni::DataType data_type = ctx->result->GetOutput()->DType();
@@ -498,19 +500,19 @@ InferContextResultDataType(InferContextResultCtx* ctx, uint32_t* dtype)
 
 nic::Error*
 InferContextResultDims(
-  InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
-  uint64_t* shape_len)
+    InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
+    uint64_t* shape_len)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL, "dims not available for empty result");
+        ni::RequestStatusCode::INTERNAL, "dims not available for empty result");
   }
 
   const ni::DimsList& dims = ctx->result->GetOutput()->Dims();
   if (static_cast<uint64_t>(dims.size()) > max_dims) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "number of result dims exceeds maximum of " + std::to_string(max_dims));
+        ni::RequestStatusCode::INTERNAL,
+        "number of result dims exceeds maximum of " + std::to_string(max_dims));
   }
 
   size_t cnt = 0;
@@ -525,13 +527,13 @@ InferContextResultDims(
 
 nic::Error*
 InferContextResultNextRaw(
-  InferContextResultCtx* ctx, size_t batch_idx, const char** val,
-  uint64_t* val_len)
+    InferContextResultCtx* ctx, size_t batch_idx, const char** val,
+    uint64_t* val_len)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL,
-      "no raw result available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "no raw result available for empty result");
   }
 
   const std::vector<uint8_t>* buf;
@@ -546,11 +548,12 @@ InferContextResultNextRaw(
 
 nic::Error*
 InferContextResultClassCount(
-  InferContextResultCtx* ctx, size_t batch_idx, uint64_t* count)
+    InferContextResultCtx* ctx, size_t batch_idx, uint64_t* count)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL, "no classes available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "no classes available for empty result");
   }
 
   nic::Error err = ctx->result->GetClassCount(batch_idx, count);
@@ -559,12 +562,13 @@ InferContextResultClassCount(
 
 nic::Error*
 InferContextResultNextClass(
-  InferContextResultCtx* ctx, size_t batch_idx, uint64_t* idx, float* prob,
-  const char** label)
+    InferContextResultCtx* ctx, size_t batch_idx, uint64_t* idx, float* prob,
+    const char** label)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(
-      ni::RequestStatusCode::INTERNAL, "no classes available for empty result");
+        ni::RequestStatusCode::INTERNAL,
+        "no classes available for empty result");
   }
 
   nic::Error err = ctx->result->GetClassAtCursor(batch_idx, &ctx->cr);

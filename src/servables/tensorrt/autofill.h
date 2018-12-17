@@ -35,14 +35,14 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillPlan : public AutoFill {
  public:
   static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillPlan>* autofill);
+      const std::string& model_name, const std::string& model_path,
+      std::unique_ptr<AutoFillPlan>* autofill);
   tensorflow::Status Fix(ModelConfig* config) override;
 
  private:
   AutoFillPlan(
-    const std::string& model_name, const std::string& plan_filename,
-    const int32_t max_batch_size, const ModelConfig& config)
+      const std::string& model_name, const std::string& plan_filename,
+      const int32_t max_batch_size, const ModelConfig& config)
       : AutoFill(model_name), plan_filename_(plan_filename),
         max_batch_size_(max_batch_size), config_(config)
   {

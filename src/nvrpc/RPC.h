@@ -35,16 +35,17 @@ class AsyncRPC : public IRPC {
  public:
   using ContextType_t = ContextType;
   using ServiceQueueFuncType =
-    typename ContextType::LifeCycleType::ServiceQueueFuncType;
+      typename ContextType::LifeCycleType::ServiceQueueFuncType;
   using ExecutorQueueFuncType =
-    typename ContextType::LifeCycleType::ExecutorQueueFuncType;
+      typename ContextType::LifeCycleType::ExecutorQueueFuncType;
 
   AsyncRPC(ServiceQueueFuncType);
   ~AsyncRPC() override {}
 
  protected:
   std::unique_ptr<IContext> CreateContext(
-    ::grpc::ServerCompletionQueue*, std::shared_ptr<Resources>) final override;
+      ::grpc::ServerCompletionQueue*,
+      std::shared_ptr<Resources>) final override;
 
  private:
   ServiceQueueFuncType m_RequestFunc;
@@ -59,17 +60,17 @@ AsyncRPC<ContextType, ServiceType>::AsyncRPC(ServiceQueueFuncType req_fn)
 template <class ContextType, class ServiceType>
 std::unique_ptr<IContext>
 AsyncRPC<ContextType, ServiceType>::CreateContext(
-  ::grpc::ServerCompletionQueue* cq, std::shared_ptr<nvrpc::Resources> r)
+    ::grpc::ServerCompletionQueue* cq, std::shared_ptr<nvrpc::Resources> r)
 {
   auto ctx_resources = std::dynamic_pointer_cast<
-    typename ContextType::ResourcesType::element_type>(r);
+      typename ContextType::ResourcesType::element_type>(r);
   if (!ctx_resources) {
     throw std::runtime_error("Incompatible Resource object");
   }
   auto q_fn =
-    ContextType::LifeCycleType::BindExecutorQueueFunc(m_RequestFunc, cq);
+      ContextType::LifeCycleType::BindExecutorQueueFunc(m_RequestFunc, cq);
   std::unique_ptr<IContext> ctx =
-    ContextFactory<ContextType>(q_fn, ctx_resources);
+      ContextFactory<ContextType>(q_fn, ctx_resources);
   return ctx;
 }
 

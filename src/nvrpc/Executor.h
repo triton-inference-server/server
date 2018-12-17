@@ -49,8 +49,8 @@ class Executor : public IExecutor {
   }
 
   void RegisterContexts(
-    IRPC* rpc, std::shared_ptr<Resources> resources,
-    int numContextsPerThread) final override
+      IRPC* rpc, std::shared_ptr<Resources> resources,
+      int numContextsPerThread) final override
   {
     // CHECK_EQ(m_ThreadPool->Size(), m_ServerCompletionQueues.size()) <<
     // "Incorrect number of CQs";
@@ -87,7 +87,7 @@ class Executor : public IExecutor {
 
   std::vector<std::unique_ptr<IContext>> m_Contexts;
   std::vector<std::unique_ptr<::grpc::ServerCompletionQueue>>
-    m_ServerCompletionQueues;
+      m_ServerCompletionQueues;
   std::unique_ptr<ThreadPool> m_ThreadPool;
 };
 

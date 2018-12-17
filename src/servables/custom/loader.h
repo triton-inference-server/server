@@ -44,9 +44,9 @@ namespace nvidia { namespace inferenceserver {
 /// library.
 /// \return Error status.
 tensorflow::Status LoadCustom(
-  const std::string& path, void** dlhandle, CustomInitializeFn_t* InitializeFn,
-  CustomFinalizeFn_t* FinalizeFn, CustomErrorStringFn_t* ErrorStringFn,
-  CustomExecuteFn_t* ExecuteFn);
+    const std::string& path, void** dlhandle,
+    CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
+    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn);
 
 /// Unload custom shared library.
 ///

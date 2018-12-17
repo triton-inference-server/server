@@ -44,22 +44,22 @@ namespace {
 
 tensorflow::Status
 CreateSavedModelBundle(
-  const SavedModelBundleSourceAdapterConfig& adapter_config,
-  const std::string& path, std::unique_ptr<SavedModelBundle>* bundle)
+    const SavedModelBundleSourceAdapterConfig& adapter_config,
+    const std::string& path, std::unique_ptr<SavedModelBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
   TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
-    std::string(model_name), &model_config));
+      std::string(model_name), &model_config));
 
   // Read all the savedmodel directories in 'path'. GetChildren()
   // returns all descendants instead for cloud storage like GCS, so
   // filter out all non-direct descendants.
   std::vector<std::string> possible_children;
   TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->GetChildren(path, &possible_children));
+      tensorflow::Env::Default()->GetChildren(path, &possible_children));
   std::set<std::string> children;
   for (const auto& child : possible_children) {
     children.insert(child.substr(0, child.find_first_of('/')));
@@ -70,8 +70,8 @@ CreateSavedModelBundle(
     const auto savedmodel_path = tensorflow::io::JoinPath(path, filename);
     if (tensorflow::Env::Default()->IsDirectory(savedmodel_path).ok()) {
       savedmodel_paths.emplace(
-        std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(savedmodel_path));
+          std::piecewise_construct, std::make_tuple(filename),
+          std::make_tuple(savedmodel_path));
     }
   }
 
@@ -79,7 +79,7 @@ CreateSavedModelBundle(
   tensorflow::Status status = (*bundle)->Init(path, model_config);
   if (status.ok()) {
     status = (*bundle)->CreateExecutionContexts(
-      adapter_config.session_config(), savedmodel_paths);
+        adapter_config.session_config(), savedmodel_paths);
   }
   if (!status.ok()) {
     bundle->reset();
@@ -92,20 +92,20 @@ CreateSavedModelBundle(
 
 tensorflow::Status
 SavedModelBundleSourceAdapter::Create(
-  const SavedModelBundleSourceAdapterConfig& config,
-  std::unique_ptr<
-    tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-    adapter)
+    const SavedModelBundleSourceAdapterConfig& config,
+    std::unique_ptr<
+        tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+        adapter)
 {
   LOG_VERBOSE(1) << "Create SavedModelBundleSourceAdaptor for config \""
                  << config.DebugString() << "\"";
 
   Creator creator = std::bind(
-    &CreateSavedModelBundle, config, std::placeholders::_1,
-    std::placeholders::_2);
+      &CreateSavedModelBundle, config, std::placeholders::_1,
+      std::placeholders::_2);
 
   adapter->reset(new SavedModelBundleSourceAdapter(
-    config, creator, SimpleSourceAdapter::EstimateNoResources()));
+      config, creator, SimpleSourceAdapter::EstimateNoResources()));
   return tensorflow::Status::OK();
 }
 
@@ -119,6 +119,6 @@ SavedModelBundleSourceAdapter::~SavedModelBundleSourceAdapter()
 namespace tensorflow { namespace serving {
 
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-  nvidia::inferenceserver::SavedModelBundleSourceAdapter,
-  nvidia::inferenceserver::SavedModelBundleSourceAdapterConfig);
+    nvidia::inferenceserver::SavedModelBundleSourceAdapter,
+    nvidia::inferenceserver::SavedModelBundleSourceAdapterConfig);
 }}  // namespace tensorflow::serving

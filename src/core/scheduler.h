@@ -43,11 +43,11 @@ class Scheduler {
     Payload() = default;
     Payload(const Payload& payload) = default;
     Payload(
-      const struct timespec queued_timestamp,
-      const std::shared_ptr<ModelInferStats>& stats,
-      const std::shared_ptr<InferRequestProvider>& request_provider,
-      const std::shared_ptr<InferResponseProvider>& response_provider,
-      const std::function<void(tensorflow::Status)> complete_function)
+        const struct timespec queued_timestamp,
+        const std::shared_ptr<ModelInferStats>& stats,
+        const std::shared_ptr<InferRequestProvider>& request_provider,
+        const std::shared_ptr<InferResponseProvider>& response_provider,
+        const std::function<void(tensorflow::Status)> complete_function)
         : queued_timestamp_(queued_timestamp), stats_(stats),
           request_provider_(request_provider),
           response_provider_(response_provider),
@@ -76,15 +76,15 @@ class Scheduler {
   // 'payloads' requests from completing. If an error is isolated to a
   // single request in 'payloads' it will be reported in that payload.
   using StandardRunFunc = std::function<void(
-    uint32_t runner_idx, std::vector<Payload>* payloads,
-    std::function<void(tensorflow::Status)> OnRunComplete)>;
+      uint32_t runner_idx, std::vector<Payload>* payloads,
+      std::function<void(tensorflow::Status)> OnRunComplete)>;
 
   // Enqueue a request with the scheduler.
   virtual void Enqueue(
-    const std::shared_ptr<ModelInferStats>& stats,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
-    const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(tensorflow::Status)> OnComplete) = 0;
+      const std::shared_ptr<ModelInferStats>& stats,
+      const std::shared_ptr<InferRequestProvider>& request_provider,
+      const std::shared_ptr<InferResponseProvider>& response_provider,
+      std::function<void(tensorflow::Status)> OnComplete) = 0;
 };
 
 }}  // namespace nvidia::inferenceserver

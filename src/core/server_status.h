@@ -52,7 +52,7 @@ class ServerStatTimerScoped {
 
   // Start server timer for a given status 'kind'.
   ServerStatTimerScoped(
-    const std::shared_ptr<ServerStatusManager>& status_manager, Kind kind)
+      const std::shared_ptr<ServerStatusManager>& status_manager, Kind kind)
       : status_manager_(status_manager), kind_(kind), enabled_(true)
   {
     clock_gettime(CLOCK_MONOTONIC, &start_);
@@ -100,8 +100,8 @@ class ModelInferStats {
   // Start model-specific timer for 'model_name' and a given status
   // 'kind'.
   ModelInferStats(
-    const std::shared_ptr<ServerStatusManager>& status_manager,
-    const std::string& model_name)
+      const std::shared_ptr<ServerStatusManager>& status_manager,
+      const std::string& model_name)
       : status_manager_(status_manager), model_name_(model_name),
         failed_(false), requested_model_version_(-1), model_servable_(nullptr),
         batch_size_(0), gpu_device_(-1), execution_count_(0),
@@ -169,30 +169,30 @@ class ServerStatusManager {
 
   // Get the entire server status, including status for all models.
   tensorflow::Status Get(
-    ServerStatus* server_status, const std::string& server_id,
-    ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-    const tensorflow::serving::ServableStateMonitor* monitor) const;
+      ServerStatus* server_status, const std::string& server_id,
+      ServerReadyState server_ready_state, uint64_t server_uptime_ns,
+      const tensorflow::serving::ServableStateMonitor* monitor) const;
 
   // Get the server status and the status for a single model.
   tensorflow::Status Get(
-    ServerStatus* server_status, const std::string& server_id,
-    ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-    const std::string& model_name,
-    const tensorflow::serving::ServableStateMonitor* monitor) const;
+      ServerStatus* server_status, const std::string& server_id,
+      ServerReadyState server_ready_state, uint64_t server_uptime_ns,
+      const std::string& model_name,
+      const tensorflow::serving::ServableStateMonitor* monitor) const;
 
   // Add a duration to the Server Stat specified by 'kind'.
   void UpdateServerStat(uint64_t duration, ServerStatTimerScoped::Kind kind);
 
   // Add durations to Infer stats for a failed inference request.
   void UpdateFailedInferStats(
-    const std::string& model_name, const uint32_t model_version,
-    size_t batch_size, uint64_t request_duration_ns);
+      const std::string& model_name, const uint32_t model_version,
+      size_t batch_size, uint64_t request_duration_ns);
 
   // Add durations to Infer stats for a successful inference request.
   void UpdateSuccessInferStats(
-    const std::string& model_name, const uint32_t model_version,
-    size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-    uint64_t run_duration_ns, uint64_t compute_duration_ns);
+      const std::string& model_name, const uint32_t model_version,
+      size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
+      uint64_t run_duration_ns, uint64_t compute_duration_ns);
 
  private:
   mutable std::mutex mu_;

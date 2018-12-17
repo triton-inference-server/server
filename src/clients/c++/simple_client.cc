@@ -58,8 +58,8 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << std::endl;
   std::cerr
-    << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-    << std::endl;
+      << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
+      << std::endl;
 
   exit(1);
 }
@@ -104,10 +104,10 @@ main(int argc, char** argv)
   std::unique_ptr<nic::InferContext> ctx;
   if (protocol == "http") {
     err = nic::InferHttpContext::Create(
-      &ctx, url, model_name, -1 /* model_version */, verbose);
+        &ctx, url, model_name, -1 /* model_version */, verbose);
   } else if (protocol == "grpc") {
     err = nic::InferGrpcContext::Create(
-      &ctx, url, model_name, -1 /* model_version */, verbose);
+        &ctx, url, model_name, -1 /* model_version */, verbose);
   } else {
     Usage(argv, "unknown protocol '" + protocol + "'");
   }
@@ -122,8 +122,8 @@ main(int argc, char** argv)
   // that all output tensors be returned.
   std::unique_ptr<nic::InferContext::Options> options;
   FAIL_IF_ERR(
-    nic::InferContext::Options::Create(&options),
-    "unable to create inference options");
+      nic::InferContext::Options::Create(&options),
+      "unable to create inference options");
 
   options->SetBatchSize(1);
   for (const auto& output : ctx->Outputs()) {
@@ -150,13 +150,13 @@ main(int argc, char** argv)
   FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
 
   FAIL_IF_ERR(
-    input0->SetRaw(
-      reinterpret_cast<uint8_t*>(&input0_data[0]), input0->ByteSize()),
-    "unable to set data for INPUT0");
+      input0->SetRaw(
+          reinterpret_cast<uint8_t*>(&input0_data[0]), input0->ByteSize()),
+      "unable to set data for INPUT0");
   FAIL_IF_ERR(
-    input1->SetRaw(
-      reinterpret_cast<uint8_t*>(&input1_data[0]), input1->ByteSize()),
-    "unable to set data for INPUT1");
+      input1->SetRaw(
+          reinterpret_cast<uint8_t*>(&input1_data[0]), input1->ByteSize()),
+      "unable to set data for INPUT1");
 
   // Send inference request to the inference server.
   std::vector<std::unique_ptr<nic::InferContext::Result>> results;
@@ -172,11 +172,11 @@ main(int argc, char** argv)
   for (size_t i = 0; i < 16; ++i) {
     int32_t r0, r1;
     FAIL_IF_ERR(
-      results[0]->GetRawAtCursor(0 /* batch idx */, &r0),
-      "unable to get OUTPUT0 result at idx " + std::to_string(i));
+        results[0]->GetRawAtCursor(0 /* batch idx */, &r0),
+        "unable to get OUTPUT0 result at idx " + std::to_string(i));
     FAIL_IF_ERR(
-      results[1]->GetRawAtCursor(0 /* batch idx */, &r1),
-      "unable to get OUTPUT1 result at idx " + std::to_string(i));
+        results[1]->GetRawAtCursor(0 /* batch idx */, &r1),
+        "unable to get OUTPUT1 result at idx " + std::to_string(i));
     std::cout << input0_data[i] << " + " << input1_data[i] << " = " << r0
               << std::endl;
     std::cout << input0_data[i] << " - " << input1_data[i] << " = " << r1

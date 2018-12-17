@@ -74,7 +74,7 @@ Server::RegisterAsyncService()
 {
   if (m_Running) {
     throw std::runtime_error(
-      "Error: cannot register service on a running server");
+        "Error: cannot register service on a running server");
   }
   auto service = new AsyncService<typename ServiceType::AsyncService>;
   auto base = static_cast<IService*>(service);

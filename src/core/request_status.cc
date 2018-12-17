@@ -57,8 +57,8 @@ GetStatusCode(const tensorflow::Status& tf_status)
 
 void
 RequestStatusFactory::Create(
-  RequestStatus* status, uint64_t request_id, const std::string& server_id,
-  RequestStatusCode code, const std::string& msg)
+    RequestStatus* status, uint64_t request_id, const std::string& server_id,
+    RequestStatusCode code, const std::string& msg)
 {
   status->Clear();
   status->set_code(code);
@@ -69,8 +69,8 @@ RequestStatusFactory::Create(
 
 void
 RequestStatusFactory::Create(
-  RequestStatus* status, uint64_t request_id, const std::string& server_id,
-  RequestStatusCode code)
+    RequestStatus* status, uint64_t request_id, const std::string& server_id,
+    RequestStatusCode code)
 {
   status->Clear();
   status->set_code(code);
@@ -80,8 +80,8 @@ RequestStatusFactory::Create(
 
 void
 RequestStatusFactory::Create(
-  RequestStatus* status, uint64_t request_id, const std::string& server_id,
-  const tensorflow::Status& tf_status)
+    RequestStatus* status, uint64_t request_id, const std::string& server_id,
+    const tensorflow::Status& tf_status)
 {
   status->Clear();
   status->set_code(GetStatusCode(tf_status));
