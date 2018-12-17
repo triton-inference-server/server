@@ -43,3 +43,9 @@ before submitting a pull request::
 
   $ apt-get install clang-format clang-format-6.0
   $ clang-format-6.0 --style=file -i *.proto *.cc *.h
+
+For convenience there is a format.py script in tools/ that can be used
+to clang-format all files within the repo::
+
+  $ cd .../tensorrt-inference-server    # top-level of repo
+  $ python format.py *
