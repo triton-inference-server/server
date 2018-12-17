@@ -30,12 +30,12 @@ namespace nvidia { namespace inferenceserver {
 
 bool
 CompareDims(
-  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims)
+    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims)
 {
   // The first model dimension can be -1 to serve as a placeholder for
   // batch. The batch dim doesn't appear in the configuration 'dims'.
   const bool has_batch_dim =
-    (model_shape.dim().size() >= 1) && (model_shape.dim(0).size() == -1);
+      (model_shape.dim().size() >= 1) && (model_shape.dim(0).size() == -1);
   if (model_shape.dim().size() != (dims.size() + (has_batch_dim ? 1 : 0))) {
     return false;
   }

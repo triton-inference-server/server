@@ -41,14 +41,14 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillSavedModel : public AutoFill {
  public:
   static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillSavedModel>* autofill);
+      const std::string& model_name, const std::string& model_path,
+      std::unique_ptr<AutoFillSavedModel>* autofill);
   tensorflow::Status Fix(ModelConfig* config) override;
 
  private:
   AutoFillSavedModel(
-    const std::string& model_name, const std::string& savedmodel_dirname,
-    const tensorflow::SignatureDef& sig)
+      const std::string& model_name, const std::string& savedmodel_dirname,
+      const tensorflow::SignatureDef& sig)
       : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname), sig_(sig)
   {
   }
@@ -63,8 +63,8 @@ class AutoFillSavedModel : public AutoFill {
 class AutoFillGraphDef : public AutoFill {
  public:
   static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillGraphDef>* autofill);
+      const std::string& model_name, const std::string& model_path,
+      std::unique_ptr<AutoFillGraphDef>* autofill);
   tensorflow::Status Fix(ModelConfig* config) override;
 
  private:

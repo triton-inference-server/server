@@ -93,23 +93,23 @@ class Caffe2Workspace {
 
   // Add an input tensor to the model.
   virtual Error AddInputTensor(
-    const std::string& name, const DataType datatype,
-    const std::vector<int>& dims) = 0;
+      const std::string& name, const DataType datatype,
+      const std::vector<int>& dims) = 0;
 
   // Add an output tensor to the model.
   virtual Error AddOutputTensor(
-    const std::string& name, const DataType datatype,
-    const std::vector<int>& dims) = 0;
+      const std::string& name, const DataType datatype,
+      const std::vector<int>& dims) = 0;
 
   // Set the value for an input tensor in preparation for inferencing.
   virtual Error SetInputTensor(
-    const std::string& name, size_t batch_size, const char* content,
-    size_t byte_size) = 0;
+      const std::string& name, size_t batch_size, const char* content,
+      size_t byte_size) = 0;
 
   // Get the value for an output tensor after inferencing.
   virtual Error GetOutputTensor(
-    const std::string& name, size_t batch_size, const char** content,
-    size_t byte_size) = 0;
+      const std::string& name, size_t batch_size, const char** content,
+      size_t byte_size) = 0;
 
   // Run the model.
   virtual Error Run() = 0;
@@ -128,10 +128,10 @@ extern "C" {
 // Create a Caffe2Workspace that interfaces with the Caffe2 library
 // for a model specified by an init and network blob.
 CAFFE2WS_EXPORT Caffe2Workspace::Error Caffe2WorkspaceCreate(
-  Caffe2Workspace** c2ws, const std::string& model_name,
-  const int max_batch_size, const std::vector<std::string>& input_names,
-  const std::vector<std::string>& output_names, const int gpu_device,
-  const std::vector<char>& init_blob, const std::vector<char>& model_blob);
+    Caffe2Workspace** c2ws, const std::string& model_name,
+    const int max_batch_size, const std::vector<std::string>& input_names,
+    const std::vector<std::string>& output_names, const int gpu_device,
+    const std::vector<char>& init_blob, const std::vector<char>& model_blob);
 
 }  // extern "C"
 

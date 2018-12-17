@@ -34,8 +34,8 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 AutoFillNetDef::Create(
-  const std::string& model_name, const std::string& model_path,
-  std::unique_ptr<AutoFillNetDef>* autofill)
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillNetDef>* autofill)
 {
   std::set<std::string> version_dirs;
   TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -45,11 +45,11 @@ AutoFillNetDef::Create(
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "' due to multiple versions");
+        "unable to autofill for '", model_name, "' due to multiple versions");
   }
 
   const auto version_path =
-    tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
 
   // There must be a single netdef model (which is spread across two
   // files) within the version directory...
@@ -57,20 +57,21 @@ AutoFillNetDef::Create(
   TF_RETURN_IF_ERROR(GetFiles(version_path, &netdef_files));
   if (netdef_files.size() != 2) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "', unable to find netdef files");
+        "unable to autofill for '", model_name,
+        "', unable to find netdef files");
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
   const auto netdef0_path =
-    tensorflow::io::JoinPath(version_path, netdef0_file);
+      tensorflow::io::JoinPath(version_path, netdef0_file);
 
   const std::string netdef1_file = *(std::next(netdef_files.begin()));
   const auto netdef1_path =
-    tensorflow::io::JoinPath(version_path, netdef1_file);
+      tensorflow::io::JoinPath(version_path, netdef1_file);
 
   const std::string expected_init_filename =
-    std::string(kCaffe2NetDefInitFilenamePrefix) +
-    std::string(kCaffe2NetDefFilename);
+      std::string(kCaffe2NetDefInitFilenamePrefix) +
+      std::string(kCaffe2NetDefFilename);
 
   // If find both files named with the default netdef names then
   // assume it is a netdef. In the future we can be smarter here and
@@ -81,9 +82,9 @@ AutoFillNetDef::Create(
         ((netdef1_file == kCaffe2NetDefFilename) &&
          (netdef0_file == expected_init_filename)))) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to find netdef files named '", kCaffe2NetDefFilename,
-      "' and '", expected_init_filename, "'");
+        "unable to autofill for '", model_name,
+        "', unable to find netdef files named '", kCaffe2NetDefFilename,
+        "' and '", expected_init_filename, "'");
   }
 
   autofill->reset(new AutoFillNetDef(model_name));

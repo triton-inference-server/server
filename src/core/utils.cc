@@ -38,7 +38,7 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 GetCudaPriority(
-  ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority)
+    ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority)
 {
   // Default priority is 0
   *cuda_stream_priority = 0;
@@ -47,8 +47,8 @@ GetCudaPriority(
   cudaError_t cuerr = cudaDeviceGetStreamPriorityRange(&min, &max);
   if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaSuccess)) {
     return tensorflow::errors::Internal(
-      "unable to get allowed CUDA stream priorities: ",
-      cudaGetErrorString(cuerr));
+        "unable to get allowed CUDA stream priorities: ",
+        cudaGetErrorString(cuerr));
   }
 
   switch (priority) {
@@ -74,7 +74,7 @@ GetModelVersionFromPath(const tensorflow::StringPiece& path, uint32_t* version)
   // Determine the version from the last segment of 'path'
   if (!absl::SimpleAtoi(version_dir, version)) {
     return tensorflow::errors::Internal(
-      "unable to determine model version from ", path);
+        "unable to determine model version from ", path);
   }
 
   return tensorflow::Status::OK();
@@ -82,7 +82,8 @@ GetModelVersionFromPath(const tensorflow::StringPiece& path, uint32_t* version)
 
 tensorflow::Status
 GetNormalizedModelConfig(
-  const tensorflow::StringPiece& path, const bool autofill, ModelConfig* config)
+    const tensorflow::StringPiece& path, const bool autofill,
+    ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = tensorflow::io::JoinPath(path, kModelConfigPbTxt);
@@ -90,7 +91,7 @@ GetNormalizedModelConfig(
     config->Clear();
   } else {
     TF_RETURN_IF_ERROR(
-      ReadTextProto(tensorflow::Env::Default(), config_path, config));
+        ReadTextProto(tensorflow::Env::Default(), config_path, config));
   }
 
   // Autofill if requested...
@@ -98,7 +99,7 @@ GetNormalizedModelConfig(
     const std::string model_name(tensorflow::io::Basename(path));
     std::unique_ptr<AutoFill> af;
     TF_RETURN_IF_ERROR(
-      AutoFill::Create(model_name, std::string(path), *config, &af));
+        AutoFill::Create(model_name, std::string(path), *config, &af));
     TF_RETURN_IF_ERROR(af->Fix(config));
 
     LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
@@ -106,7 +107,7 @@ GetNormalizedModelConfig(
 
   if (config->platform().empty()) {
     return tensorflow::errors::InvalidArgument(
-      "must specify platform for model '", config->name(), "'");
+        "must specify platform for model '", config->name(), "'");
   }
 
   // If 'default_model_filename' is not specified set it appropriately
@@ -124,8 +125,8 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kCustomFilename);
     } else {
       return tensorflow::errors::Internal(
-        "unexpected platform type ", config->platform(), " for ",
-        config->name());
+          "unexpected platform type ", config->platform(), " for ",
+          config->name());
     }
   }
 
@@ -144,11 +145,11 @@ GetNormalizedModelConfig(
     if (config->dynamic_batching().preferred_batch_size().size() == 0) {
       if (config->max_batch_size() >= 4) {
         config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-          4);
+            4);
       }
       if (config->max_batch_size() >= 8) {
         config->mutable_dynamic_batching()->mutable_preferred_batch_size()->Add(
-          8);
+            8);
       }
     }
   }
@@ -165,8 +166,8 @@ GetNormalizedModelConfig(
     device_cnt = 0;
   } else if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "unable to get number of CUDA devices for ", config->name(), ": ",
-      cudaGetErrorString(cuerr));
+        "unable to get number of CUDA devices for ", config->name(), ": ",
+        cudaGetErrorString(cuerr));
   }
 
   // Assign default name, kind and count to each instance group that
@@ -205,9 +206,8 @@ GetNormalizedModelConfig(
     }
 
     // GPUs
-    if (
-      (group.kind() == ModelInstanceGroup::KIND_GPU) &&
-      (group.gpus().size() == 0)) {
+    if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
+        (group.gpus().size() == 0)) {
       for (int d = 0; d < device_cnt; d++) {
         group.add_gpus(d);
       }
@@ -219,31 +219,31 @@ GetNormalizedModelConfig(
 
 tensorflow::Status
 ValidateModelConfig(
-  const ModelConfig& config, const std::string& expected_platform)
+    const ModelConfig& config, const std::string& expected_platform)
 {
   if (config.name().empty()) {
     return tensorflow::errors::InvalidArgument(
-      "model configuration must specify 'name'");
+        "model configuration must specify 'name'");
   }
 
   if (config.platform().empty()) {
     return tensorflow::errors::InvalidArgument(
-      "must specify 'platform' for ", config.name());
+        "must specify 'platform' for ", config.name());
   }
 
   if (!expected_platform.empty() && (config.platform() != expected_platform)) {
     return tensorflow::errors::NotFound(
-      "expected model of type ", expected_platform, " for ", config.name());
+        "expected model of type ", expected_platform, " for ", config.name());
   }
 
   if (!config.has_version_policy()) {
     return tensorflow::errors::InvalidArgument(
-      "must specify 'version policy' for ", config.name());
+        "must specify 'version policy' for ", config.name());
   }
 
   if (config.instance_group().size() == 0) {
     return tensorflow::errors::InvalidArgument(
-      "must specify one or more 'instance group's for ", config.name());
+        "must specify one or more 'instance group's for ", config.name());
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -253,20 +253,20 @@ ValidateModelConfig(
     for (const auto size : config.dynamic_batching().preferred_batch_size()) {
       if (size <= 0) {
         return tensorflow::errors::InvalidArgument(
-          "dynamic batching preferred size must be positive for ",
-          config.name());
+            "dynamic batching preferred size must be positive for ",
+            config.name());
       }
       if (size > config.max_batch_size()) {
         return tensorflow::errors::InvalidArgument(
-          "dynamic batching preferred size must be <= max batch size for ",
-          config.name());
+            "dynamic batching preferred size must be <= max batch size for ",
+            config.name());
       }
     }
 
     if (config.dynamic_batching().max_queue_delay_microseconds() < 0) {
       return tensorflow::errors::InvalidArgument(
-        "dynamic batching maximum queue delay must be non-negative for ",
-        config.name());
+          "dynamic batching maximum queue delay must be non-negative for ",
+          config.name());
     }
   }
 
@@ -279,36 +279,36 @@ ValidateModelConfig(
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "failed to get device count for validation of model ", config.name(),
-      ": ", cudaGetErrorString(cuerr));
+        "failed to get device count for validation of model ", config.name(),
+        ": ", cudaGetErrorString(cuerr));
   }
 
   for (const auto& group : config.instance_group()) {
     if (group.kind() == ModelInstanceGroup::KIND_GPU) {
       if (group.gpus().size() == 0) {
         return tensorflow::errors::InvalidArgument(
-          "instance group ", group.name(), " of model ", config.name(),
-          " has kind KIND_GPU but specifies no GPUs");
+            "instance group ", group.name(), " of model ", config.name(),
+            " has kind KIND_GPU but specifies no GPUs");
       }
 
       for (const int32_t gid : group.gpus()) {
         if ((gid < 0) || (gid >= dcnt)) {
           return tensorflow::errors::InvalidArgument(
-            "instance group ", group.name(), " of model ", config.name(),
-            " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
-            (dcnt - 1));
+              "instance group ", group.name(), " of model ", config.name(),
+              " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
+              (dcnt - 1));
         }
       }
     } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
       if (group.gpus().size() > 0) {
         return tensorflow::errors::InvalidArgument(
-          "instance group ", group.name(), " of model ", config.name(),
-          " has kind KIND_CPU but specifies one or more GPUs");
+            "instance group ", group.name(), " of model ", config.name(),
+            " has kind KIND_CPU but specifies one or more GPUs");
       }
     } else {
       return tensorflow::errors::Internal(
-        "instance group ", group.name(), " of model ", config.name(),
-        " has unexpected kind KIND_AUTO");
+          "instance group ", group.name(), " of model ", config.name(),
+          " has unexpected kind KIND_AUTO");
     }
   }
 
@@ -327,25 +327,24 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
 {
   if (io.name().empty()) {
     return tensorflow::errors::InvalidArgument(
-      "model input must specify 'name'");
+        "model input must specify 'name'");
   }
 
   if (io.data_type() == DataType::TYPE_INVALID) {
     return tensorflow::errors::InvalidArgument(
-      "model input must specify 'data_type'");
+        "model input must specify 'data_type'");
   }
 
   if (io.dims_size() == 0) {
     return tensorflow::errors::InvalidArgument(
-      "model input must specify 'dims'");
+        "model input must specify 'dims'");
   }
 
-  if (
-    ((io.format() == ModelInput::FORMAT_NHWC) ||
-     (io.format() == ModelInput::FORMAT_NCHW)) &&
-    (io.dims_size() != 3)) {
+  if (((io.format() == ModelInput::FORMAT_NHWC) ||
+       (io.format() == ModelInput::FORMAT_NCHW)) &&
+      (io.dims_size() != 3)) {
     return tensorflow::errors::InvalidArgument(
-      "model input NHWC/NCHW require 3 dims");
+        "model input NHWC/NCHW require 3 dims");
   }
 
   if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {
@@ -358,8 +357,8 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
     }
 
     return tensorflow::errors::InvalidArgument(
-      "unexpected inference input '", io.name(),
-      "', allowed inputs are: ", astr);
+        "unexpected inference input '", io.name(),
+        "', allowed inputs are: ", astr);
   }
 
   return tensorflow::Status::OK();
@@ -377,17 +376,17 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
 {
   if (io.name().empty()) {
     return tensorflow::errors::InvalidArgument(
-      "model output must specify 'name'");
+        "model output must specify 'name'");
   }
 
   if (io.data_type() == DataType::TYPE_INVALID) {
     return tensorflow::errors::InvalidArgument(
-      "model output must specify 'data_type'");
+        "model output must specify 'data_type'");
   }
 
   if (io.dims_size() == 0) {
     return tensorflow::errors::InvalidArgument(
-      "model output must specify 'dims'");
+        "model output must specify 'dims'");
   }
 
   if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {
@@ -400,8 +399,8 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
     }
 
     return tensorflow::errors::InvalidArgument(
-      "unexpected inference output '", io.name(),
-      "', allowed outputs are: ", astr);
+        "unexpected inference output '", io.name(),
+        "', allowed outputs are: ", astr);
   }
 
   return tensorflow::Status::OK();

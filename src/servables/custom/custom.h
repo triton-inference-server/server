@@ -78,8 +78,8 @@ typedef struct custom_payload_struct {
 /// \param content_byte_size Returns the size, in bytes, of 'content'.
 /// \return false if error, true if success.
 typedef bool (*CustomGetNextInputFn_t)(
-  void* input_context, const char* name, const void** content,
-  uint64_t* content_byte_size);
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size);
 
 /// Type for the CustomGetOutput callback function.
 ///
@@ -96,8 +96,8 @@ typedef bool (*CustomGetNextInputFn_t)(
 /// enough to hold 'content_byte_size' bytes.
 /// \return false if error, true if success.
 typedef bool (*CustomGetOutputFn_t)(
-  void* output_context, const char* name, uint64_t content_byte_size,
-  void** content);
+    void* output_context, const char* name, uint64_t content_byte_size,
+    void** content);
 
 /// Type for the CustomInitialize function.
 typedef int (*CustomInitializeFn_t)(const char*, int, void**);
@@ -110,7 +110,8 @@ typedef char* (*CustomErrorStringFn_t)(void*, int);
 
 /// Type for the CustomExecute function.
 typedef int (*CustomExecuteFn_t)(
-  void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t, CustomGetOutputFn_t);
+    void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
+    CustomGetOutputFn_t);
 
 /// Initialize the custom shared library for a given model
 /// configuration and get the associated custom context.
@@ -128,8 +129,8 @@ typedef int (*CustomExecuteFn_t)(
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
 int CustomInitialize(
-  const char* serialized_model_config, int gpu_device_id,
-  void** custom_context);
+    const char* serialized_model_config, int gpu_device_id,
+    void** custom_context);
 
 /// Finalize a custom context. All state associated with the context
 /// should be freed.
@@ -164,8 +165,8 @@ const char* CustomErrorString(void* custom_context, int errcode);
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
 int CustomExecute(
-  void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
-  CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+    void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
 #ifdef __cplusplus
 }

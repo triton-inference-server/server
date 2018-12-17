@@ -33,8 +33,8 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 LoadPlan(
-  const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-  nvinfer1::ICudaEngine** engine)
+    const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
+    nvinfer1::ICudaEngine** engine)
 {
   *engine = nullptr;
   *runtime = nullptr;
@@ -42,7 +42,7 @@ LoadPlan(
   // Create plugin factory to provide onnx plugins. This should be
   // generalized based on what the model requires [DLIS-54]
   nvonnxparser::IPluginFactory* onnx_plugin_factory =
-    nvonnxparser::createPluginFactory(tensorrt_logger);
+      nvonnxparser::createPluginFactory(tensorrt_logger);
 
   *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
   if (*runtime == nullptr) {
@@ -50,7 +50,7 @@ LoadPlan(
   }
 
   *engine = (*runtime)->deserializeCudaEngine(
-    &model_data[0], model_data.size(), onnx_plugin_factory);
+      &model_data[0], model_data.size(), onnx_plugin_factory);
   if (*engine == nullptr) {
     return tensorflow::errors::Internal("unable to create TensorRT engine");
   }

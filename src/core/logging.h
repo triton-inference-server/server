@@ -82,47 +82,47 @@ extern Logger gLogger_;
 
 #define LOG_ENABLE_INFO(E)                      \
   nvidia::inferenceserver::gLogger_.SetEnabled( \
-    nvidia::inferenceserver::LogMessage::Level::kINFO, (E))
+      nvidia::inferenceserver::LogMessage::Level::kINFO, (E))
 #define LOG_ENABLE_WARNING(E)                   \
   nvidia::inferenceserver::gLogger_.SetEnabled( \
-    nvidia::inferenceserver::LogMessage::Level::kWARNING, (E))
+      nvidia::inferenceserver::LogMessage::Level::kWARNING, (E))
 #define LOG_ENABLE_ERROR(E)                     \
   nvidia::inferenceserver::gLogger_.SetEnabled( \
-    nvidia::inferenceserver::LogMessage::Level::kERROR, (E))
+      nvidia::inferenceserver::LogMessage::Level::kERROR, (E))
 
-#define LOG_INFO                                            \
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(          \
-        nvidia::inferenceserver::LogMessage::Level::kINFO)) \
-  nvidia::inferenceserver::LogMessage(                      \
-    (char*)__FILE__, __LINE__,                              \
-    nvidia::inferenceserver::LogMessage::Level::kINFO)      \
-    .stream()
-#define LOG_WARNING                                            \
+#define LOG_INFO                                              \
+  if (nvidia::inferenceserver::gLogger_.IsEnabled(            \
+          nvidia::inferenceserver::LogMessage::Level::kINFO)) \
+  nvidia::inferenceserver::LogMessage(                        \
+      (char*)__FILE__, __LINE__,                              \
+      nvidia::inferenceserver::LogMessage::Level::kINFO)      \
+      .stream()
+#define LOG_WARNING                                              \
+  if (nvidia::inferenceserver::gLogger_.IsEnabled(               \
+          nvidia::inferenceserver::LogMessage::Level::kWARNING)) \
+  nvidia::inferenceserver::LogMessage(                           \
+      (char*)__FILE__, __LINE__,                                 \
+      nvidia::inferenceserver::LogMessage::Level::kWARNING)      \
+      .stream()
+#define LOG_ERROR                                              \
   if (nvidia::inferenceserver::gLogger_.IsEnabled(             \
-        nvidia::inferenceserver::LogMessage::Level::kWARNING)) \
+          nvidia::inferenceserver::LogMessage::Level::kERROR)) \
   nvidia::inferenceserver::LogMessage(                         \
-    (char*)__FILE__, __LINE__,                                 \
-    nvidia::inferenceserver::LogMessage::Level::kWARNING)      \
-    .stream()
-#define LOG_ERROR                                            \
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(           \
-        nvidia::inferenceserver::LogMessage::Level::kERROR)) \
-  nvidia::inferenceserver::LogMessage(                       \
-    (char*)__FILE__, __LINE__,                               \
-    nvidia::inferenceserver::LogMessage::Level::kERROR)      \
-    .stream()
+      (char*)__FILE__, __LINE__,                               \
+      nvidia::inferenceserver::LogMessage::Level::kERROR)      \
+      .stream()
 
 #define LOG_SET_VERBOSE(L)                           \
   nvidia::inferenceserver::gLogger_.SetVerboseLevel( \
-    static_cast<uint32_t>(std::max(0, (L))))
+      static_cast<uint32_t>(std::max(0, (L))))
 #define LOG_VERBOSE_IS_ON(L) \
   (nvidia::inferenceserver::gLogger_.VerboseLevel() >= (L))
-#define LOG_VERBOSE(L)                                 \
-  if (LOG_VERBOSE_IS_ON(L))                            \
-  nvidia::inferenceserver::LogMessage(                 \
-    (char*)__FILE__, __LINE__,                         \
-    nvidia::inferenceserver::LogMessage::Level::kINFO) \
-    .stream()
+#define LOG_VERBOSE(L)                                   \
+  if (LOG_VERBOSE_IS_ON(L))                              \
+  nvidia::inferenceserver::LogMessage(                   \
+      (char*)__FILE__, __LINE__,                         \
+      nvidia::inferenceserver::LogMessage::Level::kINFO) \
+      .stream()
 
 #define LOG_FLUSH nvidia::inferenceserver::gLogger_.Flush()
 
@@ -134,6 +134,6 @@ extern Logger gLogger_;
 #define LOG_DELEGATED_INFO_LEVEL 2
 extern "C" uint32_t DelegatedVerboseLogLevel();
 extern "C" void DelegatedLogMessage(
-  int level, const char* file, int line, const std::string& msg);
+    int level, const char* file, int line, const std::string& msg);
 
 }}  // namespace nvidia::inferenceserver

@@ -41,24 +41,25 @@ namespace nvidia { namespace inferenceserver {
 // into the corresponding savedmodel bundle.
 class SavedModelBundleSourceAdapter final
     : public tfs::SimpleLoaderSourceAdapter<
-        tfs::StoragePath, SavedModelBundle> {
+          tfs::StoragePath, SavedModelBundle> {
  public:
   static tensorflow::Status Create(
-    const SavedModelBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter);
+      const SavedModelBundleSourceAdapterConfig& config,
+      std::unique_ptr<
+          SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+          adapter);
 
   ~SavedModelBundleSourceAdapter() override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(SavedModelBundleSourceAdapter);
   using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, SavedModelBundle>;
+      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, SavedModelBundle>;
 
   SavedModelBundleSourceAdapter(
-    const SavedModelBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      const SavedModelBundleSourceAdapterConfig& config,
+      typename SimpleSourceAdapter::Creator creator,
+      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
       : SimpleSourceAdapter(creator, resource_estimator), config_(config)
   {
   }

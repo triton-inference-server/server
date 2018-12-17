@@ -41,20 +41,21 @@ ProfileStartAll()
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "failed to get device count for profiling: ", cudaGetErrorString(cuerr));
+        "failed to get device count for profiling: ",
+        cudaGetErrorString(cuerr));
   }
 
   for (int i = 0; i < dcnt; i++) {
     cuerr = cudaSetDevice(i);
     if (cuerr != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "failed to set device for profiling: ", cudaGetErrorString(cuerr));
+          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
     }
 
     cuerr = cudaProfilerStart();
     if (cuerr != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "failed to start profiling: ", cudaGetErrorString(cuerr));
+          "failed to start profiling: ", cudaGetErrorString(cuerr));
     }
   }
 
@@ -70,20 +71,21 @@ ProfileStopAll()
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
     return tensorflow::errors::Internal(
-      "failed to get device count for profiling: ", cudaGetErrorString(cuerr));
+        "failed to get device count for profiling: ",
+        cudaGetErrorString(cuerr));
   }
 
   for (int i = 0; i < dcnt; i++) {
     cuerr = cudaSetDevice(i);
     if (cuerr != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "failed to set device for profiling: ", cudaGetErrorString(cuerr));
+          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
     }
 
     cuerr = cudaProfilerStop();
     if (cuerr != cudaSuccess) {
       return tensorflow::errors::Internal(
-        "failed to stop profiling: ", cudaGetErrorString(cuerr));
+          "failed to stop profiling: ", cudaGetErrorString(cuerr));
     }
   }
 

@@ -34,16 +34,16 @@ class RequestStatusFactory {
  public:
   // Create a Status object from a code and optional message.
   static void Create(
-    RequestStatus* status, uint64_t request_id, const std::string& server_id,
-    RequestStatusCode code, const std::string& msg);
+      RequestStatus* status, uint64_t request_id, const std::string& server_id,
+      RequestStatusCode code, const std::string& msg);
   static void Create(
-    RequestStatus* status, uint64_t request_id, const std::string& server_id,
-    RequestStatusCode code);
+      RequestStatus* status, uint64_t request_id, const std::string& server_id,
+      RequestStatusCode code);
 
   // Create a Status object from a TensorFlow status.
   static void Create(
-    RequestStatus* status, uint64_t request_id, const std::string& server_id,
-    const tensorflow::Status& tf_status);
+      RequestStatus* status, uint64_t request_id, const std::string& server_id,
+      const tensorflow::Status& tf_status);
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -47,7 +47,7 @@ class ModelRepositoryManager {
   /// information in each model configuration.
   /// \return The error status.
   static tensorflow::Status Create(
-    const std::string& repository_path, const bool autofill);
+      const std::string& repository_path, const bool autofill);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -60,29 +60,29 @@ class ModelRepositoryManager {
   /// repository that have not changed.
   /// \return The error status.
   static tensorflow::Status Poll(
-    std::set<std::string>* added, std::set<std::string>* deleted,
-    std::set<std::string>* modified, std::set<std::string>* unmodified);
+      std::set<std::string>* added, std::set<std::string>* deleted,
+      std::set<std::string>* modified, std::set<std::string>* unmodified);
 
   /// Get the configuration for a named model.
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
   static tensorflow::Status GetModelConfig(
-    const std::string& name, ModelConfig* model_config);
+      const std::string& name, ModelConfig* model_config);
 
   /// Get TFS-style configuration for a named model.
   /// \param name The model name.
   /// \param tfs_model_config Returns the TFS-style model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
   static tensorflow::Status GetTFSModelConfig(
-    const std::string& name, tfs::ModelConfig* tfs_model_config);
+      const std::string& name, tfs::ModelConfig* tfs_model_config);
 
   /// Get the platform for a named model.
   /// \param name The model name.
   /// \param platform Returns the Platform.
   /// \return OK if found, NOT_FOUND otherwise.
   static tensorflow::Status GetModelPlatform(
-    const std::string& name, Platform* platform);
+      const std::string& name, Platform* platform);
 
  private:
   struct ModelInfo {
@@ -96,7 +96,7 @@ class ModelRepositoryManager {
   using ModelInfoMap = std::unordered_map<std::string, ModelInfo>;
 
   ModelRepositoryManager(
-    const std::string& repository_path, const bool autofill);
+      const std::string& repository_path, const bool autofill);
   ~ModelRepositoryManager() = default;
 
   static ModelRepositoryManager* singleton;

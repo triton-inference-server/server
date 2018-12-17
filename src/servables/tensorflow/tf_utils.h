@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 /// \return true if a TensorFlow shape matches a model configuration
 /// shape.
 bool CompareDims(
-  const tensorflow::TensorShapeProto& model_shape, const DimsList& dims);
+    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims);
 
 /// \return true if a TensorFlow data-type matches a model
 /// configuration data-type.

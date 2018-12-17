@@ -44,14 +44,14 @@ ReadBinaryProto(const std::string& filename, google::protobuf::MessageLite* msg)
 {
   tensorflow::string msg_str;
   TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
-    tensorflow::Env::Default(), filename, &msg_str));
+      tensorflow::Env::Default(), filename, &msg_str));
 
   google::protobuf::io::CodedInputStream coded_stream(
-    reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
+      reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
   coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
   if (!msg->ParseFromCodedStream(&coded_stream)) {
     return tensorflow::errors::DataLoss(
-      "Can't parse ", filename, " as binary proto");
+        "Can't parse ", filename, " as binary proto");
   }
 
   return tensorflow::Status::OK();
@@ -61,7 +61,7 @@ ReadBinaryProto(const std::string& filename, google::protobuf::MessageLite* msg)
 
 tensorflow::Status
 GraphDefBundle::Init(
-  const tensorflow::StringPiece& path, const ModelConfig& config)
+    const tensorflow::StringPiece& path, const ModelConfig& config)
 {
   TF_RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowGraphDefPlatform));
   TF_RETURN_IF_ERROR(BaseBundle::Init(path, config));
@@ -70,9 +70,9 @@ GraphDefBundle::Init(
 
 tensorflow::Status
 GraphDefBundle::CreateSession(
-  const tensorflow::SessionOptions& options, const int gpu_device,
-  const std::string& model_path, tensorflow::Session** session,
-  IONameMap* input_name_map, IONameMap* output_name_map)
+    const tensorflow::SessionOptions& options, const int gpu_device,
+    const std::string& model_path, tensorflow::Session** session,
+    IONameMap* input_name_map, IONameMap* output_name_map)
 {
   TF_RETURN_IF_ERROR(tensorflow::NewSession(options, session));
 
@@ -80,7 +80,7 @@ GraphDefBundle::CreateSession(
   TF_RETURN_IF_ERROR(ReadBinaryProto(model_path, &graph_def));
   if (graph_def.node_size() == 0) {
     return tensorflow::errors::InvalidArgument(
-      "model ", Name(), " has an empty network");
+        "model ", Name(), " has an empty network");
   }
 
   // Set the default device to control the CPU/GPU that the graph runs
@@ -92,7 +92,7 @@ GraphDefBundle::CreateSession(
     tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
   } else {
     tensorflow::graph::SetDefaultDevice(
-      "/gpu:" + std::to_string(gpu_device), &graph_def);
+        "/gpu:" + std::to_string(gpu_device), &graph_def);
   }
 
   TF_RETURN_IF_ERROR((*session)->Create(graph_def));
@@ -113,9 +113,9 @@ GraphDefBundle::CreateSession(
 
   if (potential_inputs.size() < (size_t)Config().input().size()) {
     return tensorflow::errors::InvalidArgument(
-      "unable to load model '", Name(), "', configuration expects ",
-      Config().input().size(), " inputs, model provides at most ",
-      potential_inputs.size());
+        "unable to load model '", Name(), "', configuration expects ",
+        Config().input().size(), " inputs, model provides at most ",
+        potential_inputs.size());
   }
 
   for (const auto& io : Config().input()) {

@@ -36,7 +36,7 @@
 namespace nvidia { namespace inferenceserver {
 
 GRPCInferRequestProvider::GRPCInferRequestProvider(
-  const InferRequest& request, const int version)
+    const InferRequest& request, const int version)
     : InferRequestProvider(request.model_name(), version), request_(request)
 {
   content_delivered_.resize(request_.raw_input_size(), false);
@@ -44,16 +44,16 @@ GRPCInferRequestProvider::GRPCInferRequestProvider(
 
 tensorflow::Status
 GRPCInferRequestProvider::Create(
-  const InferRequest& request,
-  std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
+    const InferRequest& request,
+    std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
 {
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
   if (request.meta_data().batch_size() < 1) {
     return tensorflow::errors::InvalidArgument(
-      "inference request batch-size must be >= 1 for models that ",
-      "support batching, and must be 1 for models that don't ",
-      "support batching");
+        "inference request batch-size must be >= 1 for models that ",
+        "support batching, and must be 1 for models that don't ",
+        "support batching");
   }
 
   const int version = (request.version() >= 0) ? request.version() : -1;
@@ -63,8 +63,8 @@ GRPCInferRequestProvider::Create(
 
 tensorflow::Status
 GRPCInferRequestProvider::GetNextInputContent(
-  int idx, const void** content, size_t* content_byte_size,
-  bool force_contiguous)
+    int idx, const void** content, size_t* content_byte_size,
+    bool force_contiguous)
 {
   if ((idx < 0) || (idx >= request_.raw_input_size())) {
     return tensorflow::errors::Internal("unexpected input index ", idx);
@@ -85,9 +85,9 @@ GRPCInferRequestProvider::GetNextInputContent(
 
 tensorflow::Status
 HTTPInferRequestProvider::Create(
-  evbuffer* input_buffer, const std::string& model_name,
-  const std::string& model_version_str, const std::string& request_header_str,
-  std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
+    evbuffer* input_buffer, const std::string& model_name,
+    const std::string& model_version_str, const std::string& request_header_str,
+    std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
 {
   int version = -1;
   if (!model_version_str.empty()) {
@@ -98,18 +98,18 @@ HTTPInferRequestProvider::Create(
   infer_provider->reset(provider);
 
   if (!tensorflow::protobuf::TextFormat::ParseFromString(
-        request_header_str, &(provider->request_header_))) {
+          request_header_str, &(provider->request_header_))) {
     return tensorflow::errors::InvalidArgument(
-      "unable to parse request for model '", model_name, "'");
+        "unable to parse request for model '", model_name, "'");
   }
 
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
   if (provider->request_header_.batch_size() < 1) {
     return tensorflow::errors::InvalidArgument(
-      "inference request batch-size must be >= 1 for models that ",
-      "support batching, and must be 1 for models that don't ",
-      "support batching");
+        "inference request batch-size must be >= 1 for models that ",
+        "support batching, and must be 1 for models that don't ",
+        "support batching");
   }
 
   // Now need to create 'contents_'. Each input has one entry in
@@ -123,10 +123,10 @@ HTTPInferRequestProvider::Create(
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
   if (n > 0) {
     struct evbuffer_iovec* v = static_cast<struct evbuffer_iovec*>(
-      alloca(sizeof(struct evbuffer_iovec) * n));
+        alloca(sizeof(struct evbuffer_iovec) * n));
     if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
       return tensorflow::errors::Internal(
-        "unexpected error getting input buffers ");
+          "unexpected error getting input buffers ");
     }
 
     int v_idx = 0;
@@ -138,7 +138,7 @@ HTTPInferRequestProvider::Create(
       auto& blocks = provider->contents_.back();
 
       size_t total_byte_size =
-        provider->request_header_.batch_size() * input.byte_size();
+          provider->request_header_.batch_size() * input.byte_size();
       while ((total_byte_size > 0) && (v_idx < n)) {
         blocks.emplace_back();
         Block& block = blocks.back();
@@ -160,8 +160,8 @@ HTTPInferRequestProvider::Create(
 
     if (v_idx != n) {
       return tensorflow::errors::InvalidArgument(
-        "unexpected additional input data for model '", provider->ModelName(),
-        "'");
+          "unexpected additional input data for model '", provider->ModelName(),
+          "'");
     }
   }
 
@@ -170,8 +170,8 @@ HTTPInferRequestProvider::Create(
 
 tensorflow::Status
 HTTPInferRequestProvider::GetNextInputContent(
-  int idx, const void** content, size_t* content_byte_size,
-  bool force_contiguous)
+    int idx, const void** content, size_t* content_byte_size,
+    bool force_contiguous)
 {
   if ((idx < 0) || ((size_t)idx >= contents_.size())) {
     return tensorflow::errors::Internal("unexpected input index ", idx);
@@ -224,11 +224,11 @@ HTTPInferRequestProvider::GetNextInputContent(
 
 tensorflow::Status
 GRPCInferResponseProvider::Create(
-  const InferRequestHeader& request_header, InferResponse* response,
-  std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
+    const InferRequestHeader& request_header, InferResponse* response,
+    std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
 {
   GRPCInferResponseProvider* provider =
-    new GRPCInferResponseProvider(request_header, response);
+      new GRPCInferResponseProvider(request_header, response);
   infer_provider->reset(provider);
 
   // Make space in the response for the output data. For outputs
@@ -239,14 +239,14 @@ GRPCInferResponseProvider::Create(
   for (const auto& requested_output : request_header.output()) {
     std::string* output = provider->response_->add_raw_output();
     const size_t output_byte_size =
-      request_header.batch_size() * requested_output.byte_size();
+        request_header.batch_size() * requested_output.byte_size();
 
     if (requested_output.has_cls()) {
       provider->CreateOutputBuffer(output_byte_size);
     } else {
       output->resize(output_byte_size);
       provider->AddOutputBuffer(
-        static_cast<void*>(&((*output)[0])), output->size());
+          static_cast<void*>(&((*output)[0])), output->size());
     }
   }
 
@@ -254,7 +254,7 @@ GRPCInferResponseProvider::Create(
 }
 
 HTTPInferResponseProvider::HTTPInferResponseProvider(
-  evbuffer* output_buffer, const InferRequestHeader& request_header)
+    evbuffer* output_buffer, const InferRequestHeader& request_header)
     : InferResponseProvider(request_header), output_buffer_(output_buffer)
 {
   // Get the total size needed for raw output tensors...
@@ -262,38 +262,37 @@ HTTPInferResponseProvider::HTTPInferResponseProvider(
   for (const auto& requested_output : request_header.output()) {
     if (!requested_output.has_cls()) {
       total_raw_byte_size_ +=
-        request_header.batch_size() * requested_output.byte_size();
+          request_header.batch_size() * requested_output.byte_size();
     }
   }
 }
 
 tensorflow::Status
 HTTPInferResponseProvider::Create(
-  evbuffer* output_buffer, const InferRequestHeader& request_header,
-  std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
+    evbuffer* output_buffer, const InferRequestHeader& request_header,
+    std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
 {
   HTTPInferResponseProvider* provider =
-    new HTTPInferResponseProvider(output_buffer, request_header);
+      new HTTPInferResponseProvider(output_buffer, request_header);
   infer_provider->reset(provider);
 
   char* raw_output_base = nullptr;
   if (provider->total_raw_byte_size_ > 0) {
     // Reserve contiguous space in the output to hold all the raw output
     // tensor data that must be returned in the response.
-    if (
-      evbuffer_reserve_space(
-        output_buffer, provider->total_raw_byte_size_, &provider->output_iovec_,
-        1) != 1) {
+    if (evbuffer_reserve_space(
+            output_buffer, provider->total_raw_byte_size_,
+            &provider->output_iovec_, 1) != 1) {
       return tensorflow::errors::Internal(
-        "failed to reserve ", provider->total_raw_byte_size_,
-        " bytes in output tensor buffer");
+          "failed to reserve ", provider->total_raw_byte_size_,
+          " bytes in output tensor buffer");
     }
 
     if (provider->output_iovec_.iov_len < provider->total_raw_byte_size_) {
       return tensorflow::errors::Internal(
-        "reserved ", provider->output_iovec_.iov_len,
-        " bytes in output tensor buffer, need ",
-        provider->total_raw_byte_size_);
+          "reserved ", provider->output_iovec_.iov_len,
+          " bytes in output tensor buffer, need ",
+          provider->total_raw_byte_size_);
     }
 
     provider->output_iovec_.iov_len = provider->total_raw_byte_size_;
@@ -307,22 +306,22 @@ HTTPInferResponseProvider::Create(
   size_t raw_output_offset = 0;
   for (const auto& requested_output : request_header.output()) {
     const size_t output_byte_size =
-      request_header.batch_size() * requested_output.byte_size();
+        request_header.batch_size() * requested_output.byte_size();
 
     if (requested_output.has_cls()) {
       provider->CreateOutputBuffer(output_byte_size);
     } else {
       provider->AddOutputBuffer(
-        static_cast<void*>(raw_output_base + raw_output_offset),
-        output_byte_size);
+          static_cast<void*>(raw_output_base + raw_output_offset),
+          output_byte_size);
       raw_output_offset += output_byte_size;
     }
   }
 
   if (raw_output_offset != provider->total_raw_byte_size_) {
     return tensorflow::errors::Internal(
-      "failed to partition ", provider->total_raw_byte_size_,
-      " bytes across output tensor buffer");
+        "failed to partition ", provider->total_raw_byte_size_,
+        " bytes across output tensor buffer");
   }
 
   return tensorflow::Status::OK();
@@ -334,7 +333,7 @@ HTTPInferResponseProvider::FinalizeResponse(const InferenceServable& is)
   if (total_raw_byte_size_ > 0) {
     if (evbuffer_commit_space(output_buffer_, &output_iovec_, 1) != 0) {
       return tensorflow::errors::Internal(
-        "failed to commit output tensors to output buffer");
+          "failed to commit output tensors to output buffer");
     }
   }
 
@@ -347,9 +346,9 @@ namespace {
 template <typename T>
 void
 AddClassResults(
-  InferResponseHeader::Output* poutput, void* poutput_buffer,
-  const size_t batch_size, const InferRequestHeader::Output& output,
-  const LabelProvider& label_provider)
+    InferResponseHeader::Output* poutput, void* poutput_buffer,
+    const size_t batch_size, const InferRequestHeader::Output& output,
+    const LabelProvider& label_provider)
 {
   T* probs = reinterpret_cast<T*>(poutput_buffer);
   const size_t entry_cnt = (output.byte_size() / sizeof(T));
@@ -393,7 +392,7 @@ InferResponseProvider::AddOutputBuffer(void* buffer, size_t byte_size)
 
 tensorflow::Status
 InferResponseProvider::GetOutputBuffer(
-  int idx, void** buffer, size_t buffer_byte_size)
+    int idx, void** buffer, size_t buffer_byte_size)
 {
   if ((idx < 0) || (idx >= (int)buffers_.size())) {
     return tensorflow::errors::Internal("unexpected output index ", idx);
@@ -401,7 +400,7 @@ InferResponseProvider::GetOutputBuffer(
 
   if (buffers_[idx].second != buffer_byte_size) {
     return tensorflow::errors::Internal(
-      "unexpected output size ", buffers_[idx].second);
+        "unexpected output size ", buffers_[idx].second);
   }
 
   *buffer = buffers_[idx].first;
@@ -432,7 +431,7 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
     } else {
       void* output_buffer;
       TF_RETURN_IF_ERROR(GetOutputBuffer(
-        output_idx, &output_buffer, batch_size * output.byte_size()));
+          output_idx, &output_buffer, batch_size * output.byte_size()));
 
       DataType dtype;
       TF_RETURN_IF_ERROR(is.GetOutputDataType(output.name(), &dtype));
@@ -440,51 +439,51 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
       switch (dtype) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
-            poutput, output_buffer, batch_size, output, label_provider);
+              poutput, output_buffer, batch_size, output, label_provider);
           break;
 
         default:
           return tensorflow::errors::InvalidArgument(
-            "class result not available for output '", output.name(),
-            "' due to unsupported type '", DataType_Name(dtype), "'");
+              "class result not available for output '", output.name(),
+              "' due to unsupported type '", DataType_Name(dtype), "'");
       }
     }
 
@@ -496,15 +495,15 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
 
 void
 InferenceServable::GetMetricLabels(
-  std::map<std::string, std::string>* labels, const int gpu_device) const
+    std::map<std::string, std::string>* labels, const int gpu_device) const
 {
   labels->insert(std::map<std::string, std::string>::value_type(
-    std::string(kMetricsLabelModelName), Name()));
+      std::string(kMetricsLabelModelName), Name()));
   labels->insert(std::map<std::string, std::string>::value_type(
-    std::string(kMetricsLabelModelVersion), std::to_string(Version())));
+      std::string(kMetricsLabelModelVersion), std::to_string(Version())));
   for (const auto& tag : Tags()) {
     labels->insert(std::map<std::string, std::string>::value_type(
-      "_" + tag.first, tag.second));
+        "_" + tag.first, tag.second));
   }
 
   // 'gpu_device' can be -1 to indicate that the GPU is not known. In
@@ -513,15 +512,15 @@ InferenceServable::GetMetricLabels(
     std::string uuid;
     if (Metrics::UUIDForCudaDevice(gpu_device, &uuid)) {
       labels->insert(std::map<std::string, std::string>::value_type(
-        std::string(kMetricsLabelGpuUuid), uuid));
+          std::string(kMetricsLabelGpuUuid), uuid));
     }
   }
 }
 
 prometheus::Counter&
 InferenceServable::GetCounterMetric(
-  std::map<int, prometheus::Counter*>& metrics,
-  prometheus::Family<prometheus::Counter>& family, const int gpu_device) const
+    std::map<int, prometheus::Counter*>& metrics,
+    prometheus::Family<prometheus::Counter>& family, const int gpu_device) const
 {
   const auto itr = metrics.find(gpu_device);
   if (itr != metrics.end()) {
@@ -533,7 +532,7 @@ InferenceServable::GetCounterMetric(
 
   prometheus::Counter& counter = family.Add(labels);
   metrics.insert(
-    std::map<int, prometheus::Counter*>::value_type(gpu_device, &counter));
+      std::map<int, prometheus::Counter*>::value_type(gpu_device, &counter));
   return counter;
 }
 
@@ -541,53 +540,53 @@ prometheus::Counter&
 InferenceServable::MetricInferenceSuccess(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_success_, Metrics::FamilyInferenceSuccess(), gpu_device);
+      metric_inf_success_, Metrics::FamilyInferenceSuccess(), gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceFailure(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_failure_, Metrics::FamilyInferenceFailure(), gpu_device);
+      metric_inf_failure_, Metrics::FamilyInferenceFailure(), gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceCount(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_count_, Metrics::FamilyInferenceCount(), gpu_device);
+      metric_inf_count_, Metrics::FamilyInferenceCount(), gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceExecutionCount(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_exec_count_, Metrics::FamilyInferenceExecutionCount(),
-    gpu_device);
+      metric_inf_exec_count_, Metrics::FamilyInferenceExecutionCount(),
+      gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceRequestDuration(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_request_duration_us_, Metrics::FamilyInferenceRequestDuration(),
-    gpu_device);
+      metric_inf_request_duration_us_,
+      Metrics::FamilyInferenceRequestDuration(), gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceComputeDuration(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_compute_duration_us_, Metrics::FamilyInferenceComputeDuration(),
-    gpu_device);
+      metric_inf_compute_duration_us_,
+      Metrics::FamilyInferenceComputeDuration(), gpu_device);
 }
 
 prometheus::Counter&
 InferenceServable::MetricInferenceQueueDuration(int gpu_device) const
 {
   return GetCounterMetric(
-    metric_inf_queue_duration_us_, Metrics::FamilyInferenceQueueDuration(),
-    gpu_device);
+      metric_inf_queue_duration_us_, Metrics::FamilyInferenceQueueDuration(),
+      gpu_device);
 }
 
 prometheus::Histogram&
@@ -602,21 +601,21 @@ InferenceServable::MetricInferenceLoadRatio(int gpu_device) const
   GetMetricLabels(&labels, gpu_device);
 
   prometheus::Histogram& hist = Metrics::FamilyInferenceLoadRatio().Add(
-    labels, std::vector<double>{1.05, 1.10, 1.25, 1.5, 2.0, 10.0, 50.0});
+      labels, std::vector<double>{1.05, 1.10, 1.25, 1.5, 2.0, 10.0, 50.0});
   metric_inf_load_ratio_.insert(
-    std::map<int, prometheus::Histogram*>::value_type(gpu_device, &hist));
+      std::map<int, prometheus::Histogram*>::value_type(gpu_device, &hist));
   return hist;
 }
 
 tensorflow::Status
 InferenceServable::SetModelConfig(
-  const tensorflow::StringPiece& path, const ModelConfig& config)
+    const tensorflow::StringPiece& path, const ModelConfig& config)
 {
   config_ = config;
   TF_RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
   for (const auto& tag : config_.tags()) {
     tags_.insert(
-      std::map<std::string, std::string>::value_type(tag.first, tag.second));
+        std::map<std::string, std::string>::value_type(tag.first, tag.second));
   }
 
   return tensorflow::Status::OK();
@@ -627,7 +626,7 @@ InferenceServable::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 {
   if (scheduler_ != nullptr) {
     return tensorflow::errors::Internal(
-      "Attempt to change scheduler not allowed");
+        "Attempt to change scheduler not allowed");
   }
 
   scheduler_ = std::move(scheduler);
@@ -636,7 +635,7 @@ InferenceServable::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 
 tensorflow::Status
 InferenceServable::SetConfiguredScheduler(
-  const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun)
+    const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun)
 {
   std::unique_ptr<Scheduler> scheduler;
 
@@ -648,20 +647,20 @@ InferenceServable::SetConfiguredScheduler(
 
 void
 InferenceServable::AsyncRun(
-  std::shared_ptr<ModelInferStats> stats,
-  std::shared_ptr<InferRequestProvider> request_provider,
-  std::shared_ptr<InferResponseProvider> response_provider,
-  std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
+    std::shared_ptr<ModelInferStats> stats,
+    std::shared_ptr<InferRequestProvider> request_provider,
+    std::shared_ptr<InferResponseProvider> response_provider,
+    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
   auto run_timer = std::make_shared<ModelInferStats::ScopedTimer>();
   stats->StartRunTimer(run_timer.get());
 
   scheduler_->Enqueue(
-    stats, request_provider, response_provider,
-    [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
-      run_timer.reset();
-      OnCompleteHandleInfer(status);
-    });
+      stats, request_provider, response_provider,
+      [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
+        run_timer.reset();
+        OnCompleteHandleInfer(status);
+      });
 }
 
 // Since callers are expecting synchronous behavior, this function
@@ -670,10 +669,10 @@ InferenceServable::AsyncRun(
 // have [DLIS-124].
 void
 InferenceServable::Run(
-  std::shared_ptr<ModelInferStats> stats,
-  std::shared_ptr<InferRequestProvider> request_provider,
-  std::shared_ptr<InferResponseProvider> response_provider,
-  std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
+    std::shared_ptr<ModelInferStats> stats,
+    std::shared_ptr<InferRequestProvider> request_provider,
+    std::shared_ptr<InferResponseProvider> response_provider,
+    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
   // Since this call is synchronous we can just use a scoped timer to
   // measure the entire run time.
@@ -688,16 +687,16 @@ InferenceServable::Run(
   // Add request to queue...
   {
     scheduler_->Enqueue(
-      stats, request_provider, response_provider,
-      [&lmu, &lcv, &run_status, &run_completed](tensorflow::Status status) {
-        // signal complete and propagate status
-        {
-          std::lock_guard<std::mutex> lk(lmu);
-          run_status = status;
-          run_completed = true;
-        }
-        lcv.notify_one();
-      });
+        stats, request_provider, response_provider,
+        [&lmu, &lcv, &run_status, &run_completed](tensorflow::Status status) {
+          // signal complete and propagate status
+          {
+            std::lock_guard<std::mutex> lk(lmu);
+            run_status = status;
+            run_completed = true;
+          }
+          lcv.notify_one();
+        });
   }
 
   // [DLIS-124] must wait for request to indicate complete...

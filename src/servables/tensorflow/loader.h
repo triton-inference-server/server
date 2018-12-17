@@ -40,9 +40,9 @@ namespace nvidia { namespace inferenceserver {
 /// \param sig If non-nullptr returns the signature of the model
 /// \return Error status.
 tensorflow::Status LoadSavedModel(
-  const std::string& model_name, const std::string& model_path,
-  const tensorflow::SessionOptions& session_options,
-  std::unique_ptr<tensorflow::SavedModelBundle>* bundle,
-  tensorflow::SignatureDef* sig = nullptr);
+    const std::string& model_name, const std::string& model_path,
+    const tensorflow::SessionOptions& session_options,
+    std::unique_ptr<tensorflow::SavedModelBundle>* bundle,
+    tensorflow::SignatureDef* sig = nullptr);
 
 }}  // namespace nvidia::inferenceserver

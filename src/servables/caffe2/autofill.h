@@ -35,8 +35,8 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillNetDef : public AutoFill {
  public:
   static tensorflow::Status Create(
-    const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillNetDef>* autofill);
+      const std::string& model_name, const std::string& model_path,
+      std::unique_ptr<AutoFillNetDef>* autofill);
   tensorflow::Status Fix(ModelConfig* config) override;
 
  private:

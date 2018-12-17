@@ -68,7 +68,7 @@ AutoFillNull::Fix(ModelConfig* config)
 class AutoFillSimple : public AutoFill {
  public:
   static tensorflow::Status Create(
-    const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill);
+      const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill);
   tensorflow::Status Fix(ModelConfig* config);
 
  private:
@@ -77,7 +77,7 @@ class AutoFillSimple : public AutoFill {
 
 tensorflow::Status
 AutoFillSimple::Create(
-  const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill)
+    const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill)
 {
   autofill->reset(new AutoFillSimple(model_name));
   return tensorflow::Status::OK();
@@ -99,8 +99,8 @@ AutoFillSimple::Fix(ModelConfig* config)
 //
 tensorflow::Status
 AutoFill::Create(
-  const std::string& model_name, const std::string& model_path,
-  const ModelConfig& config, std::unique_ptr<AutoFill>* autofill)
+    const std::string& model_name, const std::string& model_path,
+    const ModelConfig& config, std::unique_ptr<AutoFill>* autofill)
 {
   autofill->reset();
 
@@ -109,48 +109,44 @@ AutoFill::Create(
   // autofill object to see if one can detect the platform.
   const Platform platform = GetPlatform(config.platform());
 
-  if (
-    (platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
-    (platform == Platform::PLATFORM_UNKNOWN)) {
+  if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillSavedModel> afsm;
     tensorflow::Status status =
-      AutoFillSavedModel::Create(model_name, model_path, &afsm);
+        AutoFillSavedModel::Create(model_name, model_path, &afsm);
     if (status.ok()) {
       *autofill = std::move(afsm);
       return tensorflow::Status::OK();
     }
   }
 
-  if (
-    (platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
-    (platform == Platform::PLATFORM_UNKNOWN)) {
+  if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillGraphDef> afgd;
     tensorflow::Status status =
-      AutoFillGraphDef::Create(model_name, model_path, &afgd);
+        AutoFillGraphDef::Create(model_name, model_path, &afgd);
     if (status.ok()) {
       *autofill = std::move(afgd);
       return tensorflow::Status::OK();
     }
   }
 
-  if (
-    (platform == Platform::PLATFORM_TENSORRT_PLAN) ||
-    (platform == Platform::PLATFORM_UNKNOWN)) {
+  if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillPlan> afp;
     tensorflow::Status status =
-      AutoFillPlan::Create(model_name, model_path, &afp);
+        AutoFillPlan::Create(model_name, model_path, &afp);
     if (status.ok()) {
       *autofill = std::move(afp);
       return tensorflow::Status::OK();
     }
   }
 
-  if (
-    (platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
-    (platform == Platform::PLATFORM_UNKNOWN)) {
+  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillNetDef> afnd;
     tensorflow::Status status =
-      AutoFillNetDef::Create(model_name, model_path, &afnd);
+        AutoFillNetDef::Create(model_name, model_path, &afnd);
     if (status.ok()) {
       *autofill = std::move(afnd);
       return tensorflow::Status::OK();

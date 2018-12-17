@@ -49,85 +49,86 @@ uint64_t ErrorRequestId(nic::Error* ctx);
 // ServerHealthContext
 typedef struct ServerHealthContextCtx ServerHealthContextCtx;
 nic::Error* ServerHealthContextNew(
-  ServerHealthContextCtx** ctx, const char* url, int protocol_int,
-  bool verbose);
+    ServerHealthContextCtx** ctx, const char* url, int protocol_int,
+    bool verbose);
 void ServerHealthContextDelete(ServerHealthContextCtx* ctx);
 nic::Error* ServerHealthContextGetReady(
-  ServerHealthContextCtx* ctx, bool* ready);
+    ServerHealthContextCtx* ctx, bool* ready);
 nic::Error* ServerHealthContextGetLive(ServerHealthContextCtx* ctx, bool* live);
 
 //==============================================================================
 // ServerStatusContext
 typedef struct ServerStatusContextCtx ServerStatusContextCtx;
 nic::Error* ServerStatusContextNew(
-  ServerStatusContextCtx** ctx, const char* url, int protocol_int,
-  const char* model_name, bool verbose);
+    ServerStatusContextCtx** ctx, const char* url, int protocol_int,
+    const char* model_name, bool verbose);
 void ServerStatusContextDelete(ServerStatusContextCtx* ctx);
 nic::Error* ServerStatusContextGetServerStatus(
-  ServerStatusContextCtx* ctx, char** status, uint32_t* status_len);
+    ServerStatusContextCtx* ctx, char** status, uint32_t* status_len);
 
 //==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
-  InferContextCtx** ctx, const char* url, int protocol_int,
-  const char* model_name, int model_version, bool verbose);
+    InferContextCtx** ctx, const char* url, int protocol_int,
+    const char* model_name, int model_version, bool verbose);
 void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
-  InferContextCtx* ctx, nic::InferContext::Options* options);
+    InferContextCtx* ctx, nic::InferContext::Options* options);
 nic::Error* InferContextRun(InferContextCtx* ctx);
 nic::Error* InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id);
 nic::Error* InferContextGetAsyncRunResults(
-  InferContextCtx* ctx, size_t request_id, bool wait);
+    InferContextCtx* ctx, size_t request_id, bool wait);
 nic::Error* InferContextGetReadyAsyncRequest(
-  InferContextCtx* ctx, size_t* request_id, bool wait);
+    InferContextCtx* ctx, size_t* request_id, bool wait);
 
 //==============================================================================
 // InferContext::Options
 nic::Error* InferContextOptionsNew(
-  nic::InferContext::Options** ctx, uint64_t correlation_id, uint64_t batch_size);
+    nic::InferContext::Options** ctx, uint64_t correlation_id,
+    uint64_t batch_size);
 void InferContextOptionsDelete(nic::InferContext::Options* ctx);
 nic::Error* InferContextOptionsAddRaw(
-  InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-  const char* output_name);
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name);
 nic::Error* InferContextOptionsAddClass(
-  InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
-  const char* output_name, uint64_t count);
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, uint64_t count);
 
 //==============================================================================
 // InferContext::Input
 typedef struct InferContextInputCtx InferContextInputCtx;
 nic::Error* InferContextInputNew(
-  InferContextInputCtx** ctx, InferContextCtx* infer_ctx,
-  const char* input_name);
+    InferContextInputCtx** ctx, InferContextCtx* infer_ctx,
+    const char* input_name);
 void InferContextInputDelete(InferContextInputCtx* ctx);
 nic::Error* InferContextInputSetRaw(
-  InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
+    InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 
 //==============================================================================
 // InferContext::Result
 typedef struct InferContextResultCtx InferContextResultCtx;
 nic::Error* InferContextResultNew(
-  InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
-  const char* result_name);
+    InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
+    const char* result_name);
 void InferContextResultDelete(InferContextResultCtx* ctx);
 nic::Error* InferContextResultModelName(
-  InferContextResultCtx* ctx, const char** model_name);
+    InferContextResultCtx* ctx, const char** model_name);
 nic::Error* InferContextResultModelVersion(
-  InferContextResultCtx* ctx, uint32_t* model_version);
+    InferContextResultCtx* ctx, uint32_t* model_version);
 nic::Error* InferContextResultDataType(
-  InferContextResultCtx* ctx, uint32_t* dtype);
+    InferContextResultCtx* ctx, uint32_t* dtype);
 nic::Error* InferContextResultDims(
-  InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
-  uint64_t* shape_len);
+    InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
+    uint64_t* shape_len);
 nic::Error* InferContextResultNextRaw(
-  InferContextResultCtx* ctx, size_t batch_idx, const char** val,
-  uint64_t* val_len);
+    InferContextResultCtx* ctx, size_t batch_idx, const char** val,
+    uint64_t* val_len);
 nic::Error* InferContextResultClassCount(
-  InferContextResultCtx* ctx, size_t batch_idx, uint64_t* count);
+    InferContextResultCtx* ctx, size_t batch_idx, uint64_t* count);
 nic::Error* InferContextResultNextClass(
-  InferContextResultCtx* ctx, size_t batch_idx, uint64_t* idx, float* prob,
-  const char** label);
+    InferContextResultCtx* ctx, size_t batch_idx, uint64_t* idx, float* prob,
+    const char** label);
 
 #ifdef __cplusplus
 }

@@ -32,10 +32,10 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 LoadSavedModel(
-  const std::string& model_name, const std::string& model_path,
-  const tensorflow::SessionOptions& session_options,
-  std::unique_ptr<tensorflow::SavedModelBundle>* bundle,
-  tensorflow::SignatureDef* sig)
+    const std::string& model_name, const std::string& model_path,
+    const tensorflow::SessionOptions& session_options,
+    std::unique_ptr<tensorflow::SavedModelBundle>* bundle,
+    tensorflow::SignatureDef* sig)
 {
   bundle->reset(new tensorflow::SavedModelBundle);
 
@@ -44,7 +44,8 @@ LoadSavedModel(
 
   tensorflow::RunOptions run_options;
   TF_RETURN_IF_ERROR(tensorflow::LoadSavedModel(
-    session_options, run_options, model_path, saved_model_tags, bundle->get()));
+      session_options, run_options, model_path, saved_model_tags,
+      bundle->get()));
 
   LOG_VERBOSE(1) << "Loaded saved-model: "
                  << (*bundle)->meta_graph_def.DebugString();
@@ -59,19 +60,19 @@ LoadSavedModel(
   }
   if (!found_serve_tag) {
     return tensorflow::errors::Internal(
-      "unable to load model '", model_name, "', expected '",
-      tensorflow::kSavedModelTagServe, "' tag");
+        "unable to load model '", model_name, "', expected '",
+        tensorflow::kSavedModelTagServe, "' tag");
   }
 
   // Verify that a "serving_default" signature exists, that is what
   // will be used to verify the inputs and outputs.
   static const std::string DEFAULT_SERVING_SIGNATURE_DEF_KEY("serving_default");
   const auto& sig_itr = (*bundle)->meta_graph_def.signature_def().find(
-    DEFAULT_SERVING_SIGNATURE_DEF_KEY);
+      DEFAULT_SERVING_SIGNATURE_DEF_KEY);
   if (sig_itr == (*bundle)->meta_graph_def.signature_def().end()) {
     return tensorflow::errors::InvalidArgument(
-      "unable to load model '", model_name, "', expected '",
-      DEFAULT_SERVING_SIGNATURE_DEF_KEY, "' signature");
+        "unable to load model '", model_name, "', expected '",
+        DEFAULT_SERVING_SIGNATURE_DEF_KEY, "' signature");
   }
 
   if (sig != nullptr) {
