@@ -79,7 +79,7 @@ The name of the model must match the :cpp:var:`name
 directory containing the model. The :cpp:var:`platform
 <nvidia::inferenceserver::ModelConfig::platform>` must be one of
 **tensorrt_plan**, **tensorflow_graphdef**, **tensorflow_savedmodel**,
-or **caffe2_netdef**.
+**caffe2_netdef**, or **custom**.
 
 For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
