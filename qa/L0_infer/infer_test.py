@@ -46,7 +46,7 @@ class InferTest(unittest.TestCase):
                                input_dtype, output0_dtype, output1_dtype, swap=swap)
                 iu.infer_exact(self, 'savedmodel', (input_size,), bs, req_raw,
                                input_dtype, output0_dtype, output1_dtype, swap=swap)
-            # model that does not batching
+            # model that does not support batching
             iu.infer_exact(self, 'graphdef_nobatch', (input_size,), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
             iu.infer_exact(self, 'savedmodel_nobatch', (input_size,), 1, req_raw,
@@ -57,7 +57,7 @@ class InferTest(unittest.TestCase):
             for bs in (1, 8):
                 iu.infer_exact(self, 'netdef', (input_size,), bs, req_raw,
                                input_dtype, output0_dtype, output1_dtype, swap=swap)
-            # model that does not batching
+            # model that does not support batching
             iu.infer_exact(self, 'netdef_nobatch', (input_size,), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
 
@@ -66,9 +66,20 @@ class InferTest(unittest.TestCase):
             for bs in (1, 8):
                 iu.infer_exact(self, 'plan', (input_size, 1, 1), bs, req_raw,
                                input_dtype, output0_dtype, output1_dtype, swap=swap)
-            # model that does not batching
+            # model that does not support batching
             iu.infer_exact(self, 'plan_nobatch', (input_size, 1, 1), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
+
+        # the custom model is src/custom/addsub... it does not swap
+        # the inputs so always set to False
+        if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_exact(self, 'custom', (input_size,), bs, req_raw,
+                               input_dtype, output0_dtype, output1_dtype, swap=False)
+            # model that does not support batching
+            iu.infer_exact(self, 'custom_nobatch', (input_size,), 1, req_raw,
+                           input_dtype, output0_dtype, output1_dtype, swap=False)
 
     def test_raw_bbb(self):
         self._full_exact(True, np.int8, np.int8, np.int8, swap=True)

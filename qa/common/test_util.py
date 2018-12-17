@@ -59,6 +59,16 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
         return False
     return True
 
+def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
+    """Return True if input and output dtypes are supported by custom model."""
+
+    # The custom model is src/custom/addsub... it only supports int32
+    if input_dtype != np.int32:
+        return False
+    if (output0_dtype != np.int32) or (output1_dtype != np.int32):
+        return False
+    return True
+
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(
         pf, np.dtype(input_dtype).name, np.dtype(output0_dtype).name,
