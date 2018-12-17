@@ -2,7 +2,7 @@
 BasedOnStyle: Google
 
 IndentWidth: 2
-ContinuationIndentWidth: 2
+ContinuationIndentWidth: 4
 UseTab: Never
 MaxEmptyLinesToKeep: 2
 
