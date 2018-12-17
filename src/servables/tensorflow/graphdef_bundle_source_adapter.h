@@ -43,21 +43,22 @@ class GraphDefBundleSourceAdapter final
     : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, GraphDefBundle> {
  public:
   static tensorflow::Status Create(
-    const GraphDefBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter);
+      const GraphDefBundleSourceAdapterConfig& config,
+      std::unique_ptr<
+          SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+          adapter);
 
   ~GraphDefBundleSourceAdapter() override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(GraphDefBundleSourceAdapter);
   using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, GraphDefBundle>;
+      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, GraphDefBundle>;
 
   GraphDefBundleSourceAdapter(
-    const GraphDefBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      const GraphDefBundleSourceAdapterConfig& config,
+      typename SimpleSourceAdapter::Creator creator,
+      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
       : SimpleSourceAdapter(creator, resource_estimator), config_(config)
   {
   }

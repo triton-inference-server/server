@@ -125,10 +125,10 @@ class BatchStream {
       // left in the file buffer.
       csize = std::min(mBatchSize - batchPos, mDims.n() - mFileBatchPos);
       std::copy_n(
-        getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize,
-        getBatch() + batchPos * mImageSize);
+          getFileBatch() + mFileBatchPos * mImageSize, csize * mImageSize,
+          getBatch() + batchPos * mImageSize);
       std::copy_n(
-        getFileLabels() + mFileBatchPos, csize, getLabels() + batchPos);
+          getFileLabels() + mFileBatchPos, csize, getLabels() + batchPos);
     }
     mBatchCount++;
     return true;
@@ -136,9 +136,8 @@ class BatchStream {
 
   void skip(int skipCount)
   {
-    if (
-      mBatchSize >= mDims.n() && mBatchSize % mDims.n() == 0 &&
-      mFileBatchPos == mDims.n()) {
+    if (mBatchSize >= mDims.n() && mBatchSize % mDims.n() == 0 &&
+        mFileBatchPos == mDims.n()) {
       mFileCount += skipCount * mBatchSize / mDims.n();
       return;
     }
@@ -161,7 +160,7 @@ class BatchStream {
   bool update()
   {
     const std::string inputFileName =
-      mPath + "/batches/batch" + std::to_string(mFileCount++);
+        mPath + "/batches/batch" + std::to_string(mFileCount++);
     FILE* file = fopen(inputFileName.c_str(), "rb");
     if (!file)
       return false;
@@ -172,13 +171,12 @@ class BatchStream {
     }
 
     size_t readInputCount =
-      fread(getFileBatch(), sizeof(float), mDims.n() * mImageSize, file);
+        fread(getFileBatch(), sizeof(float), mDims.n() * mImageSize, file);
     size_t readLabelCount =
-      fread(getFileLabels(), sizeof(float), mDims.n(), file);
+        fread(getFileLabels(), sizeof(float), mDims.n(), file);
     ;
-    if (
-      (readInputCount != size_t(mDims.n() * mImageSize)) ||
-      (readLabelCount != size_t(mDims.n()))) {
+    if ((readInputCount != size_t(mDims.n() * mImageSize)) ||
+        (readLabelCount != size_t(mDims.n()))) {
       return false;
     }
 
@@ -205,7 +203,7 @@ class BatchStream {
 class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
  public:
   Int8EntropyCalibrator(
-    BatchStream& stream, int firstBatch, bool readCache = true)
+      BatchStream& stream, int firstBatch, bool readCache = true)
       : mStream(stream), mReadCache(readCache)
   {
     nvinfer1::DimsNCHW dims = mStream.getDims();
@@ -224,8 +222,8 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
       return false;
 
     cudaMemcpy(
-      mDeviceInput, mStream.getBatch(), mInputCount * sizeof(float),
-      cudaMemcpyHostToDevice);
+        mDeviceInput, mStream.getBatch(), mInputCount * sizeof(float),
+        cudaMemcpyHostToDevice);
     bindings[0] = mDeviceInput;
     return true;
   }
@@ -237,8 +235,8 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
     input >> std::noskipws;
     if (mReadCache && input.good())
       std::copy(
-        std::istream_iterator<char>(input), std::istream_iterator<char>(),
-        std::back_inserter(mCalibrationCache));
+          std::istream_iterator<char>(input), std::istream_iterator<char>(),
+          std::back_inserter(mCalibrationCache));
 
     length = mCalibrationCache.size();
     return length ? &mCalibrationCache[0] : nullptr;
@@ -265,32 +263,31 @@ class Int8EntropyCalibrator : public nvinfer1::IInt8EntropyCalibrator {
 
 bool
 CaffeToPlan(
-  const std::string& output_filename, const std::string& prototxt_filename,
-  const std::string& model_filename,
-  const std::vector<std::string>& output_names,
-  nvinfer1::DataType model_dtype, const std::string& calibration_filename,
-  const size_t max_batch_size, const size_t max_workspace_size)
+    const std::string& output_filename, const std::string& prototxt_filename,
+    const std::string& model_filename,
+    const std::vector<std::string>& output_names,
+    nvinfer1::DataType model_dtype, const std::string& calibration_filename,
+    const size_t max_batch_size, const size_t max_workspace_size)
 {
   nvinfer1::IBuilder* builder = nvinfer1::createInferBuilder(gLogger);
   nvinfer1::INetworkDefinition* network = builder->createNetwork();
   nvcaffeparser1::ICaffeParser* parser = nvcaffeparser1::createCaffeParser();
 
-  if (
-    (model_dtype == nvinfer1::DataType::kINT8) &&
-    !builder->platformHasFastInt8()) {
+  if ((model_dtype == nvinfer1::DataType::kINT8) &&
+      !builder->platformHasFastInt8()) {
     std::cerr << "WARNING: GPU does not support int8, using fp32" << std::endl;
     model_dtype = nvinfer1::DataType::kFLOAT;
   } else if (
-    (model_dtype == nvinfer1::DataType::kHALF) &&
-    !builder->platformHasFastFp16()) {
+      (model_dtype == nvinfer1::DataType::kHALF) &&
+      !builder->platformHasFastFp16()) {
     std::cerr << "WARNING: GPU does not support fp16, using fp32" << std::endl;
     model_dtype = nvinfer1::DataType::kFLOAT;
   }
 
   const nvcaffeparser1::IBlobNameToTensor* name_to_tensor = parser->parse(
-    prototxt_filename.c_str(), model_filename.c_str(), *network,
-    (model_dtype == nvinfer1::DataType::kINT8) ? nvinfer1::DataType::kFLOAT
-                                               : model_dtype);
+      prototxt_filename.c_str(), model_filename.c_str(), *network,
+      (model_dtype == nvinfer1::DataType::kINT8) ? nvinfer1::DataType::kFLOAT
+                                                 : model_dtype);
   if (name_to_tensor == nullptr) {
     return false;
   }
@@ -305,9 +302,9 @@ CaffeToPlan(
 
   if (model_dtype == nvinfer1::DataType::kINT8) {
     BatchStream* calibrationStream =
-      new BatchStream(calibration_filename, CAL_BATCH_SIZE, NB_CAL_BATCHES);
+        new BatchStream(calibration_filename, CAL_BATCH_SIZE, NB_CAL_BATCHES);
     Int8EntropyCalibrator* calibrator =
-      new Int8EntropyCalibrator(*calibrationStream, FIRST_CAL_BATCH);
+        new Int8EntropyCalibrator(*calibrationStream, FIRST_CAL_BATCH);
     builder->setInt8Mode(true);
     builder->setInt8Calibrator(calibrator);
   }
@@ -320,7 +317,7 @@ CaffeToPlan(
   nvinfer1::IHostMemory* plan = engine->serialize();
 
   std::ofstream output(
-    output_filename, std::ios::binary | std::ios::out | std::ios::app);
+      output_filename, std::ios::binary | std::ios::out | std::ios::app);
   output.write(reinterpret_cast<const char*>(plan->data()), plan->size());
   output.close();
 
@@ -416,11 +413,11 @@ main(int argc, char** argv)
   std::string model_filename = argv[optind + 1];
 
   if (!CaffeToPlan(
-        output_filename, prototxt_filename, model_filename, output_names,
-        (use_fp16)
-          ? nvinfer1::DataType::kHALF
-          : (use_int8) ? nvinfer1::DataType::kINT8 : nvinfer1::DataType::kFLOAT,
-        calibration_filename, max_batch_size, max_workspace_size)) {
+          output_filename, prototxt_filename, model_filename, output_names,
+          (use_fp16) ? nvinfer1::DataType::kHALF
+                     : (use_int8) ? nvinfer1::DataType::kINT8
+                                  : nvinfer1::DataType::kFLOAT,
+          calibration_filename, max_batch_size, max_workspace_size)) {
     std::cerr << "Failed to create PLAN file" << std::endl;
     return 1;
   }

@@ -46,7 +46,7 @@ class InferenceServable;
 class InferRequestProvider {
  public:
   explicit InferRequestProvider(
-    const std::string& model_name, const int version)
+      const std::string& model_name, const int version)
       : model_name_(model_name), version_(version)
   {
   }
@@ -68,8 +68,8 @@ class InferRequestProvider {
   // is true then the entire (remaining) input will be returned as a
   // single chunk. In some cases this will require copying the data.
   virtual tensorflow::Status GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
-    bool force_contiguous) = 0;
+      int idx, const void** content, size_t* content_byte_size,
+      bool force_contiguous) = 0;
 
  private:
   const std::string& model_name_;
@@ -81,8 +81,8 @@ class GRPCInferRequestProvider : public InferRequestProvider {
  public:
   // Initialize based on gRPC request
   static tensorflow::Status Create(
-    const InferRequest& request,
-    std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
+      const InferRequest& request,
+      std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
 
   const InferRequestHeader& RequestHeader() const override
   {
@@ -90,8 +90,8 @@ class GRPCInferRequestProvider : public InferRequestProvider {
   }
 
   tensorflow::Status GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
-    bool force_contiguous) override;
+      int idx, const void** content, size_t* content_byte_size,
+      bool force_contiguous) override;
 
  private:
   GRPCInferRequestProvider(const InferRequest& request, const int version);
@@ -105,9 +105,10 @@ class HTTPInferRequestProvider : public InferRequestProvider {
  public:
   // Initialize based on HTTP request
   static tensorflow::Status Create(
-    evbuffer* input_buffer, const std::string& model_name,
-    const std::string& model_version_str, const std::string& request_header_str,
-    std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
+      evbuffer* input_buffer, const std::string& model_name,
+      const std::string& model_version_str,
+      const std::string& request_header_str,
+      std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
   const InferRequestHeader& RequestHeader() const override
   {
@@ -115,8 +116,8 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   }
 
   tensorflow::Status GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
-    bool force_contiguous) override;
+      int idx, const void** content, size_t* content_byte_size,
+      bool force_contiguous) override;
 
  private:
   HTTPInferRequestProvider(const std::string& model_name, const int version)
@@ -163,7 +164,7 @@ class InferResponseProvider {
   // written. The size of the buffer must be exactly
   // 'buffer_byte_size'.
   tensorflow::Status GetOutputBuffer(
-    int idx, void** buffer, size_t buffer_byte_size);
+      int idx, void** buffer, size_t buffer_byte_size);
 
   // Finialize response header values based on a servable.
   tensorflow::Status FinalizeResponseHeader(const InferenceServable& is);
@@ -182,8 +183,8 @@ class GRPCInferResponseProvider : public InferResponseProvider {
  public:
   // Initialize based on gRPC request
   static tensorflow::Status Create(
-    const InferRequestHeader& request_header, InferResponse* response,
-    std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
+      const InferRequestHeader& request_header, InferResponse* response,
+      std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override
   {
@@ -197,7 +198,7 @@ class GRPCInferResponseProvider : public InferResponseProvider {
 
  private:
   GRPCInferResponseProvider(
-    const InferRequestHeader& request_header, InferResponse* response)
+      const InferRequestHeader& request_header, InferResponse* response)
       : InferResponseProvider(request_header), response_(response)
   {
   }
@@ -209,8 +210,8 @@ class GRPCInferResponseProvider : public InferResponseProvider {
 class HTTPInferResponseProvider : public InferResponseProvider {
  public:
   static tensorflow::Status Create(
-    evbuffer* output_buffer, const InferRequestHeader& request_header,
-    std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
+      evbuffer* output_buffer, const InferRequestHeader& request_header,
+      std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override
   {
@@ -226,7 +227,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
  private:
   HTTPInferResponseProvider(
-    evbuffer* output_buffer, const InferRequestHeader& request_header);
+      evbuffer* output_buffer, const InferRequestHeader& request_header);
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
@@ -254,7 +255,7 @@ class InferenceServable {
 
   // Get the datatype for a named output.
   virtual tensorflow::Status GetOutputDataType(
-    const std::string& name, DataType* dtype) const = 0;
+      const std::string& name, DataType* dtype) const = 0;
 
   // Get a label provider for the servable.
   virtual const LabelProvider& GetLabelProvider() const = 0;
@@ -263,19 +264,19 @@ class InferenceServable {
   // the provide response. This method should be called by synchronous
   // frontends.
   void Run(
-    std::shared_ptr<ModelInferStats> stats,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
+      std::shared_ptr<ModelInferStats> stats,
+      std::shared_ptr<InferRequestProvider> request_provider,
+      std::shared_ptr<InferResponseProvider> response_provider,
+      std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
 
   // Run inference using the provided request to produce outputs in
   // the provide response. This method should be called by
   // asynchronous frontends.
   void AsyncRun(
-    std::shared_ptr<ModelInferStats> stats,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
+      std::shared_ptr<ModelInferStats> stats,
+      std::shared_ptr<InferRequestProvider> request_provider,
+      std::shared_ptr<InferResponseProvider> response_provider,
+      std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
 
   // Get a metric for the servable specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
@@ -291,7 +292,7 @@ class InferenceServable {
  protected:
   // Set the configuration of the model being served.
   tensorflow::Status SetModelConfig(
-    const tensorflow::StringPiece& path, const ModelConfig& config);
+      const tensorflow::StringPiece& path, const ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a servable.
@@ -300,7 +301,7 @@ class InferenceServable {
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a servable.
   tensorflow::Status SetConfiguredScheduler(
-    const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun);
+      const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun);
 
  private:
   // Configuration of the model that this servable represents.
@@ -316,11 +317,11 @@ class InferenceServable {
   std::map<std::string, std::string> tags_;
 
   void GetMetricLabels(
-    std::map<std::string, std::string>* labels, const int gpu_device) const;
+      std::map<std::string, std::string>* labels, const int gpu_device) const;
   prometheus::Counter& GetCounterMetric(
-    std::map<int, prometheus::Counter*>& metrics,
-    prometheus::Family<prometheus::Counter>& family,
-    const int gpu_device) const;
+      std::map<int, prometheus::Counter*>& metrics,
+      prometheus::Family<prometheus::Counter>& family,
+      const int gpu_device) const;
 
   mutable std::map<int, prometheus::Counter*> metric_inf_success_;
   mutable std::map<int, prometheus::Counter*> metric_inf_failure_;

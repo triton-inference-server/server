@@ -39,8 +39,8 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 AutoFillPlan::Create(
-  const std::string& model_name, const std::string& model_path,
-  std::unique_ptr<AutoFillPlan>* autofill)
+    const std::string& model_name, const std::string& model_path,
+    std::unique_ptr<AutoFillPlan>* autofill)
 {
   std::set<std::string> version_dirs;
   TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -50,18 +50,18 @@ AutoFillPlan::Create(
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "' due to multiple versions");
+        "unable to autofill for '", model_name, "' due to multiple versions");
   }
 
   const auto version_path =
-    tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
 
   // There must be a single plan file within the version directory...
   std::set<std::string> plan_files;
   TF_RETURN_IF_ERROR(GetFiles(version_path, &plan_files));
   if (plan_files.size() != 1) {
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name, "', unable to find plan file");
+        "unable to autofill for '", model_name, "', unable to find plan file");
   }
 
   const std::string plan_file = *(plan_files.begin());
@@ -69,7 +69,7 @@ AutoFillPlan::Create(
 
   tensorflow::string plan_data_str;
   TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
-    tensorflow::Env::Default(), plan_path, &plan_data_str));
+      tensorflow::Env::Default(), plan_path, &plan_data_str));
   std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
 
   nvinfer1::IRuntime* runtime = nullptr;
@@ -82,8 +82,8 @@ AutoFillPlan::Create(
       runtime->destroy();
     }
     return tensorflow::errors::Internal(
-      "unable to autofill for '", model_name,
-      "', unable to create TensorRT runtime and engine");
+        "unable to autofill for '", model_name,
+        "', unable to create TensorRT runtime and engine");
   }
 
   const int32_t max_batch_size = engine->getMaxBatchSize();
@@ -95,7 +95,7 @@ AutoFillPlan::Create(
       ModelInput* config_input = config.add_input();
       config_input->set_name(engine->getBindingName(i));
       config_input->set_data_type(
-        ConvertDatatype(engine->getBindingDataType(i)));
+          ConvertDatatype(engine->getBindingDataType(i)));
       nvinfer1::Dims dims = engine->getBindingDimensions(i);
       for (int didx = 0; didx < dims.nbDims; ++didx) {
         config_input->mutable_dims()->Add(dims.d[didx]);
@@ -104,7 +104,7 @@ AutoFillPlan::Create(
       ModelOutput* config_output = config.add_output();
       config_output->set_name(engine->getBindingName(i));
       config_output->set_data_type(
-        ConvertDatatype(engine->getBindingDataType(i)));
+          ConvertDatatype(engine->getBindingDataType(i)));
       nvinfer1::Dims dims = engine->getBindingDimensions(i);
       for (int didx = 0; didx < dims.nbDims; ++didx) {
         config_output->mutable_dims()->Add(dims.d[didx]);
@@ -116,7 +116,7 @@ AutoFillPlan::Create(
   runtime->destroy();
 
   autofill->reset(
-    new AutoFillPlan(model_name, plan_file, max_batch_size, config));
+      new AutoFillPlan(model_name, plan_file, max_batch_size, config));
   return tensorflow::Status::OK();
 }
 

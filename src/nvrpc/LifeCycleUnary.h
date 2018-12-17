@@ -36,12 +36,12 @@ class LifeCycleUnary : public IContextLifeCycle {
   using RequestType = Request;
   using ResponseType = Response;
   using ServiceQueueFuncType = std::function<void(
-    ::grpc::ServerContext*, RequestType*,
-    ::grpc::ServerAsyncResponseWriter<ResponseType>*, ::grpc::CompletionQueue*,
-    ::grpc::ServerCompletionQueue*, void*)>;
+      ::grpc::ServerContext*, RequestType*,
+      ::grpc::ServerAsyncResponseWriter<ResponseType>*,
+      ::grpc::CompletionQueue*, ::grpc::ServerCompletionQueue*, void*)>;
   using ExecutorQueueFuncType = std::function<void(
-    ::grpc::ServerContext*, RequestType*,
-    ::grpc::ServerAsyncResponseWriter<ResponseType>*, void*)>;
+      ::grpc::ServerContext*, RequestType*,
+      ::grpc::ServerAsyncResponseWriter<ResponseType>*, void*)>;
 
   ~LifeCycleUnary() override {}
 
@@ -72,40 +72,40 @@ class LifeCycleUnary : public IContextLifeCycle {
   ResponseType m_Response;
   std::unique_ptr<::grpc::ServerContext> m_Context;
   std::unique_ptr<::grpc::ServerAsyncResponseWriter<ResponseType>>
-    m_ResponseWriter;
+      m_ResponseWriter;
 
  public:
   template <class RequestFuncType, class ServiceType>
   static ServiceQueueFuncType BindServiceQueueFunc(
-    /*
-    std::function<void(
-        ServiceType *, ::grpc::ServerContext *, RequestType *,
-        ::grpc::ServerAsyncResponseWriter<ResponseType> *,
-        ::grpc::CompletionQueue *, ::grpc::ServerCompletionQueue *, void *)>
-    */
-    RequestFuncType request_fn, ServiceType* service_type)
+      /*
+      std::function<void(
+          ServiceType *, ::grpc::ServerContext *, RequestType *,
+          ::grpc::ServerAsyncResponseWriter<ResponseType> *,
+          ::grpc::CompletionQueue *, ::grpc::ServerCompletionQueue *, void *)>
+      */
+      RequestFuncType request_fn, ServiceType* service_type)
   {
     return std::bind(
-      request_fn, service_type,
-      std::placeholders::_1,  // ServerContext*
-      std::placeholders::_2,  // InputType
-      std::placeholders::_3,  // AsyncResponseWriter<OutputType>
-      std::placeholders::_4,  // CQ
-      std::placeholders::_5,  // ServerCQ
-      std::placeholders::_6   // Tag
+        request_fn, service_type,
+        std::placeholders::_1,  // ServerContext*
+        std::placeholders::_2,  // InputType
+        std::placeholders::_3,  // AsyncResponseWriter<OutputType>
+        std::placeholders::_4,  // CQ
+        std::placeholders::_5,  // ServerCQ
+        std::placeholders::_6   // Tag
     );
   }
 
   static ExecutorQueueFuncType BindExecutorQueueFunc(
-    ServiceQueueFuncType service_q_fn, ::grpc::ServerCompletionQueue* cq)
+      ServiceQueueFuncType service_q_fn, ::grpc::ServerCompletionQueue* cq)
   {
     return std::bind(
-      service_q_fn,
-      std::placeholders::_1,  // ServerContext*
-      std::placeholders::_2,  // Request *
-      std::placeholders::_3,  // AsyncResponseWriter<Response> *
-      cq, cq,
-      std::placeholders::_4  // Tag
+        service_q_fn,
+        std::placeholders::_1,  // ServerContext*
+        std::placeholders::_2,  // Request *
+        std::placeholders::_3,  // AsyncResponseWriter<Response> *
+        cq, cq,
+        std::placeholders::_4  // Tag
     );
   }
 };
@@ -128,10 +128,10 @@ LifeCycleUnary<Request, Response>::Reset()
   m_Response.Clear();
   m_Context.reset(new ::grpc::ServerContext);
   m_ResponseWriter.reset(
-    new ::grpc::ServerAsyncResponseWriter<ResponseType>(m_Context.get()));
+      new ::grpc::ServerAsyncResponseWriter<ResponseType>(m_Context.get()));
   m_NextState = &LifeCycleUnary<RequestType, ResponseType>::StateRequestDone;
   m_QueuingFunc(
-    m_Context.get(), &m_Request, m_ResponseWriter.get(), IContext::Tag());
+      m_Context.get(), &m_Request, m_ResponseWriter.get(), IContext::Tag());
 }
 
 template <class Request, class Response>
@@ -166,7 +166,7 @@ LifeCycleUnary<Request, Response>::CancelResponse()
 {
   m_NextState = &LifeCycleUnary<RequestType, ResponseType>::StateFinishedDone;
   m_ResponseWriter->Finish(
-    m_Response, ::grpc::Status::CANCELLED, IContext::Tag());
+      m_Response, ::grpc::Status::CANCELLED, IContext::Tag());
 }
 
 template <class Request, class Response>

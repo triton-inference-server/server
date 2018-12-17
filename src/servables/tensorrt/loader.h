@@ -42,7 +42,7 @@ namespace nvidia { namespace inferenceserver {
 /// to create
 /// \return Error status.
 tensorflow::Status LoadPlan(
-  const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
-  nvinfer1::ICudaEngine** engine);
+    const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
+    nvinfer1::ICudaEngine** engine);
 
 }}  // namespace nvidia::inferenceserver

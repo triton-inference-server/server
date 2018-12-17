@@ -69,13 +69,13 @@ class Context {
 
   // Execute
   int Execute(
-    const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
   int GetInputTensor(
-    CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-    const size_t expected_byte_size, std::vector<int32_t>* input);
+      CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+      const size_t expected_byte_size, std::vector<int32_t>* input);
 
   // The model configuration.
   const ModelConfig model_config_;
@@ -112,17 +112,15 @@ Context::Init()
     return kInputOutputShape;
   }
   if (!CompareDims(
-        model_config_.input(0).dims(), model_config_.input(1).dims())) {
+          model_config_.input(0).dims(), model_config_.input(1).dims())) {
     return kInputOutputShape;
   }
-  if (
-    (model_config_.input(0).data_type() != DataType::TYPE_INT32) ||
-    (model_config_.input(1).data_type() != DataType::TYPE_INT32)) {
+  if ((model_config_.input(0).data_type() != DataType::TYPE_INT32) ||
+      (model_config_.input(1).data_type() != DataType::TYPE_INT32)) {
     return kInputOutputDataType;
   }
-  if (
-    (model_config_.input(0).name() != "INPUT0") ||
-    (model_config_.input(1).name() != "INPUT1")) {
+  if ((model_config_.input(0).name() != "INPUT0") ||
+      (model_config_.input(1).name() != "INPUT1")) {
     return kInputName;
   }
 
@@ -132,21 +130,18 @@ Context::Init()
   if (model_config_.output_size() != 2) {
     return kInputOutputShape;
   }
-  if (
-    !CompareDims(
-      model_config_.output(0).dims(), model_config_.output(1).dims()) ||
-    !CompareDims(
-      model_config_.output(0).dims(), model_config_.input(0).dims())) {
+  if (!CompareDims(
+          model_config_.output(0).dims(), model_config_.output(1).dims()) ||
+      !CompareDims(
+          model_config_.output(0).dims(), model_config_.input(0).dims())) {
     return kInputOutputShape;
   }
-  if (
-    (model_config_.output(0).data_type() != DataType::TYPE_INT32) ||
-    (model_config_.output(1).data_type() != DataType::TYPE_INT32)) {
+  if ((model_config_.output(0).data_type() != DataType::TYPE_INT32) ||
+      (model_config_.output(1).data_type() != DataType::TYPE_INT32)) {
     return kInputOutputDataType;
   }
-  if (
-    (model_config_.output(0).name() != "OUTPUT0") ||
-    (model_config_.output(1).name() != "OUTPUT1")) {
+  if ((model_config_.output(0).name() != "OUTPUT0") ||
+      (model_config_.output(1).name() != "OUTPUT1")) {
     return kOutputName;
   }
 
@@ -160,8 +155,8 @@ Context::Init()
 
 int
 Context::GetInputTensor(
-  CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-  const size_t expected_byte_size, std::vector<int32_t>* input)
+    CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+    const size_t expected_byte_size, std::vector<int32_t>* input)
 {
   // The values for an input tensor are not necessarily in one
   // contiguous chunk, so we copy the chunks into 'input' vector. A
@@ -190,8 +185,8 @@ Context::GetInputTensor(
 
     size_t content_elements = content_byte_size / sizeof(int32_t);
     input->insert(
-      input->end(), static_cast<const int32_t*>(content),
-      static_cast<const int32_t*>(content) + content_elements);
+        input->end(), static_cast<const int32_t*>(content),
+        static_cast<const int32_t*>(content) + content_elements);
   }
 
   // Make sure we end up with exactly the amount of input we expect.
@@ -204,8 +199,8 @@ Context::GetInputTensor(
 
 int
 Context::Execute(
-  const uint32_t payload_cnt, CustomPayload* payloads,
-  CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+    const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
   // Each payload represents a related set of inputs and required
   // outputs. Each payload may have a different batch size. The total
@@ -229,14 +224,14 @@ Context::Execute(
     // Get the input tensors.
     std::vector<int32_t> input0;
     err = GetInputTensor(
-      input_fn, payload.input_context, "INPUT0", batchn_byte_size, &input0);
+        input_fn, payload.input_context, "INPUT0", batchn_byte_size, &input0);
     if (err != kSuccess) {
       return err;
     }
 
     std::vector<int32_t> input1;
     err = GetInputTensor(
-      input_fn, payload.input_context, "INPUT1", batchn_byte_size, &input1);
+        input_fn, payload.input_context, "INPUT1", batchn_byte_size, &input1);
     if (err != kSuccess) {
       return err;
     }
@@ -249,7 +244,8 @@ Context::Execute(
 
       void* obuffer;
       if (!output_fn(
-            payload.output_context, output_name, batchn_byte_size, &obuffer)) {
+              payload.output_context, output_name, batchn_byte_size,
+              &obuffer)) {
         return kOutputBuffer;
       }
 
@@ -276,7 +272,8 @@ extern "C" {
 
 int
 CustomInitialize(
-  const char* serialized_model_config, int gpu_device_id, void** custom_context)
+    const char* serialized_model_config, int gpu_device_id,
+    void** custom_context)
 {
   // Convert the serialized model config to a ModelConfig object.
   ModelConfig model_config;
@@ -341,8 +338,8 @@ CustomErrorString(void* custom_context, int errcode)
 
 int
 CustomExecute(
-  void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-  CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
   if (custom_context == nullptr) {
     return kUnknown;

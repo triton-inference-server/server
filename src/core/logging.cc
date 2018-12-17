@@ -88,7 +88,7 @@ DelegatedVerboseLogLevel()
 
 void
 DelegatedLogMessage(
-  int dlevel, const char* file, int line, const std::string& msg)
+    int dlevel, const char* file, int line, const std::string& msg)
 {
   if ((dlevel < 0) || (dlevel > LOG_DELEGATED_INFO_LEVEL)) {
     dlevel = LOG_DELEGATED_ERROR_LEVEL;

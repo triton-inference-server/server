@@ -37,14 +37,14 @@ namespace nvidia { namespace inferenceserver { namespace test {
 
 bool
 ModelConfigTestBase::ValidateInit(
-  const std::string& model_path, bool autofill, BundleInitFunc init_func,
-  std::string* result)
+    const std::string& model_path, bool autofill, BundleInitFunc init_func,
+    std::string* result)
 {
   result->clear();
 
   ModelConfig config;
   tensorflow::Status status =
-    GetNormalizedModelConfig(model_path, autofill, &config);
+      GetNormalizedModelConfig(model_path, autofill, &config);
   if (!status.ok()) {
     result->append(status.ToString());
     return false;
@@ -71,34 +71,34 @@ ModelConfigTestBase::ValidateInit(
 
 void
 ModelConfigTestBase::ValidateAll(
-  const std::string& platform, BundleInitFunc init_func)
+    const std::string& platform, BundleInitFunc init_func)
 {
   // Sanity tests without autofill and forcing the platform.
   ValidateOne(
-    "inference_server/src/test/testdata/model_config_sanity",
-    false /* autofill */, platform, init_func);
+      "inference_server/src/test/testdata/model_config_sanity",
+      false /* autofill */, platform, init_func);
 
   // Sanity tests with autofill and no platform.
   ValidateOne(
-    "inference_server/src/test/testdata/autofill_sanity", true /* autofill */,
-    std::string() /* platform */, init_func);
+      "inference_server/src/test/testdata/autofill_sanity", true /* autofill */,
+      std::string() /* platform */, init_func);
 }
 
 void
 ModelConfigTestBase::ValidateOne(
-  const std::string& test_repository_rpath, bool autofill,
-  const std::string& platform, BundleInitFunc init_func)
+    const std::string& test_repository_rpath, bool autofill,
+    const std::string& platform, BundleInitFunc init_func)
 {
   const std::string model_base_path =
-    tensorflow::io::JoinPath(getenv("TEST_SRCDIR"), test_repository_rpath);
+      tensorflow::io::JoinPath(getenv("TEST_SRCDIR"), test_repository_rpath);
 
   std::vector<std::string> models;
   TF_CHECK_OK(
-    tensorflow::Env::Default()->GetChildren(model_base_path, &models));
+      tensorflow::Env::Default()->GetChildren(model_base_path, &models));
 
   for (const auto& model_name : models) {
     const auto model_path =
-      tensorflow::io::JoinPath(model_base_path, model_name);
+        tensorflow::io::JoinPath(model_base_path, model_name);
     const auto expected_path = tensorflow::io::JoinPath(model_path, "expected");
 
     // If a platform is specified and there is a configuration file
@@ -107,14 +107,14 @@ ModelConfigTestBase::ValidateOne(
     // testing is done it is not a problem.
     if (!platform.empty()) {
       const auto config_path =
-        tensorflow::io::JoinPath(model_path, kModelConfigPbTxt);
+          tensorflow::io::JoinPath(model_path, kModelConfigPbTxt);
       if (tensorflow::Env::Default()->FileExists(config_path).ok()) {
         ModelConfig config;
         TF_CHECK_OK(
-          ReadTextProto(tensorflow::Env::Default(), config_path, &config));
+            ReadTextProto(tensorflow::Env::Default(), config_path, &config));
         config.set_platform(platform);
         TF_CHECK_OK(
-          WriteTextProto(tensorflow::Env::Default(), config_path, config));
+            WriteTextProto(tensorflow::Env::Default(), config_path, config));
       }
     }
 
@@ -124,8 +124,8 @@ ModelConfigTestBase::ValidateOne(
 
     std::ifstream expected_file(expected_path);
     std::string expected(
-      (std::istreambuf_iterator<char>(expected_file)),
-      (std::istreambuf_iterator<char>()));
+        (std::istreambuf_iterator<char>(expected_file)),
+        (std::istreambuf_iterator<char>()));
 
     if (expected.size() < actual.size()) {
       truncated_actual = actual.substr(0, expected.size());

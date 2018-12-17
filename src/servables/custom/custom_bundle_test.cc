@@ -37,9 +37,8 @@ class CustomBundleTest : public ModelConfigTestBase {
 TEST_F(CustomBundleTest, ModelConfigSanity)
 {
   BundleInitFunc init_func =
-    [](
-      const std::string& path,
-      const ModelConfig& config) -> tensorflow::Status {
+      [](const std::string& path,
+         const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<CustomBundle> bundle(new CustomBundle());
     tensorflow::Status status = bundle->Init(path, config);
     if (status.ok()) {
@@ -48,8 +47,8 @@ TEST_F(CustomBundleTest, ModelConfigSanity)
       for (const auto& filename : std::vector<std::string>{kCustomFilename}) {
         const auto custom_path = tensorflow::io::JoinPath(path, filename);
         custom_paths.emplace(
-          std::piecewise_construct, std::make_tuple(filename),
-          std::make_tuple(custom_path));
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(custom_path));
       }
 
       status = bundle->CreateExecutionContexts(custom_paths);

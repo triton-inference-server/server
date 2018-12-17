@@ -349,7 +349,7 @@ class InferContext {
     /// \param buf Returns the vector of result bytes.
     /// \return Error object indicating success or failure.
     virtual Error GetRaw(
-      size_t batch_idx, const std::vector<uint8_t>** buf) const = 0;
+        size_t batch_idx, const std::vector<uint8_t>** buf) const = 0;
 
     /// Get a reference to raw result data for a specific batch entry
     /// at the current "cursor" and advance the cursor by the specified
@@ -362,7 +362,7 @@ class InferContext {
     /// \param adv_byte_size The number of bytes of data to get a reference to.
     /// \return Error object indicating success or failure.
     virtual Error GetRawAtCursor(
-      size_t batch_idx, const uint8_t** buf, size_t adv_byte_size) = 0;
+        size_t batch_idx, const uint8_t** buf, size_t adv_byte_size) = 0;
 
     /// Read a value for a specific batch entry at the current "cursor"
     /// from the result tensor as the specified type T and advance the
@@ -444,7 +444,7 @@ class InferContext {
     /// \param output The output.
     /// \return Error object indicating success or failure.
     virtual Error AddRawResult(
-      const std::shared_ptr<InferContext::Output>& output) = 0;
+        const std::shared_ptr<InferContext::Output>& output) = 0;
 
     /// Add 'output' to the list of requested CLASS results. Run() will
     /// return the highest 'k' values of 'output' as a result.
@@ -452,7 +452,7 @@ class InferContext {
     /// \param k Set how many class results to return for the output.
     /// \return Error object indicating success or failure.
     virtual Error AddClassResult(
-      const std::shared_ptr<InferContext::Output>& output, uint64_t k) = 0;
+        const std::shared_ptr<InferContext::Output>& output, uint64_t k) = 0;
   };
 
   //==============
@@ -584,7 +584,7 @@ class InferContext {
   /// \param output Returns the Output object for 'name'.
   /// \return Error object indicating success or failure.
   Error GetOutput(
-    const std::string& name, std::shared_ptr<Output>* output) const;
+      const std::string& name, std::shared_ptr<Output>* output) const;
 
   /// Set the options to use for all subsequent Run() invocations.
   /// \param options The options.
@@ -624,8 +624,8 @@ class InferContext {
   /// returned only if the request has been completed succesfully. UNAVAILABLE
   /// will be returned if 'wait' is false and the request is not ready.
   virtual Error GetAsyncRunResults(
-    std::vector<std::unique_ptr<Result>>* results,
-    const std::shared_ptr<Request>& async_request, bool wait) = 0;
+      std::vector<std::unique_ptr<Result>>* results,
+      const std::shared_ptr<Request>& async_request, bool wait) = 0;
 
   /// Get any one completed asynchronous request.
   /// \param async_request Returns the Request object holding the
@@ -636,7 +636,7 @@ class InferContext {
   /// returned only if a completed request was returned.. UNAVAILABLE
   /// will be returned if 'wait' is false and no request is ready.
   Error GetReadyAsyncRequest(
-    std::shared_ptr<Request>* async_request, bool wait);
+      std::shared_ptr<Request>* async_request, bool wait);
 
  protected:
   InferContext(const std::string&, int, bool);
@@ -651,7 +651,7 @@ class InferContext {
   // is ready. If the request is valid and wait == true,
   // the function will block until request is ready.
   Error IsRequestReady(
-    const std::shared_ptr<Request>& async_request, bool wait);
+      const std::shared_ptr<Request>& async_request, bool wait);
 
   // Update the context stat with the given timer
   Error UpdateStat(const RequestTimers& timer);
@@ -770,8 +770,8 @@ class ServerHealthHttpContext : public ServerHealthContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
   Error GetReady(bool* ready) override;
   Error GetLive(bool* live) override;
@@ -798,8 +798,8 @@ class ServerStatusHttpContext : public ServerStatusContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
   /// Create a context that returns information about an inference
   /// server and one model on the sever using HTTP protocol.
@@ -810,8 +810,8 @@ class ServerStatusHttpContext : public ServerStatusContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    const std::string& model_name, bool verbose = false);
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      const std::string& model_name, bool verbose = false);
 
   /// Contact the inference server and get status.
   /// \param status Returns the status.
@@ -853,15 +853,15 @@ class InferHttpContext : public InferContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int model_version = -1,
-    bool verbose = false);
+      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+      const std::string& model_name, int model_version = -1,
+      bool verbose = false);
 
   Error Run(std::vector<std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-    std::vector<std::unique_ptr<Result>>* results,
-    const std::shared_ptr<Request>& async_request, bool wait) override;
+      std::vector<std::unique_ptr<Result>>* results,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
   static size_t RequestProvider(void*, size_t, size_t, void*);
@@ -902,8 +902,8 @@ class ProfileHttpContext : public ProfileContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
  private:
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
@@ -931,8 +931,8 @@ class ServerHealthGrpcContext : public ServerHealthContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
   Error GetReady(bool* ready) override;
   Error GetLive(bool* live) override;
@@ -959,8 +959,8 @@ class ServerStatusGrpcContext : public ServerStatusContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
   /// Create a context that returns information about an inference
   /// server and one model on the sever using gRPC protocol.
@@ -971,8 +971,8 @@ class ServerStatusGrpcContext : public ServerStatusContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    const std::string& model_name, bool verbose = false);
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      const std::string& model_name, bool verbose = false);
 
   /// Contact the inference server and get status.
   /// \param status Returns the status.
@@ -1008,15 +1008,15 @@ class InferGrpcContext : public InferContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int model_version = -1,
-    bool verbose = false);
+      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+      const std::string& model_name, int model_version = -1,
+      bool verbose = false);
 
   Error Run(std::vector<std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-    std::vector<std::unique_ptr<Result>>* results,
-    const std::shared_ptr<Request>& async_request, bool wait) override;
+      std::vector<std::unique_ptr<Result>>* results,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
   InferGrpcContext(const std::string&, const std::string&, int, bool);
@@ -1056,8 +1056,8 @@ class ProfileGrpcContext : public ProfileContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose = false);
+      std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
+      bool verbose = false);
 
  private:
   ProfileGrpcContext(const std::string&, bool);

@@ -90,7 +90,7 @@ class IRPC {
 
  protected:
   virtual std::unique_ptr<IContext> CreateContext(
-    ::grpc::ServerCompletionQueue*, std::shared_ptr<Resources>) = 0;
+      ::grpc::ServerCompletionQueue*, std::shared_ptr<Resources>) = 0;
 
   friend class IExecutor;
 };
@@ -104,8 +104,8 @@ class IExecutor {
   virtual void Run() = 0;
   virtual void Shutdown() = 0;
   virtual void RegisterContexts(
-    IRPC* rpc, std::shared_ptr<Resources> resources,
-    int numContextsPerThread) = 0;
+      IRPC* rpc, std::shared_ptr<Resources> resources,
+      int numContextsPerThread) = 0;
   // virtual void Shutdown() = 0;
 
  protected:
@@ -115,8 +115,8 @@ class IExecutor {
   }
   inline void ResetContext(IContext* ctx) { ctx->Reset(); }
   inline std::unique_ptr<IContext> CreateContext(
-    IRPC* rpc, ::grpc::ServerCompletionQueue* cq,
-    std::shared_ptr<Resources> res)
+      IRPC* rpc, ::grpc::ServerCompletionQueue* cq,
+      std::shared_ptr<Resources> res)
   {
     return rpc->CreateContext(cq, res);
   }

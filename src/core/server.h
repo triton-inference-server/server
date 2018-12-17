@@ -70,7 +70,7 @@ class InferenceServer {
 
   // Run health check indicated by 'mode'
   void HandleHealth(
-    RequestStatus* request_status, bool* health, const std::string& mode);
+      RequestStatus* request_status, bool* health, const std::string& mode);
 
   // Run profile 'cmd' for profiling all the all GPU devices
   void HandleProfile(RequestStatus* request_status, const std::string& cmd);
@@ -78,18 +78,18 @@ class InferenceServer {
   // Perform inference on the given input for specified model and
   // update RequestStatus object with the status of the inference.
   void HandleInfer(
-    RequestStatus* request_status,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::shared_ptr<ModelInferStats> infer_stats,
-    std::function<void()> OnCompleteInferRPC, bool async_frontend);
+      RequestStatus* request_status,
+      std::shared_ptr<InferRequestProvider> request_provider,
+      std::shared_ptr<InferResponseProvider> response_provider,
+      std::shared_ptr<ModelInferStats> infer_stats,
+      std::function<void()> OnCompleteInferRPC, bool async_frontend);
 
   // Update the RequestStatus object and ServerStatus object with the
   // status of the model. If 'model_name' is empty, update with the
   // status of all models.
   void HandleStatus(
-    RequestStatus* request_status, ServerStatus* server_status,
-    const std::string& model_name);
+      RequestStatus* request_status, ServerStatus* server_status,
+      const std::string& model_name);
 
   // Return the server version.
   const std::string& Version() const { return version_; }
@@ -125,10 +125,10 @@ class InferenceServer {
   std::unique_ptr<tfs::net_http::HTTPServerInterface> StartHttpServer();
 
   tensorflow::Status ParseProtoTextFile(
-    const std::string& file, google::protobuf::Message* message);
+      const std::string& file, google::protobuf::Message* message);
 
   tfs::PlatformConfigMap BuildPlatformConfigMap(
-    float tf_gpu_memory_fraction, bool tf_allow_soft_placement);
+      float tf_gpu_memory_fraction, bool tf_allow_soft_placement);
 
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;

@@ -40,8 +40,8 @@
 namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
-  const ModelConfig& config, const uint32_t runner_cnt,
-  StandardRunFunc OnSchedule)
+    const ModelConfig& config, const uint32_t runner_cnt,
+    StandardRunFunc OnSchedule)
     : OnSchedule_(OnSchedule), scheduler_thread_cnt_(runner_cnt),
       idle_scheduler_thread_cnt_(0), pending_batch_size_(0),
       pending_batch_queue_cnt_(0)
@@ -56,12 +56,13 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   if (dynamic_batching_enabled_) {
     for (const auto size : config.dynamic_batching().preferred_batch_size()) {
       max_preferred_batch_size_ =
-        std::max(max_preferred_batch_size_, (size_t)size);
+          std::max(max_preferred_batch_size_, (size_t)size);
       preferred_batch_sizes_.insert(size);
     }
 
     pending_batch_delay_ns_ =
-      (uint64_t)config.dynamic_batching().max_queue_delay_microseconds() * 1000;
+        (uint64_t)config.dynamic_batching().max_queue_delay_microseconds() *
+        1000;
   }
 
   // Create one scheduler thread for each requested runner. Associate
@@ -69,7 +70,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   const int nice = GetPriorityNiceLevel(config);
   for (uint32_t c = 0; c < scheduler_thread_cnt_; ++c) {
     scheduler_threads_.emplace_back(
-      new std::thread([this, c, nice]() { SchedulerThread(c, nice); }));
+        new std::thread([this, c, nice]() { SchedulerThread(c, nice); }));
   }
 }
 
@@ -89,10 +90,10 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 
 void
 DynamicBatchScheduler::Enqueue(
-  const std::shared_ptr<ModelInferStats>& stats,
-  const std::shared_ptr<InferRequestProvider>& request_provider,
-  const std::shared_ptr<InferResponseProvider>& response_provider,
-  std::function<void(tensorflow::Status)> OnComplete)
+    const std::shared_ptr<ModelInferStats>& stats,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
+    const std::shared_ptr<InferResponseProvider>& response_provider,
+    std::function<void(tensorflow::Status)> OnComplete)
 {
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
@@ -101,7 +102,7 @@ DynamicBatchScheduler::Enqueue(
   {
     std::lock_guard<std::mutex> lock(mu_);
     queue_.emplace_back(
-      now, stats, request_provider, response_provider, OnComplete);
+        now, stats, request_provider, response_provider, OnComplete);
 
     // If there are any idle runners then wake one up to service this
     // request. We do the actual wake outside of the lock to avoid
@@ -204,9 +205,9 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
         bool found_success = false;
         for (auto& payload : *payloads) {
           tensorflow::Status final_status =
-            status.ok() ? (payload.status_.ok() ? payload.compute_status_
-                                                : payload.status_)
-                        : status;
+              status.ok() ? (payload.status_.ok() ? payload.compute_status_
+                                                  : payload.status_)
+                          : status;
 
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
@@ -245,7 +246,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   //   immediately
   {
     const auto batch_size =
-      queue_.front().request_provider_->RequestHeader().batch_size();
+        queue_.front().request_provider_->RequestHeader().batch_size();
     if ((pending_batch_size_ + batch_size) >= max_preferred_batch_size_) {
       if (pending_batch_queue_cnt_ == 0) {
         pending_batch_size_ = batch_size;
@@ -265,7 +266,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   size_t search_batch_cnt = pending_batch_queue_cnt_;
   for (auto idx = pending_batch_queue_cnt_; idx < queue_.size(); ++idx) {
     const auto batch_size =
-      queue_[idx].request_provider_->RequestHeader().batch_size();
+        queue_[idx].request_provider_->RequestHeader().batch_size();
 
     if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
       break;
@@ -274,9 +275,8 @@ DynamicBatchScheduler::GetDynamicBatch()
     search_batch_size += batch_size;
     search_batch_cnt++;
 
-    if (
-      preferred_batch_sizes_.find(search_batch_size) !=
-      preferred_batch_sizes_.end()) {
+    if (preferred_batch_sizes_.find(search_batch_size) !=
+        preferred_batch_sizes_.end()) {
       best_preferred_batch_size = search_batch_size;
       best_preferred_batch_cnt = search_batch_cnt;
     }

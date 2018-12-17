@@ -35,12 +35,12 @@ class GraphDefBundle : public BaseBundle {
   GraphDefBundle(GraphDefBundle&&) = default;
 
   tensorflow::Status Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config);
+      const tensorflow::StringPiece& path, const ModelConfig& config);
 
   tensorflow::Status CreateSession(
-    const tensorflow::SessionOptions& options, const int gpu_device,
-    const std::string& model_path, tensorflow::Session** session,
-    IONameMap* input_name_map, IONameMap* output_name_map) override;
+      const tensorflow::SessionOptions& options, const int gpu_device,
+      const std::string& model_path, tensorflow::Session** session,
+      IONameMap* input_name_map, IONameMap* output_name_map) override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(GraphDefBundle);

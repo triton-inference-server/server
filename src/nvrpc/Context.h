@@ -68,8 +68,8 @@ class BaseContext : public LifeCycle {
   // Factory function allowed to create unique pointers to context objects
   template <class ContextType>
   friend std::unique_ptr<ContextType> ContextFactory(
-    typename ContextType::QueueFuncType q_fn,
-    typename ContextType::ResourcesType resources);
+      typename ContextType::QueueFuncType q_fn,
+      typename ContextType::ResourcesType resources);
 
  public:
   // Convenience method to acquire the Context base pointer from a derived class
@@ -124,8 +124,8 @@ double
 BaseContext<LifeCycle, Resources>::Walltime() const
 {
   return std::chrono::duration<double>(
-           std::chrono::high_resolution_clock::now() - m_StartTime)
-    .count();
+             std::chrono::high_resolution_clock::now() - m_StartTime)
+      .count();
 }
 
 /**
@@ -134,7 +134,7 @@ BaseContext<LifeCycle, Resources>::Walltime() const
 template <class LifeCycle, class Resources>
 void
 BaseContext<LifeCycle, Resources>::FactoryInitializer(
-  QueueFuncType queue_fn, ResourcesType resources)
+    QueueFuncType queue_fn, ResourcesType resources)
 {
   this->SetQueueFunc(queue_fn);
   m_Resources = resources;
@@ -147,8 +147,8 @@ BaseContext<LifeCycle, Resources>::FactoryInitializer(
 template <class ContextType>
 std::unique_ptr<ContextType>
 ContextFactory(
-  typename ContextType::QueueFuncType queue_fn,
-  typename ContextType::ResourcesType resources)
+    typename ContextType::QueueFuncType queue_fn,
+    typename ContextType::ResourcesType resources)
 {
   auto ctx = nvrpc::make_unique<ContextType>();
   auto base = ctx->GetBase();

@@ -44,22 +44,22 @@ class CustomBundleSourceAdapter final
     : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle> {
  public:
   static tensorflow::Status Create(
-    const CustomBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-      tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-      adapter);
+      const CustomBundleSourceAdapterConfig& config,
+      std::unique_ptr<
+          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
+          adapter);
 
   ~CustomBundleSourceAdapter() override;
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(CustomBundleSourceAdapter);
   using SimpleSourceAdapter =
-    tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle>;
+      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle>;
 
   CustomBundleSourceAdapter(
-    const CustomBundleSourceAdapterConfig& config,
-    typename SimpleSourceAdapter::Creator creator,
-    typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
+      const CustomBundleSourceAdapterConfig& config,
+      typename SimpleSourceAdapter::Creator creator,
+      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
       : SimpleSourceAdapter(creator, resource_estimator), config_(config)
   {
   }

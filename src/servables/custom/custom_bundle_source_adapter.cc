@@ -44,22 +44,22 @@ namespace {
 
 tensorflow::Status
 CreateCustomBundle(
-  const CustomBundleSourceAdapterConfig& adapter_config,
-  const std::string& path, std::unique_ptr<CustomBundle>* bundle)
+    const CustomBundleSourceAdapterConfig& adapter_config,
+    const std::string& path, std::unique_ptr<CustomBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
   TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
-    std::string(model_name), &model_config));
+      std::string(model_name), &model_config));
 
   // Read all the files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all
   // non-direct descendants.
   std::vector<std::string> possible_children;
   TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->GetChildren(path, &possible_children));
+      tensorflow::Env::Default()->GetChildren(path, &possible_children));
   std::set<std::string> children;
   for (const auto& child : possible_children) {
     children.insert(child.substr(0, child.find_first_of('/')));
@@ -70,8 +70,8 @@ CreateCustomBundle(
     const auto custom_path = tensorflow::io::JoinPath(path, filename);
     if (!tensorflow::Env::Default()->IsDirectory(custom_path).ok()) {
       custom_paths.emplace(
-        std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(custom_path));
+          std::piecewise_construct, std::make_tuple(filename),
+          std::make_tuple(custom_path));
     }
   }
 
@@ -94,18 +94,19 @@ CreateCustomBundle(
 
 tensorflow::Status
 CustomBundleSourceAdapter::Create(
-  const CustomBundleSourceAdapterConfig& config,
-  std::unique_ptr<
-    SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter)
+    const CustomBundleSourceAdapterConfig& config,
+    std::unique_ptr<
+        SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter)
 {
   LOG_VERBOSE(1) << "Create CustomBundleSourceAdaptor for config \""
                  << config.DebugString() << "\"";
 
   Creator creator = std::bind(
-    &CreateCustomBundle, config, std::placeholders::_1, std::placeholders::_2);
+      &CreateCustomBundle, config, std::placeholders::_1,
+      std::placeholders::_2);
 
   adapter->reset(new CustomBundleSourceAdapter(
-    config, creator, SimpleSourceAdapter::EstimateNoResources()));
+      config, creator, SimpleSourceAdapter::EstimateNoResources()));
   return tensorflow::Status::OK();
 }
 
@@ -119,6 +120,6 @@ CustomBundleSourceAdapter::~CustomBundleSourceAdapter()
 namespace tensorflow { namespace serving {
 
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-  nvidia::inferenceserver::CustomBundleSourceAdapter,
-  nvidia::inferenceserver::CustomBundleSourceAdapterConfig);
+    nvidia::inferenceserver::CustomBundleSourceAdapter,
+    nvidia::inferenceserver::CustomBundleSourceAdapterConfig);
 }}  // namespace tensorflow::serving

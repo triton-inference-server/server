@@ -29,7 +29,8 @@
 namespace nvidia { namespace inferenceserver {
 
 uint64_t
-GetByteSize(const int max_batch_size, const DataType& dtype, const DimsList& dims)
+GetByteSize(
+    const int max_batch_size, const DataType& dtype, const DimsList& dims)
 {
   size_t dt_size = nvidia::inferenceserver::GetByteSize(dtype, dims);
   return std::max(1, max_batch_size) * dt_size;

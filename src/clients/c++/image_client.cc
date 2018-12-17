@@ -51,9 +51,9 @@ enum ProtocolType { HTTP = 0, GRPC = 1 };
 
 void
 Preprocess(
-  const cv::Mat& img, ni::ModelInput::Format format, int img_type1,
-  int img_type3, size_t img_channels, const cv::Size& img_size,
-  const ScaleType scale, std::vector<uint8_t>* input_data)
+    const cv::Mat& img, ni::ModelInput::Format format, int img_type1,
+    int img_type3, size_t img_channels, const cv::Size& img_size,
+    const ScaleType scale, std::vector<uint8_t>* input_data)
 {
   // Image channels are in BGR order. Currently model configuration
   // data doesn't provide any information as to the expected channel
@@ -86,7 +86,7 @@ Preprocess(
 
   cv::Mat sample_type;
   sample_resized.convertTo(
-    sample_type, (img_channels == 3) ? img_type3 : img_type1);
+      sample_type, (img_channels == 3) ? img_type3 : img_type1);
 
   cv::Mat sample_final;
   if (scale == ScaleType::INCEPTION) {
@@ -95,7 +95,7 @@ Preprocess(
       sample_final = sample_final - cv::Scalar(1.0);
     } else {
       sample_final =
-        sample_type.mul(cv::Scalar(1 / 128.0, 1 / 128.0, 1 / 128.0));
+          sample_type.mul(cv::Scalar(1 / 128.0, 1 / 128.0, 1 / 128.0));
       sample_final = sample_final - cv::Scalar(1.0, 1.0, 1.0);
     }
   } else if (scale == ScaleType::VGG) {
@@ -123,7 +123,7 @@ Preprocess(
       size_t row_byte_size = sample_final.cols * sample_final.elemSize();
       for (int r = 0; r < sample_final.rows; ++r) {
         memcpy(
-          &((*input_data)[pos]), sample_final.ptr<uint8_t>(r), row_byte_size);
+            &((*input_data)[pos]), sample_final.ptr<uint8_t>(r), row_byte_size);
         pos += row_byte_size;
       }
     }
@@ -138,7 +138,7 @@ Preprocess(
     std::vector<cv::Mat> input_bgr_channels;
     for (size_t i = 0; i < img_channels; ++i) {
       input_bgr_channels.emplace_back(
-        img_size.height, img_size.width, img_type1, &((*input_data)[pos]));
+          img_size.height, img_size.width, img_type1, &((*input_data)[pos]));
       pos += input_bgr_channels.back().total() *
              input_bgr_channels.back().elemSize();
     }
@@ -155,8 +155,8 @@ Preprocess(
 
 void
 Postprocess(
-  const std::vector<std::unique_ptr<nic::InferContext::Result>>& results,
-  const std::vector<std::string>& filenames, const size_t batch_size)
+    const std::vector<std::unique_ptr<nic::InferContext::Result>>& results,
+    const std::vector<std::string>& filenames, const size_t batch_size)
 {
   if (results.size() != 1) {
     std::cerr << "expected 1 result, got " << results.size() << std::endl;
@@ -223,11 +223,11 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "If -a is specified then asynchronous client API will be used. "
             << "Default is to use the synchronous API." << std::endl;
   std::cerr
-    << "For -b, a single image will be replicated and sent in a batch"
-    << std::endl
-    << "        of the specified size. A directory of images will be grouped"
-    << std::endl
-    << "        into batches. Default is 1." << std::endl;
+      << "For -b, a single image will be replicated and sent in a batch"
+      << std::endl
+      << "        of the specified size. A directory of images will be grouped"
+      << std::endl
+      << "        into batches. Default is 1." << std::endl;
   std::cerr << "For -c, the <topk> classes will be returned, default is 1."
             << std::endl;
   std::cerr << "For -s, specify the type of pre-processing scaling that"
@@ -240,8 +240,8 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl
             << "         each pixel." << std::endl;
   std::cerr
-    << "If -x is not specified the most recent version (that is, the highest "
-    << "numbered version) of the model will be used." << std::endl;
+      << "If -x is not specified the most recent version (that is, the highest "
+      << "numbered version) of the model will be used." << std::endl;
   std::cerr << "For -p, it generates file only if image file is specified."
             << std::endl;
   std::cerr << "For -u, the default server URL is localhost:8000." << std::endl;
@@ -321,9 +321,9 @@ ParseType(const ni::DataType& dtype, int* type1, int* type3)
 
 void
 ParseModel(
-  const std::unique_ptr<nic::InferContext>& ctx, const size_t batch_size,
-  size_t* c, size_t* h, size_t* w, ni::ModelInput::Format* format, int* type1,
-  int* type3, bool verbose = false)
+    const std::unique_ptr<nic::InferContext>& ctx, const size_t batch_size,
+    size_t* c, size_t* h, size_t* w, ni::ModelInput::Format* format, int* type1,
+    int* type3, bool verbose = false)
 {
   if (ctx->Inputs().size() != 1) {
     std::cerr << "expecting 1 input, model \"" << ctx->ModelName() << "\" has "
@@ -392,9 +392,8 @@ ParseModel(
   }
 
   // Input must be NHWC or NCHW...
-  if (
-    (*format != ni::ModelInput::FORMAT_NCHW) &&
-    (*format != ni::ModelInput::FORMAT_NHWC)) {
+  if ((*format != ni::ModelInput::FORMAT_NCHW) &&
+      (*format != ni::ModelInput::FORMAT_NHWC)) {
     std::cerr << "unexpected input format "
               << ni::ModelInput_Format_Name(*format) << ", expecting "
               << ni::ModelInput_Format_Name(ni::ModelInput::FORMAT_NHWC)
@@ -424,17 +423,17 @@ ParseModel(
 
 void
 FileToInputData(
-  const std::string& filename, size_t c, size_t h, size_t w,
-  ni::ModelInput::Format format, int type1, int type3, ScaleType scale,
-  std::vector<uint8_t>* input_data)
+    const std::string& filename, size_t c, size_t h, size_t w,
+    ni::ModelInput::Format format, int type1, int type3, ScaleType scale,
+    std::vector<uint8_t>* input_data)
 {
   // Load the specified image.
   std::ifstream file(filename);
   std::vector<char> data;
   file >> std::noskipws;
   std::copy(
-    std::istream_iterator<char>(file), std::istream_iterator<char>(),
-    std::back_inserter(data));
+      std::istream_iterator<char>(file), std::istream_iterator<char>(),
+      std::back_inserter(data));
   if (data.empty()) {
     std::cerr << "error: unable to read image file " << filename << std::endl;
     exit(1);
@@ -526,10 +525,10 @@ main(int argc, char** argv)
   nic::Error err;
   if (protocol == ProtocolType::HTTP) {
     err = nic::InferHttpContext::Create(
-      &ctx, url, model_name, model_version, verbose);
+        &ctx, url, model_name, model_version, verbose);
   } else {
     err = nic::InferGrpcContext::Create(
-      &ctx, url, model_name, model_version, verbose);
+        &ctx, url, model_name, model_version, verbose);
   }
   if (!err.IsOk()) {
     std::cerr << "error: unable to create inference context: " << err
@@ -579,7 +578,7 @@ main(int argc, char** argv)
   for (const auto& fn : image_filenames) {
     image_data.emplace_back();
     FileToInputData(
-      fn, c, h, w, format, type1, type3, scale, &(image_data.back()));
+        fn, c, h, w, format, type1, type3, scale, &(image_data.back()));
 
     if ((image_data.size() == 1) && !preprocess_output_filename.empty()) {
       std::ofstream output_file(preprocess_output_filename);

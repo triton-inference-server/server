@@ -81,7 +81,7 @@ GetChannel(const std::string& url)
     arguments.SetMaxSendMessageSize(MAX_GRPC_MESSAGE_SIZE);
     arguments.SetMaxReceiveMessageSize(MAX_GRPC_MESSAGE_SIZE);
     std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(
-      url, grpc::InsecureChannelCredentials(), arguments);
+        url, grpc::InsecureChannelCredentials(), arguments);
     grpc_channel_map_.insert(std::make_pair(url, channel));
     return channel;
   }
@@ -131,15 +131,18 @@ class OptionsImpl : public InferContext::Options {
   ~OptionsImpl() = default;
 
   uint64_t CorrelationId() const override { return correlation_id_; }
-  void SetCorrelationId(uint64_t correlation_id) override { correlation_id_ = correlation_id; }
+  void SetCorrelationId(uint64_t correlation_id) override
+  {
+    correlation_id_ = correlation_id;
+  }
 
   size_t BatchSize() const override { return batch_size_; }
   void SetBatchSize(size_t batch_size) override { batch_size_ = batch_size; }
 
   Error AddRawResult(
-    const std::shared_ptr<InferContext::Output>& output) override;
+      const std::shared_ptr<InferContext::Output>& output) override;
   Error AddClassResult(
-    const std::shared_ptr<InferContext::Output>& output, uint64_t k) override;
+      const std::shared_ptr<InferContext::Output>& output, uint64_t k) override;
 
   // Options for an output
   struct OutputOptions {
@@ -152,7 +155,7 @@ class OptionsImpl : public InferContext::Options {
   };
 
   using OutputOptionsPair =
-    std::pair<std::shared_ptr<InferContext::Output>, OutputOptions>;
+      std::pair<std::shared_ptr<InferContext::Output>, OutputOptions>;
 
   const std::vector<OutputOptionsPair>& Outputs() const { return outputs_; }
 
@@ -168,16 +171,16 @@ Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
 {
   outputs_.emplace_back(std::make_pair(
-    output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
+      output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
   return Error::Success;
 }
 
 Error
 OptionsImpl::AddClassResult(
-  const std::shared_ptr<InferContext::Output>& output, uint64_t k)
+    const std::shared_ptr<InferContext::Output>& output, uint64_t k)
 {
   outputs_.emplace_back(std::make_pair(
-    output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
+      output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
   return Error::Success;
 }
 
@@ -212,7 +215,7 @@ class InputImpl : public InferContext::Input {
   // the actual amount copied in 'input_bytes' and if the end of input
   // is reached in 'end_of_input'
   Error GetNext(
-    uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input);
+      uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input);
 
   // Copy the pointer of the raw buffer at 'batch_idx' into 'buf'
   Error GetRaw(size_t batch_idx, const uint8_t** buf) const;
@@ -252,18 +255,19 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
   if (input_byte_size != byte_size_) {
     bufs_.clear();
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "invalid size " + std::to_string(input_byte_size) + " bytes for input '" +
-        Name() + "', expects " + std::to_string(byte_size_) + " bytes");
+        RequestStatusCode::INVALID_ARG,
+        "invalid size " + std::to_string(input_byte_size) +
+            " bytes for input '" + Name() + "', expects " +
+            std::to_string(byte_size_) + " bytes");
   }
 
   if (bufs_.size() >= batch_size_) {
     bufs_.clear();
     return Error(
-      RequestStatusCode::INVALID_ARG, "expecting " +
-                                        std::to_string(batch_size_) +
-                                        " invocations of SetRaw for input '" +
-                                        Name() + "', one per batch entry");
+        RequestStatusCode::INVALID_ARG,
+        "expecting " + std::to_string(batch_size_) +
+            " invocations of SetRaw for input '" + Name() +
+            "', one per batch entry");
   }
 
   bufs_.push_back(input);
@@ -278,7 +282,7 @@ InputImpl::SetRaw(const std::vector<uint8_t>& input)
 
 Error
 InputImpl::GetNext(
-  uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input)
+    uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input)
 {
   size_t total_size = 0;
 
@@ -309,10 +313,10 @@ InputImpl::GetRaw(size_t batch_idx, const uint8_t** buf) const
 {
   if (batch_idx >= batch_size_) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        " requested for input '" + Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            " requested for input '" + Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   *buf = bufs_[batch_idx];
@@ -333,10 +337,10 @@ InputImpl::PrepareForRequest()
 {
   if (bufs_.size() != batch_size_) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "expecting " + std::to_string(batch_size_) +
-        " invocations of SetRaw for input '" + Name() + "', have " +
-        std::to_string(bufs_.size()));
+        RequestStatusCode::INVALID_ARG,
+        "expecting " + std::to_string(batch_size_) +
+            " invocations of SetRaw for input '" + Name() + "', have " +
+            std::to_string(bufs_.size()));
   }
 
   // Reset position so request sends entire input.
@@ -383,8 +387,8 @@ OutputImpl::OutputImpl(const ModelOutput& mio)
 class ResultImpl : public InferContext::Result {
  public:
   ResultImpl(
-    const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
-    InferContext::Result::ResultFormat result_format);
+      const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
+      InferContext::Result::ResultFormat result_format);
   ~ResultImpl() = default;
 
   const std::string& ModelName() const override { return model_name_; }
@@ -396,9 +400,9 @@ class ResultImpl : public InferContext::Result {
   }
 
   Error GetRaw(
-    size_t batch_idx, const std::vector<uint8_t>** buf) const override;
+      size_t batch_idx, const std::vector<uint8_t>** buf) const override;
   Error GetRawAtCursor(
-    size_t batch_idx, const uint8_t** buf, size_t adv_byte_size) override;
+      size_t batch_idx, const uint8_t** buf, size_t adv_byte_size) override;
   Error GetClassCount(size_t batch_idx, size_t* cnt) const override;
   Error GetClassAtCursor(size_t batch_idx, ClassResult* result) override;
   Error ResetCursors() override;
@@ -446,8 +450,8 @@ class ResultImpl : public InferContext::Result {
 };
 
 ResultImpl::ResultImpl(
-  const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
-  InferContext::Result::ResultFormat result_format)
+    const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
+    InferContext::Result::ResultFormat result_format)
     : output_(output), byte_size_(output->ByteSize()), batch_size_(batch_size),
       result_format_(result_format), bufs_(batch_size), bufs_idx_(0),
       bufs_pos_(batch_size), class_pos_(batch_size)
@@ -459,16 +463,17 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 {
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "raw result not available for non-RAW output '" + output_->Name() + "'");
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
   }
 
   if (batch_idx >= batch_size_) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        " requested for output '" + output_->Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            " requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   *buf = &bufs_[batch_idx];
@@ -477,27 +482,28 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 
 Error
 ResultImpl::GetRawAtCursor(
-  size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
+    size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
 {
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "raw result not available for non-RAW output '" + output_->Name() + "'");
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
   }
 
   if (batch_idx >= batch_size_) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        "requested for output '" + output_->Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            "requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   if ((bufs_pos_[batch_idx] + adv_byte_size) > byte_size_) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "attempt to read beyond end of result for output output '" +
-        output_->Name() + "'");
+        RequestStatusCode::UNSUPPORTED,
+        "attempt to read beyond end of result for output output '" +
+            output_->Name() + "'");
   }
 
   *buf = &bufs_[batch_idx][bufs_pos_[batch_idx]];
@@ -510,25 +516,24 @@ ResultImpl::GetClassCount(size_t batch_idx, size_t* cnt) const
 {
   if (result_format_ != InferContext::Result::ResultFormat::CLASS) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "class result not available for non-CLASS output '" + output_->Name() +
-        "'");
+        RequestStatusCode::UNSUPPORTED,
+        "class result not available for non-CLASS output '" + output_->Name() +
+            "'");
   }
 
   // Number of classifications should equal expected batch size but
   // check both to be careful and to protext class_pos_ accesses.
-  if (
-    (batch_idx >= (size_t)class_result_.batch_classes().size()) ||
-    (batch_idx >= batch_size_)) {
+  if ((batch_idx >= (size_t)class_result_.batch_classes().size()) ||
+      (batch_idx >= batch_size_)) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        "requested for output '" + output_->Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            "requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   const InferResponseHeader::Output::Classes& classes =
-    class_result_.batch_classes(batch_idx);
+      class_result_.batch_classes(batch_idx);
 
   *cnt = classes.cls().size();
   return Error::Success;
@@ -536,39 +541,38 @@ ResultImpl::GetClassCount(size_t batch_idx, size_t* cnt) const
 
 Error
 ResultImpl::GetClassAtCursor(
-  size_t batch_idx, InferContext::Result::ClassResult* result)
+    size_t batch_idx, InferContext::Result::ClassResult* result)
 {
   if (result_format_ != InferContext::Result::ResultFormat::CLASS) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "class result not available for non-CLASS output '" + output_->Name() +
-        "'");
+        RequestStatusCode::UNSUPPORTED,
+        "class result not available for non-CLASS output '" + output_->Name() +
+            "'");
   }
 
   // Number of classifications should equal expected batch size but
   // check both to be careful and to protext class_pos_ accesses.
-  if (
-    (batch_idx >= (size_t)class_result_.batch_classes().size()) ||
-    (batch_idx >= batch_size_)) {
+  if ((batch_idx >= (size_t)class_result_.batch_classes().size()) ||
+      (batch_idx >= batch_size_)) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        "requested for output '" + output_->Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            "requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   const InferResponseHeader::Output::Classes& classes =
-    class_result_.batch_classes(batch_idx);
+      class_result_.batch_classes(batch_idx);
 
   if (class_pos_[batch_idx] >= (size_t)classes.cls().size()) {
     return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "attempt to read beyond end of result for output output '" +
-        output_->Name() + "'");
+        RequestStatusCode::UNSUPPORTED,
+        "attempt to read beyond end of result for output output '" +
+            output_->Name() + "'");
   }
 
   const InferResponseHeader::Output::Class& cls =
-    classes.cls(class_pos_[batch_idx]);
+      classes.cls(class_pos_[batch_idx]);
 
   result->idx = cls.idx();
   result->value = cls.value();
@@ -591,10 +595,10 @@ ResultImpl::ResetCursor(size_t batch_idx)
 {
   if (batch_idx >= batch_size_) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "unexpected batch entry " + std::to_string(batch_idx) +
-        "requested for output '" + output_->Name() + "', batch size is " +
-        std::to_string(batch_size_));
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            "requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
   }
 
   bufs_pos_[batch_idx] = 0;
@@ -604,7 +608,7 @@ ResultImpl::ResetCursor(size_t batch_idx)
 
 Error
 ResultImpl::SetNextRawResult(
-  const uint8_t* buf, size_t size, size_t* result_bytes)
+    const uint8_t* buf, size_t size, size_t* result_bytes)
 {
   size_t total_size = 0;
 
@@ -689,13 +693,13 @@ class RequestImpl : public InferContext::Request {
   // Initialize 'requested_results_' according to 'batch_size' and
   // 'requested_outs' as the placeholder for the results
   Error InitializeRequestedResults(
-    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
-    const size_t batch_size);
+      const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
+      const size_t batch_size);
 
   // Return the results of the request. 'ready_' should always be checked
   // before calling GetResults() to ensure the request has been completed.
   virtual Error GetResults(
-    std::vector<std::unique_ptr<InferContext::Result>>* results) = 0;
+      std::vector<std::unique_ptr<InferContext::Result>>* results) = 0;
 
  protected:
   RequestImpl(const uint64_t id);
@@ -703,8 +707,8 @@ class RequestImpl : public InferContext::Request {
   // Helper function called after inference to set non-RAW results in
   // 'requested_results_'.
   Error PostRunProcessing(
-    std::vector<std::unique_ptr<InferContext::Result>>& results,
-    const InferResponseHeader& infer_response);
+      std::vector<std::unique_ptr<InferContext::Result>>& results,
+      const InferResponseHeader& infer_response);
 
   friend class InferContext;
 
@@ -735,14 +739,15 @@ RequestImpl::RequestImpl(const uint64_t id)
 
 Error
 RequestImpl::InitializeRequestedResults(
-  const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
-  const size_t batch_size)
+    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
+    const size_t batch_size)
 {
   // Initialize the results vector to collect the requested results.
   requested_results_.clear();
   for (const auto& io : requested_outs) {
     std::unique_ptr<ResultImpl> rp(new ResultImpl(
-      io, batch_size, reinterpret_cast<OutputImpl*>(io.get())->ResultFormat()));
+        io, batch_size,
+        reinterpret_cast<OutputImpl*>(io.get())->ResultFormat()));
     requested_results_.emplace_back(std::move(rp));
   }
   return Error::Success;
@@ -750,8 +755,8 @@ RequestImpl::InitializeRequestedResults(
 
 Error
 RequestImpl::PostRunProcessing(
-  std::vector<std::unique_ptr<InferContext::Result>>& results,
-  const InferResponseHeader& infer_response)
+    std::vector<std::unique_ptr<InferContext::Result>>& results,
+    const InferResponseHeader& infer_response)
 {
   // At this point, the RAW requested results have their result values
   // set. Now need to initialize non-RAW results.
@@ -780,7 +785,7 @@ RequestImpl::PostRunProcessing(
 //==============================================================================
 
 InferContext::InferContext(
-  const std::string& model_name, int model_version, bool verbose)
+    const std::string& model_name, int model_version, bool verbose)
     : model_name_(model_name), model_version_(model_version), verbose_(verbose),
       total_input_byte_size_(0), batch_size_(0), async_request_id_(0),
       worker_(), exiting_(true)
@@ -789,7 +794,7 @@ InferContext::InferContext(
 
 Error
 InferContext::GetInput(
-  const std::string& name, std::shared_ptr<Input>* input) const
+    const std::string& name, std::shared_ptr<Input>* input) const
 {
   for (const auto& io : inputs_) {
     if (io->Name() == name) {
@@ -799,13 +804,13 @@ InferContext::GetInput(
   }
 
   return Error(
-    RequestStatusCode::INVALID_ARG,
-    "unknown input '" + name + "' for '" + model_name_ + "'");
+      RequestStatusCode::INVALID_ARG,
+      "unknown input '" + name + "' for '" + model_name_ + "'");
 }
 
 Error
 InferContext::GetOutput(
-  const std::string& name, std::shared_ptr<Output>* output) const
+    const std::string& name, std::shared_ptr<Output>* output) const
 {
   for (const auto& io : outputs_) {
     if (io->Name() == name) {
@@ -815,8 +820,8 @@ InferContext::GetOutput(
   }
 
   return Error(
-    RequestStatusCode::INVALID_ARG,
-    "unknown output '" + name + "' for '" + model_name_ + "'");
+      RequestStatusCode::INVALID_ARG,
+      "unknown output '" + name + "' for '" + model_name_ + "'");
 }
 
 Error
@@ -829,11 +834,11 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
   uint64_t effective_max_batch_size = std::max((uint64_t)1, max_batch_size_);
   if (options.BatchSize() > effective_max_batch_size) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "run batch-size " + std::to_string(options.BatchSize()) +
-        " exceeds maximum batch size " +
-        std::to_string(effective_max_batch_size) + " allowed for model '" +
-        model_name_ + "'");
+        RequestStatusCode::INVALID_ARG,
+        "run batch-size " + std::to_string(options.BatchSize()) +
+            " exceeds maximum batch size " +
+            std::to_string(effective_max_batch_size) + " allowed for model '" +
+            model_name_ + "'");
   }
 
   // If batch-size 0 was requested (no batching) treat it like
@@ -864,7 +869,7 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
     const OptionsImpl::OutputOptions& ooptions = p.second;
 
     reinterpret_cast<OutputImpl*>(output.get())
-      ->SetResultFormat(ooptions.result_format);
+        ->SetResultFormat(ooptions.result_format);
     requested_outputs_.emplace_back(output);
 
     auto routput = infer_request_.add_output();
@@ -883,7 +888,7 @@ InferContext::GetStat(Stat* stat)
 {
   stat->completed_request_count = context_stat_.completed_request_count;
   stat->cumulative_total_request_time_ns =
-    context_stat_.cumulative_total_request_time_ns;
+      context_stat_.cumulative_total_request_time_ns;
   stat->cumulative_send_time_ns = context_stat_.cumulative_send_time_ns;
   stat->cumulative_receive_time_ns = context_stat_.cumulative_receive_time_ns;
   return Error::Success;
@@ -895,18 +900,17 @@ InferContext::UpdateStat(const RequestTimers& timer)
   uint64_t request_start_ns = timer.request_start_.tv_sec * NANOS_PER_SECOND +
                               timer.request_start_.tv_nsec;
   uint64_t request_end_ns =
-    timer.request_end_.tv_sec * NANOS_PER_SECOND + timer.request_end_.tv_nsec;
+      timer.request_end_.tv_sec * NANOS_PER_SECOND + timer.request_end_.tv_nsec;
   uint64_t send_start_ns =
-    timer.send_start_.tv_sec * NANOS_PER_SECOND + timer.send_start_.tv_nsec;
+      timer.send_start_.tv_sec * NANOS_PER_SECOND + timer.send_start_.tv_nsec;
   uint64_t send_end_ns =
-    timer.send_end_.tv_sec * NANOS_PER_SECOND + timer.send_end_.tv_nsec;
+      timer.send_end_.tv_sec * NANOS_PER_SECOND + timer.send_end_.tv_nsec;
   uint64_t receive_start_ns = timer.receive_start_.tv_sec * NANOS_PER_SECOND +
                               timer.receive_start_.tv_nsec;
   uint64_t receive_end_ns =
-    timer.receive_end_.tv_sec * NANOS_PER_SECOND + timer.receive_end_.tv_nsec;
-  if (
-    (request_start_ns >= request_end_ns) || (send_start_ns > send_end_ns) ||
-    (receive_start_ns > receive_end_ns)) {
+      timer.receive_end_.tv_sec * NANOS_PER_SECOND + timer.receive_end_.tv_nsec;
+  if ((request_start_ns >= request_end_ns) || (send_start_ns > send_end_ns) ||
+      (receive_start_ns > receive_end_ns)) {
     return Error(RequestStatusCode::INVALID_ARG, "Timer not set correctly.");
   }
 
@@ -926,8 +930,8 @@ InferContext::GetReadyAsyncRequest(std::shared_ptr<Request>* request, bool wait)
 {
   if (ongoing_async_requests_.size() == 0) {
     return Error(
-      RequestStatusCode::UNAVAILABLE,
-      "No asynchronous requests have been sent");
+        RequestStatusCode::UNAVAILABLE,
+        "No asynchronous requests have been sent");
   }
 
   Error err;
@@ -935,7 +939,7 @@ InferContext::GetReadyAsyncRequest(std::shared_ptr<Request>* request, bool wait)
   cv_.wait(lock, [&err, request, this, wait] {
     for (auto& ongoing_async_request : this->ongoing_async_requests_) {
       if (std::static_pointer_cast<RequestImpl>(ongoing_async_request.second)
-            ->ready_) {
+              ->ready_) {
         *request = ongoing_async_request.second;
         err = Error::Success;
         return true;
@@ -956,21 +960,22 @@ InferContext::GetReadyAsyncRequest(std::shared_ptr<Request>* request, bool wait)
 
 Error
 InferContext::IsRequestReady(
-  const std::shared_ptr<Request>& async_request, bool wait)
+    const std::shared_ptr<Request>& async_request, bool wait)
 {
   if (ongoing_async_requests_.size() == 0) {
     return Error(
-      RequestStatusCode::INVALID_ARG,
-      "No asynchronous requests have been sent");
+        RequestStatusCode::INVALID_ARG,
+        "No asynchronous requests have been sent");
   }
 
   std::shared_ptr<RequestImpl> request =
-    std::static_pointer_cast<RequestImpl>(async_request);
+      std::static_pointer_cast<RequestImpl>(async_request);
 
   auto itr = ongoing_async_requests_.find(request->run_index_);
   if (itr == ongoing_async_requests_.end()) {
     return Error(
-      RequestStatusCode::INVALID_ARG, "No matched asynchronous request found.");
+        RequestStatusCode::INVALID_ARG,
+        "No matched asynchronous request found.");
   }
 
   Error err = Error::Success;
@@ -1016,16 +1021,16 @@ ProfileContext::StopProfile()
 
 Error
 ServerHealthHttpContext::Create(
-  std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
   ctx->reset(static_cast<ServerHealthContext*>(
-    new ServerHealthHttpContext(server_url, verbose)));
+      new ServerHealthHttpContext(server_url, verbose)));
   return Error::Success;
 }
 
 ServerHealthHttpContext::ServerHealthHttpContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ServerHealthContext(verbose), url_(server_url + "/" + kHealthRESTEndpoint)
 {
 }
@@ -1040,7 +1045,7 @@ ServerHealthHttpContext::GetHealth(const std::string& url, bool* health)
   CURL* curl = curl_easy_init();
   if (!curl) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -1053,8 +1058,8 @@ ServerHealthHttpContext::GetHealth(const std::string& url, bool* health)
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);
     return Error(
-      RequestStatusCode::INTERNAL,
-      "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
   // Must use 64-bit integer with curl_easy_getinfo
@@ -1084,32 +1089,32 @@ ServerHealthHttpContext::GetLive(bool* live)
 
 Error
 ServerStatusHttpContext::Create(
-  std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
   ctx->reset(static_cast<ServerStatusContext*>(
-    new ServerStatusHttpContext(server_url, verbose)));
+      new ServerStatusHttpContext(server_url, verbose)));
   return Error::Success;
 }
 
 Error
 ServerStatusHttpContext::Create(
-  std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-  const std::string& model_name, bool verbose)
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::string& model_name, bool verbose)
 {
   ctx->reset(static_cast<ServerStatusContext*>(
-    new ServerStatusHttpContext(server_url, model_name, verbose)));
+      new ServerStatusHttpContext(server_url, model_name, verbose)));
   return Error::Success;
 }
 
 ServerStatusHttpContext::ServerStatusHttpContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ServerStatusContext(verbose), url_(server_url + "/" + kStatusRESTEndpoint)
 {
 }
 
 ServerStatusHttpContext::ServerStatusHttpContext(
-  const std::string& server_url, const std::string& model_name, bool verbose)
+    const std::string& server_url, const std::string& model_name, bool verbose)
     : ServerStatusContext(verbose),
       url_(server_url + "/" + kStatusRESTEndpoint + "/" + model_name)
 {
@@ -1129,7 +1134,7 @@ ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
   CURL* curl = curl_easy_init();
   if (!curl) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
   // Want binary representation of the status.
@@ -1152,8 +1157,8 @@ ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);
     return Error(
-      RequestStatusCode::INTERNAL,
-      "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
   // Must use 64-bit integer with curl_easy_getinfo
@@ -1171,9 +1176,8 @@ ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
 
   // If request has failing HTTP status or the request's explicit
   // status is not SUCCESS, then signal an error.
-  if (
-    (http_code != 200) ||
-    (request_status_.code() != RequestStatusCode::SUCCESS)) {
+  if ((http_code != 200) ||
+      (request_status_.code() != RequestStatusCode::SUCCESS)) {
     return Error(request_status_);
   }
 
@@ -1191,10 +1195,10 @@ ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
 
 size_t
 ServerStatusHttpContext::ResponseHeaderHandler(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   ServerStatusHttpContext* ctx =
-    reinterpret_cast<ServerStatusHttpContext*>(userp);
+      reinterpret_cast<ServerStatusHttpContext*>(userp);
 
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
@@ -1209,7 +1213,7 @@ ServerStatusHttpContext::ResponseHeaderHandler(
       std::string hdr(buf + idx + 1, byte_size - idx - 1);
 
       if (!google::protobuf::TextFormat::ParseFromString(
-            hdr, &ctx->request_status_)) {
+              hdr, &ctx->request_status_)) {
         ctx->request_status_.Clear();
       }
     }
@@ -1220,10 +1224,10 @@ ServerStatusHttpContext::ResponseHeaderHandler(
 
 size_t
 ServerStatusHttpContext::ResponseHandler(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   ServerStatusHttpContext* ctx =
-    reinterpret_cast<ServerStatusHttpContext*>(userp);
+      reinterpret_cast<ServerStatusHttpContext*>(userp);
   uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
   size_t result_bytes = size * nmemb;
   std::copy(buf, buf + result_bytes, std::back_inserter(ctx->response_));
@@ -1235,16 +1239,17 @@ ServerStatusHttpContext::ResponseHandler(
 class HttpRequestImpl : public RequestImpl {
  public:
   HttpRequestImpl(
-    const uint64_t id,
-    const std::vector<std::shared_ptr<InferContext::Input>> inputs);
+      const uint64_t id,
+      const std::vector<std::shared_ptr<InferContext::Input>> inputs);
 
   ~HttpRequestImpl();
 
   // Initialize the request for HTTP transfer on top of
   // RequestImpl.InitializeRequestedResults()
   Error InitializeRequest(
-    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outputs,
-    const size_t batch_size);
+      const std::vector<std::shared_ptr<InferContext::Output>>&
+          requested_outputs,
+      const size_t batch_size);
 
   // Copy into 'buf' up to 'size' bytes of input data. Return the
   // actual amount copied in 'input_bytes'.
@@ -1256,7 +1261,7 @@ class HttpRequestImpl : public RequestImpl {
 
   // @see RequestImpl.GetResults()
   Error GetResults(
-    std::vector<std::unique_ptr<InferContext::Result>>* results) override;
+      std::vector<std::unique_ptr<InferContext::Result>>* results) override;
 
  private:
   friend class InferHttpContext;
@@ -1288,8 +1293,8 @@ class HttpRequestImpl : public RequestImpl {
 };
 
 HttpRequestImpl::HttpRequestImpl(
-  const uint64_t id,
-  const std::vector<std::shared_ptr<InferContext::Input>> inputs)
+    const uint64_t id,
+    const std::vector<std::shared_ptr<InferContext::Input>> inputs)
     : RequestImpl(id), easy_handle_(curl_easy_init()), header_list_(NULL),
       inputs_(inputs), input_pos_idx_(0)
 {
@@ -1307,8 +1312,8 @@ HttpRequestImpl::~HttpRequestImpl()
 
 Error
 HttpRequestImpl::InitializeRequest(
-  const std::vector<std::shared_ptr<InferContext::Output>>& requested_outputs,
-  const size_t batch_size)
+    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outputs,
+    const size_t batch_size)
 {
   infer_response_buffer_.clear();
 
@@ -1362,13 +1367,13 @@ HttpRequestImpl::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
 
 Error
 HttpRequestImpl::SetNextRawResult(
-  const uint8_t* buf, size_t size, size_t* result_bytes)
+    const uint8_t* buf, size_t size, size_t* result_bytes)
 {
   *result_bytes = 0;
 
   while ((size > 0) && (result_pos_idx_ < requested_results_.size())) {
-    ResultImpl* io =
-      reinterpret_cast<ResultImpl*>(requested_results_[result_pos_idx_].get());
+    ResultImpl* io = reinterpret_cast<ResultImpl*>(
+        requested_results_[result_pos_idx_].get());
     size_t ob = 0;
 
     // Only try to read raw result for RAW
@@ -1401,7 +1406,7 @@ HttpRequestImpl::SetNextRawResult(
 
 Error
 HttpRequestImpl::GetResults(
-  std::vector<std::unique_ptr<InferContext::Result>>* results)
+    std::vector<std::unique_ptr<InferContext::Result>>* results)
 {
   InferResponseHeader infer_response;
 
@@ -1409,8 +1414,8 @@ HttpRequestImpl::GetResults(
     curl_slist_free_all(header_list_);
     requested_results_.clear();
     return Error(
-      RequestStatusCode::INTERNAL,
-      "HTTP client failed: " + std::string(curl_easy_strerror(http_status_)));
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(http_status_)));
   }
 
   // Must use 64-bit integer with curl_easy_getinfo
@@ -1428,9 +1433,8 @@ HttpRequestImpl::GetResults(
 
   // If request has failing HTTP status or the request's explicit
   // status is not SUCCESS, then signal an error.
-  if (
-    (http_code != 200) ||
-    (request_status_.code() != RequestStatusCode::SUCCESS)) {
+  if ((http_code != 200) ||
+      (request_status_.code() != RequestStatusCode::SUCCESS)) {
     requested_results_.clear();
     return Error(request_status_);
   }
@@ -1439,8 +1443,8 @@ HttpRequestImpl::GetResults(
   if (infer_response_buffer_.empty()) {
     requested_results_.clear();
     return Error(
-      RequestStatusCode::INTERNAL,
-      "infer request did not return result header");
+        RequestStatusCode::INTERNAL,
+        "infer request did not return result header");
   }
 
   infer_response.ParseFromString(infer_response_buffer_);
@@ -1456,16 +1460,16 @@ HttpRequestImpl::GetResults(
 
 Error
 InferHttpContext::Create(
-  std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-  const std::string& model_name, int model_version, bool verbose)
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::string& model_name, int model_version, bool verbose)
 {
   InferHttpContext* ctx_ptr =
-    new InferHttpContext(server_url, model_name, model_version, verbose);
+      new InferHttpContext(server_url, model_name, model_version, verbose);
 
   // Get status of the model and create the inputs and outputs.
   std::unique_ptr<ServerStatusContext> sctx;
   Error err =
-    ServerStatusHttpContext::Create(&sctx, server_url, model_name, verbose);
+      ServerStatusHttpContext::Create(&sctx, server_url, model_name, verbose);
   if (err.IsOk()) {
     ServerStatus server_status;
     err = sctx->GetServerStatus(&server_status);
@@ -1473,13 +1477,13 @@ InferHttpContext::Create(
       const auto& itr = server_status.model_status().find(model_name);
       if (itr == server_status.model_status().end()) {
         err = Error(
-          RequestStatusCode::INTERNAL,
-          "unable to find status information for \"" + model_name + "\"");
+            RequestStatusCode::INTERNAL,
+            "unable to find status information for \"" + model_name + "\"");
       } else {
         const ModelConfig& model_info = itr->second.config();
 
         ctx_ptr->max_batch_size_ =
-          static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
+            static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
 
         // Create inputs and outputs
         for (const auto& io : model_info.input()) {
@@ -1494,7 +1498,7 @@ InferHttpContext::Create(
 
   // Create request context for synchronous request.
   ctx_ptr->sync_request_.reset(
-    static_cast<Request*>(new HttpRequestImpl(0, ctx_ptr->inputs_)));
+      static_cast<Request*>(new HttpRequestImpl(0, ctx_ptr->inputs_)));
 
   if (err.IsOk()) {
     ctx->reset(static_cast<InferContext*>(ctx_ptr));
@@ -1506,8 +1510,8 @@ InferHttpContext::Create(
 }
 
 InferHttpContext::InferHttpContext(
-  const std::string& server_url, const std::string& model_name,
-  int model_version, bool verbose)
+    const std::string& server_url, const std::string& model_name,
+    int model_version, bool verbose)
     : InferContext(model_name, model_version, verbose),
       multi_handle_(curl_multi_init())
 {
@@ -1532,7 +1536,8 @@ InferHttpContext::~InferHttpContext()
   if (multi_handle_ != NULL) {
     for (auto& request : ongoing_async_requests_) {
       CURL* easy_handle =
-        std::static_pointer_cast<HttpRequestImpl>(request.second)->easy_handle_;
+          std::static_pointer_cast<HttpRequestImpl>(request.second)
+              ->easy_handle_;
       // Just remove, easy_cleanup will be done in ~HttpRequestImpl()
       curl_multi_remove_handle(multi_handle_, easy_handle);
     }
@@ -1544,7 +1549,7 @@ Error
 InferHttpContext::Run(std::vector<std::unique_ptr<Result>>* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
-    std::static_pointer_cast<HttpRequestImpl>(sync_request_);
+      std::static_pointer_cast<HttpRequestImpl>(sync_request_);
 
   if (!curl_global.Status().IsOk()) {
     return curl_global.Status();
@@ -1576,7 +1581,8 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 {
   if (!multi_handle_) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to start HTTP asynchronous client");
+        RequestStatusCode::INTERNAL,
+        "failed to start HTTP asynchronous client");
   } else if (exiting_) {
     // abusing variable here, exiting_ is true either when destructor is called
     // or the worker thread is not acutally created.
@@ -1592,12 +1598,12 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
   }
 
   HttpRequestImpl* current_context =
-    new HttpRequestImpl(async_request_id_++, inputs);
+      new HttpRequestImpl(async_request_id_++, inputs);
   async_request->reset(static_cast<Request*>(current_context));
 
   if (!current_context->easy_handle_) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
   Error err = PreRunProcessing(*async_request);
@@ -1606,13 +1612,13 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
-      reinterpret_cast<uintptr_t>(current_context->easy_handle_),
-      *async_request));
+        reinterpret_cast<uintptr_t>(current_context->easy_handle_),
+        *async_request));
 
     if (!insert_result.second) {
       return Error(
-        RequestStatusCode::INTERNAL,
-        "Failed to insert new asynchronous request context.");
+          RequestStatusCode::INTERNAL,
+          "Failed to insert new asynchronous request context.");
     }
 
     curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
@@ -1627,15 +1633,15 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferHttpContext::GetAsyncRunResults(
-  std::vector<std::unique_ptr<Result>>* results,
-  const std::shared_ptr<Request>& async_request, bool wait)
+    std::vector<std::unique_ptr<Result>>* results,
+    const std::shared_ptr<Request>& async_request, bool wait)
 {
   Error err = IsRequestReady(async_request, wait);
   if (!err.IsOk()) {
     return err;
   }
   std::shared_ptr<HttpRequestImpl> http_request =
-    std::static_pointer_cast<HttpRequestImpl>(async_request);
+      std::static_pointer_cast<HttpRequestImpl>(async_request);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -1651,13 +1657,13 @@ InferHttpContext::GetAsyncRunResults(
 
 size_t
 InferHttpContext::RequestProvider(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
 
   size_t input_bytes = 0;
   Error err = request->GetNextInput(
-    reinterpret_cast<uint8_t*>(contents), size * nmemb, &input_bytes);
+      reinterpret_cast<uint8_t*>(contents), size * nmemb, &input_bytes);
   if (!err.IsOk()) {
     std::cerr << "RequestProvider: " << err << std::endl;
     return CURL_READFUNC_ABORT;
@@ -1668,7 +1674,7 @@ InferHttpContext::RequestProvider(
 
 size_t
 InferHttpContext::ResponseHeaderHandler(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   char* buf = reinterpret_cast<char*>(contents);
@@ -1683,7 +1689,7 @@ InferHttpContext::ResponseHeaderHandler(
     if (idx < byte_size) {
       std::string hdr(buf + idx + 1, byte_size - idx - 1);
       if (!google::protobuf::TextFormat::ParseFromString(
-            hdr, &request->request_status_)) {
+              hdr, &request->request_status_)) {
         request->request_status_.Clear();
       }
     }
@@ -1694,7 +1700,7 @@ InferHttpContext::ResponseHeaderHandler(
 
 size_t
 InferHttpContext::ResponseHandler(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   size_t result_bytes = 0;
@@ -1704,7 +1710,7 @@ InferHttpContext::ResponseHandler(
   }
 
   Error err = request->SetNextRawResult(
-    reinterpret_cast<uint8_t*>(contents), size * nmemb, &result_bytes);
+      reinterpret_cast<uint8_t*>(contents), size * nmemb, &result_bytes);
   if (!err.IsOk()) {
     std::cerr << "ResponseHandler: " << err << std::endl;
     return 0;
@@ -1717,14 +1723,14 @@ Error
 InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
 {
   std::shared_ptr<HttpRequestImpl> http_request =
-    std::static_pointer_cast<HttpRequestImpl>(request);
+      std::static_pointer_cast<HttpRequestImpl>(request);
 
   http_request->InitializeRequest(requested_outputs_, batch_size_);
 
   CURL* curl = http_request->easy_handle_;
   if (!curl) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
   std::string full_url = url_ + "?format=binary";
@@ -1783,10 +1789,9 @@ InferHttpContext::AsyncTransfer()
       }
       // wake up if at least one request is not ready
       for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (
-          std::static_pointer_cast<HttpRequestImpl>(
-            ongoing_async_request.second)
-            ->ready_ == false) {
+        if (std::static_pointer_cast<HttpRequestImpl>(
+                ongoing_async_request.second)
+                ->ready_ == false) {
           return true;
         }
       }
@@ -1800,15 +1805,15 @@ InferHttpContext::AsyncTransfer()
       // This shouldn't happen
       if (itr == ongoing_async_requests_.end()) {
         fprintf(
-          stderr,
-          "Unexpected error: received completed request that"
-          " is not in the list of asynchronous requests.\n");
+            stderr,
+            "Unexpected error: received completed request that"
+            " is not in the list of asynchronous requests.\n");
         curl_multi_remove_handle(multi_handle_, msg->easy_handle);
         curl_easy_cleanup(msg->easy_handle);
         continue;
       }
       std::shared_ptr<HttpRequestImpl> http_request =
-        std::static_pointer_cast<HttpRequestImpl>(itr->second);
+          std::static_pointer_cast<HttpRequestImpl>(itr->second);
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
@@ -1833,16 +1838,16 @@ InferHttpContext::AsyncTransfer()
 
 Error
 ProfileHttpContext::Create(
-  std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
-  ctx->reset(
-    static_cast<ProfileContext*>(new ProfileHttpContext(server_url, verbose)));
+  ctx->reset(static_cast<ProfileContext*>(
+      new ProfileHttpContext(server_url, verbose)));
   return Error::Success;
 }
 
 ProfileHttpContext::ProfileHttpContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ProfileContext(verbose), url_(server_url + "/" + kProfileRESTEndpoint)
 {
 }
@@ -1859,7 +1864,7 @@ ProfileHttpContext::SendCommand(const std::string& cmd_str)
   CURL* curl = curl_easy_init();
   if (!curl) {
     return Error(
-      RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
   // Want binary representation of the status.
@@ -1878,8 +1883,8 @@ ProfileHttpContext::SendCommand(const std::string& cmd_str)
   if (res != CURLE_OK) {
     curl_easy_cleanup(curl);
     return Error(
-      RequestStatusCode::INTERNAL,
-      "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
   // Must use 64-bit integer with curl_easy_getinfo
@@ -1900,7 +1905,7 @@ ProfileHttpContext::SendCommand(const std::string& cmd_str)
 
 size_t
 ProfileHttpContext::ResponseHeaderHandler(
-  void* contents, size_t size, size_t nmemb, void* userp)
+    void* contents, size_t size, size_t nmemb, void* userp)
 {
   ProfileHttpContext* ctx = reinterpret_cast<ProfileHttpContext*>(userp);
 
@@ -1917,7 +1922,7 @@ ProfileHttpContext::ResponseHeaderHandler(
       std::string hdr(buf + idx + 1, byte_size - idx - 1);
 
       if (!google::protobuf::TextFormat::ParseFromString(
-            hdr, &ctx->request_status_)) {
+              hdr, &ctx->request_status_)) {
         ctx->request_status_.Clear();
       }
     }
@@ -1930,16 +1935,16 @@ ProfileHttpContext::ResponseHeaderHandler(
 
 Error
 ServerHealthGrpcContext::Create(
-  std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
   ctx->reset(static_cast<ServerHealthContext*>(
-    new ServerHealthGrpcContext(server_url, verbose)));
+      new ServerHealthGrpcContext(server_url, verbose)));
   return Error::Success;
 }
 
 ServerHealthGrpcContext::ServerHealthGrpcContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ServerHealthContext(verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
@@ -1962,9 +1967,9 @@ ServerHealthGrpcContext::GetHealth(const std::string& mode, bool* health)
   } else {
     // Something wrong with the gRPC conncection
     err = Error(
-      RequestStatusCode::INTERNAL,
-      "gRPC client failed: " + std::to_string(grpc_status.error_code()) + ": " +
-        grpc_status.error_message());
+        RequestStatusCode::INTERNAL,
+        "gRPC client failed: " + std::to_string(grpc_status.error_code()) +
+            ": " + grpc_status.error_message());
   }
 
   if (verbose_ && err.IsOk()) {
@@ -1990,33 +1995,33 @@ ServerHealthGrpcContext::GetLive(bool* live)
 
 Error
 ServerStatusGrpcContext::Create(
-  std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
   ctx->reset(static_cast<ServerStatusContext*>(
-    new ServerStatusGrpcContext(server_url, verbose)));
+      new ServerStatusGrpcContext(server_url, verbose)));
   return Error::Success;
 }
 
 Error
 ServerStatusGrpcContext::Create(
-  std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-  const std::string& model_name, bool verbose)
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::string& model_name, bool verbose)
 {
   ctx->reset(static_cast<ServerStatusContext*>(
-    new ServerStatusGrpcContext(server_url, model_name, verbose)));
+      new ServerStatusGrpcContext(server_url, model_name, verbose)));
   return Error::Success;
 }
 
 ServerStatusGrpcContext::ServerStatusGrpcContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ServerStatusContext(verbose), model_name_(""),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
 }
 
 ServerStatusGrpcContext::ServerStatusGrpcContext(
-  const std::string& server_url, const std::string& model_name, bool verbose)
+    const std::string& server_url, const std::string& model_name, bool verbose)
     : ServerStatusContext(verbose), model_name_(model_name),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
@@ -2041,9 +2046,9 @@ ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
   } else {
     // Something wrong with the gRPC conncection
     grpc_status = Error(
-      RequestStatusCode::INTERNAL,
-      "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
-        status.error_message());
+        RequestStatusCode::INTERNAL,
+        "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
   }
 
   // Log server status if request is SUCCESS and verbose is true.
@@ -2061,7 +2066,7 @@ class GrpcRequestImpl : public RequestImpl {
 
   // @see RequestImpl.GetResults()
   Error GetResults(
-    std::vector<std::unique_ptr<InferContext::Result>>* results) override;
+      std::vector<std::unique_ptr<InferContext::Result>>* results) override;
 
  private:
   // Unmarshall and process 'grpc_response_' into 'requested_results'
@@ -2093,7 +2098,7 @@ GrpcRequestImpl::SetRawResult()
     // Not using loop as in HTTP Infer because the output size should match
     if ((size > 0) && (result_pos_idx_ < requested_results_.size())) {
       ResultImpl* io = reinterpret_cast<ResultImpl*>(
-        requested_results_[result_pos_idx_].get());
+          requested_results_[result_pos_idx_].get());
 
       // Only try to read raw result for RAW
       if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
@@ -2106,8 +2111,8 @@ GrpcRequestImpl::SetRawResult()
 
     if (result_bytes != size) {
       return Error(
-        RequestStatusCode::INVALID,
-        "Written bytes doesn't match received bytes.");
+          RequestStatusCode::INVALID,
+          "Written bytes doesn't match received bytes.");
     }
 
     result_pos_idx_++;
@@ -2118,7 +2123,7 @@ GrpcRequestImpl::SetRawResult()
 
 Error
 GrpcRequestImpl::GetResults(
-  std::vector<std::unique_ptr<InferContext::Result>>* results)
+    std::vector<std::unique_ptr<InferContext::Result>>* results)
 {
   results->clear();
   InferResponseHeader infer_response;
@@ -2136,9 +2141,9 @@ GrpcRequestImpl::GetResults(
   } else {
     // Something wrong with the gRPC conncection
     err = Error(
-      RequestStatusCode::INTERNAL,
-      "gRPC client failed: " + std::to_string(grpc_status_.error_code()) +
-        ": " + grpc_status_.error_message());
+        RequestStatusCode::INTERNAL,
+        "gRPC client failed: " + std::to_string(grpc_status_.error_code()) +
+            ": " + grpc_status_.error_message());
   }
 
   // Only continue to process result if gRPC status is SUCCESS
@@ -2154,20 +2159,20 @@ GrpcRequestImpl::GetResults(
 
 Error
 InferGrpcContext::Create(
-  std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-  const std::string& model_name, int model_version, bool verbose)
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::string& model_name, int model_version, bool verbose)
 {
   InferGrpcContext* ctx_ptr =
-    new InferGrpcContext(server_url, model_name, model_version, verbose);
+      new InferGrpcContext(server_url, model_name, model_version, verbose);
 
   // Create request context for synchronous request.
   ctx_ptr->sync_request_.reset(
-    static_cast<Request*>(new GrpcRequestImpl(0, 0)));
+      static_cast<Request*>(new GrpcRequestImpl(0, 0)));
 
   // Get status of the model and create the inputs and outputs.
   std::unique_ptr<ServerStatusContext> sctx;
   Error err =
-    ServerStatusGrpcContext::Create(&sctx, server_url, model_name, verbose);
+      ServerStatusGrpcContext::Create(&sctx, server_url, model_name, verbose);
   if (err.IsOk()) {
     ServerStatus server_status;
     err = sctx->GetServerStatus(&server_status);
@@ -2175,13 +2180,13 @@ InferGrpcContext::Create(
       const auto& itr = server_status.model_status().find(model_name);
       if (itr == server_status.model_status().end()) {
         err = Error(
-          RequestStatusCode::INTERNAL,
-          "unable to find status information for \"" + model_name + "\"");
+            RequestStatusCode::INTERNAL,
+            "unable to find status information for \"" + model_name + "\"");
       } else {
         const ModelConfig& model_info = itr->second.config();
 
         ctx_ptr->max_batch_size_ =
-          static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
+            static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
 
         // Create inputs and outputs
         for (const auto& io : model_info.input()) {
@@ -2204,8 +2209,8 @@ InferGrpcContext::Create(
 }
 
 InferGrpcContext::InferGrpcContext(
-  const std::string& server_url, const std::string& model_name,
-  int model_version, bool verbose)
+    const std::string& server_url, const std::string& model_name,
+    int model_version, bool verbose)
     : InferContext(model_name, model_version, verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
@@ -2237,7 +2242,7 @@ InferGrpcContext::Run(std::vector<std::unique_ptr<Result>>* results)
   grpc::ClientContext context;
 
   std::shared_ptr<GrpcRequestImpl> sync_request =
-    std::static_pointer_cast<GrpcRequestImpl>(sync_request_);
+      std::static_pointer_cast<GrpcRequestImpl>(sync_request_);
   sync_request->InitializeRequestedResults(requested_outputs_, batch_size_);
 
   sync_request->timer_.Reset();
@@ -2248,7 +2253,7 @@ InferGrpcContext::Run(std::vector<std::unique_ptr<Result>>* results)
 
   sync_request->timer_.Record(RequestTimers::Kind::REQUEST_START);
   sync_request->grpc_status_ =
-    stub_->Infer(&context, request_, &sync_request->grpc_response_);
+      stub_->Infer(&context, request_, &sync_request->grpc_response_);
   sync_request->timer_.Record(RequestTimers::Kind::REQUEST_END);
 
   sync_request->timer_.Record(RequestTimers::Kind::RECEIVE_START);
@@ -2279,16 +2284,16 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
   }
 
   GrpcRequestImpl* current_context =
-    new GrpcRequestImpl(async_request_id_++, run_index);
+      new GrpcRequestImpl(async_request_id_++, run_index);
   async_request->reset(static_cast<Request*>(current_context));
 
-  auto insert_result =
-    ongoing_async_requests_.emplace(std::make_pair(run_index, *async_request));
+  auto insert_result = ongoing_async_requests_.emplace(
+      std::make_pair(run_index, *async_request));
 
   if (!insert_result.second) {
     return Error(
-      RequestStatusCode::INTERNAL,
-      "Failed to insert new asynchronous request context.");
+        RequestStatusCode::INTERNAL,
+        "Failed to insert new asynchronous request context.");
   }
 
   current_context->timer_.Reset();
@@ -2298,15 +2303,15 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
   current_context->timer_.Record(RequestTimers::Kind::REQUEST_START);
   std::unique_ptr<grpc::ClientAsyncResponseReader<InferResponse>> rpc(
-    stub_->PrepareAsyncInfer(
-      &current_context->grpc_context_, request_,
-      &async_request_completion_queue_));
+      stub_->PrepareAsyncInfer(
+          &current_context->grpc_context_, request_,
+          &async_request_completion_queue_));
 
   rpc->StartCall();
 
   rpc->Finish(
-    &current_context->grpc_response_, &current_context->grpc_status_,
-    (void*)run_index);
+      &current_context->grpc_response_, &current_context->grpc_status_,
+      (void*)run_index);
 
   cv_.notify_all();
   return Error(RequestStatusCode::SUCCESS);
@@ -2314,8 +2319,8 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferGrpcContext::GetAsyncRunResults(
-  std::vector<std::unique_ptr<Result>>* results,
-  const std::shared_ptr<Request>& async_request, bool wait)
+    std::vector<std::unique_ptr<Result>>* results,
+    const std::shared_ptr<Request>& async_request, bool wait)
 {
   Error err = IsRequestReady(async_request, wait);
   if (!err.IsOk()) {
@@ -2323,7 +2328,7 @@ InferGrpcContext::GetAsyncRunResults(
   }
 
   std::shared_ptr<GrpcRequestImpl> grpc_request =
-    std::static_pointer_cast<GrpcRequestImpl>(async_request);
+      std::static_pointer_cast<GrpcRequestImpl>(async_request);
 
   reusable_slot_.push_back(grpc_request->run_index_);
   grpc_request->timer_.Record(RequestTimers::Kind::RECEIVE_START);
@@ -2340,7 +2345,7 @@ Error
 InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 {
   std::shared_ptr<GrpcRequestImpl> grpc_request =
-    std::static_pointer_cast<GrpcRequestImpl>(request);
+      std::static_pointer_cast<GrpcRequestImpl>(request);
   grpc_request->InitializeRequestedResults(requested_outputs_, batch_size_);
 
   for (auto& io : inputs_) {
@@ -2361,7 +2366,7 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
       const uint8_t* data_ptr;
       io->GetRaw(batch_idx, &data_ptr);
       new_input->append(
-        reinterpret_cast<const char*>(data_ptr), io->ByteSize());
+          reinterpret_cast<const char*>(data_ptr), io->ByteSize());
     }
     input_pos_idx++;
   }
@@ -2380,10 +2385,9 @@ InferGrpcContext::AsyncTransfer()
       }
       // wake up if at least one request is not ready
       for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (
-          std::static_pointer_cast<GrpcRequestImpl>(
-            ongoing_async_request.second)
-            ->ready_ == false) {
+        if (std::static_pointer_cast<GrpcRequestImpl>(
+                ongoing_async_request.second)
+                ->ready_ == false) {
           return true;
         }
       }
@@ -2406,14 +2410,14 @@ InferGrpcContext::AsyncTransfer()
         auto itr = ongoing_async_requests_.find(got);
         if (itr == ongoing_async_requests_.end()) {
           fprintf(
-            stderr,
-            "Unexpected error: received completed request that"
-            " is not in the list of asynchronous requests.\n");
+              stderr,
+              "Unexpected error: received completed request that"
+              " is not in the list of asynchronous requests.\n");
           continue;
         }
 
         std::shared_ptr<GrpcRequestImpl> grpc_request =
-          std::static_pointer_cast<GrpcRequestImpl>(itr->second);
+            std::static_pointer_cast<GrpcRequestImpl>(itr->second);
         grpc_request->timer_.Record(RequestTimers::Kind::REQUEST_END);
         grpc_request->ready_ = true;
       }
@@ -2427,16 +2431,16 @@ InferGrpcContext::AsyncTransfer()
 
 Error
 ProfileGrpcContext::Create(
-  std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-  bool verbose)
+    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
+    bool verbose)
 {
-  ctx->reset(
-    static_cast<ProfileContext*>(new ProfileGrpcContext(server_url, verbose)));
+  ctx->reset(static_cast<ProfileContext*>(
+      new ProfileGrpcContext(server_url, verbose)));
   return Error::Success;
 }
 
 ProfileGrpcContext::ProfileGrpcContext(
-  const std::string& server_url, bool verbose)
+    const std::string& server_url, bool verbose)
     : ProfileContext(verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
@@ -2456,9 +2460,9 @@ ProfileGrpcContext::SendCommand(const std::string& cmd_str)
   } else {
     // Something wrong with the gRPC conncection
     return Error(
-      RequestStatusCode::INTERNAL,
-      "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
-        status.error_message());
+        RequestStatusCode::INTERNAL,
+        "gRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
   }
 }
 

@@ -43,7 +43,7 @@ class LabelProvider {
 
   // Add a set of named labels initialized from a given 'filepath'.
   tensorflow::Status AddLabels(
-    const std::string& name, const std::string& filepath);
+      const std::string& name, const std::string& filepath);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(LabelProvider);

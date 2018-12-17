@@ -39,10 +39,10 @@ namespace nvidia { namespace inferenceserver {
 class Caffe2WorkspaceImpl : public Caffe2Workspace {
  public:
   static Error Create(
-    Caffe2WorkspaceImpl** c2ws, const std::string& model_name,
-    const int max_batch_size, const std::vector<std::string>& input_names,
-    const std::vector<std::string>& output_names,
-    const caffe2::NetDef& netdef_init, const caffe2::NetDef& netdef_model);
+      Caffe2WorkspaceImpl** c2ws, const std::string& model_name,
+      const int max_batch_size, const std::vector<std::string>& input_names,
+      const std::vector<std::string>& output_names,
+      const caffe2::NetDef& netdef_init, const caffe2::NetDef& netdef_model);
   Caffe2WorkspaceImpl() = default;
   ~Caffe2WorkspaceImpl() = default;
 
@@ -65,22 +65,22 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
   }
 
   Error AddInputTensor(
-    const std::string& name, const DataType datatype,
-    const std::vector<int>& dims) override;
+      const std::string& name, const DataType datatype,
+      const std::vector<int>& dims) override;
   Error AddOutputTensor(
-    const std::string& name, const DataType datatype,
-    const std::vector<int>& dims) override;
+      const std::string& name, const DataType datatype,
+      const std::vector<int>& dims) override;
   Error SetInputTensor(
-    const std::string& name, size_t batch_size, const char* content,
-    size_t byte_size) override;
+      const std::string& name, size_t batch_size, const char* content,
+      size_t byte_size) override;
   Error GetOutputTensor(
-    const std::string& name, size_t batch_size, const char** content,
-    size_t byte_size) override;
+      const std::string& name, size_t batch_size, const char** content,
+      size_t byte_size) override;
   Error Run() override;
 
  private:
   using IOTensorMap =
-    std::unordered_map<std::string, std::unique_ptr<caffe2::Tensor>>;
+      std::unordered_map<std::string, std::unique_ptr<caffe2::Tensor>>;
 
   // The Caffe2 workspace.
   std::unique_ptr<caffe2::Workspace> ws_;
@@ -142,10 +142,10 @@ DimsDebugString(const std::vector<int64_t>& dims)
 
 bool
 ReadBinaryProto(
-  const std::vector<char>& blob, google::protobuf::MessageLite* msg)
+    const std::vector<char>& blob, google::protobuf::MessageLite* msg)
 {
   google::protobuf::io::CodedInputStream coded_stream(
-    reinterpret_cast<const uint8_t*>(&blob[0]), blob.size());
+      reinterpret_cast<const uint8_t*>(&blob[0]), blob.size());
   coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
   return msg->ParseFromCodedStream(&coded_stream);
 }
@@ -230,9 +230,9 @@ DataTypeName(const Caffe2Workspace::DataType datatype)
 
 caffe2::OperatorDef*
 AddOp(
-  caffe2::NetDef* net, const std::string& name,
-  const std::vector<std::string>& inputs,
-  const std::vector<std::string>& outputs)
+    caffe2::NetDef* net, const std::string& name,
+    const std::vector<std::string>& inputs,
+    const std::vector<std::string>& outputs)
 {
   auto op = net->add_op();
   op->set_type(name);
@@ -248,14 +248,14 @@ AddOp(
 
 caffe2::OperatorDef*
 AddCopyFromCpuInput(
-  caffe2::NetDef* net, const std::string& input, const std::string& output)
+    caffe2::NetDef* net, const std::string& input, const std::string& output)
 {
   return AddOp(net, "CopyFromCPUInput", {input}, {output});
 }
 
 caffe2::OperatorDef*
 AddEnsureCpuOutput(
-  caffe2::NetDef* net, const std::string& input, const std::string& output)
+    caffe2::NetDef* net, const std::string& input, const std::string& output)
 {
   return AddOp(net, "EnsureCPUOutput", {input}, {output});
 }
@@ -265,10 +265,10 @@ AddEnsureCpuOutput(
 
 Caffe2Workspace::Error
 Caffe2WorkspaceCreate(
-  Caffe2Workspace** c2ws, const std::string& model_name,
-  const int max_batch_size, const std::vector<std::string>& input_names,
-  const std::vector<std::string>& output_names, const int gpu_device,
-  const std::vector<char>& init_blob, const std::vector<char>& model_blob)
+    Caffe2Workspace** c2ws, const std::string& model_name,
+    const int max_batch_size, const std::vector<std::string>& input_names,
+    const std::vector<std::string>& output_names, const int gpu_device,
+    const std::vector<char>& init_blob, const std::vector<char>& model_blob)
 {
   caffe2::GlobalInit();
 
@@ -278,9 +278,8 @@ Caffe2WorkspaceCreate(
   new caffe2::CUDAContext(0);
 
   caffe2::NetDef netdef_init, netdef_model;
-  if (
-    !ReadBinaryProto(init_blob, &netdef_init) ||
-    !ReadBinaryProto(model_blob, &netdef_model)) {
+  if (!ReadBinaryProto(init_blob, &netdef_init) ||
+      !ReadBinaryProto(model_blob, &netdef_model)) {
     return Caffe2Workspace::Error("failed to parse NetDef model");
   }
 
@@ -300,7 +299,7 @@ Caffe2WorkspaceCreate(
 
   for (int i = 0; i < netdef_model.op().size(); ++i) {
     netdef_model.mutable_op(i)->mutable_device_option()->CopyFrom(
-      device_option);
+        device_option);
   }
 
   // For each input that feeds an operator that is executed on a GPU,
@@ -315,8 +314,8 @@ Caffe2WorkspaceCreate(
   const int op_cnt = netdef_model.op().size();
   for (int opidx = 0; opidx < op_cnt; ++opidx) {
     caffe2::OperatorDef* opdef = netdef_model.mutable_op(opidx);
-    if (
-      opdef->device_option().device_type() != static_cast<int>(caffe2::CUDA)) {
+    if (opdef->device_option().device_type() !=
+        static_cast<int>(caffe2::CUDA)) {
       continue;
     }
 
@@ -329,7 +328,7 @@ Caffe2WorkspaceCreate(
           if (itr == io_name_map.end()) {
             const std::string gpu_name = input_name + "_in_nvis_";
             caffe2::OperatorDef* cpdef =
-              AddCopyFromCpuInput(&new_input_ops, input_name, gpu_name);
+                AddCopyFromCpuInput(&new_input_ops, input_name, gpu_name);
             cpdef->mutable_device_option()->CopyFrom(device_option);
             auto pr = io_name_map.emplace(input_name, gpu_name);
             itr = pr.first;
@@ -349,7 +348,7 @@ Caffe2WorkspaceCreate(
           if (itr == io_name_map.end()) {
             const std::string gpu_name = output_name + "_out_nvis_";
             caffe2::OperatorDef* cpdef =
-              AddEnsureCpuOutput(&netdef_model, gpu_name, output_name);
+                AddEnsureCpuOutput(&netdef_model, gpu_name, output_name);
             cpdef->mutable_device_option()->CopyFrom(device_option);
             auto pr = io_name_map.emplace(output_name, gpu_name);
             itr = pr.first;
@@ -372,18 +371,18 @@ Caffe2WorkspaceCreate(
 
   Caffe2WorkspaceImpl* c2wsimpl;
   Caffe2Workspace::Error err = Caffe2WorkspaceImpl::Create(
-    &c2wsimpl, model_name, max_batch_size, input_names, output_names,
-    netdef_init, netdef_model);
+      &c2wsimpl, model_name, max_batch_size, input_names, output_names,
+      netdef_init, netdef_model);
   *c2ws = c2wsimpl;
   return err;
 }
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::Create(
-  Caffe2WorkspaceImpl** c2ws, const std::string& model_name,
-  const int max_batch_size, const std::vector<std::string>& input_names,
-  const std::vector<std::string>& output_names,
-  const caffe2::NetDef& netdef_init, const caffe2::NetDef& netdef_model)
+    Caffe2WorkspaceImpl** c2ws, const std::string& model_name,
+    const int max_batch_size, const std::vector<std::string>& input_names,
+    const std::vector<std::string>& output_names,
+    const caffe2::NetDef& netdef_init, const caffe2::NetDef& netdef_model)
 {
   *c2ws = new Caffe2WorkspaceImpl();
   (*c2ws)->model_name_ = model_name;
@@ -394,14 +393,14 @@ Caffe2WorkspaceImpl::Create(
     delete *c2ws;
     *c2ws = nullptr;
     return Error(
-      "Failed to create Caffe2 workspace for model '" + model_name + "'");
+        "Failed to create Caffe2 workspace for model '" + model_name + "'");
   }
 
   if (!(*c2ws)->ws_->RunNetOnce(netdef_init)) {
     delete *c2ws;
     *c2ws = nullptr;
     return Error(
-      "Failed to run Caffe2 init workspace for model '" + model_name + "'");
+        "Failed to run Caffe2 init workspace for model '" + model_name + "'");
   }
 
   // Create the blobs for each input
@@ -414,15 +413,15 @@ Caffe2WorkspaceImpl::Create(
       delete *c2ws;
       *c2ws = nullptr;
       return Error(
-        "Failed to create Caffe2 blob for input '" + input_name +
-        "' for model '" + model_name + "': " + ex.msg());
+          "Failed to create Caffe2 blob for input '" + input_name +
+          "' for model '" + model_name + "': " + ex.msg());
     }
     if (input == nullptr) {
       delete *c2ws;
       *c2ws = nullptr;
       return Error(
-        "Failed to create Caffe2 blob for input '" + input_name +
-        "' for model '" + model_name + "'");
+          "Failed to create Caffe2 blob for input '" + input_name +
+          "' for model '" + model_name + "'");
     }
   }
 
@@ -438,7 +437,7 @@ Caffe2WorkspaceImpl::Create(
     delete *c2ws;
     *c2ws = nullptr;
     return Error(
-      "Failed to create Caffe2 model for model '" + model_name + "'");
+        "Failed to create Caffe2 model for model '" + model_name + "'");
   }
 
   return Error();
@@ -446,15 +445,15 @@ Caffe2WorkspaceImpl::Create(
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::AddInputTensor(
-  const std::string& name, const DataType datatype,
-  const std::vector<int>& dims)
+    const std::string& name, const DataType datatype,
+    const std::vector<int>& dims)
 {
   // Create a Tensor to hold the shape and datatype.
   const auto pr = ConvertDatatype(datatype);
   if (!pr.first) {
     return Error(
-      "Failed to convert datatype '" + DataTypeName(datatype) +
-      "' to Caffe2 NetDef datatype");
+        "Failed to convert datatype '" + DataTypeName(datatype) +
+        "' to Caffe2 NetDef datatype");
   }
 
   // Tensor::ShareExternalPointer allows us to explicitly set the
@@ -465,23 +464,23 @@ Caffe2WorkspaceImpl::AddInputTensor(
   inputs_.insert(std::make_pair(name, tensor->size() * tensor->itemsize()));
 
   input_tensor_map_.emplace(
-    std::piecewise_construct, std::make_tuple(name),
-    std::make_tuple(std::move(tensor)));
+      std::piecewise_construct, std::make_tuple(name),
+      std::make_tuple(std::move(tensor)));
 
   return Error();
 }
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::AddOutputTensor(
-  const std::string& name, const DataType datatype,
-  const std::vector<int>& dims)
+    const std::string& name, const DataType datatype,
+    const std::vector<int>& dims)
 {
   // Create a Tensor to hold the shape and datatype.
   const auto pr = ConvertDatatype(datatype);
   if (!pr.first) {
     return Error(
-      "Failed to convert datatype '" + DataTypeName(datatype) +
-      "' to Caffe2 NetDef datatype");
+        "Failed to convert datatype '" + DataTypeName(datatype) +
+        "' to Caffe2 NetDef datatype");
   }
 
   // Tensor::ShareExternalPointer allows us to explicitly set the
@@ -492,16 +491,16 @@ Caffe2WorkspaceImpl::AddOutputTensor(
   outputs_.insert(std::make_pair(name, tensor->size() * tensor->itemsize()));
 
   output_tensor_map_.emplace(
-    std::piecewise_construct, std::make_tuple(name),
-    std::make_tuple(std::move(tensor)));
+      std::piecewise_construct, std::make_tuple(name),
+      std::make_tuple(std::move(tensor)));
 
   return Error();
 }
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::SetInputTensor(
-  const std::string& name, size_t batch_size, const char* content,
-  size_t byte_size)
+    const std::string& name, size_t batch_size, const char* content,
+    size_t byte_size)
 {
   const auto itr = input_tensor_map_.find(name);
   if (itr == input_tensor_map_.end()) {
@@ -526,7 +525,7 @@ Caffe2WorkspaceImpl::SetInputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-      "failed to get NetDef blob for input '" + name + "': " + ex.msg());
+        "failed to get NetDef blob for input '" + name + "': " + ex.msg());
   }
   if (blob == nullptr) {
     return Error("failed to get NetDef blob for input '" + name + "'");
@@ -538,7 +537,7 @@ Caffe2WorkspaceImpl::SetInputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-      "failed to get NetDef tensor for input '" + name + "': " + ex.msg());
+        "failed to get NetDef tensor for input '" + name + "': " + ex.msg());
   }
   if (input == nullptr) {
     return Error("failed to get NetDef tensor for input '" + name + "'");
@@ -547,21 +546,21 @@ Caffe2WorkspaceImpl::SetInputTensor(
   input->Resize(dims);
   if ((input->size() * itr->second->itemsize()) != byte_size) {
     return Error(
-      "unexpected size " + std::to_string(byte_size) +
-      " for inference input '" + name + "', expecting " +
-      std::to_string(input->size() * itr->second->itemsize()));
+        "unexpected size " + std::to_string(byte_size) +
+        " for inference input '" + name + "', expecting " +
+        std::to_string(input->size() * itr->second->itemsize()));
   }
 
   input->ShareExternalPointer(
-    const_cast<char*>(content), itr->second->meta(), byte_size);
+      const_cast<char*>(content), itr->second->meta(), byte_size);
 
   return Error();
 }
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::GetOutputTensor(
-  const std::string& name, size_t batch_size, const char** content,
-  size_t byte_size)
+    const std::string& name, size_t batch_size, const char** content,
+    size_t byte_size)
 {
   const auto itr = output_tensor_map_.find(name);
   if (itr == output_tensor_map_.end()) {
@@ -575,7 +574,7 @@ Caffe2WorkspaceImpl::GetOutputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-      "failed to get NetDef blob for output '" + name + "': " + ex.msg());
+        "failed to get NetDef blob for output '" + name + "': " + ex.msg());
   }
   if (blob == nullptr) {
     return Error("failed to get NetDef blob for output '" + name + "'");
@@ -587,7 +586,7 @@ Caffe2WorkspaceImpl::GetOutputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-      "failed to get NetDef tensor for output '" + name + "': " + ex.msg());
+        "failed to get NetDef tensor for output '" + name + "': " + ex.msg());
   }
   if (output == nullptr) {
     return Error("failed to get NetDef tensor for output '" + name + "'");
@@ -595,9 +594,9 @@ Caffe2WorkspaceImpl::GetOutputTensor(
 
   if (itr->second->meta() != output->meta()) {
     return Error(
-      "unexpected datatype " + std::string(output->meta().name()) +
-      " for inference output '" + name + "', expecting " +
-      std::string(itr->second->meta().name()));
+        "unexpected datatype " + std::string(output->meta().name()) +
+        " for inference output '" + name + "', expecting " +
+        std::string(itr->second->meta().name()));
   }
 
   // If model supports batching then prepend the batch dimension onto
@@ -612,16 +611,16 @@ Caffe2WorkspaceImpl::GetOutputTensor(
 
   if (expected_dims != output->dims()) {
     return Error(
-      "unexpected shape " + DimsDebugString(output->dims()) +
-      " for inference output '" + name + "', expecting " +
-      DimsDebugString(expected_dims));
+        "unexpected shape " + DimsDebugString(output->dims()) +
+        " for inference output '" + name + "', expecting " +
+        DimsDebugString(expected_dims));
   }
 
   if (byte_size != output->nbytes()) {
     return Error(
-      "unexpected size " + std::to_string(output->nbytes()) +
-      " for inference output '" + name + "', expecting " +
-      std::to_string(byte_size));
+        "unexpected size " + std::to_string(output->nbytes()) +
+        " for inference output '" + name + "', expecting " +
+        std::to_string(byte_size));
   }
 
   *content = static_cast<const char*>(output->raw_data());

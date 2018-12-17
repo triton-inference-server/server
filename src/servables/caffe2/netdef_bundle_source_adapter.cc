@@ -44,22 +44,22 @@ namespace {
 
 tensorflow::Status
 CreateNetDefBundle(
-  const NetDefBundleSourceAdapterConfig& adapter_config,
-  const std::string& path, std::unique_ptr<NetDefBundle>* bundle)
+    const NetDefBundleSourceAdapterConfig& adapter_config,
+    const std::string& path, std::unique_ptr<NetDefBundle>* bundle)
 {
   const auto model_path = tensorflow::io::Dirname(path);
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
   TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
-    std::string(model_name), &model_config));
+      std::string(model_name), &model_config));
 
   // Read all the netdef files in 'path'. GetChildren() returns all
   // descendants instead for cloud storage like GCS, so filter out all
   // non-direct descendants.
   std::vector<std::string> possible_children;
   TF_RETURN_IF_ERROR(
-    tensorflow::Env::Default()->GetChildren(path, &possible_children));
+      tensorflow::Env::Default()->GetChildren(path, &possible_children));
   std::set<std::string> children;
   for (const auto& child : possible_children) {
     children.insert(child.substr(0, child.find_first_of('/')));
@@ -70,7 +70,7 @@ CreateNetDefBundle(
     const auto netdef_path = tensorflow::io::JoinPath(path, filename);
     tensorflow::string model_data_str;
     TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
-      tensorflow::Env::Default(), netdef_path, &model_data_str));
+        tensorflow::Env::Default(), netdef_path, &model_data_str));
     std::vector<char> model_data(model_data_str.begin(), model_data_str.end());
     models.emplace(filename, std::move(model_data));
   }
@@ -94,18 +94,19 @@ CreateNetDefBundle(
 
 tensorflow::Status
 NetDefBundleSourceAdapter::Create(
-  const NetDefBundleSourceAdapterConfig& config,
-  std::unique_ptr<
-    SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter)
+    const NetDefBundleSourceAdapterConfig& config,
+    std::unique_ptr<
+        SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter)
 {
   LOG_VERBOSE(1) << "Create NetDefBundleSourceAdaptor for config \""
                  << config.DebugString() << "\"";
 
   Creator creator = std::bind(
-    &CreateNetDefBundle, config, std::placeholders::_1, std::placeholders::_2);
+      &CreateNetDefBundle, config, std::placeholders::_1,
+      std::placeholders::_2);
 
   adapter->reset(new NetDefBundleSourceAdapter(
-    config, creator, SimpleSourceAdapter::EstimateNoResources()));
+      config, creator, SimpleSourceAdapter::EstimateNoResources()));
   return tensorflow::Status::OK();
 }
 
@@ -119,6 +120,6 @@ NetDefBundleSourceAdapter::~NetDefBundleSourceAdapter()
 namespace tensorflow { namespace serving {
 
 REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-  nvidia::inferenceserver::NetDefBundleSourceAdapter,
-  nvidia::inferenceserver::NetDefBundleSourceAdapterConfig);
+    nvidia::inferenceserver::NetDefBundleSourceAdapter,
+    nvidia::inferenceserver::NetDefBundleSourceAdapterConfig);
 }}  // namespace tensorflow::serving

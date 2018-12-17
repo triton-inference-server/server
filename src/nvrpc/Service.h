@@ -48,8 +48,8 @@ class AsyncService : public IService {
   template <typename ContextType, typename RequestFuncType>
   IRPC* RegisterRPC(RequestFuncType req_fn)
   {
-    auto q_fn =
-      ContextType::LifeCycleType::BindServiceQueueFunc(req_fn, m_Service.get());
+    auto q_fn = ContextType::LifeCycleType::BindServiceQueueFunc(
+        req_fn, m_Service.get());
     auto rpc = new AsyncRPC<ContextType, ServiceType>(q_fn);
     auto base = static_cast<IRPC*>(rpc);
     m_RPCs.emplace_back(base);
