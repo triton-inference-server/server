@@ -32,9 +32,9 @@ NVIDIA TensorRT Inference Server
 
     **NOTE: You are currently on the master branch which tracks
     under-development progress towards the next release. The latest
-    release of the TensorRT Inference Server is 0.8.0 beta and is
-    available on branch** `r18.11
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_.
+    release of the TensorRT Inference Server is 0.9.0 beta and is
+    available on branch** `r18.12
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.12>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -57,6 +57,12 @@ server. TRTIS provides the following features:
   model can implement any logic desired, while still benefiting from
   the GPU support, concurrent execution, dynamic batching and other
   features provided by TRTIS.
+* TRTIS `monitors the model repository
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#modifying-the-model-repository>`_
+  for any change and dynamically reloads the model(s) when necessary,
+  without requiring a server restart. Models and model versions can be
+  added and removed, and model configurations can be modified while
+  the server is running.
 * Multi-GPU support. TRTIS can distribute inferencing across all
   system GPUs.
 * `Concurrent model execution support
@@ -85,11 +91,11 @@ server. TRTIS provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 0.8.0 beta and
-corresponds to the 18.11 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 0.9.0 beta and
+corresponds to the 18.12 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r18.11
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.11>`_.
+this release is `r18.12
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r18.12>`_.
 
 Documentation
 -------------
