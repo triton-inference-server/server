@@ -83,6 +83,7 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
+               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0; \
                touch /opt/conda/lib/libmkl_avx2.so; \
                touch /opt/conda/lib/libmkl_core.so; \
@@ -132,6 +133,9 @@ COPY --from=trtserver_caffe2 \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \
+     /opt/tensorrtserver/lib/
+COPY --from=trtserver_caffe2 \
+     /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0 \

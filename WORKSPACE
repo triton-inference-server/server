@@ -61,6 +61,11 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 cc_library(
+    name = "libc10_cuda",
+    srcs = ["libc10_cuda.so"],
+    visibility = ["//visibility:public"],
+)
+cc_library(
     name = "libmkldnn",
     srcs = ["libmkldnn.so.0"],
     visibility = ["//visibility:public"],
