@@ -329,7 +329,7 @@ interface is also documented in the `API Reference
 Example Custom Backend
 ^^^^^^^^^^^^^^^^^^^^^^
 
-An example of a custom backend can be found in the `addsum backend
+An example of a custom backend can be found in the `addsub backend
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/addsub/addsub.cc>`_. You
 can see the custom backend being used as part of CI testing in
 `L0_infer
