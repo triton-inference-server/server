@@ -63,6 +63,7 @@ cc_binary(
         "@extern_lib//:libcaffe2_detectron_ops_gpu",
         "@extern_lib//:libcaffe2_gpu",
         "@extern_lib//:libc10",
+        "@extern_lib//:libc10_cuda",
         "@extern_lib//:libmkldnn",
         "@extern_lib//:libmkl_core",
         "@extern_lib//:libmkl_gnu_thread",
