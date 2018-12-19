@@ -25,8 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
+#include "cuda/include/cuda.h"
+#include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/utils.h"
+#include "src/custom/addsub/kernel.h"
 #include "src/servables/custom/custom.h"
 
 // This custom backend takes two INT32 input tensors (any shape but
@@ -55,27 +59,40 @@ enum ErrorCodes {
   kInputOutputDataType,
   kInputContents,
   kInputSize,
-  kOutputBuffer
+  kOutputBuffer,
+  kCudaMalloc,
+  kCudaMemcpy
 };
 
 // Context object. All state must be kept in this object.
 class Context {
  public:
   Context(const ModelConfig& config, const int gpu_device);
+  ~Context();
 
   // Initialize the context. Validate that the model configuration,
   // etc. is something that we can handle.
   int Init();
 
-  // Execute
+  // Perform custom execution on the payloads.
   int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  int GetInputTensor(
+  int GetInputTensorCPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
       const size_t expected_byte_size, std::vector<int32_t>* input);
+  int GetInputTensorGPU(
+      CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+      const size_t expected_byte_size, int32_t* input);
+
+  int ExecuteCPU(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+  int ExecuteGPU(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
   // The model configuration.
   const ModelConfig model_config_;
@@ -89,21 +106,59 @@ class Context {
   // have the same size. To get the full size of an input/output need
   // to multiply this value by the batch-size.
   uint64_t batch1_byte_size_;
+
+  // CUDA memory buffers for input and output tensors.
+  size_t cuda_buffer_byte_size_;
+  int32_t* cuda_input0_;
+  int32_t* cuda_input1_;
+  int32_t* cuda_output_;
+
+  // The contexts executing on a GPU, the CUDA stream to use for the
+  // execution.
+  cudaStream_t stream_;
 };
 
 Context::Context(const ModelConfig& model_config, const int gpu_device)
-    : model_config_(model_config), gpu_device_(gpu_device), batch1_byte_size_(0)
+    : model_config_(model_config), gpu_device_(gpu_device),
+      batch1_byte_size_(0), cuda_buffer_byte_size_(0), cuda_input0_(nullptr),
+      cuda_input1_(nullptr), cuda_output_(nullptr), stream_(nullptr)
 {
+}
+
+Context::~Context()
+{
+  if (cuda_input0_ != nullptr) {
+    cudaError_t cuerr = cudaFree(cuda_input0_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+  }
+  if (cuda_input1_ != nullptr) {
+    cudaError_t cuerr = cudaFree(cuda_input1_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+  }
+  if (cuda_output_ != nullptr) {
+    cudaError_t cuerr = cudaFree(cuda_output_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
+    }
+  }
+
+  if (stream_ != nullptr) {
+    cudaError_t cuerr = cudaStreamDestroy(stream_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: "
+                << cudaGetErrorString(cuerr);
+    }
+    stream_ = nullptr;
+  }
 }
 
 int
 Context::Init()
 {
-  // We only have a CPU implementation currently...
-  if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
-    return kGpuNotSupported;
-  }
-
   // There must be two inputs that have the same shape. The shape can
   // be anything since we are just going to do an element-wise add and
   // an element-wise subtract. The input data-type must be INT32. The
@@ -150,11 +205,51 @@ Context::Init()
   // needed when reading and writing the tensors during execution.
   batch1_byte_size_ = GetByteSize(model_config_.input(0));
 
+  // Additional initialization if executing on the GPU...
+  if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
+    cudaError_t cuerr;
+    // Allocate GPU memory buffers large enough for each input and
+    // output. For performance we allocate once during initialization
+    // instead of doing it each time we execute.
+    cuda_buffer_byte_size_ =
+        batch1_byte_size_ * std::max(1, model_config_.max_batch_size());
+    cuerr = cudaMalloc(&cuda_input0_, cuda_buffer_byte_size_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to allocate memory for addsub: "
+                << cudaGetErrorString(cuerr);
+      return kCudaMalloc;
+    }
+    cuerr = cudaMalloc(&cuda_input1_, cuda_buffer_byte_size_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to allocate memory for addsub: "
+                << cudaGetErrorString(cuerr);
+      return kCudaMalloc;
+    }
+    cuerr = cudaMalloc(&cuda_output_, cuda_buffer_byte_size_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to allocate memory for addsub: "
+                << cudaGetErrorString(cuerr);
+      return kCudaMalloc;
+    }
+
+    // Create a CUDA stream for this context so that it executes
+    // independently of other instances of this backend.
+    int cuda_stream_priority = 0;
+    GetCudaPriority(
+        model_config_.optimization().priority(), &cuda_stream_priority);
+    cuerr = cudaStreamCreateWithPriority(
+        &stream_, cudaStreamDefault, cuda_stream_priority);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to create stream for addsub backend: "
+                << cudaGetErrorString(cuerr);
+    }
+  }
+
   return kSuccess;
 }
 
 int
-Context::GetInputTensor(
+Context::GetInputTensorCPU(
     CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
     const size_t expected_byte_size, std::vector<int32_t>* input)
 {
@@ -198,7 +293,7 @@ Context::GetInputTensor(
 }
 
 int
-Context::Execute(
+Context::ExecuteCPU(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
@@ -223,14 +318,14 @@ Context::Execute(
 
     // Get the input tensors.
     std::vector<int32_t> input0;
-    err = GetInputTensor(
+    err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT0", batchn_byte_size, &input0);
     if (err != kSuccess) {
       return err;
     }
 
     std::vector<int32_t> input1;
-    err = GetInputTensor(
+    err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT1", batchn_byte_size, &input1);
     if (err != kSuccess) {
       return err;
@@ -264,6 +359,152 @@ Context::Execute(
   }
 
   return kSuccess;
+}
+
+int
+Context::GetInputTensorGPU(
+    CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+    const size_t expected_byte_size, int32_t* input)
+{
+  // The values for an input tensor are not necessarily in one
+  // contiguous chunk, so we copy the chunks into 'input', which
+  // points to CUDA memory.
+  uint64_t total_content_byte_size = 0;
+
+  while (true) {
+    const void* content;
+    uint64_t content_byte_size;
+    if (!input_fn(input_context, name, &content, &content_byte_size)) {
+      return kInputContents;
+    }
+
+    // If 'content' returns nullptr we have all the input.
+    if (content == nullptr) {
+      break;
+    }
+
+    // If the total amount of content received exceeds what we expect
+    // then something is wrong.
+    if ((total_content_byte_size + content_byte_size) > expected_byte_size) {
+      return kInputSize;
+    }
+
+    cudaError_t cuerr = cudaMemcpyAsync(
+        reinterpret_cast<char*>(input) + total_content_byte_size, content,
+        content_byte_size, cudaMemcpyHostToDevice, stream_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "failed to copy input values to GPU for addsub: "
+                << cudaGetErrorString(cuerr);
+      return kCudaMemcpy;
+    }
+
+    total_content_byte_size += content_byte_size;
+  }
+
+  // Make sure we end up with exactly the amount of input we expect.
+  if (total_content_byte_size != expected_byte_size) {
+    return kInputSize;
+  }
+
+  return kSuccess;
+}
+
+int
+Context::ExecuteGPU(
+    const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+{
+  // Each payload represents a related set of inputs and required
+  // outputs. Each payload may have a different batch size. The total
+  // batch-size of all payloads will not exceed the max-batch-size
+  // specified in the model configuration.
+
+  // For performance, we would typically execute all payloads together
+  // as a single batch by first gathering the inputs from across the
+  // payloads and then scattering the outputs across the payloads.
+  // Here, for simplicity and clarity, we instead process each payload
+  // separately.
+  int err;
+
+  cudaSetDevice(gpu_device_);
+
+  for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
+    CustomPayload& payload = payloads[pidx];
+
+    // For this payload the expected size of the input and output
+    // tensors is determined by the batch-size of this payload.
+    size_t batchn_byte_size = payload.batch_size * batch1_byte_size_;
+    size_t batchn_elements = payload.batch_size * batch1_byte_size_ /
+                             GetDataTypeByteSize(DataType::TYPE_INT32);
+    if (batchn_byte_size > cuda_buffer_byte_size_) {
+      return kInputSize;
+    }
+
+    // Copy the input tensors into the appropriate CUDA memory buffer.
+    err = GetInputTensorGPU(
+        input_fn, payload.input_context, "INPUT0", batchn_byte_size,
+        cuda_input0_);
+    if (err != kSuccess) {
+      return err;
+    }
+
+    err = GetInputTensorGPU(
+        input_fn, payload.input_context, "INPUT1", batchn_byte_size,
+        cuda_input1_);
+    if (err != kSuccess) {
+      return err;
+    }
+
+    // For each requested output calculate the sum/difference directly
+    // into the CUDA output buffer and then copy out.
+    for (uint32_t oidx = 0; oidx < payload.output_cnt; ++oidx) {
+      const char* output_name = payload.required_output_names[oidx];
+
+      void* obuffer;
+      if (!output_fn(
+              payload.output_context, output_name, batchn_byte_size,
+              &obuffer)) {
+        return kOutputBuffer;
+      }
+
+      int block_size = 1024;
+      int grid_size = (batchn_elements + block_size - 1) / block_size;
+
+      if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
+        VecAdd<<<grid_size, block_size, 0, stream_>>>(
+            cuda_input0_, cuda_input1_, cuda_output_, batchn_elements);
+      } else {
+        VecSub<<<grid_size, block_size, 0, stream_>>>(
+            cuda_input0_, cuda_input1_, cuda_output_, batchn_elements);
+      }
+
+      cudaError_t cuerr = cudaMemcpyAsync(
+          obuffer, cuda_output_, batchn_byte_size, cudaMemcpyDeviceToHost,
+          stream_);
+      if (cuerr != cudaSuccess) {
+        LOG_ERROR << "failed to copy output values from GPU for addsub: "
+                  << cudaGetErrorString(cuerr);
+        return kCudaMemcpy;
+      }
+    }
+  }
+
+  // Wait for all compute and memcpy to complete before returning.
+  cudaStreamSynchronize(stream_);
+
+  return kSuccess;
+}
+
+int
+Context::Execute(
+    const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+{
+  if (gpu_device_ == CUSTOM_NO_GPU_DEVICE) {
+    return ExecuteCPU(payload_cnt, payloads, input_fn, output_fn);
+  } else {
+    return ExecuteGPU(payload_cnt, payloads, input_fn, output_fn);
+  }
 }
 
 /////////////
@@ -329,6 +570,10 @@ CustomErrorString(void* custom_context, int errcode)
       return "unexpected size for input tensor";
     case kOutputBuffer:
       return "unable to get buffer for output tensor values";
+    case kCudaMalloc:
+      return "cudaMalloc failed";
+    case kCudaMemcpy:
+      return "cudaMemcpy failed";
     default:
       break;
   }

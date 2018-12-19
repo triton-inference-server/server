@@ -28,13 +28,30 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
+load("@local_config_cuda//cuda:build_defs.bzl", "cuda_default_copts")
+
+cc_library(
+    name = "addsub_kernels",
+    srcs = ["kernel.cu.cc"],
+    hdrs = ["kernel.h"],
+    copts = cuda_default_copts(),
+    deps = [
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
 cc_library(
     name = "addsub_base",
-    srcs = ["addsub.cc"],
+    srcs = ["addsub.cu.cc"],
+    copts = cuda_default_copts(),
     deps = [
+        ":addsub_kernels",
+        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
+        "//src/core:utils",
         "//src/servables/custom:custom",
+        "@local_config_cuda//cuda:cuda_headers",
     ],
 )
 
@@ -42,6 +59,7 @@ cc_binary(
     name = "libaddsub.so",
     deps = [
         ":addsub_base",
+        ":addsub_kernels",
     ],
     linkshared = 1,
 )
