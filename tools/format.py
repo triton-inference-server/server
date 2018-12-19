@@ -31,7 +31,7 @@ import os
 import subprocess
 
 FLAGS = None
-FORMAT_EXTS = ('proto', 'cc', 'h')
+FORMAT_EXTS = ('proto', 'cc', 'cu', 'h')
 SKIP_PATHS = ('tools',)
 
 def visit(path):
