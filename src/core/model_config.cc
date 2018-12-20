@@ -116,7 +116,7 @@ GetPlatform(const std::string& platform_str)
 }
 
 int
-GetPriorityNiceLevel(const ModelConfig& config)
+GetCpuNiceLevel(const ModelConfig& config)
 {
   int nice = SCHEDULER_DEFAULT_NICE;
   if (config.has_optimization()) {
