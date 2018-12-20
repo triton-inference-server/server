@@ -25,57 +25,70 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client.log"
+CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=$DATADIR
-SERVER_LOG="./inference_server.log"
+SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
-rm -fr models && \
-    cp -r /data/inferenceserver/qa_model_repository models && \
-    cp -r custom_models/* models/. && \
-    cp models/graphdef_float32_float32_float32/output0_labels.txt \
-       models/custom_int32_int32_int32/. && \
-    cp models/graphdef_float32_float32_float32/output0_labels.txt \
-       models/custom_nobatch_int32_int32_int32/.
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
 
-set +e
+for TARGET in cpu gpu; do
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
+    CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
-# python unittest seems to swallow ImportError and still return 0 exit
-# code. So need to explicitly check CLIENT_LOG to make sure we see
-# some running tests
-rm -f $CLIENT_LOG
-python $INFER_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+    rm -fr models && \
+        cp -r /data/inferenceserver/qa_model_repository models && \
+        cp -r custom_models/* models/. && \
+        cp models/graphdef_float32_float32_float32/output0_labels.txt \
+           models/custom_int32_int32_int32/. && \
+        cp models/graphdef_float32_float32_float32/output0_labels.txt \
+           models/custom_nobatch_int32_int32_int32/.
 
-grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    RET=1
-fi
+    KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
+    for FW in graphdef savedmodel netdef custom; do
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+    done
 
-set -e
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set +e
+
+    # python unittest seems to swallow ImportError and still return 0
+    # exit code. So need to explicitly check CLIENT_LOG to make sure
+    # we see some running tests
+    python $INFER_TEST >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed To Run\n***"
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

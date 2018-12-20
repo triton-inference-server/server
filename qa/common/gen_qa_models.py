@@ -216,11 +216,6 @@ output [
     dims: [ {} ]
   }}
 ]
-instance_group [
-  {{
-    gpus: [ 0 ]
-  }}
-]
 '''.format(model_name, max_batch, version_policy_str,
            np_to_model_dtype(input_dtype), input_size,
            np_to_model_dtype(input_dtype), input_size,
@@ -349,11 +344,6 @@ output [
     dims: [ {} ]
   }}
 ]
-instance_group [
-  {{
-    gpus: [ 0 ]
-  }}
-]
 '''.format(model_name, max_batch, version_policy_str,
            np_to_model_dtype(input_dtype), input_size,
            np_to_model_dtype(input_dtype), input_size,
@@ -457,11 +447,6 @@ output [
     name: "OUTPUT1"
     data_type: {}
     dims: [ {} ]
-  }}
-]
-instance_group [
-  {{
-    gpus: [ 0 ]
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
@@ -582,11 +567,6 @@ output [
     name: "OUTPUT1"
     data_type: {}
     dims: [ {}, 1, 1 ]
-  }}
-]
-instance_group [
-  {{
-    gpus: [ 0 ]
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
