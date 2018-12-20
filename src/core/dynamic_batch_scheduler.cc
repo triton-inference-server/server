@@ -67,7 +67,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
-  const int nice = GetPriorityNiceLevel(config);
+  const int nice = GetCpuNiceLevel(config);
   for (uint32_t c = 0; c < scheduler_thread_cnt_; ++c) {
     scheduler_threads_.emplace_back(
         new std::thread([this, c, nice]() { SchedulerThread(c, nice); }));

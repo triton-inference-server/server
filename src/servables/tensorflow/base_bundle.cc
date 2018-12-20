@@ -26,8 +26,8 @@
 
 #include "src/servables/tensorflow/base_bundle.h"
 
-#include <cuda_runtime_api.h>
 #include <set>
+#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
