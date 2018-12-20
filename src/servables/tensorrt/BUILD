@@ -90,6 +90,7 @@ cc_library(
         "//src/core:constants",
         "//src/core:infer",
         "//src/core:label_provider",
+        "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
         "//src/core:server_status",
         "//src/core:utils",
