@@ -53,8 +53,3 @@ output [
     dims: [ 16 ]
   }
 ]
-instance_group [
-  {
-    kind: KIND_CPU
-  }
-]
