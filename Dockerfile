@@ -97,8 +97,8 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=0.10.0dev
-ARG TRTIS_CONTAINER_VERSION=19.01dev
+ARG TRTIS_VERSION=0.11.0dev
+ARG TRTIS_CONTAINER_VERSION=19.02dev
 ARG PYVER=3.5
 ARG BUILD_CLIENTS_ONLY=0
 
@@ -239,8 +239,8 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=0.10.0dev
-ARG TRTIS_CONTAINER_VERSION=19.01dev
+ARG TRTIS_VERSION=0.11.0dev
+ARG TRTIS_CONTAINER_VERSION=19.02dev
 ARG PYVER=3.5
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
