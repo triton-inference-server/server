@@ -26,8 +26,8 @@
 
 #include "src/core/utils.h"
 
-#include <cuda_runtime_api.h>
 #include "absl/strings/numbers.h"
+#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -35,36 +35,6 @@
 #include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
-
-tensorflow::Status
-GetCudaPriority(
-    ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority)
-{
-  // Default priority is 0
-  *cuda_stream_priority = 0;
-
-  int min, max;
-  cudaError_t cuerr = cudaDeviceGetStreamPriorityRange(&min, &max);
-  if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaSuccess)) {
-    return tensorflow::errors::Internal(
-        "unable to get allowed CUDA stream priorities: ",
-        cudaGetErrorString(cuerr));
-  }
-
-  switch (priority) {
-    case ModelOptimizationPolicy::PRIORITY_MAX:
-      *cuda_stream_priority = max;
-      break;
-    case ModelOptimizationPolicy::PRIORITY_MIN:
-      *cuda_stream_priority = min;
-      break;
-    default:
-      *cuda_stream_priority = 0;
-      break;
-  }
-
-  return tensorflow::Status::OK();
-}
 
 tensorflow::Status
 GetModelVersionFromPath(const tensorflow::StringPiece& path, uint32_t* version)

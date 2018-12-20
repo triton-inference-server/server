@@ -27,9 +27,9 @@
 
 #include "src/core/metrics.h"
 
-#include <cuda_runtime_api.h>
 #include <nvml.h>
 #include <thread>
+#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 

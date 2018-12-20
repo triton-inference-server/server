@@ -30,13 +30,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-/// Get the CUDA stream priority for a given ModelPriority
-/// \param priority The ModelOptimizationPolicy::ModelPriority priority.
-/// \param cuda_stream_priority Returns the CUDA stream priority.
-/// \return The error status.
-tensorflow::Status GetCudaPriority(
-    ModelOptimizationPolicy::ModelPriority priority, int* cuda_stream_priority);
-
 /// Get version of a model from the path containing the model
 /// definition file.
 /// \param path The path to the model definition file.

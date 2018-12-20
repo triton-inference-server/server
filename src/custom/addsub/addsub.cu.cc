@@ -28,8 +28,8 @@
 #include "cuda/include/cuda.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/core/model_config_cuda.h"
 #include "src/core/model_config.pb.h"
-#include "src/core/utils.h"
 #include "src/custom/addsub/kernel.h"
 #include "src/servables/custom/custom.h"
 
@@ -234,9 +234,8 @@ Context::Init()
 
     // Create a CUDA stream for this context so that it executes
     // independently of other instances of this backend.
-    int cuda_stream_priority = 0;
-    GetCudaPriority(
-        model_config_.optimization().priority(), &cuda_stream_priority);
+    const int cuda_stream_priority =
+        GetCudaStreamPriority(model_config_.optimization().priority());
     cuerr = cudaStreamCreateWithPriority(
         &stream_, cudaStreamDefault, cuda_stream_priority);
     if (cuerr != cudaSuccess) {

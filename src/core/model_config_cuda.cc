@@ -24,72 +24,37 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/profile.h"
+#include "src/core/model_config_cuda.h"
 
-#include "cuda/include/cuda_profiler_api.h"
 #include "cuda/include/cuda_runtime_api.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
-ProfileStartAll()
+int
+GetCudaStreamPriority(ModelOptimizationPolicy::ModelPriority priority)
 {
-  int dcnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
-    dcnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for profiling: ",
-        cudaGetErrorString(cuerr));
+  // Default priority is 0
+  int cuda_stream_priority = 0;
+
+  int min, max;
+  cudaError_t cuerr = cudaDeviceGetStreamPriorityRange(&min, &max);
+  if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaSuccess)) {
+    return 0;
   }
 
-  for (int i = 0; i < dcnt; i++) {
-    cuerr = cudaSetDevice(i);
-    if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
-    }
-
-    cuerr = cudaProfilerStart();
-    if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to start profiling: ", cudaGetErrorString(cuerr));
-    }
+  switch (priority) {
+    case ModelOptimizationPolicy::PRIORITY_MAX:
+      cuda_stream_priority = max;
+      break;
+    case ModelOptimizationPolicy::PRIORITY_MIN:
+      cuda_stream_priority = min;
+      break;
+    default:
+      cuda_stream_priority = 0;
+      break;
   }
 
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-ProfileStopAll()
-{
-  int dcnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
-    dcnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for profiling: ",
-        cudaGetErrorString(cuerr));
-  }
-
-  for (int i = 0; i < dcnt; i++) {
-    cuerr = cudaSetDevice(i);
-    if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
-    }
-
-    cuerr = cudaProfilerStop();
-    if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to stop profiling: ", cudaGetErrorString(cuerr));
-    }
-  }
-
-  return tensorflow::Status::OK();
+  return cuda_stream_priority;
 }
 
 }}  // namespace nvidia::inferenceserver
