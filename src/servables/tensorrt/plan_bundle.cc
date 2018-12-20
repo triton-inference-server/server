@@ -27,10 +27,11 @@
 #include "src/servables/tensorrt/plan_bundle.h"
 
 #include <NvInfer.h>
-#include <cuda_runtime_api.h>
 #include <stdint.h>
+#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/model_config_cuda.h"
 #include "src/core/server_status.h"
 #include "src/core/utils.h"
 #include "src/servables/tensorrt/loader.h"
@@ -265,9 +266,8 @@ PlanBundle::CreateExecutionContext(
   }
 
   // Create CUDA stream associated with the execution context
-  int cuda_stream_priority = 0;
-  TF_RETURN_IF_ERROR(GetCudaPriority(
-      Config().optimization().priority(), &cuda_stream_priority));
+  const int cuda_stream_priority =
+      GetCudaStreamPriority(Config().optimization().priority());
   cuerr = cudaStreamCreateWithPriority(
       &context.stream_, cudaStreamDefault, cuda_stream_priority);
   if (cuerr != cudaSuccess) {

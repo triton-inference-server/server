@@ -30,14 +30,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// The type for the correlation ID in an inference request. This must
-// match the protobuf type used in InferRequestHeader.correlation_id.
+/// The type for the correlation ID in an inference request. This must
+/// match the protobuf type used in InferRequestHeader.correlation_id.
 using CorrelationID = uint64_t;
 
-// The type for a repeated dims field (used for shape)
+/// The type for a repeated dims field (used for shape)
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 
-// Enumeration for the different platform types
+/// Enumeration for the different platform types.
 enum Platform {
   PLATFORM_UNKNOWN = 0,
   PLATFORM_TENSORRT_PLAN = 1,
@@ -47,33 +47,48 @@ enum Platform {
   PLATFORM_CUSTOM = 5
 };
 
-// Get the size of a datatype in bytes. Return 0 if unable to
-// determine the size of the data type.
+/// Get the size of a datatype in bytes.
+/// \param dtype The data-type.
+/// \return The size, in bytes, of the datatype, or 0 if unknown
+/// datatype.
 size_t GetDataTypeByteSize(const DataType dtype);
 
-// Get the size, in bytes, of a tensor based on datatype and
-// dimensions. Return 0 if unable to determine the size of the data
-// type.
+/// Get the size, in bytes, of a tensor based on datatype and
+/// shape.
+/// \param dtype The data-type.
+/// \param dims The shape.
+/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// unable to determine the size.
 uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
 
-// Get the size, in bytes, of a tensor based on ModelInput. Return 0
-// if unable to determine the size of the data type.
+/// Get the size, in bytes, of a tensor based on ModelInput.
+/// \param mio The ModelInput protobuf.
+/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// unable to determine the size.
 uint64_t GetByteSize(const ModelInput& mio);
 
-// Get the size, in bytes, of a tensor based on ModelOutput. Return 0
-// if unable to determine the size of the data type.
+/// Get the size, in bytes, of a tensor based on ModelOutput.
+/// \param mio The ModelOutput protobuf.
+/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// unable to determine the size.
 uint64_t GetByteSize(const ModelOutput& mio);
 
-// Get the Platform value for a platform string or Platform::UNKNOWN
-// if the platform string is not recognized.
-Platform GetPlatform(const std::string& platform_str);
+/// Get the Platform value for a platform name.
+/// \param platform_name The platform name.
+/// \return The Platform or Platform::UNKNOWN if the platform string
+/// is not recognized.
+Platform GetPlatform(const std::string& platform_name);
 
-// Get the CPU thread nice level associate with a model configurations
-// priority.
-int GetPriorityNiceLevel(const ModelConfig& config);
+/// Get the CPU thread nice level associate with a model
+/// configuration's priority.
+/// \param config The model configuration.
+/// \return The nice level.
+int GetCpuNiceLevel(const ModelConfig& config);
 
-// Compare two model configuration shapes. Return true if equal, false
-// is not equal.
+/// Compare two model configuration shapes for equality.
+/// \params dims0 The first shape.
+/// \params dims1 The second shape.
+/// \return True if the shapes are equal, false if not equal.
 bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 
 }}  // namespace nvidia::inferenceserver

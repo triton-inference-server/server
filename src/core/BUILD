@@ -222,6 +222,16 @@ cc_library(
 )
 
 cc_library(
+    name = "model_config_cuda",
+    srcs = ["model_config_cuda.cc"],
+    hdrs = ["model_config_cuda.h"],
+    deps = [
+        ":model_config_proto",
+        "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_library(
     name = "model_repository_manager",
     srcs = ["model_repository_manager.cc"],
     hdrs = ["model_repository_manager.h"],
