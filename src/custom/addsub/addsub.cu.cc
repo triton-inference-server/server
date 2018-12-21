@@ -28,8 +28,8 @@
 #include "cuda/include/cuda.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/model_config_cuda.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/model_config_cuda.h"
 #include "src/custom/addsub/kernel.h"
 #include "src/servables/custom/custom.h"
 
@@ -320,14 +320,16 @@ Context::ExecuteCPU(
     err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT0", batchn_byte_size, &input0);
     if (err != kSuccess) {
-      return err;
+      payload.error_code = err;
+      continue;
     }
 
     std::vector<int32_t> input1;
     err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT1", batchn_byte_size, &input1);
     if (err != kSuccess) {
-      return err;
+      payload.error_code = err;
+      continue;
     }
 
     // For each requested output get the buffer to hold the output
@@ -340,7 +342,8 @@ Context::ExecuteCPU(
       if (!output_fn(
               payload.output_context, output_name, batchn_byte_size,
               &obuffer)) {
-        return kOutputBuffer;
+        payload.error_code = kOutputBuffer;
+        break;
       }
 
       int32_t* output = static_cast<int32_t*>(obuffer);
@@ -436,7 +439,8 @@ Context::ExecuteGPU(
     size_t batchn_elements = payload.batch_size * batch1_byte_size_ /
                              GetDataTypeByteSize(DataType::TYPE_INT32);
     if (batchn_byte_size > cuda_buffer_byte_size_) {
-      return kInputSize;
+      payload.error_code = kInputSize;
+      continue;
     }
 
     // Copy the input tensors into the appropriate CUDA memory buffer.
@@ -444,14 +448,16 @@ Context::ExecuteGPU(
         input_fn, payload.input_context, "INPUT0", batchn_byte_size,
         cuda_input0_);
     if (err != kSuccess) {
-      return err;
+      payload.error_code = err;
+      continue;
     }
 
     err = GetInputTensorGPU(
         input_fn, payload.input_context, "INPUT1", batchn_byte_size,
         cuda_input1_);
     if (err != kSuccess) {
-      return err;
+      payload.error_code = err;
+      continue;
     }
 
     // For each requested output calculate the sum/difference directly
@@ -463,7 +469,8 @@ Context::ExecuteGPU(
       if (!output_fn(
               payload.output_context, output_name, batchn_byte_size,
               &obuffer)) {
-        return kOutputBuffer;
+        payload.error_code = kOutputBuffer;
+        break;
       }
 
       int block_size = 1024;
@@ -483,7 +490,8 @@ Context::ExecuteGPU(
       if (cuerr != cudaSuccess) {
         LOG_ERROR << "failed to copy output values from GPU for addsub: "
                   << cudaGetErrorString(cuerr);
-        return kCudaMemcpy;
+        payload.error_code = kCudaMemcpy;
+        break;
       }
     }
   }
