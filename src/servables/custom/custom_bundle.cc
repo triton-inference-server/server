@@ -409,6 +409,7 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     work_io_contexts.emplace_back(this, &payload);
     custom_payload.input_context = &work_io_contexts.back();
     custom_payload.output_context = custom_payload.input_context;
+    custom_payload.error_code = 0;
   }
 
   // Execute the custom backend which will use CustomGetOutput to get
@@ -421,6 +422,15 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     return tensorflow::errors::Internal(
         "execute error for '", name_, "': (", err, ") ",
         LibraryErrorString(err));
+  }
+
+  // Transfer payload errors back to the Payload objects.
+  for (size_t i = 0; i < custom_payloads.size(); ++i) {
+    if (custom_payloads[i].error_code != 0) {
+      (*payloads)[i].status_ = tensorflow::errors::Internal(
+          "payload error for '", name_, "': (", err, ") ",
+          LibraryErrorString(err));
+    }
   }
 
   return tensorflow::Status::OK();

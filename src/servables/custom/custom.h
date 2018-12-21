@@ -58,6 +58,11 @@ typedef struct custom_payload_struct {
   // The context to use with CustomGetOutput callback function to
   // get the buffer for output tensor values for this payload.
   void* output_context;
+
+  // The error code indicating success or failure from execution. A
+  // value of 0 (zero) indicates success, all other values indicate
+  // failure and are backend defined.
+  int error_code;
 } CustomPayload;
 
 /// Type for the CustomGetNextInput callback function.
