@@ -32,6 +32,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/utils.h"
+#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
@@ -99,7 +100,6 @@ ModelConfigTestBase::ValidateOne(
   for (const auto& model_name : models) {
     const auto model_path =
         tensorflow::io::JoinPath(model_base_path, model_name);
-    const auto expected_path = tensorflow::io::JoinPath(model_path, "expected");
 
     // If a platform is specified and there is a configuration file
     // then must change the configuration to use that platform. We
@@ -119,23 +119,42 @@ ModelConfigTestBase::ValidateOne(
     }
 
     LOG_INFO << "Testing " << model_name;
-    std::string actual, truncated_actual;
+    std::string actual, fail_expected;
     ValidateInit(model_path, autofill, init_func, &actual);
 
-    std::ifstream expected_file(expected_path);
-    std::string expected(
-        (std::istreambuf_iterator<char>(expected_file)),
-        (std::istreambuf_iterator<char>()));
+    // The actual output must match *one of* the "expected*" files.
+    std::vector<std::string> children;
+    if (tensorflow::Env::Default()->GetChildren(model_path, &children).ok()) {
+      for (const auto& child : children) {
+        std::string real_child = child.substr(0, child.find_first_of('/'));
+        if (real_child.find("expected") == 0) {
+          const auto expected_path = tensorflow::io::JoinPath(model_path, real_child);
+          LOG_INFO << "Comparing with " << expected_path;
 
-    if (expected.size() < actual.size()) {
-      truncated_actual = actual.substr(0, expected.size());
-    } else {
-      truncated_actual = actual;
+          std::ifstream expected_file(expected_path);
+          std::string expected(
+            (std::istreambuf_iterator<char>(expected_file)),
+            (std::istreambuf_iterator<char>()));
+          std::string truncated_actual;
+          if (expected.size() < actual.size()) {
+            truncated_actual = actual.substr(0, expected.size());
+          } else {
+            truncated_actual = actual;
+          }
+
+          if (expected != truncated_actual) {
+            fail_expected = expected;
+          } else {
+            fail_expected.clear();
+            break;
+          }
+        }
+      }
     }
 
-    EXPECT_TRUE(expected == truncated_actual);
-    if (expected != truncated_actual) {
-      LOG_ERROR << "Expected:" << std::endl << expected;
+    EXPECT_TRUE(fail_expected.empty());
+    if (!fail_expected.empty()) {
+      LOG_ERROR << "Expected:" << std::endl << fail_expected;
       LOG_ERROR << "Actual:" << std::endl << actual;
     }
   }
