@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -46,6 +46,11 @@ enum Platform {
   PLATFORM_CAFFE2_NETDEF = 4,
   PLATFORM_CUSTOM = 5
 };
+
+/// Get the number of elements in a shape.
+/// \param dims The shape.
+/// \return The number of elements.
+uint64_t GetElementCount(const DimsList& dims);
 
 /// Get the size of a datatype in bytes.
 /// \param dtype The data-type.

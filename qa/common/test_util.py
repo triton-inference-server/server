@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,9 +63,10 @@ def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
     """Return True if input and output dtypes are supported by custom model."""
 
     # The custom model is src/custom/addsub... it only supports int32
-    if input_dtype != np.int32:
+    # and fp32, and input and output datatype must be equal.
+    if (input_dtype != np.int32) and (input_dtype != np.float32):
         return False
-    if (output0_dtype != np.int32) or (output1_dtype != np.int32):
+    if (output0_dtype != input_dtype) or (output1_dtype != input_dtype):
         return False
     return True
 

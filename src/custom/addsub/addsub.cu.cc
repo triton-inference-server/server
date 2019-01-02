@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,10 +33,11 @@
 #include "src/custom/addsub/kernel.h"
 #include "src/servables/custom/custom.h"
 
-// This custom backend takes two INT32 input tensors (any shape but
-// must have the same shape) and produces two output tensors (with
-// same shape as the inputs). The input tensors must be named "INPUT0"
-// and "INPUT1". The output tensors must be named "OUTPUT0" and
+// This custom backend takes two input tensors (any shape but must
+// have the same shape) and produces two output tensors (with same
+// shape as the inputs). All tensors must be the same data-type,
+// either INT32 or FP32. The input tensors must be named "INPUT0" and
+// "INPUT1". The output tensors must be named "OUTPUT0" and
 // "OUTPUT1". This backend does element-wise operation to produce:
 //
 //   OUTPUT0 = INPUT0 + INPUT1
@@ -82,10 +83,10 @@ class Context {
  private:
   int GetInputTensorCPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-      const size_t expected_byte_size, std::vector<int32_t>* input);
+      const size_t expected_byte_size, std::vector<uint8_t>* input);
   int GetInputTensorGPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-      const size_t expected_byte_size, int32_t* input);
+      const size_t expected_byte_size, uint8_t* input);
 
   int ExecuteCPU(
       const uint32_t payload_cnt, CustomPayload* payloads,
@@ -101,7 +102,15 @@ class Context {
   // execute on CPU.
   const int gpu_device_;
 
-  // The size, in bytes, or batch-size 1 input or output tensor. Input
+  // The data-type of the input and output tensors. Must be either
+  // INT32 or FP32.
+  DataType datatype_;
+
+  // The number of elements in each input and output tensor for
+  // batch-size 1.
+  uint64_t batch1_element_count_;
+
+  // The size, in bytes, of batch-size 1 input or output tensor. Input
   // and output tensors are the same shape and data-type so they all
   // have the same size. To get the full size of an input/output need
   // to multiply this value by the batch-size.
@@ -109,9 +118,9 @@ class Context {
 
   // CUDA memory buffers for input and output tensors.
   size_t cuda_buffer_byte_size_;
-  int32_t* cuda_input0_;
-  int32_t* cuda_input1_;
-  int32_t* cuda_output_;
+  uint8_t* cuda_input0_;
+  uint8_t* cuda_input1_;
+  uint8_t* cuda_output_;
 
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
@@ -120,6 +129,7 @@ class Context {
 
 Context::Context(const ModelConfig& model_config, const int gpu_device)
     : model_config_(model_config), gpu_device_(gpu_device),
+      datatype_(DataType::TYPE_INVALID), batch1_element_count_(0),
       batch1_byte_size_(0), cuda_buffer_byte_size_(0), cuda_input0_(nullptr),
       cuda_input1_(nullptr), cuda_output_(nullptr), stream_(nullptr)
 {
@@ -161,8 +171,8 @@ Context::Init()
 {
   // There must be two inputs that have the same shape. The shape can
   // be anything since we are just going to do an element-wise add and
-  // an element-wise subtract. The input data-type must be INT32. The
-  // inputs must be named INPUT0 and INPUT1.
+  // an element-wise subtract. The input data-type must be INT32 or
+  // FP32. The inputs must be named INPUT0 and INPUT1.
   if (model_config_.input_size() != 2) {
     return kInputOutputShape;
   }
@@ -170,8 +180,11 @@ Context::Init()
           model_config_.input(0).dims(), model_config_.input(1).dims())) {
     return kInputOutputShape;
   }
-  if ((model_config_.input(0).data_type() != DataType::TYPE_INT32) ||
-      (model_config_.input(1).data_type() != DataType::TYPE_INT32)) {
+
+  datatype_ = model_config_.input(0).data_type();
+  if (((datatype_ != DataType::TYPE_INT32) &&
+       (datatype_ != DataType::TYPE_FP32)) ||
+      (model_config_.input(1).data_type() != datatype_)) {
     return kInputOutputDataType;
   }
   if ((model_config_.input(0).name() != "INPUT0") ||
@@ -180,8 +193,8 @@ Context::Init()
   }
 
   // There must be two outputs that have the same shape as the
-  // inputs. The output data-type must be INT32. The outputs must be
-  // named OUTPUT0 and OUTPUT1.
+  // inputs. The output data-type must be the same as the input
+  // data-type. The outputs must be named OUTPUT0 and OUTPUT1.
   if (model_config_.output_size() != 2) {
     return kInputOutputShape;
   }
@@ -191,8 +204,8 @@ Context::Init()
           model_config_.output(0).dims(), model_config_.input(0).dims())) {
     return kInputOutputShape;
   }
-  if ((model_config_.output(0).data_type() != DataType::TYPE_INT32) ||
-      (model_config_.output(1).data_type() != DataType::TYPE_INT32)) {
+  if ((model_config_.output(0).data_type() != datatype_) ||
+      (model_config_.output(1).data_type() != datatype_)) {
     return kInputOutputDataType;
   }
   if ((model_config_.output(0).name() != "OUTPUT0") ||
@@ -203,6 +216,7 @@ Context::Init()
   // Due to the above contraints, each input and output tensor will be
   // the same size (in bytes). Calculate that batch-1 size as it is
   // needed when reading and writing the tensors during execution.
+  batch1_element_count_ = GetElementCount(model_config_.input(0).dims());
   batch1_byte_size_ = GetByteSize(model_config_.input(0));
 
   // Additional initialization if executing on the GPU...
@@ -247,10 +261,38 @@ Context::Init()
   return kSuccess;
 }
 
+namespace {
+
+template <typename T>
+void
+AddForType(uint64_t cnt, uint8_t* in0, uint8_t* in1, uint8_t* out)
+{
+  T* output = reinterpret_cast<T*>(out);
+  T* input0 = reinterpret_cast<T*>(in0);
+  T* input1 = reinterpret_cast<T*>(in1);
+  for (uint64_t i = 0; i < cnt; ++i) {
+    output[i] = input0[i] + input1[i];
+  }
+}
+
+template <typename T>
+void
+SubForType(uint64_t cnt, uint8_t* in0, uint8_t* in1, uint8_t* out)
+{
+  T* output = reinterpret_cast<T*>(out);
+  T* input0 = reinterpret_cast<T*>(in0);
+  T* input1 = reinterpret_cast<T*>(in1);
+  for (uint64_t i = 0; i < cnt; ++i) {
+    output[i] = input0[i] - input1[i];
+  }
+}
+
+}  // namespace
+
 int
 Context::GetInputTensorCPU(
     CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-    const size_t expected_byte_size, std::vector<int32_t>* input)
+    const size_t expected_byte_size, std::vector<uint8_t>* input)
 {
   // The values for an input tensor are not necessarily in one
   // contiguous chunk, so we copy the chunks into 'input' vector. A
@@ -277,10 +319,10 @@ Context::GetInputTensorCPU(
       return kInputSize;
     }
 
-    size_t content_elements = content_byte_size / sizeof(int32_t);
+    size_t content_elements = content_byte_size / sizeof(uint8_t);
     input->insert(
-        input->end(), static_cast<const int32_t*>(content),
-        static_cast<const int32_t*>(content) + content_elements);
+        input->end(), static_cast<const uint8_t*>(content),
+        static_cast<const uint8_t*>(content) + content_elements);
   }
 
   // Make sure we end up with exactly the amount of input we expect.
@@ -313,10 +355,11 @@ Context::ExecuteCPU(
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
+    uint64_t batchn_element_count = payload.batch_size * batch1_element_count_;
     size_t batchn_byte_size = payload.batch_size * batch1_byte_size_;
 
     // Get the input tensors.
-    std::vector<int32_t> input0;
+    std::vector<uint8_t> input0;
     err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT0", batchn_byte_size, &input0);
     if (err != kSuccess) {
@@ -324,7 +367,7 @@ Context::ExecuteCPU(
       continue;
     }
 
-    std::vector<int32_t> input1;
+    std::vector<uint8_t> input1;
     err = GetInputTensorCPU(
         input_fn, payload.input_context, "INPUT1", batchn_byte_size, &input1);
     if (err != kSuccess) {
@@ -346,15 +389,25 @@ Context::ExecuteCPU(
         break;
       }
 
-      int32_t* output = static_cast<int32_t*>(obuffer);
-
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
-        for (uint32_t i = 0; i < input0.size(); ++i) {
-          output[i] = input0[i] + input1[i];
+        if (datatype_ == DataType::TYPE_INT32) {
+          AddForType<int32_t>(
+              batchn_element_count, &input0[0], &input1[0],
+              reinterpret_cast<uint8_t*>(obuffer));
+        } else {
+          AddForType<float>(
+              batchn_element_count, &input0[0], &input1[0],
+              reinterpret_cast<uint8_t*>(obuffer));
         }
       } else {
-        for (uint32_t i = 0; i < input0.size(); ++i) {
-          output[i] = input0[i] - input1[i];
+        if (datatype_ == DataType::TYPE_INT32) {
+          SubForType<int32_t>(
+              batchn_element_count, &input0[0], &input1[0],
+              reinterpret_cast<uint8_t*>(obuffer));
+        } else {
+          SubForType<float>(
+              batchn_element_count, &input0[0], &input1[0],
+              reinterpret_cast<uint8_t*>(obuffer));
         }
       }
     }
@@ -366,7 +419,7 @@ Context::ExecuteCPU(
 int
 Context::GetInputTensorGPU(
     CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-    const size_t expected_byte_size, int32_t* input)
+    const size_t expected_byte_size, uint8_t* input)
 {
   // The values for an input tensor are not necessarily in one
   // contiguous chunk, so we copy the chunks into 'input', which
@@ -435,9 +488,8 @@ Context::ExecuteGPU(
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
+    uint64_t batchn_element_count = payload.batch_size * batch1_element_count_;
     size_t batchn_byte_size = payload.batch_size * batch1_byte_size_;
-    size_t batchn_elements = payload.batch_size * batch1_byte_size_ /
-                             GetDataTypeByteSize(DataType::TYPE_INT32);
     if (batchn_byte_size > cuda_buffer_byte_size_) {
       payload.error_code = kInputSize;
       continue;
@@ -474,14 +526,31 @@ Context::ExecuteGPU(
       }
 
       int block_size = 1024;
-      int grid_size = (batchn_elements + block_size - 1) / block_size;
-
+      int grid_size = (batchn_element_count + block_size - 1) / block_size;
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
-        VecAdd<<<grid_size, block_size, 0, stream_>>>(
-            cuda_input0_, cuda_input1_, cuda_output_, batchn_elements);
+        if (datatype_ == DataType::TYPE_INT32) {
+          VecAddInt32<<<grid_size, block_size, 0, stream_>>>(
+              reinterpret_cast<int32_t*>(cuda_input0_),
+              reinterpret_cast<int32_t*>(cuda_input1_),
+              reinterpret_cast<int32_t*>(cuda_output_), batchn_element_count);
+        } else {
+          VecAddFp32<<<grid_size, block_size, 0, stream_>>>(
+              reinterpret_cast<float*>(cuda_input0_),
+              reinterpret_cast<float*>(cuda_input1_),
+              reinterpret_cast<float*>(cuda_output_), batchn_element_count);
+        }
       } else {
-        VecSub<<<grid_size, block_size, 0, stream_>>>(
-            cuda_input0_, cuda_input1_, cuda_output_, batchn_elements);
+        if (datatype_ == DataType::TYPE_INT32) {
+          VecSubInt32<<<grid_size, block_size, 0, stream_>>>(
+              reinterpret_cast<int32_t*>(cuda_input0_),
+              reinterpret_cast<int32_t*>(cuda_input1_),
+              reinterpret_cast<int32_t*>(cuda_output_), batchn_element_count);
+        } else {
+          VecSubFp32<<<grid_size, block_size, 0, stream_>>>(
+              reinterpret_cast<float*>(cuda_input0_),
+              reinterpret_cast<float*>(cuda_input1_),
+              reinterpret_cast<float*>(cuda_output_), batchn_element_count);
+        }
       }
 
       cudaError_t cuerr = cudaMemcpyAsync(
@@ -570,7 +639,8 @@ CustomErrorString(void* custom_context, int errcode)
     case kOutputName:
       return "model outputs must be named 'OUTPUT0' and 'OUTPUT1'";
     case kInputOutputDataType:
-      return "model inputs and outputs must have TYPE_INT32 data-type";
+      return "model inputs and outputs must have TYPE_INT32 or TYPE_FP32 "
+             "data-type";
     case kInputContents:
       return "unable to get input tensor values";
     case kInputSize:

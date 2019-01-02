@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,11 +45,7 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/qa_model_repository models && \
-        cp -r custom_models/* models/. && \
-        cp models/graphdef_float32_float32_float32/output0_labels.txt \
-           models/custom_int32_int32_int32/. && \
-        cp models/graphdef_float32_float32_float32/output0_labels.txt \
-           models/custom_nobatch_int32_int32_int32/.
+        cp -r ../custom_models/* models/.
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,14 +38,22 @@ RET=0
 # Setup model store
 rm -fr *.log *.serverlog models && mkdir models
 for m in \
-        graphdef_float32_float32_float32 \
-        netdef_float32_float32_float32 \
-        plan_float32_float32_float32 ; do
-    cp -r $DATADIR/qa_model_repository/$m models/. &&
-        (cd models/$m && \
+        $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 \
+        $DATADIR/qa_model_repository/graphdef_float32_float32_float32 \
+        $DATADIR/qa_model_repository/netdef_float32_float32_float32 \
+        $DATADIR/qa_model_repository/plan_float32_float32_float32 \
+        ../custom_models/custom_float32_float32_float32 ; do
+    cp -r $m models/. &&
+        (cd models/$(basename $m) && \
                 sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
                 echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 done
+
+# Custom model needs to have 3 versions like others...
+(cd models/custom_float32_float32_float32 && \
+        cp -r 1 2 && \
+        cp -r 1 3 && \
+        echo "version_policy: { specific { versions: [1, 3] }}" >> config.pbtxt)
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correctly batch size was used

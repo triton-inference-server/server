@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@ import test_util as tu
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
-_trials = ("graphdef", "plan", "netdef")
+_trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
 _max_queue_delay = 10000
 _check_exception = None
 
@@ -61,7 +61,7 @@ class BatcherTest(unittest.TestCase):
 
             start_ms = int(round(time.time() * 1000))
 
-            if trial == "graphdef" or trial == "netdef":
+            if trial == "savedmodel" or trial == "graphdef" or trial == "netdef":
                 tensor_shape = (input_size,)
                 iu.infer_exact(self, trial, tensor_shape, bs, True,
                                np.float32, np.float32, np.float32, swap=True,
@@ -71,6 +71,12 @@ class BatcherTest(unittest.TestCase):
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs, True,
                                np.float32, np.float32, np.float32, swap=True,
+                               outputs=requested_outputs,
+                               use_grpc=False, skip_request_id_check=True)
+            elif trial == "custom":
+                tensor_shape = (input_size,)
+                iu.infer_exact(self, trial, tensor_shape, bs, True,
+                               np.float32, np.float32, np.float32, swap=False,
                                outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             else:
