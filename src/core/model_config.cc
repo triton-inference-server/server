@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -66,6 +66,21 @@ GetDataTypeByteSize(const DataType dtype)
 }
 
 uint64_t
+GetElementCount(const DimsList& dims)
+{
+  int64_t cnt = 0;
+  for (auto dim : dims) {
+    if (cnt == 0) {
+      cnt = dim;
+    } else {
+      cnt *= dim;
+    }
+  }
+
+  return cnt;
+}
+
+uint64_t
 GetByteSize(const DataType& dtype, const DimsList& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
@@ -73,16 +88,8 @@ GetByteSize(const DataType& dtype, const DimsList& dims)
     return 0;
   }
 
-  int64_t size = 0;
-  for (auto dim : dims) {
-    if (size == 0) {
-      size = dim;
-    } else {
-      size *= dim;
-    }
-  }
-
-  return size * dt_size;
+  int64_t cnt = GetElementCount(dims);
+  return cnt * dt_size;
 }
 
 uint64_t
