@@ -215,13 +215,13 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mkdir -p /opt/tensorrtserver/lib && \
     cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/. && \
     cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/. && \
-    mkdir -p /opt/tensorrtserver/custom && \
-    cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
     mkdir -p /opt/tensorrtserver/pip && \
     bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/pip/. && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/.; \
                cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
+               mkdir -p /opt/tensorrtserver/custom; \
+               cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/.; \
              fi' && \
     bazel clean --expunge && \
     rm -rf /root/.cache/bazel && \
