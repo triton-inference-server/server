@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,10 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace addsub {
 
-__global__ void VecAdd(int32_t* in0, int32_t* in1, int32_t* out, int cnt);
-__global__ void VecSub(int32_t* in0, int32_t* in1, int32_t* out, int cnt);
+__global__ void VecAddInt32(int32_t* in0, int32_t* in1, int32_t* out, int cnt);
+__global__ void VecAddFp32(float* in0, float* in1, float* out, int cnt);
+
+__global__ void VecSubInt32(int32_t* in0, int32_t* in1, int32_t* out, int cnt);
+__global__ void VecSubFp32(float* in0, float* in1, float* out, int cnt);
 
 }}}}  // namespace nvidia::inferenceserver::custom::addsub
