@@ -52,10 +52,28 @@ enum Platform {
 /// \return The number of elements.
 uint64_t GetElementCount(const DimsList& dims);
 
-/// Get the size of a datatype in bytes.
+/// Get the number of elements in the shape of a model input.
+/// \param mio The model input.
+/// \return The number of elements.
+uint64_t GetElementCount(const ModelInput& mio);
+
+/// Get the number of elements in the shape of a model output.
+/// \param mio The model output.
+/// \return The number of elements.
+uint64_t GetElementCount(const ModelOutput& mio);
+
+/// Are values of a datatype fixed-size, or variable-sized.
 /// \param dtype The data-type.
-/// \return The size, in bytes, of the datatype, or 0 if unknown
-/// datatype.
+/// \return True if datatype values are fixed-sized, false if
+/// variable-sized.
+bool IsFixedSizeDataType(const DataType dtype);
+
+/// Get the size of objects of a given datatype in bytes.
+/// \param dtype The data-type.
+/// \return The size, in bytes, of objects of the datatype, or 0 if
+/// size cannot be determine (for example, values of type TYPE_STRING
+/// have variable length and so size cannot be determine just from the
+/// type).
 size_t GetDataTypeByteSize(const DataType dtype);
 
 /// Get the size, in bytes, of a tensor based on datatype and

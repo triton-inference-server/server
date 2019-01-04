@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -124,6 +124,8 @@ ConvertDataType(DataType dtype)
       return tensorflow::DT_FLOAT;
     case DataType::TYPE_FP64:
       return tensorflow::DT_DOUBLE;
+    case DataType::TYPE_STRING:
+      return tensorflow::DT_STRING;
     default:
       break;
   }
@@ -161,6 +163,8 @@ ConvertDataType(tensorflow::DataType dtype)
       return DataType::TYPE_FP32;
     case tensorflow::DT_DOUBLE:
       return DataType::TYPE_FP64;
+    case tensorflow::DT_STRING:
+      return DataType::TYPE_STRING;
     default:
       break;
   }

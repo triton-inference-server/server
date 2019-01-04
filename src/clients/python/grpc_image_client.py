@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,6 @@ import tensorrtserver.api.model_config_pb2 as model_config
 FLAGS = None
 
 def model_dtype_to_np(model_dtype):
-
     if model_dtype == model_config.TYPE_BOOL:
         return np.bool
     elif model_dtype == model_config.TYPE_INT8:
@@ -62,6 +61,8 @@ def model_dtype_to_np(model_dtype):
         return np.float32
     elif model_dtype == model_config.TYPE_FP64:
         return np.float64
+    elif model_dtype == model_config.TYPE_STRING:
+        return np.dtype(object)
     return None
 
 def parse_model(status, model_name, batch_size, verbose=False):
