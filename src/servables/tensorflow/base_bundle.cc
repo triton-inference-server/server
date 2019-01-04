@@ -295,6 +295,199 @@ BaseBundle::Run(
   OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
 }
 
+namespace {
+
+void
+SetFixedSizedInputTensor(
+    tensorflow::Tensor& tensor, const std::string& input_name,
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+{
+  auto flat = tensor.bit_casted_shaped<char, 1>(
+      {tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype())});
+  size_t tensor_copy_offset = 0;
+
+  // Visit the payloads in order and copy the input values into the
+  // input tensor. Skip payloads that had errors since they are not
+  // included in the dynamic batch.
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_byte_size =
+        request_header.batch_size() * batch1_byte_size;
+
+    int input_idx = 0;
+    for (const auto& input : request_header.input()) {
+      if (input.name() == input_name) {
+        size_t copied_byte_size = 0;
+        while (payload.compute_status_.ok()) {
+          const void* content;
+          size_t content_byte_size;
+          payload.compute_status_ =
+              payload.request_provider_->GetNextInputContent(
+                  input_idx, &content, &content_byte_size, false);
+          if (!payload.compute_status_.ok()) {
+            break;
+          }
+
+          // No more input content available then done with copying...
+          if (content == nullptr) {
+            break;
+          }
+
+          if ((tensor_copy_offset + copied_byte_size + content_byte_size) >
+              ((size_t)flat.size())) {
+            payload.compute_status_ = tensorflow::errors::InvalidArgument(
+                "unexpected size ",
+                tensor_copy_offset + copied_byte_size + content_byte_size,
+                " for inference input '", input_name, "', expecting ",
+                flat.size());
+            break;
+          }
+
+          memcpy(
+              static_cast<char*>(flat.data()) + tensor_copy_offset +
+                  copied_byte_size,
+              content, content_byte_size);
+          copied_byte_size += content_byte_size;
+        }
+
+        if (payload.compute_status_.ok() &&
+            (copied_byte_size != expected_byte_size)) {
+          payload.compute_status_ = tensorflow::errors::Internal(
+              "expected ", expected_byte_size, " of data for inference input '",
+              input_name, "', got ", copied_byte_size);
+        }
+
+        break;
+      }
+
+      input_idx++;
+    }
+
+    tensor_copy_offset += expected_byte_size;
+  }
+}
+
+void
+FillStringTensor(tensorflow::Tensor& tensor, const size_t idx, const size_t cnt)
+{
+  auto flat = tensor.flat<std::string>();
+  std::string empty;
+
+  for (size_t c = 0; c < cnt; ++c) {
+    flat(idx + c) = empty;
+  }
+}
+
+void
+SetStringInputTensor(
+    tensorflow::Tensor& tensor, const std::string& input_name,
+    const size_t batch1_element_cnt, std::vector<Scheduler::Payload>* payloads)
+{
+  auto flat = tensor.flat<std::string>();
+  size_t tensor_element_idx = 0;
+
+  // Visit the payloads in order and copy the input values into the
+  // input tensor. Skip payloads that had errors since they are not
+  // included in the dynamic batch.
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_element_cnt =
+        request_header.batch_size() * batch1_element_cnt;
+    size_t element_idx = 0;
+
+    int input_idx = 0;
+    for (const auto& input : request_header.input()) {
+      if (input.name() == input_name) {
+        const void* vcontent;
+        size_t content_byte_size;
+        payload.compute_status_ =
+            payload.request_provider_->GetNextInputContent(
+                input_idx, &vcontent, &content_byte_size, true);
+        if (!payload.compute_status_.ok()) {
+          FillStringTensor(
+              tensor, tensor_element_idx + element_idx,
+              expected_element_cnt - element_idx);
+          break;
+        }
+
+        const char* content = reinterpret_cast<const char*>(vcontent);
+
+        // No more input content available then done with copying...
+        if (content == nullptr) {
+          break;
+        }
+
+        // Parse content as null-terminated strings and assign
+        // them to the 'tensor'.
+        while (content_byte_size >= sizeof(uint32_t)) {
+          if (element_idx >= expected_element_cnt) {
+            payload.compute_status_ = tensorflow::errors::InvalidArgument(
+                "unexpected number of string elements ", element_idx + 1,
+                " for inference input '", input_name, "', expecting ",
+                expected_element_cnt);
+            FillStringTensor(
+                tensor, tensor_element_idx + element_idx,
+                expected_element_cnt - element_idx);
+            break;
+          }
+
+          const uint32_t len = *(reinterpret_cast<const uint32_t*>(content));
+          content += sizeof(uint32_t);
+          content_byte_size -= sizeof(uint32_t);
+
+          if (content_byte_size < len) {
+            payload.compute_status_ = tensorflow::errors::InvalidArgument(
+                "incomplete string data for inference input '", input_name,
+                "', expecting string of length ", len, " but only ",
+                content_byte_size, " bytes available");
+            FillStringTensor(
+                tensor, tensor_element_idx + element_idx,
+                expected_element_cnt - element_idx);
+            break;
+          }
+
+          std::string str(content, len);
+          content += len;
+          content_byte_size -= len;
+
+          flat(tensor_element_idx + element_idx) = str;
+          element_idx++;
+
+          std::cerr << "bb " << str << std::endl;
+        }
+
+        break;
+      }
+
+      input_idx++;
+    }
+
+    if (payload.compute_status_.ok() && (element_idx != expected_element_cnt)) {
+      payload.compute_status_ = tensorflow::errors::Internal(
+          "expected ", expected_element_cnt, " strings for inference input '",
+          input_name, "', got ", element_idx);
+      FillStringTensor(
+          tensor, tensor_element_idx + element_idx,
+          expected_element_cnt - element_idx);
+    }
+
+    tensor_element_idx += expected_element_cnt;
+  }
+}
+
+}  // namespace
+
+
 tensorflow::Status
 BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 {
@@ -336,14 +529,18 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         break;
       }
 
+      // For STRING type can't check the byte-size since it is
+      // variable.
       const tensorflow::Tensor& tensor = ii_iter->second;
-      const size_t expected_byte_size =
-          tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype());
-      if (input.byte_size() != expected_byte_size) {
-        payload.status_ = tensorflow::errors::InvalidArgument(
-            "unexpected size ", input.byte_size(), " for inference input '",
-            name, "', expecting ", expected_byte_size);
-        break;
+      if (tensor.dtype() != tensorflow::DT_STRING) {
+        const size_t expected_byte_size =
+            tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype());
+        if (input.byte_size() != expected_byte_size) {
+          payload.status_ = tensorflow::errors::InvalidArgument(
+              "unexpected size ", input.byte_size(), " for inference input '",
+              name, "', expecting ", expected_byte_size);
+          break;
+        }
       }
     }
 
@@ -377,10 +574,10 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   for (const auto& ipair : inputs_) {
     const std::string& name = ipair.first;
     const tensorflow::Tensor& batch1_tensor = ipair.second;
-    tensorflow::TensorShape shape = ipair.second.shape();
+    tensorflow::TensorShape shape = batch1_tensor.shape();
+    const size_t batch1_element_cnt = batch1_tensor.NumElements();
     const size_t batch1_byte_size =
-        batch1_tensor.NumElements() *
-        tensorflow::DataTypeSize(batch1_tensor.dtype());
+        batch1_element_cnt * tensorflow::DataTypeSize(batch1_tensor.dtype());
 
     // If model supports batching then prepend the batch dimension
     // onto the input shape.
@@ -395,75 +592,13 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
 
     input_tensors.emplace_back(std::make_pair(
-        *input_tensor_name, tensorflow::Tensor(ipair.second.dtype(), shape)));
+        *input_tensor_name, tensorflow::Tensor(batch1_tensor.dtype(), shape)));
     tensorflow::Tensor& tensor = input_tensors.back().second;
-    auto flat = tensor.bit_casted_shaped<char, 1>(
-        {tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype())});
-    size_t tensor_copy_offset = 0;
 
-    // Visit the payloads in order and copy the input tensors to
-    // GPU. Skip payloads that had errors since they are not included
-    // in the dynamic batch.
-    for (auto& payload : *payloads) {
-      if (!payload.status_.ok()) {
-        continue;
-      }
-
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      int input_idx = 0;
-      for (const auto& input : request_header.input()) {
-        if (input.name() == name) {
-          size_t copied_byte_size = 0;
-          while (payload.compute_status_.ok()) {
-            const void* content;
-            size_t content_byte_size;
-            payload.compute_status_ =
-                payload.request_provider_->GetNextInputContent(
-                    input_idx, &content, &content_byte_size, false);
-            if (!payload.compute_status_.ok()) {
-              break;
-            }
-
-            // No more input content available then done with copying...
-            if (content == nullptr) {
-              break;
-            }
-
-            if ((tensor_copy_offset + copied_byte_size + content_byte_size) >
-                ((size_t)flat.size())) {
-              payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                  "unexpected size ",
-                  tensor_copy_offset + copied_byte_size + content_byte_size,
-                  " for inference input '", name, "', expecting ", flat.size());
-              break;
-            }
-
-            memcpy(
-                static_cast<char*>(flat.data()) + tensor_copy_offset +
-                    copied_byte_size,
-                content, content_byte_size);
-            copied_byte_size += content_byte_size;
-          }
-
-          if (payload.compute_status_.ok() &&
-              (copied_byte_size != expected_byte_size)) {
-            payload.compute_status_ = tensorflow::errors::Internal(
-                "expected ", expected_byte_size,
-                " of data for inference input '", name, "', got ",
-                copied_byte_size);
-          }
-
-          break;
-        }
-
-        input_idx++;
-      }
-
-      tensor_copy_offset += expected_byte_size;
+    if (tensor.dtype() != tensorflow::DT_STRING) {
+      SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
+    } else {
+      SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
     }
   }
 

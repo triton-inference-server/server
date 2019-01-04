@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -253,8 +253,15 @@ class InferContext {
 
     /// \return The size in bytes of this input. This is the size for
     /// one instance of the input, not the entire size of a batched
-    /// input.
+    /// input. For non-fixed-sized types like TYPE_STRING this will be
+    /// zero.
     virtual size_t ByteSize() const = 0;
+
+    /// \return The size in bytes of entire batch of this input. For
+    /// fixed-sized types this is just ByteSize() * batch-size, but
+    /// for non-fixed-sized types like TYPE_STRING it is the only way
+    /// to get the entire input size.
+    virtual size_t TotalByteSize() const = 0;
 
     /// \return The data-type of the input.
     virtual DataType DType() const = 0;
@@ -292,6 +299,17 @@ class InferContext {
     /// \param input The vector holding tensor values.
     /// \return Error object indicating success or failure.
     virtual Error SetRaw(const std::vector<uint8_t>& input) = 0;
+
+    /// Set tensor values for this input from a vector or
+    /// strings. This method can only be used for tensors with STRING
+    /// data-type. The strings are assigned in row-major order to the
+    /// elements of the tensor. The strings are copied and so the
+    /// 'input' does not need to be preserved as with SetRaw(). For
+    /// batched inputs this function must be called batch-size times
+    /// to provide all tensor values for a batch of this input.
+    /// \param input The vector holding tensor string values.
+    /// \return Error object indicating success or failure.
+    virtual Error SetFromString(const std::vector<std::string>& input) = 0;
   };
 
   //==============
@@ -668,10 +686,6 @@ class InferContext {
   // size indicates that the context does not support batching and so
   // only a single inference at a time can be performed.
   uint64_t max_batch_size_;
-
-  // Total size of all inputs, in bytes (must be 64-bit integer
-  // because used with curl_easy_setopt).
-  uint64_t total_input_byte_size_;
 
   // Requested batch size for inference request
   uint64_t batch_size_;

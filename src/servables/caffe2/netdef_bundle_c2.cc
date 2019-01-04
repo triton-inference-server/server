@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -185,6 +185,9 @@ ConvertDatatype(Caffe2Workspace::DataType dtype)
     case Caffe2Workspace::DataType::TYPE_FP64:
       ctype = caffe2::TensorProto_DataType_DOUBLE;
       break;
+    case Caffe2Workspace::DataType::TYPE_STRING:
+      ctype = caffe2::TensorProto_DataType_STRING;
+      break;
     default:
       return std::make_pair(false, caffe2::TypeMeta());
   }
@@ -222,6 +225,8 @@ DataTypeName(const Caffe2Workspace::DataType datatype)
       return "FP32";
     case Caffe2Workspace::DataType::TYPE_FP64:
       return "FP64";
+    case Caffe2Workspace::DataType::TYPE_STRING:
+      return "STRING";
   }
 
   return "<unknown>";

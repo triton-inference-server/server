@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,8 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
+
+np_dtype_string = np.dtype(object)
 
 class InferTest(unittest.TestCase):
     def _full_exact(self, req_raw, input_dtype, output0_dtype, output1_dtype, swap):
@@ -107,6 +109,10 @@ class InferTest(unittest.TestCase):
         self._full_exact(True, np.float32, np.int32, np.int32, swap=False)
     def test_raw_ihs(self):
         self._full_exact(True, np.int32, np.float16, np.int16, swap=False)
+    def test_raw_oii(self):
+        self._full_exact(True, np_dtype_string, np.int32, np.int32, swap=False)
+    def test_raw_ooo(self):
+        self._full_exact(True, np_dtype_string, np_dtype_string, np_dtype_string, swap=False)
 
     def test_class_bbb(self):
         self._full_exact(False, np.int8, np.int8, np.int8, swap=True)

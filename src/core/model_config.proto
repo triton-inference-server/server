@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -68,6 +68,9 @@ enum DataType {
   TYPE_FP32 = 11;
   //@@  .. cpp:enumerator:: DataType::FP64 = 12
   TYPE_FP64 = 12;
+
+  //@@  .. cpp:enumerator:: DataType::STRING = 13
+  TYPE_STRING = 13;
 }
 
 //@@

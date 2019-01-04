@@ -138,8 +138,12 @@ HTTPInferRequestProvider::Create(
       provider->contents_.emplace_back();
       auto& blocks = provider->contents_.back();
 
-      size_t total_byte_size =
-          provider->request_header_.batch_size() * input.byte_size();
+      size_t total_byte_size = input.batch_byte_size();
+      if (total_byte_size == 0) {
+        total_byte_size =
+            provider->request_header_.batch_size() * input.byte_size();
+      }
+
       while ((total_byte_size > 0) && (v_idx < n)) {
         blocks.emplace_back();
         Block& block = blocks.back();

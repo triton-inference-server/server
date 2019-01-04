@@ -152,11 +152,10 @@ class InferResponseProvider {
     return FinalizeResponseHeader(is);
   }
 
-  // Create a buffer for the next output of the specified
-  // 'byte_size'.
+  // Create a buffer for the next output of the specified 'byte_size'.
   void CreateOutputBuffer(size_t byte_size);
 
-  // Set the buffer for the next output to by 'buffer' which is size
+  // Set the buffer for the next output to be 'buffer' which is size
   // of 'byte_size'.
   void AddOutputBuffer(void* buffer, size_t byte_size);
 

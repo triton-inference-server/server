@@ -30,6 +30,12 @@
 
 namespace nvidia { namespace inferenceserver {
 
+bool
+IsFixedSizeDataType(const DataType dtype)
+{
+  return dtype != TYPE_STRING;
+}
+
 size_t
 GetDataTypeByteSize(const DataType dtype)
 {
@@ -58,6 +64,8 @@ GetDataTypeByteSize(const DataType dtype)
       return 4;
     case TYPE_FP64:
       return 8;
+    case TYPE_STRING:
+      return 0;
     default:
       break;
   }
@@ -78,6 +86,18 @@ GetElementCount(const DimsList& dims)
   }
 
   return cnt;
+}
+
+uint64_t
+GetElementCount(const ModelInput& mio)
+{
+  return GetElementCount(mio.dims());
+}
+
+uint64_t
+GetElementCount(const ModelOutput& mio)
+{
+  return GetElementCount(mio.dims());
 }
 
 uint64_t
