@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -151,11 +151,13 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       input0->SetRaw(
-          reinterpret_cast<uint8_t*>(&input0_data[0]), input0->ByteSize()),
+          reinterpret_cast<uint8_t*>(&input0_data[0]),
+          input0_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT0");
   FAIL_IF_ERR(
       input1->SetRaw(
-          reinterpret_cast<uint8_t*>(&input1_data[0]), input1->ByteSize()),
+          reinterpret_cast<uint8_t*>(&input1_data[0]),
+          input1_data.size() * sizeof(int32_t)),
       "unable to set data for INPUT1");
 
   // Send inference request to the inference server.

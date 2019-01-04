@@ -54,11 +54,22 @@ message InferRequestHeader
 
     //@@    .. cpp:var:: uint64 byte_size
     //@@
-    //@@       The size of the input tensor, in bytes. This is the size for
-    //@@       one instance of the input, not the entire size of a batched
-    //@@       input.
+    //@@       The size of the input tensor, in bytes. For tensors with
+    //@@       fixed-sized datatypes this is the size for one instance of the
+    //@@       input, not the entire size of a batched input. For tensors
+    //@@       with a non-fixed-size datatype (like STRING) this field should
+    //@@       not be specified (or should be specified as zero).
     //@@
     uint64 byte_size = 2;
+
+    //@@    .. cpp:var:: uint64 batch_byte_size
+    //@@
+    //@@       The size of the full batch of the input tensor, in bytes.
+    //@@       For tensors with fixed-sized datatypes this field is optional.
+    //@@       For tensors with a non-fixed-size datatype (like STRING) this
+    //@@       field must be specified.
+    //@@
+    uint64 batch_byte_size = 3;
   }
 
   //@@  .. cpp:var:: message Output

@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@ import sys
 import numpy as np
 
 FLAGS = None
+np_dtype_string = np.dtype(object)
 
 def np_to_model_dtype(np_dtype):
     if np_dtype == np.bool:
@@ -53,6 +54,8 @@ def np_to_model_dtype(np_dtype):
         return "TYPE_FP32"
     elif np_dtype == np.float64:
         return "TYPE_FP64"
+    elif np_dtype == np_dtype_string:
+        return "TYPE_STRING"
     return None
 
 def np_to_tf_dtype(np_dtype):
@@ -76,6 +79,8 @@ def np_to_tf_dtype(np_dtype):
         return tf.float32
     elif np_dtype == np.float64:
         return tf.float64
+    elif np_dtype == np_dtype_string:
+        return tf.string
     return None
 
 def np_to_c2_dtype(np_dtype):
@@ -99,6 +104,8 @@ def np_to_c2_dtype(np_dtype):
         return c2core.DataType.FLOAT
     elif np_dtype == np.float64:
         return c2core.DataType.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return c2core.DataType.STRING
     return None
 
 def np_to_trt_dtype(np_dtype):
@@ -133,6 +140,12 @@ def create_graphdef_modelfile(
         in0 = tf.placeholder(tf_input_dtype, [None, input_size], "INPUT0")
         in1 = tf.placeholder(tf_input_dtype, [None, input_size], "INPUT1")
 
+    # If the input is a string, then convert each string to the
+    # equivalent int32 value.
+    if tf_input_dtype == tf.string:
+        in0 = tf.strings.to_number(in0, tf.int32)
+        in1 = tf.strings.to_number(in1, tf.int32)
+
     # TF doesn't have GPU add or subtract operation for int8, int16 or
     # int32 so force those onto CPU.
     if ((input_dtype == np.int8) or (input_dtype == np.int16) or
@@ -144,8 +157,17 @@ def create_graphdef_modelfile(
         add = tf.add(in0, in1, "ADD")
         sub = tf.subtract(in0, in1, "SUB")
 
-    cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
-    cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
+    # Cast or convert result to the output dtype.
+    if tf_output0_dtype == tf.string:
+        cast0 = tf.dtypes.as_string(add if not swap else sub, name="TOSTR0")
+    else:
+        cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
+
+    if tf_output1_dtype == tf.string:
+        cast1 = tf.dtypes.as_string(sub if not swap else add, name="TOSTR1")
+    else:
+        cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
+
     out0 = tf.identity(cast0, "OUTPUT0")
     out1 = tf.identity(cast1, "OUTPUT1")
 
@@ -256,6 +278,12 @@ def create_savedmodel_modelfile(
         in0 = tf.placeholder(tf_input_dtype, [None, input_size], "TENSOR_INPUT0")
         in1 = tf.placeholder(tf_input_dtype, [None, input_size], "TENSOR_INPUT1")
 
+    # If the input is a string, then convert each string to the
+    # equivalent float value.
+    if tf_input_dtype == tf.string:
+        in0 = tf.strings.to_number(in0, tf.int32)
+        in1 = tf.strings.to_number(in1, tf.int32)
+
     # TF doesn't have GPU add or subtract operation for int8, int16 or
     # int32 so force those onto CPU.
     if ((input_dtype == np.int8) or (input_dtype == np.int16) or
@@ -267,8 +295,17 @@ def create_savedmodel_modelfile(
         add = tf.add(in0, in1, "ADD")
         sub = tf.subtract(in0, in1, "SUB")
 
-    cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
-    cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
+    # Cast or convert result to the output dtype.
+    if tf_output0_dtype == tf.string:
+        cast0 = tf.dtypes.as_string(add if not swap else sub, name="TOSTR0")
+    else:
+        cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
+
+    if tf_output1_dtype == tf.string:
+        cast1 = tf.dtypes.as_string(sub if not swap else add, name="TOSTR1")
+    else:
+        cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
+
     out0 = tf.identity(cast0, "TENSOR_OUTPUT0")
     out1 = tf.identity(cast1, "TENSOR_OUTPUT1")
 
@@ -693,6 +730,8 @@ if __name__ == '__main__':
     create_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
     create_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
     create_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
+    create_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32)
+    create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string)
 
     # Make multiple versions of some models for version testing (they
     # use different version policies when created above)

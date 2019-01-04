@@ -30,6 +30,19 @@ _last_request_id = 0
 
 def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
     """Return True if input and output dtypes are supported by a TF model."""
+
+    # If the input type is string the output type must be string or
+    # int32. This is because the QA models we generate convert strings
+    # internally to int32 for compute.
+    if ((input_dtype == np.object) and
+        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
+         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
+        return False
+
+    # Don't support string outputs.
+    if (output0_dtype == np.object) or (output1_dtype == np.object):
+        return False
+
     return True
 
 def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
@@ -46,12 +59,25 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
         (output0_dtype == np.int16) or (output1_dtype == np.int16)):
         return False
 
+    # If the input type is string the output type must be string or
+    # int32. This is because the QA models we generate convert strings
+    # internally to int32 for compute.
+    if ((input_dtype == np.object) and
+        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
+         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
+        return False
+
+    # Don't support string inputs or outputs.
+    if ((input_dtype == np.object) or (output0_dtype == np.object) or
+        (output1_dtype == np.object)):
+        return False
+
     return True
 
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
     """Return True if input and output dtypes are supported by a TRT model."""
 
-    # TRT supports limited datatypes as of TRT 4.0. Input can be FP16 or
+    # TRT supports limited datatypes as of TRT 5.0. Input can be FP16 or
     # FP32, output must be FP32.
     if (input_dtype != np.float16) and (input_dtype != np.float32):
         return False

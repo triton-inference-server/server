@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -194,6 +194,7 @@ class InputImpl : public InferContext::Input {
 
   const std::string& Name() const override { return mio_.name(); }
   size_t ByteSize() const override { return byte_size_; }
+  size_t TotalByteSize() const override { return total_byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
@@ -203,6 +204,7 @@ class InputImpl : public InferContext::Input {
   Error Reset() override;
   Error SetRaw(const std::vector<uint8_t>& input) override;
   Error SetRaw(const uint8_t* input, size_t input_byte_size) override;
+  Error SetFromString(const std::vector<std::string>& input) override;
 
   // Copy into 'buf' up to 'size' bytes of this input's data. Return
   // the actual amount copied in 'input_bytes' and if the end of input
@@ -211,42 +213,52 @@ class InputImpl : public InferContext::Input {
       uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input);
 
   // Copy the pointer of the raw buffer at 'batch_idx' into 'buf'
-  Error GetRaw(size_t batch_idx, const uint8_t** buf) const;
+  Error GetRaw(size_t batch_idx, const uint8_t** buf, size_t* byte_size) const;
 
   // Prepare to send this input as part of a request.
   Error PrepareForRequest();
 
  private:
   const ModelInput mio_;
+
   const size_t byte_size_;
+  size_t total_byte_size_;
+
   size_t batch_size_;
-  std::vector<const uint8_t*> bufs_;
   size_t bufs_idx_, buf_pos_;
+  std::vector<const uint8_t*> bufs_;
+  std::vector<size_t> buf_byte_sizes_;
+
+  // Used only for STRING type tensors set with SetFromString(). Hold
+  // the "raw" serialization of the string values for each batch index
+  // that are then referenced by 'bufs_'. A std::list is used to avoid
+  // reallocs that could invalidate the pointer references into the
+  // std::string objects.
+  std::list<std::string> str_bufs_;
 };
 
 InputImpl::InputImpl(const ModelInput& mio)
-    : mio_(mio), byte_size_(GetByteSize(mio)), batch_size_(0), bufs_idx_(0),
-      buf_pos_(0)
+    : mio_(mio), byte_size_(GetByteSize(mio)), total_byte_size_(0),
+      batch_size_(0), bufs_idx_(0), buf_pos_(0)
 {
 }
 
 InputImpl::InputImpl(const InputImpl& obj)
-    : mio_(obj.mio_), byte_size_(obj.byte_size_), batch_size_(obj.batch_size_),
-      bufs_idx_(0), buf_pos_(0)
+    : mio_(obj.mio_), byte_size_(obj.byte_size_),
+      total_byte_size_(obj.total_byte_size_), batch_size_(obj.batch_size_),
+      bufs_idx_(0), buf_pos_(0), bufs_(obj.bufs_),
+      buf_byte_sizes_(obj.buf_byte_sizes_), str_bufs_(obj.str_bufs_)
 {
-  // Set raw inputs
-  for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
-    const uint8_t* data_ptr;
-    obj.GetRaw(batch_idx, &data_ptr);
-    SetRaw(data_ptr, byte_size_);
-  }
 }
 
 Error
 InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
 {
-  if (input_byte_size != byte_size_) {
+  if (IsFixedSizeDataType(mio_.data_type()) &&
+      (input_byte_size != byte_size_)) {
     bufs_.clear();
+    buf_byte_sizes_.clear();
+    str_bufs_.clear();
     return Error(
         RequestStatusCode::INVALID_ARG,
         "invalid size " + std::to_string(input_byte_size) +
@@ -256,6 +268,8 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
 
   if (bufs_.size() >= batch_size_) {
     bufs_.clear();
+    buf_byte_sizes_.clear();
+    str_bufs_.clear();
     return Error(
         RequestStatusCode::INVALID_ARG,
         "expecting " + std::to_string(batch_size_) +
@@ -263,7 +277,11 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
             "', one per batch entry");
   }
 
+  total_byte_size_ += input_byte_size;
+
   bufs_.push_back(input);
+  buf_byte_sizes_.push_back(input_byte_size);
+
   return Error::Success;
 }
 
@@ -274,13 +292,51 @@ InputImpl::SetRaw(const std::vector<uint8_t>& input)
 }
 
 Error
+InputImpl::SetFromString(const std::vector<std::string>& input)
+{
+  if (mio_.data_type() != DataType::TYPE_STRING) {
+    bufs_.clear();
+    buf_byte_sizes_.clear();
+    str_bufs_.clear();
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "non-string tensor '" + Name() + "' cannot be set from string data");
+  }
+
+  if (input.size() != GetElementCount(mio_)) {
+    bufs_.clear();
+    buf_byte_sizes_.clear();
+    str_bufs_.clear();
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "expecting " + std::to_string(GetElementCount(mio_)) +
+            " strings for input '" + Name() + "', got " +
+            std::to_string(input.size()));
+  }
+
+  // Serialize the strings into a "raw" buffer. The first 4-bytes are
+  // the length of the string length. Next are the actual string
+  // characters. There is *not* a null-terminator on the string.
+  str_bufs_.emplace_back();
+  std::string& sbuf = str_bufs_.back();
+  for (const auto& str : input) {
+    uint32_t len = str.size();
+    sbuf.append(reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+    sbuf.append(str);
+  }
+
+  return SetRaw(reinterpret_cast<const uint8_t*>(&sbuf[0]), sbuf.size());
+}
+
+Error
 InputImpl::GetNext(
     uint8_t* buf, size_t size, size_t* input_bytes, bool* end_of_input)
 {
   size_t total_size = 0;
 
   while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
-    const size_t csz = std::min(byte_size_ - buf_pos_, size);
+    const size_t buf_byte_size = buf_byte_sizes_[bufs_idx_];
+    const size_t csz = std::min(buf_byte_size - buf_pos_, size);
     if (csz > 0) {
       const uint8_t* input_ptr = bufs_[bufs_idx_] + buf_pos_;
       std::copy(input_ptr, input_ptr + csz, buf);
@@ -290,7 +346,7 @@ InputImpl::GetNext(
       total_size += csz;
     }
 
-    if (buf_pos_ == byte_size_) {
+    if (buf_pos_ == buf_byte_size) {
       bufs_idx_++;
       buf_pos_ = 0;
     }
@@ -302,7 +358,8 @@ InputImpl::GetNext(
 }
 
 Error
-InputImpl::GetRaw(size_t batch_idx, const uint8_t** buf) const
+InputImpl::GetRaw(
+    size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
 {
   if (batch_idx >= batch_size_) {
     return Error(
@@ -313,6 +370,8 @@ InputImpl::GetRaw(size_t batch_idx, const uint8_t** buf) const
   }
 
   *buf = bufs_[batch_idx];
+  *byte_size = buf_byte_sizes_[batch_idx];
+
   return Error::Success;
 }
 
@@ -320,8 +379,12 @@ Error
 InputImpl::Reset()
 {
   bufs_.clear();
+  buf_byte_sizes_.clear();
+  str_bufs_.clear();
   bufs_idx_ = 0;
   buf_pos_ = 0;
+  total_byte_size_ = 0;
+
   return Error::Success;
 }
 
@@ -781,9 +844,8 @@ InferContext::InferContext(
     const std::string& model_name, int model_version,
     CorrelationID correlation_id, bool verbose)
     : model_name_(model_name), model_version_(model_version),
-      correlation_id_(correlation_id), verbose_(verbose),
-      total_input_byte_size_(0), batch_size_(0), async_request_id_(0),
-      worker_(), exiting_(true)
+      correlation_id_(correlation_id), verbose_(verbose), batch_size_(0),
+      async_request_id_(0), worker_(), exiting_(true)
 {
 }
 
@@ -839,7 +901,6 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
   // If batch-size 0 was requested (no batching) treat it like
   // batch-size 1.
   batch_size_ = std::max((uint64_t)1, options.BatchSize());
-  total_input_byte_size_ = 0;
 
   // Create the InferRequestHeader protobuf. This protobuf will be
   // used for all subsequent requests.
@@ -849,11 +910,6 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
 
   for (const auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->SetBatchSize(batch_size_);
-    total_input_byte_size_ += io->ByteSize() * batch_size_;
-
-    auto rinput = infer_request_.add_input();
-    rinput->set_name(io->Name());
-    rinput->set_byte_size(io->ByteSize());
   }
 
   requested_outputs_.clear();
@@ -1289,17 +1345,17 @@ class HttpRequestImpl : public RequestImpl {
 HttpRequestImpl::HttpRequestImpl(
     const uint64_t id,
     const std::vector<std::shared_ptr<InferContext::Input>> inputs)
-    : RequestImpl(id), easy_handle_(curl_easy_init()), header_list_(NULL),
+    : RequestImpl(id), easy_handle_(curl_easy_init()), header_list_(nullptr),
       inputs_(inputs), input_pos_idx_(0)
 {
-  if (easy_handle_ != NULL) {
+  if (easy_handle_ != nullptr) {
     run_index_ = reinterpret_cast<uintptr_t>(easy_handle_);
   }
 }
 
 HttpRequestImpl::~HttpRequestImpl()
 {
-  if (easy_handle_ != NULL) {
+  if (easy_handle_ != nullptr) {
     curl_easy_cleanup(easy_handle_);
   }
 }
@@ -1538,7 +1594,7 @@ InferHttpContext::~InferHttpContext()
     worker_.join();
   }
 
-  if (multi_handle_ != NULL) {
+  if (multi_handle_ != nullptr) {
     for (auto& request : ongoing_async_requests_) {
       CURL* easy_handle =
           std::static_pointer_cast<HttpRequestImpl>(request.second)
@@ -1759,15 +1815,35 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_request.get());
 
+  // Create the input metadata for the request now that all input
+  // sizes are known. For non-fixed-sized datatypes the
+  // per-batch-instance byte-size can be different for different input
+  // instances in the batch... so set the batch-byte-size to the total
+  // size of the batch (see api.proto).
+  uint64_t total_input_byte_size = 0;
+  infer_request_.mutable_input()->Clear();
+  for (const auto& io : inputs_) {
+    total_input_byte_size += io->TotalByteSize();
+
+    auto rinput = infer_request_.add_input();
+    rinput->set_name(io->Name());
+
+    if (!IsFixedSizeDataType(io->DType())) {
+      rinput->set_batch_byte_size(io->TotalByteSize());
+    } else {
+      rinput->set_byte_size(io->ByteSize());
+    }
+  }
+
   // set the expected POST size. If you want to POST large amounts of
   // data, consider CURLOPT_POSTFIELDSIZE_LARGE
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, total_input_byte_size_);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, total_input_byte_size);
 
   // Headers to specify input and output tensors
   infer_request_str_.clear();
   infer_request_str_ = std::string(kInferRequestHTTPHeader) + ":" +
                        infer_request_.ShortDebugString();
-  struct curl_slist* list = NULL;
+  struct curl_slist* list = nullptr;
   list = curl_slist_append(list, "Expect:");
   list = curl_slist_append(list, "Content-Type: application/octet-stream");
   list = curl_slist_append(list, infer_request_str_.c_str());
@@ -1783,7 +1859,7 @@ void
 InferHttpContext::AsyncTransfer()
 {
   int place_holder = 0;
-  CURLMsg* msg = NULL;
+  CURLMsg* msg = nullptr;
   do {
     bool has_completed = false;
     // sleep if no work is available
@@ -2364,8 +2440,23 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
       std::static_pointer_cast<GrpcRequestImpl>(request);
   grpc_request->InitializeRequestedResults(requested_outputs_, batch_size_);
 
+  // Create the input metadata for the request now that all input
+  // sizes are known. For non-fixed-sized datatypes the
+  // per-batch-instance byte-size can be different for different input
+  // instances in the batch... so set the batch-byte-size to the total
+  // size of the batch (see api.proto).
+  infer_request_.mutable_input()->Clear();
   for (auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
+
+    auto rinput = infer_request_.add_input();
+    rinput->set_name(io->Name());
+
+    if (!IsFixedSizeDataType(io->DType())) {
+      rinput->set_batch_byte_size(io->TotalByteSize());
+    } else {
+      rinput->set_byte_size(io->ByteSize());
+    }
   }
 
   request_.Clear();
@@ -2377,15 +2468,18 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
   while (input_pos_idx < inputs_.size()) {
     InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
     std::string* new_input = request_.add_raw_input();
+
     // Append all batches of one input together
     for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
       const uint8_t* data_ptr;
-      io->GetRaw(batch_idx, &data_ptr);
+      size_t data_byte_size;
+      io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
       new_input->append(
-          reinterpret_cast<const char*>(data_ptr), io->ByteSize());
+          reinterpret_cast<const char*>(data_ptr), data_byte_size);
     }
     input_pos_idx++;
   }
+
   return Error::Success;
 }
 
