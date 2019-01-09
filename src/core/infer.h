@@ -147,26 +147,31 @@ class InferResponseProvider {
   virtual InferResponseHeader* MutableResponseHeader() = 0;
 
   // Finialize response based on a servable.
-  virtual tensorflow::Status FinalizeResponse(const InferenceServable& is)
-  {
-    return FinalizeResponseHeader(is);
-  }
+  virtual tensorflow::Status FinalizeResponse(const InferenceServable& is) = 0;
 
+  // Set the contents of the output buffer for output 'idx' to the
+  // specified 'content'. 'content' is copied into the buffer. This
+  // method must be used for output with non-fixed-sized datatype.
+  virtual tensorflow::Status SetOutputBuffer(
+      int idx, const void* content, size_t content_byte_size) = 0;
+
+  // Get a pointer to the buffer into which output 'idx' should be
+  // written. The size of the buffer must be exactly
+  // 'buffer_byte_size'. This method must be used for output with
+  // fixed-sized datatype.
+  tensorflow::Status GetOutputBuffer(
+      int idx, void** buffer, size_t buffer_byte_size);
+
+  // Finialize response header values based on a servable.
+  tensorflow::Status FinalizeResponseHeader(const InferenceServable& is);
+
+ protected:
   // Create a buffer for the next output of the specified 'byte_size'.
   void CreateOutputBuffer(size_t byte_size);
 
   // Set the buffer for the next output to be 'buffer' which is size
   // of 'byte_size'.
   void AddOutputBuffer(void* buffer, size_t byte_size);
-
-  // Get a pointer to the buffer into which output 'idx' should be
-  // written. The size of the buffer must be exactly
-  // 'buffer_byte_size'.
-  tensorflow::Status GetOutputBuffer(
-      int idx, void** buffer, size_t buffer_byte_size);
-
-  // Finialize response header values based on a servable.
-  tensorflow::Status FinalizeResponseHeader(const InferenceServable& is);
 
  private:
   const InferRequestHeader& request_header_;
@@ -195,6 +200,10 @@ class GRPCInferResponseProvider : public InferResponseProvider {
     return response_->mutable_meta_data();
   }
 
+  tensorflow::Status SetOutputBuffer(
+      int idx, const void* content, size_t content_byte_size) override;
+  tensorflow::Status FinalizeResponse(const InferenceServable& is) override;
+
  private:
   GRPCInferResponseProvider(
       const InferRequestHeader& request_header, InferResponse* response)
@@ -222,7 +231,9 @@ class HTTPInferResponseProvider : public InferResponseProvider {
     return &response_header_;
   }
 
-  tensorflow::Status FinalizeResponse(const InferenceServable& is);
+  tensorflow::Status SetOutputBuffer(
+      int idx, const void* content, size_t content_byte_size) override;
+  tensorflow::Status FinalizeResponse(const InferenceServable& is) override;
 
  private:
   HTTPInferResponseProvider(

@@ -78,6 +78,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
         input1_list = list()
         expected0_list = list()
         expected1_list = list()
+        expected0_val_list = list()
+        expected1_val_list = list()
         for b in range(batch_size):
             in0 = np.random.randint(low=val_min, high=val_max,
                                     size=tensor_shape, dtype=rinput_dtype)
@@ -86,23 +88,36 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
             if input_dtype != np.object:
                 in0 = in0.astype(input_dtype)
                 in1 = in1.astype(input_dtype)
+
             if not swap:
-                expected0_list.append(in0 + in1)
-                expected1_list.append(in0 - in1)
+                op0 = in0 + in1
+                op1 = in0 - in1
             else:
-                expected1_list.append(in0 + in1)
-                expected0_list.append(in0 - in1)
+                op0 = in0 - in1
+                op1 = in0 + in1
+
+            expected0_val_list.append(op0)
+            expected1_val_list.append(op1)
+            if output0_dtype == np.object:
+                expected0_list.append(np.array([bytes(str(x), encoding='utf-8') for x in (op0)], dtype=object))
+            else:
+                expected0_list.append(op0)
+            if output1_dtype == np.object:
+                expected1_list.append(np.array([bytes(str(x), encoding='utf-8') for x in (op1)], dtype=object))
+            else:
+                expected1_list.append(op1)
 
             if input_dtype == np.object:
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
                 in0 = in0n.reshape(in0.shape)
                 in1n = np.array([str(x) for x in in1.reshape(in1.size)], dtype=object)
                 in1 = in1n.reshape(in1.shape)
+
             input0_list.append(in0)
             input1_list.append(in1)
 
-        expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_list ]
-        expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_list ]
+        expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
+        expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
 
         output_req = {}
         for o in outputs:

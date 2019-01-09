@@ -94,7 +94,7 @@ Send(
               << std::endl;
   }
 
-  int32_t r;
+  int32_t r = 0;
   FAIL_IF_ERR(
       results[0]->GetRawAtCursor(0 /* batch idx */, &r),
       "unable to get OUTPUT result");

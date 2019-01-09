@@ -39,10 +39,6 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
          ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
         return False
 
-    # Don't support string outputs.
-    if (output0_dtype == np.object) or (output1_dtype == np.object):
-        return False
-
     return True
 
 def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):

@@ -427,8 +427,9 @@ SetStringInputTensor(
           break;
         }
 
-        // Parse content as null-terminated strings and assign
-        // them to the 'tensor'.
+        // Parse content and assign them to the 'tensor'. Each string
+        // in 'content' is a 4-byte length followed by the string
+        // itself with no null-terminator.
         while (content_byte_size >= sizeof(uint32_t)) {
           if (element_idx >= expected_element_cnt) {
             payload.compute_status_ = tensorflow::errors::InvalidArgument(
@@ -462,8 +463,6 @@ SetStringInputTensor(
 
           flat(tensor_element_idx + element_idx) = str;
           element_idx++;
-
-          std::cerr << "bb " << str << std::endl;
         }
 
         break;
@@ -479,6 +478,117 @@ SetStringInputTensor(
       FillStringTensor(
           tensor, tensor_element_idx + element_idx,
           expected_element_cnt - element_idx);
+    }
+
+    tensor_element_idx += expected_element_cnt;
+  }
+}
+
+void
+ReadFixedSizedOutputTensor(
+    tensorflow::Tensor& tensor, const std::string& output_name,
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+{
+  const auto& flat = tensor.bit_casted_shaped<char, 1>(
+      {tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype())});
+  size_t tensor_copy_offset = 0;
+
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    // If 'payload' requested this output then copy it from the
+    // GPU. If it did not request this output then just skip it in
+    // the output buffer.
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_byte_size =
+        request_header.batch_size() * batch1_byte_size;
+
+    int req_output_idx = 0;
+    for (const auto& output : request_header.output()) {
+      if (output.name() == output_name) {
+        void* content;
+        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+            req_output_idx, &content, expected_byte_size);
+        if (!status.ok()) {
+          payload.compute_status_ = status;
+        } else if (content == nullptr) {
+          payload.compute_status_ = tensorflow::errors::Internal(
+              "no buffer to accept output values for output '", output_name,
+              "'");
+        } else {
+          if ((tensor_copy_offset + expected_byte_size) >
+              ((size_t)flat.size())) {
+            payload.compute_status_ = tensorflow::errors::InvalidArgument(
+                "unexpected size ", tensor_copy_offset + expected_byte_size,
+                " for inference output '", output_name, "', expecting ",
+                flat.size());
+          } else {
+            memcpy(
+                content, static_cast<char*>(flat.data()) + tensor_copy_offset,
+                expected_byte_size);
+          }
+        }
+
+        break;
+      }
+
+      req_output_idx++;
+    }
+
+    tensor_copy_offset += expected_byte_size;
+  }
+}
+
+void
+ReadStringOutputTensor(
+    tensorflow::Tensor& tensor, const std::string& output_name,
+    const size_t batch1_element_cnt, std::vector<Scheduler::Payload>* payloads)
+{
+  auto flat = tensor.flat<std::string>();
+  size_t tensor_element_idx = 0;
+
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    // If 'payload' requested this output then copy it from the
+    // GPU. If it did not request this output then just skip it in
+    // the output tensor.
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_element_cnt =
+        request_header.batch_size() * batch1_element_cnt;
+
+    int req_output_idx = 0;
+    for (const auto& output : request_header.output()) {
+      if (output.name() == output_name) {
+        // Serialize the output tensor strings. Each string is
+        // serialized as a 4-byte length followed by the string itself
+        // with no null-terminator.
+        std::string serialized;
+        for (size_t e = 0; e < expected_element_cnt; ++e) {
+          std::string& str = flat(tensor_element_idx + e);
+          const uint32_t len = str.size();
+          serialized.append(
+              reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+          serialized.append(str);
+        }
+
+        tensorflow::Status status = payload.response_provider_->SetOutputBuffer(
+            req_output_idx, reinterpret_cast<const void*>(serialized.c_str()),
+            serialized.size());
+        if (!status.ok()) {
+          payload.compute_status_ = status;
+        }
+
+        break;
+      }
+
+      req_output_idx++;
     }
 
     tensor_element_idx += expected_element_cnt;
@@ -650,8 +760,9 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
 
     const tensorflow::Tensor& expected_template = opair.second;
+    const size_t batch1_element_cnt = expected_template.NumElements();
     const size_t batch1_byte_size =
-        expected_template.NumElements() *
+        batch1_element_cnt *
         tensorflow::DataTypeSize(expected_template.dtype());
 
     // Use the output template and fix the shape based on the batch
@@ -675,57 +786,12 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
           expected.shape().DebugString());
     }
 
-    const auto& flat = outputs[output_idx].bit_casted_shaped<char, 1>(
-        {outputs[output_idx].NumElements() *
-         tensorflow::DataTypeSize(outputs[output_idx].dtype())});
-    size_t tensor_copy_offset = 0;
-
-    for (auto& payload : *payloads) {
-      if (!payload.status_.ok()) {
-        continue;
-      }
-
-      // If 'payload' requested this output then copy it from the
-      // GPU. If it did not request this output then just skip it in
-      // the output buffer.
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      int req_output_idx = 0;
-      for (const auto& output : request_header.output()) {
-        if (output.name() == name) {
-          void* content;
-          tensorflow::Status status =
-              payload.response_provider_->GetOutputBuffer(
-                  req_output_idx, &content, expected_byte_size);
-          if (!status.ok()) {
-            payload.compute_status_ = status;
-          } else if (content == nullptr) {
-            payload.compute_status_ = tensorflow::errors::Internal(
-                "no buffer to accept output values for output '", name, "'");
-          } else {
-            if ((tensor_copy_offset + expected_byte_size) >
-                ((size_t)flat.size())) {
-              payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                  "unexpected size ", tensor_copy_offset + expected_byte_size,
-                  " for inference output '", name, "', expecting ",
-                  flat.size());
-            } else {
-              memcpy(
-                  content, static_cast<char*>(flat.data()) + tensor_copy_offset,
-                  expected_byte_size);
-            }
-          }
-
-          break;
-        }
-
-        req_output_idx++;
-      }
-
-      tensor_copy_offset += expected_byte_size;
+    if (expected.dtype() != tensorflow::DT_STRING) {
+      ReadFixedSizedOutputTensor(
+          outputs[output_idx], name, batch1_byte_size, payloads);
+    } else {
+      ReadStringOutputTensor(
+          outputs[output_idx], name, batch1_element_cnt, payloads);
     }
 
     output_idx++;

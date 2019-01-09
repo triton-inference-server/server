@@ -1122,6 +1122,9 @@ class ProfileGrpcContext : public ProfileContext {
 
 std::ostream& operator<<(std::ostream&, const Error&);
 
+template <>
+Error InferContext::Result::GetRawAtCursor(size_t batch_idx, std::string* out);
+
 template <typename T>
 Error
 InferContext::Result::GetRawAtCursor(size_t batch_idx, T* out)

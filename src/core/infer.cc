@@ -249,13 +249,46 @@ GRPCInferResponseProvider::Create(
     if (requested_output.has_cls()) {
       provider->CreateOutputBuffer(output_byte_size);
     } else {
-      output->resize(output_byte_size);
-      provider->AddOutputBuffer(
-          static_cast<void*>(&((*output)[0])), output->size());
+      // If byte-size for the output is zero, then the size is unknown
+      // and we require that SetOutputBuffer be used to create and set
+      // the buffer once the output size is known.
+      if (output_byte_size == 0) {
+        provider->AddOutputBuffer(nullptr, 0);
+      } else {
+        output->resize(output_byte_size);
+        provider->AddOutputBuffer(
+            static_cast<void*>(&((*output)[0])), output->size());
+      }
     }
   }
 
   return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+GRPCInferResponseProvider::SetOutputBuffer(
+    int idx, const void* content, size_t content_byte_size)
+{
+  if ((idx < 0) || (idx >= response_->raw_output_size())) {
+    return tensorflow::errors::Internal("unexpected output index ", idx);
+  }
+
+  std::string* output = response_->mutable_raw_output(idx);
+  if (!output->empty()) {
+    return tensorflow::errors::Internal(
+        "buffer for output with non-fixed-size datatype already set");
+  }
+
+  *output =
+      std::string(reinterpret_cast<const char*>(content), content_byte_size);
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+GRPCInferResponseProvider::FinalizeResponse(const InferenceServable& is)
+{
+  return FinalizeResponseHeader(is);
 }
 
 HTTPInferResponseProvider::HTTPInferResponseProvider(
@@ -316,10 +349,17 @@ HTTPInferResponseProvider::Create(
     if (requested_output.has_cls()) {
       provider->CreateOutputBuffer(output_byte_size);
     } else {
-      provider->AddOutputBuffer(
-          static_cast<void*>(raw_output_base + raw_output_offset),
-          output_byte_size);
-      raw_output_offset += output_byte_size;
+      // If byte-size for the output is zero, then the size is unknown
+      // and we require that SetOutputBuffer be used to create and set
+      // the buffer once the output size is known.
+      if (output_byte_size == 0) {
+        provider->AddOutputBuffer(nullptr, 0);
+      } else {
+        provider->AddOutputBuffer(
+            static_cast<void*>(raw_output_base + raw_output_offset),
+            output_byte_size);
+        raw_output_offset += output_byte_size;
+      }
     }
   }
 
@@ -329,6 +369,13 @@ HTTPInferResponseProvider::Create(
         " bytes across output tensor buffer");
   }
 
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+HTTPInferResponseProvider::SetOutputBuffer(
+    int idx, const void* content, size_t content_byte_size)
+{
   return tensorflow::Status::OK();
 }
 
@@ -344,7 +391,6 @@ HTTPInferResponseProvider::FinalizeResponse(const InferenceServable& is)
 
   return FinalizeResponseHeader(is);
 }
-
 
 namespace {
 
@@ -403,7 +449,8 @@ InferResponseProvider::GetOutputBuffer(
     return tensorflow::errors::Internal("unexpected output index ", idx);
   }
 
-  if (buffers_[idx].second != buffer_byte_size) {
+  if ((buffers_[idx].first == nullptr) ||
+      (buffers_[idx].second != buffer_byte_size)) {
     return tensorflow::errors::Internal(
         "unexpected output size ", buffers_[idx].second);
   }
