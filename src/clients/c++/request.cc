@@ -67,6 +67,22 @@ static CurlGlobal curl_global;
 
 //==============================================================================
 
+template <>
+Error
+InferContext::Result::GetRawAtCursor(size_t batch_idx, std::string* out)
+{
+  const uint8_t* buf;
+  Error err = GetRawAtCursor(batch_idx, &buf, sizeof(std::string));
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  std::copy(buf, buf + sizeof(std::string), reinterpret_cast<uint8_t*>(out));
+  return Error::Success;
+}
+
+//==============================================================================
+
 // Use map to keep track of GRPC channels. <key, value> : <url, Channel*>
 // If context is created on url that has established Channel, then reuse it.
 std::map<std::string, std::shared_ptr<grpc::Channel>> grpc_channel_map_;
@@ -443,8 +459,7 @@ OutputImpl::OutputImpl(const ModelOutput& mio)
 class ResultImpl : public InferContext::Result {
  public:
   ResultImpl(
-      const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
-      InferContext::Result::ResultFormat result_format);
+      const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size);
   ~ResultImpl() = default;
 
   const std::string& ModelName() const override { return model_name_; }
@@ -489,14 +504,20 @@ class ResultImpl : public InferContext::Result {
   Error SetNextRawResult(const uint8_t* buf, size_t size, size_t* result_bytes);
 
  private:
+  Error SetBatchRawResult(
+      const size_t batch1_byte_size, const uint8_t* buf, size_t size,
+      size_t* result_bytes);
+
   const std::shared_ptr<InferContext::Output> output_;
-  const size_t byte_size_;
-  const size_t batch_size_;
+  const size_t batch1_byte_size_;
+  const size_t batch1_element_count_;
   const InferContext::Result::ResultFormat result_format_;
+  const size_t batch_size_;
 
   std::vector<std::vector<uint8_t>> bufs_;
   size_t bufs_idx_;
   std::vector<size_t> bufs_pos_;
+  std::vector<uint8_t> pending_;
 
   std::string model_name_;
   uint32_t model_version_;
@@ -506,10 +527,12 @@ class ResultImpl : public InferContext::Result {
 };
 
 ResultImpl::ResultImpl(
-    const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size,
-    InferContext::Result::ResultFormat result_format)
-    : output_(output), byte_size_(output->ByteSize()), batch_size_(batch_size),
-      result_format_(result_format), bufs_(batch_size), bufs_idx_(0),
+    const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size)
+    : output_(output), batch1_byte_size_(output->ByteSize()),
+      batch1_element_count_(GetElementCount(output->Dims())),
+      result_format_(
+          reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
+      batch_size_(batch_size), bufs_(batch_size), bufs_idx_(0),
       bufs_pos_(batch_size), class_pos_(batch_size)
 {
 }
@@ -555,11 +578,11 @@ ResultImpl::GetRawAtCursor(
             std::to_string(batch_size_));
   }
 
-  if ((bufs_pos_[batch_idx] + adv_byte_size) > byte_size_) {
+  if ((bufs_pos_[batch_idx] + adv_byte_size) > batch1_byte_size_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "attempt to read beyond end of result for output output '" +
-            output_->Name() + "'");
+        "attempt to read beyond end of result for output '" + output_->Name() +
+            "'");
   }
 
   *buf = &bufs_[batch_idx][bufs_pos_[batch_idx]];
@@ -663,13 +686,14 @@ ResultImpl::ResetCursor(size_t batch_idx)
 }
 
 Error
-ResultImpl::SetNextRawResult(
-    const uint8_t* buf, size_t size, size_t* result_bytes)
+ResultImpl::SetBatchRawResult(
+    const size_t batch1_byte_size, const uint8_t* buf, size_t size,
+    size_t* result_bytes)
 {
   size_t total_size = 0;
 
   while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
-    const size_t csz = std::min(byte_size_ - bufs_pos_[bufs_idx_], size);
+    const size_t csz = std::min(batch1_byte_size - bufs_pos_[bufs_idx_], size);
     if (csz > 0) {
       std::copy(buf, buf + csz, std::back_inserter(bufs_[bufs_idx_]));
       bufs_pos_[bufs_idx_] += csz;
@@ -678,12 +702,87 @@ ResultImpl::SetNextRawResult(
       total_size += csz;
     }
 
-    if (bufs_pos_[bufs_idx_] == byte_size_) {
+    if (bufs_pos_[bufs_idx_] == batch1_byte_size) {
       bufs_idx_++;
     }
   }
 
   *result_bytes = total_size;
+  return Error::Success;
+}
+
+Error
+ResultImpl::SetNextRawResult(
+    const uint8_t* buf, size_t size, size_t* result_bytes)
+{
+  // If output has non-zero byte-size then it is an output with a
+  // fixed-sized datatype and can directly assign the results to the
+  // appropriate per-batch buffers.
+  if (batch1_byte_size_ > 0) {
+    return SetBatchRawResult(batch1_byte_size_, buf, size, result_bytes);
+  }
+
+  // Output is a non-fixed-sized datatype. For now we assume that it
+  // is TYPE_STRING and so we need to parse buf to get the size for
+  // each batch (since 'batch1_element_count_' entries which go into a
+  // batch).
+
+  // If there is partial batch data then append the new data to it and
+  // parse it all together.
+  const size_t orig_size = size;
+  if (!pending_.empty()) {
+    std::copy(buf, buf + size, std::back_inserter(pending_));
+    buf = &pending_[0];
+    size = pending_.size();
+  }
+
+  std::vector<size_t> batch_byte_sizes;
+  size_t buf_offset = 0;
+  for (size_t b = 0; b < batch_size_; ++b) {
+    size_t batch_byte_size = 0;
+    for (size_t e = 0; e < batch1_element_count_; ++e) {
+      const uint32_t len =
+          *(reinterpret_cast<const uint32_t*>(buf + buf_offset));
+      batch_byte_size += sizeof(len) + len;
+      buf_offset += sizeof(len) + len;
+      if (buf_offset > size) {
+        break;
+      }
+    }
+
+    if (buf_offset > size) {
+      break;
+    }
+
+    batch_byte_sizes.push_back(batch_byte_size);
+  }
+
+  // Don't assign batches until we have entire batch of tensor data.
+  if (batch_byte_sizes.size() < batch_size_) {
+    if (pending_.empty()) {
+      std::copy(buf, buf + orig_size, std::back_inserter(pending_));
+    }
+    *result_bytes = orig_size;
+  } else {
+    for (size_t sz : batch_byte_sizes) {
+      size_t batch1_result_bytes = 0;
+      Error err = SetBatchRawResult(sz, buf, sz, &batch1_result_bytes);
+      if (!err.IsOk()) {
+        return err;
+      }
+      if (batch1_result_bytes != sz) {
+        return Error(
+            RequestStatusCode::INTERNAL,
+            "bad batch size for non-fixed-sized result");
+      }
+
+      buf += sz;
+    }
+
+    pending_.clear();
+    *result_bytes = orig_size - (size - buf_offset);
+  }
+
   return Error::Success;
 }
 
@@ -801,9 +900,7 @@ RequestImpl::InitializeRequestedResults(
   // Initialize the results vector to collect the requested results.
   requested_results_.clear();
   for (const auto& io : requested_outs) {
-    std::unique_ptr<ResultImpl> rp(new ResultImpl(
-        io, batch_size,
-        reinterpret_cast<OutputImpl*>(io.get())->ResultFormat()));
+    std::unique_ptr<ResultImpl> rp(new ResultImpl(io, batch_size));
     requested_results_.emplace_back(std::move(rp));
   }
   return Error::Success;
@@ -1646,7 +1743,7 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
         "failed to start HTTP asynchronous client");
   } else if (exiting_) {
     // abusing variable here, exiting_ is true either when destructor is called
-    // or the worker thread is not acutally created.
+    // or the worker thread is not actually created.
     exiting_ = false;
     worker_ = std::thread(&InferHttpContext::AsyncTransfer, this);
   }
@@ -2046,7 +2143,7 @@ ServerHealthGrpcContext::GetHealth(const std::string& mode, bool* health)
     *health = response.health();
     err = Error(response.request_status());
   } else {
-    // Something wrong with the GRPC conncection
+    // Something wrong with the GRPC connection
     err = Error(
         RequestStatusCode::INTERNAL,
         "GRPC client failed: " + std::to_string(grpc_status.error_code()) +
@@ -2335,7 +2432,6 @@ InferGrpcContext::Run(std::vector<std::unique_ptr<Result>>* results)
 
   std::shared_ptr<GrpcRequestImpl> sync_request =
       std::static_pointer_cast<GrpcRequestImpl>(sync_request_);
-  sync_request->InitializeRequestedResults(requested_outputs_, batch_size_);
 
   sync_request->timer_.Reset();
   // Use send timer to measure time for marshalling infer request

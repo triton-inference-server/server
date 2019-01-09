@@ -692,7 +692,27 @@ class InferContext:
                                 _crequest_infer_ctx_result_next_raw(
                                     result, b, byref(cval), byref(cval_len))))
                         val_buf = cast(cval, POINTER(c_byte * cval_len.value))[0]
-                        val = np.frombuffer(val_buf, dtype=result_dtype)
+
+                        # If the result is not a string datatype then
+                        # convert directly. Otherwise parse 'val_buf'
+                        # into an array of strings and from that into
+                        # a numpy array of string objects.
+                        if result_dtype != np.object:
+                            val = np.frombuffer(val_buf, dtype=result_dtype)
+                        else:
+                            # String results contain a 4-byte string
+                            # length followed by the actual string
+                            # characters.
+                            strs = list()
+                            offset = 0
+                            while offset < len(val_buf):
+                                l = struct.unpack_from("<I", val_buf, offset)[0]
+                                offset += 4
+                                sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+                                offset += l
+                                strs.append(sb)
+                            val = np.array(strs, dtype=object)
+
                         # Reshape the result to the appropriate shape
                         max_shape_dims = 16
                         shape = np.zeros(max_shape_dims, dtype=np.uint32)

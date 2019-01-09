@@ -89,7 +89,9 @@ message InferRequestHeader
     //@@
     //@@       The size of the output tensor, in bytes. This is the size for
     //@@       one instance of the output, not the entire size of a batched
-    //@@       output.
+    //@@       output. For tensors with a non-fixed-size datatype (like
+    //@@       STRING) this field must not be specified (or must be specified
+    //@@       as zero).
     //@@
     uint64 byte_size = 2;
 
@@ -180,9 +182,11 @@ message InferResponseHeader
     {
       //@@      .. cpp:var:: uint64 byte_size
       //@@
-      //@@         The size of the output tensor, in bytes. This is the size for
-      //@@         one instance of the output, not the entire size of a batched
-      //@@         output.
+      //@@         The size of the output tensor, in bytes. For tensors with
+      //@@         fixed-sized datatypes this is the size for one instance of
+      //@@         the output, not the entire size of a batched output. For
+      //@@         tensors with a non-fixed-size datatype (like STRING) this
+      //@@         field must not be specified (or must be specified as zero).
       //@@
       uint64 byte_size = 1;
     }
