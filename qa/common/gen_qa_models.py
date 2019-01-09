@@ -730,8 +730,11 @@ if __name__ == '__main__':
     create_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
     create_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
     create_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
+
     create_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32)
     create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string)
+    create_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string)
+    create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np.int32)
 
     # Make multiple versions of some models for version testing (they
     # use different version policies when created above)
