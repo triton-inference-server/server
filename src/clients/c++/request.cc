@@ -72,13 +72,25 @@ template <>
 Error
 InferContext::Result::GetRawAtCursor(size_t batch_idx, std::string* out)
 {
-  const uint8_t* buf;
-  Error err = GetRawAtCursor(batch_idx, &buf, sizeof(std::string));
+  Error err;
+
+  const uint8_t* len_ptr;
+  err = GetRawAtCursor(batch_idx, &len_ptr, sizeof(uint32_t));
   if (!err.IsOk()) {
     return err;
   }
 
-  std::copy(buf, buf + sizeof(std::string), reinterpret_cast<uint8_t*>(out));
+  const uint32_t len = *(reinterpret_cast<const uint32_t*>(len_ptr));
+
+  const uint8_t* str_ptr;
+  err = GetRawAtCursor(batch_idx, &str_ptr, len);
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  out->clear();
+  std::copy(str_ptr, str_ptr + len, std::back_inserter(*out));
+
   return Error::Success;
 }
 
@@ -526,7 +538,6 @@ class ResultImpl : public InferContext::Result {
       size_t* result_bytes);
 
   const std::shared_ptr<InferContext::Output> output_;
-  const size_t batch1_byte_size_;
   const size_t batch1_element_count_;
   const InferContext::Result::ResultFormat result_format_;
   const size_t batch_size_;
@@ -534,6 +545,7 @@ class ResultImpl : public InferContext::Result {
   std::vector<std::vector<uint8_t>> bufs_;
   size_t bufs_idx_;
   std::vector<size_t> bufs_pos_;
+  std::vector<size_t> bufs_byte_size_;
   std::vector<uint8_t> pending_;
 
   std::string model_name_;
@@ -545,12 +557,11 @@ class ResultImpl : public InferContext::Result {
 
 ResultImpl::ResultImpl(
     const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size)
-    : output_(output), batch1_byte_size_(output->ByteSize()),
-      batch1_element_count_(GetElementCount(output->Dims())),
+    : output_(output), batch1_element_count_(GetElementCount(output->Dims())),
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
       batch_size_(batch_size), bufs_(batch_size), bufs_idx_(0),
-      bufs_pos_(batch_size), class_pos_(batch_size)
+      bufs_pos_(batch_size), bufs_byte_size_(batch_size), class_pos_(batch_size)
 {
 }
 
@@ -595,7 +606,7 @@ ResultImpl::GetRawAtCursor(
             std::to_string(batch_size_));
   }
 
-  if ((bufs_pos_[batch_idx] + adv_byte_size) > batch1_byte_size_) {
+  if ((bufs_pos_[batch_idx] + adv_byte_size) > bufs_byte_size_[batch_idx]) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
         "attempt to read beyond end of result for output '" + output_->Name() +
@@ -714,6 +725,7 @@ ResultImpl::SetBatchRawResult(
     if (csz > 0) {
       std::copy(buf, buf + csz, std::back_inserter(bufs_[bufs_idx_]));
       bufs_pos_[bufs_idx_] += csz;
+      bufs_byte_size_[bufs_idx_] += csz;
       buf += csz;
       size -= csz;
       total_size += csz;
@@ -735,8 +747,8 @@ ResultImpl::SetNextRawResult(
   // If output has non-zero byte-size then it is an output with a
   // fixed-sized datatype and can directly assign the results to the
   // appropriate per-batch buffers.
-  if (batch1_byte_size_ > 0) {
-    return SetBatchRawResult(batch1_byte_size_, buf, size, result_bytes);
+  if (output_->ByteSize() > 0) {
+    return SetBatchRawResult(output_->ByteSize(), buf, size, result_bytes);
   }
 
   // Output is a non-fixed-sized datatype. For now we assume that it

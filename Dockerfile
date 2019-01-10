@@ -212,6 +212,7 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     cp bazel-bin/src/clients/c++/image_client /opt/tensorrtserver/bin/. && \
     cp bazel-bin/src/clients/c++/perf_client /opt/tensorrtserver/bin/. && \
     cp bazel-bin/src/clients/c++/simple_client /opt/tensorrtserver/bin/. && \
+    cp bazel-bin/src/clients/c++/simple_string_client /opt/tensorrtserver/bin/. && \
     cp bazel-bin/src/clients/c++/simple_sequence_client /opt/tensorrtserver/bin/. && \
     mkdir -p /opt/tensorrtserver/lib && \
     cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/. && \
