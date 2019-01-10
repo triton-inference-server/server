@@ -81,6 +81,11 @@ directory containing the model. The :cpp:var:`platform
 **tensorrt_plan**, **tensorflow_graphdef**, **tensorflow_savedmodel**,
 **caffe2_netdef**, or **custom**.
 
+The datatypes allowed for input and output tensors varies based on the
+type of the model. Section :ref:`section-datatypes` describes the
+allowed datatypes and how they map to the datatypes of each model
+type.
+
 For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
 >= 1. The TensorRT Inference Server assumes that the batching occurs
@@ -143,6 +148,62 @@ portions of the model configuration if necessary, such as
 :cpp:var:`cc_model_filenames
 <nvidia::inferenceserver::ModelConfig::cc_model_filenames>`, and
 :cpp:var:`tags <nvidia::inferenceserver::ModelConfig::tags>`.
+
+.. _section-datatypes:
+
+Datatypes
+---------
+
+The following table shows the tensor datatypes supported by TRTIS. The
+first column shows the name of the datatype as it appears in the model
+configuration file. The other columns show the corresponding datatype
+for the model frameworks supported by TRTIS and for the Python numpy
+library. If a model framework does not have an entry for a given
+datatype, then TRTIS does not support that datatype for that model.
+
++--------------+--------------+--------------+--------------+--------------+
+|TRTIS Type    |TensorRT      |TensorFlow    |Caffe2        |NumPy         |
++==============+==============+==============+==============+==============+
+|TYPE_BOOL     |              |DT_BOOL       |BOOL          |bool          |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_UINT8    |              |DT_UINT8      |UINT8         |uint8         |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_UINT16   |              |DT_UINT16     |UINT16        |uint16        |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_UINT32   |              |DT_UINT32     |              |uint32        |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_UINT64   |              |DT_UINT64     |              |uint64        |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |int8          |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_INT16    |              |DT_INT16      |INT16         |int16         |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |int32         |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_INT64    |              |DT_INT64      |INT64         |int64         |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |float16       |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |float32       |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |float64       |
++--------------+--------------+--------------+--------------+--------------+
+|TYPE_STRING   |              |DT_STRING     |              |dtype(object) |
++--------------+--------------+--------------+--------------+--------------+
+
+For TensorRT each value is in the nvinfer1::DataType namespace. For
+example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
+datatype.
+
+For TensorFlow each value is in the tensorflow namespace. For example,
+tensorflow::DT_FLOAT is the 32-bit floating-point value.
+
+For Caffe2 each value is in the caffe2 namespace and is prepended with
+TensorProto_DataType_. For example, caffe2::TensorProto_DataType_FLOAT
+is the 32-bit floating-point datatype.
+
+For Numpy each value is in the numpy module. For example, numpy.float32
+is the 32-bit floating-point datatype.
 
 .. _section-version-policy:
 
