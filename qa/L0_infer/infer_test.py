@@ -118,6 +118,12 @@ class InferTest(unittest.TestCase):
         self._full_exact(True, np_dtype_string, np.int32, np_dtype_string, swap=False)
     def test_raw_ooi(self):
         self._full_exact(True, np_dtype_string, np_dtype_string, np.int32, swap=False)
+    def test_raw_ioo(self):
+        self._full_exact(True, np.int32, np_dtype_string, np_dtype_string, swap=False)
+    def test_raw_iio(self):
+        self._full_exact(True, np.int32, np.int32, np_dtype_string, swap=False)
+    def test_raw_ioi(self):
+        self._full_exact(True, np.int32, np_dtype_string, np.int32, swap=False)
 
     def test_class_bbb(self):
         self._full_exact(False, np.int8, np.int8, np.int8, swap=True)
