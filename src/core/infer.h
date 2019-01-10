@@ -179,6 +179,8 @@ class InferResponseProvider {
   using Buffer = std::pair<void*, size_t>;
   std::vector<Buffer> buffers_;
 
+  // Created buffers that need to be deleted when this request
+  // provider is destructed.
   std::vector<std::unique_ptr<char[]>> created_buffers_;
 };
 
@@ -242,7 +244,9 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
   struct evbuffer_iovec output_iovec_;
-  size_t total_raw_byte_size_;
+  size_t total_raw_fixed_byte_size_;
+
+  std::vector<std::vector<uint8_t>> non_fixed_size_output_buffers_;
 };
 
 // Interface for servables that handle inference requests.

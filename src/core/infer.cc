@@ -293,13 +293,16 @@ GRPCInferResponseProvider::FinalizeResponse(const InferenceServable& is)
 
 HTTPInferResponseProvider::HTTPInferResponseProvider(
     evbuffer* output_buffer, const InferRequestHeader& request_header)
-    : InferResponseProvider(request_header), output_buffer_(output_buffer)
+    : InferResponseProvider(request_header), output_buffer_(output_buffer),
+      non_fixed_size_output_buffers_(request_header.output().size())
+
 {
-  // Get the total size needed for raw output tensors...
-  total_raw_byte_size_ = 0;
+  // Get the total size needed for raw output tensors that has a
+  // fixed-sized datatype...
+  total_raw_fixed_byte_size_ = 0;
   for (const auto& requested_output : request_header.output()) {
     if (!requested_output.has_cls()) {
-      total_raw_byte_size_ +=
+      total_raw_fixed_byte_size_ +=
           request_header.batch_size() * requested_output.byte_size();
     }
   }
@@ -315,25 +318,26 @@ HTTPInferResponseProvider::Create(
   infer_provider->reset(provider);
 
   char* raw_output_base = nullptr;
-  if (provider->total_raw_byte_size_ > 0) {
+  if (provider->total_raw_fixed_byte_size_ > 0) {
     // Reserve contiguous space in the output to hold all the raw output
     // tensor data that must be returned in the response.
     if (evbuffer_reserve_space(
-            output_buffer, provider->total_raw_byte_size_,
+            output_buffer, provider->total_raw_fixed_byte_size_,
             &provider->output_iovec_, 1) != 1) {
       return tensorflow::errors::Internal(
-          "failed to reserve ", provider->total_raw_byte_size_,
+          "failed to reserve ", provider->total_raw_fixed_byte_size_,
           " bytes in output tensor buffer");
     }
 
-    if (provider->output_iovec_.iov_len < provider->total_raw_byte_size_) {
+    if (provider->output_iovec_.iov_len <
+        provider->total_raw_fixed_byte_size_) {
       return tensorflow::errors::Internal(
           "reserved ", provider->output_iovec_.iov_len,
           " bytes in output tensor buffer, need ",
-          provider->total_raw_byte_size_);
+          provider->total_raw_fixed_byte_size_);
     }
 
-    provider->output_iovec_.iov_len = provider->total_raw_byte_size_;
+    provider->output_iovec_.iov_len = provider->total_raw_fixed_byte_size_;
     raw_output_base = static_cast<char*>(provider->output_iovec_.iov_base);
   }
 
@@ -341,12 +345,21 @@ HTTPInferResponseProvider::Create(
   // from the space reserved in 'output_buffer'. For outputs returning
   // classification we create a buffer to hold the output that we can
   // then post-process for classifications.
+  bool seen_non_fixed_size = false;
   size_t raw_output_offset = 0;
   for (const auto& requested_output : request_header.output()) {
     const size_t output_byte_size =
         request_header.batch_size() * requested_output.byte_size();
 
     if (requested_output.has_cls()) {
+      // Class output currently not supported for non-fixed-size types.
+      if (output_byte_size == 0) {
+        seen_non_fixed_size = true;
+        return tensorflow::errors::InvalidArgument(
+            "CLASS output not supported for unknown size output '",
+            requested_output.name(), "'");
+      }
+
       provider->CreateOutputBuffer(output_byte_size);
     } else {
       // If byte-size for the output is zero, then the size is unknown
@@ -354,7 +367,15 @@ HTTPInferResponseProvider::Create(
       // the buffer once the output size is known.
       if (output_byte_size == 0) {
         provider->AddOutputBuffer(nullptr, 0);
+        seen_non_fixed_size = true;
       } else {
+        if (seen_non_fixed_size) {
+          return tensorflow::errors::InvalidArgument(
+              "HTTP API requires that output '", requested_output.name(),
+              "' appear before any non-fixed-size outputs in the request "
+              "header");
+        }
+
         provider->AddOutputBuffer(
             static_cast<void*>(raw_output_base + raw_output_offset),
             output_byte_size);
@@ -363,9 +384,9 @@ HTTPInferResponseProvider::Create(
     }
   }
 
-  if (raw_output_offset != provider->total_raw_byte_size_) {
+  if (raw_output_offset != provider->total_raw_fixed_byte_size_) {
     return tensorflow::errors::Internal(
-        "failed to partition ", provider->total_raw_byte_size_,
+        "failed to partition ", provider->total_raw_fixed_byte_size_,
         " bytes across output tensor buffer");
   }
 
@@ -376,16 +397,38 @@ tensorflow::Status
 HTTPInferResponseProvider::SetOutputBuffer(
     int idx, const void* content, size_t content_byte_size)
 {
+  if ((idx < 0) || (idx >= (int)non_fixed_size_output_buffers_.size())) {
+    return tensorflow::errors::Internal("unexpected output index ", idx);
+  }
+
+  std::vector<uint8_t>& buf = non_fixed_size_output_buffers_[idx];
+  buf.clear();
+  std::copy(
+      reinterpret_cast<const uint8_t*>(content),
+      reinterpret_cast<const uint8_t*>(content) + content_byte_size,
+      std::back_inserter(buf));
+
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
 HTTPInferResponseProvider::FinalizeResponse(const InferenceServable& is)
 {
-  if (total_raw_byte_size_ > 0) {
+  // Finalize the RAW outputs that have fixed-size datatype...
+  if (total_raw_fixed_byte_size_ > 0) {
     if (evbuffer_commit_space(output_buffer_, &output_iovec_, 1) != 0) {
       return tensorflow::errors::Internal(
           "failed to commit output tensors to output buffer");
+    }
+  }
+
+  // Add the RAW outputs that have non-fixed-size datatype...
+  for (const auto& buf : non_fixed_size_output_buffers_) {
+    if (!buf.empty()) {
+      if (evbuffer_add(output_buffer_, &buf[0], buf.size()) != 0) {
+        return tensorflow::errors::Internal(
+            "failed to write ", buf.size(), " bytes to response buffer");
+      }
     }
   }
 
