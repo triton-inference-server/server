@@ -736,7 +736,7 @@ class ConcurrencyManager {
     // run inferencing until receiving exit signal to maintain server load.
     do {
       // Run inference to get output
-      std::vector<std::unique_ptr<nic::InferContext::Result>> results;
+      std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
 
       // Record the start time of the request
       struct timespec start_time;
@@ -851,7 +851,7 @@ class ConcurrencyManager {
     // run inferencing until receiving exit signal to maintain server load.
     do {
       // Run inference to get output
-      std::vector<std::unique_ptr<nic::InferContext::Result>> results;
+      std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
       std::shared_ptr<nic::InferContext::Request> request;
 
       // Create async requests such that the number of ongoing requests

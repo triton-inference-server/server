@@ -854,7 +854,8 @@ class RequestImpl : public InferContext::Request {
   // Return the results of the request. 'ready_' should always be checked
   // before calling GetResults() to ensure the request has been completed.
   virtual Error GetResults(
-      std::vector<std::unique_ptr<InferContext::Result>>* results) = 0;
+      std::map<std::string, std::unique_ptr<InferContext::Result>>*
+          results) = 0;
 
  protected:
   RequestImpl(const uint64_t id);
@@ -880,7 +881,8 @@ class RequestImpl : public InferContext::Request {
   InferContext::RequestTimers timer_;
 
   // Results being collected for the requested outputs from inference
-  // server response.
+  // server response. Ordered in a vector as the HTTP API requires
+  // ordering to associate results correctly.
   std::vector<std::unique_ptr<InferContext::Result>> requested_results_;
 
   // Current positions within output vectors when processing response.
@@ -1407,8 +1409,8 @@ class HttpRequestImpl : public RequestImpl {
   Error SetNextRawResult(const uint8_t* buf, size_t size, size_t* result_bytes);
 
   // @see RequestImpl.GetResults()
-  Error GetResults(
-      std::vector<std::unique_ptr<InferContext::Result>>* results) override;
+  Error GetResults(std::map<std::string, std::unique_ptr<InferContext::Result>>*
+                       results) override;
 
  private:
   friend class InferHttpContext;
@@ -1553,7 +1555,7 @@ HttpRequestImpl::SetNextRawResult(
 
 Error
 HttpRequestImpl::GetResults(
-    std::vector<std::unique_ptr<InferContext::Result>>* results)
+    std::map<std::string, std::unique_ptr<InferContext::Result>>* results)
 {
   InferResponseHeader infer_response;
 
@@ -1598,7 +1600,11 @@ HttpRequestImpl::GetResults(
 
   PostRunProcessing(requested_results_, infer_response);
 
-  results->swap(requested_results_);
+  results->clear();
+  for (auto& result : requested_results_) {
+    results->insert(
+        std::make_pair(result->GetOutput()->Name(), std::move(result)));
+  }
 
   return Error(request_status_);
 }
@@ -1704,7 +1710,7 @@ InferHttpContext::~InferHttpContext()
 }
 
 Error
-InferHttpContext::Run(std::vector<std::unique_ptr<Result>>* results)
+InferHttpContext::Run(std::map<std::string, std::unique_ptr<Result>>* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
       std::static_pointer_cast<HttpRequestImpl>(sync_request_);
@@ -1791,7 +1797,7 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferHttpContext::GetAsyncRunResults(
-    std::vector<std::unique_ptr<Result>>* results,
+    std::map<std::string, std::unique_ptr<Result>>* results,
     const std::shared_ptr<Request>& async_request, bool wait)
 {
   Error err = IsRequestReady(async_request, wait);
@@ -2243,8 +2249,8 @@ class GrpcRequestImpl : public RequestImpl {
   GrpcRequestImpl(const uint64_t id, const uintptr_t run_index);
 
   // @see RequestImpl.GetResults()
-  Error GetResults(
-      std::vector<std::unique_ptr<InferContext::Result>>* results) override;
+  Error GetResults(std::map<std::string, std::unique_ptr<InferContext::Result>>*
+                       results) override;
 
  private:
   // Unmarshall and process 'grpc_response_' into 'requested_results'
@@ -2301,7 +2307,7 @@ GrpcRequestImpl::SetRawResult()
 
 Error
 GrpcRequestImpl::GetResults(
-    std::vector<std::unique_ptr<InferContext::Result>>* results)
+    std::map<std::string, std::unique_ptr<InferContext::Result>>* results)
 {
   results->clear();
   InferResponseHeader infer_response;
@@ -2327,7 +2333,12 @@ GrpcRequestImpl::GetResults(
   // Only continue to process result if GRPC status is SUCCESS
   if (err.Code() == RequestStatusCode::SUCCESS) {
     PostRunProcessing(requested_results_, infer_response);
-    results->swap(requested_results_);
+
+    results->clear();
+    for (auto& result : requested_results_) {
+      results->insert(
+          std::make_pair(result->GetOutput()->Name(), std::move(result)));
+    }
   }
 
   return err;
@@ -2426,7 +2437,7 @@ InferGrpcContext::~InferGrpcContext()
 }
 
 Error
-InferGrpcContext::Run(std::vector<std::unique_ptr<Result>>* results)
+InferGrpcContext::Run(std::map<std::string, std::unique_ptr<Result>>* results)
 {
   grpc::ClientContext context;
 
@@ -2507,7 +2518,7 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferGrpcContext::GetAsyncRunResults(
-    std::vector<std::unique_ptr<Result>>* results,
+    std::map<std::string, std::unique_ptr<Result>>* results,
     const std::shared_ptr<Request>& async_request, bool wait)
 {
   Error err = IsRequestReady(async_request, wait);

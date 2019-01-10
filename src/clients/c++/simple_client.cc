@@ -161,7 +161,7 @@ main(int argc, char** argv)
       "unable to set data for INPUT1");
 
   // Send inference request to the inference server.
-  std::vector<std::unique_ptr<nic::InferContext::Result>> results;
+  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(ctx->Run(&results), "unable to run model");
 
   // We expect there to be 2 results. Walk over all 16 result elements
@@ -174,10 +174,10 @@ main(int argc, char** argv)
   for (size_t i = 0; i < 16; ++i) {
     int32_t r0, r1;
     FAIL_IF_ERR(
-        results[0]->GetRawAtCursor(0 /* batch idx */, &r0),
+        results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
         "unable to get OUTPUT0 result at idx " + std::to_string(i));
     FAIL_IF_ERR(
-        results[1]->GetRawAtCursor(0 /* batch idx */, &r1),
+        results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
         "unable to get OUTPUT1 result at idx " + std::to_string(i));
     std::cout << input0_data[i] << " + " << input1_data[i] << " = " << r0
               << std::endl;

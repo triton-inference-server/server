@@ -605,12 +605,12 @@ class InferContext {
 
   /// Send a synchronous request to the inference server to perform an
   /// inference to produce results for the outputs specified in the
-  /// most recent call to SetRunOptions(). The Result objects holding
-  /// the output values are returned in the same order as the outputs
-  /// are specified in the options.
-  /// \param results Returns Result objects holding inference results.
+  /// most recent call to SetRunOptions().
+  /// \param results Returns Result objects holding inference results
+  /// as a map from output name to Result object.
   /// \return Error object indicating success or failure.
-  virtual Error Run(std::vector<std::unique_ptr<Result>>* results) = 0;
+  virtual Error Run(
+      std::map<std::string, std::unique_ptr<Result>>* results) = 0;
 
   /// Send an asynchronous request to the inference server to perform
   /// an inference to produce results for the outputs specified in the
@@ -620,10 +620,10 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(std::shared_ptr<Request>* async_request) = 0;
 
-  /// Get the results of the asynchronous request referenced by 'async_request'.
-  /// The Result objects holding the output values are returned in the same
-  /// order as the outputs are specified in the options when AsyncRun() was
-  /// called. \param results Return Result objects holding inference results.
+  /// Get the results of the asynchronous request referenced by
+  /// 'async_request'.
+  /// \param results Returns Result objects holding inference results
+  /// as a map from output name to Result object.
   /// \param async_request Request handle to retrieve results.
   /// \param wait If true, block until the request completes. Otherwise, return
   /// immediately.
@@ -631,7 +631,7 @@ class InferContext {
   /// returned only if the request has been completed succesfully. UNAVAILABLE
   /// will be returned if 'wait' is false and the request is not ready.
   virtual Error GetAsyncRunResults(
-      std::vector<std::unique_ptr<Result>>* results,
+      std::map<std::string, std::unique_ptr<Result>>* results,
       const std::shared_ptr<Request>& async_request, bool wait) = 0;
 
   /// Get any one completed asynchronous request.
@@ -886,10 +886,10 @@ class InferHttpContext : public InferContext {
       const std::string& server_url, const std::string& model_name,
       int model_version = -1, bool verbose = false);
 
-  Error Run(std::vector<std::unique_ptr<Result>>* results) override;
+  Error Run(std::map<std::string, std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-      std::vector<std::unique_ptr<Result>>* results,
+      std::map<std::string, std::unique_ptr<Result>>* results,
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
@@ -1063,10 +1063,10 @@ class InferGrpcContext : public InferContext {
       const std::string& server_url, const std::string& model_name,
       int model_version = -1, bool verbose = false);
 
-  Error Run(std::vector<std::unique_ptr<Result>>* results) override;
+  Error Run(std::map<std::string, std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-      std::vector<std::unique_ptr<Result>>* results,
+      std::map<std::string, std::unique_ptr<Result>>* results,
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
