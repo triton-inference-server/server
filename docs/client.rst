@@ -331,8 +331,7 @@ API. The commented interface is available at
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/__init__.py>`_
 and in the API Reference.
 
-A very simple C++ example application at
-`src/clients/c++/simple\_client.cc
+A simple C++ example application at `src/clients/c++/simple\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_client.cc>`_
 and a Python version at `src/clients/python/simple\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
@@ -381,3 +380,19 @@ described in :ref:`section-building-the-client-libraries-and-examples`
 and install the tensorrtserver whl, then::
 
   $ python src/clients/python/simple_client.py
+
+String Datatype
+^^^^^^^^^^^^^^^
+
+Some frameworks support tensors where each element in the tensor is a
+string (see :ref:`section-datatypes` for information on supported
+datatypes). For the most part, the Client API is identical for string
+and non-string tensors. One exception is that in the C++ API a string
+input tensor must be initialized with SetFromString() instead of
+SetRaw().
+
+String tensors are demonstrated in the C++ example application at
+`src/clients/c++/simple\_string\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_string_client.cc>`_
+and a Python version at `src/clients/python/simple\_string\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_string_client.py>`_.
