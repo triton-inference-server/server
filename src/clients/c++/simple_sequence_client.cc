@@ -85,7 +85,7 @@ Send(
       "unable to set data for INPUT");
 
   // Send inference request to the inference server.
-  std::vector<std::unique_ptr<nic::InferContext::Result>> results;
+  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(ctx->Run(&results), "unable to run model");
 
   // We expect there to be 1 result value, return it...
@@ -96,7 +96,7 @@ Send(
 
   int32_t r = 0;
   FAIL_IF_ERR(
-      results[0]->GetRawAtCursor(0 /* batch idx */, &r),
+      results["OUTPUT"]->GetRawAtCursor(0 /* batch idx */, &r),
       "unable to get OUTPUT result");
 
   return r;

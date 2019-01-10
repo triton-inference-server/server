@@ -155,7 +155,8 @@ Preprocess(
 
 void
 Postprocess(
-    const std::vector<std::unique_ptr<nic::InferContext::Result>>& results,
+    const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>&
+        results,
     const std::vector<std::string>& filenames, const size_t batch_size)
 {
   if (results.size() != 1) {
@@ -163,7 +164,8 @@ Postprocess(
     exit(1);
   }
 
-  const std::unique_ptr<nic::InferContext::Result>& result = results[0];
+  const std::unique_ptr<nic::InferContext::Result>& result =
+      results.begin()->second;
 
   if (filenames.size() != batch_size) {
     std::cerr << "expected " << batch_size << " filenames, got "
@@ -608,7 +610,8 @@ main(int argc, char** argv)
   // the first images until the batch is filled.
   //
   // Number of requests sent = ceil(number of images / batch_size)
-  std::vector<std::vector<std::unique_ptr<nic::InferContext::Result>>> results;
+  std::vector<std::map<std::string, std::unique_ptr<nic::InferContext::Result>>>
+      results;
   std::vector<std::vector<std::string>> result_filenames;
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
   size_t image_idx = 0;
