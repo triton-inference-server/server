@@ -235,7 +235,7 @@ ServerStatusContextGetServerStatus(
 //==============================================================================
 struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
-  std::vector<std::unique_ptr<nic::InferContext::Result>> results;
+  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
 };
 
@@ -431,19 +431,15 @@ InferContextResultNew(
     const char* result_name)
 {
   InferContextResultCtx* lctx = new InferContextResultCtx;
-  for (auto& r : infer_ctx->results) {
-    if ((r != nullptr) && (r->GetOutput()->Name() == result_name)) {
-      lctx->result.swap(r);
-      break;
-    }
-  }
 
-  if (lctx->result == nullptr) {
+  auto itr = infer_ctx->results.find(result_name);
+  if ((itr == infer_ctx->results.end()) || (itr->second == nullptr)) {
     return new nic::Error(
         ni::RequestStatusCode::INTERNAL,
         "unable to find result for output '" + std::string(result_name) + "'");
   }
 
+  lctx->result.swap(itr->second);
   *ctx = lctx;
   return nullptr;
 }
