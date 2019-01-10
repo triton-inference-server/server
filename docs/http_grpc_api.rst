@@ -144,7 +144,10 @@ The inference results are returned in the body of the HTTP response to
 the POST request. For outputs where full result tensors were
 requested, the result values are communicated in the body of the
 response in the order as the outputs are listed in the request
-header. After those, an :cpp:var:`InferResponseHeader
+header. Outputs that have fixed-size datatypes must be listed first in
+the request header followed by outputs that have non-fixed-size
+datatypes (like STRING).  After those, an
+:cpp:var:`InferResponseHeader
 <nvidia::inferenceserver::InferResponseHeader>` message is appended to
 the response body. The :cpp:var:`InferResponseHeader
 <nvidia::inferenceserver::InferResponseHeader>` message is returned in
@@ -152,15 +155,20 @@ either text format (the default) or in binary format if query
 parameter format=binary is specified (for example,
 /api/infer/foo?format=binary).
 
-For example, assuming outputs specified in the
-:cpp:var:`InferResponseHeader
+For example, assuming an inference request for a model that has 'n'
+outputs with fixed-size datatypes and 'm' outputs with non-fixed-size
+datatypes, the outputs specified in the :cpp:var:`InferResponseHeader
 <nvidia::inferenceserver::InferResponseHeader>` in order are
-“output0”, “output1”, …, “outputn”, the response body would contain::
+“output-fixed[0]”, ..., “output-fixed[n-1]”, “output-non-fixed[0]”,
+..., “output-non-fixed[m-1]”. Assuming RAW output is being requested
+for all outputs the response body would contain::
 
-  <raw binary tensor values for output0, if raw output was requested for output0>
-  <raw binary tensor values for output1, if raw output was requested for output1>
+  <raw binary tensor values for output-fixed[0] >
   ...
-  <raw binary tensor values for outputn, if raw output was requested for outputn>
+  <raw binary tensor values for output-fixed[n-1] >
+  <raw binary tensor values for output-non-fixed[0] >
+  ...
+  <raw binary tensor values for output-non-fixed[m-1] >
   <text or binary encoded InferResponseHeader proto>
 
 The success or failure of the inference request is indicated in the
