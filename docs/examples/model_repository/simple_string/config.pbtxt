@@ -1,0 +1,28 @@
+
+name: "simple_string"
+platform: "tensorflow_graphdef"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_STRING
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_STRING
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_STRING
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_STRING
+    dims: [ 16 ]
+  }
+]
