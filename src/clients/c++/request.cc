@@ -28,6 +28,7 @@
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
+#include <deque>
 #include <iostream>
 #include <memory>
 #include "src/core/constants.h"
@@ -167,11 +168,11 @@ class OptionsImpl : public InferContext::Options {
   using OutputOptionsPair =
       std::pair<std::shared_ptr<InferContext::Output>, OutputOptions>;
 
-  const std::vector<OutputOptionsPair>& Outputs() const { return outputs_; }
+  const std::deque<OutputOptionsPair>& Outputs() const { return outputs_; }
 
  private:
   size_t batch_size_;
-  std::vector<OutputOptionsPair> outputs_;
+  std::deque<OutputOptionsPair> outputs_;
 };
 
 OptionsImpl::OptionsImpl() : batch_size_(0) {}
@@ -179,8 +180,16 @@ OptionsImpl::OptionsImpl() : batch_size_(0) {}
 Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
 {
-  outputs_.emplace_back(std::make_pair(
-      output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
+  // HTTP protocol requires that outputs with non-fixed-size datatype
+  // (STRING) be requested last in the request header...
+  if (!IsFixedSizeDataType(output->DType())) {
+    outputs_.emplace_back(std::make_pair(
+        output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
+  } else {
+    outputs_.emplace_front(std::make_pair(
+        output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
+  }
+
   return Error::Success;
 }
 
@@ -188,8 +197,16 @@ Error
 OptionsImpl::AddClassResult(
     const std::shared_ptr<InferContext::Output>& output, uint64_t k)
 {
-  outputs_.emplace_back(std::make_pair(
-      output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
+  // HTTP protocol requires that outputs with non-fixed-size datatype
+  // (STRING) be requested last in the request header...
+  if (!IsFixedSizeDataType(output->DType())) {
+    outputs_.emplace_back(std::make_pair(
+        output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
+  } else {
+    outputs_.emplace_front(std::make_pair(
+        output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
+  }
+
   return Error::Success;
 }
 
@@ -726,6 +743,10 @@ ResultImpl::SetNextRawResult(
   // is TYPE_STRING and so we need to parse buf to get the size for
   // each batch (since 'batch1_element_count_' entries which go into a
   // batch).
+  if (bufs_idx_ == bufs_.size()) {
+    *result_bytes = 0;
+    return Error::Success;
+  }
 
   // If there is partial batch data then append the new data to it and
   // parse it all together.
@@ -773,10 +794,19 @@ ResultImpl::SetNextRawResult(
       if (batch1_result_bytes != sz) {
         return Error(
             RequestStatusCode::INTERNAL,
-            "bad batch size for non-fixed-sized result");
+            "output '" + output_->Name() + "' expecting batch size " +
+                std::to_string(sz) + " for non-fixed-sized result, got " +
+                std::to_string(batch1_result_bytes));
       }
 
       buf += sz;
+    }
+
+    if (bufs_idx_ != bufs_.size()) {
+      return Error(
+          RequestStatusCode::INTERNAL,
+          "output '" + output_->Name() +
+              "' failed to set result for entire batch");
     }
 
     pending_.clear();
@@ -1405,7 +1435,7 @@ class HttpRequestImpl : public RequestImpl {
   Error GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes);
 
   // Copy into the context 'size' bytes of result data from
-  // 'buf'. Return the actual amount copied in 'result_<bytes'.
+  // 'buf'. Return the actual amount copied in 'result_bytes'.
   Error SetNextRawResult(const uint8_t* buf, size_t size, size_t* result_bytes);
 
   // @see RequestImpl.GetResults()
