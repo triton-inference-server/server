@@ -37,6 +37,10 @@ using CorrelationID = uint64_t;
 /// The type for a repeated dims field (used for shape)
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
 
+/// The value for a dimension in a shape that indicates that that
+/// dimension can take on any size.
+constexpr int WILDCARD_DIM = -1;
+
 /// Enumeration for the different platform types.
 enum Platform {
   PLATFORM_UNKNOWN = 0,
@@ -108,10 +112,23 @@ Platform GetPlatform(const std::string& platform_name);
 /// \return The nice level.
 int GetCpuNiceLevel(const ModelConfig& config);
 
-/// Compare two model configuration shapes for equality.
+/// Compare two model configuration shapes for equality. Wildcard
+/// dimensions (that is, dimensions with size WILDCARD_DIM) are
+/// compared literally so that to be equal the two shapes must both
+/// specify WILDCARD_DIM in the same dimensions.
 /// \params dims0 The first shape.
 /// \params dims1 The second shape.
 /// \return True if the shapes are equal, false if not equal.
 bool CompareDims(const DimsList& dims0, const DimsList& dims1);
+
+/// Compare two model configuration shapes for equality. Wildcard
+/// dimensions (that is, dimensions with size WILDCARD_DIM) are
+/// allowed to match with any value. So, a dimension in one shape
+/// specified as WILDCARD_DIM will always match the same dimension in
+/// the other shape.
+/// \params dims0 The first shape.
+/// \params dims1 The second shape.
+/// \return True if the shapes are equal, false if not equal.
+bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
 
 }}  // namespace nvidia::inferenceserver

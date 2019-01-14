@@ -124,9 +124,8 @@ class CustomBundle : public InferenceServable {
     // batching is not supported.
     int max_batch_size_;
 
-    // The inputs and outputs from the model configuration and the
-    // byte-size of each, where is size is the batch-1 size.
-    IOSizeMap inputs_;
+    // The outputs from the model configuration and the byte-size of
+    // each, where is size is the batch-1 size.
     IOSizeMap outputs_;
 
     // The handle to the shared library associated with this context.

@@ -108,9 +108,6 @@ class PlanBundle : public InferenceServable {
     nvinfer1::ICudaEngine* engine_;
     nvinfer1::IExecutionContext* context_;
 
-    // The number of inputs required for this model.
-    size_t num_inputs_;
-
     // For each binding index of the TensorRT engine, the size of the
     // corresponding tensor and pointer to the CUDA buffer for the
     // tensor. These are arrays with size equal to number of bindings.

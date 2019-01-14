@@ -104,7 +104,6 @@ using nvrpc::ThreadPool;
 
 namespace nvidia { namespace inferenceserver {
 
-
 namespace {
 
 class AsyncResources : public nvrpc::Resources {
@@ -161,33 +160,45 @@ class InferContext final
         server->StatusManager(), request.model_name());
     auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
     infer_stats->StartRequestTimer(timer.get());
+    infer_stats->SetRequestedVersion(request.version());
 
     RequestStatus* request_status = response.mutable_request_status();
 
-    std::shared_ptr<GRPCInferRequestProvider> request_provider;
-    tensorflow::Status status =
-        GRPCInferRequestProvider::Create(request, &request_provider);
+    auto backend = std::make_shared<InferenceServer::InferBackendState>();
+    tensorflow::Status status = server->InitBackendState(
+        request.model_name(), request.version(), backend);
     if (status.ok()) {
-      std::shared_ptr<GRPCInferResponseProvider> response_provider;
-      status = GRPCInferResponseProvider::Create(
-          request.meta_data(), &response, &response_provider);
-      if (status.ok()) {
-        server->HandleInfer(
-            request_status, request_provider, response_provider, infer_stats,
-            [this, request_status, &response, infer_stats, timer]() mutable {
-              // If the response is an error then clear the meta-data
-              // and raw output as they may be partially or
-              // un-initialized.
-              if (request_status->code() != RequestStatusCode::SUCCESS) {
-                response.mutable_meta_data()->Clear();
-                response.mutable_raw_output()->Clear();
-              }
+      infer_stats->SetModelServable(backend->Backend());
 
-              timer.reset();
-              this->FinishResponse();
-            },
-            true  // async_frontend
-        );
+      std::shared_ptr<GRPCInferRequestProvider> request_provider;
+      status = GRPCInferRequestProvider::Create(
+          *(backend->Backend()), request, &request_provider);
+      if (status.ok()) {
+        infer_stats->SetBatchSize(
+            request_provider->RequestHeader().batch_size());
+
+        std::shared_ptr<GRPCInferResponseProvider> response_provider;
+        status = GRPCInferResponseProvider::Create(
+            request.meta_data(), &response, &response_provider);
+        if (status.ok()) {
+          server->HandleInfer(
+              request_status, backend, request_provider, response_provider,
+              infer_stats,
+              [this, request_status, &response, infer_stats, timer]() mutable {
+                // If the response is an error then clear the meta-data
+                // and raw output as they may be partially or
+                // un-initialized.
+                if (request_status->code() != RequestStatusCode::SUCCESS) {
+                  response.mutable_meta_data()->Clear();
+                  response.mutable_raw_output()->Clear();
+                }
+
+                timer.reset();
+                this->FinishResponse();
+              },
+              true  // async_frontend
+          );
+        }
       }
     }
 
@@ -404,10 +415,16 @@ HTTPServiceImpl::Infer(
     }
   }
 
+  int model_version = -1;
+  if (!model_version_str.empty()) {
+    model_version = std::atoi(model_version_str.c_str());
+  }
+
   auto infer_stats =
       std::make_shared<ModelInferStats>(server_->StatusManager(), model_name);
   auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
   infer_stats->StartRequestTimer(timer.get());
+  infer_stats->SetRequestedVersion(model_version);
 
   absl::string_view infer_request_header =
       req->GetRequestHeader(kInferRequestHTTPHeader);
@@ -416,40 +433,50 @@ HTTPServiceImpl::Infer(
 
   RequestStatus request_status;
 
-  std::shared_ptr<HTTPInferRequestProvider> request_provider;
-  tensorflow::Status status = HTTPInferRequestProvider::Create(
-      req->InputBuffer(), model_name, model_version_str,
-      infer_request_header_str, &request_provider);
+  auto backend = std::make_shared<InferenceServer::InferBackendState>();
+  tensorflow::Status status =
+      server_->InitBackendState(model_name, model_version, backend);
   if (status.ok()) {
-    std::shared_ptr<HTTPInferResponseProvider> response_provider;
-    status = HTTPInferResponseProvider::Create(
-        req->OutputBuffer(), request_provider->RequestHeader(),
-        &response_provider);
+    infer_stats->SetModelServable(backend->Backend());
+
+    std::shared_ptr<HTTPInferRequestProvider> request_provider;
+    status = HTTPInferRequestProvider::Create(
+        req->InputBuffer(), *(backend->Backend()), model_name, model_version,
+        infer_request_header_str, &request_provider);
     if (status.ok()) {
-      server_->HandleInfer(
-          &request_status, request_provider, response_provider, infer_stats,
-          [&request_status, request_provider, response_provider, infer_stats,
-           req]() mutable {
-            if (request_status.code() == RequestStatusCode::SUCCESS) {
-              std::string format;
-              if (!req->QueryParam("format", &format)) {
-                format = "text";
-              }
+      infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
-              const InferResponseHeader& response_header =
-                  response_provider->ResponseHeader();
+      std::shared_ptr<HTTPInferResponseProvider> response_provider;
+      status = HTTPInferResponseProvider::Create(
+          req->OutputBuffer(), request_provider->RequestHeader(),
+          &response_provider);
+      if (status.ok()) {
+        server_->HandleInfer(
+            &request_status, backend, request_provider, response_provider,
+            infer_stats,
+            [&request_status, request_provider, response_provider, infer_stats,
+             req]() mutable {
+              if (request_status.code() == RequestStatusCode::SUCCESS) {
+                std::string format;
+                if (!req->QueryParam("format", &format)) {
+                  format = "text";
+                }
 
-              std::string rstr;
-              if (format == "binary") {
-                response_header.SerializeToString(&rstr);
-              } else {
-                rstr = response_header.DebugString();
+                const InferResponseHeader& response_header =
+                    response_provider->ResponseHeader();
+
+                std::string rstr;
+                if (format == "binary") {
+                  response_header.SerializeToString(&rstr);
+                } else {
+                  rstr = response_header.DebugString();
+                }
+                req->WriteResponseBytes(rstr.c_str(), rstr.size());
               }
-              req->WriteResponseBytes(rstr.c_str(), rstr.size());
-            }
-          },
-          false  // async frontend
-      );
+            },
+            false  // async frontend
+        );
+      }
     }
   }
 
@@ -1029,6 +1056,14 @@ InferenceServer::Wait()
   }
 }
 
+tensorflow::Status
+InferenceServer::InitBackendState(
+    const std::string& model_name, const int model_version,
+    const std::shared_ptr<InferBackendState>& backend)
+{
+  return backend->Init(model_name, model_version, core_.get());
+}
+
 std::unique_ptr<nvrpc::Server>
 InferenceServer::StartGrpcServer()
 {
@@ -1251,22 +1286,10 @@ InferenceServer::HandleProfile(
   }
 }
 
-namespace {
-
-// Use the servable appropriate for the requested model's platform.
-struct AsyncState {
-  InferenceServable* is = nullptr;
-  tfs::ServableHandle<GraphDefBundle> graphdef_bundle;
-  tfs::ServableHandle<PlanBundle> plan_bundle;
-  tfs::ServableHandle<NetDefBundle> netdef_bundle;
-  tfs::ServableHandle<SavedModelBundle> saved_model_bundle;
-  tfs::ServableHandle<CustomBundle> custom_bundle;
-};
-}  // namespace
-
 void
 InferenceServer::HandleInfer(
     RequestStatus* request_status,
+    const std::shared_ptr<InferBackendState>& backend,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
@@ -1283,110 +1306,37 @@ InferenceServer::HandleInfer(
   ScopedAtomicIncrement inflight(inflight_request_counter_);
   const uint64_t request_id = NextRequestId();
 
-  tensorflow::Status status = tensorflow::Status::OK();
-
-  // Create the model-spec. A negative version indicates that the
-  // latest version of the model should be used.
-  tfs::ModelSpec model_spec;
-  model_spec.set_name(request_provider->ModelName());
-  if (request_provider->ModelVersion() >= 0) {
-    model_spec.mutable_version()->set_value(request_provider->ModelVersion());
-  }
-
-  auto state = std::make_shared<AsyncState>();
-
-  std::function<void()> handle;
-
-  Platform platform;
-  status = ModelRepositoryManager::GetModelPlatform(
-      request_provider->ModelName(), &platform);
-  if (status.ok()) {
-    switch (platform) {
-      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-        status =
-            core_->GetServableHandle(model_spec, &(state->graphdef_bundle));
-        if (status.ok()) {
-          state->is =
-              static_cast<InferenceServable*>(state->graphdef_bundle.get());
-        }
-        break;
-      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-        status =
-            core_->GetServableHandle(model_spec, &(state->saved_model_bundle));
-        if (status.ok()) {
-          state->is =
-              static_cast<InferenceServable*>(state->saved_model_bundle.get());
-        }
-        break;
-      case Platform::PLATFORM_TENSORRT_PLAN:
-        status = core_->GetServableHandle(model_spec, &(state->plan_bundle));
-        if (status.ok()) {
-          state->is = static_cast<InferenceServable*>(state->plan_bundle.get());
-        }
-        break;
-      case Platform::PLATFORM_CAFFE2_NETDEF:
-        status = core_->GetServableHandle(model_spec, &(state->netdef_bundle));
-        if (status.ok()) {
-          state->is =
-              static_cast<InferenceServable*>(state->netdef_bundle.get());
-        }
-        break;
-      case Platform::PLATFORM_CUSTOM:
-        status = core_->GetServableHandle(model_spec, &(state->custom_bundle));
-        if (status.ok()) {
-          state->is =
-              static_cast<InferenceServable*>(state->custom_bundle.get());
-        }
-        break;
-      default:
-        break;
-    }
-  }
-
-  infer_stats->SetRequestedVersion(request_provider->ModelVersion());
-  infer_stats->SetModelServable(state->is);
-  infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
-
-  if (!status.ok() || (state->is == nullptr)) {
-    status = tensorflow::errors::Unavailable(
-        "Inference request for unknown model '", request_provider->ModelName(),
-        "'");
-  }
-
-  auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, state,
+  // Need to capture 'backend' to keep it alive... it goes away when
+  // it goes out of scope which can cause the model to be unloaded,
+  // and we don't want that to happen when a request is in flight.
+  auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, backend,
                                 response_provider, request_status, request_id,
                                 infer_stats](
                                    tensorflow::Status status) mutable {
     if (status.ok()) {
-      auto status = response_provider->FinalizeResponse(*(state->is));
+      auto status = response_provider->FinalizeResponse(*(backend->Backend()));
       if (status.ok()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
         return;
       }
     }
+
     // Report only stats that are relevant for a failed inference run.
     infer_stats->SetFailed(true);
-    LOG_VERBOSE(1) << "Infer failed: "
-                   << status.error_message();  // should logged as an error
+    LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
     RequestStatusFactory::Create(request_status, request_id, id_, status);
     OnCompleteInferRPC();
   };
 
-  if (status.ok()) {
-    // we need to capture the servable handle to keep it alive
-    // it goes away when it goes out of scope
-    if (async_frontend) {
-      state->is->AsyncRun(
-          infer_stats, request_provider, response_provider,
-          OnCompleteHandleInfer);
-    } else {
-      state->is->Run(
-          infer_stats, request_provider, response_provider,
-          OnCompleteHandleInfer);
-    }
+  if (async_frontend) {
+    backend->Backend()->AsyncRun(
+        infer_stats, request_provider, response_provider,
+        OnCompleteHandleInfer);
   } else {
-    OnCompleteHandleInfer(status);
+    backend->Backend()->Run(
+        infer_stats, request_provider, response_provider,
+        OnCompleteHandleInfer);
   }
 }
 
@@ -1543,6 +1493,71 @@ InferenceServer::BuildPlatformConfigMap(
         .mutable_source_adapter_config()) = custom_source_adapter_config;
 
   return platform_config_map;
+}
+
+//
+// InferBackendState
+//
+tensorflow::Status
+InferenceServer::InferBackendState::Init(
+    const std::string& model_name, const int model_version,
+    tfs::ServerCore* core)
+{
+  // Create the model-spec. A negative version indicates that the
+  // latest version of the model should be used.
+  tfs::ModelSpec model_spec;
+  model_spec.set_name(model_name);
+  if (model_version >= 0) {
+    model_spec.mutable_version()->set_value(model_version);
+  }
+
+  // Get the InferenceServable appropriate for the request.
+  Platform platform;
+  tensorflow::Status status =
+      ModelRepositoryManager::GetModelPlatform(model_name, &platform);
+  if (status.ok()) {
+    switch (platform) {
+      case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
+        status = core->GetServableHandle(model_spec, &(graphdef_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceServable*>(graphdef_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
+        status = core->GetServableHandle(model_spec, &(saved_model_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceServable*>(saved_model_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_TENSORRT_PLAN:
+        status = core->GetServableHandle(model_spec, &(plan_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceServable*>(plan_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_CAFFE2_NETDEF:
+        status = core->GetServableHandle(model_spec, &(netdef_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceServable*>(netdef_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_CUSTOM:
+        status = core->GetServableHandle(model_spec, &(custom_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceServable*>(custom_bundle_.get());
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (!status.ok() || (is_ == nullptr)) {
+    status = tensorflow::errors::Unavailable(
+        "Inference request for unknown model '", model_name, "'");
+  }
+
+  return status;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -235,9 +235,10 @@ message ModelStatus
   //@@     Duration statistics for each version of the model, as a map
   //@@     from version to the status. A version will not occur in the map
   //@@     unless there has been at least one inference request of
-  //@@     that model version.
+  //@@     that model version. A version of -1 indicates the status is
+  //@@     for requests for which the version could not be determined.
   //@@
-  map<uint32, ModelVersionStatus> version_status = 2;
+  map<int32, ModelVersionStatus> version_status = 2;
 }
 
 //@@

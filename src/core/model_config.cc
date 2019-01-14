@@ -179,4 +179,21 @@ CompareDims(const DimsList& dims0, const DimsList& dims1)
   return true;
 }
 
+bool
+CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1)
+{
+  if (dims0.size() != dims1.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < dims0.size(); ++i) {
+    if ((dims0[i] != WILDCARD_DIM) && (dims1[i] != WILDCARD_DIM) &&
+        (dims0[i] != dims1[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 }}  // namespace nvidia::inferenceserver
