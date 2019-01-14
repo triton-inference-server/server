@@ -123,7 +123,6 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "expected error for unavailable model " + model_name)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
@@ -143,7 +142,6 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "expected status failure for " + savedmodel_name)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith("no status available for unknown model"))
 
@@ -229,7 +227,6 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "expected error for unavailable model " + savedmodel_name)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
                     "Inference request for unknown model 'savedmodel_float32_float32_float32'"))
@@ -285,7 +282,6 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "expected error for unavailable model " + netdef_name)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
                     "Inference request for unknown model 'netdef_float32_float32_float32'"))
@@ -455,7 +451,6 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "expected error for unavailable model " + graphdef_name)
         except InferenceServerException as ex:
             self.assertEqual("inference:0", ex.server_id())
-            self.assertGreater(ex.request_id(), 0)
             self.assertTrue(
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_int32_int32_int32'"))
@@ -647,7 +642,6 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(False, "expected error for unavailable model " + model_name)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 

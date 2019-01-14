@@ -1975,8 +1975,6 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
 
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
-    } else {
-      rinput->set_byte_size(io->ByteSize());
     }
   }
 
@@ -2603,8 +2601,6 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
-    } else {
-      rinput->set_byte_size(io->ByteSize());
     }
   }
 

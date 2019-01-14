@@ -52,15 +52,15 @@ message InferRequestHeader
     //@@
     string name = 1;
 
-    //@@    .. cpp:var:: uint64 byte_size
+    //@@    .. cpp:var:: int64 dims (repeated)
     //@@
-    //@@       The size of the input tensor, in bytes. For tensors with
-    //@@       fixed-sized datatypes this is the size for one instance of the
-    //@@       input, not the entire size of a batched input. For tensors
-    //@@       with a non-fixed-size datatype (like STRING) this field should
-    //@@       not be specified (or should be specified as zero).
+    //@@       The shape of the input tensor. If the model configuration for
+    //@@       this input explicitly specifies all dimensions of the shape,
+    //@@       then this field is optional. If the model configuration has
+    //@@       any wildcard dimensions (-1) dimensions for this input, then
+    //@@       the input shape must be specified.
     //@@
-    uint64 byte_size = 2;
+    repeated int64 dims = 4;
 
     //@@    .. cpp:var:: uint64 batch_byte_size
     //@@

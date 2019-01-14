@@ -608,7 +608,7 @@ class ConcurrencyManager {
 
     // If model_version is -1 then look in the end status to find the
     // latest (highest valued version) and use that as the version.
-    uint32_t status_model_version = 0;
+    int32_t status_model_version = 0;
     if (model_version_ < 0) {
       for (const auto& vp : end_status.version_status()) {
         status_model_version = std::max(status_model_version, vp.first);

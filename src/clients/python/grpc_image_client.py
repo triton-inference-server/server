@@ -271,8 +271,7 @@ if __name__ == '__main__':
         img = Image.open(filename)
         image_data.append(preprocess(img, format, dtype, c, h, w, FLAGS.scaling))
 
-    request.meta_data.input.add(
-        name=input_name, byte_size=image_data[0].size * image_data[0].itemsize)
+    request.meta_data.input.add(name=input_name)
 
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just

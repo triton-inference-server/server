@@ -151,7 +151,6 @@ class InferTest(unittest.TestCase):
                                model_version=1, swap=False)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
@@ -161,7 +160,6 @@ class InferTest(unittest.TestCase):
                                model_version=2, swap=True)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
@@ -182,7 +180,6 @@ class InferTest(unittest.TestCase):
                                model_version=1, swap=False)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
@@ -227,7 +224,6 @@ class InferTest(unittest.TestCase):
                                model_version=2, swap=True)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
@@ -237,7 +233,6 @@ class InferTest(unittest.TestCase):
                                model_version=3, swap=True)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
@@ -258,7 +253,6 @@ class InferTest(unittest.TestCase):
                                model_version=2, swap=True)
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
-                self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 

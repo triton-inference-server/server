@@ -50,8 +50,8 @@ CustomBundle::Context::Context(
 
 CustomBundle::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_), inputs_(std::move(o.inputs_)),
-      outputs_(std::move(o.outputs_)), library_handle_(o.library_handle_),
+      max_batch_size_(o.max_batch_size_), outputs_(std::move(o.outputs_)),
+      library_handle_(o.library_handle_),
       library_context_handle_(o.library_context_handle_),
       InitializeFn_(o.InitializeFn_), FinalizeFn_(o.FinalizeFn_),
       ErrorStringFn_(o.ErrorStringFn_), ExecuteFn_(o.ExecuteFn_)
@@ -187,10 +187,7 @@ CustomBundle::CreateExecutionContext(
   Context& context = contexts_.back();
 
   // Initialize 'context' for a specific 'gpu_device'. Collect the
-  // inputs and outputs and their byte-sizes.
-  for (const auto& io : Config().input()) {
-    context.inputs_.insert({io.name(), GetByteSize(io)});
-  }
+  // outputs and their byte-sizes.
   for (const auto& io : Config().output()) {
     context.outputs_.insert({io.name(), GetByteSize(io)});
   }
@@ -247,57 +244,21 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  // For each request in 'payloads' make sure the inputs and outputs
-  // are correct and collect up the total batch size for this
-  // inference execution.
+  // For each request in 'payloads' collect the total batch size for
+  // this inference execution. The batch-size, number of inputs, and
+  // size of each input has already been checked by each payloads
+  // request provider so don't need to do that here.
   uint32_t total_batch_size = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
 
-    // For models that don't support batching (i.e. max_batch_size_ ==
-    // 0) the request batch-size will still be 1.
-    const size_t batch_size = request_header.batch_size();
-    if ((batch_size != 1) && ((int)batch_size > max_batch_size_)) {
-      payload.status_ = tensorflow::errors::InvalidArgument(
-          "unexpected batch size ", batch_size, " for '", name_,
-          "', max allowed is ", max_batch_size_);
-      continue;
-    }
-
-    if ((size_t)request_header.input().size() != inputs_.size()) {
-      payload.status_ = tensorflow::errors::InvalidArgument(
-          "expected ", inputs_.size(), " inputs but got ",
-          request_header.input().size());
-      continue;
-    }
-
     if ((size_t)request_header.output().size() > outputs_.size()) {
       payload.status_ = tensorflow::errors::InvalidArgument(
           "expected at most ", outputs_.size(), " outputs but got ",
           request_header.output().size());
       continue;
-    }
-
-    // Validate that all inputs are expected and of the correct size.
-    for (const auto& input : request_header.input()) {
-      const std::string& name = input.name();
-
-      const auto& ii_iter = inputs_.find(name);
-      if (ii_iter == inputs_.end()) {
-        payload.status_ = tensorflow::errors::InvalidArgument(
-            "unexpected inference input '", name, "' for '", name_, "'");
-        break;
-      }
-
-      const size_t expected_byte_size = ii_iter->second;
-      if (input.byte_size() != expected_byte_size) {
-        payload.status_ = tensorflow::errors::InvalidArgument(
-            "unexpected size ", input.byte_size(), " for inference input '",
-            name, "', expecting ", expected_byte_size);
-        break;
-      }
     }
 
     // Validate that all requested outputs are allowed and of the
@@ -325,7 +286,7 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       continue;
     }
 
-    total_batch_size += batch_size;
+    total_batch_size += request_header.batch_size();
     total_requested_outputs += request_header.output_size();
   }
 
