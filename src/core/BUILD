@@ -173,6 +173,7 @@ cc_library(
         ":constants",
         ":dynamic_batch_scheduler",
         ":infer_header",
+        ":label_provider",
         ":logging",
         ":sequence_batch_scheduler",
         ":utils",
