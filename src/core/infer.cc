@@ -36,6 +36,51 @@
 
 namespace nvidia { namespace inferenceserver {
 
+tensorflow::Status
+InferRequestProvider::GetInputByteSize(
+    const InferRequestHeader::Input& input, const ModelInput& input_config,
+    uint64_t* byte_size)
+{
+  uint64_t bs = 0;
+
+  // If the inference request specifies a shape for an input, make
+  // sure it matches what the model expects and then calculate the
+  // expected input size from that shape.
+  if (input.dims_size() > 0) {
+    if (!CompareDimsWithWildcard(input.dims(), input_config.dims())) {
+      return tensorflow::errors::InvalidArgument(
+          "expected equal shape for input '", input.name(), "' for model '",
+          ModelName(), "'");
+    }
+
+    bs = GetByteSize(input_config.data_type(), input.dims());
+  } else {
+    // Inference request doesn't specify shape, make sure input
+    // shape is fully specified in the model and calculate expected
+    // size from the model configuration.
+    for (auto dim : input_config.dims()) {
+      if (dim < 0) {
+        return tensorflow::errors::InvalidArgument(
+            "expected shape for input '", input.name(), "' for model '",
+            ModelName(), "'");
+      }
+    }
+
+    bs = GetByteSize(input_config);
+  }
+
+  // If the input's datatype is not fixed-sized (like TYPE_STRING)
+  // then need to use the full-batch size specified by the input.
+  if (IsFixedSizeDataType(input_config.data_type())) {
+    bs *= RequestHeader().batch_size();
+  } else {
+    bs = input.batch_byte_size();
+  }
+
+  *byte_size = bs;
+  return tensorflow::Status::OK();
+}
+
 GRPCInferRequestProvider::GRPCInferRequestProvider(
     const InferRequest& request, const int version)
     : InferRequestProvider(request.model_name(), version), request_(request)
@@ -45,20 +90,69 @@ GRPCInferRequestProvider::GRPCInferRequestProvider(
 
 tensorflow::Status
 GRPCInferRequestProvider::Create(
-    const InferRequest& request,
+    const InferenceServable& is, const InferRequest& request,
     std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
 {
-  // Make sure the request has a batch-size > 0. Even for models that
-  // don't support batching the requested batch size must be 1.
-  if (request.meta_data().batch_size() < 1) {
-    return tensorflow::errors::InvalidArgument(
-        "inference request batch-size must be >= 1 for models that ",
-        "support batching, and must be 1 for models that don't ",
-        "support batching");
-  }
-
   const int version = (request.version() >= 0) ? request.version() : -1;
   infer_provider->reset(new GRPCInferRequestProvider(request, version));
+
+  const ModelConfig& model_config = is.Config();
+  const InferRequestHeader& request_header = request.meta_data();
+  const std::string& model_name = request.model_name();
+
+  // Make sure the request has a batch-size > 0. Even for models that
+  // don't support batching the requested batch size must be 1.
+  if (request_header.batch_size() < 1) {
+    return tensorflow::errors::InvalidArgument(
+        "inference request batch-size must be >= 1 for '", model_name, "'");
+  }
+
+  // Make sure request batch-size doesn't exceed what is supported by
+  // the model. For models that don't support batching the request
+  // batch-size will still be 1.
+  if ((request_header.batch_size() != 1) &&
+      ((int)request_header.batch_size() > model_config.max_batch_size())) {
+    return tensorflow::errors::InvalidArgument(
+        "inference request batch-size must be <= ",
+        std::to_string(model_config.max_batch_size()), " for '", model_name,
+        "'");
+  }
+
+  // Make sure that the request is providing the same number of inputs
+  // as is expected by the model.
+  if (request_header.input_size() != request.raw_input_size()) {
+    return tensorflow::errors::InvalidArgument(
+        "expected tensor data for ", request_header.input_size(),
+        " inputs but got ", request.raw_input_size(),
+        " sets of data for model '", model_name, "'");
+  }
+  if (request_header.input_size() != model_config.input_size()) {
+    return tensorflow::errors::InvalidArgument(
+        "expected ", model_config.input_size(), " inputs but got ",
+        request_header.input_size(), " inputs for model '", model_name, "'");
+  }
+
+  // Get the byte-size expected for each input and verify that the
+  // request is providing exactly that size of input.
+  size_t idx = 0;
+  for (const auto& io : request_header.input()) {
+    const ModelInput* input_config;
+    TF_RETURN_IF_ERROR(is.GetInput(io.name(), &input_config));
+
+    uint64_t byte_size = 0;
+    TF_RETURN_IF_ERROR(
+        (*infer_provider)->GetInputByteSize(io, *input_config, &byte_size));
+
+    if (byte_size != request.raw_input(idx).size()) {
+      return tensorflow::errors::InvalidArgument(
+          "unexpected size ", request.raw_input(idx).size(), " for input '",
+          io.name(), "', expecting ", byte_size, " for model '", model_name,
+          "'");
+    }
+
+    idx++;
+  }
+
   return tensorflow::Status::OK();
 }
 
@@ -86,16 +180,12 @@ GRPCInferRequestProvider::GetNextInputContent(
 
 tensorflow::Status
 HTTPInferRequestProvider::Create(
-    evbuffer* input_buffer, const std::string& model_name,
-    const std::string& model_version_str, const std::string& request_header_str,
+    evbuffer* input_buffer, const InferenceServable& is,
+    const std::string& model_name, const int model_version,
+    const std::string& request_header_str,
     std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
 {
-  int version = -1;
-  if (!model_version_str.empty()) {
-    version = std::atoi(model_version_str.c_str());
-  }
-
-  auto provider = new HTTPInferRequestProvider(model_name, version);
+  auto provider = new HTTPInferRequestProvider(model_name, model_version);
   infer_provider->reset(provider);
 
   if (!tensorflow::protobuf::TextFormat::ParseFromString(
@@ -104,13 +194,33 @@ HTTPInferRequestProvider::Create(
         "unable to parse request for model '", model_name, "'");
   }
 
+  const InferRequestHeader& request_header = provider->request_header_;
+  const ModelConfig& model_config = is.Config();
+
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
-  if (provider->request_header_.batch_size() < 1) {
+  if (request_header.batch_size() < 1) {
     return tensorflow::errors::InvalidArgument(
-        "inference request batch-size must be >= 1 for models that ",
-        "support batching, and must be 1 for models that don't ",
-        "support batching");
+        "inference request batch-size must be >= 1 for '", model_name, "'");
+  }
+
+  // Make sure request batch-size doesn't exceed what is supported by
+  // the model. For models that don't support batching the request
+  // batch-size will still be 1.
+  if ((request_header.batch_size() != 1) &&
+      ((int)request_header.batch_size() > model_config.max_batch_size())) {
+    return tensorflow::errors::InvalidArgument(
+        "inference request batch-size must be <= ",
+        std::to_string(model_config.max_batch_size()), " for '", model_name,
+        "'");
+  }
+
+  // Make sure that the request is providing the same number of inputs
+  // as is expected by the model.
+  if (request_header.input_size() != model_config.input_size()) {
+    return tensorflow::errors::InvalidArgument(
+        "expected ", model_config.input_size(), " inputs but got ",
+        request_header.input_size(), " inputs for model '", model_name, "'");
   }
 
   // Now need to create 'contents_'. Each input has one entry in
@@ -132,41 +242,48 @@ HTTPInferRequestProvider::Create(
 
     int v_idx = 0;
 
-    // For each input get the blocks holding the data for that input
-    for (const auto& input : provider->request_header_.input()) {
+    // Get the byte-size for each input and from that get the blocks
+    // holding the that must data for that input
+    for (const auto& io : request_header.input()) {
       provider->contents_idx_.push_back(0);
       provider->contents_.emplace_back();
       auto& blocks = provider->contents_.back();
 
-      size_t total_byte_size = input.batch_byte_size();
-      if (total_byte_size == 0) {
-        total_byte_size =
-            provider->request_header_.batch_size() * input.byte_size();
-      }
+      const ModelInput* input_config;
+      TF_RETURN_IF_ERROR(is.GetInput(io.name(), &input_config));
 
-      while ((total_byte_size > 0) && (v_idx < n)) {
+      uint64_t byte_size = 0;
+      TF_RETURN_IF_ERROR(
+          (*infer_provider)->GetInputByteSize(io, *input_config, &byte_size));
+
+      while ((byte_size > 0) && (v_idx < n)) {
         blocks.emplace_back();
         Block& block = blocks.back();
 
         char* base = static_cast<char*>(v[v_idx].iov_base);
         block.first = base;
-        if (v[v_idx].iov_len > total_byte_size) {
-          block.second = total_byte_size;
-          v[v_idx].iov_base = static_cast<void*>(base + total_byte_size);
-          v[v_idx].iov_len -= total_byte_size;
-          total_byte_size = 0;
+        if (v[v_idx].iov_len > byte_size) {
+          block.second = byte_size;
+          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+          v[v_idx].iov_len -= byte_size;
+          byte_size = 0;
         } else {
           block.second = v[v_idx].iov_len;
-          total_byte_size -= v[v_idx].iov_len;
+          byte_size -= v[v_idx].iov_len;
           v_idx++;
         }
+      }
+
+      if (byte_size != 0) {
+        return tensorflow::errors::InvalidArgument(
+            "unexpected size for input '", io.name(), "', missing expecting ",
+            byte_size, " bytes for model '", model_name, "'");
       }
     }
 
     if (v_idx != n) {
       return tensorflow::errors::InvalidArgument(
-          "unexpected additional input data for model '", provider->ModelName(),
-          "'");
+          "unexpected additional input data for model '", model_name, "'");
     }
   }
 
@@ -528,10 +645,10 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
       TF_RETURN_IF_ERROR(GetOutputBuffer(
           output_idx, &output_buffer, batch_size * output.byte_size()));
 
-      DataType dtype;
-      TF_RETURN_IF_ERROR(is.GetOutputDataType(output.name(), &dtype));
+      const ModelOutput* output_config;
+      TF_RETURN_IF_ERROR(is.GetOutput(output.name(), &output_config));
 
-      switch (dtype) {
+      switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, output_buffer, batch_size, output, label_provider);
@@ -578,7 +695,8 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
         default:
           return tensorflow::errors::InvalidArgument(
               "class result not available for output '", output.name(),
-              "' due to unsupported type '", DataType_Name(dtype), "'");
+              "' due to unsupported type '",
+              DataType_Name(output_config->data_type()), "'");
       }
     }
 
@@ -703,16 +821,30 @@ InferenceServable::MetricInferenceLoadRatio(int gpu_device) const
 }
 
 tensorflow::Status
-InferenceServable::GetOutputDataType(
-    const std::string& name, DataType* dtype) const
+InferenceServable::GetInput(
+    const std::string& name, const ModelInput** input) const
 {
-  const auto itr = output_dtype_map_.find(name);
-  if (itr == output_dtype_map_.end()) {
-    return tensorflow::errors::Internal(
-        "unable to find datatype for output '", name, "'");
+  const auto itr = input_map_.find(name);
+  if (itr == input_map_.end()) {
+    return tensorflow::errors::InvalidArgument(
+        "unexpected inference input '", name, "' for model '", Name(), "'");
   }
 
-  *dtype = itr->second;
+  *input = &itr->second;
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+InferenceServable::GetOutput(
+    const std::string& name, const ModelOutput** output) const
+{
+  const auto itr = output_map_.find(name);
+  if (itr == output_map_.end()) {
+    return tensorflow::errors::InvalidArgument(
+        "unexpected inference output '", name, "' for model '", Name(), "'");
+  }
+
+  *output = &itr->second;
   return tensorflow::Status::OK();
 }
 
@@ -727,10 +859,15 @@ InferenceServable::SetModelConfig(
         std::map<std::string, std::string>::value_type(tag.first, tag.second));
   }
 
-  // Initialize the datatype map and label provider for each output
+  // Initialize the input map
+  for (const auto& io : config.input()) {
+    input_map_.insert(std::make_pair(io.name(), io));
+  }
+
+  // Initialize the output map and label provider for each output
   const auto model_dir = tensorflow::io::Dirname(path);
   for (const auto& io : config.output()) {
-    output_dtype_map_.insert(std::make_pair(io.name(), io.data_type()));
+    output_map_.insert(std::make_pair(io.name(), io));
 
     if (!io.label_filename().empty()) {
       const auto label_path =

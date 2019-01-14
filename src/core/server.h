@@ -51,9 +51,17 @@ namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
+class CustomBundle;
+class GraphDefBundle;
+class NetDefBundle;
+class PlanBundle;
+class SavedModelBundle;
+
 // Inference server information.
 class InferenceServer {
  public:
+  class InferBackendState;
+
   // Construct an inference server.
   InferenceServer();
 
@@ -79,6 +87,7 @@ class InferenceServer {
   // update RequestStatus object with the status of the inference.
   void HandleInfer(
       RequestStatus* request_status,
+      const std::shared_ptr<InferBackendState>& backend,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
       std::shared_ptr<ModelInferStats> infer_stats,
@@ -116,17 +125,36 @@ class InferenceServer {
     return status_manager_;
   }
 
+ public:
+  class InferBackendState {
+   public:
+    InferBackendState() : is_(nullptr) {}
+    tensorflow::Status Init(
+        const std::string& model_name, const int model_version,
+        tfs::ServerCore* core);
+    InferenceServable* Backend() { return is_; }
+
+   private:
+    InferenceServable* is_;
+    tfs::ServableHandle<GraphDefBundle> graphdef_bundle_;
+    tfs::ServableHandle<PlanBundle> plan_bundle_;
+    tfs::ServableHandle<NetDefBundle> netdef_bundle_;
+    tfs::ServableHandle<SavedModelBundle> saved_model_bundle_;
+    tfs::ServableHandle<CustomBundle> custom_bundle_;
+  };
+
+  tensorflow::Status InitBackendState(
+      const std::string& model_name, const int model_version,
+      const std::shared_ptr<InferBackendState>& backend);
+
  private:
   // Start server running and listening on gRPC and/or HTTP endpoints.
   void Start();
 
   std::unique_ptr<nvrpc::Server> StartGrpcServer();
-
   std::unique_ptr<tfs::net_http::HTTPServerInterface> StartHttpServer();
-
   tensorflow::Status ParseProtoTextFile(
       const std::string& file, google::protobuf::Message* message);
-
   tfs::PlatformConfigMap BuildPlatformConfigMap(
       float tf_gpu_memory_fraction, bool tf_allow_soft_placement);
 

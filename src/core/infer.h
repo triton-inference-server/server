@@ -71,6 +71,11 @@ class InferRequestProvider {
       int idx, const void** content, size_t* content_byte_size,
       bool force_contiguous) = 0;
 
+ protected:
+  tensorflow::Status GetInputByteSize(
+      const InferRequestHeader::Input& input, const ModelInput& input_config,
+      uint64_t* byte_size);
+
  private:
   const std::string& model_name_;
   const int version_;
@@ -81,7 +86,7 @@ class GRPCInferRequestProvider : public InferRequestProvider {
  public:
   // Initialize based on gRPC request
   static tensorflow::Status Create(
-      const InferRequest& request,
+      const InferenceServable& is, const InferRequest& request,
       std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
 
   const InferRequestHeader& RequestHeader() const override
@@ -105,8 +110,8 @@ class HTTPInferRequestProvider : public InferRequestProvider {
  public:
   // Initialize based on HTTP request
   static tensorflow::Status Create(
-      evbuffer* input_buffer, const std::string& model_name,
-      const std::string& model_version_str,
+      evbuffer* input_buffer, const InferenceServable& is,
+      const std::string& model_name, const int model_version,
       const std::string& request_header_str,
       std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
@@ -264,9 +269,13 @@ class InferenceServable {
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
-  // Get the datatype for a named output.
-  tensorflow::Status GetOutputDataType(
-      const std::string& name, DataType* dtype) const;
+  // Get the model configuration for a named input.
+  tensorflow::Status GetInput(
+      const std::string& name, const ModelInput** input) const;
+
+  // Get the model configuration for a named output.
+  tensorflow::Status GetOutput(
+      const std::string& name, const ModelOutput** output) const;
 
   // Get a label provider for the model.
   const LabelProvider& GetLabelProvider() const { return label_provider_; }
@@ -327,11 +336,14 @@ class InferenceServable {
   // Label provider for this model.
   LabelProvider label_provider_;
 
-  // Map from an output name to the datatype of that output.
-  std::unordered_map<std::string, DataType> output_dtype_map_;
-
   // The scheduler to use for this servable.
   std::unique_ptr<Scheduler> scheduler_;
+
+  // Map from input name to the model configuration for that input.
+  std::unordered_map<std::string, ModelInput> input_map_;
+
+  // Map from output name to the model configuration for that output.
+  std::unordered_map<std::string, ModelOutput> output_map_;
 
   // Tags of the model that this servable represents.
   std::map<std::string, std::string> tags_;
