@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/core/infer.h"
-#include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -53,13 +52,6 @@ class BaseBundle : public InferenceServable {
       const std::string& instance_name, const int gpu_device,
       const tensorflow::ConfigProto& session_config,
       const std::unordered_map<std::string, std::string>& paths);
-
-  tensorflow::Status GetOutputDataType(
-      const std::string& name, DataType* dtype) const override;
-  const LabelProvider& GetLabelProvider() const override
-  {
-    return label_provider_;
-  }
 
  protected:
   using IONameMap = std::unordered_map<std::string, std::string>;
@@ -141,12 +133,6 @@ class BaseBundle : public InferenceServable {
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(BaseBundle);
   friend std::ostream& operator<<(std::ostream&, const BaseBundle&);
-
-  // Label provider for this bundle.
-  LabelProvider label_provider_;
-
-  // Map from an output name to the datatype of that output.
-  std::unordered_map<std::string, DataType> output_dtype_map_;
 
   // The contexts for this servable.
   std::vector<Context> contexts_;

@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/core/infer.h"
-#include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/servables/custom/custom.h"
@@ -50,13 +49,6 @@ class CustomBundle : public InferenceServable {
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::string>& libraries);
 
-  tensorflow::Status GetOutputDataType(
-      const std::string& name, DataType* dtype) const override;
-  const LabelProvider& GetLabelProvider() const override
-  {
-    return label_provider_;
-  }
-
  private:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
@@ -69,12 +61,6 @@ class CustomBundle : public InferenceServable {
   friend std::ostream& operator<<(std::ostream&, const CustomBundle&);
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
   friend bool CustomGetOutput(void*, const char*, uint64_t, void**);
-
-  // Label provider for this bundle.
-  LabelProvider label_provider_;
-
-  // Map from an output name to the datatype of that output.
-  std::unordered_map<std::string, DataType> output_dtype_map_;
 
   // For each model instance there is a context.
   struct Context {
