@@ -261,18 +261,18 @@ class InferenceServable {
   // Get the version of model being served.
   uint32_t Version() const { return version_; }
 
-  // Get the tags of model being served.
-  const std::map<std::string, std::string>& Tags() const { return tags_; }
-
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
   // Get the datatype for a named output.
-  virtual tensorflow::Status GetOutputDataType(
-      const std::string& name, DataType* dtype) const = 0;
+  tensorflow::Status GetOutputDataType(
+      const std::string& name, DataType* dtype) const;
 
-  // Get a label provider for the servable.
-  virtual const LabelProvider& GetLabelProvider() const = 0;
+  // Get a label provider for the model.
+  const LabelProvider& GetLabelProvider() const { return label_provider_; }
+
+  // Get the tags of model being served.
+  const std::map<std::string, std::string>& Tags() const { return tags_; }
 
   // Run inference using the provided request to produce outputs in
   // the provide response. This method should be called by synchronous
@@ -323,6 +323,12 @@ class InferenceServable {
 
   // Version of the model that this servable represents.
   uint32_t version_;
+
+  // Label provider for this model.
+  LabelProvider label_provider_;
+
+  // Map from an output name to the datatype of that output.
+  std::unordered_map<std::string, DataType> output_dtype_map_;
 
   // The scheduler to use for this servable.
   std::unique_ptr<Scheduler> scheduler_;

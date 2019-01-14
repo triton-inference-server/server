@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/core/infer.h"
-#include "src/core/label_provider.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/servables/caffe2/netdef_bundle_c2.h"
@@ -50,13 +49,6 @@ class NetDefBundle : public InferenceServable {
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models);
 
-  tensorflow::Status GetOutputDataType(
-      const std::string& name, DataType* dtype) const override;
-  const LabelProvider& GetLabelProvider() const override
-  {
-    return label_provider_;
-  }
-
  private:
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
@@ -67,12 +59,6 @@ class NetDefBundle : public InferenceServable {
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(NetDefBundle);
   friend std::ostream& operator<<(std::ostream&, const NetDefBundle&);
-
-  // Label provider for this bundle.
-  LabelProvider label_provider_;
-
-  // Map from an output name to the datatype of that output.
-  std::unordered_map<std::string, DataType> output_dtype_map_;
 
   // For each model instance there is a context.
   struct Context {

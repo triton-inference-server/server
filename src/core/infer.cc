@@ -703,6 +703,20 @@ InferenceServable::MetricInferenceLoadRatio(int gpu_device) const
 }
 
 tensorflow::Status
+InferenceServable::GetOutputDataType(
+    const std::string& name, DataType* dtype) const
+{
+  const auto itr = output_dtype_map_.find(name);
+  if (itr == output_dtype_map_.end()) {
+    return tensorflow::errors::Internal(
+        "unable to find datatype for output '", name, "'");
+  }
+
+  *dtype = itr->second;
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
 InferenceServable::SetModelConfig(
     const tensorflow::StringPiece& path, const ModelConfig& config)
 {
@@ -711,6 +725,18 @@ InferenceServable::SetModelConfig(
   for (const auto& tag : config_.tags()) {
     tags_.insert(
         std::map<std::string, std::string>::value_type(tag.first, tag.second));
+  }
+
+  // Initialize the datatype map and label provider for each output
+  const auto model_dir = tensorflow::io::Dirname(path);
+  for (const auto& io : config.output()) {
+    output_dtype_map_.insert(std::make_pair(io.name(), io.data_type()));
+
+    if (!io.label_filename().empty()) {
+      const auto label_path =
+          tensorflow::io::JoinPath(model_dir, io.label_filename());
+      TF_RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
+    }
   }
 
   return tensorflow::Status::OK();

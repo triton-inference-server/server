@@ -89,7 +89,6 @@ cc_library(
         ":plan_utils",
         "//src/core:constants",
         "//src/core:infer",
-        "//src/core:label_provider",
         "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
         "//src/core:server_status",

@@ -56,7 +56,6 @@ cc_library(
         ":loader",
         "//src/core:constants",
         "//src/core:infer",
-        "//src/core:label_provider",
         "//src/core:logging",
         "//src/core:model_config_proto",
         "//src/core:model_config",
