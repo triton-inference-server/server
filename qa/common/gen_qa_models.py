@@ -120,10 +120,12 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 def create_graphdef_modelfile(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
 
-    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
         return
 
     tf_input_dtype = np_to_tf_dtype(input_dtype)
@@ -134,11 +136,11 @@ def create_graphdef_modelfile(
     # dimension.
     tf.reset_default_graph()
     if max_batch == 0:
-        in0 = tf.placeholder(tf_input_dtype, [input_size], "INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [input_size], "INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, [None, input_size], "INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [None, input_size], "INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "INPUT1")
 
     # If the input is a string, then convert each string to the
     # equivalent int32 value.
@@ -187,10 +189,12 @@ def create_graphdef_modelfile(
 
 
 def create_graphdef_modelconfig(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, version_policy):
 
-    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
         return
 
     # Unpack version policy
@@ -230,7 +234,7 @@ output [
     name: "OUTPUT0"
     data_type: {}
     dims: [ {} ]
-    label_filename: "output0_labels.txt"
+    {}
   }},
   {{
     name: "OUTPUT1"
@@ -239,10 +243,11 @@ output [
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(output0_dtype), input_size,
-           np_to_model_dtype(output1_dtype), input_size)
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
+           'label_filename: "output0_labels.txt"' if tu.shape_is_fixed(output0_shape) else '',
+           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape))
 
     try:
         os.makedirs(config_dir)
@@ -252,16 +257,19 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(input_size):
-            lfile.write("label" + str(l) + "\n")
+    if tu.shape_is_fixed(output0_shape):
+        with open(config_dir + "/output0_labels.txt", "w") as lfile:
+            for l in range(tu.shape_element_count(output0_shape)):
+                lfile.write("label" + str(l) + "\n")
 
 
 def create_savedmodel_modelfile(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
 
-    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
         return
 
     tf_input_dtype = np_to_tf_dtype(input_dtype)
@@ -272,11 +280,11 @@ def create_savedmodel_modelfile(
     # dimension.
     tf.reset_default_graph()
     if max_batch == 0:
-        in0 = tf.placeholder(tf_input_dtype, [input_size], "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [input_size], "TENSOR_INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, [None, input_size], "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [None, input_size], "TENSOR_INPUT1")
+        in0 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT0")
+        in1 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
 
     # If the input is a string, then convert each string to the
     # equivalent float value.
@@ -330,10 +338,13 @@ def create_savedmodel_modelfile(
 
 
 def create_savedmodel_modelconfig(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, version_policy):
 
-    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
+
         return
 
     # Unpack version policy
@@ -373,7 +384,7 @@ output [
     name: "OUTPUT0"
     data_type: {}
     dims: [ {} ]
-    label_filename: "output0_labels.txt"
+    {}
   }},
   {{
     name: "OUTPUT1"
@@ -382,10 +393,11 @@ output [
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(output0_dtype), input_size,
-           np_to_model_dtype(output1_dtype), input_size)
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
+           'label_filename: "output0_labels.txt"' if tu.shape_is_fixed(output0_shape) else '',
+           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape))
 
     try:
         os.makedirs(config_dir)
@@ -395,16 +407,19 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(input_size):
-            lfile.write("label" + str(l) + "\n")
+    if tu.shape_is_fixed(output0_shape):
+        with open(config_dir + "/output0_labels.txt", "w") as lfile:
+            for l in range(tu.shape_element_count(output0_shape)):
+                lfile.write("label" + str(l) + "\n")
 
 
 def create_netdef_modelfile(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
 
-    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
         return
 
     c2_input_dtype = np_to_c2_dtype(input_dtype)
@@ -435,10 +450,12 @@ def create_netdef_modelfile(
 
 
 def create_netdef_modelconfig(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, version_policy):
 
-    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
         return
 
     # Unpack version policy
@@ -478,7 +495,7 @@ output [
     name: "OUTPUT0"
     data_type: {}
     dims: [ {} ]
-    label_filename: "output0_labels.txt"
+    {}
   }},
   {{
     name: "OUTPUT1"
@@ -487,10 +504,11 @@ output [
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(output0_dtype), input_size,
-           np_to_model_dtype(output1_dtype), input_size)
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
+           'label_filename: "output0_labels.txt"' if tu.shape_is_fixed(output0_shape) else '',
+           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape))
 
     try:
         os.makedirs(config_dir)
@@ -500,16 +518,19 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(input_size):
-            lfile.write("label" + str(l) + "\n")
+    if tu.shape_is_fixed(output0_shape):
+        with open(config_dir + "/output0_labels.txt", "w") as lfile:
+            for l in range(tu.shape_element_count(output0_shape)):
+                lfile.write("label" + str(l) + "\n")
 
 
 def create_plan_modelfile(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
 
-    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                                     input_shape, output0_shape, output1_shape):
         return
 
     trt_input_dtype = np_to_trt_dtype(input_dtype)
@@ -520,8 +541,8 @@ def create_plan_modelfile(
     G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
     builder = trt.infer.create_infer_builder(G_LOGGER)
     network = builder.create_network()
-    in0 = network.add_input("INPUT0", trt_input_dtype, (input_size, 1, 1))
-    in1 = network.add_input("INPUT1", trt_input_dtype, (input_size, 1, 1))
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
     add = network.add_element_wise(in0, in1, trt.infer.ElementWiseOperation.SUM)
     sub = network.add_element_wise(in0, in1, trt.infer.ElementWiseOperation.SUB)
 
@@ -555,10 +576,12 @@ def create_plan_modelfile(
 
 
 def create_plan_modelconfig(
-        models_dir, input_size, max_batch, model_version,
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, version_policy):
 
-    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
+    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                                     input_shape, output0_shape, output1_shape):
         return
 
     # Unpack version policy
@@ -585,32 +608,33 @@ input [
   {{
     name: "INPUT0"
     data_type: {}
-    dims: [ {}, 1, 1 ]
+    dims: [ {} ]
   }},
   {{
     name: "INPUT1"
     data_type: {}
-    dims: [ {}, 1, 1 ]
+    dims: [ {} ]
   }}
 ]
 output [
   {{
     name: "OUTPUT0"
     data_type: {}
-    dims: [ {}, 1, 1 ]
-    label_filename: "output0_labels.txt"
+    dims: [ {} ]
+    {}
   }},
   {{
     name: "OUTPUT1"
     data_type: {}
-    dims: [ {}, 1, 1 ]
+    dims: [ {} ]
   }}
 ]
 '''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(input_dtype), input_size,
-           np_to_model_dtype(output0_dtype), input_size,
-           np_to_model_dtype(output1_dtype), input_size)
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
+           'label_filename: "output0_labels.txt"' if tu.shape_is_fixed(output0_shape) else '',
+           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape))
 
     try:
         os.makedirs(config_dir)
@@ -620,14 +644,15 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-    with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(input_size):
-            lfile.write("label" + str(l) + "\n")
+    if tu.shape_is_fixed(output0_shape):
+        with open(config_dir + "/output0_labels.txt", "w") as lfile:
+            for l in range(tu.shape_element_count(output0_shape)):
+                lfile.write("label" + str(l) + "\n")
 
 
 def create_models(
-        models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
-    input_size = 16
+        models_dir, input_dtype, output0_dtype, output1_dtype,
+        input_shape, output0_shape, output1_shape, version_policy=None):
     model_version = 1
 
     # Create two models, one that supports batching with a max-batch
@@ -635,75 +660,111 @@ def create_models(
     if FLAGS.graphdef:
         # max-batch 8
         create_graphdef_modelconfig(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_graphdef_modelfile(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
         # max-batch 0
         create_graphdef_modelconfig(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_graphdef_modelfile(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
 
     if FLAGS.savedmodel:
         # max-batch 8
         create_savedmodel_modelconfig(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_savedmodel_modelfile(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
         # max-batch 0
         create_savedmodel_modelconfig(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_savedmodel_modelfile(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
 
     if FLAGS.netdef:
         # max-batch 8
         create_netdef_modelconfig(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_netdef_modelfile(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
         # max-batch 0
         create_netdef_modelconfig(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_netdef_modelfile(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
 
     if FLAGS.tensorrt:
         # max-batch 8
         create_plan_modelconfig(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_plan_modelfile(
-            models_dir, input_size, 8, model_version,
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
         # max-batch 0
         create_plan_modelconfig(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype, version_policy)
         create_plan_modelfile(
-            models_dir, input_size, 0, model_version,
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
+
+def create_fixed_models(
+        models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
+    input_size = 16
+
+    if FLAGS.tensorrt:
+        create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
+                      (input_size, 1, 1), (input_size, 1, 1), (input_size, 1, 1),
+                      version_policy)
+    else:
+        create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
+                      (input_size,), (input_size,), (input_size,),
+                      version_policy)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir', type=str, required=True, help='Top-level model directory')
-    parser.add_argument('--graphdef', type=bool, required=False, help='Generate GraphDef models')
-    parser.add_argument('--savedmodel', type=bool, required=False, help='Generate SavedModel models')
-    parser.add_argument('--netdef', type=bool, required=False, help='Generate NetDef models')
-    parser.add_argument('--tensorrt', type=bool, required=False, help='Generate TensorRT PLAN models')
+    parser.add_argument('--models_dir', type=str, required=True,
+                        help='Top-level model directory')
+    parser.add_argument('--graphdef', required=False, action='store_true',
+                        help='Generate GraphDef models')
+    parser.add_argument('--savedmodel', required=False, action='store_true',
+                        help='Generate SavedModel models')
+    parser.add_argument('--netdef', required=False, action='store_true',
+                        help='Generate NetDef models')
+    parser.add_argument('--tensorrt', required=False, action='store_true',
+                        help='Generate TensorRT PLAN models')
+    parser.add_argument('--variable', required=False, action='store_true',
+                        help='Used variable-shape tensors for input/output')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -717,54 +778,76 @@ if __name__ == '__main__':
 
     import test_util as tu
 
-    create_models(FLAGS.models_dir, np.int8, np.int8, np.int8, ('latest', 1))
-    create_models(FLAGS.models_dir, np.int16, np.int16, np.int16, ('latest', 2))
-    create_models(FLAGS.models_dir, np.int32, np.int32, np.int32, ('all', None))
-    create_models(FLAGS.models_dir, np.int64, np.int64, np.int64)
-    create_models(FLAGS.models_dir, np.float16, np.float16, np.float16, ('specific', [1,]))
-    create_models(FLAGS.models_dir, np.float32, np.float32, np.float32, ('specific', [1, 3]))
-    create_models(FLAGS.models_dir, np.float16, np.float32, np.float32)
-    create_models(FLAGS.models_dir, np.int32, np.int8, np.int8)
-    create_models(FLAGS.models_dir, np.int8, np.int32, np.int32)
-    create_models(FLAGS.models_dir, np.int32, np.int8, np.int16)
-    create_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
-    create_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
-    create_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
+    # Tests with models that accept fixed-shape input/output tensors
+    if not FLAGS.variable:
+        create_fixed_models(FLAGS.models_dir, np.int8, np.int8, np.int8, ('latest', 1))
+        create_fixed_models(FLAGS.models_dir, np.int16, np.int16, np.int16, ('latest', 2))
+        create_fixed_models(FLAGS.models_dir, np.int32, np.int32, np.int32, ('all', None))
+        create_fixed_models(FLAGS.models_dir, np.int64, np.int64, np.int64)
+        create_fixed_models(FLAGS.models_dir, np.float16, np.float16, np.float16, ('specific', [1,]))
+        create_fixed_models(FLAGS.models_dir, np.float32, np.float32, np.float32, ('specific', [1, 3]))
+        create_fixed_models(FLAGS.models_dir, np.float16, np.float32, np.float32)
+        create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int8)
+        create_fixed_models(FLAGS.models_dir, np.int8, np.int32, np.int32)
+        create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int16)
+        create_fixed_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
+        create_fixed_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
+        create_fixed_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
 
-    create_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32)
-    create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string)
-    create_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string)
-    create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np.int32)
-    create_models(FLAGS.models_dir, np.int32, np_dtype_string, np_dtype_string)
-    create_models(FLAGS.models_dir, np.int32, np.int32, np_dtype_string)
-    create_models(FLAGS.models_dir, np.int32, np_dtype_string, np.int32)
+        create_fixed_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32)
+        create_fixed_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string)
+        create_fixed_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string)
+        create_fixed_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np.int32)
+        create_fixed_models(FLAGS.models_dir, np.int32, np_dtype_string, np_dtype_string)
+        create_fixed_models(FLAGS.models_dir, np.int32, np.int32, np_dtype_string)
+        create_fixed_models(FLAGS.models_dir, np.int32, np_dtype_string, np.int32)
 
-    # Make multiple versions of some models for version testing (they
-    # use different version policies when created above)
-    if FLAGS.graphdef:
-        for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
-            create_graphdef_modelfile(FLAGS.models_dir, 16, 8, 2, vt, vt, vt, swap=True)
-            create_graphdef_modelfile(FLAGS.models_dir, 16, 8, 3, vt, vt, vt, swap=True)
-            create_graphdef_modelfile(FLAGS.models_dir, 16, 0, 2, vt, vt, vt, swap=True)
-            create_graphdef_modelfile(FLAGS.models_dir, 16, 0, 3, vt, vt, vt, swap=True)
+        # Make multiple versions of some models for version testing
+        # (they use different version policies when created above)
+        if FLAGS.graphdef:
+            for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                create_graphdef_modelfile(FLAGS.models_dir, 8, 2,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_graphdef_modelfile(FLAGS.models_dir, 8, 3,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_graphdef_modelfile(FLAGS.models_dir, 0, 2,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_graphdef_modelfile(FLAGS.models_dir, 0, 3,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
 
-    if FLAGS.savedmodel:
-        for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
-            create_savedmodel_modelfile(FLAGS.models_dir, 16, 8, 2, vt, vt, vt, swap=True)
-            create_savedmodel_modelfile(FLAGS.models_dir, 16, 8, 3, vt, vt, vt, swap=True)
-            create_savedmodel_modelfile(FLAGS.models_dir, 16, 0, 2, vt, vt, vt, swap=True)
-            create_savedmodel_modelfile(FLAGS.models_dir, 16, 0, 3, vt, vt, vt, swap=True)
+        if FLAGS.savedmodel:
+            for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                create_savedmodel_modelfile(FLAGS.models_dir, 8, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir, 8, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir, 0, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_savedmodel_modelfile(FLAGS.models_dir, 0, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
 
-    if FLAGS.netdef:
-        for vt in [np.float32, np.int32]:
-            create_netdef_modelfile(FLAGS.models_dir, 16, 8, 2, vt, vt, vt, swap=True)
-            create_netdef_modelfile(FLAGS.models_dir, 16, 8, 3, vt, vt, vt, swap=True)
-            create_netdef_modelfile(FLAGS.models_dir, 16, 0, 2, vt, vt, vt, swap=True)
-            create_netdef_modelfile(FLAGS.models_dir, 16, 0, 3, vt, vt, vt, swap=True)
+        if FLAGS.netdef:
+            for vt in [np.float32, np.int32]:
+                create_netdef_modelfile(FLAGS.models_dir, 8, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_netdef_modelfile(FLAGS.models_dir, 8, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_netdef_modelfile(FLAGS.models_dir, 0, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_netdef_modelfile(FLAGS.models_dir, 0, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
 
-    if FLAGS.tensorrt:
-        for vt in [np.float32,]:
-            create_plan_modelfile(FLAGS.models_dir, 16, 8, 2, vt, vt, vt, swap=True)
-            create_plan_modelfile(FLAGS.models_dir, 16, 8, 3, vt, vt, vt, swap=True)
-            create_plan_modelfile(FLAGS.models_dir, 16, 0, 2, vt, vt, vt, swap=True)
-            create_plan_modelfile(FLAGS.models_dir, 16, 0, 3, vt, vt, vt, swap=True)
+        if FLAGS.tensorrt:
+            for vt in [np.float32,]:
+                create_plan_modelfile(FLAGS.models_dir, 8, 2,
+                                            (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+                create_plan_modelfile(FLAGS.models_dir, 8, 3,
+                                            (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+                create_plan_modelfile(FLAGS.models_dir, 0, 2,
+                                            (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+                create_plan_modelfile(FLAGS.models_dir, 0, 3,
+                                            (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+
+    # Tests with models that accept variable-shape input/output tensors
+    if FLAGS.variable:
+        create_models(FLAGS.models_dir, np.float32, np.float32, np.float32, (-1,), (16,), (16,))

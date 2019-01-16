@@ -28,7 +28,28 @@ import numpy as np
 
 _last_request_id = 0
 
-def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+def shape_element_count(shape):
+    cnt = 0
+    for d in shape:
+        if d == -1:
+            return -1
+        if cnt == 0:
+            cnt = d
+        else:
+            cnt = cnt * d
+    return cnt
+
+def shape_is_fixed(shape):
+    return shape_element_count(shape) != -1
+
+def shape_to_tf_shape(shape):
+    return [None if i == -1 else i for i in shape]
+
+def shape_to_dims_str(shape):
+    return ','.join(str(i) for i in shape)
+
+def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                          input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TF model."""
 
     # If the input type is string the output type must be string or
@@ -39,9 +60,14 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
          ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
         return False
 
+    # Output shapes must be fixed-size.
+    if not shape_is_fixed(output0_shape) or not shape_is_fixed(output1_shape):
+        return False
+    
     return True
 
-def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
+def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
+                          input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a Caffe2 model."""
 
     # Some operations used by test don't support fp16.
@@ -68,9 +94,16 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
         (output1_dtype == np.object)):
         return False
 
+    # Input and output shapes must be fixed-size.
+    if (not shape_is_fixed(input_shape) or
+        not shape_is_fixed(output0_shape) or
+        not shape_is_fixed(output1_shape)):
+        return False
+
     return True
 
-def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
+def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                           input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TRT model."""
 
     # TRT supports limited datatypes as of TRT 5.0. Input can be FP16 or
@@ -79,9 +112,17 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
         return False
     if (output0_dtype != np.float32) or (output1_dtype != np.float32):
         return False
+
+    # Input and output shapes must be fixed-size.
+    if (not shape_is_fixed(input_shape) or
+        not shape_is_fixed(output0_shape) or
+        not shape_is_fixed(output1_shape)):
+        return False
+
     return True
 
-def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
+def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
+                              input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by custom model."""
 
     # The custom model is src/custom/addsub... it only supports int32
@@ -90,6 +131,13 @@ def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
         return False
     if (output0_dtype != input_dtype) or (output1_dtype != input_dtype):
         return False
+
+    # Input and output shapes must be fixed-size.
+    if (not shape_is_fixed(input_shape) or
+        not shape_is_fixed(output0_shape) or
+        not shape_is_fixed(output1_shape)):
+        return False
+
     return True
 
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):

@@ -37,8 +37,9 @@
 ## 2. Set CUDA_DEVICE to the ID of the CUDA device present on the
 ## local system that you want to target for the generated models.
 ##
-## 3. Run this script to create a /tmp/qa_model_repository directory
-## containing all the models needed for CI testing.
+## 3. Run this script to create /tmp/qa_model_repository and
+## /tmp/qa_variable_model_repository directories containing all the
+## models needed for CI testing.
 ##
 ############################################################################
 
@@ -50,9 +51,11 @@ CUDA_DEVICE=0
 ###
 HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/qa_model_repository
+HOST_VARDESTDIR=/tmp/qa_variable_model_repository
 
-rm -fr $HOST_DESTDIR
+rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
 mkdir -p $HOST_DESTDIR
+mkdir -p $HOST_VARDESTDIR
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
@@ -66,6 +69,7 @@ TRTSCRIPT=trt_gen.cmds
 
 SRCDIR=/tmp/src
 DESTDIR=/tmp/models
+VARDESTDIR=/tmp/varmodels
 
 # PyTorch
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
@@ -73,8 +77,10 @@ cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_models.py --netdef=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --netdef --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
+python3 $SRCDIR/gen_qa_models.py --netdef --variable --models_dir=$VARDESTDIR
+chown -R $(id -u):$(id -g) $VARDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
@@ -87,6 +93,7 @@ docker pull $PYTORCH_IMAGE
 nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -99,8 +106,10 @@ cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_models.py --graphdef=True --savedmodel=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
+python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
+chown -R $(id -u):$(id -g) $VARDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -113,6 +122,7 @@ docker pull $TENSORFLOW_IMAGE
 nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -125,8 +135,10 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_models.py --tensorrt=True --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
+python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
+chown -R $(id -u):$(id -g) $VARDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
@@ -139,6 +151,7 @@ docker pull $TENSORRT_IMAGE
 nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
+       --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        -u $(id -u):$(id -g) $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
