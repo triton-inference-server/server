@@ -230,7 +230,7 @@ message ModelStatus
   //@@
   ModelConfig config = 1;
 
-  //@@  .. cpp:var:: map<uint32, ModelVersionStatus> version_status
+  //@@  .. cpp:var:: map<int64, ModelVersionStatus> version_status
   //@@
   //@@     Duration statistics for each version of the model, as a map
   //@@     from version to the status. A version will not occur in the map
@@ -238,7 +238,7 @@ message ModelStatus
   //@@     that model version. A version of -1 indicates the status is
   //@@     for requests for which the version could not be determined.
   //@@
-  map<int32, ModelVersionStatus> version_status = 2;
+  map<int64, ModelVersionStatus> version_status = 2;
 }
 
 //@@

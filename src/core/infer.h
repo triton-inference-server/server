@@ -46,7 +46,7 @@ class InferenceServable;
 class InferRequestProvider {
  public:
   explicit InferRequestProvider(
-      const std::string& model_name, const int version)
+      const std::string& model_name, const int64_t version)
       : model_name_(model_name), version_(version)
   {
   }
@@ -56,7 +56,7 @@ class InferRequestProvider {
 
   // Return the requested model version, or -1 if no specific version
   // was requested.
-  int ModelVersion() const { return version_; }
+  int64_t ModelVersion() const { return version_; }
 
   // Get the request header for this inference request.
   virtual const InferRequestHeader& RequestHeader() const = 0;
@@ -78,7 +78,7 @@ class InferRequestProvider {
 
  private:
   const std::string& model_name_;
-  const int version_;
+  const int64_t version_;
 };
 
 // Inference input provider for a gRPC inference request
@@ -99,7 +99,7 @@ class GRPCInferRequestProvider : public InferRequestProvider {
       bool force_contiguous) override;
 
  private:
-  GRPCInferRequestProvider(const InferRequest& request, const int version);
+  GRPCInferRequestProvider(const InferRequest& request, const int64_t version);
 
   const InferRequest& request_;
   std::vector<bool> content_delivered_;
@@ -111,7 +111,7 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   // Initialize based on HTTP request
   static tensorflow::Status Create(
       evbuffer* input_buffer, const InferenceServable& is,
-      const std::string& model_name, const int model_version,
+      const std::string& model_name, const int64_t model_version,
       const std::string& request_header_str,
       std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
@@ -125,7 +125,7 @@ class HTTPInferRequestProvider : public InferRequestProvider {
       bool force_contiguous) override;
 
  private:
-  HTTPInferRequestProvider(const std::string& model_name, const int version)
+  HTTPInferRequestProvider(const std::string& model_name, const int64_t version)
       : InferRequestProvider(model_name, version)
   {
   }
@@ -264,7 +264,7 @@ class InferenceServable {
   const std::string& Name() const { return config_.name(); }
 
   // Get the version of model being served.
-  uint32_t Version() const { return version_; }
+  int64_t Version() const { return version_; }
 
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
@@ -331,7 +331,7 @@ class InferenceServable {
   ModelConfig config_;
 
   // Version of the model that this servable represents.
-  uint32_t version_;
+  int64_t version_;
 
   // Label provider for this model.
   LabelProvider label_provider_;

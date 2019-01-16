@@ -130,7 +130,7 @@ class InferenceServer {
    public:
     InferBackendState() : is_(nullptr) {}
     tensorflow::Status Init(
-        const std::string& model_name, const int model_version,
+        const std::string& model_name, const int64_t model_version,
         tfs::ServerCore* core);
     InferenceServable* Backend() { return is_; }
 
@@ -144,7 +144,7 @@ class InferenceServer {
   };
 
   tensorflow::Status InitBackendState(
-      const std::string& model_name, const int model_version,
+      const std::string& model_name, const int64_t model_version,
       const std::shared_ptr<InferBackendState>& backend);
 
  private:

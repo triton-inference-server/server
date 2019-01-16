@@ -116,7 +116,7 @@ class ModelInferStats {
   void SetFailed(bool failed) { failed_ = failed; }
   // Set the model version explicitly requested for the inference, or
   // -1 if latest version was requested.
-  void SetRequestedVersion(int v) { requested_model_version_ = v; }
+  void SetRequestedVersion(int64_t v) { requested_model_version_ = v; }
   // Set model servable for the inference stats.
   void SetModelServable(const InferenceServable* s) { model_servable_ = s; }
   // Set batch size for the inference stats.
@@ -147,7 +147,7 @@ class ModelInferStats {
   std::shared_ptr<ServerStatusManager> status_manager_;
   const std::string model_name_;
   bool failed_;
-  int requested_model_version_;
+  int64_t requested_model_version_;
   const InferenceServable* model_servable_;
   size_t batch_size_;
   int gpu_device_;
@@ -185,12 +185,12 @@ class ServerStatusManager {
 
   // Add durations to Infer stats for a failed inference request.
   void UpdateFailedInferStats(
-      const std::string& model_name, const uint32_t model_version,
+      const std::string& model_name, const int64_t model_version,
       size_t batch_size, uint64_t request_duration_ns);
 
   // Add durations to Infer stats for a successful inference request.
   void UpdateSuccessInferStats(
-      const std::string& model_name, const uint32_t model_version,
+      const std::string& model_name, const int64_t model_version,
       size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
       uint64_t run_duration_ns, uint64_t compute_duration_ns);
 

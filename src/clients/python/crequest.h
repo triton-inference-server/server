@@ -72,8 +72,8 @@ nic::Error* ServerStatusContextGetServerStatus(
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int model_version, ni::CorrelationID correlation_id,
-    bool verbose);
+    const char* model_name, int64_t model_version,
+    ni::CorrelationID correlation_id, bool verbose);
 void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
@@ -116,7 +116,7 @@ void InferContextResultDelete(InferContextResultCtx* ctx);
 nic::Error* InferContextResultModelName(
     InferContextResultCtx* ctx, const char** model_name);
 nic::Error* InferContextResultModelVersion(
-    InferContextResultCtx* ctx, uint32_t* model_version);
+    InferContextResultCtx* ctx, int64_t* model_version);
 nic::Error* InferContextResultDataType(
     InferContextResultCtx* ctx, uint32_t* dtype);
 nic::Error* InferContextResultDims(

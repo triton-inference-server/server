@@ -256,11 +256,11 @@ message InferResponseHeader
   //@@
   string model_name = 1;
 
-  //@@  .. cpp:var:: uint32 model_version
+  //@@  .. cpp:var:: int64 model_version
   //@@
   //@@     The version of the model that produced the outputs.
   //@@
-  uint32 model_version = 2;
+  int64 model_version = 2;
 
   //@@  .. cpp:var:: uint32 batch_size
   //@@

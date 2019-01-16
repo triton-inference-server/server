@@ -192,12 +192,12 @@ message InferRequest
   //@@
   string model_name = 1;
 
-  //@@  .. cpp:var:: int32 version
+  //@@  .. cpp:var:: int64 version
   //@@
   //@@     The version of the model to use for inference. If -1
   //@@     the latest/most-recent version of the model is used.
   //@@
-  int32 version = 2;
+  int64 model_version = 2;
 
   //@@  .. cpp:var:: InferRequestHeader meta_data
   //@@
