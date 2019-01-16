@@ -54,7 +54,7 @@ SetModelVersionReadyState(
   const tensorflow::serving::ServableStateMonitor::VersionMap
       versions_and_states = monitor.GetVersionStates(model_name);
   for (const auto& version_and_state : versions_and_states) {
-    const int32_t version = version_and_state.first;
+    const int64_t version = version_and_state.first;
     const tensorflow::serving::ServableState& servable_state =
         version_and_state.second.state;
 
@@ -199,7 +199,7 @@ ServerStatusManager::UpdateServerStat(
 
 void
 ServerStatusManager::UpdateFailedInferStats(
-    const std::string& model_name, const uint32_t model_version,
+    const std::string& model_name, const int64_t model_version,
     size_t batch_size, uint64_t request_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
@@ -241,7 +241,7 @@ ServerStatusManager::UpdateFailedInferStats(
 
 void
 ServerStatusManager::UpdateSuccessInferStats(
-    const std::string& model_name, const uint32_t model_version,
+    const std::string& model_name, const int64_t model_version,
     size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
     uint64_t run_duration_ns, uint64_t compute_duration_ns)
 {
@@ -363,9 +363,9 @@ ModelInferStats::ScopedTimer::Stop()
 
 ModelInferStats::~ModelInferStats()
 {
-  const uint32_t model_version = (model_servable_ != nullptr)
-                                     ? model_servable_->Version()
-                                     : requested_model_version_;
+  const int64_t model_version = (model_servable_ != nullptr)
+                                    ? model_servable_->Version()
+                                    : requested_model_version_;
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(

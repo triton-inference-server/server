@@ -492,7 +492,7 @@ class ResultImpl : public InferContext::Result {
   ~ResultImpl() = default;
 
   const std::string& ModelName() const override { return model_name_; }
-  uint32_t ModelVersion() const override { return model_version_; }
+  int64_t ModelVersion() const override { return model_version_; }
 
   const std::shared_ptr<InferContext::Output> GetOutput() const override
   {
@@ -515,7 +515,7 @@ class ResultImpl : public InferContext::Result {
   }
 
   // Set information about the model that produced this result.
-  void SetModel(const std::string& name, const uint32_t version)
+  void SetModel(const std::string& name, const int64_t version)
   {
     model_name_ = name;
     model_version_ = version;
@@ -549,7 +549,7 @@ class ResultImpl : public InferContext::Result {
   std::vector<uint8_t> pending_;
 
   std::string model_name_;
-  uint32_t model_version_;
+  int64_t model_version_;
 
   InferResponseHeader::Output class_result_;
   std::vector<size_t> class_pos_;
@@ -982,7 +982,7 @@ RequestImpl::PostRunProcessing(
 //==============================================================================
 
 InferContext::InferContext(
-    const std::string& model_name, int model_version,
+    const std::string& model_name, int64_t model_version,
     CorrelationID correlation_id, bool verbose)
     : model_name_(model_name), model_version_(model_version),
       correlation_id_(correlation_id), verbose_(verbose), batch_size_(0),
@@ -1656,7 +1656,7 @@ HttpRequestImpl::GetResults(
 Error
 InferHttpContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int model_version, bool verbose)
+    const std::string& model_name, int64_t model_version, bool verbose)
 {
   return Create(
       ctx, 0 /* correlation_id */, server_url, model_name, model_version,
@@ -1667,7 +1667,7 @@ Error
 InferHttpContext::Create(
     std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
     const std::string& server_url, const std::string& model_name,
-    int model_version, bool verbose)
+    int64_t model_version, bool verbose)
 {
   InferHttpContext* ctx_ptr = new InferHttpContext(
       server_url, model_name, model_version, correlation_id, verbose);
@@ -1717,7 +1717,7 @@ InferHttpContext::Create(
 
 InferHttpContext::InferHttpContext(
     const std::string& server_url, const std::string& model_name,
-    int model_version, CorrelationID correlation_id, bool verbose)
+    int64_t model_version, CorrelationID correlation_id, bool verbose)
     : InferContext(model_name, model_version, correlation_id, verbose),
       multi_handle_(curl_multi_init())
 {
@@ -2389,7 +2389,7 @@ GrpcRequestImpl::GetResults(
 Error
 InferGrpcContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int model_version, bool verbose)
+    const std::string& model_name, int64_t model_version, bool verbose)
 {
   return Create(
       ctx, 0 /* correlation_id */, server_url, model_name, model_version,
@@ -2400,7 +2400,7 @@ Error
 InferGrpcContext::Create(
     std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
     const std::string& server_url, const std::string& model_name,
-    int model_version, bool verbose)
+    int64_t model_version, bool verbose)
 {
   InferGrpcContext* ctx_ptr = new InferGrpcContext(
       server_url, model_name, model_version, correlation_id, verbose);
@@ -2450,7 +2450,7 @@ InferGrpcContext::Create(
 
 InferGrpcContext::InferGrpcContext(
     const std::string& server_url, const std::string& model_name,
-    int model_version, CorrelationID correlation_id, bool verbose)
+    int64_t model_version, CorrelationID correlation_id, bool verbose)
     : InferContext(model_name, model_version, correlation_id, verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
@@ -2606,7 +2606,7 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 
   request_.Clear();
   request_.set_model_name(model_name_);
-  request_.set_version(model_version_);
+  request_.set_model_version(model_version_);
   request_.mutable_meta_data()->MergeFrom(infer_request_);
 
   size_t input_pos_idx = 0;

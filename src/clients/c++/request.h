@@ -356,7 +356,7 @@ class InferContext {
     virtual const std::string& ModelName() const = 0;
 
     /// \return The version of the model that produced this result.
-    virtual uint32_t ModelVersion() const = 0;
+    virtual int64_t ModelVersion() const = 0;
 
     /// \return The Output object corresponding to this result.
     virtual const std::shared_ptr<Output> GetOutput() const = 0;
@@ -563,7 +563,7 @@ class InferContext {
   /// \return The version of the model being used for this context. -1
   /// indicates that the latest (i.e. highest version number) version
   /// of that model is being used.
-  int ModelVersion() const { return model_version_; }
+  int64_t ModelVersion() const { return model_version_; }
 
   /// \return The maximum batch size supported by the context. A
   /// maximum batch size indicates that the context does not support
@@ -646,7 +646,7 @@ class InferContext {
       std::shared_ptr<Request>* async_request, bool wait);
 
  protected:
-  InferContext(const std::string&, int, uint64_t, bool);
+  InferContext(const std::string&, int64_t, CorrelationID, bool);
 
   // Function for worker thread to proceed the data transfer for all requests
   virtual void AsyncTransfer() = 0;
@@ -673,7 +673,7 @@ class InferContext {
   const std::string model_name_;
 
   // Model version
-  const int model_version_;
+  const int64_t model_version_;
 
   // The correlation ID to use with all inference requests using this
   // context. A value of 0 (zero) indicates no correlation ID.
@@ -863,7 +863,7 @@ class InferHttpContext : public InferContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-      const std::string& model_name, int model_version = -1,
+      const std::string& model_name, int64_t model_version = -1,
       bool verbose = false);
 
   /// Create context that performs inference for a sequence model
@@ -884,7 +884,7 @@ class InferHttpContext : public InferContext {
   static Error Create(
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
-      int model_version = -1, bool verbose = false);
+      int64_t model_version = -1, bool verbose = false);
 
   Error Run(std::map<std::string, std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
@@ -897,7 +897,8 @@ class InferHttpContext : public InferContext {
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
-  InferHttpContext(const std::string&, const std::string&, int, uint64_t, bool);
+  InferHttpContext(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
 
   // @see InferContext.AsyncTransfer()
   void AsyncTransfer() override;
@@ -1040,7 +1041,7 @@ class InferGrpcContext : public InferContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-      const std::string& model_name, int model_version = -1,
+      const std::string& model_name, int64_t model_version = -1,
       bool verbose = false);
 
   /// Create context that performs inference for a sequence model
@@ -1061,7 +1062,7 @@ class InferGrpcContext : public InferContext {
   static Error Create(
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
-      int model_version = -1, bool verbose = false);
+      int64_t model_version = -1, bool verbose = false);
 
   Error Run(std::map<std::string, std::unique_ptr<Result>>* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
@@ -1070,7 +1071,8 @@ class InferGrpcContext : public InferContext {
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
-  InferGrpcContext(const std::string&, const std::string&, int, uint64_t, bool);
+  InferGrpcContext(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
 
   // @see InferContext.AsyncTransfer()
   void AsyncTransfer() override;

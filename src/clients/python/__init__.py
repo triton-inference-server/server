@@ -92,7 +92,7 @@ _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
-_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int, c_uint64, c_bool]
+_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int64, c_uint64, c_bool]
 _crequest_infer_ctx_del = _crequest.InferContextDelete
 _crequest_infer_ctx_del.argtypes = [c_void_p]
 _crequest_infer_ctx_set_options = _crequest.InferContextSetOptions
@@ -142,7 +142,7 @@ _crequest_infer_ctx_result_modelname.restype = c_void_p
 _crequest_infer_ctx_result_modelname.argtypes = [c_void_p, POINTER(c_char_p)]
 _crequest_infer_ctx_result_modelver = _crequest.InferContextResultModelVersion
 _crequest_infer_ctx_result_modelver.restype = c_void_p
-_crequest_infer_ctx_result_modelver.argtypes = [c_void_p, POINTER(c_uint32)]
+_crequest_infer_ctx_result_modelver.argtypes = [c_void_p, POINTER(c_int64)]
 _crequest_infer_ctx_result_dtype = _crequest.InferContextResultDataType
 _crequest_infer_ctx_result_dtype.restype = c_void_p
 _crequest_infer_ctx_result_dtype.argtypes = [c_void_p, POINTER(c_uint32)]
@@ -673,7 +673,7 @@ class InferContext:
                     if cmodelname.value is not None:
                         self._last_request_model_name = cmodelname.value.decode('utf-8')
                 if self._last_request_model_version is None:
-                    cmodelver = c_uint32()
+                    cmodelver = c_int64()
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_result_modelver(result, byref(cmodelver))))

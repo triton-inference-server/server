@@ -242,8 +242,8 @@ struct InferContextCtx {
 nic::Error*
 InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int model_version, ni::CorrelationID correlation_id,
-    bool verbose)
+    const char* model_name, int64_t model_version,
+    ni::CorrelationID correlation_id, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -465,7 +465,7 @@ InferContextResultModelName(InferContextResultCtx* ctx, const char** model_name)
 
 nic::Error*
 InferContextResultModelVersion(
-    InferContextResultCtx* ctx, uint32_t* model_version)
+    InferContextResultCtx* ctx, int64_t* model_version)
 {
   if (ctx->result == nullptr) {
     return new nic::Error(

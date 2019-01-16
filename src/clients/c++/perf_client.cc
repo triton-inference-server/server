@@ -230,8 +230,9 @@ class ConcurrencyManager {
       std::unique_ptr<ConcurrencyManager>* manager, const bool verbose,
       const bool profile, const int32_t batch_size, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
-      const bool async, const std::string& model_name, const int model_version,
-      const std::string& url, const ProtocolType protocol)
+      const bool async, const std::string& model_name,
+      const int64_t model_version, const std::string& url,
+      const ProtocolType protocol)
   {
     manager->reset(new ConcurrencyManager(
         verbose, profile, batch_size, stable_offset, measurement_window_ms,
@@ -393,7 +394,7 @@ class ConcurrencyManager {
       const bool verbose, const bool profile, const int32_t batch_size,
       const double stable_offset, const int32_t measurement_window_ms,
       const size_t max_measurement_count, const bool async,
-      const std::string& model_name, const int model_version,
+      const std::string& model_name, const int64_t model_version,
       const std::string& url, const ProtocolType protocol)
       : verbose_(verbose), profile_(profile), batch_size_(batch_size),
         stable_offset_(stable_offset),
@@ -608,7 +609,7 @@ class ConcurrencyManager {
 
     // If model_version is -1 then look in the end status to find the
     // latest (highest valued version) and use that as the version.
-    int32_t status_model_version = 0;
+    int64_t status_model_version = 0;
     if (model_version_ < 0) {
       for (const auto& vp : end_status.version_status()) {
         status_model_version = std::max(status_model_version, vp.first);
@@ -978,7 +979,7 @@ class ConcurrencyManager {
   size_t max_measurement_count_;
   bool async_;
   std::string model_name_;
-  int model_version_;
+  int64_t model_version_;
   std::string url_;
   ProtocolType protocol_;
 
@@ -1199,7 +1200,7 @@ main(int argc, char** argv)
   uint64_t measurement_window_ms = 0;
   size_t max_measurement_count = 10;
   std::string model_name;
-  int model_version = -1;
+  int64_t model_version = -1;
   std::string url("localhost:8000");
   std::string filename("");
   ProtocolType protocol = ProtocolType::HTTP;
@@ -1224,28 +1225,28 @@ main(int argc, char** argv)
         model_name = optarg;
         break;
       case 'x':
-        model_version = atoi(optarg);
+        model_version = std::atoll(optarg);
         break;
       case 'b':
-        batch_size = atoi(optarg);
+        batch_size = std::atoi(optarg);
         break;
       case 't':
-        concurrent_request_count = atoi(optarg);
+        concurrent_request_count = std::atoi(optarg);
         break;
       case 'p':
-        measurement_window_ms = atoi(optarg);
+        measurement_window_ms = std::atoi(optarg);
         break;
       case 'i':
         protocol = ParseProtocol(optarg);
         break;
       case 'l':
-        latency_threshold_ms = atoi(optarg);
+        latency_threshold_ms = std::atoi(optarg);
         break;
       case 'c':
-        max_concurrency = atoi(optarg);
+        max_concurrency = std::atoi(optarg);
         break;
       case 'r':
-        max_measurement_count = atoi(optarg);
+        max_measurement_count = std::atoi(optarg);
         break;
       case 's':
         stable_offset = atof(optarg) / 100;
