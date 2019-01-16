@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -64,15 +64,30 @@ and examples. Issue the following command to build the C++ client
 library, C++ and Python examples, and a Python wheel file for the
 Python client library::
 
-  $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "PYVER=<ver>" --build-arg "BUILD_CLIENTS_ONLY=1" .
+  $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
 
-The -\\-build-arg setting PYVER is optional and can be used to set the
-Python version that you want the Python client library built for (the
-default is 3.5).
+You can optionally add *-\\-build-arg "PYVER=<ver>"* to set the Python
+version that you want the Python client library built for. Supported
+values for *<ver>* are 2.6 and 3.5, with 3.5 being the default.
 
-After the build completes, the easiest way to extract the built
-libraries and examples from the docker image is to mount a host
-directory and then copy them out from within the container::
+After the build completes the tensorrtserver_clients docker image will
+contain the built client libraries and examples. The easiest way to
+try the examples described in the following sections is to run the
+client image with -\\-net=host so that the client examples can access
+the TRTIS server running in its own container (see
+:ref:`section-running-the-inference-server` for more information about
+running the inference server)::
+
+  $ docker run -it --rm --net=host tensorrtserver_clients
+
+In the client image you can find the example executables in
+/opt/tensorrtserver/bin, and the Python wheel in
+/opt/tensorrtserver/pip.
+
+If your host sytem is Ubuntu-16.04, an alternative to running the
+examples within the tensorrtserver_clients container is to instead
+copy the libraries and examples from the docker image to the host
+system::
 
   $ docker run -it --rm -v/tmp:/tmp/host tensorrtserver_clients
   # cp /opt/tensorrtserver/bin/image_client /tmp/host/.
@@ -84,13 +99,13 @@ directory and then copy them out from within the container::
 You can now access the files from /tmp on the host system. To run the
 C++ examples you must install some dependencies on your host system::
 
-  $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev python-pil
+  $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev
 
 To run the Python examples you will need to additionally install the
 client whl file and some other dependencies::
 
   $ apt-get install python3 python3-pip
-  $ pip3 install --user --upgrade tensorrtserver-*.whl pillow
+  $ pip3 install --user --upgrade tensorrtserver-*.whl numpy pillow
 
 .. build-client-end-marker-do-not-remove
 
@@ -124,7 +139,7 @@ an image from the `qa/images
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
 directory::
 
-  $ image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -132,7 +147,7 @@ directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ python3 /workspace/src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
@@ -143,7 +158,7 @@ instructs the client library to use HTTP protocol to talk to TRTIS,
 but you can use GRPC protocol by providing the \-i flag. You must also
 use the \-u flag to point at the GRPC endpoint on TRTIS::
 
-  $ image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ /opt/tensorrtserver/bin/image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -151,7 +166,7 @@ use the \-u flag to point at the GRPC endpoint on TRTIS::
 By default the client prints the most probable classification for the
 image. Use the \-c flag to see more classifications::
 
-  $ image_client -m resnet50_netdef -s INCEPTION -c 3 qa/images/mug.jpg
+  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -164,7 +179,7 @@ images that you specified. If the batch is bigger than the number of
 images then image\_client will just repeat the images to fill the
 batch::
 
-  $ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
+  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
   Request 0, batch size 2
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
@@ -178,7 +193,7 @@ batch::
 Provide a directory instead of a single image to perform inferencing
 on all images in the directory::
 
-  $ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
+  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
   Request 0, batch size 2
   Image '../qa/images/car.jpg':
       817 (SPORTS CAR) = 0.836187
@@ -231,7 +246,7 @@ level of concurrency. Use the \-t flag to control concurrency and \-v
 to see verbose output. The following example simulates four clients
 continuously sending requests to TRTIS::
 
-  $ perf_client -m resnet50_netdef -p3000 -t4 -v
+  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -t4 -v
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 3000 msec
@@ -255,7 +270,7 @@ limit or concurrency limit is reached. This mode is enabled by using
 the \-d option and \-l to specify the latency limit and optionally the
 \-c to specify a maximum concurrency limit::
 
-  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
+  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 3000 msec
@@ -300,7 +315,7 @@ the \-d option and \-l to specify the latency limit and optionally the
 Use the \-f flag to generate a file containing CSV output of the
 results::
 
-  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
+  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
 
 You can then import the CSV file into a spreadsheet to help visualize
 the latency vs inferences/second tradeoff as well as see some
@@ -341,7 +356,7 @@ To run the the C++ version of the simple example, first build as
 described in :ref:`section-building-the-client-libraries-and-examples`
 and then::
 
-  $ simple_client
+  $ /opt/tensorrtserver/bin/simple_client
   0 + 1 = 1
   0 - 1 = -1
   1 + 1 = 2
@@ -379,7 +394,7 @@ To run the the Python version of the simple example, first build as
 described in :ref:`section-building-the-client-libraries-and-examples`
 and install the tensorrtserver whl, then::
 
-  $ python src/clients/python/simple_client.py
+  $ python3 /workspace/src/clients/python/simple_client.py
 
 String Datatype
 ^^^^^^^^^^^^^^^
