@@ -41,7 +41,8 @@ class InferTest(unittest.TestCase):
     def _full_exact(self, req_raw, input_dtype, output0_dtype, output1_dtype, swap):
         input_size = 16
 
-        if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype):
+        if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
+                                    (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
                 iu.infer_exact(self, 'graphdef', (input_size,), bs, req_raw,
@@ -54,7 +55,8 @@ class InferTest(unittest.TestCase):
             iu.infer_exact(self, 'savedmodel_nobatch', (input_size,), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
 
-        if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype):
+        if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
+                                    (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
                 iu.infer_exact(self, 'netdef', (input_size,), bs, req_raw,
@@ -63,7 +65,8 @@ class InferTest(unittest.TestCase):
             iu.infer_exact(self, 'netdef_nobatch', (input_size,), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
 
-        if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype):
+        if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                                    (input_size,1,1), (input_size,1,1), (input_size,1,1)):
             # model that supports batching
             for bs in (1, 8):
                 iu.infer_exact(self, 'plan', (input_size, 1, 1), bs, req_raw,
@@ -74,7 +77,8 @@ class InferTest(unittest.TestCase):
 
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
-        if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype):
+        if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
+                                        (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
                 iu.infer_exact(self, 'custom', (input_size,), bs, req_raw,
