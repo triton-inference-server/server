@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param version Returns the version.
 /// \return The error status.
 tensorflow::Status GetModelVersionFromPath(
-    const tensorflow::StringPiece& path, uint32_t* version);
+    const tensorflow::StringPiece& path, int64_t* version);
 
 /// Read a ModelConfig and normalize it as expected by model servables.
 /// \param path The full-path to the directory containing the

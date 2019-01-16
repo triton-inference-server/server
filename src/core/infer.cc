@@ -82,7 +82,7 @@ InferRequestProvider::GetInputByteSize(
 }
 
 GRPCInferRequestProvider::GRPCInferRequestProvider(
-    const InferRequest& request, const int version)
+    const InferRequest& request, const int64_t version)
     : InferRequestProvider(request.model_name(), version), request_(request)
 {
   content_delivered_.resize(request_.raw_input_size(), false);
@@ -93,7 +93,8 @@ GRPCInferRequestProvider::Create(
     const InferenceServable& is, const InferRequest& request,
     std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
 {
-  const int version = (request.version() >= 0) ? request.version() : -1;
+  const int64_t version =
+      (request.model_version() >= 0) ? request.model_version() : -1;
   infer_provider->reset(new GRPCInferRequestProvider(request, version));
 
   const ModelConfig& model_config = is.Config();
@@ -181,7 +182,7 @@ GRPCInferRequestProvider::GetNextInputContent(
 tensorflow::Status
 HTTPInferRequestProvider::Create(
     evbuffer* input_buffer, const InferenceServable& is,
-    const std::string& model_name, const int model_version,
+    const std::string& model_name, const int64_t model_version,
     const std::string& request_header_str,
     std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
 {

@@ -37,7 +37,7 @@
 namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
-GetModelVersionFromPath(const tensorflow::StringPiece& path, uint32_t* version)
+GetModelVersionFromPath(const tensorflow::StringPiece& path, int64_t* version)
 {
   auto version_dir = tensorflow::io::Basename(path);
 

@@ -463,7 +463,7 @@ main(int argc, char** argv)
   ScaleType scale = ScaleType::NONE;
   std::string preprocess_output_filename;
   std::string model_name;
-  int model_version = -1;
+  int64_t model_version = -1;
   std::string url("localhost:8000");
   ProtocolType protocol = ProtocolType::HTTP;
 
@@ -484,13 +484,13 @@ main(int argc, char** argv)
         model_name = optarg;
         break;
       case 'x':
-        model_version = atoi(optarg);
+        model_version = std::atoll(optarg);
         break;
       case 'b':
-        batch_size = atoi(optarg);
+        batch_size = std::atoi(optarg);
         break;
       case 'c':
-        topk = atoi(optarg);
+        topk = std::atoi(optarg);
         break;
       case 's':
         scale = ParseScale(optarg);

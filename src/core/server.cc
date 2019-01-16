@@ -160,13 +160,13 @@ class InferContext final
         server->StatusManager(), request.model_name());
     auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
     infer_stats->StartRequestTimer(timer.get());
-    infer_stats->SetRequestedVersion(request.version());
+    infer_stats->SetRequestedVersion(request.model_version());
 
     RequestStatus* request_status = response.mutable_request_status();
 
     auto backend = std::make_shared<InferenceServer::InferBackendState>();
     tensorflow::Status status = server->InitBackendState(
-        request.model_name(), request.version(), backend);
+        request.model_name(), request.model_version(), backend);
     if (status.ok()) {
       infer_stats->SetModelServable(backend->Backend());
 
@@ -415,9 +415,9 @@ HTTPServiceImpl::Infer(
     }
   }
 
-  int model_version = -1;
+  int64_t model_version = -1;
   if (!model_version_str.empty()) {
-    model_version = std::atoi(model_version_str.c_str());
+    model_version = std::atoll(model_version_str.c_str());
   }
 
   auto infer_stats =
@@ -1058,7 +1058,7 @@ InferenceServer::Wait()
 
 tensorflow::Status
 InferenceServer::InitBackendState(
-    const std::string& model_name, const int model_version,
+    const std::string& model_name, const int64_t model_version,
     const std::shared_ptr<InferBackendState>& backend)
 {
   return backend->Init(model_name, model_version, core_.get());
@@ -1500,7 +1500,7 @@ InferenceServer::BuildPlatformConfigMap(
 //
 tensorflow::Status
 InferenceServer::InferBackendState::Init(
-    const std::string& model_name, const int model_version,
+    const std::string& model_name, const int64_t model_version,
     tfs::ServerCore* core)
 {
   // Create the model-spec. A negative version indicates that the
