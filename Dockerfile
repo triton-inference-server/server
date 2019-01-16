@@ -225,6 +225,8 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
                mkdir -p /opt/tensorrtserver/custom; \
                cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/.; \
                cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/.; \
+             else \
+               pip install --upgrade /opt/tensorrtserver/pip/tensorrtserver-*.whl numpy pillow; \
              fi' && \
     bazel clean --expunge && \
     rm -rf /root/.cache/bazel && \
