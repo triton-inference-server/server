@@ -29,19 +29,55 @@
 namespace nvidia { namespace inferenceserver {
 
 bool
-CompareDims(
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims)
+CompareDimsExact(
+    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const bool supports_batching)
 {
-  // The first model dimension can be -1 to serve as a placeholder for
-  // batch. The batch dim doesn't appear in the configuration 'dims'.
-  const bool has_batch_dim =
-      (model_shape.dim().size() >= 1) && (model_shape.dim(0).size() == -1);
-  if (model_shape.dim().size() != (dims.size() + (has_batch_dim ? 1 : 0))) {
+  // If the model configuration expects batching support in the model,
+  // then the tensorflow shape first dimension must be -1.
+  if (supports_batching) {
+    if ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1)) {
+      return false;
+    }
+  }
+
+  if (model_shape.dim().size() != (dims.size() + (supports_batching ? 1 : 0))) {
     return false;
   }
 
   for (int i = 0; i < dims.size(); ++i) {
-    if (model_shape.dim(i + (has_batch_dim ? 1 : 0)).size() != dims[i]) {
+    if (model_shape.dim(i + (supports_batching ? 1 : 0)).size() != dims[i]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool
+CompareDimsSupported(
+    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const bool supports_batching)
+{
+  // If the model configuration expects batching support in the model,
+  // then the tensorflow shape first dimension must be -1.
+  if (supports_batching) {
+    if ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1)) {
+      return false;
+    }
+  }
+
+  if (model_shape.dim().size() != (dims.size() + (supports_batching ? 1 : 0))) {
+    return false;
+  }
+
+  for (int i = 0; i < dims.size(); ++i) {
+    int64_t model_dim = model_shape.dim(i + (supports_batching ? 1 : 0)).size();
+    if (model_dim == -1) {
+      continue;
+    }
+
+    if (model_dim != dims[i]) {
       return false;
     }
   }

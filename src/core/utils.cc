@@ -31,6 +31,7 @@
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/model_config.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 
@@ -310,6 +311,15 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
         "model input must specify 'dims'");
   }
 
+  for (auto dim : io.dims()) {
+    if ((dim < 1) && (dim != WILDCARD_DIM)) {
+      return tensorflow::errors::InvalidArgument(
+          "model input dimension must be integer >= 1, or ",
+          std::to_string(WILDCARD_DIM),
+          " to indicate a variable-size dimension");
+    }
+  }
+
   if (((io.format() == ModelInput::FORMAT_NHWC) ||
        (io.format() == ModelInput::FORMAT_NCHW)) &&
       (io.dims_size() != 3)) {
@@ -357,6 +367,15 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
   if (io.dims_size() == 0) {
     return tensorflow::errors::InvalidArgument(
         "model output must specify 'dims'");
+  }
+
+  for (auto dim : io.dims()) {
+    if ((dim < 1) && (dim != WILDCARD_DIM)) {
+      return tensorflow::errors::InvalidArgument(
+          "model input dimension must be integer >= 1, or ",
+          std::to_string(WILDCARD_DIM),
+          " to indicate a variable-size dimension");
+    }
   }
 
   if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {

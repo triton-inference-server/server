@@ -49,7 +49,7 @@ InferRequestProvider::GetInputByteSize(
   if (input.dims_size() > 0) {
     if (!CompareDimsWithWildcard(input.dims(), input_config.dims())) {
       return tensorflow::errors::InvalidArgument(
-          "expected equal shape for input '", input.name(), "' for model '",
+          "unexpected shape for input '", input.name(), "' for model '",
           ModelName(), "'");
     }
 
@@ -61,8 +61,9 @@ InferRequestProvider::GetInputByteSize(
     for (auto dim : input_config.dims()) {
       if (dim < 0) {
         return tensorflow::errors::InvalidArgument(
-            "expected shape for input '", input.name(), "' for model '",
-            ModelName(), "'");
+            "model supports variable-size for input '", input.name(),
+            "', request must specify input shape for model '", ModelName(),
+            "'");
       }
     }
 
