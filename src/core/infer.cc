@@ -922,8 +922,8 @@ InferenceServable::AsyncRun(
   scheduler_->Enqueue(
       stats, request_provider, response_provider,
       [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
-        run_timer.reset();
         OnCompleteHandleInfer(status);
+        run_timer.reset();
       });
 }
 
