@@ -53,18 +53,31 @@ enum Platform {
 
 /// Get the number of elements in a shape.
 /// \param dims The shape.
-/// \return The number of elements.
-uint64_t GetElementCount(const DimsList& dims);
+/// \return The number of elements, or -1 if the number of elements
+/// cannot be determined because the shape contains one or more
+/// wilcard dimensions.
+int64_t GetElementCount(const DimsList& dims);
+
+/// Get the number of elements in a shape.
+/// \param dims The shape.
+/// \return The number of elements, or -1 if the number of elements
+/// cannot be determined because the shape contains one or more
+/// wilcard dimensions.
+int64_t GetElementCount(const std::vector<int64_t>& dims);
 
 /// Get the number of elements in the shape of a model input.
 /// \param mio The model input.
-/// \return The number of elements.
-uint64_t GetElementCount(const ModelInput& mio);
+/// \return The number of elements, or -1 if the number of elements
+/// cannot be determined because the shape contains one or more
+/// wilcard dimensions.
+int64_t GetElementCount(const ModelInput& mio);
 
 /// Get the number of elements in the shape of a model output.
 /// \param mio The model output.
-/// \return The number of elements.
-uint64_t GetElementCount(const ModelOutput& mio);
+/// \return The number of elements, or -1 if the number of elements
+/// cannot be determined because the shape contains one or more
+/// wilcard dimensions.
+int64_t GetElementCount(const ModelOutput& mio);
 
 /// Are values of a datatype fixed-size, or variable-sized.
 /// \param dtype The data-type.
@@ -87,6 +100,14 @@ size_t GetDataTypeByteSize(const DataType dtype);
 /// \return The size, in bytes, of the corresponding tensor, or 0 if
 /// unable to determine the size.
 uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
+
+/// Get the size, in bytes, of a tensor based on datatype and
+/// shape.
+/// \param dtype The data-type.
+/// \param dims The shape.
+/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// unable to determine the size.
+uint64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on ModelInput.
 /// \param mio The ModelInput protobuf.

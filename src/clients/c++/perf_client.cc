@@ -711,7 +711,19 @@ class ConcurrencyManager {
     // input values.
     size_t max_input_byte_size = 0;
     for (const auto& input : ctx->Inputs()) {
-      max_input_byte_size = std::max(max_input_byte_size, input->ByteSize());
+      const int64_t bs = input->ByteSize();
+      if (bs < 0) {
+        *err = nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() +
+                "' has variable-size shape, unable to create input values for "
+                "model '" +
+                ctx->ModelName() + "'");
+        return;
+      }
+
+      max_input_byte_size =
+          std::max(max_input_byte_size, (size_t)input->ByteSize());
     }
 
     std::vector<uint8_t> input_buf(max_input_byte_size);
@@ -727,7 +739,7 @@ class ConcurrencyManager {
       }
 
       for (size_t i = 0; i < batch_size_; ++i) {
-        *err = input->SetRaw(&input_buf[0], input->ByteSize());
+        *err = input->SetRaw(&input_buf[0], (size_t)input->ByteSize());
         if (!err->IsOk()) {
           return;
         }
@@ -825,7 +837,19 @@ class ConcurrencyManager {
     // input values.
     size_t max_input_byte_size = 0;
     for (const auto& input : ctx->Inputs()) {
-      max_input_byte_size = std::max(max_input_byte_size, input->ByteSize());
+      const int64_t bs = input->ByteSize();
+      if (bs < 0) {
+        *err = nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() +
+                "' has variable-size shape, unable to create input values for "
+                "model '" +
+                ctx->ModelName() + "'");
+        return;
+      }
+
+      max_input_byte_size =
+          std::max(max_input_byte_size, (size_t)input->ByteSize());
     }
 
     std::vector<uint8_t> input_buf(max_input_byte_size);
@@ -841,7 +865,7 @@ class ConcurrencyManager {
       }
 
       for (size_t i = 0; i < batch_size_; ++i) {
-        *err = input->SetRaw(&input_buf[0], input->ByteSize());
+        *err = input->SetRaw(&input_buf[0], (size_t)input->ByteSize());
         if (!err->IsOk()) {
           return;
         }
