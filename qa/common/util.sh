@@ -191,3 +191,28 @@ function run_gpu_monitor () {
         MONITOR_PID=0
     fi
 }
+
+# Wait until all server model states are stable, MODEL_READY or MODEL_UNAVAILABLE,
+# or until timeout. Note that server has to be live.
+# if timeout is not specified, only return when all model states are stable
+function wait_for_model_stable() {
+    local wait_time_secs="${1:--1}"; shift
+
+    local wait_secs=$wait_time_secs
+    until test $wait_secs -eq 0 ; do
+        sleep 1;
+
+        set +e
+        total_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`
+        stable_count=`curl -s localhost:8000/api/status | grep "MODEL_READY\|MODEL_UNAVAILABLE" | wc -l`
+        count=$((total_count - stable_count))
+        set -e
+        if [ "$count" == "0" ]; then
+            return
+        fi
+
+        ((wait_secs--));
+    done
+
+    echo "=== Timeout $wait_time_secs secs. Not all models stable."
+}
