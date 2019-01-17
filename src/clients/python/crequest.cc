@@ -411,6 +411,20 @@ InferContextInputDelete(InferContextInputCtx* ctx)
 }
 
 nic::Error*
+InferContextInputSetShape(
+    InferContextInputCtx* ctx, const int64_t* dims, uint64_t size)
+{
+  std::vector<int64_t> shape;
+  shape.reserve(size);
+  for (uint64_t i = 0; i < size; ++i) {
+    shape.push_back(dims[i]);
+  }
+
+  nic::Error err = ctx->input->SetShape(shape);
+  return new nic::Error(err);
+}
+
+nic::Error*
 InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size)
 {

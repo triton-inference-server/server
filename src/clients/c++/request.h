@@ -253,9 +253,10 @@ class InferContext {
 
     /// \return The size in bytes of this input. This is the size for
     /// one instance of the input, not the entire size of a batched
-    /// input. For non-fixed-sized types like TYPE_STRING this will be
-    /// zero.
-    virtual size_t ByteSize() const = 0;
+    /// input. When the byte-size is not known, for example for
+    /// non-fixed-sized types like TYPE_STRING or for inputs with
+    /// variable-size dimensions, this will return -1.
+    virtual int64_t ByteSize() const = 0;
 
     /// \return The size in bytes of entire batch of this input. For
     /// fixed-sized types this is just ByteSize() * batch-size, but
@@ -269,7 +270,8 @@ class InferContext {
     /// \return The format of the input.
     virtual ModelInput::Format Format() const = 0;
 
-    /// \return The dimensions/shape of the input.
+    /// \return The dimensions/shape of the input. Variable-size
+    /// dimensions are reported as -1.
     virtual const DimsList& Dims() const = 0;
 
     /// Prepare this input to receive new tensor values. Forget any
@@ -277,6 +279,20 @@ class InferContext {
     /// SetRaw().
     /// \return Error object indicating success or failure.
     virtual Error Reset() = 0;
+
+    /// Get the shape for this input that was most recently set by
+    /// SetShape.
+    /// \return The shape, or empty vector if SetShape has not been
+    /// called.
+    virtual const std::vector<int64_t>& Shape() const = 0;
+
+    /// Set the shape for this input. The shape must be set for inputs
+    /// that have variable-size dimensions and is optional for other
+    /// inputs. The shape must be set before calling SetRaw or
+    /// SetFromString.
+    /// \param dims The dimensions of the shape.
+    /// \return Error object indicating success or failure.
+    virtual Error SetShape(const std::vector<int64_t>& dims) = 0;
 
     /// Set tensor values for this input from a byte array. The array
     /// is not copied and so it must not be modified or destroyed

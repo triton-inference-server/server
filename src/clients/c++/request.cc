@@ -238,13 +238,16 @@ class InputImpl : public InferContext::Input {
   ~InputImpl() = default;
 
   const std::string& Name() const override { return mio_.name(); }
-  size_t ByteSize() const override { return byte_size_; }
+  int64_t ByteSize() const override { return byte_size_; }
   size_t TotalByteSize() const override { return total_byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
+
+  const std::vector<int64_t>& Shape() const override { return shape_; }
+  Error SetShape(const std::vector<int64_t>& dims) override;
 
   Error Reset() override;
   Error SetRaw(const std::vector<uint8_t>& input) override;
@@ -266,8 +269,11 @@ class InputImpl : public InferContext::Input {
  private:
   const ModelInput mio_;
 
-  const size_t byte_size_;
+  int64_t byte_size_;
   size_t total_byte_size_;
+
+  bool needs_shape_;
+  std::vector<int64_t> shape_;
 
   size_t batch_size_;
   size_t bufs_idx_, buf_pos_;
@@ -283,24 +289,67 @@ class InputImpl : public InferContext::Input {
 };
 
 InputImpl::InputImpl(const ModelInput& mio)
-    : mio_(mio), byte_size_(GetByteSize(mio)), total_byte_size_(0),
-      batch_size_(0), bufs_idx_(0), buf_pos_(0)
+    : mio_(mio), total_byte_size_(0), needs_shape_(false), batch_size_(0),
+      bufs_idx_(0), buf_pos_(0)
 {
+  if (GetElementCount(mio) == -1) {
+    byte_size_ = -1;
+    needs_shape_ = true;
+  } else {
+    byte_size_ = GetByteSize(mio);
+    if (byte_size_ == 0) {
+      byte_size_ = -1;
+    }
+  }
 }
 
 InputImpl::InputImpl(const InputImpl& obj)
     : mio_(obj.mio_), byte_size_(obj.byte_size_),
-      total_byte_size_(obj.total_byte_size_), batch_size_(obj.batch_size_),
-      bufs_idx_(0), buf_pos_(0), bufs_(obj.bufs_),
-      buf_byte_sizes_(obj.buf_byte_sizes_), str_bufs_(obj.str_bufs_)
+      total_byte_size_(obj.total_byte_size_), needs_shape_(obj.needs_shape_),
+      shape_(obj.shape_), batch_size_(obj.batch_size_), bufs_idx_(0),
+      buf_pos_(0), bufs_(obj.bufs_), buf_byte_sizes_(obj.buf_byte_sizes_),
+      str_bufs_(obj.str_bufs_)
 {
+}
+
+Error
+InputImpl::SetShape(const std::vector<int64_t>& dims)
+{
+  // Make sure the shape does not contain any invalid dimensions
+  for (const auto dim : dims) {
+    if (dim < 1) {
+      return Error(
+          RequestStatusCode::INVALID_ARG,
+          "attempt to set invalid shape dimension " + std::to_string(dim) +
+              ", shape dimensions must be >= 1 for input '" + Name());
+    }
+  }
+
+  needs_shape_ = false;
+  shape_ = dims;
+
+  byte_size_ = GetByteSize(DType(), dims);
+  if (byte_size_ == 0) {
+    byte_size_ = -1;
+  }
+
+  return Error::Success;
 }
 
 Error
 InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
 {
-  if (IsFixedSizeDataType(mio_.data_type()) &&
-      (input_byte_size != byte_size_)) {
+  if (needs_shape_) {
+    bufs_.clear();
+    buf_byte_sizes_.clear();
+    str_bufs_.clear();
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "must set shape for variable-size input '" + Name() +
+            "' before setting input data");
+  }
+
+  if (IsFixedSizeDataType(DType()) && (input_byte_size != (size_t)byte_size_)) {
     bufs_.clear();
     buf_byte_sizes_.clear();
     str_bufs_.clear();
@@ -339,7 +388,7 @@ InputImpl::SetRaw(const std::vector<uint8_t>& input)
 Error
 InputImpl::SetFromString(const std::vector<std::string>& input)
 {
-  if (mio_.data_type() != DataType::TYPE_STRING) {
+  if (DType() != DataType::TYPE_STRING) {
     bufs_.clear();
     buf_byte_sizes_.clear();
     str_bufs_.clear();
@@ -348,15 +397,24 @@ InputImpl::SetFromString(const std::vector<std::string>& input)
         "non-string tensor '" + Name() + "' cannot be set from string data");
   }
 
-  if (input.size() != GetElementCount(mio_)) {
+  if (needs_shape_) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "must set shape for variable-size input '" + Name() +
+            "' before setting input data");
+  }
+
+  const int64_t element_count =
+      (!shape_.empty()) ? GetElementCount(shape_) : GetElementCount(mio_);
+
+  if (input.size() != (size_t)element_count) {
     bufs_.clear();
     buf_byte_sizes_.clear();
     str_bufs_.clear();
     return Error(
         RequestStatusCode::INVALID_ARG,
-        "expecting " + std::to_string(GetElementCount(mio_)) +
-            " strings for input '" + Name() + "', got " +
-            std::to_string(input.size()));
+        "expecting " + std::to_string(element_count) + " strings for input '" +
+            Name() + "', got " + std::to_string(input.size()));
   }
 
   // Serialize the strings into a "raw" buffer. The first 4-bytes are
@@ -1973,6 +2031,9 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
     auto rinput = infer_request_.add_input();
     rinput->set_name(io->Name());
 
+    for (const auto s : io->Shape()) {
+      rinput->add_dims(s);
+    }
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
     }
@@ -2599,6 +2660,9 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
     auto rinput = infer_request_.add_input();
     rinput->set_name(io->Name());
 
+    for (const auto s : io->Shape()) {
+      rinput->add_dims(s);
+    }
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
     }
