@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/server_status.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -43,12 +44,12 @@ class Scheduler {
     Payload() = default;
     Payload(const Payload& payload) = default;
     Payload(
-        const struct timespec queued_timestamp,
+        const std::shared_ptr<ModelInferStats::ScopedTimer> queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
         const std::function<void(tensorflow::Status)> complete_function)
-        : queued_timestamp_(queued_timestamp), stats_(stats),
+        : queue_timer_(queue_timer), stats_(stats),
           request_provider_(request_provider),
           response_provider_(response_provider),
           complete_function_(complete_function),
@@ -57,7 +58,7 @@ class Scheduler {
     {
     }
 
-    const struct timespec queued_timestamp_;
+    std::shared_ptr<ModelInferStats::ScopedTimer> queue_timer_;
     std::shared_ptr<ModelInferStats> stats_;
     std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<InferResponseProvider> response_provider_;

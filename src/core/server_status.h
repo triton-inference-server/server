@@ -89,6 +89,8 @@ class ModelInferStats {
     struct timespec Start();
     void Stop();
 
+    const struct timespec& StartTimeStamp() const { return start_; };
+
    private:
     friend class ModelInferStats;
     struct timespec start_;
@@ -133,10 +135,10 @@ class ModelInferStats {
   // lifetime of 'this' object.
   struct timespec StartRequestTimer(ScopedTimer* timer) const;
 
-  // Get a ScopedTimer that measures time spent in servable Run(),
-  // including queuing, scheduling and compute time. The lifetime of
+  // Get a ScopedTimer that measures wait time spent in servable Run(),
+  // including queuing, scheduling. The lifetime of
   // 'timer' must not exceed the lifetime of 'this' object.
-  struct timespec StartRunTimer(ScopedTimer* timer) const;
+  struct timespec StartQueueTimer(ScopedTimer* timer) const;
 
   // Get a ScopedTimer that measures model compute duration including
   // H2D, compute and D2H. The lifetime of 'timer' must not exceed the
@@ -154,7 +156,7 @@ class ModelInferStats {
   uint32_t execution_count_;
 
   mutable uint64_t request_duration_ns_;
-  mutable uint64_t run_duration_ns_;
+  mutable uint64_t queue_duration_ns_;
   mutable uint64_t compute_duration_ns_;
 };
 
@@ -192,7 +194,7 @@ class ServerStatusManager {
   void UpdateSuccessInferStats(
       const std::string& model_name, const int64_t model_version,
       size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-      uint64_t run_duration_ns, uint64_t compute_duration_ns);
+      uint64_t queue_duration_ns, uint64_t compute_duration_ns);
 
  private:
   mutable std::mutex mu_;

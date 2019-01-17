@@ -916,14 +916,10 @@ InferenceServable::AsyncRun(
     std::shared_ptr<InferResponseProvider> response_provider,
     std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
-  auto run_timer = std::make_shared<ModelInferStats::ScopedTimer>();
-  stats->StartRunTimer(run_timer.get());
-
   scheduler_->Enqueue(
       stats, request_provider, response_provider,
-      [OnCompleteHandleInfer, run_timer](tensorflow::Status status) mutable {
+      [OnCompleteHandleInfer](tensorflow::Status status) mutable {
         OnCompleteHandleInfer(status);
-        run_timer.reset();
       });
 }
 
@@ -938,11 +934,6 @@ InferenceServable::Run(
     std::shared_ptr<InferResponseProvider> response_provider,
     std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
-  // Since this call is synchronous we can just use a scoped timer to
-  // measure the entire run time.
-  ModelInferStats::ScopedTimer run_timer;
-  stats->StartRunTimer(&run_timer);
-
   std::mutex lmu;
   std::condition_variable lcv;
   tensorflow::Status run_status;

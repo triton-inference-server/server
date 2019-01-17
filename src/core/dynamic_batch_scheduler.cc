@@ -95,14 +95,15 @@ DynamicBatchScheduler::Enqueue(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(tensorflow::Status)> OnComplete)
 {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
+  // Queue timer starts at the beginning of the queueing and scheduling process
+  auto queue_timer = std::make_shared<ModelInferStats::ScopedTimer>();
+  stats->StartQueueTimer(queue_timer.get());
 
   bool wake_runner = false;
   {
     std::lock_guard<std::mutex> lock(mu_);
     queue_.emplace_back(
-        now, stats, request_provider, response_provider, OnComplete);
+        queue_timer, stats, request_provider, response_provider, OnComplete);
 
     // If there are any idle runners then wake one up to service this
     // request. We do the actual wake outside of the lock to avoid
@@ -311,7 +312,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   // a thread to check again at the maximum allowed delay.
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
-  const struct timespec& queued = queue_.front().queued_timestamp_;
+  const struct timespec& queued = queue_.front().queue_timer_->StartTimeStamp();
   uint64_t delay_ns = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) -
                       (queued.tv_sec * NANOS_PER_SECOND + queued.tv_nsec);
 
