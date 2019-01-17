@@ -103,6 +103,8 @@ nic::Error* InferContextInputNew(
     InferContextInputCtx** ctx, InferContextCtx* infer_ctx,
     const char* input_name);
 void InferContextInputDelete(InferContextInputCtx* ctx);
+nic::Error* InferContextInputSetShape(
+    InferContextInputCtx* ctx, const int64_t* dims, uint64_t size);
 nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 

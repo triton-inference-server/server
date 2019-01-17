@@ -73,11 +73,15 @@ GetDataTypeByteSize(const DataType dtype)
   return 0;
 }
 
-uint64_t
+int64_t
 GetElementCount(const DimsList& dims)
 {
   int64_t cnt = 0;
   for (auto dim : dims) {
+    if (dim == WILDCARD_DIM) {
+      return -1;
+    }
+
     if (cnt == 0) {
       cnt = dim;
     } else {
@@ -88,13 +92,32 @@ GetElementCount(const DimsList& dims)
   return cnt;
 }
 
-uint64_t
+int64_t
+GetElementCount(const std::vector<int64_t>& dims)
+{
+  int64_t cnt = 0;
+  for (auto dim : dims) {
+    if (dim == WILDCARD_DIM) {
+      return -1;
+    }
+
+    if (cnt == 0) {
+      cnt = dim;
+    } else {
+      cnt *= dim;
+    }
+  }
+
+  return cnt;
+}
+
+int64_t
 GetElementCount(const ModelInput& mio)
 {
   return GetElementCount(mio.dims());
 }
 
-uint64_t
+int64_t
 GetElementCount(const ModelOutput& mio)
 {
   return GetElementCount(mio.dims());
@@ -109,6 +132,26 @@ GetByteSize(const DataType& dtype, const DimsList& dims)
   }
 
   int64_t cnt = GetElementCount(dims);
+  if (cnt == -1) {
+    return 0;
+  }
+
+  return cnt * dt_size;
+}
+
+uint64_t
+GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims)
+{
+  size_t dt_size = GetDataTypeByteSize(dtype);
+  if (dt_size <= 0) {
+    return 0;
+  }
+
+  int64_t cnt = GetElementCount(dims);
+  if (cnt == -1) {
+    return 0;
+  }
+
   return cnt * dt_size;
 }
 
