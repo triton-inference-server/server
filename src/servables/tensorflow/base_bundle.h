@@ -81,8 +81,6 @@ class BaseBundle : public InferenceServable {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
-    tensorflow::Status InitializeInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     tensorflow::Status InitializeOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
@@ -92,7 +90,8 @@ class BaseBundle : public InferenceServable {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(std::vector<Scheduler::Payload>* payloads);
+    tensorflow::Status Run(
+        const BaseBundle* base, std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
     std::string name_;
@@ -112,11 +111,9 @@ class BaseBundle : public InferenceServable {
     // that output in the model.
     IONameMap output_name_map_;
 
-    // The input and output tensors. These are not used as actual
-    // inputs and outputs to the model (those are created dynamically
-    // for each run) but simply to hold information about each tensor
-    // (data-type, shape).
-    TensorMap inputs_;
+    // The output tensors. These are not used as actual outputs to the
+    // model (those are created dynamically for each run) but simply
+    // to hold information about each tensor (data-type, shape).
     TensorMap outputs_;
 
     // Tensorflow session for this context.

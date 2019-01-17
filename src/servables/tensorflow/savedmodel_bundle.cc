@@ -110,7 +110,9 @@ SavedModelBundle::CreateSession(
           "unexpected inference input '", io.name(), "'");
     }
 
-    if (!CompareDims(iitr->second.tensor_shape(), io.dims())) {
+    if (!CompareDimsSupported(
+            iitr->second.tensor_shape(), io.dims(),
+            Config().max_batch_size() > 0)) {
       return tensorflow::errors::InvalidArgument(
           "unable to load model '", Name(), "', input '", io.name(), "' dims ",
           DimsDebugString(iitr->second.tensor_shape()),
@@ -134,7 +136,9 @@ SavedModelBundle::CreateSession(
           "unexpected inference output '", io.name(), "'");
     }
 
-    if (!CompareDims(oitr->second.tensor_shape(), io.dims())) {
+    if (!CompareDimsSupported(
+            oitr->second.tensor_shape(), io.dims(),
+            Config().max_batch_size() > 0)) {
       return tensorflow::errors::InvalidArgument(
           "unable to load model '", Name(), "', output '", io.name(), "' dims ",
           DimsDebugString(oitr->second.tensor_shape()),

@@ -385,6 +385,7 @@ cc_library(
         ":autofill",
         ":constants",
         ":logging",
+        ":model_config",
         ":model_config_proto",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",

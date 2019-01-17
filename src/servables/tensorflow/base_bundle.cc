@@ -53,8 +53,7 @@ BaseBundle::Context::Context(Context&& o)
       max_batch_size_(o.max_batch_size_),
       input_name_map_(std::move(o.input_name_map_)),
       output_name_map_(std::move(o.output_name_map_)),
-      inputs_(std::move(o.inputs_)), outputs_(std::move(o.outputs_)),
-      session_(o.session_)
+      outputs_(std::move(o.outputs_)), session_(o.session_)
 {
   o.gpu_device_ = NO_GPU_DEVICE;
   o.max_batch_size_ = NO_BATCHING;
@@ -204,27 +203,8 @@ BaseBundle::CreateExecutionContext(
       options, gpu_device, gdp_itr->second, &context.session_,
       &context.input_name_map_, &context.output_name_map_));
 
-  // Initialize an appropriately sized Tensor for each input and
-  // output.
-  TF_RETURN_IF_ERROR(context.InitializeInputs(Config().input()));
+  // Initialize an appropriately sized Tensor for each output.
   TF_RETURN_IF_ERROR(context.InitializeOutputs(Config().output()));
-
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-BaseBundle::Context::InitializeInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
-{
-  for (const auto& io : ios) {
-    tensorflow::TensorShape shape;
-    for (int d = 0; d < io.dims_size(); ++d) {
-      shape.AddDim(io.dims(d));
-    }
-
-    tensorflow::DataType dtype = ConvertDataType(io.data_type());
-    inputs_.insert({io.name(), tensorflow::Tensor(dtype, shape)});
-  }
 
   return tensorflow::Status::OK();
 }
@@ -269,7 +249,7 @@ BaseBundle::Run(
     payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
 }
 
 namespace {
@@ -576,10 +556,13 @@ ReadStringOutputTensor(
 
 
 tensorflow::Status
-BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
+BaseBundle::Context::Run(
+    const BaseBundle* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
+
+  const InferRequestHeader* input_request_header = nullptr;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -587,11 +570,14 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   // request provider so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
+    if (payload.status_.ok()) {
+      total_batch_size +=
+          payload.request_provider_->RequestHeader().batch_size();
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+      // All payloads must have equally-sized input tensors so use any
+      // payload as the representative for the input tensors.
+      input_request_header = &(payload.request_provider_->RequestHeader());
+    }
   }
 
   // If there are no valid payloads then no need to run the
@@ -609,23 +595,44 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         "', max allowed is ", max_batch_size_);
   }
 
-  // Create a tensor for each input, sized correctly for the total
+  // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
   // into the corresponding tensor.
   using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
   TensorVec input_tensors;
-  for (const auto& ipair : inputs_) {
-    const std::string& name = ipair.first;
-    const tensorflow::Tensor& batch1_tensor = ipair.second;
-    tensorflow::TensorShape shape = batch1_tensor.shape();
-    const size_t batch1_element_cnt = batch1_tensor.NumElements();
-    const size_t batch1_byte_size =
-        batch1_element_cnt * tensorflow::DataTypeSize(batch1_tensor.dtype());
+
+  for (const auto& input : input_request_header->input()) {
+    const std::string& name = input.name();
+
+    const ModelInput* input_config;
+    TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
+
+    const tensorflow::DataType dtype =
+        ConvertDataType(input_config->data_type());
+
+    // Get the shape of the input. This comes from the request if it
+    // provided dims otherwise from the model configuration. The
+    // provider has already checked that the request shape is valid so
+    // don't need to do it here.
+    tensorflow::TensorShape shape;
 
     // If model supports batching then prepend the batch dimension
     // onto the input shape.
     if (max_batch_size_ != NO_BATCHING) {
-      shape.InsertDim(0, total_batch_size);
+      shape.AddDim(total_batch_size);
+    }
+
+    size_t batch1_element_cnt = 1;
+    if (input.dims_size() > 0) {
+      for (auto dim : input.dims()) {
+        shape.AddDim(dim);
+        batch1_element_cnt *= dim;
+      }
+    } else {
+      for (auto dim : input_config->dims()) {
+        shape.AddDim(dim);
+        batch1_element_cnt *= dim;
+      }
     }
 
     const std::string* input_tensor_name = &name;
@@ -634,11 +641,13 @@ BaseBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       input_tensor_name = &tn_itr->second;
     }
 
-    input_tensors.emplace_back(std::make_pair(
-        *input_tensor_name, tensorflow::Tensor(batch1_tensor.dtype(), shape)));
+    input_tensors.emplace_back(
+        std::make_pair(*input_tensor_name, tensorflow::Tensor(dtype, shape)));
     tensorflow::Tensor& tensor = input_tensors.back().second;
 
-    if (tensor.dtype() != tensorflow::DT_STRING) {
+    if (dtype != tensorflow::DT_STRING) {
+      const size_t batch1_byte_size =
+          batch1_element_cnt * tensorflow::DataTypeSize(dtype);
       SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
     } else {
       SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
@@ -747,13 +756,8 @@ operator<<(std::ostream& out, const BaseBundle& pb)
         << ((context.max_batch_size_ == BaseBundle::Context::NO_BATCHING)
                 ? "<none>"
                 : std::to_string(context.max_batch_size_))
-        << std::endl
-        << "  inputs:" << std::endl;
-    for (const auto& inp : context.inputs_) {
-      out << "    name=" << inp.first << " " << inp.second.DebugString()
-          << std::endl;
-    }
-    out << "  inputs:" << std::endl;
+        << std::endl;
+    out << "  outputs:" << std::endl;
     for (const auto& outp : context.outputs_) {
       out << "    name=" << outp.first << " " << outp.second.DebugString()
           << std::endl;
