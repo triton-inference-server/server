@@ -162,6 +162,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
                     # match expected top values
                     class_list = result_val[b]
                     tester.assertEqual(len(class_list), num_classes)
+
+                    expected0_flatten = expected0_list[b].flatten()
+                    expected1_flatten = expected1_list[b].flatten()
+
                     for idx, ctuple in enumerate(class_list):
                         if result_name == "OUTPUT0":
                             # can't compare indices since could have
@@ -170,13 +174,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
                             # each index equals the expected
                             # value. Can only compare labels when the
                             # indices are equal.
-                            tester.assertEqual(ctuple[1], expected0_list[b][ctuple[0]])
-                            tester.assertEqual(ctuple[1], expected0_list[b][expected0_sort_idx[b][idx]])
+                            tester.assertEqual(ctuple[1], expected0_flatten[ctuple[0]])
+                            tester.assertEqual(ctuple[1], expected0_flatten[expected0_sort_idx[b][idx]])
                             if ctuple[0] == expected0_sort_idx[b][idx]:
                                 tester.assertEqual(ctuple[2], 'label{}'.format(expected0_sort_idx[b][idx]))
                         elif result_name == "OUTPUT1":
-                            tester.assertEqual(ctuple[1], expected1_list[b][ctuple[0]])
-                            tester.assertEqual(ctuple[1], expected1_list[b][expected1_sort_idx[b][idx]])
+                            tester.assertEqual(ctuple[1], expected1_flatten[ctuple[0]])
+                            tester.assertEqual(ctuple[1], expected1_flatten[expected1_sort_idx[b][idx]])
                         else:
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
     return results
