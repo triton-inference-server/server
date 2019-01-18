@@ -91,9 +91,12 @@ def parse_model(url, protocol, model_name, batch_size, verbose=False):
 
     # Output is expected to be a vector. But allow any number of
     # dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
-    # }, { 10, 1, 1 } are all ok).
+    # }, { 10, 1, 1 } are all ok). Variable-size dimensions are not
+    # currently supported.
     non_one_cnt = 0
     for dim in output.dims:
+        if dim == -1:
+            raise Exception("variable-size dimension in model output not supported")
         if dim > 1:
             non_one_cnt += 1
             if non_one_cnt > 1:
@@ -116,6 +119,11 @@ def parse_model(url, protocol, model_name, batch_size, verbose=False):
         raise Exception(
             "expecting input to have 3 dimensions, model '{}' input has {}".format(
                 model_name, len(input.dims)))
+
+    # Variable-size dimensions are not currently supported.
+    for dim in input.dims:
+        if dim == -1:
+            raise Exception("variable-size dimension in model input not supported")
 
     if ((input.format != model_config.ModelInput.FORMAT_NCHW) and
         (input.format != model_config.ModelInput.FORMAT_NHWC)):
