@@ -99,11 +99,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
             expected0_val_list.append(op0)
             expected1_val_list.append(op1)
             if output0_dtype == np.object:
-                expected0_list.append(np.array([bytes(str(x), encoding='utf-8') for x in (op0)], dtype=object))
+                expected0_list.append(np.array([bytes(str(x), encoding='utf-8')
+                                                for x in (op0.flatten())], dtype=object).reshape(op1.shape))
             else:
                 expected0_list.append(op0)
             if output1_dtype == np.object:
-                expected1_list.append(np.array([bytes(str(x), encoding='utf-8') for x in (op1)], dtype=object))
+                expected1_list.append(np.array([bytes(str(x), encoding='utf-8')
+                                                for x in (op1.flatten())], dtype=object).reshape(op1.shape))
             else:
                 expected1_list.append(op1)
 

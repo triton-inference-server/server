@@ -854,3 +854,12 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int32, (-1,-1), (2,8), (2,8))
         create_models(FLAGS.models_dir, np.float32, np.int64, np.int64, (8,-1), (8,4), (8,4))
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int64, (-1,8,-1), (2,8,2), (2,8,2,))
+
+        create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string,
+                      (-1,), (16,), (16,))
+        create_models(FLAGS.models_dir, np_dtype_string, np.int32, np.int32,
+                      (-1,-1), (2,8), (2,8))
+        create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np.int32,
+                      (8,-1), (8,4), (8,4))
+        create_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string,
+                      (-1,8,-1), (2,8,2), (2,8,2,))
