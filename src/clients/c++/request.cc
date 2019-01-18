@@ -660,7 +660,7 @@ ResultImpl::GetRawAtCursor(
     return Error(
         RequestStatusCode::INVALID_ARG,
         "unexpected batch entry " + std::to_string(batch_idx) +
-            "requested for output '" + output_->Name() + "', batch size is " +
+            " requested for output '" + output_->Name() + "', batch size is " +
             std::to_string(batch_size_));
   }
 
@@ -693,7 +693,7 @@ ResultImpl::GetClassCount(size_t batch_idx, size_t* cnt) const
     return Error(
         RequestStatusCode::INVALID_ARG,
         "unexpected batch entry " + std::to_string(batch_idx) +
-            "requested for output '" + output_->Name() + "', batch size is " +
+            " requested for output '" + output_->Name() + "', batch size is " +
             std::to_string(batch_size_));
   }
 
@@ -722,7 +722,7 @@ ResultImpl::GetClassAtCursor(
     return Error(
         RequestStatusCode::INVALID_ARG,
         "unexpected batch entry " + std::to_string(batch_idx) +
-            "requested for output '" + output_->Name() + "', batch size is " +
+            " requested for output '" + output_->Name() + "', batch size is " +
             std::to_string(batch_size_));
   }
 
@@ -762,7 +762,7 @@ ResultImpl::ResetCursor(size_t batch_idx)
     return Error(
         RequestStatusCode::INVALID_ARG,
         "unexpected batch entry " + std::to_string(batch_idx) +
-            "requested for output '" + output_->Name() + "', batch size is " +
+            " requested for output '" + output_->Name() + "', batch size is " +
             std::to_string(batch_size_));
   }
 
