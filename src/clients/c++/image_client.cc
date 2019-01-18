@@ -351,9 +351,16 @@ ParseModel(
 
   // Output is expected to be a vector. But allow any number of
   // dimensions as long as all but 1 is size 1 (e.g. { 10 }, { 1, 10
-  // }, { 10, 1, 1 } are all ok).
+  // }, { 10, 1, 1 } are all ok). Variable-size dimensions are not
+  // currently supported.
   size_t non_one_cnt = 0;
   for (const auto dim : output->Dims()) {
+    if (dim == -1) {
+      std::cerr << "variable-size dimension in model output not supported"
+                << std::endl;
+      exit(1);
+    }
+
     if (dim > 1) {
       non_one_cnt++;
       if (non_one_cnt > 1) {
@@ -391,6 +398,15 @@ ParseModel(
               << ctx->ModelName() << "\" input has " << input->Dims().size()
               << std::endl;
     exit(1);
+  }
+
+  // Variable-size dimensions are not currently supported.
+  for (const auto dim : input->Dims()) {
+    if (dim == -1) {
+      std::cerr << "variable-size dimension in model input not supported"
+                << std::endl;
+      exit(1);
+    }
   }
 
   // Input must be NHWC or NCHW...
