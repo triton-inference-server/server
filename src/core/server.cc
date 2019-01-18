@@ -1314,7 +1314,7 @@ InferenceServer::HandleInfer(
                                 infer_stats](
                                    tensorflow::Status status) mutable {
     if (status.ok()) {
-      auto status = response_provider->FinalizeResponse(*(backend->Backend()));
+      status = response_provider->FinalizeResponse(*(backend->Backend()));
       if (status.ok()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();

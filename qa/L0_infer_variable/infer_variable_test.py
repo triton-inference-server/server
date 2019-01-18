@@ -62,9 +62,22 @@ class InferVariableTest(unittest.TestCase):
 
     def test_raw_fff(self):
         self._full_exact(True, np.float32, np.float32, np.float32, (16,), (16,), (16,))
+    def test_raw_fii(self):
+        self._full_exact(True, np.float32, np.int32, np.int32, (2,8), (2,8), (2,8))
+    def test_raw_fll(self):
+        self._full_exact(True, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
+    def test_raw_fil(self):
+        self._full_exact(True, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
 
     def test_class_fff(self):
         self._full_exact(False, np.float32, np.float32, np.float32, (16,), (16,), (16,))
+    def test_class_fii(self):
+        self._full_exact(False, np.float32, np.int32, np.int32, (2,8), (2,8), (2,8))
+    def test_class_fll(self):
+        self._full_exact(False, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
+    def test_class_fil(self):
+        self._full_exact(False, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
+
 
 if __name__ == '__main__':
     unittest.main()
