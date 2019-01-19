@@ -63,7 +63,7 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
     # Output shapes must be fixed-size.
     if not shape_is_fixed(output0_shape) or not shape_is_fixed(output1_shape):
         return False
-    
+
     return True
 
 def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
@@ -94,10 +94,8 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
         (output1_dtype == np.object)):
         return False
 
-    # Input and output shapes must be fixed-size.
-    if (not shape_is_fixed(input_shape) or
-        not shape_is_fixed(output0_shape) or
-        not shape_is_fixed(output1_shape)):
+    # Output shapes must be fixed-size.
+    if not shape_is_fixed(output0_shape) or not shape_is_fixed(output1_shape):
         return False
 
     return True
