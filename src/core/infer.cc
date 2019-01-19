@@ -917,10 +917,7 @@ InferenceServable::AsyncRun(
     std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
 {
   scheduler_->Enqueue(
-      stats, request_provider, response_provider,
-      [OnCompleteHandleInfer](tensorflow::Status status) mutable {
-        OnCompleteHandleInfer(status);
-      });
+      stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
 // Since callers are expecting synchronous behavior, this function

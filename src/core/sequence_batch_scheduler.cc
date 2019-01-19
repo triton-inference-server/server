@@ -63,7 +63,8 @@ SequenceBatchScheduler::Enqueue(
     std::function<void(tensorflow::Status)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
-  auto queue_timer = std::make_shared<ModelInferStats::ScopedTimer>();
+  std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
+      new ModelInferStats::ScopedTimer());
   stats->StartQueueTimer(queue_timer.get());
 
   const auto& request_header = request_provider->RequestHeader();
@@ -181,7 +182,7 @@ SequenceBatchScheduler::SequenceBatch::GetFreeSlot(uint32_t* slot)
 void
 SequenceBatchScheduler::SequenceBatch::Enqueue(
     const uint32_t slot, const CorrelationID correlation_id,
-    const std::shared_ptr<ModelInferStats::ScopedTimer> queue_timer,
+    std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -282,7 +283,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               continue;
             }
 
-            const SequencePayload& slot_payload = queue.front();
+            SequencePayload& slot_payload = queue.front();
 
             payloads->emplace_back(
                 slot_payload.queue_timer_, slot_payload.stats_,

@@ -96,7 +96,8 @@ DynamicBatchScheduler::Enqueue(
     std::function<void(tensorflow::Status)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
-  auto queue_timer = std::make_shared<ModelInferStats::ScopedTimer>();
+  std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
+      new ModelInferStats::ScopedTimer());
   stats->StartQueueTimer(queue_timer.get());
 
   bool wake_runner = false;
@@ -162,7 +163,7 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
         if (wait_microseconds == 0) {
           payloads = std::make_shared<std::vector<Scheduler::Payload>>();
           for (size_t idx = 0; idx < pending_batch_queue_cnt_; ++idx) {
-            payloads->emplace_back(queue_.front());
+            payloads->emplace_back(std::move(queue_.front()));
             queue_.pop_front();
           }
 
@@ -183,7 +184,7 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
       } else {
         // No batching... execute next request payload
         payloads = std::make_shared<std::vector<Scheduler::Payload>>();
-        payloads->emplace_back(queue_.front());
+        payloads->emplace_back(std::move(queue_.front()));
         queue_.pop_front();
       }
 

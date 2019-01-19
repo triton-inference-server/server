@@ -60,9 +60,10 @@ class SequenceBatchScheduler : public Scheduler {
   // Scheduler payload for each request.
   struct SequencePayload : public Scheduler::Payload {
     SequencePayload() = default;
-    SequencePayload(const SequencePayload& payload) = default;
+    SequencePayload(const SequencePayload& payload) = delete;
+    SequencePayload(SequencePayload&& payload) : Payload(std::move(payload)) {}
     SequencePayload(
-        const std::shared_ptr<ModelInferStats::ScopedTimer> queue_timer,
+        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -92,7 +93,7 @@ class SequenceBatchScheduler : public Scheduler {
     // slot.
     void Enqueue(
         const uint32_t slot, const CorrelationID correlation_id,
-        const std::shared_ptr<ModelInferStats::ScopedTimer> queue_timer,
+        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
