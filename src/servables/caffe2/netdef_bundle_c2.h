@@ -87,15 +87,9 @@ class Caffe2Workspace {
   virtual const std::set<std::string>& PotentialInputNames() const = 0;
   virtual const std::set<std::string>& PotentialOutputNames() const = 0;
 
-  // The inputs and outputs of the model, as a map from the name to
-  // the size of the tensor.
-  virtual const std::unordered_map<std::string, size_t>& Inputs() const = 0;
+  // The outputs of the model, as a map from the name to the size of
+  // the tensor.
   virtual const std::unordered_map<std::string, size_t>& Outputs() const = 0;
-
-  // Add an input tensor to the model.
-  virtual Error AddInputTensor(
-      const std::string& name, const DataType datatype,
-      const std::vector<int>& dims) = 0;
 
   // Add an output tensor to the model.
   virtual Error AddOutputTensor(
@@ -104,8 +98,8 @@ class Caffe2Workspace {
 
   // Set the value for an input tensor in preparation for inferencing.
   virtual Error SetInputTensor(
-      const std::string& name, size_t batch_size, const char* content,
-      size_t byte_size) = 0;
+      const std::string& name, const std::vector<int64_t>& shape,
+      const DataType dtype, const char* content, size_t byte_size) = 0;
 
   // Get the value for an output tensor after inferencing.
   virtual Error GetOutputTensor(

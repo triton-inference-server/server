@@ -77,7 +77,7 @@ class NetDefBundle : public InferenceServable {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
-    tensorflow::Status InitializeInputs(
+    tensorflow::Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     tensorflow::Status InitializeOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
@@ -88,7 +88,15 @@ class NetDefBundle : public InferenceServable {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(std::vector<Scheduler::Payload>* payloads);
+    tensorflow::Status Run(
+        const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads);
+
+    // Set an input tensor from one or more payloads.
+    tensorflow::Status SetFixedSizedInputTensor(
+        const std::string& input_name, const std::vector<int64_t>& shape,
+        const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
+        const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+        std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Name of the model instance
     std::string name_;

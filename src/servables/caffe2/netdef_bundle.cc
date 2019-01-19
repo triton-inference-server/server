@@ -44,7 +44,7 @@ namespace {
 // Convert model datatype to non-protobuf equivalent datatype required
 // by Caffe2Workspace.
 Caffe2Workspace::DataType
-ConvertDatatype(DataType dtype)
+ConvertDataType(DataType dtype)
 {
   switch (dtype) {
     case DataType::TYPE_INVALID:
@@ -73,8 +73,6 @@ ConvertDatatype(DataType dtype)
       return Caffe2Workspace::DataType::TYPE_FP32;
     case DataType::TYPE_FP64:
       return Caffe2Workspace::DataType::TYPE_FP64;
-    case DataType::TYPE_STRING:
-      return Caffe2Workspace::DataType::TYPE_STRING;
     default:
       break;
   }
@@ -245,30 +243,31 @@ NetDefBundle::CreateExecutionContext(
 
   context.workspace_.reset(c2ws);
 
-  TF_RETURN_IF_ERROR(context.InitializeInputs(Config().input()));
+  TF_RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
   TF_RETURN_IF_ERROR(context.InitializeOutputs(Config().output()));
 
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-NetDefBundle::Context::InitializeInputs(
+NetDefBundle::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(
         ValidateModelInput(io, workspace_->PotentialInputNames()));
 
-    std::vector<int> dims(io.dims().begin(), io.dims().end());
-    Caffe2Workspace::Error err = workspace_->AddInputTensor(
-        io.name(), ConvertDatatype(io.data_type()), dims);
-    if (!err.IsOk()) {
-      return tensorflow::errors::Internal(err.Message());
+    if (ConvertDataType(io.data_type()) ==
+        Caffe2Workspace::DataType::TYPE_INVALID) {
+      return tensorflow::errors::Internal(
+          "unsupported datatype ", DataType_Name(io.data_type()),
+          " for input '", io.name(), "' for model '", name_, "'");
     }
   }
 
   return tensorflow::Status::OK();
 }
+
 
 tensorflow::Status
 NetDefBundle::Context::InitializeOutputs(
@@ -280,7 +279,7 @@ NetDefBundle::Context::InitializeOutputs(
 
     std::vector<int> dims(io.dims().begin(), io.dims().end());
     Caffe2Workspace::Error err = workspace_->AddOutputTensor(
-        io.name(), ConvertDatatype(io.data_type()), dims);
+        io.name(), ConvertDataType(io.data_type()), dims);
     if (!err.IsOk()) {
       return tensorflow::errors::Internal(err.Message());
     }
@@ -312,14 +311,106 @@ NetDefBundle::Run(
     payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
 }
 
 tensorflow::Status
-NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
+NetDefBundle::Context::SetFixedSizedInputTensor(
+    const std::string& name, const std::vector<int64_t>& shape,
+    const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
+    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<char[]>>* input_buffers)
+{
+  // The entire input tensor must be delivered as a single
+  // contiguous chunk so create a buffer large enough to hold the
+  // entire dynamic batched input.
+  input_buffers->emplace_back(new char[total_byte_size]);
+  char* buffer = input_buffers->back().get();
+
+  size_t buffer_copy_offset = 0;
+
+  // Visit the payloads in order and copy the input tensors to
+  // 'buffer'. Skip payloads that had errors since they are not
+  // included in the dynamic batch.
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_byte_size =
+        request_header.batch_size() * batch1_byte_size;
+
+    int input_idx = 0;
+    for (const auto& input : request_header.input()) {
+      if (input.name() == name) {
+        size_t copied_byte_size = 0;
+        while (payload.compute_status_.ok()) {
+          const void* content;
+          size_t content_byte_size;
+          payload.compute_status_ =
+              payload.request_provider_->GetNextInputContent(
+                  input_idx, &content, &content_byte_size, false);
+          if (!payload.compute_status_.ok()) {
+            break;
+          }
+
+          // No more input content available then done with copying...
+          if (content == nullptr) {
+            break;
+          }
+
+          if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
+              total_byte_size) {
+            payload.compute_status_ = tensorflow::errors::InvalidArgument(
+                "unexpected size ",
+                buffer_copy_offset + copied_byte_size + content_byte_size,
+                " for inference input '", name, "', expecting ",
+                total_byte_size);
+            break;
+          }
+
+          memcpy(
+              static_cast<char*>(buffer) + buffer_copy_offset +
+                  copied_byte_size,
+              content, content_byte_size);
+          copied_byte_size += content_byte_size;
+        }
+
+        if (payload.compute_status_.ok() &&
+            (copied_byte_size != expected_byte_size)) {
+          payload.compute_status_ = tensorflow::errors::Internal(
+              "expected ", expected_byte_size, " of data for inference input '",
+              name, "', got ", copied_byte_size);
+        }
+
+        break;
+      }
+
+      input_idx++;
+    }
+
+    buffer_copy_offset += expected_byte_size;
+  }
+
+  Caffe2Workspace::Error err = workspace_->SetInputTensor(
+      name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
+  if (!err.IsOk()) {
+    return tensorflow::errors::Internal(err.Message());
+  }
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+NetDefBundle::Context::Run(
+    const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
+
+  const InferRequestHeader* input_request_header = nullptr;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -327,11 +418,14 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   // request provider so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
+    if (payload.status_.ok()) {
+      total_batch_size +=
+          payload.request_provider_->RequestHeader().batch_size();
 
-    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+      // All payloads must have equally-sized input tensors so use any
+      // payload as the representative for the input tensors.
+      input_request_header = &(payload.request_provider_->RequestHeader());
+    }
   }
 
   // If there are no valid payloads then no need to run the
@@ -349,94 +443,55 @@ NetDefBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         "', max allowed is ", max_batch_size_);
   }
 
-  // For each input allocate and populate a buffer containing all the
-  // payload inputs.
-  std::vector<std::unique_ptr<char>> input_buffers;
-  for (const auto& ipair : workspace_->Inputs()) {
-    const std::string& name = ipair.first;
-    const size_t batch1_byte_size = ipair.second;
+  // Hold reference to each buffer of input data to that it stays
+  // until the inference has completed.
+  std::vector<std::unique_ptr<char[]>> input_buffers;
 
-    // The entire input tensor must be delivered as a single
-    // contiguous chunk so create a buffer large enough to hold the
-    // entire dynamic batched input.
-    const size_t total_byte_size = batch1_byte_size * total_batch_size;
-    void* buffer = malloc(total_byte_size);
-    input_buffers.emplace_back(static_cast<char*>(buffer));
+  // Create a tensor for each input sized correctly for the total
+  // payload batch size. Concatenate input values from each payload
+  // into the corresponding tensor.
+  for (const auto& input : input_request_header->input()) {
+    const std::string& name = input.name();
 
-    size_t buffer_copy_offset = 0;
+    const ModelInput* input_config;
+    TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
 
-    // Visit the payloads in order and copy the input tensors to
-    // GPU. Skip payloads that had errors since they are not included in
-    // the dynamic batch.
-    for (auto& payload : *payloads) {
-      if (!payload.status_.ok()) {
-        continue;
-      }
+    // Get the shape of the input. This comes from the request if it
+    // provided dims otherwise from the model configuration. The
+    // provider has already checked that the request shape is valid so
+    // don't need to do it here.
+    std::vector<int64_t> shape;
 
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      int input_idx = 0;
-      for (const auto& input : request_header.input()) {
-        if (input.name() == name) {
-          size_t copied_byte_size = 0;
-          while (payload.compute_status_.ok()) {
-            const void* content;
-            size_t content_byte_size;
-            payload.compute_status_ =
-                payload.request_provider_->GetNextInputContent(
-                    input_idx, &content, &content_byte_size, false);
-            if (!payload.compute_status_.ok()) {
-              break;
-            }
-
-            // No more input content available then done with copying...
-            if (content == nullptr) {
-              break;
-            }
-
-            if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
-                total_byte_size) {
-              payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                  "unexpected size ",
-                  buffer_copy_offset + copied_byte_size + content_byte_size,
-                  " for inference input '", name, "', expecting ",
-                  total_byte_size);
-              break;
-            }
-
-            memcpy(
-                static_cast<char*>(buffer) + buffer_copy_offset +
-                    copied_byte_size,
-                content, content_byte_size);
-            copied_byte_size += content_byte_size;
-          }
-
-          if (payload.compute_status_.ok() &&
-              (copied_byte_size != expected_byte_size)) {
-            payload.compute_status_ = tensorflow::errors::Internal(
-                "expected ", expected_byte_size,
-                " of data for inference input '", name, "', got ",
-                copied_byte_size);
-          }
-
-          break;
-        }
-
-        input_idx++;
-      }
-
-      buffer_copy_offset += expected_byte_size;
+    // If model supports batching then prepend the batch dimension
+    // onto the input shape.
+    if (max_batch_size_ != NO_BATCHING) {
+      shape.push_back(total_batch_size);
     }
 
-    Caffe2Workspace::Error err = workspace_->SetInputTensor(
-        name, total_batch_size, static_cast<const char*>(buffer),
-        total_byte_size);
-    if (!err.IsOk()) {
-      return tensorflow::errors::Internal(err.Message());
+    size_t batch1_element_cnt = 1;
+    if (input.dims_size() > 0) {
+      for (auto dim : input.dims()) {
+        shape.push_back(dim);
+        batch1_element_cnt *= dim;
+      }
+    } else {
+      for (auto dim : input_config->dims()) {
+        shape.push_back(dim);
+        batch1_element_cnt *= dim;
+      }
     }
+
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an input, so can just assume fixed-sized here.
+    const Caffe2Workspace::DataType dtype =
+        ConvertDataType(input_config->data_type());
+    const size_t batch1_byte_size =
+        batch1_element_cnt * GetDataTypeByteSize(input_config->data_type());
+    const size_t total_byte_size = total_batch_size * batch1_byte_size;
+
+    TF_RETURN_IF_ERROR(SetFixedSizedInputTensor(
+        name, shape, dtype, batch1_byte_size, total_byte_size, payloads,
+        &input_buffers));
   }
 
   // Run...
