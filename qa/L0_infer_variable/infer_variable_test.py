@@ -59,6 +59,17 @@ class InferVariableTest(unittest.TestCase):
                            input_dtype, output0_dtype, output1_dtype,
                            swap=swap, send_input_shape=True)
 
+        if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_exact(self, 'netdef', input_shape, bs, req_raw,
+                               input_dtype, output0_dtype, output1_dtype,
+                               swap=swap, send_input_shape=True)
+            # model that does not support batching
+            iu.infer_exact(self, 'netdef_nobatch', input_shape, 1, req_raw,
+                           input_dtype, output0_dtype, output1_dtype,
+                           swap=swap, send_input_shape=True)
 
     def test_raw_fff(self):
         self._full_exact(True, np.float32, np.float32, np.float32, (16,), (16,), (16,))
