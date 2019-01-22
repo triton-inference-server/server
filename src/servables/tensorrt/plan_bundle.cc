@@ -409,6 +409,9 @@ PlanBundle::Run(
 
   std::vector<ModelInferStats::ScopedTimer> compute_timers;
   for (auto& payload : *payloads) {
+    // Stop queue timer when the payload is scheduled to run
+    payload.queue_timer_.reset();
+
     compute_timers.emplace_back();
     payload.stats_->StartComputeTimer(&compute_timers.back());
     payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);

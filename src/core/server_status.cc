@@ -243,7 +243,7 @@ void
 ServerStatusManager::UpdateSuccessInferStats(
     const std::string& model_name, const int64_t model_version,
     size_t batch_size, uint32_t execution_cnt, uint64_t request_duration_ns,
-    uint64_t run_duration_ns, uint64_t compute_duration_ns)
+    uint64_t queue_duration_ns, uint64_t compute_duration_ns)
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -287,8 +287,7 @@ ServerStatusManager::UpdateSuccessInferStats(
       new_stats->mutable_compute()->set_count(1);
       new_stats->mutable_compute()->set_total_time_ns(compute_duration_ns);
       new_stats->mutable_queue()->set_count(1);
-      new_stats->mutable_queue()->set_total_time_ns(
-          run_duration_ns - compute_duration_ns);
+      new_stats->mutable_queue()->set_total_time_ns(queue_duration_ns);
     } else if (existing_stats != nullptr) {
       InferRequestStats& stats = *existing_stats;
       stats.mutable_success()->set_count(stats.success().count() + 1);
@@ -299,8 +298,7 @@ ServerStatusManager::UpdateSuccessInferStats(
           stats.compute().total_time_ns() + compute_duration_ns);
       stats.mutable_queue()->set_count(stats.queue().count() + 1);
       stats.mutable_queue()->set_total_time_ns(
-          stats.queue().total_time_ns() +
-          (run_duration_ns - compute_duration_ns));
+          stats.queue().total_time_ns() + queue_duration_ns);
     } else {
       LOG_ERROR << "Internal error logging INFER stats for " << model_name;
     }
@@ -378,7 +376,7 @@ ModelInferStats::~ModelInferStats()
   } else {
     status_manager_->UpdateSuccessInferStats(
         model_name_, model_version, batch_size_, execution_count_,
-        request_duration_ns_, run_duration_ns_, compute_duration_ns_);
+        request_duration_ns_, queue_duration_ns_, compute_duration_ns_);
 
     if (model_servable_ == nullptr) {
       LOG_ERROR << "Unable to collect inference metrics for nullptr servable";
@@ -395,7 +393,7 @@ ModelInferStats::~ModelInferStats()
       model_servable_->MetricInferenceComputeDuration(gpu_device_)
           .Increment(compute_duration_ns_ / 1000);
       model_servable_->MetricInferenceQueueDuration(gpu_device_)
-          .Increment((run_duration_ns_ - compute_duration_ns_) / 1000);
+          .Increment(queue_duration_ns_ / 1000);
 
       model_servable_->MetricInferenceLoadRatio(gpu_device_)
           .Observe(
@@ -413,9 +411,9 @@ ModelInferStats::StartRequestTimer(ScopedTimer* timer) const
 }
 
 struct timespec
-ModelInferStats::StartRunTimer(ScopedTimer* timer) const
+ModelInferStats::StartQueueTimer(ScopedTimer* timer) const
 {
-  timer->duration_ptr_ = &run_duration_ns_;
+  timer->duration_ptr_ = &queue_duration_ns_;
   return timer->Start();
 }
 

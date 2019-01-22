@@ -62,8 +62,10 @@ SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(tensorflow::Status)> OnComplete)
 {
-  struct timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
+  // Queue timer starts at the beginning of the queueing and scheduling process
+  std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
+      new ModelInferStats::ScopedTimer());
+  stats->StartQueueTimer(queue_timer.get());
 
   const auto& request_header = request_provider->RequestHeader();
   const CorrelationID correlation_id = request_header.correlation_id();
@@ -120,7 +122,7 @@ SequenceBatchScheduler::Enqueue(
 
   if (target->IsBacklog()) {
     target->backlog_.emplace_back(
-        now, stats, request_provider, response_provider, OnComplete);
+        queue_timer, stats, request_provider, response_provider, OnComplete);
     return;
   }
 
@@ -130,8 +132,8 @@ SequenceBatchScheduler::Enqueue(
   lock.unlock();
 
   sb->Enqueue(
-      slot, correlation_id, now, stats, request_provider, response_provider,
-      OnComplete);
+      slot, correlation_id, queue_timer, stats, request_provider,
+      response_provider, OnComplete);
 }
 
 SequenceBatchScheduler::SequenceBatch::SequenceBatch(
@@ -180,7 +182,7 @@ SequenceBatchScheduler::SequenceBatch::GetFreeSlot(uint32_t* slot)
 void
 SequenceBatchScheduler::SequenceBatch::Enqueue(
     const uint32_t slot, const CorrelationID correlation_id,
-    const struct timespec queue_timestamp,
+    std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -193,8 +195,7 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 
     correlation_ids_[slot] = correlation_id;
     queues_[slot].emplace_back(
-        queue_timestamp, stats, request_provider, response_provider,
-        OnComplete);
+        queue_timer, stats, request_provider, response_provider, OnComplete);
     max_active_slot_ = std::max(max_active_slot_, static_cast<int32_t>(slot));
 
     // If runner is idle then wake it to service this request. We do
@@ -282,10 +283,10 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               continue;
             }
 
-            const SequencePayload& slot_payload = queue.front();
+            SequencePayload& slot_payload = queue.front();
 
             payloads->emplace_back(
-                slot_payload.queued_timestamp_, slot_payload.stats_,
+                slot_payload.queue_timer_, slot_payload.stats_,
                 slot_payload.request_provider_, slot_payload.response_provider_,
                 slot_payload.complete_function_);
 
