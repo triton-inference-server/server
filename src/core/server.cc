@@ -193,8 +193,8 @@ class InferContext final
                   response.mutable_raw_output()->Clear();
                 }
 
-                timer.reset();
                 this->FinishResponse();
+                timer.reset();
               },
               true  // async_frontend
           );

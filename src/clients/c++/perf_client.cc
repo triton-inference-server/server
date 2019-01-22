@@ -1037,6 +1037,10 @@ Report(
   const uint64_t compute_time_us = summary.server_compute_time_ns / 1000;
   const uint64_t compute_avg_us = compute_time_us / cnt;
 
+  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
+                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
+                                : 0;
+
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
@@ -1095,8 +1099,7 @@ Report(
             << "  Server: " << std::endl
             << "    Request count: " << cnt << std::endl
             << "    Avg request latency: " << cumm_avg_us << " usec"
-            << " (overhead " << (cumm_avg_us - queue_avg_us - compute_avg_us)
-            << " usec + "
+            << " (overhead " << overhead << " usec + "
             << "queue " << queue_avg_us << " usec + "
             << "compute " << compute_avg_us << " usec)" << std::endl
             << std::endl;

@@ -60,15 +60,16 @@ class SequenceBatchScheduler : public Scheduler {
   // Scheduler payload for each request.
   struct SequencePayload : public Scheduler::Payload {
     SequencePayload() = default;
-    SequencePayload(const SequencePayload& payload) = default;
+    SequencePayload(const SequencePayload& payload) = delete;
+    SequencePayload(SequencePayload&& payload) : Payload(std::move(payload)) {}
     SequencePayload(
-        const struct timespec queued_timestamp,
+        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
         const std::function<void(tensorflow::Status)> complete_function)
         : Payload(
-              queued_timestamp, stats, request_provider, response_provider,
+              queue_timer, stats, request_provider, response_provider,
               complete_function)
     {
     }
@@ -92,7 +93,7 @@ class SequenceBatchScheduler : public Scheduler {
     // slot.
     void Enqueue(
         const uint32_t slot, const CorrelationID correlation_id,
-        const struct timespec queue_timestamp,
+        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
