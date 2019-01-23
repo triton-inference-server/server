@@ -151,10 +151,10 @@ _crequest_infer_ctx_result_modelver.argtypes = [c_void_p, POINTER(c_int64)]
 _crequest_infer_ctx_result_dtype = _crequest.InferContextResultDataType
 _crequest_infer_ctx_result_dtype.restype = c_void_p
 _crequest_infer_ctx_result_dtype.argtypes = [c_void_p, POINTER(c_uint32)]
-_crequest_infer_ctx_result_dims = _crequest.InferContextResultDims
-_crequest_infer_ctx_result_dims.restype = c_void_p
-_crequest_infer_ctx_result_dims.argtypes = [c_void_p, c_uint64,
-                                            ndpointer(c_uint32, flags="C_CONTIGUOUS"),
+_crequest_infer_ctx_result_shape = _crequest.InferContextResultShape
+_crequest_infer_ctx_result_shape.restype = c_void_p
+_crequest_infer_ctx_result_shape.argtypes = [c_void_p, c_uint64,
+                                            ndpointer(c_int64, flags="C_CONTIGUOUS"),
                                             POINTER(c_uint64)]
 _crequest_infer_ctx_result_next_raw = _crequest.InferContextResultNextRaw
 _crequest_infer_ctx_result_next_raw.restype = c_void_p
@@ -731,11 +731,11 @@ class InferContext:
 
                         # Reshape the result to the appropriate shape
                         max_shape_dims = 16
-                        shape = np.zeros(max_shape_dims, dtype=np.uint32)
+                        shape = np.zeros(max_shape_dims, dtype=np.int64)
                         shape_len = c_uint64()
                         _raise_if_error(
                             c_void_p(
-                                _crequest_infer_ctx_result_dims(
+                                _crequest_infer_ctx_result_shape(
                                     result, c_uint64(max_shape_dims),
                                     shape, byref(shape_len))))
                         shaped = np.reshape(np.copy(val), np.resize(shape, shape_len.value).tolist())
@@ -796,10 +796,12 @@ class InferContext:
             returned for the output.
 
         input_shapes : dict
-            Dictionary from input name to the shape for that input. An
-            input shape is specified as a list/tuple of the
-            dimensions. A shape is required for an input that has a
-            tensor with one or more variable-size dimensions.
+
+            Dictionary from input name to the shape for that input,
+            not including the batch dimension. An input shape is
+            specified as a list/tuple of the dimensions. A shape is
+            required for an input that has a tensor with one or more
+            variable-size dimensions.
 
         batch_size : int
             The batch size of the inference. Each input must provide
@@ -869,10 +871,11 @@ class InferContext:
             returned for the output.
 
         input_shapes : dict
-            Dictionary from input name to the shape for that input. An
-            input shape is specified as a list/tuple of the
-            dimensions. A shape is required for an input that has a
-            tensor with one or more variable-size dimensions.
+            Dictionary from input name to the shape for that input,
+            not including the batch dimension. An input shape is
+            specified as a list/tuple of the dimensions. A shape is
+            required for an input that has a tensor with one or more
+            variable-size dimensions.
 
         batch_size : int
             The batch size of the inference. Each input must provide

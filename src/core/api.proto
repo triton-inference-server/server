@@ -54,20 +54,18 @@ message InferRequestHeader
 
     //@@    .. cpp:var:: int64 dims (repeated)
     //@@
-    //@@       The shape of the input tensor. If the model configuration for
-    //@@       this input explicitly specifies all dimensions of the shape,
-    //@@       then this field is optional. If the model configuration has
-    //@@       any wildcard dimensions (-1) dimensions for this input, then
-    //@@       the input shape must be specified.
+    //@@       The shape of the input tensor, not including the batch dimension.
+    //@@       Optional if the model configuration for this input explicitly
+    //@@       specifies all dimensions of the shape. Required if the model
+    //@@       configuration for this input has any wildcard dimensions (-1).
     //@@
-    repeated int64 dims = 4;
+    repeated int64 dims = 2;
 
     //@@    .. cpp:var:: uint64 batch_byte_size
     //@@
     //@@       The size of the full batch of the input tensor, in bytes.
-    //@@       For tensors with fixed-sized datatypes this field is optional.
-    //@@       For tensors with a non-fixed-size datatype (like STRING) this
-    //@@       field must be specified.
+    //@@       Optional for tensors with fixed-sized datatypes. Required
+    //@@       for tensors with a non-fixed-size datatype (like STRING).
     //@@
     uint64 batch_byte_size = 3;
   }
@@ -84,16 +82,6 @@ message InferRequestHeader
     //@@       The name of the output tensor.
     //@@
     string name = 1;
-
-    //@@    .. cpp:var:: uint64 byte_size
-    //@@
-    //@@       The size of the output tensor, in bytes. This is the size for
-    //@@       one instance of the output, not the entire size of a batched
-    //@@       output. For tensors with a non-fixed-size datatype (like
-    //@@       STRING) this field must not be specified (or must be specified
-    //@@       as zero).
-    //@@
-    uint64 byte_size = 2;
 
     //@@    .. cpp:var:: message Class
     //@@
@@ -180,15 +168,19 @@ message InferResponseHeader
     //@@
     message Raw
     {
-      //@@      .. cpp:var:: uint64 byte_size
+      //@@      .. cpp:var:: int64 dims (repeated)
       //@@
-      //@@         The size of the output tensor, in bytes. For tensors with
-      //@@         fixed-sized datatypes this is the size for one instance of
-      //@@         the output, not the entire size of a batched output. For
-      //@@         tensors with a non-fixed-size datatype (like STRING) this
-      //@@         field must not be specified (or must be specified as zero).
+      //@@         The shape of the output tensor, not including the batch
+      //@@         dimension.
       //@@
-      uint64 byte_size = 1;
+      repeated int64 dims = 1;
+
+      //@@      .. cpp:var:: uint64 batch_byte_size
+      //@@
+      //@@         The full size of the output tensor, in bytes. For a
+      //@@         batch output, this is the size of the entire batch.
+      //@@
+      uint64 batch_byte_size = 2;
     }
 
     //@@    .. cpp:var:: message Class

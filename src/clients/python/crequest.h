@@ -121,8 +121,8 @@ nic::Error* InferContextResultModelVersion(
     InferContextResultCtx* ctx, int64_t* model_version);
 nic::Error* InferContextResultDataType(
     InferContextResultCtx* ctx, uint32_t* dtype);
-nic::Error* InferContextResultDims(
-    InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
+nic::Error* InferContextResultShape(
+    InferContextResultCtx* ctx, uint64_t max_dims, int64_t* shape,
     uint64_t* shape_len);
 nic::Error* InferContextResultNextRaw(
     InferContextResultCtx* ctx, size_t batch_idx, const char** val,

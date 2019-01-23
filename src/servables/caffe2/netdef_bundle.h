@@ -79,7 +79,7 @@ class NetDefBundle : public InferenceServable {
 
     tensorflow::Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    tensorflow::Status InitializeOutputs(
+    tensorflow::Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Run model to execute for one or more requests. This function
@@ -97,6 +97,13 @@ class NetDefBundle : public InferenceServable {
         const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
+
+    // Read an output tensor into one or more payloads.
+    tensorflow::Status ReadFixedSizedOutputTensor(
+        const std::string& name, const std::vector<int64_t>& shape,
+        const Caffe2Workspace::DataType dtype, const size_t dtype_byte_size,
+        const size_t total_batch_size,
+        std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
     std::string name_;

@@ -94,10 +94,6 @@ def validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
         (output1_dtype == np.object)):
         return False
 
-    # Output shapes must be fixed-size.
-    if not shape_is_fixed(output0_shape) or not shape_is_fixed(output1_shape):
-        return False
-
     return True
 
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,

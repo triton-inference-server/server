@@ -244,7 +244,7 @@ NetDefBundle::CreateExecutionContext(
   context.workspace_.reset(c2ws);
 
   TF_RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
-  TF_RETURN_IF_ERROR(context.InitializeOutputs(Config().output()));
+  TF_RETURN_IF_ERROR(context.ValidateOutputs(Config().output()));
 
   return tensorflow::Status::OK();
 }
@@ -270,18 +270,18 @@ NetDefBundle::Context::ValidateInputs(
 
 
 tensorflow::Status
-NetDefBundle::Context::InitializeOutputs(
+NetDefBundle::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
     TF_RETURN_IF_ERROR(
         ValidateModelOutput(io, workspace_->PotentialOutputNames()));
 
-    std::vector<int> dims(io.dims().begin(), io.dims().end());
-    Caffe2Workspace::Error err = workspace_->AddOutputTensor(
-        io.name(), ConvertDataType(io.data_type()), dims);
-    if (!err.IsOk()) {
-      return tensorflow::errors::Internal(err.Message());
+    if (ConvertDataType(io.data_type()) ==
+        Caffe2Workspace::DataType::TYPE_INVALID) {
+      return tensorflow::errors::Internal(
+          "unsupported datatype ", DataType_Name(io.data_type()),
+          " for output '", io.name(), "' for model '", name_, "'");
     }
   }
 
@@ -404,6 +404,76 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
 }
 
 tensorflow::Status
+NetDefBundle::Context::ReadFixedSizedOutputTensor(
+    const std::string& name, const std::vector<int64_t>& shape,
+    const Caffe2Workspace::DataType dtype, const size_t dtype_byte_size,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
+{
+  std::vector<int64_t> content_shape;
+  const char* content = nullptr;
+  size_t byte_size = 0;
+  Caffe2Workspace::Error err = workspace_->GetOutputTensor(
+      name, shape, dtype, &content, &byte_size, &content_shape);
+  if (!err.IsOk()) {
+    return tensorflow::errors::Internal(err.Message());
+  }
+
+  const size_t total_byte_size =
+      GetElementCount(content_shape) * dtype_byte_size;
+  const size_t batch1_byte_size = total_byte_size / total_batch_size;
+
+  if (byte_size != total_byte_size) {
+    return tensorflow::errors::Internal(
+        "unexpected size for output '", name, "', byte-size ",
+        std::to_string(byte_size), " does not equal ",
+        std::to_string(total_batch_size), " * ",
+        std::to_string(batch1_byte_size));
+  }
+
+  size_t content_offset = 0;
+
+  for (auto& payload : *payloads) {
+    if (!payload.status_.ok()) {
+      continue;
+    }
+
+    // If 'payload' requested this output then copy it from
+    // 'content'. If it did not request this output then just
+    // skip it in the 'content'.
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_byte_size =
+        request_header.batch_size() * batch1_byte_size;
+
+    int output_idx = 0;
+    for (const auto& output : request_header.output()) {
+      if (output.name() == name) {
+        void* buffer;
+        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+            output_idx, &buffer, expected_byte_size, content_shape);
+        if (status.ok()) {
+          memcpy(buffer, content + content_offset, expected_byte_size);
+          status = payload.response_provider_->CommitOutputBuffer(output_idx);
+        }
+
+        if (!status.ok()) {
+          payload.compute_status_ = status;
+        }
+
+        break;
+      }
+
+      output_idx++;
+    }
+
+    content_offset += expected_byte_size;
+  }
+
+  return tensorflow::Status::OK();
+}
+
+
+tensorflow::Status
 NetDefBundle::Context::Run(
     const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads)
 {
@@ -454,7 +524,7 @@ NetDefBundle::Context::Run(
     const std::string& name = input.name();
 
     const ModelInput* input_config;
-    TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
+    TF_RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     // Get the shape of the input. This comes from the request if it
     // provided dims otherwise from the model configuration. The
@@ -502,66 +572,32 @@ NetDefBundle::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  for (const auto& opair : workspace_->Outputs()) {
-    const std::string& name = opair.first;
-    const size_t batch1_byte_size = opair.second;
-    const size_t total_byte_size = batch1_byte_size * total_batch_size;
+  for (const auto& output : input_request_header->output()) {
+    const std::string& name = output.name();
 
-    const char* output_tensor;
-    Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-        name, total_batch_size, &output_tensor, total_byte_size);
-    if (!err.IsOk()) {
-      return tensorflow::errors::Internal(err.Message());
+    const ModelOutput* output_config;
+    TF_RETURN_IF_ERROR(base->GetOutput(name, &output_config));
+
+    // Get the shape of the output from the model configuration.
+    std::vector<int64_t> shape;
+
+    // If model supports batching then prepend the batch dimension
+    // onto the output shape.
+    if (max_batch_size_ != NO_BATCHING) {
+      shape.push_back(total_batch_size);
     }
 
-    size_t buffer_copy_offset = 0;
-
-    for (auto& payload : *payloads) {
-      if (!payload.status_.ok()) {
-        continue;
-      }
-
-      // If 'payload' requested this output then copy it from
-      // 'output_tensor'. If it did not request this output then just
-      // skip it in the 'output_tensor'.
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      int output_idx = 0;
-      for (const auto& output : request_header.output()) {
-        if (output.name() == name) {
-          void* content;
-          tensorflow::Status status =
-              payload.response_provider_->GetOutputBuffer(
-                  output_idx, &content, expected_byte_size);
-          if (!status.ok()) {
-            payload.compute_status_ = status;
-          } else if (content == nullptr) {
-            payload.compute_status_ = tensorflow::errors::Internal(
-                "no buffer to accept output values for output '", name, "'");
-          } else {
-            if ((buffer_copy_offset + expected_byte_size) > total_byte_size) {
-              payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                  "unexpected size ", buffer_copy_offset + expected_byte_size,
-                  " for inference output '", name, "', expecting maximum",
-                  total_byte_size);
-            } else {
-              memcpy(
-                  content, output_tensor + buffer_copy_offset,
-                  expected_byte_size);
-            }
-          }
-
-          break;
-        }
-
-        output_idx++;
-      }
-
-      buffer_copy_offset += expected_byte_size;
+    for (auto dim : output_config->dims()) {
+      shape.push_back(dim);
     }
+
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an output, so can just assume fixed-sized here.
+    const Caffe2Workspace::DataType dtype =
+        ConvertDataType(output_config->data_type());
+    TF_RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
+        name, shape, dtype, GetDataTypeByteSize(output_config->data_type()),
+        total_batch_size, payloads));
   }
 
   return tensorflow::Status::OK();

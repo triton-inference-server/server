@@ -516,7 +516,6 @@ class OutputImpl : public InferContext::Output {
   ~OutputImpl() = default;
 
   const std::string& Name() const override { return mio_.name(); }
-  size_t ByteSize() const override { return byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
 
@@ -531,13 +530,11 @@ class OutputImpl : public InferContext::Output {
 
  private:
   const ModelOutput mio_;
-  const size_t byte_size_;
   InferContext::Result::ResultFormat result_format_;
 };
 
 OutputImpl::OutputImpl(const ModelOutput& mio)
-    : mio_(mio), byte_size_(GetByteSize(mio)),
-      result_format_(InferContext::Result::ResultFormat::RAW)
+    : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW)
 {
 }
 
@@ -557,6 +554,7 @@ class ResultImpl : public InferContext::Result {
     return output_;
   }
 
+  Error GetRawShape(std::vector<int64_t>* shape) const override;
   Error GetRaw(
       size_t batch_idx, const std::vector<uint8_t>** buf) const override;
   Error GetRawAtCursor(
@@ -570,6 +568,20 @@ class ResultImpl : public InferContext::Result {
   InferContext::Result::ResultFormat ResultFormat() const
   {
     return result_format_;
+  }
+
+  void SetBatchnByteSize(const size_t s)
+  {
+    batch1_byte_size_ = s / batch_size_;
+  }
+
+  void SetBatch1Shape(const DimsList& dims)
+  {
+    shape_.clear();
+    for (auto d : dims) {
+      shape_.push_back(d);
+    }
+    batch1_element_count_ = GetElementCount(dims);
   }
 
   // Set information about the model that produced this result.
@@ -596,9 +608,12 @@ class ResultImpl : public InferContext::Result {
       size_t* result_bytes);
 
   const std::shared_ptr<InferContext::Output> output_;
-  const size_t batch1_element_count_;
   const InferContext::Result::ResultFormat result_format_;
   const size_t batch_size_;
+
+  size_t batch1_byte_size_;
+  size_t batch1_element_count_;
+  std::vector<int64_t> shape_;
 
   std::vector<std::vector<uint8_t>> bufs_;
   size_t bufs_idx_;
@@ -615,12 +630,28 @@ class ResultImpl : public InferContext::Result {
 
 ResultImpl::ResultImpl(
     const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size)
-    : output_(output), batch1_element_count_(GetElementCount(output->Dims())),
+    : output_(output),
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
-      batch_size_(batch_size), bufs_(batch_size), bufs_idx_(0),
-      bufs_pos_(batch_size), bufs_byte_size_(batch_size), class_pos_(batch_size)
+      batch_size_(batch_size), batch1_byte_size_(0), batch1_element_count_(0),
+      bufs_(batch_size), bufs_idx_(0), bufs_pos_(batch_size),
+      bufs_byte_size_(batch_size), class_pos_(batch_size)
 {
+}
+
+Error
+ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
+{
+  shape->clear();
+
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw shape not available for non-RAW output '" + output_->Name() + "'");
+  }
+
+  *shape = shape_;
+  return Error::Success;
 }
 
 Error
@@ -802,11 +833,11 @@ Error
 ResultImpl::SetNextRawResult(
     const uint8_t* buf, size_t size, size_t* result_bytes)
 {
-  // If output has non-zero byte-size then it is an output with a
-  // fixed-sized datatype and can directly assign the results to the
-  // appropriate per-batch buffers.
-  if (output_->ByteSize() > 0) {
-    return SetBatchRawResult(output_->ByteSize(), buf, size, result_bytes);
+  // If output has a known batch1-byte-size (which is the same for
+  // every item in the batch) then can directly assign the results to
+  // the appropriate per-batch buffers.
+  if (batch1_byte_size_ > 0) {
+    return SetBatchRawResult(batch1_byte_size_, buf, size, result_bytes);
   }
 
   // Output is a non-fixed-sized datatype. For now we assume that it
@@ -984,15 +1015,9 @@ class RequestImpl : public InferContext::Request {
   // server response. Ordered in a vector as the HTTP API requires
   // ordering to associate results correctly.
   std::vector<std::unique_ptr<InferContext::Result>> requested_results_;
-
-  // Current positions within output vectors when processing response.
-  size_t result_pos_idx_;
 };
 
-RequestImpl::RequestImpl(const uint64_t id)
-    : id_(id), ready_(false), result_pos_idx_(0)
-{
-}
+RequestImpl::RequestImpl(const uint64_t id) : id_(id), ready_(false) {}
 
 Error
 RequestImpl::InitializeRequestedResults(
@@ -1123,7 +1148,6 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
-    routput->set_byte_size(output->ByteSize());
     if (ooptions.result_format == Result::ResultFormat::CLASS) {
       routput->mutable_cls()->set_count(ooptions.u64);
     }
@@ -1528,6 +1552,9 @@ class HttpRequestImpl : public RequestImpl {
   // RequestStatus received in server response.
   RequestStatus request_status_;
 
+  // The partial InferResponseHeader delivered via HTTP header.
+  InferResponseHeader response_header_;
+
   // Buffer that accumulates the serialized InferResponseHeader at the
   // end of the body.
   std::string infer_response_buffer_;
@@ -1539,13 +1566,16 @@ class HttpRequestImpl : public RequestImpl {
 
   // Current positions within input vectors when sending request.
   size_t input_pos_idx_;
+
+  // Current positions within output vectors when processing response.
+  size_t result_pos_idx_;
 };
 
 HttpRequestImpl::HttpRequestImpl(
     const uint64_t id,
     const std::vector<std::shared_ptr<InferContext::Input>> inputs)
     : RequestImpl(id), easy_handle_(curl_easy_init()), header_list_(nullptr),
-      inputs_(inputs), input_pos_idx_(0)
+      inputs_(inputs), input_pos_idx_(0), result_pos_idx_(0)
 {
   if (easy_handle_ != nullptr) {
     run_index_ = reinterpret_cast<uintptr_t>(easy_handle_);
@@ -1569,6 +1599,7 @@ HttpRequestImpl::InitializeRequest(
   // Reset all the position indicators so that we send all inputs
   // correctly.
   request_status_.Clear();
+  response_header_.Clear();
 
   for (auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
@@ -1678,6 +1709,14 @@ HttpRequestImpl::GetResults(
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
     request_status_.set_msg("infer request did not return status");
+  }
+
+  // Should have response header from HTTP header, if not then create
+  // an error status.
+  if (response_header_.model_name().empty()) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg("infer request did not response header");
   }
 
   // If request has failing HTTP status or the request's explicit
@@ -1943,8 +1982,10 @@ InferHttpContext::ResponseHeaderHandler(
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
+  size_t idx;
 
-  size_t idx = strlen(kStatusHTTPHeader);
+  // Status header
+  idx = strlen(kStatusHTTPHeader);
   if ((idx < byte_size) && !strncasecmp(buf, kStatusHTTPHeader, idx)) {
     while ((idx < byte_size) && (buf[idx] != ':')) {
       ++idx;
@@ -1955,6 +1996,36 @@ InferHttpContext::ResponseHeaderHandler(
       if (!google::protobuf::TextFormat::ParseFromString(
               hdr, &request->request_status_)) {
         request->request_status_.Clear();
+      }
+    }
+  }
+
+  // Response header
+  idx = strlen(kInferResponseHTTPHeader);
+  if ((idx < byte_size) && !strncasecmp(buf, kInferResponseHTTPHeader, idx)) {
+    while ((idx < byte_size) && (buf[idx] != ':')) {
+      ++idx;
+    }
+
+    if (idx < byte_size) {
+      std::string hdr(buf + idx + 1, byte_size - idx - 1);
+      if (!google::protobuf::TextFormat::ParseFromString(
+              hdr, &request->response_header_)) {
+        request->response_header_.Clear();
+      } else {
+        size_t idx = 0;
+        for (const auto& output : request->response_header_.output()) {
+          ResultImpl* io = reinterpret_cast<ResultImpl*>(
+              request->requested_results_[idx].get());
+          if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
+            io->SetBatch1Shape(output.raw().dims());
+            if (IsFixedSizeDataType(io->GetOutput()->DType())) {
+              io->SetBatchnByteSize(output.raw().batch_byte_size());
+            }
+          }
+
+          ++idx;
+        }
       }
     }
   }
@@ -2354,8 +2425,8 @@ class GrpcRequestImpl : public RequestImpl {
                        results) override;
 
  private:
-  // Unmarshall and process 'grpc_response_' into 'requested_results'
-  Error SetRawResult();
+  Error SetRawResult(
+      const size_t idx, const InferResponseHeader::Output& output);
 
   friend class InferGrpcContext;
 
@@ -2372,35 +2443,41 @@ GrpcRequestImpl::GrpcRequestImpl(const uint64_t id, const uintptr_t run_index)
 }
 
 Error
-GrpcRequestImpl::SetRawResult()
+GrpcRequestImpl::SetRawResult(
+    const size_t idx, const InferResponseHeader::Output& output)
 {
-  result_pos_idx_ = 0;
-  for (std::string output : grpc_response_.raw_output()) {
-    const uint8_t* buf = reinterpret_cast<uint8_t*>(&output[0]);
-    size_t size = output.size();
+  // Set entire raw batch result in one call since entire result
+  // should be available in the GRPC response.
+  ResultImpl* io = reinterpret_cast<ResultImpl*>(requested_results_[idx].get());
+
+  if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
+    if (grpc_response_.raw_output_size() <= (int)idx) {
+      return Error(
+          RequestStatusCode::INVALID,
+          "Expected RAW output for result '" + io->GetOutput()->Name() + "'");
+    }
+
+    io->SetBatch1Shape(output.raw().dims());
+    if (IsFixedSizeDataType(io->GetOutput()->DType())) {
+      io->SetBatchnByteSize(output.raw().batch_byte_size());
+    }
+
+    const std::string& raw_output = grpc_response_.raw_output(idx);
+    const uint8_t* buf = reinterpret_cast<const uint8_t*>(&raw_output[0]);
+    size_t size = raw_output.size();
     size_t result_bytes = 0;
 
-    // Not using loop as in HTTP Infer because the output size should match
-    if ((size > 0) && (result_pos_idx_ < requested_results_.size())) {
-      ResultImpl* io = reinterpret_cast<ResultImpl*>(
-          requested_results_[result_pos_idx_].get());
-
-      // Only try to read raw result for RAW
-      if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
-        Error err = io->SetNextRawResult(buf, size, &result_bytes);
-        if (!err.IsOk()) {
-          return err;
-        }
-      }
+    Error err = io->SetNextRawResult(buf, size, &result_bytes);
+    if (!err.IsOk()) {
+      return err;
     }
 
     if (result_bytes != size) {
       return Error(
           RequestStatusCode::INVALID,
-          "Written bytes doesn't match received bytes.");
+          "Written bytes doesn't match received bytes for result '" +
+              io->GetOutput()->Name() + "'");
     }
-
-    result_pos_idx_++;
   }
 
   return Error::Success;
@@ -2418,13 +2495,18 @@ GrpcRequestImpl::GetResults(
     infer_response.Swap(grpc_response_.mutable_meta_data());
     err = Error(grpc_response_.request_status());
     if (err.IsOk()) {
-      Error set_err = SetRawResult();
-      if (!set_err.IsOk()) {
-        return set_err;
+      size_t idx = 0;
+      for (const auto& output : infer_response.output()) {
+        Error set_err = SetRawResult(idx, output);
+        if (!set_err.IsOk()) {
+          return set_err;
+        }
+
+        ++idx;
       }
     }
   } else {
-    // Something wrong with the GRPC conncection
+    // Something wrong with the GRPC connection
     err = Error(
         RequestStatusCode::INTERNAL,
         "GRPC client failed: " + std::to_string(grpc_status_.error_code()) +
