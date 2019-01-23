@@ -466,9 +466,11 @@ ReadFixedSizedOutputTensor(
     int req_output_idx = 0;
     for (const auto& output : request_header.output()) {
       if (output.name() == output_name) {
-        void* content;
-        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
-            req_output_idx, &content, expected_byte_size);
+        void* content = nullptr;
+        tensorflow::Status status = tensorflow::Status::OK();
+        // tensorflow::Status status =
+        // payload.response_provider_->GetOutputBuffer( req_output_idx,
+        // &content, expected_byte_size);
         if (!status.ok()) {
           payload.compute_status_ = status;
         } else if (content == nullptr) {
@@ -535,9 +537,17 @@ ReadStringOutputTensor(
           serialized.append(str);
         }
 
-        tensorflow::Status status = payload.response_provider_->SetOutputBuffer(
-            req_output_idx, reinterpret_cast<const void*>(serialized.c_str()),
-            serialized.size());
+        void* content;
+        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+            req_output_idx, &content, serialized.size(), {});
+        if (status.ok()) {
+          memcpy(
+              content, reinterpret_cast<const void*>(serialized.c_str()),
+              serialized.size());
+          status =
+              payload.response_provider_->CommitOutputBuffer(req_output_idx);
+        }
+
         if (!status.ok()) {
           payload.compute_status_ = status;
         }
@@ -665,8 +675,8 @@ BaseBundle::Context::Run(
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     for (const auto& output : request_header.output()) {
-      required_outputs.insert(
-          std::make_pair(output.name(), output.byte_size()));
+      //      required_outputs.insert(
+      //          std::make_pair(output.name(), output.byte_size()));
     }
   }
 

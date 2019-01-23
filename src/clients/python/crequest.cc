@@ -507,8 +507,8 @@ InferContextResultDataType(InferContextResultCtx* ctx, uint32_t* dtype)
 }
 
 nic::Error*
-InferContextResultDims(
-    InferContextResultCtx* ctx, uint64_t max_dims, uint32_t* shape,
+InferContextResultShape(
+    InferContextResultCtx* ctx, uint64_t max_dims, int64_t* shape,
     uint64_t* shape_len)
 {
   if (ctx->result == nullptr) {
@@ -516,19 +516,25 @@ InferContextResultDims(
         ni::RequestStatusCode::INTERNAL, "dims not available for empty result");
   }
 
-  const ni::DimsList& dims = ctx->result->GetOutput()->Dims();
-  if (static_cast<uint64_t>(dims.size()) > max_dims) {
+  std::vector<int64_t> rshape;
+  nic::Error err = ctx->result->GetRawShape(&rshape);
+  if (!err.IsOk()) {
+    return new nic::Error(err);
+  }
+
+  if (rshape.size() > max_dims) {
     return new nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "number of result dims exceeds maximum of " + std::to_string(max_dims));
+        "number of dimensions in result shape exceeds maximum of " +
+            std::to_string(max_dims));
   }
 
   size_t cnt = 0;
-  for (auto dim : dims) {
-    shape[cnt++] = static_cast<uint32_t>(dim);
+  for (auto dim : rshape) {
+    shape[cnt++] = dim;
   }
 
-  *shape_len = dims.size();
+  *shape_len = rshape.size();
 
   return nullptr;
 }

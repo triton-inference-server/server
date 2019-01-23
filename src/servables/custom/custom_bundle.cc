@@ -276,13 +276,13 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         break;
       }
 
-      const size_t expected_byte_size = ii_iter->second;
-      if (output.byte_size() != expected_byte_size) {
-        payload.status_ = tensorflow::errors::InvalidArgument(
-            "unexpected size ", output.byte_size(), " for inference output '",
-            name, "', expecting ", expected_byte_size);
-        break;
-      }
+      //      const size_t expected_byte_size = ii_iter->second;
+      //      if (output.byte_size() != expected_byte_size) {
+      //        payload.status_ = tensorflow::errors::InvalidArgument(
+      //            "unexpected size ", output.byte_size(), " for inference
+      //            output '", name, "', expecting ", expected_byte_size);
+      //        break;
+      //      }
     }
 
     if (!payload.status_.ok()) {
@@ -440,7 +440,7 @@ CustomBundle::Context::GetOutput(
   for (const auto& output : request_header.output()) {
     if (output.name() == name) {
       tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
-          output_idx, content, content_byte_size);
+          output_idx, content, content_byte_size, {});  // FIXME
       return status.ok();
     }
 

@@ -79,6 +79,9 @@ class InferVariableTest(unittest.TestCase):
         self._full_exact(True, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
     def test_raw_fil(self):
         self._full_exact(True, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
+    def test_raw_ffi(self):
+        self._full_exact(True, np.float32, np.float32, np.int32, (16,), (16,), (16,))
+
     def test_raw_ooo(self):
         self._full_exact(True, np_dtype_string, np_dtype_string, np_dtype_string, (16,), (16,), (16,))
     def test_raw_oii(self):
@@ -96,6 +99,8 @@ class InferVariableTest(unittest.TestCase):
         self._full_exact(False, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
     def test_class_fil(self):
         self._full_exact(False, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
+    def test_class_ffi(self):
+        self._full_exact(False, np.float32, np.float32, np.int32, (16,), (16,), (16,))
 
 
 if __name__ == '__main__':

@@ -54,26 +54,16 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
     return potential_output_names_;
   }
 
-  const std::unordered_map<std::string, size_t>& Outputs() const override
-  {
-    return outputs_;
-  }
-
-  Error AddOutputTensor(
-      const std::string& name, const DataType datatype,
-      const std::vector<int>& dims) override;
   Error SetInputTensor(
       const std::string& name, const std::vector<int64_t>& shape,
       const DataType dtype, const char* content, size_t byte_size) override;
   Error GetOutputTensor(
-      const std::string& name, size_t batch_size, const char** content,
-      size_t byte_size) override;
+      const std::string& name, const std::vector<int64_t>& shape,
+      const Caffe2Workspace::DataType dtype, const char** content,
+      size_t* byte_size, std::vector<int64_t>* content_shape) override;
   Error Run() override;
 
  private:
-  using IOTensorMap =
-      std::unordered_map<std::string, std::unique_ptr<caffe2::Tensor>>;
-
   // The Caffe2 workspace.
   std::unique_ptr<caffe2::Workspace> ws_;
 
@@ -94,19 +84,26 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
   // outputs.
   std::set<std::string> potential_input_names_;
   std::set<std::string> potential_output_names_;
-
-  // The outputs of the model specified by the model configuration and
-  // the size of each.
-  std::unordered_map<std::string, size_t> outputs_;
-
-  // Map from output name to caffe2 tensor holding shape and type for
-  // that output. We can use TensorCPU for this even when using the
-  // GPU since we are only interested in the shape and type of these
-  // tensors.
-  IOTensorMap output_tensor_map_;
 };
 
 namespace {
+
+bool
+CompareOutputShape(
+    const std::vector<int64_t>& config_shape, const at::IntList& output_shape)
+{
+  if (config_shape.size() != output_shape.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < config_shape.size(); ++i) {
+    if ((config_shape[i] != -1) && (config_shape[i] != output_shape[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 const std::string
 DimsDebugString(const at::IntList& dims)
@@ -434,33 +431,6 @@ Caffe2WorkspaceImpl::Create(
 }
 
 Caffe2Workspace::Error
-Caffe2WorkspaceImpl::AddOutputTensor(
-    const std::string& name, const DataType datatype,
-    const std::vector<int>& dims)
-{
-  // Create a Tensor to hold the shape and datatype.
-  const auto pr = ConvertDatatype(datatype);
-  if (!pr.first) {
-    return Error(
-        "Failed to convert datatype '" + DataTypeName(datatype) +
-        "' to Caffe2 NetDef datatype");
-  }
-
-  // Tensor::ShareExternalPointer allows us to explicitly set the
-  // tensor's type.
-  std::unique_ptr<caffe2::Tensor> tensor(new caffe2::Tensor(dims, caffe2::CPU));
-  tensor->ShareExternalPointer(nullptr, pr.second);
-
-  outputs_.insert(std::make_pair(name, tensor->size() * tensor->itemsize()));
-
-  output_tensor_map_.emplace(
-      std::piecewise_construct, std::make_tuple(name),
-      std::make_tuple(std::move(tensor)));
-
-  return Error();
-}
-
-Caffe2Workspace::Error
 Caffe2WorkspaceImpl::SetInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
     const Caffe2Workspace::DataType dtype, const char* content,
@@ -515,14 +485,10 @@ Caffe2WorkspaceImpl::SetInputTensor(
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::GetOutputTensor(
-    const std::string& name, size_t batch_size, const char** content,
-    size_t byte_size)
+    const std::string& name, const std::vector<int64_t>& shape,
+    const Caffe2Workspace::DataType dtype, const char** content,
+    size_t* byte_size, std::vector<int64_t>* content_shape)
 {
-  const auto itr = output_tensor_map_.find(name);
-  if (itr == output_tensor_map_.end()) {
-    return Error("unexpected inference output '" + name + "'");
-  }
-
   // Find the output tensor in the model...
   caffe2::Blob* blob = nullptr;
   try {
@@ -548,37 +514,33 @@ Caffe2WorkspaceImpl::GetOutputTensor(
     return Error("failed to get NetDef tensor for output '" + name + "'");
   }
 
-  if (itr->second->meta() != output->meta()) {
+  const auto pr = ConvertDatatype(dtype);
+  if (!pr.first) {
+    return Error(
+        "Failed to convert datatype '" + DataTypeName(dtype) +
+        "' to Caffe2 NetDef datatype");
+  }
+
+  if (pr.second != output->meta()) {
     return Error(
         "unexpected datatype " + std::string(output->meta().name()) +
         " for inference output '" + name + "', expecting " +
-        std::string(itr->second->meta().name()));
+        std::string(pr.second.name()));
   }
 
-  // If model supports batching then prepend the batch dimension onto
-  // the output shape.
-  std::vector<long int> expected_dims;
-  if (max_batch_size_ != NO_BATCHING) {
-    expected_dims.push_back(batch_size);
-  }
-  for (const auto d : itr->second->dims()) {
-    expected_dims.push_back(d);
-  }
-
-  if (expected_dims != output->dims()) {
+  if (!CompareOutputShape(shape, output->dims())) {
     return Error(
         "unexpected shape " + DimsDebugString(output->dims()) +
         " for inference output '" + name + "', expecting " +
-        DimsDebugString(expected_dims));
+        DimsDebugString(shape));
   }
 
-  if (byte_size != output->nbytes()) {
-    return Error(
-        "unexpected size " + std::to_string(output->nbytes()) +
-        " for inference output '" + name + "', expecting " +
-        std::to_string(byte_size));
+  content_shape->clear();
+  for (auto d : output->dims()) {
+    content_shape->push_back(d);
   }
 
+  *byte_size = output->nbytes();
   *content = static_cast<const char*>(output->raw_data());
 
   return Error();

@@ -30,6 +30,7 @@
 namespace nvidia { namespace inferenceserver {
 
 constexpr char kInferRequestHTTPHeader[] = "NV-InferRequest";
+constexpr char kInferResponseHTTPHeader[] = "NV-InferResponse";
 constexpr char kStatusHTTPHeader[] = "NV-Status";
 
 constexpr char kInferRESTEndpoint[] = "api/infer";
