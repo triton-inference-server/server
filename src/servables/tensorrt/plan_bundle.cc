@@ -577,10 +577,10 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       int output_idx = 0;
       for (const auto& output : request_header.output()) {
         if (output.name() == name) {
-          void* content;
-          tensorflow::Status status =
-              payload.response_provider_->GetOutputBuffer(
-                  output_idx, &content, expected_byte_size);
+          void* content = nullptr;
+          tensorflow::Status status = tensorflow::Status::OK();
+          // payload.response_provider_->GetOutputBuffer(
+          // output_idx, &content, expected_byte_size);
           if (!status.ok()) {
             payload.compute_status_ = status;
           } else if (content == nullptr) {

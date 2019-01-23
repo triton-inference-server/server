@@ -448,8 +448,8 @@ HTTPServiceImpl::Infer(
 
       std::shared_ptr<HTTPInferResponseProvider> response_provider;
       status = HTTPInferResponseProvider::Create(
-          req->OutputBuffer(), request_provider->RequestHeader(),
-          &response_provider);
+          req->OutputBuffer(), *(backend->Backend()),
+          request_provider->RequestHeader(), &response_provider);
       if (status.ok()) {
         server_->HandleInfer(
             &request_status, backend, request_provider, response_provider,
@@ -462,6 +462,11 @@ HTTPServiceImpl::Infer(
                   format = "text";
                 }
 
+                // The description of the raw outputs needs to go in
+                // the kInferResponseHTTPHeader since it is needed to
+                // interpret the body. The entire response (including
+                // classifications) is serialized at the end of the
+                // body.
                 const InferResponseHeader& response_header =
                     response_provider->ResponseHeader();
 
@@ -472,6 +477,20 @@ HTTPServiceImpl::Infer(
                   rstr = response_header.DebugString();
                 }
                 req->WriteResponseBytes(rstr.c_str(), rstr.size());
+
+                // We do this in destructive manner since we are the
+                // last one to use response header from the provider.
+                InferResponseHeader* brief_response_header =
+                    response_provider->MutableResponseHeader();
+                for (int i = 0; i < brief_response_header->output_size(); ++i) {
+                  InferResponseHeader::Output* output =
+                      brief_response_header->mutable_output(i);
+                  output->clear_batch_classes();
+                }
+
+                req->OverwriteResponseHeader(
+                    kInferResponseHTTPHeader,
+                    brief_response_header->ShortDebugString());
               }
             },
             false  // async frontend
@@ -487,7 +506,7 @@ HTTPServiceImpl::Infer(
         &request_status, 0 /* request_id */, server_->Id(), status);
   }
 
-  // this part still needs to be implemented in teh completer
+  // this part still needs to be implemented in the completer
   req->OverwriteResponseHeader(
       kStatusHTTPHeader, request_status.ShortDebugString());
   req->OverwriteResponseHeader("Content-Type", "application/octet-stream");

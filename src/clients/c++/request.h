@@ -270,8 +270,9 @@ class InferContext {
     /// \return The format of the input.
     virtual ModelInput::Format Format() const = 0;
 
-    /// \return The dimensions/shape of the input. Variable-size
-    /// dimensions are reported as -1.
+    /// \return The dimensions/shape of the input specified in the
+    /// model configuration. Variable-size dimensions are reported as
+    /// -1.
     virtual const DimsList& Dims() const = 0;
 
     /// Prepare this input to receive new tensor values. Forget any
@@ -338,15 +339,12 @@ class InferContext {
     /// \return The name of the output.
     virtual const std::string& Name() const = 0;
 
-    /// \return The size in bytes of this output. This is the size for
-    /// one instance of the output, not the entire size of a batched
-    /// input.
-    virtual size_t ByteSize() const = 0;
-
     /// \return The data-type of the output.
     virtual DataType DType() const = 0;
 
-    /// \return The dimensions/shape of the output.
+    /// \return The dimensions/shape of the output specified in the
+    /// model configuration. Variable-size dimensions are reported as
+    /// -1.
     virtual const DimsList& Dims() const = 0;
   };
 
@@ -376,6 +374,12 @@ class InferContext {
 
     /// \return The Output object corresponding to this result.
     virtual const std::shared_ptr<Output> GetOutput() const = 0;
+
+    /// Get the shape of a raw result. The shape does not include the
+    /// batch dimension.
+    /// \param shape Returns the shape.
+    /// \return Error object indicating success or failure.
+    virtual Error GetRawShape(std::vector<int64_t>* shape) const = 0;
 
     /// Get a reference to entire raw result data for a specific batch
     /// entry. Returns error if this result is not RAW format.
