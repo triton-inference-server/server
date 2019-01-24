@@ -1030,6 +1030,12 @@ InferenceServer::Wait()
                         << "': " << status.error_message();
               goto next;
             }
+            status = status_manager_->UpdateConfigForModel(name);
+            if (!status.ok()) {
+              LOG_ERROR << "Failed to reload model config for '" << name
+                        << "': " << status.error_message();
+              goto next;
+            }
           }
 
           status = core_->ReloadConfig(msc);
