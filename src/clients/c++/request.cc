@@ -35,6 +35,9 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
+class HttpRequestImpl;
+using ResponseHandlerUserP = std::pair<InferHttpContext*, HttpRequestImpl*>;
+
 //==============================================================================
 
 // Global initialization for libcurl. Libcurl requires global
@@ -974,30 +977,17 @@ class RequestImpl : public InferContext::Request {
  public:
   virtual ~RequestImpl() = default;
 
-  uint64_t Id() const { return id_; };
-
-  // Initialize 'requested_results_' according to 'batch_size' and
-  // 'requested_outs' as the placeholder for the results
-  Error InitializeRequestedResults(
-      const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
-      const size_t batch_size);
-
-  // Return the results of the request. 'ready_' should always be checked
-  // before calling GetResults() to ensure the request has been completed.
-  virtual Error GetResults(
-      std::map<std::string, std::unique_ptr<InferContext::Result>>*
-          results) = 0;
+  uint64_t Id() const override { return id_; };
 
  protected:
+  friend class InferContext;
+
   RequestImpl(const uint64_t id);
 
-  // Helper function called after inference to set non-RAW results in
-  // 'requested_results_'.
+  // Set non-RAW results from the inference response
   Error PostRunProcessing(
-      std::vector<std::unique_ptr<InferContext::Result>>& results,
-      const InferResponseHeader& infer_response);
-
-  friend class InferContext;
+      const InferResponseHeader& infer_response,
+      InferContext::ResultMap* results);
 
   // Identifier seen by user
   uint64_t id_;
@@ -1010,38 +1000,18 @@ class RequestImpl : public InferContext::Request {
 
   // The timer for infer request.
   InferContext::RequestTimers timer_;
-
-  // Results being collected for the requested outputs from inference
-  // server response. Ordered in a vector as the HTTP API requires
-  // ordering to associate results correctly.
-  std::vector<std::unique_ptr<InferContext::Result>> requested_results_;
 };
 
 RequestImpl::RequestImpl(const uint64_t id) : id_(id), ready_(false) {}
 
 Error
-RequestImpl::InitializeRequestedResults(
-    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outs,
-    const size_t batch_size)
-{
-  // Initialize the results vector to collect the requested results.
-  requested_results_.clear();
-  for (const auto& io : requested_outs) {
-    std::unique_ptr<ResultImpl> rp(new ResultImpl(io, batch_size));
-    requested_results_.emplace_back(std::move(rp));
-  }
-  return Error::Success;
-}
-
-Error
 RequestImpl::PostRunProcessing(
-    std::vector<std::unique_ptr<InferContext::Result>>& results,
-    const InferResponseHeader& infer_response)
+    const InferResponseHeader& infer_response, InferContext::ResultMap* results)
 {
   // At this point, the RAW requested results have their result values
   // set. Now need to initialize non-RAW results.
-  for (auto& rr : results) {
-    ResultImpl* r = reinterpret_cast<ResultImpl*>(rr.get());
+  for (auto& pr : *results) {
+    ResultImpl* r = reinterpret_cast<ResultImpl*>(pr.second.get());
     r->SetModel(infer_response.model_name(), infer_response.model_version());
     switch (r->ResultFormat()) {
       case InferContext::Result::ResultFormat::RAW:
@@ -1059,6 +1029,7 @@ RequestImpl::PostRunProcessing(
       }
     }
   }
+
   return Error::Success;
 }
 
@@ -1136,15 +1107,12 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
     reinterpret_cast<InputImpl*>(io.get())->SetBatchSize(batch_size_);
   }
 
-  requested_outputs_.clear();
-
   for (const auto& p : options.Outputs()) {
     const std::shared_ptr<Output>& output = p.first;
     const OptionsImpl::OutputOptions& ooptions = p.second;
 
     reinterpret_cast<OutputImpl*>(output.get())
         ->SetResultFormat(ooptions.result_format);
-    requested_outputs_.emplace_back(output);
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
@@ -1517,24 +1485,24 @@ class HttpRequestImpl : public RequestImpl {
 
   ~HttpRequestImpl();
 
-  // Initialize the request for HTTP transfer on top of
-  // RequestImpl.InitializeRequestedResults()
-  Error InitializeRequest(
-      const std::vector<std::shared_ptr<InferContext::Output>>&
-          requested_outputs,
-      const size_t batch_size);
+  // Initialize the request for HTTP transfer. */
+  Error InitializeRequest();
 
   // Copy into 'buf' up to 'size' bytes of input data. Return the
   // actual amount copied in 'input_bytes'.
   Error GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes);
 
+  // Create a result object for this request.
+  Error CreateResult(
+      const InferHttpContext& ctx, const InferResponseHeader::Output& output,
+      const size_t batch_size);
+
   // Copy into the context 'size' bytes of result data from
   // 'buf'. Return the actual amount copied in 'result_bytes'.
   Error SetNextRawResult(const uint8_t* buf, size_t size, size_t* result_bytes);
 
-  // @see RequestImpl.GetResults()
-  Error GetResults(std::map<std::string, std::unique_ptr<InferContext::Result>>*
-                       results) override;
+  // Get results from an inference request.
+  Error GetResults(InferContext::ResultMap* results);
 
  private:
   friend class InferHttpContext;
@@ -1569,6 +1537,13 @@ class HttpRequestImpl : public RequestImpl {
 
   // Current positions within output vectors when processing response.
   size_t result_pos_idx_;
+
+  // Callback data for response handler.
+  ResponseHandlerUserP response_handler_userp_;
+
+  // The results of this request, in the order indicated by the
+  // response header.
+  std::vector<std::unique_ptr<ResultImpl>> ordered_results_;
 };
 
 HttpRequestImpl::HttpRequestImpl(
@@ -1590,9 +1565,7 @@ HttpRequestImpl::~HttpRequestImpl()
 }
 
 Error
-HttpRequestImpl::InitializeRequest(
-    const std::vector<std::shared_ptr<InferContext::Output>>& requested_outputs,
-    const size_t batch_size)
+HttpRequestImpl::InitializeRequest()
 {
   infer_response_buffer_.clear();
 
@@ -1608,7 +1581,7 @@ HttpRequestImpl::InitializeRequest(
   input_pos_idx_ = 0;
   result_pos_idx_ = 0;
 
-  return RequestImpl::InitializeRequestedResults(requested_outputs, batch_size);
+  return Error::Success;
 }
 
 
@@ -1651,9 +1624,8 @@ HttpRequestImpl::SetNextRawResult(
 {
   *result_bytes = 0;
 
-  while ((size > 0) && (result_pos_idx_ < requested_results_.size())) {
-    ResultImpl* io = reinterpret_cast<ResultImpl*>(
-        requested_results_[result_pos_idx_].get());
+  while ((size > 0) && (result_pos_idx_ < ordered_results_.size())) {
+    ResultImpl* io = ordered_results_[result_pos_idx_].get();
     size_t ob = 0;
 
     // Only try to read raw result for RAW
@@ -1685,14 +1657,35 @@ HttpRequestImpl::SetNextRawResult(
 }
 
 Error
-HttpRequestImpl::GetResults(
-    std::map<std::string, std::unique_ptr<InferContext::Result>>* results)
+HttpRequestImpl::CreateResult(
+    const InferHttpContext& ctx, const InferResponseHeader::Output& output,
+    const size_t batch_size)
+{
+  std::shared_ptr<InferContext::Output> infer_output;
+  Error err = ctx.GetOutput(output.name(), &infer_output);
+  if (!err.IsOk()) {
+    return err;
+  }
+
+  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
+  result->SetBatch1Shape(output.raw().dims());
+  if (IsFixedSizeDataType(infer_output->DType())) {
+    result->SetBatchnByteSize(output.raw().batch_byte_size());
+  }
+
+  ordered_results_.emplace_back(std::move(result));
+
+  return Error::Success;
+}
+
+Error
+HttpRequestImpl::GetResults(InferContext::ResultMap* results)
 {
   InferResponseHeader infer_response;
 
   if (http_status_ != CURLE_OK) {
     curl_slist_free_all(header_list_);
-    requested_results_.clear();
+    ordered_results_.clear();
     return Error(
         RequestStatusCode::INTERNAL,
         "HTTP client failed: " + std::string(curl_easy_strerror(http_status_)));
@@ -1713,23 +1706,24 @@ HttpRequestImpl::GetResults(
 
   // Should have response header from HTTP header, if not then create
   // an error status.
-  if (response_header_.model_name().empty()) {
+  if ((request_status_.code() == RequestStatusCode::SUCCESS) &&
+      response_header_.model_name().empty()) {
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
-    request_status_.set_msg("infer request did not response header");
+    request_status_.set_msg("infer request did not return response header");
   }
 
   // If request has failing HTTP status or the request's explicit
   // status is not SUCCESS, then signal an error.
   if ((http_code != 200) ||
       (request_status_.code() != RequestStatusCode::SUCCESS)) {
-    requested_results_.clear();
+    ordered_results_.clear();
     return Error(request_status_);
   }
 
   // The infer response header should be available...
   if (infer_response_buffer_.empty()) {
-    requested_results_.clear();
+    ordered_results_.clear();
     return Error(
         RequestStatusCode::INTERNAL,
         "infer request did not return result header");
@@ -1737,13 +1731,13 @@ HttpRequestImpl::GetResults(
 
   infer_response.ParseFromString(infer_response_buffer_);
 
-  PostRunProcessing(requested_results_, infer_response);
-
   results->clear();
-  for (auto& result : requested_results_) {
-    results->insert(
-        std::make_pair(result->GetOutput()->Name(), std::move(result)));
+  for (auto& r : ordered_results_) {
+    const std::string& name = r->GetOutput()->Name();
+    results->insert(std::make_pair(name, std::move(r)));
   }
+
+  PostRunProcessing(infer_response, results);
 
   return Error(request_status_);
 }
@@ -1849,7 +1843,7 @@ InferHttpContext::~InferHttpContext()
 }
 
 Error
-InferHttpContext::Run(std::map<std::string, std::unique_ptr<Result>>* results)
+InferHttpContext::Run(ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
       std::static_pointer_cast<HttpRequestImpl>(sync_request_);
@@ -1936,8 +1930,8 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferHttpContext::GetAsyncRunResults(
-    std::map<std::string, std::unique_ptr<Result>>* results,
-    const std::shared_ptr<Request>& async_request, bool wait)
+    ResultMap* results, const std::shared_ptr<Request>& async_request,
+    bool wait)
 {
   Error err = IsRequestReady(async_request, wait);
   if (!err.IsOk()) {
@@ -1979,7 +1973,10 @@ size_t
 InferHttpContext::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
+  ResponseHandlerUserP* pr = reinterpret_cast<ResponseHandlerUserP*>(userp);
+  InferHttpContext* ctx = reinterpret_cast<InferHttpContext*>(pr->first);
+  HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(pr->second);
+
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
   size_t idx;
@@ -2013,18 +2010,12 @@ InferHttpContext::ResponseHeaderHandler(
               hdr, &request->response_header_)) {
         request->response_header_.Clear();
       } else {
-        size_t idx = 0;
         for (const auto& output : request->response_header_.output()) {
-          ResultImpl* io = reinterpret_cast<ResultImpl*>(
-              request->requested_results_[idx].get());
-          if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
-            io->SetBatch1Shape(output.raw().dims());
-            if (IsFixedSizeDataType(io->GetOutput()->DType())) {
-              io->SetBatchnByteSize(output.raw().batch_byte_size());
-            }
+          Error err = request->CreateResult(
+              *ctx, output, request->response_header_.batch_size());
+          if (!err.IsOk()) {
+            request->response_header_.Clear();
           }
-
-          ++idx;
         }
       }
     }
@@ -2060,7 +2051,7 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(request);
 
-  http_request->InitializeRequest(requested_outputs_, batch_size_);
+  http_request->InitializeRequest();
 
   CURL* curl = http_request->easy_handle_;
   if (!curl) {
@@ -2082,8 +2073,11 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
   curl_easy_setopt(curl, CURLOPT_READDATA, http_request.get());
 
   // response headers handled by ResponseHeaderHandler()
+  http_request->response_handler_userp_ =
+      std::make_pair(this, http_request.get());
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
-  curl_easy_setopt(curl, CURLOPT_HEADERDATA, http_request.get());
+  curl_easy_setopt(
+      curl, CURLOPT_HEADERDATA, &http_request->response_handler_userp_);
 
   // response data handled by ResponseHandler()
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
@@ -2110,7 +2104,7 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
     }
   }
 
-  // set the expected POST size. If you want to POST large amounts of
+  // Set the expected POST size. If you want to POST large amounts of
   // data, consider CURLOPT_POSTFIELDSIZE_LARGE
   curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, total_input_byte_size);
 
@@ -2408,7 +2402,7 @@ ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
   }
 
   // Log server status if request is SUCCESS and verbose is true.
-  if (grpc_status.Code() == RequestStatusCode::SUCCESS && verbose_) {
+  if (grpc_status.IsOk() && verbose_) {
     std::cout << server_status->DebugString() << std::endl;
   }
   return grpc_status;
@@ -2420,13 +2414,14 @@ class GrpcRequestImpl : public RequestImpl {
  public:
   GrpcRequestImpl(const uint64_t id, const uintptr_t run_index);
 
-  // @see RequestImpl.GetResults()
-  Error GetResults(std::map<std::string, std::unique_ptr<InferContext::Result>>*
-                       results) override;
+  Error GetResults(
+      const InferGrpcContext& ctx, InferContext::ResultMap* results);
 
  private:
-  Error SetRawResult(
-      const size_t idx, const InferResponseHeader::Output& output);
+  Error CreateResult(
+      const InferGrpcContext& ctx, const InferResponseHeader::Output& output,
+      const size_t batch_size, const size_t idx,
+      InferContext::ResultMap* results);
 
   friend class InferGrpcContext;
 
@@ -2443,23 +2438,27 @@ GrpcRequestImpl::GrpcRequestImpl(const uint64_t id, const uintptr_t run_index)
 }
 
 Error
-GrpcRequestImpl::SetRawResult(
-    const size_t idx, const InferResponseHeader::Output& output)
+GrpcRequestImpl::CreateResult(
+    const InferGrpcContext& ctx, const InferResponseHeader::Output& output,
+    const size_t batch_size, const size_t idx, InferContext::ResultMap* results)
 {
-  // Set entire raw batch result in one call since entire result
-  // should be available in the GRPC response.
-  ResultImpl* io = reinterpret_cast<ResultImpl*>(requested_results_[idx].get());
+  std::shared_ptr<InferContext::Output> infer_output;
+  Error err = ctx.GetOutput(output.name(), &infer_output);
+  if (!err.IsOk()) {
+    return err;
+  }
 
-  if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
+  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
+  result->SetBatch1Shape(output.raw().dims());
+  if (IsFixedSizeDataType(infer_output->DType())) {
+    result->SetBatchnByteSize(output.raw().batch_byte_size());
+  }
+
+  if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
     if (grpc_response_.raw_output_size() <= (int)idx) {
       return Error(
           RequestStatusCode::INVALID,
-          "Expected RAW output for result '" + io->GetOutput()->Name() + "'");
-    }
-
-    io->SetBatch1Shape(output.raw().dims());
-    if (IsFixedSizeDataType(io->GetOutput()->DType())) {
-      io->SetBatchnByteSize(output.raw().batch_byte_size());
+          "Expected RAW output for result '" + output.name() + "'");
     }
 
     const std::string& raw_output = grpc_response_.raw_output(idx);
@@ -2467,7 +2466,7 @@ GrpcRequestImpl::SetRawResult(
     size_t size = raw_output.size();
     size_t result_bytes = 0;
 
-    Error err = io->SetNextRawResult(buf, size, &result_bytes);
+    Error err = result->SetNextRawResult(buf, size, &result_bytes);
     if (!err.IsOk()) {
       return err;
     }
@@ -2476,16 +2475,18 @@ GrpcRequestImpl::SetRawResult(
       return Error(
           RequestStatusCode::INVALID,
           "Written bytes doesn't match received bytes for result '" +
-              io->GetOutput()->Name() + "'");
+              output.name() + "'");
     }
   }
+
+  results->insert(std::make_pair(output.name(), std::move(result)));
 
   return Error::Success;
 }
 
 Error
 GrpcRequestImpl::GetResults(
-    std::map<std::string, std::unique_ptr<InferContext::Result>>* results)
+    const InferGrpcContext& ctx, InferContext::ResultMap* results)
 {
   results->clear();
   InferResponseHeader infer_response;
@@ -2497,7 +2498,8 @@ GrpcRequestImpl::GetResults(
     if (err.IsOk()) {
       size_t idx = 0;
       for (const auto& output : infer_response.output()) {
-        Error set_err = SetRawResult(idx, output);
+        Error set_err = CreateResult(
+            ctx, output, infer_response.batch_size(), idx, results);
         if (!set_err.IsOk()) {
           return set_err;
         }
@@ -2513,15 +2515,10 @@ GrpcRequestImpl::GetResults(
             ": " + grpc_status_.error_message());
   }
 
-  // Only continue to process result if GRPC status is SUCCESS
-  if (err.Code() == RequestStatusCode::SUCCESS) {
-    PostRunProcessing(requested_results_, infer_response);
-
+  if (err.IsOk()) {
+    PostRunProcessing(infer_response, results);
+  } else {
     results->clear();
-    for (auto& result : requested_results_) {
-      results->insert(
-          std::make_pair(result->GetOutput()->Name(), std::move(result)));
-    }
   }
 
   return err;
@@ -2620,7 +2617,7 @@ InferGrpcContext::~InferGrpcContext()
 }
 
 Error
-InferGrpcContext::Run(std::map<std::string, std::unique_ptr<Result>>* results)
+InferGrpcContext::Run(ResultMap* results)
 {
   grpc::ClientContext context;
 
@@ -2639,7 +2636,7 @@ InferGrpcContext::Run(std::map<std::string, std::unique_ptr<Result>>* results)
   sync_request->timer_.Record(RequestTimers::Kind::REQUEST_END);
 
   sync_request->timer_.Record(RequestTimers::Kind::RECEIVE_START);
-  Error request_status = sync_request->GetResults(results);
+  Error request_status = sync_request->GetResults(*this, results);
   sync_request->timer_.Record(RequestTimers::Kind::RECEIVE_END);
 
   Error err = UpdateStat(sync_request->timer_);
@@ -2701,8 +2698,8 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferGrpcContext::GetAsyncRunResults(
-    std::map<std::string, std::unique_ptr<Result>>* results,
-    const std::shared_ptr<Request>& async_request, bool wait)
+    ResultMap* results, const std::shared_ptr<Request>& async_request,
+    bool wait)
 {
   Error err = IsRequestReady(async_request, wait);
   if (!err.IsOk()) {
@@ -2714,7 +2711,7 @@ InferGrpcContext::GetAsyncRunResults(
 
   reusable_slot_.push_back(grpc_request->run_index_);
   grpc_request->timer_.Record(RequestTimers::Kind::RECEIVE_START);
-  Error request_status = grpc_request->GetResults(results);
+  Error request_status = grpc_request->GetResults(*this, results);
   grpc_request->timer_.Record(RequestTimers::Kind::RECEIVE_END);
   err = UpdateStat(grpc_request->timer_);
   if (!err.IsOk()) {
@@ -2726,10 +2723,6 @@ InferGrpcContext::GetAsyncRunResults(
 Error
 InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 {
-  std::shared_ptr<GrpcRequestImpl> grpc_request =
-      std::static_pointer_cast<GrpcRequestImpl>(request);
-  grpc_request->InitializeRequestedResults(requested_outputs_, batch_size_);
-
   // Create the input metadata for the request now that all input
   // sizes are known. For non-fixed-sized datatypes the
   // per-batch-instance byte-size can be different for different input

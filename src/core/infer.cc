@@ -389,35 +389,29 @@ GRPCInferResponseProvider::MutableResponseHeader()
 
 tensorflow::Status
 GRPCInferResponseProvider::GetOutputBuffer(
-    int idx, void** content, size_t content_byte_size,
+    const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape)
 {
-  bool is_buffered = false;
+  Output* output;
   TF_RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      idx, content, content_byte_size, content_shape, &is_buffered));
+      name, content, content_byte_size, content_shape, &output));
 
   // Must always add a raw output into the list so that the number and
   // order of raw output entries equals the output meta-data. But
   // leave empty if not returning raw result for the output.
-  std::string* output = response_->add_raw_output();
-  if (!is_buffered) {
-    output->resize(content_byte_size);
-    *content = static_cast<void*>(&((*output)[0]));
+  std::string* raw_output = response_->add_raw_output();
+  if (output->buffer_ == nullptr) {
+    raw_output->resize(content_byte_size);
+    *content = static_cast<void*>(&((*raw_output)[0]));
   }
 
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-GRPCInferResponseProvider::CommitOutputBuffer(const int idx)
+GRPCInferResponseProvider::CommitOutputBuffer(const std::string& name)
 {
   return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-GRPCInferResponseProvider::FinalizeResponse(const InferenceServable& is)
-{
-  return FinalizeResponseHeader(is);
 }
 
 HTTPInferResponseProvider::HTTPInferResponseProvider(
@@ -436,24 +430,6 @@ HTTPInferResponseProvider::Create(
       new HTTPInferResponseProvider(output_buffer, request_header);
   infer_provider->reset(provider);
 
-  // Make sure that all output with fixed-size type appear before
-  // outputs with non-fixed-size type (STRING).
-  bool seen_non_fixed_size = false;
-  for (const auto& requested_output : request_header.output()) {
-    const ModelOutput* output_config;
-    TF_RETURN_IF_ERROR(is.GetOutput(requested_output.name(), &output_config));
-    if (!IsFixedSizeDataType(output_config->data_type())) {
-      seen_non_fixed_size = true;
-    } else {
-      if (seen_non_fixed_size) {
-        return tensorflow::errors::InvalidArgument(
-            "HTTP API requires that output '", requested_output.name(),
-            "' appear before any non-fixed-size outputs in the request "
-            "header");
-      }
-    }
-  }
-
   return tensorflow::Status::OK();
 }
 
@@ -471,15 +447,16 @@ HTTPInferResponseProvider::MutableResponseHeader()
 
 tensorflow::Status
 HTTPInferResponseProvider::GetOutputBuffer(
-    int idx, void** content, size_t content_byte_size,
+    const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape)
 {
   *content = nullptr;
 
-  bool is_buffered = false;
+  Output* output;
   TF_RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      idx, content, content_byte_size, content_shape, &is_buffered));
-  if (!is_buffered && (content_byte_size > 0)) {
+      name, content, content_byte_size, content_shape, &output));
+
+  if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
     // Reserve requested space in evbuffer...
     if (evbuffer_reserve_space(
             output_buffer_, content_byte_size, &output_iovec_, 1) != 1) {
@@ -502,15 +479,14 @@ HTTPInferResponseProvider::GetOutputBuffer(
 }
 
 tensorflow::Status
-HTTPInferResponseProvider::CommitOutputBuffer(const int idx)
+HTTPInferResponseProvider::CommitOutputBuffer(const std::string& name)
 {
-  if ((idx + 1) != next_idx_) {
-    return tensorflow::errors::Internal(
-        "unexpected output buffer commit for index ", std::to_string(idx),
-        ", expected index ", std::to_string(next_idx_ - 1));
+  const auto& output = outputs_.back();
+  if (output.name_ != name) {
+    return tensorflow::errors::Internal("unexpected output '", name, "'");
   }
 
-  if (!is_buffered_output_[idx] && (output_byte_sizes_[idx] > 0)) {
+  if ((output.buffer_ == nullptr) && (output.byte_size_ > 0)) {
     if (evbuffer_commit_space(output_buffer_, &output_iovec_, 1) != 0) {
       return tensorflow::errors::Internal(
           "failed to commit output tensors to output buffer");
@@ -518,12 +494,6 @@ HTTPInferResponseProvider::CommitOutputBuffer(const int idx)
   }
 
   return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-HTTPInferResponseProvider::FinalizeResponse(const InferenceServable& is)
-{
-  return FinalizeResponseHeader(is);
 }
 
 namespace {
@@ -564,61 +534,50 @@ AddClassResults(
 
 InferResponseProvider::InferResponseProvider(
     const InferRequestHeader& request_header)
-    : request_header_(request_header),
-      num_outputs_(request_header_.output_size()), next_idx_(0),
-      is_buffered_output_(num_outputs_, false), buffered_outputs_(num_outputs_)
+    : request_header_(request_header)
 {
-  for (int idx = 0; idx < (int)num_outputs_; ++idx) {
-    if (request_header_.output(idx).has_cls()) {
-      is_buffered_output_[idx] = true;
-    }
+  // Create a map from output name to the InferRequestHeader::Output
+  // object for that output.
+  for (const InferRequestHeader::Output& output : request_header.output()) {
+    output_map_.emplace(std::make_pair(output.name(), &output));
   }
+}
+
+bool
+InferResponseProvider::RequiresOutput(const std::string& name)
+{
+  return output_map_.find(name) != output_map_.end();
 }
 
 tensorflow::Status
 InferResponseProvider::CheckAndSetIfBufferedOutput(
-    const int idx, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape, bool* is_buffered)
+    const std::string& name, void** content, size_t content_byte_size,
+    const std::vector<int64_t>& content_shape, Output** output)
 {
-  if ((idx >= (int)num_outputs_) || (idx != next_idx_)) {
-    return tensorflow::errors::Internal("unexpected next output index ", idx);
+  const auto& pr = output_map_.find(name);
+  if (pr == output_map_.end()) {
+    return tensorflow::errors::Internal("unexpected output '", name, "'");
   }
 
-  if (is_buffered_output_[idx]) {
+  outputs_.emplace_back();
+  Output* loutput = &(outputs_.back());
+  loutput->name_ = name;
+  loutput->shape_ = content_shape;
+  loutput->byte_size_ = content_byte_size;
+
+  if (pr->second->has_cls()) {
     char* buffer = new char[content_byte_size];
     *content = static_cast<void*>(buffer);
-    buffered_outputs_[idx].reset(buffer);
-    *is_buffered = true;
-  } else {
-    *is_buffered = false;
+    loutput->buffer_.reset(buffer);
   }
 
-  output_shapes_.emplace_back(content_shape);
-  output_byte_sizes_.emplace_back(content_byte_size);
-  next_idx_++;
+  *output = loutput;
 
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-InferResponseProvider::GetBufferedOutput(
-    int idx, std::unique_ptr<char[]>* buffer)
-{
-  if ((idx < 0) || (idx >= (int)num_outputs_)) {
-    return tensorflow::errors::Internal("unexpected output index ", idx);
-  }
-
-  if (!is_buffered_output_[idx]) {
-    return tensorflow::errors::Internal(
-        "attempt to get non-buffered output index ", idx);
-  }
-
-  *buffer = std::move(buffered_outputs_[idx]);
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
+InferResponseProvider::FinalizeResponse(const InferenceServable& is)
 {
   InferResponseHeader* response_header = MutableResponseHeader();
   response_header->Clear();
@@ -632,20 +591,19 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
   response_header->set_batch_size(batch_size);
 
   int output_idx = 0;
-  for (const auto& output : request_header_.output()) {
+  for (const auto& output : outputs_) {
     auto poutput = response_header->add_output();
-    poutput->set_name(output.name());
+    poutput->set_name(output.name_);
 
-    if (!output.has_cls()) {
+    if (output.buffer_ == nullptr) {
       // Raw result...
       poutput->mutable_raw()->Clear();
-      poutput->mutable_raw()->set_batch_byte_size(
-          output_byte_sizes_[output_idx]);
+      poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
 
       // If the model produces batched output, don't include the batch
       // dimension.
       bool skip = (is.Config().max_batch_size() != 0);
-      for (auto d : output_shapes_[output_idx]) {
+      for (auto d : output.shape_) {
         if (!skip) {
           poutput->mutable_raw()->add_dims(d);
         }
@@ -653,16 +611,20 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
       }
     } else {
       // Class result...
-      std::unique_ptr<char[]> output_buffer;
-      TF_RETURN_IF_ERROR(GetBufferedOutput(output_idx, &output_buffer));
-
       const ModelOutput* output_config;
-      TF_RETURN_IF_ERROR(is.GetOutput(output.name(), &output_config));
+      TF_RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
+
+      const auto& pr = output_map_.find(output.name_);
+      if (pr == output_map_.end()) {
+        return tensorflow::errors::Internal(
+            "can't find request meta-data for output '", output.name_, "'");
+      }
+      const InferRequestHeader::Output* request_output = pr->second;
 
       // Determine the number of elements in a batch-1 output.
       size_t batch1_element_count = 1;
       bool skip = (is.Config().max_batch_size() != 0);
-      for (auto d : output_shapes_[output_idx]) {
+      for (auto d : output.shape_) {
         if (!skip) {
           batch1_element_count *= (size_t)d;
         }
@@ -672,60 +634,60 @@ InferResponseProvider::FinalizeResponseHeader(const InferenceServable& is)
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
-              poutput, output_buffer.get(), batch1_element_count, batch_size,
-              output, label_provider);
+              poutput, output.buffer_.get(), batch1_element_count, batch_size,
+              *request_output, label_provider);
           break;
 
         default:
           return tensorflow::errors::InvalidArgument(
-              "class result not available for output '", output.name(),
+              "class result not available for output '", output.name_,
               "' due to unsupported type '",
               DataType_Name(output_config->data_type()), "'");
       }

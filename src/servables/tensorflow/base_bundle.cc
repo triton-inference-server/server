@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -52,8 +52,7 @@ BaseBundle::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
       max_batch_size_(o.max_batch_size_),
       input_name_map_(std::move(o.input_name_map_)),
-      output_name_map_(std::move(o.output_name_map_)),
-      outputs_(std::move(o.outputs_)), session_(o.session_)
+      output_name_map_(std::move(o.output_name_map_)), session_(o.session_)
 {
   o.gpu_device_ = NO_GPU_DEVICE;
   o.max_batch_size_ = NO_BATCHING;
@@ -202,26 +201,6 @@ BaseBundle::CreateExecutionContext(
   TF_RETURN_IF_ERROR(CreateSession(
       options, gpu_device, gdp_itr->second, &context.session_,
       &context.input_name_map_, &context.output_name_map_));
-
-  // Initialize an appropriately sized Tensor for each output.
-  TF_RETURN_IF_ERROR(context.InitializeOutputs(Config().output()));
-
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-BaseBundle::Context::InitializeOutputs(
-    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
-{
-  for (const auto& io : ios) {
-    tensorflow::TensorShape shape;
-    for (int d = 0; d < io.dims_size(); ++d) {
-      shape.AddDim(io.dims(d));
-    }
-
-    tensorflow::DataType dtype = ConvertDataType(io.data_type());
-    outputs_.insert({io.name(), tensorflow::Tensor(dtype, shape)});
-  }
 
   return tensorflow::Status::OK();
 }
@@ -444,7 +423,8 @@ SetStringInputTensor(
 void
 ReadFixedSizedOutputTensor(
     tensorflow::Tensor& tensor, const std::string& output_name,
-    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
+    std::vector<Scheduler::Payload>* payloads)
 {
   const auto& flat = tensor.bit_casted_shaped<char, 1>(
       {tensor.NumElements() * tensorflow::DataTypeSize(tensor.dtype())});
@@ -463,38 +443,28 @@ ReadFixedSizedOutputTensor(
     const size_t expected_byte_size =
         request_header.batch_size() * batch1_byte_size;
 
-    int req_output_idx = 0;
-    for (const auto& output : request_header.output()) {
-      if (output.name() == output_name) {
-        void* content = nullptr;
-        tensorflow::Status status = tensorflow::Status::OK();
-        // tensorflow::Status status =
-        // payload.response_provider_->GetOutputBuffer( req_output_idx,
-        // &content, expected_byte_size);
-        if (!status.ok()) {
-          payload.compute_status_ = status;
-        } else if (content == nullptr) {
-          payload.compute_status_ = tensorflow::errors::Internal(
-              "no buffer to accept output values for output '", output_name,
-              "'");
+    if (payload.response_provider_->RequiresOutput(output_name)) {
+      void* content = nullptr;
+      tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+          output_name, &content, expected_byte_size, shape);
+      if (!status.ok()) {
+        payload.compute_status_ = status;
+      } else {
+        if ((tensor_copy_offset + expected_byte_size) > ((size_t)flat.size())) {
+          payload.compute_status_ = tensorflow::errors::InvalidArgument(
+              "unexpected size ", tensor_copy_offset + expected_byte_size,
+              " for inference output '", output_name, "', expecting ",
+              flat.size());
         } else {
-          if ((tensor_copy_offset + expected_byte_size) >
-              ((size_t)flat.size())) {
-            payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ", tensor_copy_offset + expected_byte_size,
-                " for inference output '", output_name, "', expecting ",
-                flat.size());
-          } else {
-            memcpy(
-                content, static_cast<char*>(flat.data()) + tensor_copy_offset,
-                expected_byte_size);
+          memcpy(
+              content, static_cast<char*>(flat.data()) + tensor_copy_offset,
+              expected_byte_size);
+          status = payload.response_provider_->CommitOutputBuffer(output_name);
+          if (!status.ok()) {
+            payload.compute_status_ = status;
           }
         }
-
-        break;
       }
-
-      req_output_idx++;
     }
 
     tensor_copy_offset += expected_byte_size;
@@ -504,7 +474,8 @@ ReadFixedSizedOutputTensor(
 void
 ReadStringOutputTensor(
     tensorflow::Tensor& tensor, const std::string& output_name,
-    const size_t batch1_element_cnt, std::vector<Scheduler::Payload>* payloads)
+    const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
+    std::vector<Scheduler::Payload>* payloads)
 {
   auto flat = tensor.flat<std::string>();
   size_t tensor_element_idx = 0;
@@ -522,40 +493,32 @@ ReadStringOutputTensor(
     const size_t expected_element_cnt =
         request_header.batch_size() * batch1_element_cnt;
 
-    int req_output_idx = 0;
-    for (const auto& output : request_header.output()) {
-      if (output.name() == output_name) {
-        // Serialize the output tensor strings. Each string is
-        // serialized as a 4-byte length followed by the string itself
-        // with no null-terminator.
-        std::string serialized;
-        for (size_t e = 0; e < expected_element_cnt; ++e) {
-          std::string& str = flat(tensor_element_idx + e);
-          const uint32_t len = str.size();
-          serialized.append(
-              reinterpret_cast<const char*>(&len), sizeof(uint32_t));
-          serialized.append(str);
-        }
-
-        void* content;
-        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
-            req_output_idx, &content, serialized.size(), {});
-        if (status.ok()) {
-          memcpy(
-              content, reinterpret_cast<const void*>(serialized.c_str()),
-              serialized.size());
-          status =
-              payload.response_provider_->CommitOutputBuffer(req_output_idx);
-        }
-
-        if (!status.ok()) {
-          payload.compute_status_ = status;
-        }
-
-        break;
+    if (payload.response_provider_->RequiresOutput(output_name)) {
+      // Serialize the output tensor strings. Each string is
+      // serialized as a 4-byte length followed by the string itself
+      // with no null-terminator.
+      std::string serialized;
+      for (size_t e = 0; e < expected_element_cnt; ++e) {
+        std::string& str = flat(tensor_element_idx + e);
+        const uint32_t len = str.size();
+        serialized.append(
+            reinterpret_cast<const char*>(&len), sizeof(uint32_t));
+        serialized.append(str);
       }
 
-      req_output_idx++;
+      void* content;
+      tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+          output_name, &content, serialized.size(), shape);
+      if (status.ok()) {
+        memcpy(
+            content, reinterpret_cast<const void*>(serialized.c_str()),
+            serialized.size());
+        status = payload.response_provider_->CommitOutputBuffer(output_name);
+      }
+
+      if (!status.ok()) {
+        payload.compute_status_ = status;
+      }
     }
 
     tensor_element_idx += expected_element_cnt;
@@ -666,7 +629,7 @@ BaseBundle::Context::Run(
 
   // Collect the names of outputs requested by any request
   // payload. Skip payloads that have an error.
-  std::unordered_map<std::string, uint64_t> required_outputs;
+  std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
     if (!payload.status_.ok()) {
       continue;
@@ -675,20 +638,16 @@ BaseBundle::Context::Run(
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     for (const auto& output : request_header.output()) {
-      //      required_outputs.insert(
-      //          std::make_pair(output.name(), output.byte_size()));
+      required_outputs.insert(output.name());
     }
   }
 
-  // Create the vector of required output names.
+  // Create the vector of required output names using the names
+  // expected by the model.
+  std::vector<std::string> model_output_names;
   std::vector<std::string> output_names;
-  for (const auto& opair : outputs_) {
-    const std::string& name = opair.first;
-    const auto& ritr = required_outputs.find(name);
-    if (ritr == required_outputs.end()) {
-      continue;
-    }
-
+  for (const auto& name : required_outputs) {
+    model_output_names.push_back(name);
     const auto& tn_itr = output_name_map_.find(name);
     if (tn_itr == output_name_map_.end()) {
       output_names.push_back(name);
@@ -704,46 +663,39 @@ BaseBundle::Context::Run(
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
   int output_idx = 0;
-  for (const auto& opair : outputs_) {
-    const std::string& name = opair.first;
-    const auto& ritr = required_outputs.find(name);
-    if (ritr == required_outputs.end()) {
-      continue;
+  for (const auto& name : model_output_names) {
+    const ModelOutput* output_config;
+    TF_RETURN_IF_ERROR(base->GetOutput(name, &output_config));
+
+    // Get the shape of the output from the output tensor.
+    std::vector<int64_t> shape;
+    bool skip_element_cnt = (max_batch_size_ != NO_BATCHING);
+    size_t batch1_element_cnt = 1;
+    for (int i = 0; i < outputs[output_idx].shape().dims(); ++i) {
+      int64_t dim = outputs[output_idx].shape().dim_size(i);
+      shape.push_back(dim);
+
+      if (!skip_element_cnt) {
+        batch1_element_cnt *= dim;
+      }
+      skip_element_cnt = false;
     }
 
-    const tensorflow::Tensor& expected_template = opair.second;
-    const size_t batch1_element_cnt = expected_template.NumElements();
-    const size_t batch1_byte_size =
-        batch1_element_cnt *
-        tensorflow::DataTypeSize(expected_template.dtype());
-
-    // Use the output template and fix the shape based on the batch
-    // size of the request.
-    tensorflow::TensorShape shape = expected_template.shape();
-    if (max_batch_size_ != NO_BATCHING) {
-      shape.InsertDim(0, total_batch_size);
-    }
-    tensorflow::Tensor expected(expected_template.dtype(), shape);
-
-    if (expected.dtype() != outputs[output_idx].dtype()) {
+    tensorflow::DataType dtype = ConvertDataType(output_config->data_type());
+    if (dtype != outputs[output_idx].dtype()) {
       return tensorflow::errors::InvalidArgument(
           "unexpected datatype ", outputs[output_idx].dtype(),
-          " for inference output '", name, "', expecting ", expected.dtype());
+          " for inference output '", name, "', expecting ", dtype);
     }
 
-    if (expected.shape() != outputs[output_idx].shape()) {
-      return tensorflow::errors::InvalidArgument(
-          "unexpected shape ", outputs[output_idx].shape().DebugString(),
-          " for inference output '", name, "', expecting ",
-          expected.shape().DebugString());
-    }
-
-    if (expected.dtype() != tensorflow::DT_STRING) {
+    if (dtype != tensorflow::DT_STRING) {
+      const size_t batch1_byte_size =
+          batch1_element_cnt * tensorflow::DataTypeSize(dtype);
       ReadFixedSizedOutputTensor(
-          outputs[output_idx], name, batch1_byte_size, payloads);
+          outputs[output_idx], name, shape, batch1_byte_size, payloads);
     } else {
       ReadStringOutputTensor(
-          outputs[output_idx], name, batch1_element_cnt, payloads);
+          outputs[output_idx], name, shape, batch1_element_cnt, payloads);
     }
 
     output_idx++;
@@ -767,11 +719,6 @@ operator<<(std::ostream& out, const BaseBundle& pb)
                 ? "<none>"
                 : std::to_string(context.max_batch_size_))
         << std::endl;
-    out << "  outputs:" << std::endl;
-    for (const auto& outp : context.outputs_) {
-      out << "    name=" << outp.first << " " << outp.second.DebugString()
-          << std::endl;
-    }
   }
 
   return out;

@@ -437,33 +437,26 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
       continue;
     }
 
-    // If 'payload' requested this output then copy it from
-    // 'content'. If it did not request this output then just
-    // skip it in the 'content'.
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_byte_size =
         request_header.batch_size() * batch1_byte_size;
 
-    int output_idx = 0;
-    for (const auto& output : request_header.output()) {
-      if (output.name() == name) {
-        void* buffer;
-        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
-            output_idx, &buffer, expected_byte_size, content_shape);
-        if (status.ok()) {
-          memcpy(buffer, content + content_offset, expected_byte_size);
-          status = payload.response_provider_->CommitOutputBuffer(output_idx);
-        }
-
-        if (!status.ok()) {
-          payload.compute_status_ = status;
-        }
-
-        break;
+    // If 'payload' requested this output then copy it from
+    // 'content'. If it did not request this output then just
+    // skip it in the 'content'.
+    if (payload.response_provider_->RequiresOutput(name)) {
+      void* buffer;
+      tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+          name, &buffer, expected_byte_size, content_shape);
+      if (status.ok()) {
+        memcpy(buffer, content + content_offset, expected_byte_size);
+        status = payload.response_provider_->CommitOutputBuffer(name);
       }
 
-      output_idx++;
+      if (!status.ok()) {
+        payload.compute_status_ = status;
+      }
     }
 
     content_offset += expected_byte_size;
@@ -572,7 +565,7 @@ NetDefBundle::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  for (const auto& output : input_request_header->output()) {
+  for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
 
     const ModelOutput* output_config;

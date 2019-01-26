@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -64,8 +64,6 @@ class BaseBundle : public InferenceServable {
 
   // For each model instance there is a context.
   struct Context {
-    using TensorMap = std::unordered_map<std::string, tensorflow::Tensor>;
-
     // GPU device number that indicates that no gpu is available for a
     // context.
     static constexpr int NO_GPU_DEVICE = -1;
@@ -80,9 +78,6 @@ class BaseBundle : public InferenceServable {
     ~Context();
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
-
-    tensorflow::Status InitializeOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -110,11 +105,6 @@ class BaseBundle : public InferenceServable {
     // Map from configuration name for an output to tensor name for
     // that output in the model.
     IONameMap output_name_map_;
-
-    // The output tensors. These are not used as actual outputs to the
-    // model (those are created dynamically for each run) but simply
-    // to hold information about each tensor (data-type, shape).
-    TensorMap outputs_;
 
     // Tensorflow session for this context.
     tensorflow::Session* session_;

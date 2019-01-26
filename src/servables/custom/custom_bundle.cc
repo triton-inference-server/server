@@ -433,23 +433,9 @@ CustomBundle::Context::GetOutput(
     return false;
   }
 
-  const InferRequestHeader& request_header =
-      payload->request_provider_->RequestHeader();
-
-  int output_idx = 0;
-  for (const auto& output : request_header.output()) {
-    if (output.name() == name) {
-      tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
-          output_idx, content, content_byte_size, {});  // FIXME
-      return status.ok();
-    }
-
-    output_idx++;
-  }
-
-  // Something went very wrong since unable to find the requested output.
-  LOG_ERROR << "can't get output buffer for unknown output '" << name << "'";
-  return false;
+  tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
+      name, content, content_byte_size, {});  // FIXME
+  return status.ok();
 }
 
 std::string
