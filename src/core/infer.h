@@ -150,54 +150,52 @@ class InferResponseProvider {
   // Get a mutuable full response header for this inference request.
   virtual InferResponseHeader* MutableResponseHeader() = 0;
 
-  // Get a buffer to store results for output 'idx'. 'idx' indicates
-  // the index of the output in the request header. Outputs must be
-  // set in order by index.
+  // Get a buffer to store results for a named output. The output must
+  // be listed in the request header.
   virtual tensorflow::Status GetOutputBuffer(
-      const int idx, void** content, size_t content_byte_size,
+      const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) = 0;
 
   // Signal that an output buffer has been written. Must be used in
   // concert with GetOutputBuffer.
-  virtual tensorflow::Status CommitOutputBuffer(const int idx) = 0;
+  virtual tensorflow::Status CommitOutputBuffer(const std::string& name) = 0;
+
+  // Return true if this provider requires a named output.
+  bool RequiresOutput(const std::string& name);
 
   // Finialize response based on a servable.
-  virtual tensorflow::Status FinalizeResponse(const InferenceServable& is) = 0;
+  tensorflow::Status FinalizeResponse(const InferenceServable& is);
 
  protected:
-  // Check that 'idx' is a valid index for saving the "next"
-  // output". If output 'idx' is to be buffered, allocate space for it
-  // and point to that space with 'content' and return true in
-  // 'is_buffered'. Otherwise return false in 'is_buffered'.
+  struct Output;
+
+  // Check that 'name' is a valid output. If output is to be buffered,
+  // allocate space for it and point to that space with 'content'
   tensorflow::Status CheckAndSetIfBufferedOutput(
-      const int idx, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, bool* is_buffered);
-
-  // Get a pointer to the buffered content for an output (identified
-  // by index). Outputs that are not being returned as raw results are
-  // buffered in the response handler for post processing. This method
-  // is used to access those buffered values.
-  tensorflow::Status GetBufferedOutput(
-      int idx, std::unique_ptr<char[]>* buffer);
-
-  // Finialize response header values based on a servable.
-  tensorflow::Status FinalizeResponseHeader(const InferenceServable& is);
+      const std::string& name, void** content, size_t content_byte_size,
+      const std::vector<int64_t>& content_shape, Output** output);
 
  protected:
   const InferRequestHeader& request_header_;
-  const size_t num_outputs_;
-  int next_idx_;
 
-  // The shape of each output.
-  std::vector<std::vector<int64_t>> output_shapes_;
+  // Map from output name to the InferRequestHeader output information
+  // for that output.
+  std::unordered_map<std::string, const InferRequestHeader::Output*>
+      output_map_;
 
-  // The byte-size of each output.
-  std::vector<size_t> output_byte_sizes_;
+  // Information about each output.
+  struct Output {
+    std::string name_;
+    std::vector<int64_t> shape_;
+    size_t byte_size_;
 
-  // Created buffers that need to be deleted when this request
-  // provider is destructed.
-  std::vector<bool> is_buffered_output_;
-  std::vector<std::unique_ptr<char[]>> buffered_outputs_;
+    // Created buffer for non-RAW results
+    std::unique_ptr<char[]> buffer_;
+  };
+
+  // Ordered list of outputs as they "added" by
+  // GetOutputBuffer().
+  std::vector<Output> outputs_;
 };
 
 // Inference response provider for a gRPC inference request
@@ -211,10 +209,9 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
   tensorflow::Status GetOutputBuffer(
-      int idx, void** content, size_t content_byte_size,
+      const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
-  tensorflow::Status CommitOutputBuffer(const int idx) override;
-  tensorflow::Status FinalizeResponse(const InferenceServable& is) override;
+  tensorflow::Status CommitOutputBuffer(const std::string& name) override;
 
  private:
   GRPCInferResponseProvider(
@@ -237,10 +234,9 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
   tensorflow::Status GetOutputBuffer(
-      int idx, void** content, size_t content_byte_size,
+      const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
-  tensorflow::Status CommitOutputBuffer(const int idx) override;
-  tensorflow::Status FinalizeResponse(const InferenceServable& is) override;
+  tensorflow::Status CommitOutputBuffer(const std::string& name) override;
 
  private:
   HTTPInferResponseProvider(
