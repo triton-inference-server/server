@@ -137,12 +137,7 @@ def parse_model(status, model_name, batch_size, verbose=False):
         h = input.dims[1]
         w = input.dims[2]
 
-    output_size = 1
-    for dim in output.dims:
-        output_size = output_size * dim
-    output_size = output_size * np.dtype(model_dtype_to_np(output.data_type)).itemsize
-
-    return (input.name, output.name, c, h, w, input.format, model_dtype_to_np(input.data_type), output_size)
+    return (input.name, output.name, c, h, w, input.format, model_dtype_to_np(input.data_type))
 
 def preprocess(img, format, dtype, c, h, w, scaling):
     """
@@ -236,7 +231,7 @@ if __name__ == '__main__':
     response = grpc_stub.Status(request)
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
-    input_name, output_name, c, h, w, format, dtype, output_size = parse_model(
+    input_name, output_name, c, h, w, format, dtype = parse_model(
         response, FLAGS.model_name, FLAGS.batch_size, FLAGS.verbose)
 
     # Prepare request for Infer gRPC
@@ -250,7 +245,6 @@ if __name__ == '__main__':
     request.meta_data.batch_size = FLAGS.batch_size
     output_message = api_pb2.InferRequestHeader.Output()
     output_message.name = output_name
-    output_message.byte_size = output_size
     output_message.cls.count = FLAGS.classes
     request.meta_data.output.extend([output_message])
 
