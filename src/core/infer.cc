@@ -408,12 +408,6 @@ GRPCInferResponseProvider::GetOutputBuffer(
   return tensorflow::Status::OK();
 }
 
-tensorflow::Status
-GRPCInferResponseProvider::CommitOutputBuffer(const std::string& name)
-{
-  return tensorflow::Status::OK();
-}
-
 HTTPInferResponseProvider::HTTPInferResponseProvider(
     evbuffer* output_buffer, const InferRequestHeader& request_header)
     : InferResponseProvider(request_header), output_buffer_(output_buffer)
@@ -458,36 +452,30 @@ HTTPInferResponseProvider::GetOutputBuffer(
 
   if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
     // Reserve requested space in evbuffer...
+    struct evbuffer_iovec output_iovec;
     if (evbuffer_reserve_space(
-            output_buffer_, content_byte_size, &output_iovec_, 1) != 1) {
+            output_buffer_, content_byte_size, &output_iovec, 1) != 1) {
       return tensorflow::errors::Internal(
           "failed to reserve ", content_byte_size,
           " bytes in output tensor buffer");
     }
 
-    if (output_iovec_.iov_len < content_byte_size) {
+    if (output_iovec.iov_len < content_byte_size) {
       return tensorflow::errors::Internal(
-          "reserved ", output_iovec_.iov_len,
+          "reserved ", output_iovec.iov_len,
           " bytes in output tensor buffer, need ", content_byte_size);
     }
 
-    output_iovec_.iov_len = content_byte_size;
-    *content = output_iovec_.iov_base;
-  }
+    output_iovec.iov_len = content_byte_size;
+    *content = output_iovec.iov_base;
 
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-HTTPInferResponseProvider::CommitOutputBuffer(const std::string& name)
-{
-  const auto& output = outputs_.back();
-  if (output.name_ != name) {
-    return tensorflow::errors::Internal("unexpected output '", name, "'");
-  }
-
-  if ((output.buffer_ == nullptr) && (output.byte_size_ > 0)) {
-    if (evbuffer_commit_space(output_buffer_, &output_iovec_, 1) != 0) {
+    // Immediately commit the buffer space. Some backends will write
+    // async to the just allocated buffer space so we are relying on
+    // evbuffer not to relocate this space. Because we request a
+    // contiguous chunk every time (above by allowing only a single
+    // entry in output_iovec), this seems to be a valid assumption.
+    if (evbuffer_commit_space(output_buffer_, &output_iovec, 1) != 0) {
+      *content = nullptr;
       return tensorflow::errors::Internal(
           "failed to commit output tensors to output buffer");
     }

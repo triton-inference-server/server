@@ -60,7 +60,8 @@ class CustomBundle : public InferenceServable {
   TF_DISALLOW_COPY_AND_ASSIGN(CustomBundle);
   friend std::ostream& operator<<(std::ostream&, const CustomBundle&);
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
-  friend bool CustomGetOutput(void*, const char*, uint64_t, void**);
+  friend bool CustomGetOutput(
+      void*, const char*, size_t, int64_t*, uint64_t, void**);
 
   // For each model instance there is a context.
   struct Context {
@@ -112,7 +113,8 @@ class CustomBundle : public InferenceServable {
     // 'name'd output tensor.
     bool GetOutput(
         GetInputOutputContext* output_context, const char* name,
-        uint64_t content_byte_size, void** content);
+        size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
+        void** content);
 
     // Name of the model instance
     std::string name_;
@@ -123,10 +125,6 @@ class CustomBundle : public InferenceServable {
     // Maximum batch size to allow. NO_BATCHING indicates that
     // batching is not supported.
     int max_batch_size_;
-
-    // The outputs from the model configuration and the byte-size of
-    // each, where is size is the batch-1 size.
-    IOSizeMap outputs_;
 
     // The handle to the shared library associated with this context.
     void* library_handle_;
@@ -156,7 +154,7 @@ bool CustomGetNextInput(
 // Callback used by custom backends to get the output buffer for a
 // 'name'd output tensor.
 bool CustomGetOutput(
-    void* output_context, const char* name, uint64_t content_byte_size,
-    void** content);
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content);
 
 }}  // namespace nvidia::inferenceserver

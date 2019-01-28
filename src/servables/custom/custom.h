@@ -56,8 +56,8 @@ typedef struct custom_payload_struct {
   // get the input tensor values for this payload.
   void* input_context;
 
-  // The context to use with CustomGetOutput callback function to
-  // get the buffer for output tensor values for this payload.
+  // The context to use with CustomGetOutput callback function to get
+  // the buffer for output tensor values for this payload.
   void* output_context;
 
   // The error code indicating success or failure from execution. A
@@ -96,14 +96,16 @@ typedef bool (*CustomGetNextInputFn_t)(
 /// \param output_context The output context provided in call to
 /// CustomExecute.
 /// \param name The name of the output tensor.
+/// \param shape_dim_cnt The number of dimensions in the output shape.
+/// \param shape_dims The dimensions of the output shape.
 /// \param content_byte_size The size, in bytes, of the output tensor.
 /// \param content Returns a pointer to a buffer where the output for
 /// the tensor should be copied. The size of the buffer will be large
 /// enough to hold 'content_byte_size' bytes.
 /// \return false if error, true if success.
 typedef bool (*CustomGetOutputFn_t)(
-    void* output_context, const char* name, uint64_t content_byte_size,
-    void** content);
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content);
 
 /// Type for the CustomInitialize function.
 typedef int (*CustomInitializeFn_t)(const char*, size_t, int, void**);

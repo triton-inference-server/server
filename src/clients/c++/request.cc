@@ -195,16 +195,8 @@ OptionsImpl::OptionsImpl() : batch_size_(0) {}
 Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
 {
-  // HTTP protocol requires that outputs with non-fixed-size datatype
-  // (STRING) be requested last in the request header...
-  if (!IsFixedSizeDataType(output->DType())) {
-    outputs_.emplace_back(std::make_pair(
-        output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
-  } else {
-    outputs_.emplace_front(std::make_pair(
-        output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
-  }
-
+  outputs_.emplace_back(std::make_pair(
+      output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
   return Error::Success;
 }
 
@@ -212,16 +204,8 @@ Error
 OptionsImpl::AddClassResult(
     const std::shared_ptr<InferContext::Output>& output, uint64_t k)
 {
-  // HTTP protocol requires that outputs with non-fixed-size datatype
-  // (STRING) be requested last in the request header...
-  if (!IsFixedSizeDataType(output->DType())) {
-    outputs_.emplace_back(std::make_pair(
-        output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
-  } else {
-    outputs_.emplace_front(std::make_pair(
-        output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
-  }
-
+  outputs_.emplace_back(std::make_pair(
+      output, OutputOptions(InferContext::Result::ResultFormat::CLASS, k)));
   return Error::Success;
 }
 

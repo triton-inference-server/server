@@ -592,7 +592,7 @@ class InferContext:
             return np.dtype(object)
         _raise_error("unknown result datatype " + ctype.value)
 
-    def _prepare_request(self, inputs, outputs, input_shapes,
+    def _prepare_request(self, inputs, outputs,
                          batch_size, contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
@@ -635,11 +635,9 @@ class InferContext:
                 _raise_if_error(
                     c_void_p(_crequest_infer_ctx_input_new(byref(input), self._ctx, input_name)))
 
-                # If the input has a shape specified for it set it
-                # before assigning values.
-                if (input_shapes is not None) and (input_name in input_shapes):
-                    shape = input_shapes[input_name]
-                    shape_value = np.asarray(shape, dtype=np.int64)
+                # Set the input shape
+                if len(input_values) > 0:
+                    shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_input_set_shape(
@@ -774,7 +772,7 @@ class InferContext:
         _crequest_infer_ctx_del(self._ctx)
         self._ctx = None
 
-    def run(self, inputs, outputs, batch_size=1, input_shapes=None):
+    def run(self, inputs, outputs, batch_size=1):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -794,14 +792,6 @@ class InferContext:
             should be a tuple (ResultFormat.CLASS, k), where 'k'
             indicates how many classification results should be
             returned for the output.
-
-        input_shapes : dict
-
-            Dictionary from input name to the shape for that input,
-            not including the batch dimension. An input shape is
-            specified as a list/tuple of the dimensions. A shape is
-            required for an input that has a tensor with one or more
-            variable-size dimensions.
 
         batch_size : int
             The batch size of the inference. Each input must provide
@@ -837,14 +827,14 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, input_shapes, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, inputs, outputs, batch_size=1, input_shapes=None):
+    def async_run(self, inputs, outputs, batch_size=1):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -870,13 +860,6 @@ class InferContext:
             indicates how many classification results should be
             returned for the output.
 
-        input_shapes : dict
-            Dictionary from input name to the shape for that input,
-            not including the batch dimension. An input shape is
-            specified as a list/tuple of the dimensions. A shape is
-            required for an input that has a tensor with one or more
-            variable-size dimensions.
-
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
@@ -901,7 +884,7 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, input_shapes, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
 
         # Run asynchronous inference...
         c_request_id = c_uint64()

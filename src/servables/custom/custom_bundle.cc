@@ -50,8 +50,7 @@ CustomBundle::Context::Context(
 
 CustomBundle::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_), outputs_(std::move(o.outputs_)),
-      library_handle_(o.library_handle_),
+      max_batch_size_(o.max_batch_size_), library_handle_(o.library_handle_),
       library_context_handle_(o.library_context_handle_),
       InitializeFn_(o.InitializeFn_), FinalizeFn_(o.FinalizeFn_),
       ErrorStringFn_(o.ErrorStringFn_), ExecuteFn_(o.ExecuteFn_)
@@ -186,12 +185,6 @@ CustomBundle::CreateExecutionContext(
   contexts_.emplace_back(instance_name, gpu_device, mbs);
   Context& context = contexts_.back();
 
-  // Initialize 'context' for a specific 'gpu_device'. Collect the
-  // outputs and their byte-sizes.
-  for (const auto& io : Config().output()) {
-    context.outputs_.insert({io.name(), GetByteSize(io)});
-  }
-
   // 'mn_itr->second' is the path to the shared library file to use
   // for that context (e.g. model_name/1/libcustom.so). Load that
   // library as it provides the custom backend implementation.
@@ -254,43 +247,12 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   uint32_t total_batch_size = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-
-    if ((size_t)request_header.output().size() > outputs_.size()) {
-      payload.status_ = tensorflow::errors::InvalidArgument(
-          "expected at most ", outputs_.size(), " outputs but got ",
-          request_header.output().size());
-      continue;
+    if (payload.status_.ok()) {
+      const InferRequestHeader& request_header =
+          payload.request_provider_->RequestHeader();
+      total_batch_size += request_header.batch_size();
+      total_requested_outputs += request_header.output_size();
     }
-
-    // Validate that all requested outputs are allowed and of the
-    // correct size.
-    for (const auto& output : request_header.output()) {
-      const std::string& name = output.name();
-
-      const auto& ii_iter = outputs_.find(name);
-      if (ii_iter == outputs_.end()) {
-        payload.status_ = tensorflow::errors::InvalidArgument(
-            "unexpected inference output '", name, "' for '", name_, "'");
-        break;
-      }
-
-      //      const size_t expected_byte_size = ii_iter->second;
-      //      if (output.byte_size() != expected_byte_size) {
-      //        payload.status_ = tensorflow::errors::InvalidArgument(
-      //            "unexpected size ", output.byte_size(), " for inference
-      //            output '", name, "', expecting ", expected_byte_size);
-      //        break;
-      //      }
-    }
-
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
-    total_batch_size += request_header.batch_size();
-    total_requested_outputs += request_header.output_size();
   }
 
   // If there are no valid payloads then no need to run the
@@ -419,7 +381,8 @@ CustomBundle::Context::GetNextInput(
 bool
 CustomBundle::Context::GetOutput(
     GetInputOutputContext* output_context, const char* cname,
-    uint64_t content_byte_size, void** content)
+    size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
+    void** content)
 {
   const std::string name(cname);
   Scheduler::Payload* payload = output_context->payload_;
@@ -433,8 +396,9 @@ CustomBundle::Context::GetOutput(
     return false;
   }
 
+  std::vector<int64_t> shape(shape_dims, shape_dims + shape_dim_cnt);
   tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
-      name, content, content_byte_size, {});  // FIXME
+      name, content, content_byte_size, shape);
   return status.ok();
 }
 
@@ -479,14 +443,14 @@ CustomGetNextInput(
 
 bool
 CustomGetOutput(
-    void* output_context, const char* name, uint64_t content_byte_size,
-    void** content)
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
   CustomBundle::Context::GetInputOutputContext* ocontext =
       static_cast<CustomBundle::Context::GetInputOutputContext*>(
           output_context);
   return ocontext->context_->GetOutput(
-      ocontext, name, content_byte_size, content);
+      ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content);
 }
 
 }}  // namespace nvidia::inferenceserver

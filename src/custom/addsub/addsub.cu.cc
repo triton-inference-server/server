@@ -106,6 +106,9 @@ class Context {
   // INT32 or FP32.
   DataType datatype_;
 
+  // The shape of the input and output tensors.
+  std::vector<int64_t> shape_;
+
   // The number of elements in each input and output tensor for
   // batch-size 1.
   uint64_t batch1_element_count_;
@@ -211,6 +214,12 @@ Context::Init()
   if ((model_config_.output(0).name() != "OUTPUT0") ||
       (model_config_.output(1).name() != "OUTPUT1")) {
     return kOutputName;
+  }
+
+  // Get the shape of input and output tensors... needed when
+  // reporting output values.
+  for (auto d : model_config_.output(0).dims()) {
+    shape_.push_back(d);
   }
 
   // Due to the above contraints, each input and output tensor will be
@@ -381,10 +390,19 @@ Context::ExecuteCPU(
     for (uint32_t oidx = 0; oidx < payload.output_cnt; ++oidx) {
       const char* output_name = payload.required_output_names[oidx];
 
+      // The output shape is [payload-batch-size, output-shape] if the
+      // model configuration supports batching, or just [output-shape]
+      // if the model configuration does not support batching.
+      std::vector<int64_t> shape;
+      if (model_config_.max_batch_size() != 0) {
+        shape.push_back(payload.batch_size);
+      }
+      shape.insert(shape.end(), shape_.begin(), shape_.end());
+
       void* obuffer;
       if (!output_fn(
-              payload.output_context, output_name, batchn_byte_size,
-              &obuffer)) {
+              payload.output_context, output_name, shape.size(), &shape[0],
+              batchn_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         break;
       }
@@ -517,10 +535,19 @@ Context::ExecuteGPU(
     for (uint32_t oidx = 0; oidx < payload.output_cnt; ++oidx) {
       const char* output_name = payload.required_output_names[oidx];
 
+      // The output shape is [payload-batch-size, output-shape] if the
+      // model configuration supports batching, or just [output-shape]
+      // if the model configuration does not support batching.
+      std::vector<int64_t> shape;
+      if (model_config_.max_batch_size() != 0) {
+        shape.push_back(payload.batch_size);
+      }
+      shape.insert(shape.end(), shape_.begin(), shape_.end());
+
       void* obuffer;
       if (!output_fn(
-              payload.output_context, output_name, batchn_byte_size,
-              &obuffer)) {
+              payload.output_context, output_name, shape.size(), &shape[0],
+              batchn_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         break;
       }
