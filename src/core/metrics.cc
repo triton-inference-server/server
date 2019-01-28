@@ -120,7 +120,8 @@ Metrics::Initialize(uint32_t port)
     return;
   }
 
-  singleton->InitializeNvmlMetrics();
+  if (std::getenv("TENSORRT_SERVER_CPU_ONLY") == nullptr)
+    singleton->InitializeNvmlMetrics();
 
   std::ostringstream stream;
   stream << "0.0.0.0:" << port;
