@@ -451,7 +451,6 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
           name, &buffer, expected_byte_size, content_shape);
       if (status.ok()) {
         memcpy(buffer, content + content_offset, expected_byte_size);
-        status = payload.response_provider_->CommitOutputBuffer(name);
       }
 
       if (!status.ok()) {

@@ -45,7 +45,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
                 input_dtype, output0_dtype, output1_dtype,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                skip_request_id_check=False, send_input_shape=False):
+                skip_request_id_check=False):
     tester.assertTrue(use_http or use_grpc)
     protocols = []
     if use_http:
@@ -131,8 +131,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
         ctx = InferContext(pair[0], pair[1], model_name, model_version, True)
         results = ctx.run(
             { "INPUT0" : input0_list, "INPUT1" : input1_list },
-            output_req, batch_size,
-            { "INPUT0" : tensor_shape, "INPUT1" : tensor_shape } if (send_input_shape) else None)
+            output_req, batch_size)
 
         if not skip_request_id_check:
             global _last_request_id

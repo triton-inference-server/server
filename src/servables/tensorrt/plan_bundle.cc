@@ -561,6 +561,17 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         (byte_sizes_[bindex] / std::max(1, max_batch_size_));
     size_t binding_copy_offset = 0;
 
+    // Get the shape of the output. If model supports batching then
+    // prepend the batch dimension onto the output shape.
+    std::vector<int64_t> shape;
+    if (max_batch_size_ != NO_BATCHING) {
+      shape.push_back(total_batch_size);
+    }
+    nvinfer1::Dims dims = engine_->getBindingDimensions(bindex);
+    for (int i = 0; i < dims.nbDims; ++i) {
+      shape.push_back(dims.d[i]);
+    }
+
     for (auto& payload : *payloads) {
       if (!payload.status_.ok()) {
         continue;
@@ -574,42 +585,33 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       const size_t expected_byte_size =
           request_header.batch_size() * batch1_byte_size;
 
-      int output_idx = 0;
-      for (const auto& output : request_header.output()) {
-        if (output.name() == name) {
-          void* content = nullptr;
-          tensorflow::Status status = tensorflow::Status::OK();
-          // payload.response_provider_->GetOutputBuffer(
-          // output_idx, &content, expected_byte_size);
-          if (!status.ok()) {
-            payload.compute_status_ = status;
-          } else if (content == nullptr) {
-            payload.compute_status_ = tensorflow::errors::Internal(
-                "no buffer to accept output values for output '", name, "'");
+      if (payload.response_provider_->RequiresOutput(name)) {
+        void* content = nullptr;
+        tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
+            name, &content, expected_byte_size, shape);
+        if (status.ok()) {
+          if ((binding_copy_offset + expected_byte_size) >
+              byte_sizes_[bindex]) {
+            status = tensorflow::errors::InvalidArgument(
+                "unexpected size ", binding_copy_offset + expected_byte_size,
+                " for inference output '", name, "', expecting maximum",
+                byte_sizes_[bindex]);
           } else {
-            if ((binding_copy_offset + expected_byte_size) >
-                byte_sizes_[bindex]) {
-              payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                  "unexpected size ", binding_copy_offset + expected_byte_size,
-                  " for inference output '", name, "', expecting maximum",
-                  byte_sizes_[bindex]);
-            } else {
-              cudaError_t err = cudaMemcpyAsync(
-                  content,
-                  static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
-                  expected_byte_size, cudaMemcpyDeviceToHost, stream_);
-              if (err != cudaSuccess) {
-                payload.compute_status_ = tensorflow::errors::Internal(
-                    "failed to copy output values from GPU for output '", name,
-                    "': ", cudaGetErrorString(err));
-              }
+            cudaError_t err = cudaMemcpyAsync(
+                content,
+                static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
+                expected_byte_size, cudaMemcpyDeviceToHost, stream_);
+            if (err != cudaSuccess) {
+              status = tensorflow::errors::Internal(
+                  "failed to copy output values from GPU for output '", name,
+                  "': ", cudaGetErrorString(err));
             }
           }
-
-          break;
         }
 
-        output_idx++;
+        if (!status.ok()) {
+          payload.compute_status_ = status;
+        }
       }
 
       binding_copy_offset += expected_byte_size;

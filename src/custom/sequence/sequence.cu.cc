@@ -268,10 +268,19 @@ Context::Execute(
     if ((payload.error_code == 0) && (payload.output_cnt > 0)) {
       const char* output_name = payload.required_output_names[0];
 
+      // The output shape is [1, 1] if the model configuration
+      // supports batching, or just [1] if the model configuration
+      // does not support batching.
+      std::vector<int64_t> shape;
+      if (model_config_.max_batch_size() != 0) {
+        shape.push_back(1);
+      }
+      shape.push_back(1);
+
       void* obuffer;
       if (!output_fn(
-              payload.output_context, output_name, batch1_byte_size,
-              &obuffer)) {
+              payload.output_context, output_name, shape.size(), &shape[0],
+              batch1_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         continue;
       }
