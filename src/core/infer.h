@@ -156,10 +156,6 @@ class InferResponseProvider {
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) = 0;
 
-  // Signal that an output buffer has been written. Must be used in
-  // concert with GetOutputBuffer.
-  virtual tensorflow::Status CommitOutputBuffer(const std::string& name) = 0;
-
   // Return true if this provider requires a named output.
   bool RequiresOutput(const std::string& name);
 
@@ -211,7 +207,6 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   tensorflow::Status GetOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
-  tensorflow::Status CommitOutputBuffer(const std::string& name) override;
 
  private:
   GRPCInferResponseProvider(
@@ -236,7 +231,6 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   tensorflow::Status GetOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
-  tensorflow::Status CommitOutputBuffer(const std::string& name) override;
 
  private:
   HTTPInferResponseProvider(
@@ -244,7 +238,6 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
-  struct evbuffer_iovec output_iovec_;
 };
 
 //

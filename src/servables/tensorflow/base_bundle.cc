@@ -459,10 +459,6 @@ ReadFixedSizedOutputTensor(
           memcpy(
               content, static_cast<char*>(flat.data()) + tensor_copy_offset,
               expected_byte_size);
-          status = payload.response_provider_->CommitOutputBuffer(output_name);
-          if (!status.ok()) {
-            payload.compute_status_ = status;
-          }
         }
       }
     }
@@ -513,10 +509,7 @@ ReadStringOutputTensor(
         memcpy(
             content, reinterpret_cast<const void*>(serialized.c_str()),
             serialized.size());
-        status = payload.response_provider_->CommitOutputBuffer(output_name);
-      }
-
-      if (!status.ok()) {
+      } else {
         payload.compute_status_ = status;
       }
     }
