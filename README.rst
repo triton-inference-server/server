@@ -41,19 +41,25 @@ server.
 What's New In 0.10.0 Beta
 -------------------------
 
+* `Custom backend support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#custom-backends>`_.
+  TRTIS allows individual models to be implemented with custom
+  backends instead of by a deep-learning framework. With a custom
+  backend a model can implement any logic desired, while still
+  benefiting from the GPU support, concurrent execution, dynamic
+  batching and other features provided by TRTIS.
+
+Features
+--------
+
+The inference server provides the following features.
+
 * `Multiple framework support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
   TensorFlow-TensorRT integrated models.
-* `Custom backend support
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#custom-backends>`_. TRTIS
-  allows individual models to be implemented with custom backends
-  instead of by a deep-learning framework. With a custom backend a
-  model can implement any logic desired, while still benefiting from
-  the GPU support, concurrent execution, dynamic batching and other
-  features provided by TRTIS.
 * TRTIS `monitors the model repository
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#modifying-the-model-repository>`_
   for any change and dynamically reloads the model(s) when necessary,
