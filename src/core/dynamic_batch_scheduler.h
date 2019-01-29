@@ -30,6 +30,7 @@
 #include <deque>
 #include <mutex>
 #include <thread>
+#include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -55,6 +56,8 @@ class DynamicBatchScheduler : public Scheduler {
 
  private:
   void SchedulerThread(const uint32_t runner_id, const int nice);
+  void InitPendingShape(const InferRequestHeader& request);
+  bool CompareWithPendingShape(const InferRequestHeader& request) const;
   uint64_t GetDynamicBatch();
 
   // Function the scheduler will call to schedule a payload(s) for
@@ -86,6 +89,9 @@ class DynamicBatchScheduler : public Scheduler {
   uint64_t pending_batch_delay_ns_;
   size_t pending_batch_size_;
   size_t pending_batch_queue_cnt_;
+
+  bool need_pending_shape_;
+  std::unordered_map<std::string, DimsList> pending_batch_shapes_;
 };
 
 }}  // namespace nvidia::inferenceserver

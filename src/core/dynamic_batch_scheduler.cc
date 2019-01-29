@@ -49,6 +49,17 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   dynamic_batching_enabled_ = config.has_dynamic_batching();
   scheduler_threads_exit_.store(false);
 
+  // Need to keep track of input tensor shapes if the model allows one
+  // or more variable-size input tensors. Requests to the same model
+  // can't be batched if any of the inputs have different shape.
+  need_pending_shape_ = false;
+  for (const auto input : config.input()) {
+    if (GetElementCount(input) == -1) {
+      need_pending_shape_ = true;
+      break;
+    }
+  }
+
   max_preferred_batch_size_ = 0;
   preferred_batch_sizes_.clear();
   pending_batch_delay_ns_ = 0;
@@ -169,6 +180,7 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
 
           pending_batch_size_ = 0;
           pending_batch_queue_cnt_ = 0;
+          pending_batch_shapes_.clear();
 
           // If there are still requests in the queue after removing
           // the pending batch and if there are any idle threads then
@@ -230,6 +242,36 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
                  << "...";
 }
 
+void
+DynamicBatchScheduler::InitPendingShape(const InferRequestHeader& request)
+{
+  pending_batch_shapes_.clear();
+
+  for (const auto& input : request.input()) {
+    if (input.dims_size() > 0) {
+      pending_batch_shapes_.emplace(std::make_pair(input.name(), input.dims()));
+    }
+  }
+}
+
+bool
+DynamicBatchScheduler::CompareWithPendingShape(
+    const InferRequestHeader& request) const
+{
+  for (const auto& input : request.input()) {
+    const auto itr = pending_batch_shapes_.find(input.name());
+    if (itr == pending_batch_shapes_.end()) {
+      return (input.dims_size() == 0);
+    }
+
+    if (!CompareDims(itr->second, input.dims())) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 uint64_t
 DynamicBatchScheduler::GetDynamicBatch()
 {
@@ -240,15 +282,22 @@ DynamicBatchScheduler::GetDynamicBatch()
   // executed immediately.
   //
   //   1) if next request would make pending batch larger than the max
-  //   preferred batch size then must execute the pending patch
+  //   preferred batch size then must execute the pending batch
   //   immediately
   //
   //   2) if no pending batch and next request on its own has batch
   //   size larger than the max preferred batch size then must execute
   //   immediately
-  {
-    const auto batch_size =
-        queue_.front().request_provider_->RequestHeader().batch_size();
+  //
+  //   3) if next request has a shape different than the pending batch
+  //   then must execute the pending batch immediately (this will
+  //   only occur for models that have variable-size input tensor(s)
+
+  if (pending_batch_queue_cnt_ < queue_.size()) {
+    // Case 1 and 2
+    const auto batch_size = queue_[pending_batch_queue_cnt_]
+                                .request_provider_->RequestHeader()
+                                .batch_size();
     if ((pending_batch_size_ + batch_size) >= max_preferred_batch_size_) {
       if (pending_batch_queue_cnt_ == 0) {
         pending_batch_size_ = batch_size;
@@ -256,12 +305,21 @@ DynamicBatchScheduler::GetDynamicBatch()
       }
       return 0;
     }
+
+    // Case 3
+    if (need_pending_shape_ && (pending_batch_queue_cnt_ > 0)) {
+      if (!CompareWithPendingShape(queue_[pending_batch_queue_cnt_]
+                                       .request_provider_->RequestHeader())) {
+        return 0;
+      }
+    }
   }
 
   // Examine the new requests. If adding these new requests to the
   // pending batch allows a preferred batch size then execute it
   // immediately. Stop examining requests if the maximum preferred
-  // batch size would be exceeded.
+  // batch size would be exceeded or if the shape of the next request
+  // does not match the shape of the pending batch.
   size_t best_preferred_batch_size = 0;
   size_t best_preferred_batch_cnt = 0;
   size_t search_batch_size = pending_batch_size_;
@@ -272,6 +330,15 @@ DynamicBatchScheduler::GetDynamicBatch()
 
     if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
       break;
+    }
+
+    if (need_pending_shape_) {
+      if (search_batch_cnt == 0) {
+        InitPendingShape(queue_[idx].request_provider_->RequestHeader());
+      } else if (!CompareWithPendingShape(
+                     queue_[idx].request_provider_->RequestHeader())) {
+        break;
+      }
     }
 
     search_batch_size += batch_size;
