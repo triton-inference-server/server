@@ -272,6 +272,7 @@ cc_library(
     srcs = ["dynamic_batch_scheduler.cc"],
     hdrs = ["dynamic_batch_scheduler.h"],
     deps = [
+        ":api_proto",
         ":constants",
         ":infer_header",
         ":logging",

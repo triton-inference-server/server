@@ -528,7 +528,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
               (copied_byte_size != expected_byte_size)) {
             payload.compute_status_ = tensorflow::errors::Internal(
                 "expected ", expected_byte_size,
-                " of data for inference input '", name, "', got ",
+                " bytes of data for inference input '", name, "', got ",
                 copied_byte_size);
           }
 

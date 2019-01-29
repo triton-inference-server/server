@@ -35,7 +35,7 @@ source ../common/util.sh
 
 RET=0
 
-# Setup model store
+# Setup non-variable-size model store
 rm -fr *.log *.serverlog models && mkdir models
 for m in \
         $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 \
@@ -46,61 +46,110 @@ for m in \
     cp -r $m models/. &&
         (cd models/$(basename $m) && \
                 sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+                sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
                 echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 done
 
-# Custom model needs to have 3 versions like others...
-(cd models/custom_float32_float32_float32 && \
-        cp -r 1 2 && \
-        cp -r 1 3 && \
-        echo "version_policy: { specific { versions: [1, 3] }}" >> config.pbtxt)
+# Setup variable-size model store
+rm -fr var_models && mkdir var_models
+for m in \
+        $DATADIR/qa_variable_model_repository/savedmodel_float32_float32_float32 \
+        $DATADIR/qa_variable_model_repository/graphdef_float32_float32_float32 \
+        $DATADIR/qa_variable_model_repository/netdef_float32_float32_float32 \
+        $DATADIR/qa_variable_model_repository/plan_float32_float32_float32 \
+        ../custom_models/custom_float32_float32_float32 ; do
+    cp -r $m var_models/. && \
+        (cd var_models/$(basename $m) && \
+                sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+                sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+                echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt) && \
+        for MC in `ls var_models/*/config.pbtxt`; do
+            sed -i "s/16/-1/g" $MC
+        done
+done
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correctly batch size was used
-# for execution)
-for i in \
-        test_static_batch_preferred \
-        test_static_batch_lt_any_preferred \
-        test_static_batch_not_preferred \
-        test_static_batch_gt_max_preferred \
-        test_multi_batch_not_preferred \
-        test_multi_batch_gt_max_preferred \
-        test_multi_batch_sum_gt_max_preferred \
-        test_multi_same_output0 \
-        test_multi_same_output1 \
-        test_multi_different_outputs ; do
-    SERVER_ARGS="--model-store=`pwd`/models"
-    SERVER_LOG="./$i.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+# for execution). Test everything with fixed-tensor-size models and
+# variable-tensor-size models.
+for model_type in FIXED VARIABLE; do
+    export BATCHER_TYPE=$model_type
+    MODEL_PATH=models && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
+    for i in \
+            test_static_batch_preferred \
+            test_static_batch_lt_any_preferred \
+            test_static_batch_not_preferred \
+            test_static_batch_gt_max_preferred \
+            test_multi_batch_not_preferred \
+            test_multi_batch_gt_max_preferred \
+            test_multi_batch_sum_gt_max_preferred \
+            test_multi_same_output0 \
+            test_multi_same_output1 \
+            test_multi_different_outputs \
+            test_multi_different_output_order ; do
+        SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
+        SERVER_LOG="./$i.$model_type.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-    echo "Test: $i" >>$CLIENT_LOG
+        echo "Test: $i" >>$CLIENT_LOG
 
-    set +e
-    python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+        set +e
+        python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
+
+    # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+    # scheduler is delayed and requests can collect in the queue.
+    for i in \
+            test_multi_batch_use_biggest_preferred \
+            test_multi_batch_use_best_preferred ; do
+        export TRTSERVER_DELAY_SCHEDULER=6 &&
+            [[ "$i" == "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3
+        SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
+        SERVER_LOG="./$i.$model_type.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        echo "Test: $i" >>$CLIENT_LOG
+
+        set +e
+        python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+
+        unset TRTSERVER_DELAY_SCHEDULER
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 done
 
-# Tests that require TRTSERVER_DELAY_SCHEDULER so that the scheduler
-# is delayed and requests can collect in the queue.
+# Tests that run only on the variable-size tensor models
+export BATCHER_TYPE=VARIABLE
 for i in \
-        test_multi_batch_use_biggest_preferred \
-        test_multi_batch_use_best_preferred ; do
-    export TRTSERVER_DELAY_SCHEDULER=6 &&
-        [[ "$i" == "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3
-    SERVER_ARGS="--model-store=`pwd`/models"
-    SERVER_LOG="./$i.serverlog"
+        test_multi_batch_not_preferred_different_shape \
+        test_multi_batch_preferred_different_shape \
+        test_multi_batch_different_shape ; do
+    SERVER_ARGS="--model-store=`pwd`/var_models"
+    SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -118,7 +167,6 @@ for i in \
     fi
     set -e
 
-    unset TRTSERVER_DELAY_SCHEDULER
     kill $SERVER_PID
     wait $SERVER_PID
 done
