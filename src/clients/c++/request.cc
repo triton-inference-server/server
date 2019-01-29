@@ -1551,10 +1551,9 @@ HttpRequestImpl::~HttpRequestImpl()
 Error
 HttpRequestImpl::InitializeRequest()
 {
+  ordered_results_.clear();
   infer_response_buffer_.clear();
 
-  // Reset all the position indicators so that we send all inputs
-  // correctly.
   request_status_.Clear();
   response_header_.Clear();
 
