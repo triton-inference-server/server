@@ -40,7 +40,11 @@ import test_util as tu
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
-_trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
+if os.environ['BATCHER_TYPE'] == "VARIABLE":
+    _trials = ("savedmodel", "graphdef", "netdef")
+else:
+    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
+
 _max_queue_delay = 10000
 _check_exception = None
 
@@ -54,30 +58,28 @@ class BatcherTest(unittest.TestCase):
             raise _check_exception
 
     def check_response(self, trial, bs, less_than, threshold_ms,
-                       requested_outputs=("OUTPUT0", "OUTPUT1")):
+                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16):
         global _check_exception
         try:
-            input_size = 16
-
             start_ms = int(round(time.time() * 1000))
 
             if trial == "savedmodel" or trial == "graphdef" or trial == "netdef":
                 tensor_shape = (input_size,)
                 iu.infer_exact(self, trial, tensor_shape, bs, True,
-                               np.float32, np.float32, np.float32, swap=True,
-                               outputs=requested_outputs,
+                               np.float32, np.float32, np.float32, swap=False,
+                               model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs, True,
-                               np.float32, np.float32, np.float32, swap=True,
-                               outputs=requested_outputs,
+                               np.float32, np.float32, np.float32, swap=False,
+                               model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             elif trial == "custom":
                 tensor_shape = (input_size,)
                 iu.infer_exact(self, trial, tensor_shape, bs, True,
                                np.float32, np.float32, np.float32, swap=False,
-                               outputs=requested_outputs,
+                               model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
@@ -113,21 +115,21 @@ class BatcherTest(unittest.TestCase):
         self.assertTrue(model_name in ss.model_status,
                         "expected status for model " + model_name)
         vs = ss.model_status[model_name].version_status
-        self.assertEqual(len(vs), 2) # *_float32_float32_float32 has 2 versions
-        self.assertTrue(3 in vs, "expected status for version 3")
-        infer = vs[3].infer_stats
+        self.assertEqual(len(vs), 1)
+        self.assertTrue(1 in vs, "expected status for version 1")
+        infer = vs[1].infer_stats
         self.assertEqual(len(infer), len(static_bs),
                          "expected batch-sizes (" + ",".join(str(b) for b in static_bs) +
-                         "), got " + str(vs[3]))
+                         "), got " + str(vs[1]))
         for b in static_bs:
             self.assertTrue(b in infer,
-                            "expected batch-size " + str(b) + ", got " + str(vs[3]))
-        self.assertEqual(vs[3].model_execution_count, exec_cnt,
+                            "expected batch-size " + str(b) + ", got " + str(vs[1]))
+        self.assertEqual(vs[1].model_execution_count, exec_cnt,
                         "expected model-execution-count " + str(exec_cnt) + ", got " +
-                        str(vs[3].model_execution_count))
-        self.assertEqual(vs[3].model_inference_count, infer_cnt,
+                        str(vs[1].model_execution_count))
+        self.assertEqual(vs[1].model_inference_count, infer_cnt,
                         "expected model-inference-count " + str(infer_cnt) + ", got " +
-                        str(vs[3].model_inference_count))
+                        str(vs[1].model_inference_count))
 
     def test_static_batch_preferred(self):
         # Send two requests with static batch sizes == preferred
@@ -206,6 +208,39 @@ class BatcherTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multi_batch_different_shape(self):
+        # Send two requests with sum of static batch sizes ==
+        # preferred size, but with different shapes (using model with
+        # variable-size tensors). This should cause the requests to
+        # not be batched. The first response will come back
+        # immediately and the second delayed by the max batch queue
+        # delay
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000),
+                                                kwargs={'input_size': 16}))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, False, _max_queue_delay),
+                                                kwargs={'input_size': 8}))
+                threads[0].start()
+                time.sleep(1)
+                threads[1].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,), 2, 2)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_multi_batch_not_preferred(self):
         # Send two requests with total static batch size in between
         # preferred sizes. This should cause the first response to be
@@ -233,6 +268,80 @@ class BatcherTest(unittest.TestCase):
                     t.join()
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (1,3), 1, 4)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_multi_batch_not_preferred_different_shape(self):
+        # Send two requests with total static batch size in between
+        # preferred sizes. Then send a request with a different shape
+        # and a non-preferred batch size. This should cause the first
+        # to requests to be immediately responded to and the third
+        # response to be delayed by the max batch queue delay.
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 3, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, False, _max_queue_delay),
+                                                kwargs={'input_size': 8}))
+                threads[0].start()
+                threads[1].start()
+                time.sleep(1)
+                threads[2].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,3), 2, 5)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_multi_batch_preferred_different_shape(self):
+        # Send two requests with total static batch size in between
+        # preferred sizes. Then send a request with a different shape
+        # and a non-preferred batch size. This should cause the first
+        # to requests to be immediately responded to. Send a forth
+        # request with the same shape as the third that causes a
+        # preferred size so that third and forth response are send
+        # immediately.
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 3, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000),
+                                                kwargs={'input_size': 8}))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 5, True, 3000),
+                                                kwargs={'input_size': 8}))
+                threads[0].start()
+                threads[1].start()
+                time.sleep(1)
+                threads[2].start()
+                threads[3].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,3,5), 2, 10)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -386,6 +495,36 @@ class BatcherTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multi_different_output_order(self):
+        # Send two requests that ask for both outputs, but in a
+        # different order. They should be batched and get the correct
+        # response even though they use different order.
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000),
+                                                kwargs={'requested_outputs': ("OUTPUT0","OUTPUT1")}))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000),
+                                                kwargs={'requested_outputs': ("OUTPUT1","OUTPUT0")}))
+                threads[0].start()
+                threads[1].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,), 1, 2)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_multi_batch_use_biggest_preferred(self):
         # Send multiple requests that sum to multiple preferred sizes
         # and make sure the largest preferred size if used for the
@@ -463,6 +602,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 2, 3)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()
