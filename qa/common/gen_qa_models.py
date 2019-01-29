@@ -860,6 +860,8 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np.float32, np.int64, np.int64, (8,-1), (8,4), (8,4), 32)
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int64, (-1,8,-1), (2,8,2), (2,8,2), 32)
         create_models(FLAGS.models_dir, np.float32, np.float32, np.int32, (-1,), (-1,), (-1,), 16)
+        create_models(FLAGS.models_dir, np.int32, np.int32, np.int32, (-1,-1), (-1,8), (-1,-1), 16)
+        create_models(FLAGS.models_dir, np.int32, np.int32, np.float32, (-1,8,-1), (-1,8,-1), (2,8,2), 32)
 
         create_models(FLAGS.models_dir, np_dtype_string, np_dtype_string, np_dtype_string,
                       (-1,), (16,), (16,), 16)
