@@ -47,6 +47,10 @@ for TARGET in cpu gpu; do
         cp -r /data/inferenceserver/qa_variable_model_repository models && \
         cp -r ../custom_models/* models/.
 
+    for MC in `ls models/custom*_int32_int32_int32/config.pbtxt`; do
+        sed -i "s/16/-1,-1/g" $MC
+    done
+
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
