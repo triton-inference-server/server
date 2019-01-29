@@ -107,6 +107,7 @@ CustomBundle::CreateExecutionContexts(
             group.name() + "_" + std::to_string(c) + "_cpu";
         TF_RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, Context::NO_GPU_DEVICE, libraries));
+        total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
@@ -114,10 +115,9 @@ CustomBundle::CreateExecutionContexts(
                                             std::to_string(gpu_device);
           TF_RETURN_IF_ERROR(
               CreateExecutionContext(instance_name, gpu_device, libraries));
+          total_context_cnt++;
         }
       }
-
-      total_context_cnt++;
     }
   }
 
