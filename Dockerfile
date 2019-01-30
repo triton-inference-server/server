@@ -106,10 +106,13 @@ ARG BUILD_CLIENTS_ONLY=0
 # TENSORFLOW_IMAGE
 ARG TFS_BRANCH=r1.12
 
+# libcurl and libopencv are needed to build some testing
+# applications. libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             automake \
             libcurl3-dev \
+            libgoogle-glog0v5 \
             libopencv-dev \
             libopencv-core-dev \
             libtool
@@ -194,8 +197,8 @@ ENV TF_NEED_S3 1
 
 # Build the server, clients and any testing artifacts
 RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
-    (cd tools && mv bazel.rc bazel.orig && \
-     cat bazel.orig /opt/tensorflow/.tf_configure.bazelrc > bazel.rc) && \
+    mv .bazelrc .bazelrc.orig && \
+    cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                bazel build -c opt --config=cuda \
                      src/servers/trtserver \
@@ -269,6 +272,11 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
     useradd $TENSORRT_SERVER_USER && \
     [ `id -u $TENSORRT_SERVER_USER` -eq 1000 ] && \
     [ `id -g $TENSORRT_SERVER_USER` -eq 1000 ]
+
+# libgoogle-glog0v5 is needed by caffe2 libraries.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            libgoogle-glog0v5
 
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
