@@ -66,11 +66,6 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 cc_library(
-    name = "libmkldnn",
-    srcs = ["libmkldnn.so.0"],
-    visibility = ["//visibility:public"],
-)
-cc_library(
     name = "libmkl_core",
     srcs = ["libmkl_core.so"],
     visibility = ["//visibility:public"],
@@ -135,4 +130,4 @@ tf_serving_workspace()
 # Specify the minimum required bazel version.
 load("@org_tensorflow//tensorflow:version_check.bzl", "check_bazel_version_at_least")
 
-check_bazel_version_at_least("0.15.0")
+check_bazel_version_at_least("0.18.0")

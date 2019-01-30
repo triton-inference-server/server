@@ -84,7 +84,6 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0; \
                touch /opt/conda/lib/libmkl_avx2.so; \
                touch /opt/conda/lib/libmkl_core.so; \
                touch /opt/conda/lib/libmkl_def.so; \
@@ -136,9 +135,6 @@ COPY --from=trtserver_caffe2 \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0 \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/
@@ -200,8 +196,8 @@ ENV TF_NEED_S3 1
 
 # Build the server, clients and any testing artifacts
 RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
-    (cd tools && mv bazel.rc bazel.orig && \
-     cat bazel.orig /opt/tensorflow/.tf_configure.bazelrc > bazel.rc) && \
+    mv .bazelrc .bazelrc.orig && \
+    cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                bazel build -c opt --config=cuda \
                      src/servers/trtserver \

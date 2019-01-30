@@ -1,2 +1,2 @@
-327d4aeafda1aa0e9e17007eb67a16bb31715a9c  /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
-c1d704be26629357e5d5eeb9fc07829ca345b778  /opt/tensorflow/tensorflow/core/platform/default/logging.cc
+8e1307417d57caca270ff21dc0f8909de87f638b  /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
+f96ccb0eb9dba13318ca5d5cdd6d2904a4d01948  /opt/tensorflow/tensorflow/core/platform/default/logging.cc
