@@ -40,6 +40,16 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 for TARGET in cpu gpu; do
+    if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
+        if [ "$TARGET" == "gpu" ]; then
+            echo -e "Skip GPU testing on CPU-only device"
+            continue
+        fi
+        # set strict readiness=false on CPU-only device to allow
+        # unsuccessful load of TensorRT plans, which require GPU.
+        SERVER_ARGS="--model-store=$DATADIR --strict-readiness=false"
+    fi
+
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
     CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 

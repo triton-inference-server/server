@@ -34,6 +34,9 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
+import os
+
+CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
 
 np_dtype_string = np.dtype(object)
 
@@ -65,7 +68,7 @@ class InferTest(unittest.TestCase):
             iu.infer_exact(self, 'netdef_nobatch', (input_size,), 1, req_raw,
                            input_dtype, output0_dtype, output1_dtype, swap=swap)
 
-        if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+        if not CPU_ONLY and tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,1,1), (input_size,1,1), (input_size,1,1)):
             # model that supports batching
             for bs in (1, 8):
@@ -246,6 +249,8 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
         for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
+            if platform == 'plan' and CPU_ONLY:
+                continue
             tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
             iu.infer_exact(self, platform, tensor_shape, 1, True,
                            np.float32, np.float32, np.float32,
