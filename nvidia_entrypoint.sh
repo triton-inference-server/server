@@ -52,7 +52,7 @@ if [[ "$(find /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /dev
   ln -s `find / -name libcuda.so.1 -print -quit` lib/libcuda.so.1
   ln -s `find / -name libnvidia-ml.so -print -quit` lib/libnvidia-ml.so.1
   ln -s `find / -name libnvidia-fatbinaryloader.so.${CUDA_DRIVER_VERSION} -print -quit` lib/libnvidia-fatbinaryloader.so.${CUDA_DRIVER_VERSION}
-  export TENSORRT_SERVER_CPU_ONLY=
+  export TENSORRT_SERVER_CPU_ONLY=1
 else
   ( /usr/local/bin/checkSMVER.sh )
   DRIVER_VERSION=$(sed -n 's/^NVRM.*Kernel Module *\([0-9.]*\).*$/\1/p' /proc/driver/nvidia/version 2>/dev/null || true)
