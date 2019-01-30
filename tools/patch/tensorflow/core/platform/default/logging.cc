@@ -1,6 +1,8 @@
---- tensorflow/core/platform/default/logging.cc	2018-07-13 12:53:35.159015218 -0700
-+++ ../tensorrtserver/tools/patch/tensorflow/core/platform/default/logging.cc	2018-10-12 16:39:38.071855234 -0700
-@@ -76,7 +76,31 @@
+diff --git a/tensorflow/core/platform/default/logging.cc b/tensorflow/core/platform/default/logging.cc
+index 26bd854..6ba94a0 100644
+--- a/tensorflow/core/platform/default/logging.cc
++++ b/tensorflow/core/platform/default/logging.cc
+@@ -76,7 +76,31 @@ void LogMessage::GenerateLogMessage() {
  
  #else
  
@@ -32,8 +34,8 @@
    static EnvTime* env_time = tensorflow::EnvTime::Default();
    uint64 now_micros = env_time->NowMicros();
    time_t now_seconds = static_cast<time_t>(now_micros / 1000000);
-@@ -121,7 +145,22 @@
-   return LogLevelStrToInt(tf_env_var_val);
+@@ -197,6 +221,14 @@ int64 MinLogLevelFromEnv() {
+ #endif
  }
  
 +// NVIDIA
@@ -45,6 +47,12 @@
 +extern "C" uint32_t DelegatedVerboseLogLevel() __attribute__((weak));
 +
  int64 MinVLogLevelFromEnv() {
+   // We don't want to print logs during fuzzing as that would slow fuzzing down
+   // by almost 2x. So, if we are in fuzzing mode (not just running a test), we
+@@ -207,6 +239,13 @@ int64 MinVLogLevelFromEnv() {
+ #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+   return 0;
+ #else
 +  if (DelegatedVerboseLogLevel) {
 +    int64 lvl = DelegatedVerboseLogLevel();
 +    // Reduce the inference-server verbose-log level by 1 for TF. That
@@ -54,4 +62,4 @@
 +
    const char* tf_env_var_val = getenv("TF_CPP_MIN_VLOG_LEVEL");
    return LogLevelStrToInt(tf_env_var_val);
- }
+ #endif
