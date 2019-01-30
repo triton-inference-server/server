@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -231,26 +231,58 @@ CustomBundle::Run(
     payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
 }
 
 tensorflow::Status
-CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
+CustomBundle::Context::Run(
+    CustomBundle* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
+
+  // Each payload will have the same number and shape for inputs. Get
+  // the shape for each input.
+  std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
+      input_shapes;
+  if (!payloads->empty()) {
+    const InferRequestHeader& request_header =
+        payloads->front().request_provider_->RequestHeader();
+
+    for (const auto& input : request_header.input()) {
+      if (input.dims_size() > 0) {
+        std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
+        for (auto d : input.dims()) {
+          shape->push_back(d);
+        }
+        input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
+      } else {
+        const ModelInput* input_config;
+        TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
+
+        std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
+        for (auto d : input_config->dims()) {
+          shape->push_back(d);
+        }
+        input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
+      }
+    }
+  }
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
   // size of each input has already been checked by each payloads
   // request provider so don't need to do that here.
   uint32_t total_batch_size = 0;
+  uint32_t total_inputs = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& payload : *payloads) {
     if (payload.status_.ok()) {
       const InferRequestHeader& request_header =
           payload.request_provider_->RequestHeader();
+
       total_batch_size += request_header.batch_size();
+      total_inputs += request_header.input_size();
       total_requested_outputs += request_header.output_size();
     }
   }
@@ -271,12 +303,20 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         "', max allowed is ", max_batch_size_);
   }
 
-  // We use the following to hold pointers to all the output names of
-  // the payloads. We don't want this to resize as that will
+  // We use the following to hold pointers to all the input and output
+  // names of the payloads. We don't want this to resize as that will
   // invalidate the pointers so set the capacity big enough to hold
   // all the pointers for all the payloads.
+  std::vector<const char*> work_input_name_ptrs;
+  work_input_name_ptrs.reserve(total_inputs);
   std::vector<const char*> work_output_name_ptrs;
   work_output_name_ptrs.reserve(total_requested_outputs);
+
+  // Similarly for input dim sizes and the dimension values.
+  std::vector<size_t> work_input_dim_cnts;
+  work_input_dim_cnts.reserve(total_inputs);
+  std::vector<const int64_t*> work_input_dims_ptrs;
+  work_input_dims_ptrs.reserve(total_inputs);
 
   // We use the following to hold contexts needed for the input and
   // output callbacks. We don't want this to resize as that will
@@ -300,6 +340,32 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     CustomPayload& custom_payload = custom_payloads.back();
     custom_payload.batch_size = request_header.batch_size();
 
+    // Inputs
+    custom_payload.input_cnt = request_header.input_size();
+    custom_payload.input_names = nullptr;
+    custom_payload.input_shape_dim_cnts = nullptr;
+    custom_payload.input_shape_dims = nullptr;
+    for (const auto& input : request_header.input()) {
+      auto itr = input_shapes.find(input.name());
+      if (itr == input_shapes.end()) {
+        return tensorflow::errors::Internal(
+            "unable to find shape for input '", input.name(), "' for '", name_,
+            "'");
+      }
+
+      std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
+
+      work_input_name_ptrs.push_back(input.name().c_str());
+      work_input_dim_cnts.push_back(shape->size());
+      work_input_dims_ptrs.push_back(&(shape->at(0)));
+      if (custom_payload.input_names == nullptr) {
+        custom_payload.input_names = &work_input_name_ptrs.back();
+        custom_payload.input_shape_dim_cnts = &work_input_dim_cnts.back();
+        custom_payload.input_shape_dims = &work_input_dims_ptrs.back();
+      }
+    }
+
+    // Outputs
     custom_payload.output_cnt = request_header.output_size();
     custom_payload.required_output_names = nullptr;
     for (const auto& output : request_header.output()) {
@@ -331,8 +397,8 @@ CustomBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
     if (custom_payloads[i].error_code != 0) {
       (*payloads)[i].status_ = tensorflow::errors::Internal(
-          "payload error for '", name_, "': (", err, ") ",
-          LibraryErrorString(err));
+          "payload error for '", name_, "': (", custom_payloads[i].error_code,
+          ") ", LibraryErrorString(custom_payloads[i].error_code));
     }
   }
 

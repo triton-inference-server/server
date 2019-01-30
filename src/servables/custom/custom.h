@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -42,6 +42,20 @@ extern "C" {
 typedef struct custom_payload_struct {
   // The size of the batch represented by this payload.
   uint32_t batch_size;
+
+  // The number of inputs included in this payload.
+  uint32_t input_cnt;
+
+  // The 'input_cnt' names of the inputs included in this payload.
+  const char** input_names;
+
+  // For each of the 'input_cnt' inputs, the number of dimensions in
+  // the input's shape, not including the batch dimension.
+  const size_t* input_shape_dim_cnts;
+
+  // For each of the 'input_cnt' inputs, the shape of the input, not
+  // including the batch dimension.
+  const int64_t** input_shape_dims;
 
   // The number of outputs that must be computed for this payload. Can
   // be 0 to indicate that no outputs are required from the backend.
