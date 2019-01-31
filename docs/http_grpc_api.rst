@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -130,23 +130,30 @@ The request uses the **NV-InferRequest** header to communicate an
 <nvidia::inferenceserver::InferRequestHeader>` message that describes
 the input tensors and the requested output tensors. For example, for a
 resnet50 model the following **NV-InferRequest** header indicates that
-a batch-size 1 request is being made with input size of 602112 bytes
-(3 * 224 * 224 * sizeof(FP32)), and that the result of the tensor
-named "output" should be returned as the top-3 classification values::
+a batch-size 1 request is being made with a single input named
+"input", and that the result of the tensor named "output" should be
+returned as the top-3 classification values::
 
-  NV-InferRequest: batch_size: 1 input { name: "input" byte_size: 602112 } output { name: "output" byte_size: 4000 cls { count: 3 } }
+  NV-InferRequest: batch_size: 1 input { name: "input" } output { name: "output" cls { count: 3 } }
 
 The input tensor values are communicated in the body of the HTTP POST
 request as raw binary in the order as the inputs are listed in the
 request header.
 
-The inference results are returned in the body of the HTTP response to
-the POST request. For outputs where full result tensors were
-requested, the result values are communicated in the body of the
-response in the order as the outputs are listed in the request
-header. Outputs that have fixed-size datatypes must be listed first in
-the request header followed by outputs that have non-fixed-size
-datatypes (like STRING).  After those, an
+The HTTP response includes an **NV-InferResponse** header that
+communicates an :cpp:var:`InferResponseHeader
+<nvidia::inferenceserver::InferResponseHeader>` message that describes
+the outputs. For example the above response could return the
+following::
+
+  NV-InferResponse: model_name: "mymodel" model_version: 1 batch_size: 1 output { name: "output" raw { dims: 4 dims: 4 batch_byte_size: 64 } }
+
+This response shows that the output in a tensor with shape [ 4, 4 ]
+and has a size of 64 bytes. The output tensor contents are returned in
+the body of the HTTP response to the POST request. For outputs where
+full result tensors were requested, the result values are communicated
+in the body of the response in the order as the outputs are listed in
+the **NV-InferResponse** header. After those, an
 :cpp:var:`InferResponseHeader
 <nvidia::inferenceserver::InferResponseHeader>` message is appended to
 the response body. The :cpp:var:`InferResponseHeader
@@ -156,19 +163,13 @@ parameter format=binary is specified (for example,
 /api/infer/foo?format=binary).
 
 For example, assuming an inference request for a model that has 'n'
-outputs with fixed-size datatypes and 'm' outputs with non-fixed-size
-datatypes, the outputs specified in the :cpp:var:`InferResponseHeader
-<nvidia::inferenceserver::InferResponseHeader>` in order are
-“output-fixed[0]”, ..., “output-fixed[n-1]”, “output-non-fixed[0]”,
-..., “output-non-fixed[m-1]”. Assuming RAW output is being requested
-for all outputs the response body would contain::
+outputs, the outputs specified in the **NV-InferResponse** header in
+order are “output[0]”, ..., “output[n-1]” the response body would
+contain::
 
-  <raw binary tensor values for output-fixed[0] >
+  <raw binary tensor values for output[0] >
   ...
-  <raw binary tensor values for output-fixed[n-1] >
-  <raw binary tensor values for output-non-fixed[0] >
-  ...
-  <raw binary tensor values for output-non-fixed[m-1] >
+  <raw binary tensor values for output[n-1] >
   <text or binary encoded InferResponseHeader proto>
 
 The success or failure of the inference request is indicated in the
