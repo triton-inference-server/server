@@ -62,7 +62,8 @@ enum ErrorCodes {
   kInputSize,
   kOutputBuffer,
   kCudaMalloc,
-  kCudaMemcpy
+  kCudaMemcpy,
+  kCudaStream
 };
 
 // Context object. All state must be kept in this object.
@@ -81,6 +82,9 @@ class Context {
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
+  int FreeCudaBuffers();
+  int AllocateCudaBuffers(size_t byte_size);
+
   int GetInputTensorCPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
       const size_t expected_byte_size, std::vector<uint8_t>* input);
@@ -106,19 +110,6 @@ class Context {
   // INT32 or FP32.
   DataType datatype_;
 
-  // The shape of the input and output tensors.
-  std::vector<int64_t> shape_;
-
-  // The number of elements in each input and output tensor for
-  // batch-size 1.
-  uint64_t batch1_element_count_;
-
-  // The size, in bytes, of batch-size 1 input or output tensor. Input
-  // and output tensors are the same shape and data-type so they all
-  // have the same size. To get the full size of an input/output need
-  // to multiply this value by the batch-size.
-  uint64_t batch1_byte_size_;
-
   // CUDA memory buffers for input and output tensors.
   size_t cuda_buffer_byte_size_;
   uint8_t* cuda_input0_;
@@ -132,13 +123,28 @@ class Context {
 
 Context::Context(const ModelConfig& model_config, const int gpu_device)
     : model_config_(model_config), gpu_device_(gpu_device),
-      datatype_(DataType::TYPE_INVALID), batch1_element_count_(0),
-      batch1_byte_size_(0), cuda_buffer_byte_size_(0), cuda_input0_(nullptr),
-      cuda_input1_(nullptr), cuda_output_(nullptr), stream_(nullptr)
+      datatype_(DataType::TYPE_INVALID), cuda_buffer_byte_size_(0),
+      cuda_input0_(nullptr), cuda_input1_(nullptr), cuda_output_(nullptr),
+      stream_(nullptr)
 {
 }
 
 Context::~Context()
+{
+  FreeCudaBuffers();
+
+  if (stream_ != nullptr) {
+    cudaError_t cuerr = cudaStreamDestroy(stream_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: "
+                << cudaGetErrorString(cuerr);
+    }
+    stream_ = nullptr;
+  }
+}
+
+int
+Context::FreeCudaBuffers()
 {
   if (cuda_input0_ != nullptr) {
     cudaError_t cuerr = cudaFree(cuda_input0_);
@@ -159,23 +165,51 @@ Context::~Context()
     }
   }
 
-  if (stream_ != nullptr) {
-    cudaError_t cuerr = cudaStreamDestroy(stream_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "Failed to destroy cuda stream: "
-                << cudaGetErrorString(cuerr);
-    }
-    stream_ = nullptr;
+  cuda_buffer_byte_size_ = 0;
+  return kSuccess;
+}
+
+int
+Context::AllocateCudaBuffers(size_t byte_size)
+{
+  cudaError_t cuerr;
+
+  FreeCudaBuffers();
+
+  // Allocate GPU memory buffers large enough for each input and
+  // output. For performance we allocate once during initialization
+  // instead of doing it each time we execute.
+  cuerr = cudaMalloc(&cuda_input0_, byte_size);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "unable to allocate memory for addsub: "
+              << cudaGetErrorString(cuerr);
+    return kCudaMalloc;
   }
+  cuerr = cudaMalloc(&cuda_input1_, byte_size);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "unable to allocate memory for addsub: "
+              << cudaGetErrorString(cuerr);
+    return kCudaMalloc;
+  }
+  cuerr = cudaMalloc(&cuda_output_, byte_size);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "unable to allocate memory for addsub: "
+              << cudaGetErrorString(cuerr);
+    return kCudaMalloc;
+  }
+
+  cuda_buffer_byte_size_ = byte_size;
+  return kSuccess;
 }
 
 int
 Context::Init()
 {
   // There must be two inputs that have the same shape. The shape can
-  // be anything since we are just going to do an element-wise add and
-  // an element-wise subtract. The input data-type must be INT32 or
-  // FP32. The inputs must be named INPUT0 and INPUT1.
+  // be anything (including having wildcard, -1, dimensions) since we
+  // are just going to do an element-wise add and an element-wise
+  // subtract. The input data-type must be INT32 or FP32. The inputs
+  // must be named INPUT0 and INPUT1.
   if (model_config_.input_size() != 2) {
     return kInputOutputShape;
   }
@@ -216,54 +250,18 @@ Context::Init()
     return kOutputName;
   }
 
-  // Get the shape of input and output tensors... needed when
-  // reporting output values.
-  for (auto d : model_config_.output(0).dims()) {
-    shape_.push_back(d);
-  }
-
-  // Due to the above contraints, each input and output tensor will be
-  // the same size (in bytes). Calculate that batch-1 size as it is
-  // needed when reading and writing the tensors during execution.
-  batch1_element_count_ = GetElementCount(model_config_.input(0).dims());
-  batch1_byte_size_ = GetByteSize(model_config_.input(0));
-
   // Additional initialization if executing on the GPU...
   if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
-    cudaError_t cuerr;
-    // Allocate GPU memory buffers large enough for each input and
-    // output. For performance we allocate once during initialization
-    // instead of doing it each time we execute.
-    cuda_buffer_byte_size_ =
-        batch1_byte_size_ * std::max(1, model_config_.max_batch_size());
-    cuerr = cudaMalloc(&cuda_input0_, cuda_buffer_byte_size_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to allocate memory for addsub: "
-                << cudaGetErrorString(cuerr);
-      return kCudaMalloc;
-    }
-    cuerr = cudaMalloc(&cuda_input1_, cuda_buffer_byte_size_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to allocate memory for addsub: "
-                << cudaGetErrorString(cuerr);
-      return kCudaMalloc;
-    }
-    cuerr = cudaMalloc(&cuda_output_, cuda_buffer_byte_size_);
-    if (cuerr != cudaSuccess) {
-      LOG_ERROR << "unable to allocate memory for addsub: "
-                << cudaGetErrorString(cuerr);
-      return kCudaMalloc;
-    }
-
     // Create a CUDA stream for this context so that it executes
     // independently of other instances of this backend.
     const int cuda_stream_priority =
         GetCudaStreamPriority(model_config_.optimization().priority());
-    cuerr = cudaStreamCreateWithPriority(
+    cudaError_t cuerr = cudaStreamCreateWithPriority(
         &stream_, cudaStreamDefault, cuda_stream_priority);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "unable to create stream for addsub backend: "
                 << cudaGetErrorString(cuerr);
+      return kCudaStream;
     }
   }
 
@@ -351,21 +349,52 @@ Context::ExecuteCPU(
   // outputs. Each payload may have a different batch size. The total
   // batch-size of all payloads will not exceed the max-batch-size
   // specified in the model configuration.
+  if (payload_cnt == 0) {
+    return kSuccess;
+  }
 
   // For performance, we would typically execute all payloads together
   // as a single batch by first gathering the inputs from across the
   // payloads and then scattering the outputs across the payloads.
   // Here, for simplicity and clarity, we instead process each payload
   // separately.
-  int err;
 
+  // Make sure all inputs have the same shape. We need to do this
+  // check for every request to support variable-size input tensors
+  // (otherwise the checks of the model configuration in Init() would
+  // be sufficient). The scheduler will ensure that all payloads have
+  // consistent shape for all inputs so we only need to check that the
+  // first payload INPUT0 and INPUT1 are the same shape.
+
+  if (payloads[0].input_cnt != 2) {
+    // Should never hit this case since inference server will ensure
+    // correct number of inputs...
+    return kInputOutputShape;
+  }
+
+  std::vector<int64_t> shape(
+      payloads[0].input_shape_dims[0],
+      payloads[0].input_shape_dims[0] + payloads[0].input_shape_dim_cnts[0]);
+  std::vector<int64_t> shape1(
+      payloads[0].input_shape_dims[1],
+      payloads[0].input_shape_dims[1] + payloads[0].input_shape_dim_cnts[1]);
+  if (shape != shape1) {
+    return kInputOutputShape;
+  }
+
+  const uint64_t batch1_element_count = GetElementCount(shape);
+  const uint64_t batch1_byte_size =
+      batch1_element_count * GetDataTypeByteSize(datatype_);
+
+  int err;
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
     CustomPayload& payload = payloads[pidx];
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
-    uint64_t batchn_element_count = payload.batch_size * batch1_element_count_;
-    size_t batchn_byte_size = payload.batch_size * batch1_byte_size_;
+    const uint64_t batchn_element_count =
+        payload.batch_size * batch1_element_count;
+    const uint64_t batchn_byte_size = payload.batch_size * batch1_byte_size;
 
     // Get the input tensors.
     std::vector<uint8_t> input0;
@@ -384,25 +413,25 @@ Context::ExecuteCPU(
       continue;
     }
 
+    // The output shape is [payload-batch-size, shape] if the model
+    // configuration supports batching, or just [shape] if the
+    // model configuration does not support batching.
+    std::vector<int64_t> output_shape;
+    if (model_config_.max_batch_size() != 0) {
+      output_shape.push_back(payload.batch_size);
+    }
+    output_shape.insert(output_shape.end(), shape.begin(), shape.end());
+
     // For each requested output get the buffer to hold the output
     // values and calculate the sum/difference directly into that
     // buffer.
     for (uint32_t oidx = 0; oidx < payload.output_cnt; ++oidx) {
       const char* output_name = payload.required_output_names[oidx];
 
-      // The output shape is [payload-batch-size, output-shape] if the
-      // model configuration supports batching, or just [output-shape]
-      // if the model configuration does not support batching.
-      std::vector<int64_t> shape;
-      if (model_config_.max_batch_size() != 0) {
-        shape.push_back(payload.batch_size);
-      }
-      shape.insert(shape.end(), shape_.begin(), shape_.end());
-
       void* obuffer;
       if (!output_fn(
-              payload.output_context, output_name, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer)) {
+              payload.output_context, output_name, output_shape.size(),
+              &output_shape[0], batchn_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         break;
       }
@@ -491,26 +520,64 @@ Context::ExecuteGPU(
   // outputs. Each payload may have a different batch size. The total
   // batch-size of all payloads will not exceed the max-batch-size
   // specified in the model configuration.
+  if (payload_cnt == 0) {
+    return kSuccess;
+  }
+
+  cudaSetDevice(gpu_device_);
 
   // For performance, we would typically execute all payloads together
   // as a single batch by first gathering the inputs from across the
   // payloads and then scattering the outputs across the payloads.
   // Here, for simplicity and clarity, we instead process each payload
   // separately.
+
+  // Make sure all inputs have the same shape. We need to do this
+  // check for every request to support variable-size input tensors
+  // (otherwise the checks of the model configuration in Init() would
+  // be sufficient). The scheduler will ensure that all payloads have
+  // consistent shape for all inputs so we only need to check that the
+  // first payload INPUT0 and INPUT1 are the same shape.
+
+  if (payloads[0].input_cnt != 2) {
+    // Should never hit this case since inference server will ensure
+    // correct number of inputs...
+    return kInputOutputShape;
+  }
+
+  std::vector<int64_t> shape(
+      payloads[0].input_shape_dims[0],
+      payloads[0].input_shape_dims[0] + payloads[0].input_shape_dim_cnts[0]);
+  std::vector<int64_t> shape1(
+      payloads[0].input_shape_dims[1],
+      payloads[0].input_shape_dims[1] + payloads[0].input_shape_dim_cnts[1]);
+  if (shape != shape1) {
+    return kInputOutputShape;
+  }
+
+  const uint64_t batch1_element_count = GetElementCount(shape);
+  const uint64_t batch1_byte_size =
+      batch1_element_count * GetDataTypeByteSize(datatype_);
+
   int err;
-
-  cudaSetDevice(gpu_device_);
-
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
     CustomPayload& payload = payloads[pidx];
 
     // For this payload the expected size of the input and output
     // tensors is determined by the batch-size of this payload.
-    uint64_t batchn_element_count = payload.batch_size * batch1_element_count_;
-    size_t batchn_byte_size = payload.batch_size * batch1_byte_size_;
+    const uint64_t batchn_element_count =
+        payload.batch_size * batch1_element_count;
+    const uint64_t batchn_byte_size = payload.batch_size * batch1_byte_size;
+
+    // Make sure the CUDA memory buffers are large enough for this
+    // payload. If not increase their size.
     if (batchn_byte_size > cuda_buffer_byte_size_) {
-      payload.error_code = kInputSize;
-      continue;
+      FreeCudaBuffers();
+      err = AllocateCudaBuffers(batchn_byte_size);
+      if (err != kSuccess) {
+        payload.error_code = err;
+        continue;
+      }
     }
 
     // Copy the input tensors into the appropriate CUDA memory buffer.
@@ -530,24 +597,24 @@ Context::ExecuteGPU(
       continue;
     }
 
+    // The output shape is [payload-batch-size, shape] if the model
+    // configuration supports batching, or just [shape] if the
+    // model configuration does not support batching.
+    std::vector<int64_t> output_shape;
+    if (model_config_.max_batch_size() != 0) {
+      output_shape.push_back(payload.batch_size);
+    }
+    output_shape.insert(output_shape.end(), shape.begin(), shape.end());
+
     // For each requested output calculate the sum/difference directly
     // into the CUDA output buffer and then copy out.
     for (uint32_t oidx = 0; oidx < payload.output_cnt; ++oidx) {
       const char* output_name = payload.required_output_names[oidx];
 
-      // The output shape is [payload-batch-size, output-shape] if the
-      // model configuration supports batching, or just [output-shape]
-      // if the model configuration does not support batching.
-      std::vector<int64_t> shape;
-      if (model_config_.max_batch_size() != 0) {
-        shape.push_back(payload.batch_size);
-      }
-      shape.insert(shape.end(), shape_.begin(), shape_.end());
-
       void* obuffer;
       if (!output_fn(
-              payload.output_context, output_name, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer)) {
+              payload.output_context, output_name, output_shape.size(),
+              &output_shape[0], batchn_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         break;
       }
@@ -679,6 +746,8 @@ CustomErrorString(void* custom_context, int errcode)
       return "cudaMalloc failed";
     case kCudaMemcpy:
       return "cudaMemcpy failed";
+    case kCudaStream:
+      return "failed to create CUDA stream";
     default:
       break;
   }

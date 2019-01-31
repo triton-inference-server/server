@@ -46,6 +46,7 @@ fi
 
 RET=0
 
+set +e
 $SIMPLE_CLIENT -v >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
@@ -55,6 +56,7 @@ python $SIMPLE_CLIENT_PY -v >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

@@ -71,6 +71,20 @@ class InferVariableTest(unittest.TestCase):
                            input_dtype, output0_dtype, output1_dtype,
                            swap=swap)
 
+        # the custom model is src/custom/addsub... it does not swap
+        # the inputs so always set to False
+        if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
+                                        input_shape, output0_shape, output1_shape):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_exact(self, 'custom', input_shape, bs, req_raw,
+                               input_dtype, output0_dtype, output1_dtype,
+                               swap=False)
+            # model that does not support batching
+            iu.infer_exact(self, 'custom_nobatch', input_shape, 1, req_raw,
+                           input_dtype, output0_dtype, output1_dtype,
+                           swap=False)
+
 
     def test_raw_fff(self):
         self._full_exact(True, np.float32, np.float32, np.float32, (16,), (16,), (16,))
