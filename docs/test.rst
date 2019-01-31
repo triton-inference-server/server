@@ -34,24 +34,24 @@ future update.
 
 There is a set of tests in the qa/ directory that can be run manually
 to provide some testing. Before running these tests you must first
-generate a test model repository containing the models needed by the
-tests.
+generate a couple of test model repositories containing the models
+needed by the tests.
 
-Generate QA Model Repository
-----------------------------
+Generate QA Model Repositories
+------------------------------
 
-The QA model repository contains some simple models that are used to
+The QA model repositories contain some simple models that are used to
 verify the correctness of the inference server. To generate the QA
-model repository::
+model repositories::
 
   $ cd qa/common
   $ ./gen_qa_model_repository
 
-This will generate the model repository in /tmp/qa_model_repository.
-The TensorRT models will be created for the GPU on the system that
-CUDA considers device 0 (zero). If you have multiple GPUs on your
-system see the documentation in the script for how to target a
-specific GPU.
+This will generate two model repositories: in /tmp/qa_model_repository
+and /tmp/qa_variable_model_repository.  The TensorRT models will be
+created for the GPU on the system that CUDA considers device 0
+(zero). If you have multiple GPUs on your system see the documentation
+in the script for how to target a specific GPU.
 
 Build QA Container
 ------------------
@@ -71,7 +71,7 @@ Run QA Container
 Now run the QA container and mount the QA model repository into the
 container so the tests will be able to access it::
 
-  $ nvidia-docker run -it --rm -v/tmp/qa_model_repository:/models tensorrtserver_qa
+  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tensorrtserver_qa
 
 Within the container the QA tests are in /opt/tensorrtserver/qa. To run a test::
 
