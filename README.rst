@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -38,11 +38,11 @@ NVIDIA TensorRT Inference Server
 
 .. overview-begin-marker-do-not-remove
 
-The NVIDIA TensorRT Inference Server (TRTIS) provides a cloud
-inferencing solution optimized for NVIDIA GPUs. The server provides an
-inference service via an HTTP or gRPC endpoint, allowing remote
-clients to request inferencing for any model being managed by the
-server. TRTIS provides the following features:
+The NVIDIA TensorRT Inference Server provides a cloud inferencing
+solution optimized for NVIDIA GPUs. The server provides an inference
+service via an HTTP or gRPC endpoint, allowing remote clients to
+request inferencing for any model being managed by the server. The
+inference server provides the following features:
 
 * `Multiple framework support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#framework-model-definition>`_. The
@@ -51,19 +51,19 @@ server. TRTIS provides the following features:
   TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
   TensorFlow-TensorRT integrated models.
 * `Custom backend support
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. TRTIS
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. The inference server
   allows individual models to be implemented with custom backends
   instead of by a deep-learning framework. With a custom backend a
   model can implement any logic desired, while still benefiting from
   the GPU support, concurrent execution, dynamic batching and other
-  features provided by TRTIS.
-* TRTIS `monitors the model repository
+  features provided by the server.
+* The inference server `monitors the model repository
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#modifying-the-model-repository>`_
   for any change and dynamically reloads the model(s) when necessary,
   without requiring a server restart. Models and model versions can be
   added and removed, and model configurations can be modified while
   the server is running.
-* Multi-GPU support. TRTIS can distribute inferencing across all
+* Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
 * `Concurrent model execution support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple
@@ -71,8 +71,8 @@ server. TRTIS provides the following features:
   simultaneously on the same GPU.
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. TRTIS also supports `dynamic
-  batching
+  corresponding batch of outputs. The inference server also supports
+  `dynamic batching
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_
   where individual inference requests are dynamically combined
   together to improve inference throughput. Dynamic batching is
@@ -151,7 +151,7 @@ The `Release Notes
 and `Support Matrix
 <https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
-describe which GPUs are supported by TRTIS.
+describe which GPUs are supported by the inference server.
 
 Contributing
 ------------

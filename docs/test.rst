@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -41,7 +41,8 @@ Generate QA Model Repository
 ----------------------------
 
 The QA model repository contains some simple models that are used to
-verify the correctness of TRTIS. To generate the QA model repository::
+verify the correctness of the inference server. To generate the QA
+model repository::
 
   $ cd qa/common
   $ ./gen_qa_model_repository
@@ -55,11 +56,12 @@ specific GPU.
 Build QA Container
 ------------------
 
-Next you need to build a QA version of the TRTIS container. This
-container will contain TRTIS, the QA tests, and all the dependencies
-needed to run the QA tests. You must first build the
-tensorrtserver_build and tensorrtserver containers as described in
-:ref:`section-building-the-server` and then build the QA container::
+Next you need to build a QA version of the inference server
+container. This container will contain the inference server, the QA
+tests, and all the dependencies needed to run the QA tests. You must
+first build the tensorrtserver_build and tensorrtserver containers as
+described in :ref:`section-building-the-server` and then build the QA
+container::
 
   $ docker build -t tensorrtserver_qa -f Dockerfile.QA .
 

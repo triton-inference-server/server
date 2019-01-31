@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -56,4 +56,5 @@ Server container using the following command::
 
   docker pull nvcr.io/nvidia/tensorrtserver:19.01-py3
 
-Replace *19.01* with the version of TRTIS that you want to pull.
+Replace *19.01* with the version of inference server that you want to
+pull.
