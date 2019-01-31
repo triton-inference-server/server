@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -28,25 +28,188 @@
 Quickstart
 ==========
 
-To quickly get the TensorRT Inference Server (TRTIS) up and running
-follow these steps. After you've seen TRTIS in action you can revisit
-the rest of the User Guide to learn more about its features.
+The TensorRT Inference Server is available in two ways:
 
-First, follow the instructions in
-:ref:`section-installing-prebuilt-containers` to install the TRTIS
-container.
+* As a pre-built Docker container container available from the `NVIDIA
+  GPU Cloud (NGC) <https://ngc.nvidia.com>`_. For more information,
+  see :ref:`section-using-a-prebuilt-docker-container`.
 
-Next, use the :ref:`section-example-model-repository` section to
-create an example model repository containing a couple of models that
-you can serve with TRTIS.
+* As buildable source code located in GitHub. Building the inference
+  server yourself requires the usage of Docker and the TensorFlow and
+  PyTorch containers available from `NGC <https://ngc.nvidia.com>`_.
+  For more information, see :ref:`section-building-from-source-code`.
 
-Now that you have a model repository, follow the instructions in
-:ref:`section-running-the-inference-server` to start TRTIS. Use the
-server's *Status* endpoint to :ref:`make sure the server and the
-models are ready for
-inferencing<section-checking-inference-server-status>`.
+Prerequisites
+-------------
 
-Finally,
-:ref:`build<section-building-the-client-libraries-and-examples>` and
-:ref:`run<section-image_classification_example>` the example
-image-client application to perform image classification using TRTIS.
+Regardless of which method you choose (starting with a pre-built
+container from NGC or building from source), you must perform the
+following prerequisite steps:
+
+* Ensure you have access and are logged into NGC.  For step-by-step
+  instructions, see the `NGC Getting Started Guide
+  <http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
+
+* Install Docker and nvidia-docker.  For DGX users, see `Preparing to
+  use NVIDIA Containers
+  <http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html>`_.
+  For users other than DGX, see the `nvidia-docker installation
+  documentation <https://github.com/NVIDIA/nvidia-docker>`_.
+
+* Clone the TensorRT Inference Server GitHub repo. Even if you choose
+  to get the pre-built inference server from NGC, you need the GitHub
+  repo for the example model repository and to build the example
+  applications. Go to
+  https://github.com/NVIDIA/tensorrt-inference-server, select the
+  r<xx.yy> release branch that you are using, and then select the
+  clone or download drop down button.
+
+* Create a model repository containing one or more models that you
+  want the inference server to serve. An example model repository is
+  included in the docs/examples/model_repository directory of the
+  GitHub repo. Before using the repository, you must fetch any missing
+  model definition files from their public model zoos via the provided
+  docs/examples/fetch_models.sh script::
+
+  $ cd docs/examples
+  $ ./fetch_models.sh
+
+.. _section-using-a-prebuilt-docker-container:
+
+Using A Prebuilt Docker Container
+---------------------------------
+
+Use docker pull to get the TensorRT Inference Server container from
+NGC::
+
+  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3
+
+Where <xx.yy> is the version of the inference server that you want to
+pull. Once you have the container follow these steps to run the server
+and the example client applications.
+
+#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
+#. :ref:`Build the example client applications <section-building-the-client-examples>`.
+#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+
+.. _section-building-from-source-code:
+
+Building From Source Code
+-------------------------
+
+To build the inference server from source, change to the root
+directory of the GitHub repo and use docker to build::
+
+  $ docker build --pull -t tensorrtserver
+
+After the build completes follow these steps to run the server and the
+example client applications.
+
+#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
+#. :ref:`Build the example client applications <section-building-the-client-examples>`.
+#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+
+.. _section-run-tensorrt-inference-server:
+
+Run TensorRT Inference Server
+-----------------------------
+
+Assuming the example model repository is available in
+/full/path/to/example/model/repository, use the following command to
+run the inference server container::
+
+  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> trtserver --model-store=/models
+
+Where <docker image> is *nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3* if
+you pulled the inference server container from NGC, or is
+*tensorrtserver* if you built the inference server from source.
+
+For more information, see :ref:`section-running-the-inference-server`.
+
+.. _section-verify-inference-server-status:
+
+Verify Inference Server Is Running Correctly
+--------------------------------------------
+
+Use the server’s *Status* endpoint to verify that the server and the
+models are ready for inference.  From the host system use curl to
+access the HTTP endpoint to request the server status. For example::
+
+  $ curl localhost:8000/api/status
+  id: "inference:0"
+  version: "0.6.0"
+  uptime_ns: 23322988571
+  model_status {
+    key: "resnet50_netdef"
+    value {
+      config {
+        name: "resnet50_netdef"
+        platform: "caffe2_netdef"
+      }
+      ...
+      version_status {
+        key: 1
+        value {
+          ready_state: MODEL_READY
+        }
+      }
+    }
+  }
+  ready_state: SERVER_READY
+
+The ready_state field should return SERVER_READY to indicate that the
+inference server is online, that models are properly loaded, and that
+the server is ready to receive inference requests.
+
+For more information, see
+:ref:`section-checking-inference-server-status`.
+
+.. _section-building-the-client-examples:
+
+Building The Client Examples
+----------------------------
+
+To build the C++ client library, C++ and Python examples, and a Python
+wheel file for the Python client library, change to the root directory
+of the GitHub repo and use docker to build::
+
+  $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
+
+After the build completes, the tensorrtserver_clients Docker image
+will contain the built client libraries and examples. Run the client
+image so that the client examples can access the inference server
+running in its own container::
+
+  $ docker run -it --rm --net=host tensorrtserver_clients
+
+For more information, see
+:ref:`section-building-the-client-libraries-and-examples`.
+
+.. _section-running-the-image-classification-example:
+
+Running The Image Classification Example
+----------------------------------------
+
+From within the tensorrtserver_clients image, run the example
+image-client application to perform image classification using the
+example resnet50_netdef from the example model repository.
+
+To send a request for the resnet50_netdef (Caffe2) model from the
+example model repository for an image from the qa/images directory::
+
+  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  Request 0, batch size 1
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+
+The Python version of the application accepts the same command-line
+arguments::
+
+  $ python3 /workspace/src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  Request 0, batch size 1
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.778078556061
+
+For more information, see :ref:`section-image_classification_example`.
