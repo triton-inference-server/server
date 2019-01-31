@@ -97,6 +97,42 @@ corresponds to the 19.01 release of the tensorrtserver container on
 this release is `r19.01
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.01>`_.
 
+Backwards Compatibility
+-----------------------
+
+The inference server is still in beta. As a result, we sometimes make
+non-backwards-compatible changes. You must rebuild the client
+libraries and any client applications you use to talk to the inference
+server to make sure they stay in sync with the server.
+
+Compared to the r19.01 release, the master branch has the following
+non-backward-compatible changes:
+
+* The inference request header for inputs and outputs no longer allow
+  the byte_size field. See InferRequestHeader::Input and
+  InferRequestHeader::Output in `api.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_.
+
+* The inference response header no longer returns the batch-1
+  byte_size field for each output. Instead the shape and byte-size for
+  the full output batch is returned. See InferResponseHeader::Output
+  in `api.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_.
+
+* The inference response header reports the model version as a 64-bit
+  integer (previously reported as an unsigned 32-bit integer). See
+  InferResponseHeader.model_version in `api.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_,
+  InferRequest.model_version in `grpc_service.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_server.proto>`_,
+  and ModelStatus.version_status in `server_status.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/server_status.proto>`_.
+
+* For custom backends, the CustomGetOutputFn function signature has
+  changed to require the backend to report the shape of each computed
+  output. See CustomGetOutputFn_t in `custom.h
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_.
+
 Documentation
 -------------
 
