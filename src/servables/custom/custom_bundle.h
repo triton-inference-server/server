@@ -91,7 +91,8 @@ class CustomBundle : public InferenceServable {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(std::vector<Scheduler::Payload>* payloads);
+    tensorflow::Status Run(
+        CustomBundle* base, std::vector<Scheduler::Payload>* payloads);
 
     struct GetInputOutputContext {
       GetInputOutputContext(

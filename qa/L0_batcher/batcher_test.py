@@ -41,7 +41,7 @@ from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
 if os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef")
+    _trials = ("savedmodel", "graphdef", "netdef", "custom")
 else:
     _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
 
