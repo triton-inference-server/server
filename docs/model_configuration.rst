@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -101,6 +101,20 @@ zero. If the above example specified a :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero, TRTIS
 would expect to receive input tensors with shape **[ 16 ]**, and would
 produce an output tensor with shape **[ 16 ]**.
+
+For models that support input and output tensors with variable-size
+dimensions, those dimensions can be listed as -1 in the input and
+output configuration. For example, if a model requires a 2-dimensional
+input tensor where the first dimension must be size 4 but the second
+dimension can be any size, the model configuration for that input
+would include **dims: [ 4, -1 ]**. The inference server would then
+accept inference requests where that input tensor's second dimension
+was any value >= 1. The model configuration can be more restrictive
+than what is allowed by the underlying model. For example, even though
+the model allows the second dimension to be any size, the model
+configuration could be specific as **dims: [ 4, 4 ]**. In this case,
+the inference server would only accept inference requests where the
+input tensor's shape was exactly **[ 4, 4 ]**.
 
 .. _section-generated-model-configuration:
 
