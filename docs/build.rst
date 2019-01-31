@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -39,8 +39,9 @@ instructions in :ref:`section-installing-prebuilt-containers`.
 Building the Server
 -------------------
 
-To build a release version of the TRTIS container, change directory to
-the root of the repo and issue the following command::
+To build a release version of the TensorRT Inference Server container,
+change directory to the root of the repo and issue the following
+command::
 
   $ docker build --pull -t tensorrtserver .
 
@@ -84,9 +85,9 @@ of the C++ and Python client libraries and example executables with::
 
 Some source changes seem to cause bazel to get confused and not
 correctly rebuild all required sources. You can force bazel to rebuild
-all of the TRTIS source without requiring a complete rebuild of the
-TensorFlow and Caffe2 components by doing the following before issuing
-the above build command::
+all of the inference server source without requiring a complete
+rebuild of the TensorFlow and Caffe2 components by doing the following
+before issuing the above build command::
 
   # rm -fr bazel-bin/src
 
@@ -97,8 +98,8 @@ the above build command::
 Building the Documentation
 --------------------------
 
-The TRTIS documentation is found in the docs/ directory and is based
-on `Sphinx <http://www.sphinx-doc.org>`_. `Doxygen
+The inference server documentation is found in the docs/ directory and
+is based on `Sphinx <http://www.sphinx-doc.org>`_. `Doxygen
 <http://www.doxygen.org/>`_ integrated with `Exhale
 <https://github.com/svenevs/exhale>`_ is used for C++ API
 docuementation.

@@ -44,8 +44,8 @@ for each protocol.
   inputs, runs inference and returns the requested outputs.
 
 The HTTP endpoints can be used directly as described in this section,
-but for most use-cases, the preferred way to access TRTIS is via the
-`C++ and Python Client libraries
+but for most use-cases, the preferred way to access the inference
+server is via the `C++ and Python Client libraries
 <section-client-libraries-and-examples>`.
 
 The GRPC endpoints can also be used via the `C++ and Python Client
@@ -65,9 +65,9 @@ way that prevents it from processing requests.
 Once the liveness endpoint indicates that the server is active,
 performing an HTTP GET to /api/health/ready returns a 200 status if
 the server is able to respond to inference requests for some or all
-models (based on TRTIS's -\\-strict-readiness option explained
-below). Any other status code indicates that the server is not ready
-to respond to some or all inference requests.
+models (based on the inference server's -\\-strict-readiness option
+explained below). Any other status code indicates that the server is
+not ready to respond to some or all inference requests.
 
 For GRPC the :cpp:var:`GRPCService
 <nvidia::inferenceserver::GRPCService>` uses the

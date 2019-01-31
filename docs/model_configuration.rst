@@ -36,8 +36,8 @@ the model. Typically, this configuration is provided in a config.pbtxt
 file specified as :doc:`ModelConfig <protobuf_api/model_config.proto>`
 protobuf. In some cases, discussed in
 :ref:`section-generated-model-configuration`, the model configuration
-can be generated automatically by TRTIS and so does not need to be
-provided explicitly.
+can be generated automatically by the inference server and so does not
+need to be provided explicitly.
 
 A minimal model configuration must specify :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>`, :cpp:var:`platform
@@ -90,17 +90,17 @@ For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
 >= 1. The TensorRT Inference Server assumes that the batching occurs
 along a first dimension that is not listed in the inputs or
-outputs. For the above example TRTIS expects to receive input tensors
-with shape **[ x, 16 ]** and produces an output tensor with shape **[
-x, 16 ]**, where **x** is the batch size of the request.
+outputs. For the above example, the server expects to receive input
+tensors with shape **[ x, 16 ]** and produces an output tensor with
+shape **[ x, 16 ]**, where **x** is the batch size of the request.
 
 For models that do not support batched inputs the
 :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
 zero. If the above example specified a :cpp:var:`max_batch_size
-<nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero, TRTIS
-would expect to receive input tensors with shape **[ 16 ]**, and would
-produce an output tensor with shape **[ 16 ]**.
+<nvidia::inferenceserver::ModelConfig::max_batch_size>` of zero, the
+inference server would expect to receive input tensors with shape **[
+16 ]**, and would produce an output tensor with shape **[ 16 ]**.
 
 For models that support input and output tensors with variable-size
 dimensions, those dimensions can be listed as -1 in the input and
@@ -122,23 +122,23 @@ Generated Model Configuration
 -----------------------------
 
 By default, the model configuration file containing the required
-settings must be provided with each model. However, if TRTIS is
+settings must be provided with each model. However, if the server is
 started with the -\\-strict-model-config=false option, then in some
 cases the required portions of the model configuration file can be
-generated automatically by TRTIS. The required portion of the model
-configuration are those settings shown in the example minimal
-configuration above. Specifically:
+generated automatically by the inference server. The required portion
+of the model configuration are those settings shown in the example
+minimal configuration above. Specifically:
 
 * :ref:`TensorRT Plan <section-tensorrt-models>` models do not require
-  a model configuration file because TRTIS can derive all the required
-  settings automatically.
+  a model configuration file because the inference server can derive
+  all the required settings automatically.
 
 * Some :ref:`TensorFlow SavedModel <section-tensorflow-models>` models
   do not require a model configuration file. The models must specify
   all inputs and outputs as fixed-size tensors (with an optional
   initial batch dimension) for the model configuration to be generated
   automatically. The easiest way to determine if a particular
-  SavedModel is supported is to try it with TRTIS and check the
+  SavedModel is supported is to try it with the server and check the
   console log and :ref:`Status API <section-api-status>` to determine
   if the model loaded successfully.
 
@@ -168,15 +168,16 @@ portions of the model configuration if necessary, such as
 Datatypes
 ---------
 
-The following table shows the tensor datatypes supported by TRTIS. The
-first column shows the name of the datatype as it appears in the model
-configuration file. The other columns show the corresponding datatype
-for the model frameworks supported by TRTIS and for the Python numpy
-library. If a model framework does not have an entry for a given
-datatype, then TRTIS does not support that datatype for that model.
+The following table shows the tensor datatypes supported by the
+TensorRT Inference Server. The first column shows the name of the
+datatype as it appears in the model configuration file. The other
+columns show the corresponding datatype for the model frameworks
+supported by the server and for the Python numpy library. If a model
+framework does not have an entry for a given datatype, then the
+inference server does not support that datatype for that model.
 
 +--------------+--------------+--------------+--------------+--------------+
-|TRTIS Type    |TensorRT      |TensorFlow    |Caffe2        |NumPy         |
+|Type          |TensorRT      |TensorFlow    |Caffe2        |NumPy         |
 +==============+==============+==============+==============+==============+
 |TYPE_BOOL     |              |DT_BOOL       |BOOL          |bool          |
 +--------------+--------------+--------------+--------------+--------------+
@@ -248,13 +249,13 @@ the following policies.
 If no version policy is specified, then :cpp:var:`Latest
 <nvidia::inferenceserver::ModelVersionPolicy::Latest>` (with
 num_version = 1) is used as the default, indicating that only the most
-recent version of the model is made available by TRTIS. In all cases,
-the addition or removal of version subdirectories from the model
-repository can change which model version is used on subsequent
-inference requests.
+recent version of the model is made available by the inference
+server. In all cases, the addition or removal of version
+subdirectories from the model repository can change which model
+version is used on subsequent inference requests.
 
 Continuing the above example, the following configuration specifies
-that all versions of the model will be available from TRTIS::
+that all versions of the model will be available from the server::
 
   name: "mymodel"
   platform: "tensorrt_plan"
@@ -346,10 +347,10 @@ inferencing throughput. In many use-cases the individual inference
 requests are not batched, therefore, they do not benefit from the
 throughput benefits of batching.
 
-Dynamic batching is a feature of TRTIS that allows non-batched
-inference requests to be combined by TRTIS, so that a batch is created
-dynamically, resulting in the same increased throughput seen for
-batched inference requests.
+Dynamic batching is a feature of the inference server that allows
+non-batched inference requests to be combined by the server, so that a
+batch is created dynamically, resulting in the same increased
+throughput seen for batched inference requests.
 
 Dynamic batching is enabled and configured independently for each
 model using the :cpp:var:`ModelDynamicBatching
@@ -376,5 +377,5 @@ The model configuration :cpp:var:`ModelOptimizationPolicy
 <nvidia::inferenceserver::ModelOptimizationPolicy>` is used to specify
 optimization and prioritization settings for a model. These settings
 control if/how a model is optimized by the backend framework and how
-it is scheduled and executed by TRTIS. See the protobuf documentation
-for the currently available settings.
+it is scheduled and executed by the inference server. See the protobuf
+documentation for the currently available settings.
