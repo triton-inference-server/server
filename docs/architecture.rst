@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -30,16 +30,16 @@ Architecture
 
 The following figure shows the TensorRT Inference Server high-level
 architecture. The :ref:`model repository <section-model-repository>`
-is a file-system based store of the models that TRTIS will make
-available for inferencing. Inference requests arrive at the server via
-either :ref:`HTTP or GRPC <section-inference-server-api>` and are then
-routed to the appropriate per-model scheduler queue. The scheduler
-performs fair scheduling and dynamic batching for each model’s
-requests. The schedule passes each request to the framework backend
-corresponding to the model type. The framework backend performs
-inferencing using the inputs provided in the request to produce the
-requested outputs. The outputs are then formatted and a response is
-sent.
+is a file-system based store of the models that the inference server
+will make available for inferencing. Inference requests arrive at the
+server via either :ref:`HTTP or GRPC <section-inference-server-api>`
+and are then routed to the appropriate per-model scheduler queue. The
+scheduler performs fair scheduling and dynamic batching for each
+model’s requests. The schedule passes each request to the framework
+backend corresponding to the model type. The framework backend
+performs inferencing using the inputs provided in the request to
+produce the requested outputs. The outputs are then formatted and a
+response is sent.
 
 .. image:: images/arch.png
 
@@ -48,19 +48,21 @@ sent.
 Concurrent Model Execution
 --------------------------
 
-The TRTIS architecture allows multiple models and/or multiple
-instances of the same model to execute in parallel on a single
-GPU. The following figure shows an example with two models; model0 and
-model1. Assuming TRTIS is not currently processing any request, when
-two requests arrive simultaneously, one for each model, TRTIS
-immediately schedules both of them onto the GPU and the GPU’s hardware
-scheduler begins working on both computations in parallel.
+The TensorRT Inference Server architecture allows multiple models
+and/or multiple instances of the same model to execute in parallel on
+a single GPU. The following figure shows an example with two models;
+model0 and model1. Assuming the server is not currently processing any
+request, when two requests arrive simultaneously, one for each model,
+the server immediately schedules both of them onto the GPU and the
+GPU’s hardware scheduler begins working on both computations in
+parallel.
 
 .. image:: images/multi_model_exec.png
 
 By default, if multiple requests for the same model arrive at the same
-time, TRTIS will serialize their execution by scheduling only one at a
-time on the GPU, as shown in the following figure.
+time, the inference server will serialize their execution by
+scheduling only one at a time on the GPU, as shown in the following
+figure.
 
 .. image:: images/multi_model_serial_exec.png
 
@@ -68,7 +70,7 @@ The TensorRT inference server provides an :ref:`instance-group
 <section-instance-groups>` feature that allows each model to specify
 how many parallel executions of that model should be allowed. Each
 such enabled parallel execution is referred to as an *execution
-instance*. By default, TRTIS gives each model a single execution
+instance*. By default, the server gives each model a single execution
 instance, which means that only a single execution of the model is
 allowed to be in progress at a time as shown in the above figure. By
 using instance-group the number of execution instances for a model can
@@ -82,13 +84,13 @@ beginning.
 .. image:: images/multi_model_parallel_exec.png
 
 To provide the current model execution capabilities shown in the above
-figures, TRTIS uses `CUDA streams
+figures, the inference server uses `CUDA streams
 <https://devblogs.nvidia.com/gpu-pro-tip-cuda-7-streams-simplify-concurrency/>`_
 to exploit the GPU’s hardware scheduling capabilities. CUDA streams
-allow TRTIS to communicate independent sequences of memory-copy and
-kernel executions to the GPU. The hardware scheduler in the GPU takes
-advantage of the independent execution streams to fill the GPU with
-independent memory-copy and kernel executions. For example, using
+allow the server to communicate independent sequences of memory-copy
+and kernel executions to the GPU. The hardware scheduler in the GPU
+takes advantage of the independent execution streams to fill the GPU
+with independent memory-copy and kernel executions. For example, using
 streams allows the GPU to execute a memory-copy for one model, a
 kernel for another model, and a different kernel for yet another model
 at the same time.
@@ -101,18 +103,18 @@ terminology for this concept but here we refer to them generally as
 execution contexts). Each framework allows an execution context to be
 associated with a CUDA stream. This CUDA stream is used by the
 framework to execute all memory copies and kernels needed for the
-model associated with the execution context. For a given model, TRTIS
-creates one execution context for each execution instance specified
-for the model. When an inference request arrives for a given model,
-that request is queued in the model scheduler associated with that
-model. The model scheduler waits for any execution context associated
-with that model to be idle and then sends the queued request to the
-context. The execution context then issues all the memory copies and
-kernel executions required to execute the model to the CUDA stream
-associated with that execution context. The memory copies and kernels
-in each CUDA stream are independent of memory copies and kernels in
-other CUDA streams. The GPU hardware scheduler looks across all CUDA
-streams to find independent memory copies and kernels to execute on
-the GPU.
+model associated with the execution context. For a given model, the
+inference server creates one execution context for each execution
+instance specified for the model. When an inference request arrives
+for a given model, that request is queued in the model scheduler
+associated with that model. The model scheduler waits for any
+execution context associated with that model to be idle and then sends
+the queued request to the context. The execution context then issues
+all the memory copies and kernel executions required to execute the
+model to the CUDA stream associated with that execution context. The
+memory copies and kernels in each CUDA stream are independent of
+memory copies and kernels in other CUDA streams. The GPU hardware
+scheduler looks across all CUDA streams to find independent memory
+copies and kernels to execute on the GPU.
 
 .. image:: images/cuda_stream_exec.png

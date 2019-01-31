@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -62,11 +62,11 @@ An example of a typical model repository layout is shown below::
       7/
         model.graphdef
 
-Any number of models may be specified and TRTIS will attempt to load
-all models into the CPU and GPU when the server starts. The
-:ref:`Status API <section-api-status>` can be used to determine if any
-models failed to load successfully. The server's console log will also
-show the reason for any failures during startup.
+Any number of models may be specified and the inference server will
+attempt to load all models into the CPU and GPU when the server
+starts. The :ref:`Status API <section-api-status>` can be used to
+determine if any models failed to load successfully. The server's
+console log will also show the reason for any failures during startup.
 
 The name of the model directory (model_0 and model_1 in the above
 example) must match the name of the model specified in the
@@ -98,11 +98,11 @@ the output it corresponds to in the :ref:`model configuration
 Modifying the Model Repository
 ------------------------------
 
-By default, changes to the model repository will be detected by a
-running TRTIS and the server will attempt to add, remove, and reload
-models as necessary based on those changes. Changes to the model
-repository may not be detected immediately because TRTIS polls the
-repository periodically. You can control the polling interval with the
+By default, changes to the model repository will be detected and the
+server will attempt to add, remove, and reload models as necessary
+based on those changes. Changes to the model repository may not be
+detected immediately because the server polls the repository
+periodically. You can control the polling interval with the
 -\\-repository-poll-secs options. The console log or the :ref:`Status
 API <section-api-status>` can be used to determine when model
 repository changes have taken effect. You can disable the server from
@@ -120,22 +120,22 @@ The TensorRT Inference Server responds to the following changes:
   change which model version is served by default.
 
 * Existing models can be removed from the repository by removing the
-  corresponding model directory.  TRTIS will allow in-flight requests
-  to any version of the removed model to complete. New requests for a
-  removed model will fail.
+  corresponding model directory.  The inference server will allow
+  in-flight requests to any version of the removed model to
+  complete. New requests for a removed model will fail.
 
 * New models can be added to the repository by adding a new model
   directory.
 
 * The :ref:`model configuration <section-model-configuration>`
-  (config.pbtxt) can be changed and TRTIS will unload and reload the
-  model to pick up the new model configuration.
+  (config.pbtxt) can be changed and the server will unload and reload
+  the model to pick up the new model configuration.
 
 * Labels files providing labels for outputs that represent
-  classifications can be added, removed, or modified and TRTIS will
-  unload and reload the model to pick up the new labels. If a label
-  file is added or removed the corresponding edit to the
-  :cpp:var:`label_filename
+  classifications can be added, removed, or modified and the inference
+  server will unload and reload the model to pick up the new
+  labels. If a label file is added or removed the corresponding edit
+  to the :cpp:var:`label_filename
   <nvidia::inferenceserver::ModelOutput::label_filename>` property of
   the output it corresponds to in the :ref:`model configuration
   <section-model-configuration>` must be performed at the same time.
@@ -150,7 +150,8 @@ repository. Each version is stored in its own, numerically named,
 subdirectory where the name of the subdirectory corresponds to the
 version number of the model. Each model specifies a :ref:`version
 policy <section-version-policy>` that controls which of the versions
-in the model repository are made available by TRTIS at any given time.
+in the model repository are made available by the server at any given
+time.
 
 .. _section-framework-model-definition:
 
@@ -274,11 +275,11 @@ TensorRT/TensorFlow Models
 
 TensorFlow 1.7 and later integrates TensorRT to enable TensorFlow
 models to benefit from the inference optimizations provided by
-TensorRT. TRTIS supports models that have been optimized with TensorRT
-and can serve those models just like any other TensorFlow model. The
-inference server’s TensorRT version (available in the Release Notes)
-must match the TensorRT version that was used when the model was
-created.
+TensorRT. The inference server supports models that have been
+optimized with TensorRT and can serve those models just like any other
+TensorFlow model. The inference server’s TensorRT version (available
+in the Release Notes) must match the TensorRT version that was used
+when the model was created.
 
 A TensorRT/TensorFlow integrated model is specific to CUDA Compute
 Capability and so it is typically necessary to use the :ref:`model
