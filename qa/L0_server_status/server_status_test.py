@@ -123,7 +123,7 @@ class ServerStatusTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
             # Infer using latest version (which is 3)...
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
                            model_version=None, swap=True)
 
@@ -183,7 +183,7 @@ class ServerStatusTest(unittest.TestCase):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
             # Infer using version 1...
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
                            model_version=1, swap=False)
 
