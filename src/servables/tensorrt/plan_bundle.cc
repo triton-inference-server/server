@@ -139,7 +139,7 @@ PlanBundle::CreateExecutionContexts(
         (group.gpus().size() == 0)) {
       return tensorflow::errors::InvalidArgument(
           "instance group ", group.name(), " of model ", Name(),
-          " must be KIND_GPU and must specify at least on GPU id");
+          " must be KIND_GPU and must specify at least one GPU id");
     }
 
     for (int c = 0; c < group.count(); c++) {
