@@ -65,19 +65,19 @@ class BatcherTest(unittest.TestCase):
 
             if trial == "savedmodel" or trial == "graphdef" or trial == "netdef":
                 tensor_shape = (input_size,)
-                iu.infer_exact(self, trial, tensor_shape, bs, True,
+                iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
-                iu.infer_exact(self, trial, tensor_shape, bs, True,
+                iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
             elif trial == "custom":
                 tensor_shape = (input_size,)
-                iu.infer_exact(self, trial, tensor_shape, bs, True,
+                iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True)
