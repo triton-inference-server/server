@@ -39,6 +39,16 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
 
+# Verify the flag is set only on CPU-only device
+if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
+    gpu_count=`nvidia-smi -L | grep GPU | wc -l`
+    if [ "$gpu_count" -ne 0 ]; then
+    echo -e "\n***\n*** Running on a device with GPU\n***"
+    echo -e "\n***\n*** Test Failed To Run\n***"
+    exit 1
+    fi
+fi
+
 for TARGET in cpu gpu; do
     if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
