@@ -50,8 +50,11 @@ class IContext {
   static IContext* Detag(void* tag) { return static_cast<IContext*>(tag); }
 
  protected:
-  IContext() = default;
+  IContext() : m_MasterContext(this) {}
+  IContext(IContext* master) : m_MasterContext(master) {}
   void* Tag() { return reinterpret_cast<void*>(this); }
+
+  IContext* m_MasterContext;
 
  private:
   virtual bool RunNextState(bool) = 0;

@@ -26,6 +26,7 @@
 //
 #pragma once
 
+#include "src/nvrpc/BidirectionalStreamingLifeCycle.h"
 #include "src/nvrpc/Interfaces.h"
 #include "src/nvrpc/LifeCycleUnary.h"
 #include "src/nvrpc/future_std.h"
@@ -37,6 +38,10 @@ class BaseContext;
 
 template <class Request, class Response, class Resources>
 using Context = BaseContext<LifeCycleUnary<Request, Response>, Resources>;
+
+template <class Request, class Response, class Resources>
+using StreamingContext =
+    BaseContext<BidirectionalStreamingLifeCycle<Request, Response>, Resources>;
 
 template <class LifeCycle, class Resources>
 class BaseContext : public LifeCycle {

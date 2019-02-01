@@ -36,6 +36,7 @@ cc_library(
         "ThreadPool.cc"
     ],
     hdrs = [
+        "BidirectionalStreamingLifeCycle.h",
         "Context.h", 
         "Executor.h", 
         "Interfaces.h",

@@ -100,6 +100,7 @@
 #include "src/nvrpc/ThreadPool.h"
 
 using nvrpc::Context;
+using nvrpc::StreamingContext;
 using nvrpc::ThreadPool;
 
 namespace nvidia { namespace inferenceserver {
@@ -153,6 +154,75 @@ class StatusContext final
 
 class InferContext final
     : public Context<InferRequest, InferResponse, AsyncResources> {
+  void ExecuteRPC(InferRequest& request, InferResponse& response) final override
+  {
+    auto server = GetResources()->GetServer();
+    auto infer_stats = std::make_shared<ModelInferStats>(
+        server->StatusManager(), request.model_name());
+    auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
+    infer_stats->StartRequestTimer(timer.get());
+    infer_stats->SetRequestedVersion(request.model_version());
+
+    RequestStatus* request_status = response.mutable_request_status();
+
+    auto backend = std::make_shared<InferenceServer::InferBackendState>();
+    tensorflow::Status status = server->InitBackendState(
+        request.model_name(), request.model_version(), backend);
+    if (status.ok()) {
+      infer_stats->SetModelServable(backend->Backend());
+
+      std::shared_ptr<GRPCInferRequestProvider> request_provider;
+      status = GRPCInferRequestProvider::Create(
+          *(backend->Backend()), request, &request_provider);
+      if (status.ok()) {
+        infer_stats->SetBatchSize(
+            request_provider->RequestHeader().batch_size());
+
+        std::shared_ptr<GRPCInferResponseProvider> response_provider;
+        status = GRPCInferResponseProvider::Create(
+            request.meta_data(), &response, &response_provider);
+        if (status.ok()) {
+          server->HandleInfer(
+              request_status, backend, request_provider, response_provider,
+              infer_stats,
+              [this, request_status, &response, infer_stats, timer]() mutable {
+                // If the response is an error then clear the meta-data
+                // and raw output as they may be partially or
+                // un-initialized.
+                if (request_status->code() != RequestStatusCode::SUCCESS) {
+                  response.mutable_meta_data()->Clear();
+                  response.mutable_raw_output()->Clear();
+                }
+
+                this->FinishResponse();
+                timer.reset();
+              },
+              true  // async_frontend
+          );
+        }
+      }
+    }
+
+    if (!status.ok()) {
+      LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
+      infer_stats->SetFailed(true);
+      RequestStatusFactory::Create(
+          request_status, 0 /* request_id */, server->Id(), status);
+
+      // If the response is an error then clear the meta-data and raw
+      // output as they may be partially or un-initialized.
+      response.mutable_meta_data()->Clear();
+      response.mutable_raw_output()->Clear();
+
+      this->FinishResponse();
+    }
+  }
+};
+
+// For now, this context ExecuteRPC in the same way as InferContext, except that
+// it actually maintains the stream to be able to process sequence of requests
+class StreamInferContext final
+    : public StreamingContext<InferRequest, InferResponse, AsyncResources> {
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
     auto server = GetResources()->GetServer();
@@ -1113,6 +1183,10 @@ InferenceServer::StartGrpcServer()
   auto rpcInfer = inferenceService->RegisterRPC<InferContext>(
       &GRPCService::AsyncService::RequestInfer);
 
+  LOG_INFO << "Register StreamInfer RPC";
+  auto rpcStreamInfer = inferenceService->RegisterRPC<StreamInferContext>(
+      &GRPCService::AsyncService::RequestStreamInfer);
+
   LOG_INFO << "Register Status RPC";
   auto rpcStatus = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
@@ -1132,6 +1206,8 @@ InferenceServer::StartGrpcServer()
   // executor.
   executor->RegisterContexts(
       rpcInfer, g_Resources, 1000);  // Configurable DLIS-161
+  executor->RegisterContexts(
+      rpcStreamInfer, g_Resources, 100);  // Configurable DLIS-161
   executor->RegisterContexts(rpcStatus, g_Resources, 1);
   executor->RegisterContexts(rpcHealth, g_Resources, 1);
   executor->RegisterContexts(rpcProfile, g_Resources, 1);
