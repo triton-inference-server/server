@@ -298,7 +298,7 @@ DynamicBatchScheduler::GetDynamicBatch()
     const auto batch_size = queue_[pending_batch_queue_cnt_]
                                 .request_provider_->RequestHeader()
                                 .batch_size();
-    if ((pending_batch_size_ + batch_size) >= max_preferred_batch_size_) {
+    if ((pending_batch_size_ + batch_size) > max_preferred_batch_size_) {
       if (pending_batch_queue_cnt_ == 0) {
         pending_batch_size_ = batch_size;
         pending_batch_queue_cnt_ = 1;
@@ -320,6 +320,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   // immediately. Stop examining requests if the maximum preferred
   // batch size would be exceeded or if the shape of the next request
   // does not match the shape of the pending batch.
+  bool send_now = false;
   size_t best_preferred_batch_size = 0;
   size_t best_preferred_batch_cnt = 0;
   size_t search_batch_size = pending_batch_size_;
@@ -329,14 +330,20 @@ DynamicBatchScheduler::GetDynamicBatch()
         queue_[idx].request_provider_->RequestHeader().batch_size();
 
     if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
+      send_now = true;
       break;
     }
 
+    // If forming new batch then get the shape required for the
+    // batch. If we already have a (partial) batch and this next
+    // request is a different shape, then need to send what we have
+    // immediately since the existing batch can't grow any larger.
     if (need_pending_shape_) {
       if (search_batch_cnt == 0) {
         InitPendingShape(queue_[idx].request_provider_->RequestHeader());
       } else if (!CompareWithPendingShape(
                      queue_[idx].request_provider_->RequestHeader())) {
+        send_now = true;
         break;
       }
     }
@@ -368,9 +375,10 @@ DynamicBatchScheduler::GetDynamicBatch()
     return 0;
   }
 
-  // If there is no batch queuing delay then just immediately
-  // execute whatever is pending.
-  if (pending_batch_delay_ns_ == 0) {
+  // If there is no batch queuing delay if the current batch can't
+  // grow any larger then just immediately execute whatever is
+  // pending.
+  if (send_now || (pending_batch_delay_ns_ == 0)) {
     return 0;
   }
 
@@ -392,7 +400,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   // until the queue delay has expired. Another thread may be awaken
   // due to incoming request to handle the pending batch before this
   // thread wakes and that is ok. But if no other request comes in
-  // then this thread will wake and revist the pending batch (and at
+  // then this thread will wake and revisit the pending batch (and at
   // that time will then see the delay has been exceeded and will send
   // the batch).
   return (pending_batch_delay_ns_ - delay_ns) / 1000;
