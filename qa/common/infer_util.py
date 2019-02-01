@@ -41,8 +41,9 @@ def _range_repr_dtype(dtype):
         return np.int32
     return dtype
 
-def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
+def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
+                output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False):
@@ -63,8 +64,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
         # class outputs the result value/probability is returned as a
         # float so must use fp32 range in that case.
         rinput_dtype = _range_repr_dtype(input_dtype)
-        routput0_dtype = _range_repr_dtype(output0_dtype if req_raw else np.float32)
-        routput1_dtype = _range_repr_dtype(output1_dtype if req_raw else np.float32)
+        routput0_dtype = _range_repr_dtype(output0_dtype if output0_raw else np.float32)
+        routput1_dtype = _range_repr_dtype(output1_dtype if output1_raw else np.float32)
         val_min = max(np.iinfo(rinput_dtype).min,
                     np.iinfo(routput0_dtype).min,
                     np.iinfo(routput1_dtype).min) / 2
@@ -122,11 +123,16 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
 
         output_req = {}
-        for o in outputs:
-            if req_raw:
-                output_req[o] = InferContext.ResultFormat.RAW
+        if "OUTPUT0" in outputs:
+            if output0_raw:
+                output_req["OUTPUT0"] = InferContext.ResultFormat.RAW
             else:
-                output_req[o] = (InferContext.ResultFormat.CLASS, num_classes)
+                output_req["OUTPUT0"] = (InferContext.ResultFormat.CLASS, num_classes)
+        if "OUTPUT1" in outputs:
+            if output1_raw:
+                output_req["OUTPUT1"] = InferContext.ResultFormat.RAW
+            else:
+                output_req["OUTPUT1"] = (InferContext.ResultFormat.CLASS, num_classes)
 
         ctx = InferContext(pair[0], pair[1], model_name, model_version, True)
         results = ctx.run(
@@ -147,7 +153,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size, req_raw,
         tester.assertEqual(len(results), len(outputs))
         for (result_name, result_val) in iteritems(results):
             for b in range(batch_size):
-                if req_raw:
+                if ((result_name == "OUTPUT0" and output0_raw) or
+                    (result_name == "OUTPUT1" and output1_raw)):
                     if result_name == "OUTPUT0":
                         tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
                                         "{}, OUTPUT0 expected: {}, got {}".format(

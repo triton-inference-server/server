@@ -41,42 +41,51 @@ CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
 np_dtype_string = np.dtype(object)
 
 class InferTest(unittest.TestCase):
-    def _full_exact(self, req_raw, input_dtype, output0_dtype, output1_dtype, swap):
+    def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
+                    output0_raw, output1_raw, swap):
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'graphdef', (input_size,), bs, req_raw,
-                               input_dtype, output0_dtype, output1_dtype, swap=swap)
-                iu.infer_exact(self, 'savedmodel', (input_size,), bs, req_raw,
-                               input_dtype, output0_dtype, output1_dtype, swap=swap)
+                iu.infer_exact(self, 'graphdef', (input_size,), bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                iu.infer_exact(self, 'savedmodel', (input_size,), bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             # model that does not support batching
-            iu.infer_exact(self, 'graphdef_nobatch', (input_size,), 1, req_raw,
-                           input_dtype, output0_dtype, output1_dtype, swap=swap)
-            iu.infer_exact(self, 'savedmodel_nobatch', (input_size,), 1, req_raw,
-                           input_dtype, output0_dtype, output1_dtype, swap=swap)
+            iu.infer_exact(self, 'graphdef_nobatch', (input_size,), 1,
+                           input_dtype, output0_dtype, output1_dtype,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            iu.infer_exact(self, 'savedmodel_nobatch', (input_size,), 1,
+                           input_dtype, output0_dtype, output1_dtype,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'netdef', (input_size,), bs, req_raw,
-                               input_dtype, output0_dtype, output1_dtype, swap=swap)
+                iu.infer_exact(self, 'netdef', (input_size,), bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             # model that does not support batching
-            iu.infer_exact(self, 'netdef_nobatch', (input_size,), 1, req_raw,
-                           input_dtype, output0_dtype, output1_dtype, swap=swap)
+            iu.infer_exact(self, 'netdef_nobatch', (input_size,), 1,
+                           input_dtype, output0_dtype, output1_dtype,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if not CPU_ONLY and tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,1,1), (input_size,1,1), (input_size,1,1)):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'plan', (input_size, 1, 1), bs, req_raw,
-                               input_dtype, output0_dtype, output1_dtype, swap=swap)
+                iu.infer_exact(self, 'plan', (input_size, 1, 1), bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             # model that does not support batching
-            iu.infer_exact(self, 'plan_nobatch', (input_size, 1, 1), 1, req_raw,
-                           input_dtype, output0_dtype, output1_dtype, swap=swap)
+            iu.infer_exact(self, 'plan_nobatch', (input_size, 1, 1), 1,
+                           input_dtype, output0_dtype, output1_dtype,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
@@ -84,66 +93,113 @@ class InferTest(unittest.TestCase):
                                         (input_size,), (input_size,), (input_size,)):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'custom', (input_size,), bs, req_raw,
-                               input_dtype, output0_dtype, output1_dtype, swap=False)
+                iu.infer_exact(self, 'custom', (input_size,), bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
             # model that does not support batching
-            iu.infer_exact(self, 'custom_nobatch', (input_size,), 1, req_raw,
-                           input_dtype, output0_dtype, output1_dtype, swap=False)
+            iu.infer_exact(self, 'custom_nobatch', (input_size,), 1,
+                           input_dtype, output0_dtype, output1_dtype,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
     def test_raw_bbb(self):
-        self._full_exact(True, np.int8, np.int8, np.int8, swap=True)
+        self._full_exact(np.int8, np.int8, np.int8,
+                         output0_raw=True, output1_raw=True, swap=True)
     def test_raw_sss(self):
-        self._full_exact(True, np.int16, np.int16, np.int16, swap=True)
+        self._full_exact(np.int16, np.int16, np.int16,
+                         output0_raw=True, output1_raw=True, swap=True)
     def test_raw_iii(self):
-        self._full_exact(True, np.int32, np.int32, np.int32, swap=True)
+        self._full_exact(np.int32, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=True)
     def test_raw_lll(self):
-        self._full_exact(True, np.int64, np.int64, np.int64, swap=False)
+        self._full_exact(np.int64, np.int64, np.int64,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_hhh(self):
-        self._full_exact(True, np.float16, np.float16, np.float16, swap=False)
+        self._full_exact(np.float16, np.float16, np.float16,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_fff(self):
-        self._full_exact(True, np.float32, np.float32, np.float32, swap=True)
+        self._full_exact(np.float32, np.float32, np.float32,
+                         output0_raw=True, output1_raw=True, swap=True)
     def test_raw_hff(self):
-        self._full_exact(True, np.float16, np.float32, np.float32, swap=False)
+        self._full_exact(np.float16, np.float32, np.float32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_bii(self):
-        self._full_exact(True, np.int8, np.int32, np.int32, swap=False)
+        self._full_exact(np.int8, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ibb(self):
-        self._full_exact(True, np.int32, np.int8, np.int8, swap=False)
+        self._full_exact(np.int32, np.int8, np.int8,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ibs(self):
-        self._full_exact(True, np.int32, np.int8, np.int16, swap=False)
+        self._full_exact(np.int32, np.int8, np.int16,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_iff(self):
-        self._full_exact(True, np.int32, np.float32, np.float32, swap=False)
+        self._full_exact(np.int32, np.float32, np.float32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_fii(self):
-        self._full_exact(True, np.float32, np.int32, np.int32, swap=False)
+        self._full_exact(np.float32, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ihs(self):
-        self._full_exact(True, np.int32, np.float16, np.int16, swap=False)
+        self._full_exact(np.int32, np.float16, np.int16,
+                         output0_raw=True, output1_raw=True, swap=False)
 
     def test_raw_oii(self):
-        self._full_exact(True, np_dtype_string, np.int32, np.int32, swap=False)
+        self._full_exact(np_dtype_string, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ooo(self):
-        self._full_exact(True, np_dtype_string, np_dtype_string, np_dtype_string, swap=False)
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_oio(self):
-        self._full_exact(True, np_dtype_string, np.int32, np_dtype_string, swap=False)
+        self._full_exact(np_dtype_string, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ooi(self):
-        self._full_exact(True, np_dtype_string, np_dtype_string, np.int32, swap=False)
+        self._full_exact(np_dtype_string, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ioo(self):
-        self._full_exact(True, np.int32, np_dtype_string, np_dtype_string, swap=False)
+        self._full_exact(np.int32, np_dtype_string, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_iio(self):
-        self._full_exact(True, np.int32, np.int32, np_dtype_string, swap=False)
+        self._full_exact(np.int32, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ioi(self):
-        self._full_exact(True, np.int32, np_dtype_string, np.int32, swap=False)
+        self._full_exact(np.int32, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
 
     def test_class_bbb(self):
-        self._full_exact(False, np.int8, np.int8, np.int8, swap=True)
+        self._full_exact(np.int8, np.int8, np.int8,
+                         output0_raw=False, output1_raw=False, swap=True)
     def test_class_sss(self):
-        self._full_exact(False, np.int16, np.int16, np.int16, swap=True)
+        self._full_exact(np.int16, np.int16, np.int16,
+                         output0_raw=False, output1_raw=False, swap=True)
     def test_class_iii(self):
-        self._full_exact(False, np.int32, np.int32, np.int32, swap=True)
+        self._full_exact(np.int32, np.int32, np.int32,
+                         output0_raw=False, output1_raw=False, swap=True)
     def test_class_lll(self):
-        self._full_exact(False, np.int64, np.int64, np.int64, swap=False)
+        self._full_exact(np.int64, np.int64, np.int64,
+                         output0_raw=False, output1_raw=False, swap=False)
     def test_class_fff(self):
-        self._full_exact(False, np.float32, np.float32, np.float32, swap=True)
+        self._full_exact(np.float32, np.float32, np.float32,
+                         output0_raw=False, output1_raw=False, swap=True)
     def test_class_iff(self):
-        self._full_exact(False, np.int32, np.float32, np.float32, swap=False)
+        self._full_exact(np.int32, np.float32, np.float32,
+                         output0_raw=False, output1_raw=False, swap=False)
+
+    def test_mix_bbb(self):
+        self._full_exact(np.int8, np.int8, np.int8,
+                         output0_raw=True, output1_raw=False, swap=True)
+    def test_mix_sss(self):
+        self._full_exact(np.int16, np.int16, np.int16,
+                         output0_raw=False, output1_raw=True, swap=True)
+    def test_mix_iii(self):
+        self._full_exact(np.int32, np.int32, np.int32,
+                         output0_raw=True, output1_raw=False, swap=True)
+    def test_mix_lll(self):
+        self._full_exact(np.int64, np.int64, np.int64,
+                         output0_raw=False, output1_raw=True, swap=False)
+    def test_mix_fff(self):
+        self._full_exact(np.float32, np.float32, np.float32,
+                         output0_raw=True, output1_raw=False, swap=True)
+    def test_mix_iff(self):
+        self._full_exact(np.int32, np.float32, np.float32,
+                         output0_raw=False, output1_raw=True, swap=False)
 
     def test_raw_version_latest_1(self):
         input_size = 16
@@ -153,7 +209,7 @@ class InferTest(unittest.TestCase):
         # only version 3 should be available
         for platform in ('graphdef', 'savedmodel'):
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
                                model_version=1, swap=False)
             except InferenceServerException as ex:
@@ -162,7 +218,7 @@ class InferTest(unittest.TestCase):
                     ex.message().startswith("Inference request for unknown model"))
 
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
                                model_version=2, swap=True)
             except InferenceServerException as ex:
@@ -170,7 +226,7 @@ class InferTest(unittest.TestCase):
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int8, np.int8, np.int8,
                            model_version=3, swap=True)
 
@@ -182,7 +238,7 @@ class InferTest(unittest.TestCase):
         # versions 2 and 3 should be available
         for platform in ('graphdef', 'savedmodel'):
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int16, np.int16, np.int16,
                                model_version=1, swap=False)
             except InferenceServerException as ex:
@@ -190,10 +246,10 @@ class InferTest(unittest.TestCase):
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int16, np.int16, np.int16,
                            model_version=2, swap=True)
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int16, np.int16, np.int16,
                            model_version=3, swap=True)
 
@@ -204,13 +260,13 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of *_int32_int32_int32 and all should
         # be available.
         for platform in ('graphdef', 'savedmodel', 'netdef'):
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
                            model_version=1, swap=False)
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
                            model_version=2, swap=True)
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.int32, np.int32, np.int32,
                            model_version=3, swap=True)
 
@@ -221,12 +277,12 @@ class InferTest(unittest.TestCase):
         # There are 3 versions of *_float16_float16_float16 but only
         # version 1 should be available.
         for platform in ('graphdef', 'savedmodel'):
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float16, np.float16, np.float16,
                            model_version=1, swap=False)
 
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float16, np.float16, np.float16,
                                model_version=2, swap=True)
             except InferenceServerException as ex:
@@ -235,7 +291,7 @@ class InferTest(unittest.TestCase):
                     ex.message().startswith("Inference request for unknown model"))
 
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float16, np.float16, np.float16,
                                model_version=3, swap=True)
             except InferenceServerException as ex:
@@ -252,12 +308,12 @@ class InferTest(unittest.TestCase):
             if platform == 'plan' and CPU_ONLY:
                 continue
             tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
                            model_version=1, swap=False)
 
             try:
-                iu.infer_exact(self, platform, tensor_shape, 1, True,
+                iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float32, np.float32, np.float32,
                                model_version=2, swap=True)
             except InferenceServerException as ex:
@@ -265,7 +321,7 @@ class InferTest(unittest.TestCase):
                 self.assertTrue(
                     ex.message().startswith("Inference request for unknown model"))
 
-            iu.infer_exact(self, platform, tensor_shape, 1, True,
+            iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
                            model_version=3, swap=True)
 
