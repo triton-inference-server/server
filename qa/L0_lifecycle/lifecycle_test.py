@@ -118,7 +118,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         try:
-            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32)
             self.assertTrue(False, "expected error for unavailable model " + model_name)
         except InferenceServerException as ex:
@@ -167,7 +167,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Run inference on the just loaded model
         try:
-            iu.infer_exact(self, 'savedmodel', tensor_shape, 1, True,
+            iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -222,7 +222,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Model is removed so inference should fail
         try:
-            iu.infer_exact(self, 'savedmodel', tensor_shape, 1, True,
+            iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + savedmodel_name)
         except InferenceServerException as ex:
@@ -277,7 +277,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Model is removed so inference should fail
         try:
-            iu.infer_exact(self, 'netdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'netdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + netdef_name)
         except InferenceServerException as ex:
@@ -322,7 +322,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Run inference which should fail because the model isn't there
         try:
-            iu.infer_exact(self, 'savedmodel', tensor_shape, 1, True,
+            iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
             self.assertTrue(False, "expected error for unavailable model " + savedmodel_name)
         except InferenceServerException as ex:
@@ -359,7 +359,7 @@ class LifeCycleTest(unittest.TestCase):
         # Run inference to make sure model still being served even
         # though deleted from model store
         try:
-            iu.infer_exact(self, 'netdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'netdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -390,7 +390,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Run inference on version 1 to make sure it is available
         try:
-            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
         except InferenceServerException as ex:
@@ -445,7 +445,7 @@ class LifeCycleTest(unittest.TestCase):
 
         # Version is removed so inference should fail
         try:
-            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
             self.assertTrue(False, "expected error for unavailable model " + graphdef_name)
@@ -562,7 +562,7 @@ class LifeCycleTest(unittest.TestCase):
         # Run inference to make sure model still being served even
         # though version deleted from model store
         try:
-            iu.infer_exact(self, 'graphdef', tensor_shape, 1, True,
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,
                            model_version=1)
         except InferenceServerException as ex:
@@ -598,7 +598,7 @@ class LifeCycleTest(unittest.TestCase):
         for version in (1, 3):
             for model_name, model_shape in zip(models_base, models_shape):
                 try:
-                    iu.infer_exact(self, model_name, model_shape, 1, True,
+                    iu.infer_exact(self, model_name, model_shape, 1,
                                    np.float32, np.float32, np.float32, swap=(version == 3),
                                    model_version=version)
                 except InferenceServerException as ex:
@@ -636,7 +636,7 @@ class LifeCycleTest(unittest.TestCase):
         # change in model policy makes that no longer available.
         for model_name, model_shape in zip(models_base, models_shape):
             try:
-                iu.infer_exact(self, model_name, model_shape, 1, True,
+                iu.infer_exact(self, model_name, model_shape, 1,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1)
                 self.assertTrue(False, "expected error for unavailable model " + model_name)
@@ -648,7 +648,7 @@ class LifeCycleTest(unittest.TestCase):
         # Version 3 should continue to work...
         for model_name, model_shape in zip(models_base, models_shape):
             try:
-                iu.infer_exact(self, model_name, model_shape, 1, True,
+                iu.infer_exact(self, model_name, model_shape, 1,
                                np.float32, np.float32, np.float32, swap=True,
                                model_version=3)
             except InferenceServerException as ex:

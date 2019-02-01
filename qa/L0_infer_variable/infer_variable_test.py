@@ -38,38 +38,39 @@ from tensorrtserver.api import *
 np_dtype_string = np.dtype(object)
 
 class InferVariableTest(unittest.TestCase):
-    def _full_exact(self, req_raw, input_dtype, output0_dtype, output1_dtype,
-                    input_shape, output0_shape, output1_shape, swap=False):
+    def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
+                    input_shape, output0_shape, output1_shape,
+                    output0_raw=True, output1_raw=True, swap=False):
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'graphdef', input_shape, bs, req_raw,
+                iu.infer_exact(self, 'graphdef', input_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
-                               swap=swap)
-                iu.infer_exact(self, 'savedmodel', input_shape, bs, req_raw,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                iu.infer_exact(self, 'savedmodel', input_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
-                               swap=swap)
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             # model that does not support batching
-            iu.infer_exact(self, 'graphdef_nobatch', input_shape, 1, req_raw,
+            iu.infer_exact(self, 'graphdef_nobatch', input_shape, 1,
                            input_dtype, output0_dtype, output1_dtype,
-                           swap=swap)
-            iu.infer_exact(self, 'savedmodel_nobatch', input_shape, 1, req_raw,
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            iu.infer_exact(self, 'savedmodel_nobatch', input_shape, 1,
                            input_dtype, output0_dtype, output1_dtype,
-                           swap=swap)
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'netdef', input_shape, bs, req_raw,
+                iu.infer_exact(self, 'netdef', input_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
-                               swap=swap)
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             # model that does not support batching
-            iu.infer_exact(self, 'netdef_nobatch', input_shape, 1, req_raw,
+            iu.infer_exact(self, 'netdef_nobatch', input_shape, 1,
                            input_dtype, output0_dtype, output1_dtype,
-                           swap=swap)
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
@@ -77,54 +78,71 @@ class InferVariableTest(unittest.TestCase):
                                         input_shape, output0_shape, output1_shape):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_exact(self, 'custom', input_shape, bs, req_raw,
+                iu.infer_exact(self, 'custom', input_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
-                               swap=False)
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
             # model that does not support batching
-            iu.infer_exact(self, 'custom_nobatch', input_shape, 1, req_raw,
+            iu.infer_exact(self, 'custom_nobatch', input_shape, 1,
                            input_dtype, output0_dtype, output1_dtype,
-                           swap=False)
+                           output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
 
     def test_raw_fff(self):
-        self._full_exact(True, np.float32, np.float32, np.float32, (16,), (16,), (16,))
+        self._full_exact(np.float32, np.float32, np.float32, (16,), (16,), (16,))
     def test_raw_fii(self):
-        self._full_exact(True, np.float32, np.int32, np.int32, (2,8), (2,8), (2,8))
+        self._full_exact(np.float32, np.int32, np.int32, (2,8), (2,8), (2,8))
     def test_raw_fll(self):
-        self._full_exact(True, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
+        self._full_exact(np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
     def test_raw_fil(self):
-        self._full_exact(True, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
+        self._full_exact(np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
     def test_raw_ffi(self):
-        self._full_exact(True, np.float32, np.float32, np.int32, (16,), (16,), (16,))
+        self._full_exact(np.float32, np.float32, np.int32, (16,), (16,), (16,))
     def test_raw_iii(self):
-        self._full_exact(True, np.int32, np.int32, np.int32, (2,8), (2,8), (2,8))
+        self._full_exact(np.int32, np.int32, np.int32, (2,8), (2,8), (2,8))
     def test_faw_iif(self):
-        self._full_exact(True, np.int32, np.int32, np.float32, (2,8,2), (2,8,2), (2,8,2))
+        self._full_exact(np.int32, np.int32, np.float32, (2,8,2), (2,8,2), (2,8,2))
 
     def test_raw_ooo(self):
-        self._full_exact(True, np_dtype_string, np_dtype_string, np_dtype_string, (16,), (16,), (16,))
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string, (16,), (16,), (16,))
     def test_raw_oii(self):
-        self._full_exact(True, np_dtype_string, np.int32, np.int32, (2,8), (2,8), (2,8))
+        self._full_exact(np_dtype_string, np.int32, np.int32, (2,8), (2,8), (2,8))
     def test_raw_ooi(self):
-        self._full_exact(True, np_dtype_string, np_dtype_string, np.int32, (8,4), (8,4), (8,4))
+        self._full_exact(np_dtype_string, np_dtype_string, np.int32, (8,4), (8,4), (8,4))
     def test_raw_oio(self):
-        self._full_exact(True, np_dtype_string, np.int32, np_dtype_string, (2,8,2), (2,8,2), (2,8,2))
+        self._full_exact(np_dtype_string, np.int32, np_dtype_string, (2,8,2), (2,8,2), (2,8,2))
 
     def test_class_fff(self):
-        self._full_exact(False, np.float32, np.float32, np.float32, (16,), (16,), (16,))
+        self._full_exact(np.float32, np.float32, np.float32, (16,), (16,), (16,),
+                         output0_raw=False, output1_raw=False)
     def test_class_fii(self):
-        self._full_exact(False, np.float32, np.int32, np.int32, (2,8), (2,8), (2,8))
+        self._full_exact(np.float32, np.int32, np.int32, (2,8), (2,8), (2,8),
+                         output0_raw=False, output1_raw=False)
     def test_class_fll(self):
-        self._full_exact(False, np.float32, np.int64, np.int64, (8,4), (8,4), (8,4))
+        self._full_exact(np.float32, np.int64, np.int64, (8,4), (8,4), (8,4),
+                         output0_raw=False, output1_raw=False)
     def test_class_fil(self):
-        self._full_exact(False, np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2))
+        self._full_exact(np.float32, np.int32, np.int64, (2,8,2), (2,8,2), (2,8,2),
+                         output0_raw=False, output1_raw=False)
 
     def test_class_ffi(self):
-        self._full_exact(False, np.float32, np.float32, np.int32, (16,), (16,), (16,))
+        self._full_exact(np.float32, np.float32, np.int32, (16,), (16,), (16,),
+                         output0_raw=False, output1_raw=False)
     def test_class_iii(self):
-        self._full_exact(False, np.int32, np.int32, np.int32, (2,8), (2,8), (2,8))
+        self._full_exact(np.int32, np.int32, np.int32, (2,8), (2,8), (2,8),
+                         output0_raw=False, output1_raw=False)
     def test_class_iif(self):
-        self._full_exact(False, np.int32, np.int32, np.float32, (2,8,2), (2,8,2), (2,8,2))
+        self._full_exact(np.int32, np.int32, np.float32, (2,8,2), (2,8,2), (2,8,2),
+                         output0_raw=False, output1_raw=False)
+
+    def test_mix_ffi(self):
+        self._full_exact(np.float32, np.float32, np.int32, (16,), (16,), (16,),
+                         output0_raw=True, output1_raw=False)
+    def test_mix_iii(self):
+        self._full_exact(np.int32, np.int32, np.int32, (2,8), (2,8), (2,8),
+                         output0_raw=False, output1_raw=True)
+    def test_mix_iif(self):
+        self._full_exact(np.int32, np.int32, np.float32, (2,8,2), (2,8,2), (2,8,2),
+                         output0_raw=True, output1_raw=False)
 
 
 if __name__ == '__main__':
