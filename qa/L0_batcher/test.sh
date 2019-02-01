@@ -113,10 +113,12 @@ for model_type in FIXED VARIABLE; do
     # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
     # scheduler is delayed and requests can collect in the queue.
     for i in \
+            test_multi_batch_delayed_sum_gt_max_preferred \
             test_multi_batch_use_biggest_preferred \
             test_multi_batch_use_best_preferred ; do
         export TRTSERVER_DELAY_SCHEDULER=6 &&
-            [[ "$i" == "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3
+            [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3 &&
+            [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=2
         SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
@@ -167,6 +169,37 @@ for i in \
     fi
     set -e
 
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Tests that run only on the variable-size tensor models and that
+# require TRTSERVER_DELAY_SCHEDULER so that the scheduler is delayed
+# and requests can collect in the queue.
+export BATCHER_TYPE=VARIABLE
+for i in \
+        test_multi_batch_delayed_preferred_different_shape ; do
+    export TRTSERVER_DELAY_SCHEDULER=4
+    SERVER_ARGS="--model-store=`pwd`/var_models"
+    SERVER_LOG="./$i.VARIABLE.serverlog"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    unset TRTSERVER_DELAY_SCHEDULER
     kill $SERVER_PID
     wait $SERVER_PID
 done

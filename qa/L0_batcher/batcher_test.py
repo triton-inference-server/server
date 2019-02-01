@@ -275,7 +275,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests with total static batch size in between
         # preferred sizes. Then send a request with a different shape
         # and a non-preferred batch size. This should cause the first
-        # to requests to be immediately responded to and the third
+        # two requests to be immediately responded to and the third
         # response to be delayed by the max batch queue delay.
         for trial in _trials:
             try:
@@ -309,9 +309,9 @@ class BatcherTest(unittest.TestCase):
         # Send two requests with total static batch size in between
         # preferred sizes. Then send a request with a different shape
         # and a non-preferred batch size. This should cause the first
-        # to requests to be immediately responded to. Send a forth
+        # two requests to be immediately responded to. Send a forth
         # request with the same shape as the third that causes a
-        # preferred size so that third and forth response are send
+        # preferred size so that third and forth response are sent
         # immediately.
         for trial in _trials:
             try:
@@ -347,8 +347,10 @@ class BatcherTest(unittest.TestCase):
 
     def test_multi_batch_gt_max_preferred(self):
         # Send two requests with first not having preferred size and
-        # second being larger than max preferred size. This should cause
-        # both responses to be returned immediately.
+        # second being larger than max preferred size. Delay the
+        # second request so that it arrives after the first is already
+        # be processed by the dynamic batcher. This should cause both
+        # responses to be returned immediately.
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -376,10 +378,12 @@ class BatcherTest(unittest.TestCase):
     def test_multi_batch_sum_gt_max_preferred(self):
         # Send two requests with first not having preferred size and
         # second being smaller than max preferred size but the sum of
-        # the requests being larger than max preferred size. This
-        # should cause first response to be returned immediately but
-        # the second response, since it alone is not greater than max
-        # preferred size, will be delayed.
+        # the requests being larger than max preferred size. Delay the
+        # second request so that it arrives after the first is already
+        # be processed by the dynamic batcher. This should cause first
+        # response to be returned immediately but the second response,
+        # since it alone is not greater than max preferred size, will
+        # be delayed.
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -525,11 +529,92 @@ class BatcherTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multi_batch_delayed_sum_gt_max_preferred(self):
+        # Send two requests with first not having preferred size and
+        # second being smaller than max preferred size but the sum of
+        # the requests being larger than max preferred size. Use
+        # TRTSERVER_DELAY_SCHEDULER in the environment so that
+        # requests can be queued up before scheduler starts
+        # servicing. This should cause first response to be returned
+        # immediately but the second response, since it alone is not
+        # greater than max preferred size, will be delayed.
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+
+                # Need scheduler to wait for queue to contain 2 requests
+                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 2)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 3, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 4, False, _max_queue_delay)))
+                threads[0].start()
+                time.sleep(1)
+                threads[1].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (3,4), 2, 7)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_multi_batch_delayed_preferred_different_shape(self):
+        # Send two requests with total static batch size in between
+        # preferred sizes. Then send a request with a different shape
+        # and a non-preferred batch size. Use
+        # TRTSERVER_DELAY_SCHEDULER in the environment so that
+        # requests can be queued up before scheduler starts
+        # servicing. This should cause the first two requests to be
+        # immediately responded to. Send a forth request with the same
+        # shape as the third that causes a preferred size so that
+        # third and forth response are sent immediately.
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+
+                # Need scheduler to wait for queue to contain 4 requests
+                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 4)
+
+                threads = []
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 3, True, 3000)))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 1, True, 3000),
+                                                kwargs={'input_size': 8}))
+                threads.append(threading.Thread(target=self.check_response,
+                                                args=(trial, 5, True, 3000),
+                                                kwargs={'input_size': 8}))
+                threads[0].start()
+                threads[1].start()
+                time.sleep(1)
+                threads[2].start()
+                threads[3].start()
+                for t in threads:
+                    t.join()
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (1,3,5), 2, 10)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_multi_batch_use_biggest_preferred(self):
         # Send multiple requests that sum to multiple preferred sizes
         # and make sure the largest preferred size if used for the
-        # batch. Requires TRTSERVER_DELAY_SCHEDULER in the environment
-        # so that requests can be queued up before scheduler starts
+        # batch. Use TRTSERVER_DELAY_SCHEDULER in the environment so
+        # that requests can be queued up before scheduler starts
         # servicing.
         for trial in _trials:
             try:
@@ -570,9 +655,9 @@ class BatcherTest(unittest.TestCase):
         # preferred size and then extra request goes beyond that. The
         # initial requests should be handled immediately at the
         # preferred batch size and then the other one after
-        # timeout. Requires TRTSERVER_DELAY_SCHEDULER in the
-        # environment so that requests can be queued up before
-        # scheduler starts servicing.
+        # timeout. Use TRTSERVER_DELAY_SCHEDULER in the environment so
+        # that requests can be queued up before scheduler starts
+        # servicing.
         for trial in _trials:
             try:
                 url = "localhost:8000"
