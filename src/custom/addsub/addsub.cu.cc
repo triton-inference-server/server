@@ -151,18 +151,21 @@ Context::FreeCudaBuffers()
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
     }
+    cuda_input0_ = nullptr;
   }
   if (cuda_input1_ != nullptr) {
     cudaError_t cuerr = cudaFree(cuda_input1_);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
     }
+    cuda_input1_ = nullptr;
   }
   if (cuda_output_ != nullptr) {
     cudaError_t cuerr = cudaFree(cuda_output_);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "Failed to free cuda memory: " << cudaGetErrorString(cuerr);
     }
+    cuda_output_ = nullptr;
   }
 
   cuda_buffer_byte_size_ = 0;
