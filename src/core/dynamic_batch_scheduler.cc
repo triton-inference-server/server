@@ -278,43 +278,6 @@ DynamicBatchScheduler::GetDynamicBatch()
   // 'mu_' mutex must be held when this function is called. queue_
   // must not be empty.
 
-  // Handle the cases where the pending batch or request must be
-  // executed immediately.
-  //
-  //   1) if next request would make pending batch larger than the max
-  //   preferred batch size then must execute the pending batch
-  //   immediately
-  //
-  //   2) if no pending batch and next request on its own has batch
-  //   size larger than the max preferred batch size then must execute
-  //   immediately
-  //
-  //   3) if next request has a shape different than the pending batch
-  //   then must execute the pending batch immediately (this will
-  //   only occur for models that have variable-size input tensor(s)
-
-  if (pending_batch_queue_cnt_ < queue_.size()) {
-    // Case 1 and 2
-    const auto batch_size = queue_[pending_batch_queue_cnt_]
-                                .request_provider_->RequestHeader()
-                                .batch_size();
-    if ((pending_batch_size_ + batch_size) > max_preferred_batch_size_) {
-      if (pending_batch_queue_cnt_ == 0) {
-        pending_batch_size_ = batch_size;
-        pending_batch_queue_cnt_ = 1;
-      }
-      return 0;
-    }
-
-    // Case 3
-    if (need_pending_shape_ && (pending_batch_queue_cnt_ > 0)) {
-      if (!CompareWithPendingShape(queue_[pending_batch_queue_cnt_]
-                                       .request_provider_->RequestHeader())) {
-        return 0;
-      }
-    }
-  }
-
   // Examine the new requests. If adding these new requests to the
   // pending batch allows a preferred batch size then execute it
   // immediately. Stop examining requests if the maximum preferred
@@ -329,20 +292,26 @@ DynamicBatchScheduler::GetDynamicBatch()
     const auto batch_size =
         queue_[idx].request_provider_->RequestHeader().batch_size();
 
-    if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
-      send_now = true;
-      break;
-    }
-
-    // If forming new batch then get the shape required for the
-    // batch. If we already have a (partial) batch and this next
-    // request is a different shape, then need to send what we have
-    // immediately since the existing batch can't grow any larger.
-    if (need_pending_shape_) {
-      if (search_batch_cnt == 0) {
+    // If there is no pending batch, then this request is starting a
+    // new batch.
+    if (search_batch_cnt == 0) {
+      // Get the shape of the new batch that is being started...
+      if (need_pending_shape_) {
         InitPendingShape(queue_[idx].request_provider_->RequestHeader());
-      } else if (!CompareWithPendingShape(
-                     queue_[idx].request_provider_->RequestHeader())) {
+      }
+    } else {
+      // There is a pending batch and adding this request would make
+      // the batch size too large, so send the pending batch as it is.
+      if ((search_batch_size + batch_size) > max_preferred_batch_size_) {
+        send_now = true;
+        break;
+      }
+
+      // There is a pending batch and it has a different shape then
+      // this request, so send the pending batch as it is.
+      if (need_pending_shape_ &&
+          !CompareWithPendingShape(
+              queue_[idx].request_provider_->RequestHeader())) {
         send_now = true;
         break;
       }
@@ -375,10 +344,11 @@ DynamicBatchScheduler::GetDynamicBatch()
     return 0;
   }
 
-  // If there is no batch queuing delay if the current batch can't
+  // If there is no batch queuing delay or if the current batch can't
   // grow any larger then just immediately execute whatever is
   // pending.
-  if (send_now || (pending_batch_delay_ns_ == 0)) {
+  if (send_now || (pending_batch_delay_ns_ == 0) ||
+      (pending_batch_size_ >= max_preferred_batch_size_)) {
     return 0;
   }
 
