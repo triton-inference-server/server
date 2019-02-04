@@ -39,6 +39,8 @@ The TensorRT Inference Server is available in two ways:
   PyTorch containers available from `NGC <https://ngc.nvidia.com>`_.
   For more information, see :ref:`section-building-from-source-code`.
 
+.. _section-prerequisites:
+
 Prerequisites
 -------------
 
@@ -79,8 +81,10 @@ following prerequisite steps:
 Using A Prebuilt Docker Container
 ---------------------------------
 
-Use docker pull to get the TensorRT Inference Server container from
-NGC::
+Make sure you log into NGC as described in
+:ref:`section-prerequisites` before attempting the steps in this
+section.  Use docker pull to get the TensorRT Inference Server
+container from NGC::
 
   $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3
 
@@ -98,8 +102,10 @@ and the example client applications.
 Building From Source Code
 -------------------------
 
-To build the inference server from source, change to the root
-directory of the GitHub repo and use docker to build::
+Make sure you complete the steps in :ref:`section-prerequisites`
+before attempting to build the inference server. To build the
+inference server from source, change to the root directory of the
+GitHub repo and use docker to build::
 
   $ docker build --pull -t tensorrtserver
 
