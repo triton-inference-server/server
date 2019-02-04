@@ -28,6 +28,13 @@
 Running the Server
 ==================
 
+For best performance the TensorRT Inference Server should be run on a
+system that contains Docker, nvidia-docker, CUDA and one or more
+supported GPUs, as explained in
+:ref:`section-running-the-inference-server`. The inference server can
+also be run on non-CUDA, non-GPU systems as described in
+:ref:`section-running-the-inference-server-without-gpu`.
+
 .. _section-example-model-repository:
 
 Example Model Repository
@@ -67,9 +74,10 @@ you pulled from NGC or built locally::
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
 
 Where *<tensorrtserver image name>* will be something like
-**nvcr.io/nvidia/tensorrtserver:19.01-py3** if you pulled the
-container from the NGC register, or **tensorrtserver** if you
-:ref:`built it from source <section-building-the-server>`.
+**nvcr.io/nvidia/tensorrtserver:19.01-py3** if you :ref:`pulled the
+container from the NGC registry
+<section-installing-prebuilt-containers>`, or **tensorrtserver** if
+you :ref:`built it from source <section-building-the-server>`.
 
 The nvidia-docker -v option maps /path/to/model/repository on the host
 into the container at /models, and the -\\-model-store option to the
@@ -87,10 +95,26 @@ of models being served.
 For more information on the Prometheus metrics provided by the
 inference server see :ref:`section-metrics`.
 
+.. _section-running-the-inference-server-without-gpu:
+
+Running The Inference Server On A System Without A GPU
+------------------------------------------------------
+
+On a system without GPUs, the inference server should be run using
+docker instead of nvidia-docker, but is otherwise identical to what is
+described in :ref:`section-running-the-inference-server`::
+
+  $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
+
+Because a GPU is not available, the inference server will be unable to
+load any model configuration that requires a GPU or that specified a
+GPU instance by an :ref:`instance-group <section-instance-groups>`
+configuration.
+
 .. _section-checking-inference-server-status:
 
 Checking Inference Server Status
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+--------------------------------
 
 The simplest way to verify that the inference server is running
 correctly is to use the Status API to query the server’s status. From
