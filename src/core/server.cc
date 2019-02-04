@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -99,7 +99,10 @@
 #include "src/nvrpc/Service.h"
 #include "src/nvrpc/ThreadPool.h"
 
+using nvrpc::BaseContext;
+using nvrpc::BidirectionalStreamingLifeCycle;
 using nvrpc::Context;
+using nvrpc::LifeCycleUnary;
 using nvrpc::ThreadPool;
 
 namespace nvidia { namespace inferenceserver {
@@ -151,11 +154,11 @@ class StatusContext final
   }
 };
 
-class InferContext final
-    : public Context<InferRequest, InferResponse, AsyncResources> {
+template <class LifeCycle>
+class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
-    auto server = GetResources()->GetServer();
+    auto server = this->GetResources()->GetServer();
     auto infer_stats = std::make_shared<ModelInferStats>(
         server->StatusManager(), request.model_name());
     auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
@@ -216,6 +219,15 @@ class InferContext final
       this->FinishResponse();
     }
   }
+};
+
+class InferContext final
+    : public InferBaseContext<LifeCycleUnary<InferRequest, InferResponse>> {
+};
+
+class StreamInferContext final
+    : public InferBaseContext<
+          BidirectionalStreamingLifeCycle<InferRequest, InferResponse>> {
 };
 
 class ProfileContext final
@@ -1113,6 +1125,10 @@ InferenceServer::StartGrpcServer()
   auto rpcInfer = inferenceService->RegisterRPC<InferContext>(
       &GRPCService::AsyncService::RequestInfer);
 
+  LOG_INFO << "Register StreamInfer RPC";
+  auto rpcStreamInfer = inferenceService->RegisterRPC<StreamInferContext>(
+      &GRPCService::AsyncService::RequestStreamInfer);
+
   LOG_INFO << "Register Status RPC";
   auto rpcStatus = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
@@ -1132,6 +1148,8 @@ InferenceServer::StartGrpcServer()
   // executor.
   executor->RegisterContexts(
       rpcInfer, g_Resources, 1000);  // Configurable DLIS-161
+  executor->RegisterContexts(
+      rpcStreamInfer, g_Resources, 100);  // Configurable DLIS-161
   executor->RegisterContexts(rpcStatus, g_Resources, 1);
   executor->RegisterContexts(rpcHealth, g_Resources, 1);
   executor->RegisterContexts(rpcProfile, g_Resources, 1);
