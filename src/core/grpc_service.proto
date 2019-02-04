@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -66,6 +66,15 @@ service GRPCService
   //@@     can be transmitted in one pass.
   //@@
   rpc Infer(InferRequest) returns (InferResponse) {}
+
+  //@@  .. cpp:var:: rpc StreamInfer(stream InferRequest) returns (stream
+  //@@     InferResponse)
+  //@@
+  //@@     Request inferences using a specific model in a streaming manner.
+  //@@     Individual inference requests sent through the same stream will be
+  //@@     processed in order and be returned on completion
+  //@@
+  rpc StreamInfer(stream InferRequest) returns (stream InferResponse) {}
 }
 
 //@@
