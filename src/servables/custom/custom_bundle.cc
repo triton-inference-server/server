@@ -225,11 +225,15 @@ CustomBundle::Run(
   std::vector<ModelInferStats::ScopedTimer> compute_timers;
   for (auto& payload : *payloads) {
     // Stop queue timer when the payload is scheduled to run
-    payload.queue_timer_.reset();
+    if (payload.queue_timer_ != nullptr) {
+      payload.queue_timer_.reset();
+    }
 
-    compute_timers.emplace_back();
-    payload.stats_->StartComputeTimer(&compute_timers.back());
-    payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    if (payload.stats_ != nullptr) {
+      compute_timers.emplace_back();
+      payload.stats_->StartComputeTimer(&compute_timers.back());
+      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    }
   }
 
   OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
@@ -244,9 +248,13 @@ CustomBundle::Context::Run(
 
   // Each payload will have the same number and shape for inputs. Get
   // the shape for each input into a vector suitable to passing via
-  // the custom backend interface.
+  // the custom backend interface. As a performance improvement for
+  // models that don't have any variable-size input tensors we could
+  // calculate the input tensor shapes once during bundle
+  // initialization.
   std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
       input_shapes;
+
   if (!payloads->empty()) {
     const InferRequestHeader& request_header =
         payloads->front().request_provider_->RequestHeader();
@@ -262,20 +270,24 @@ CustomBundle::Context::Run(
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
-  // size of each input has already been checked by each payloads
+  // size of each input has already been checked by each payload's
   // request provider so don't need to do that here.
   uint32_t total_batch_size = 0;
   uint32_t total_inputs = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& payload : *payloads) {
-    if (payload.status_.ok()) {
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-
-      total_batch_size += request_header.batch_size();
-      total_inputs += request_header.input_size();
-      total_requested_outputs += request_header.output_size();
+    if (!payload.status_.ok()) {
+      return tensorflow::errors::Internal(
+          "unexpected payload with non-OK status given to custom runner for '",
+          name_, "'");
     }
+
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+
+    total_batch_size += request_header.batch_size();
+    total_inputs += request_header.input_size();
+    total_requested_outputs += request_header.output_size();
   }
 
   // If there are no valid payloads then no need to run the
@@ -317,13 +329,11 @@ CustomBundle::Context::Run(
   work_io_contexts.reserve(payloads->size());
 
   // Collect the payload information into a array of custom::Payload
-  // structs that can be passed to the backend.
+  // structs that can be passed to the backend. Every payload must
+  // have an OK status (checked above) so we don't bother to check
+  // that here.
   std::vector<CustomPayload> custom_payloads;
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
 
@@ -407,13 +417,6 @@ CustomBundle::Context::GetNextInput(
   *content = nullptr;
   *content_byte_size = 0;
 
-  // If a payload has errors then it never should have been passed to
-  // the custom backend.
-  if (!payload->status_.ok()) {
-    LOG_ERROR << "can't get tensor input for payload with non-ok status";
-    return false;
-  }
-
   const InferRequestHeader& request_header =
       payload->request_provider_->RequestHeader();
 
@@ -446,17 +449,16 @@ CustomBundle::Context::GetOutput(
 
   *content = nullptr;
 
-  // If a payload has errors then it never should have been passed to
-  // the custom backend.
-  if (!payload->status_.ok()) {
-    LOG_ERROR << "can't get output buffer for payload with non-ok status";
-    return false;
+  // If there is no response provider return content == nullptr with
+  // OK status as an indication that the output should not be written.
+  if (payload->response_provider_ != nullptr) {
+    std::vector<int64_t> shape(shape_dims, shape_dims + shape_dim_cnt);
+    tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
+        name, content, content_byte_size, shape);
+    return status.ok();
   }
 
-  std::vector<int64_t> shape(shape_dims, shape_dims + shape_dim_cnt);
-  tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
-      name, content, content_byte_size, shape);
-  return status.ok();
+  return true;
 }
 
 std::string
