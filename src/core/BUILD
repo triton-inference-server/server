@@ -151,31 +151,44 @@ cc_library(
 )
 
 cc_library(
-    name = "infer_header",
-    hdrs = ["infer.h"],
+    name = "backend",
+    hdrs = ["backend.h"],
+    srcs = ["backend.cc"],
     deps = [
-        ":api_proto",
-        ":grpc_service_proto",
+        ":constants",
+        ":dynamic_batch_scheduler",
         ":label_provider",
+        ":logging",
         ":metrics",
         ":model_config_proto",
         ":scheduler",
-        ":server_status_header",
+        ":sequence_batch_scheduler",
+        ":utils",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
 cc_library(
-    name = "infer",
-    srcs = ["infer.cc"],
+    name = "provider_header",
+    hdrs = ["provider.h"],
     deps = [
+        ":api_proto",
+        ":grpc_service_proto",
+        "@com_github_libevent_libevent//:libevent",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "provider",
+    srcs = ["provider.cc"],
+    deps = [
+        ":backend",
         ":constants",
-        ":dynamic_batch_scheduler",
-        ":infer_header",
-        ":label_provider",
+        ":provider_header",
         ":logging",
-        ":sequence_batch_scheduler",
+        ":model_config",
         ":utils",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
@@ -274,7 +287,7 @@ cc_library(
     deps = [
         ":api_proto",
         ":constants",
-        ":infer_header",
+        ":provider_header",
         ":logging",
         ":model_config",
         ":model_config_proto",
@@ -291,7 +304,7 @@ cc_library(
     hdrs = ["sequence_batch_scheduler.h"],
     deps = [
         ":constants",
-        ":infer_header",
+        ":provider_header",
         ":logging",
         ":model_config",
         ":model_config_proto",
@@ -310,7 +323,7 @@ cc_library(
         ":api_proto",
         ":constants",
         ":grpc_service_proto",
-        ":infer",
+        ":provider",
         ":logging",
         ":model_config",
         ":model_config_proto",
@@ -358,8 +371,9 @@ cc_library(
     name = "server_status",
     srcs = ["server_status.cc"],
     deps = [
+        ":backend",
         ":constants",
-        ":infer_header",
+        ":provider_header",
         ":logging",
         ":metrics",
         ":server_status_header",

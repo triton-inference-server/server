@@ -87,10 +87,11 @@ cc_library(
     deps = [
         ":loader",
         ":plan_utils",
+        "//src/core:backend",
         "//src/core:constants",
-        "//src/core:infer",
         "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
+        "//src/core:provider",
         "//src/core:server_status",
         "//src/core:utils",
         "@org_tensorflow//tensorflow/c:c_api",

@@ -27,10 +27,11 @@
 #include "src/core/server_status.h"
 
 #include <time.h>
+#include "src/core/backend.h"
 #include "src/core/constants.h"
-#include "src/core/infer.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/provider.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow_serving/core/servable_state.h"
 
@@ -383,41 +384,41 @@ ModelInferStats::ScopedTimer::Stop()
 
 ModelInferStats::~ModelInferStats()
 {
-  const int64_t model_version = (model_servable_ != nullptr)
-                                    ? model_servable_->Version()
+  const int64_t model_version = (model_backend_ != nullptr)
+                                    ? model_backend_->Version()
                                     : requested_model_version_;
 
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
         model_name_, model_version, batch_size_, request_duration_ns_);
-    if (model_servable_ == nullptr) {
-      LOG_ERROR << "Unable to collect inference metrics for nullptr servable";
+    if (model_backend_ == nullptr) {
+      LOG_ERROR << "Unable to collect inference metrics for nullptr backend";
     } else {
-      model_servable_->MetricInferenceFailure(gpu_device_).Increment();
+      model_backend_->MetricInferenceFailure(gpu_device_).Increment();
     }
   } else {
     status_manager_->UpdateSuccessInferStats(
         model_name_, model_version, batch_size_, execution_count_,
         request_duration_ns_, queue_duration_ns_, compute_duration_ns_);
 
-    if (model_servable_ == nullptr) {
-      LOG_ERROR << "Unable to collect inference metrics for nullptr servable";
+    if (model_backend_ == nullptr) {
+      LOG_ERROR << "Unable to collect inference metrics for nullptr backend";
     } else {
-      model_servable_->MetricInferenceSuccess(gpu_device_).Increment();
-      model_servable_->MetricInferenceCount(gpu_device_).Increment(batch_size_);
+      model_backend_->MetricInferenceSuccess(gpu_device_).Increment();
+      model_backend_->MetricInferenceCount(gpu_device_).Increment(batch_size_);
       if (execution_count_ > 0) {
-        model_servable_->MetricInferenceExecutionCount(gpu_device_)
+        model_backend_->MetricInferenceExecutionCount(gpu_device_)
             .Increment(execution_count_);
       }
 
-      model_servable_->MetricInferenceRequestDuration(gpu_device_)
+      model_backend_->MetricInferenceRequestDuration(gpu_device_)
           .Increment(request_duration_ns_ / 1000);
-      model_servable_->MetricInferenceComputeDuration(gpu_device_)
+      model_backend_->MetricInferenceComputeDuration(gpu_device_)
           .Increment(compute_duration_ns_ / 1000);
-      model_servable_->MetricInferenceQueueDuration(gpu_device_)
+      model_backend_->MetricInferenceQueueDuration(gpu_device_)
           .Increment(queue_duration_ns_ / 1000);
 
-      model_servable_->MetricInferenceLoadRatio(gpu_device_)
+      model_backend_->MetricInferenceLoadRatio(gpu_device_)
           .Observe(
               (double)request_duration_ns_ /
               std::max(1.0, (double)compute_duration_ns_));

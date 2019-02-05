@@ -95,9 +95,9 @@ cc_library(
     deps = [
         ":tf_utils",
         "//src/core:constants",
-        "//src/core:infer",
         "//src/core:logging",
         "//src/core:model_config_proto",
+        "//src/core:provider",
         "//src/core:server_status",
         "//src/core:utils",
         "@org_tensorflow//tensorflow/c:c_api",
