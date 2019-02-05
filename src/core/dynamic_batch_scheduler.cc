@@ -226,11 +226,15 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
           // executions.
-          if (!found_success && final_status.ok()) {
+          if (!found_success && final_status.ok() &&
+              (payload.stats_ != nullptr)) {
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;
           }
-          payload.complete_function_(final_status);
+
+          if (payload.complete_function_ != nullptr) {
+            payload.complete_function_(final_status);
+          }
         }
       };
 

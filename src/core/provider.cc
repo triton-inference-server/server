@@ -130,6 +130,45 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
   return tensorflow::Status::OK();
 }
 
+//
+// NULLInferRequestProvider
+//
+std::vector<uint8_t> NULLInferRequestProvider::buf_;
+std::mutex NULLInferRequestProvider::mu_;
+
+tensorflow::Status
+NULLInferRequestProvider::GetNextInputContent(
+    int idx, const void** content, size_t* content_byte_size,
+    bool force_contiguous)
+{
+  if ((idx < 0) || (idx >= request_header_.input_size())) {
+    return tensorflow::errors::Internal("unexpected input index ", idx);
+  }
+
+  if (content_byte_size == 0) {
+    *content = nullptr;
+    *content_byte_size = 0;
+  } else {
+    std::lock_guard<std::mutex> lock(mu_);
+
+    // Must return content with all zero data. This is required by
+    // string-datatype tensors where it is interpreted as all empty
+    // strings. Clamp the maximum size that we allow the buffer to
+    // grow to avoid massive allocation.
+    if (buf_.size() < *content_byte_size) {
+      constexpr size_t max_size = 16 * 1024 * 1024;
+      buf_.resize(std::min(max_size, *content_byte_size), 0);
+    }
+
+    *content = &(buf_[0]);
+  }
+
+  return tensorflow::Status::OK();
+}
+
+//
+// GRPCInferRequestProvider
+//
 GRPCInferRequestProvider::GRPCInferRequestProvider(
     const InferRequest& request, const int64_t version)
     : InferRequestProvider(request.model_name(), version), request_(request)
@@ -200,6 +239,9 @@ GRPCInferRequestProvider::GetNextInputContent(
   return tensorflow::Status::OK();
 }
 
+//
+// HTTPInferRequestProvider
+//
 tensorflow::Status
 HTTPInferRequestProvider::Create(
     evbuffer* input_buffer, const InferenceBackend& is,
