@@ -439,6 +439,12 @@ Context::ExecuteCPU(
         break;
       }
 
+      // If no error but the 'obuffer' is returned as nullptr, then
+      // skip writing this output.
+      if (obuffer == nullptr) {
+        continue;
+      }
+
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
         if (datatype_ == DataType::TYPE_INT32) {
           AddForType<int32_t>(
@@ -620,6 +626,12 @@ Context::ExecuteGPU(
               &output_shape[0], batchn_byte_size, &obuffer)) {
         payload.error_code = kOutputBuffer;
         break;
+      }
+
+      // If no error but the 'obuffer' is returned as nullptr, then
+      // skip writing this output.
+      if (obuffer == nullptr) {
+        continue;
       }
 
       int block_size = 1024;

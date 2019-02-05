@@ -305,11 +305,15 @@ NetDefBundle::Run(
   std::vector<ModelInferStats::ScopedTimer> compute_timers;
   for (auto& payload : *payloads) {
     // Stop queue timer when the payload is scheduled to run
-    payload.queue_timer_.reset();
+    if (payload.queue_timer_ != nullptr) {
+      payload.queue_timer_.reset();
+    }
 
-    compute_timers.emplace_back();
-    payload.stats_->StartComputeTimer(&compute_timers.back());
-    payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    if (payload.stats_ != nullptr) {
+      compute_timers.emplace_back();
+      payload.stats_->StartComputeTimer(&compute_timers.back());
+      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    }
   }
 
   OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
@@ -447,7 +451,8 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
     // If 'payload' requested this output then copy it from
     // 'content'. If it did not request this output then just
     // skip it in the 'content'.
-    if (payload.response_provider_->RequiresOutput(name)) {
+    if ((payload.response_provider_ != nullptr) &&
+        payload.response_provider_->RequiresOutput(name)) {
       void* buffer;
       tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
           name, &buffer, expected_byte_size, content_shape);

@@ -106,8 +106,8 @@ typedef bool (*CustomGetNextInputFn_t)(
 /// Type for the CustomGetOutput callback function.
 ///
 /// This callback function is provided in the call to ComputeExecute
-/// and is used to get the buffers to store the output tensor
-/// values.
+/// and is used to report the shape of an output and to get the
+/// buffers to store the output tensor values.
 ///
 /// \param output_context The output context provided in call to
 /// CustomExecute.
@@ -116,8 +116,10 @@ typedef bool (*CustomGetNextInputFn_t)(
 /// \param shape_dims The dimensions of the output shape.
 /// \param content_byte_size The size, in bytes, of the output tensor.
 /// \param content Returns a pointer to a buffer where the output for
-/// the tensor should be copied. The size of the buffer will be large
-/// enough to hold 'content_byte_size' bytes.
+/// the tensor should be copied. If nullptr and function returns true
+/// (no error), then the output should not be written and the backend
+/// should continue to the next output. If non-nullptr, the size of
+/// the buffer will be large enough to hold 'content_byte_size' bytes.
 /// \return false if error, true if success.
 typedef bool (*CustomGetOutputFn_t)(
     void* output_context, const char* name, size_t shape_dim_cnt,
