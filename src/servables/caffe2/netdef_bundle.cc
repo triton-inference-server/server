@@ -520,10 +520,8 @@ NetDefBundle::Context::Run(
     const ModelInput* input_config;
     TF_RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
-    // Get the shape of the input. This comes from the request if it
-    // provided dims otherwise from the model configuration. The
-    // provider has already checked that the request shape is valid so
-    // don't need to do it here.
+    // Get the shape of the input.  The provider has already checked
+    // that the request shape is valid so don't need to do it here.
     std::vector<int64_t> shape;
 
     // If model supports batching then prepend the batch dimension
@@ -533,16 +531,9 @@ NetDefBundle::Context::Run(
     }
 
     size_t batch1_element_cnt = 1;
-    if (input.dims_size() > 0) {
-      for (auto dim : input.dims()) {
-        shape.push_back(dim);
-        batch1_element_cnt *= dim;
-      }
-    } else {
-      for (auto dim : input_config->dims()) {
-        shape.push_back(dim);
-        batch1_element_cnt *= dim;
-      }
+    for (auto dim : input.dims()) {
+      shape.push_back(dim);
+      batch1_element_cnt *= dim;
     }
 
     // Checked at initialization time to make sure that STRING is not

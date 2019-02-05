@@ -578,10 +578,8 @@ BaseBundle::Context::Run(
     const tensorflow::DataType dtype =
         ConvertDataType(input_config->data_type());
 
-    // Get the shape of the input. This comes from the request if it
-    // provided dims otherwise from the model configuration. The
-    // provider has already checked that the request shape is valid so
-    // don't need to do it here.
+    // Get the shape of the input. The provider has already checked
+    // that the request shape is valid so don't need to do it here.
     tensorflow::TensorShape shape;
 
     // If model supports batching then prepend the batch dimension
@@ -591,16 +589,9 @@ BaseBundle::Context::Run(
     }
 
     size_t batch1_element_cnt = 1;
-    if (input.dims_size() > 0) {
-      for (auto dim : input.dims()) {
-        shape.AddDim(dim);
-        batch1_element_cnt *= dim;
-      }
-    } else {
-      for (auto dim : input_config->dims()) {
-        shape.AddDim(dim);
-        batch1_element_cnt *= dim;
-      }
+    for (auto dim : input.dims()) {
+      shape.AddDim(dim);
+      batch1_element_cnt *= dim;
     }
 
     const std::string* input_tensor_name = &name;

@@ -248,9 +248,7 @@ DynamicBatchScheduler::InitPendingShape(const InferRequestHeader& request)
   pending_batch_shapes_.clear();
 
   for (const auto& input : request.input()) {
-    if (input.dims_size() > 0) {
-      pending_batch_shapes_.emplace(std::make_pair(input.name(), input.dims()));
-    }
+    pending_batch_shapes_.emplace(std::make_pair(input.name(), input.dims()));
   }
 }
 
@@ -260,8 +258,12 @@ DynamicBatchScheduler::CompareWithPendingShape(
 {
   for (const auto& input : request.input()) {
     const auto itr = pending_batch_shapes_.find(input.name());
+
+    // It should never happen that we don't find the shape for an
+    // input, but if it does just return to be conservative.
     if (itr == pending_batch_shapes_.end()) {
-      return (input.dims_size() == 0);
+      LOG_ERROR << "expected to find shape for input '" << input.name() << "'";
+      return false;
     }
 
     if (!CompareDims(itr->second, input.dims())) {
