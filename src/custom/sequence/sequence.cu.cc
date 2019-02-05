@@ -285,7 +285,11 @@ Context::Execute(
         continue;
       }
 
-      memcpy(obuffer, &output, batch1_byte_size);
+      // If no error but the 'obuffer' is returned as nullptr, then
+      // skip writing this output.
+      if (obuffer != nullptr) {
+        memcpy(obuffer, &output, batch1_byte_size);
+      }
     }
   }
 

@@ -411,11 +411,15 @@ PlanBundle::Run(
   std::vector<ModelInferStats::ScopedTimer> compute_timers;
   for (auto& payload : *payloads) {
     // Stop queue timer when the payload is scheduled to run
-    payload.queue_timer_.reset();
+    if (payload.queue_timer_ != nullptr) {
+      payload.queue_timer_.reset();
+    }
 
-    compute_timers.emplace_back();
-    payload.stats_->StartComputeTimer(&compute_timers.back());
-    payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    if (payload.stats_ != nullptr) {
+      compute_timers.emplace_back();
+      payload.stats_->StartComputeTimer(&compute_timers.back());
+      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+    }
   }
 
   OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
@@ -578,15 +582,16 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         continue;
       }
 
-      // If 'payload' requested this output then copy it from the
-      // GPU. If it did not request this output then just skip it in
-      // the output buffer.
       const InferRequestHeader& request_header =
           payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =
           request_header.batch_size() * batch1_byte_size;
 
-      if (payload.response_provider_->RequiresOutput(name)) {
+      // If 'payload' requested this output then copy it from the
+      // GPU. If it did not request this output then just skip it in
+      // the output buffer.
+      if ((payload.response_provider_ != nullptr) &&
+          payload.response_provider_->RequiresOutput(name)) {
         void* content = nullptr;
         tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
             name, &content, expected_byte_size, shape);
