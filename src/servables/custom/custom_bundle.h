@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/infer.h"
+#include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/servables/custom/custom.h"
@@ -33,7 +33,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class CustomBundle : public InferenceServable {
+class CustomBundle : public InferenceBackend {
  public:
   CustomBundle() = default;
   CustomBundle(CustomBundle&&) = default;

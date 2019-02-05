@@ -35,7 +35,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceServable;
+class InferenceBackend;
 class ServerStatusManager;
 
 // Updates a server stat with duration measured by a C++ scope.
@@ -105,7 +105,7 @@ class ModelInferStats {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& model_name)
       : status_manager_(status_manager), model_name_(model_name),
-        failed_(false), requested_model_version_(-1), model_servable_(nullptr),
+        failed_(false), requested_model_version_(-1), model_backend_(nullptr),
         batch_size_(0), gpu_device_(-1), execution_count_(0),
         request_duration_ns_(0)
   {
@@ -119,8 +119,8 @@ class ModelInferStats {
   // Set the model version explicitly requested for the inference, or
   // -1 if latest version was requested.
   void SetRequestedVersion(int64_t v) { requested_model_version_ = v; }
-  // Set model servable for the inference stats.
-  void SetModelServable(const InferenceServable* s) { model_servable_ = s; }
+  // Set model backend for the inference stats.
+  void SetModelBackend(const InferenceBackend* s) { model_backend_ = s; }
   // Set batch size for the inference stats.
   void SetBatchSize(size_t bs) { batch_size_ = bs; }
   // Set CUDA GPU device index where inference was performed.
@@ -135,7 +135,7 @@ class ModelInferStats {
   // lifetime of 'this' object.
   struct timespec StartRequestTimer(ScopedTimer* timer) const;
 
-  // Get a ScopedTimer that measures wait time spent in servable Run(),
+  // Get a ScopedTimer that measures wait time spent in backend Run(),
   // including queuing, scheduling. The lifetime of
   // 'timer' must not exceed the lifetime of 'this' object.
   struct timespec StartQueueTimer(ScopedTimer* timer) const;
@@ -150,7 +150,7 @@ class ModelInferStats {
   const std::string model_name_;
   bool failed_;
   int64_t requested_model_version_;
-  const InferenceServable* model_servable_;
+  const InferenceBackend* model_backend_;
   size_t batch_size_;
   int gpu_device_;
   uint32_t execution_count_;

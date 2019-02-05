@@ -27,14 +27,14 @@
 
 #include <NvInfer.h>
 #include <mutex>
-#include "src/core/infer.h"
+#include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class PlanBundle : public InferenceServable {
+class PlanBundle : public InferenceBackend {
  public:
   PlanBundle() = default;
   PlanBundle(PlanBundle&&) = default;

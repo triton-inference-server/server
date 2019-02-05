@@ -24,13 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/infer.h"
+#include "src/core/provider.h"
 
-#include <chrono>
+#include "src/core/backend.h"
 #include "src/core/constants.h"
-#include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
-#include "src/core/sequence_batch_scheduler.h"
+#include "src/core/model_config.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 
@@ -106,7 +105,7 @@ GRPCInferRequestProvider::GRPCInferRequestProvider(
 
 tensorflow::Status
 GRPCInferRequestProvider::Create(
-    const InferenceServable& is, const InferRequest& request,
+    const InferenceBackend& is, const InferRequest& request,
     std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
 {
   const int64_t version =
@@ -198,7 +197,7 @@ GRPCInferRequestProvider::GetNextInputContent(
 
 tensorflow::Status
 HTTPInferRequestProvider::Create(
-    evbuffer* input_buffer, const InferenceServable& is,
+    evbuffer* input_buffer, const InferenceBackend& is,
     const std::string& model_name, const int64_t model_version,
     const std::string& request_header_str,
     std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
@@ -416,7 +415,7 @@ HTTPInferResponseProvider::HTTPInferResponseProvider(
 
 tensorflow::Status
 HTTPInferResponseProvider::Create(
-    evbuffer* output_buffer, const InferenceServable& is,
+    evbuffer* output_buffer, const InferenceBackend& is,
     const InferRequestHeader& request_header,
     std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
 {
@@ -565,7 +564,7 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
 }
 
 tensorflow::Status
-InferResponseProvider::FinalizeResponse(const InferenceServable& is)
+InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 {
   InferResponseHeader* response_header = MutableResponseHeader();
   response_header->Clear();
@@ -685,262 +684,6 @@ InferResponseProvider::FinalizeResponse(const InferenceServable& is)
   }
 
   return tensorflow::Status::OK();
-}
-
-void
-InferenceServable::GetMetricLabels(
-    std::map<std::string, std::string>* labels, const int gpu_device) const
-{
-  labels->insert(std::map<std::string, std::string>::value_type(
-      std::string(kMetricsLabelModelName), Name()));
-  labels->insert(std::map<std::string, std::string>::value_type(
-      std::string(kMetricsLabelModelVersion), std::to_string(Version())));
-  for (const auto& tag : Tags()) {
-    labels->insert(std::map<std::string, std::string>::value_type(
-        "_" + tag.first, tag.second));
-  }
-
-  // 'gpu_device' can be -1 to indicate that the GPU is not known. In
-  // that case use a metric that doesn't have the gpu_uuid label.
-  if (gpu_device >= 0) {
-    std::string uuid;
-    if (Metrics::UUIDForCudaDevice(gpu_device, &uuid)) {
-      labels->insert(std::map<std::string, std::string>::value_type(
-          std::string(kMetricsLabelGpuUuid), uuid));
-    }
-  }
-}
-
-prometheus::Counter&
-InferenceServable::GetCounterMetric(
-    std::map<int, prometheus::Counter*>& metrics,
-    prometheus::Family<prometheus::Counter>& family, const int gpu_device) const
-{
-  const auto itr = metrics.find(gpu_device);
-  if (itr != metrics.end()) {
-    return *(itr->second);
-  }
-
-  std::map<std::string, std::string> labels;
-  GetMetricLabels(&labels, gpu_device);
-
-  prometheus::Counter& counter = family.Add(labels);
-  metrics.insert(
-      std::map<int, prometheus::Counter*>::value_type(gpu_device, &counter));
-  return counter;
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceSuccess(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_success_, Metrics::FamilyInferenceSuccess(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceFailure(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_failure_, Metrics::FamilyInferenceFailure(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceCount(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_count_, Metrics::FamilyInferenceCount(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceExecutionCount(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_exec_count_, Metrics::FamilyInferenceExecutionCount(),
-      gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceRequestDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_request_duration_us_,
-      Metrics::FamilyInferenceRequestDuration(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceComputeDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_compute_duration_us_,
-      Metrics::FamilyInferenceComputeDuration(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceServable::MetricInferenceQueueDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_queue_duration_us_, Metrics::FamilyInferenceQueueDuration(),
-      gpu_device);
-}
-
-prometheus::Histogram&
-InferenceServable::MetricInferenceLoadRatio(int gpu_device) const
-{
-  const auto itr = metric_inf_load_ratio_.find(gpu_device);
-  if (itr != metric_inf_load_ratio_.end()) {
-    return *(itr->second);
-  }
-
-  std::map<std::string, std::string> labels;
-  GetMetricLabels(&labels, gpu_device);
-
-  prometheus::Histogram& hist = Metrics::FamilyInferenceLoadRatio().Add(
-      labels, std::vector<double>{1.05, 1.10, 1.25, 1.5, 2.0, 10.0, 50.0});
-  metric_inf_load_ratio_.insert(
-      std::map<int, prometheus::Histogram*>::value_type(gpu_device, &hist));
-  return hist;
-}
-
-tensorflow::Status
-InferenceServable::GetInput(
-    const std::string& name, const ModelInput** input) const
-{
-  const auto itr = input_map_.find(name);
-  if (itr == input_map_.end()) {
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference input '", name, "' for model '", Name(), "'");
-  }
-
-  *input = &itr->second;
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-InferenceServable::GetOutput(
-    const std::string& name, const ModelOutput** output) const
-{
-  const auto itr = output_map_.find(name);
-  if (itr == output_map_.end()) {
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference output '", name, "' for model '", Name(), "'");
-  }
-
-  *output = &itr->second;
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-InferenceServable::SetModelConfig(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
-{
-  config_ = config;
-  TF_RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
-  for (const auto& tag : config_.tags()) {
-    tags_.insert(
-        std::map<std::string, std::string>::value_type(tag.first, tag.second));
-  }
-
-  // Initialize the input map
-  for (const auto& io : config.input()) {
-    input_map_.insert(std::make_pair(io.name(), io));
-  }
-
-  // Initialize the output map and label provider for each output
-  const auto model_dir = tensorflow::io::Dirname(path);
-  for (const auto& io : config.output()) {
-    output_map_.insert(std::make_pair(io.name(), io));
-
-    if (!io.label_filename().empty()) {
-      const auto label_path =
-          tensorflow::io::JoinPath(model_dir, io.label_filename());
-      TF_RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
-    }
-  }
-
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-InferenceServable::SetScheduler(std::unique_ptr<Scheduler> scheduler)
-{
-  if (scheduler_ != nullptr) {
-    return tensorflow::errors::Internal(
-        "Attempt to change scheduler not allowed");
-  }
-
-  scheduler_ = std::move(scheduler);
-  return tensorflow::Status::OK();
-}
-
-tensorflow::Status
-InferenceServable::SetConfiguredScheduler(
-    const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun)
-{
-  std::unique_ptr<Scheduler> scheduler;
-
-  // If 'sequence_batching' is configured use the SequenceBatchScheduler,
-  // otherwise use the default DynamicBatchScheduler.
-  if (config_.has_sequence_batching()) {
-    scheduler.reset(new SequenceBatchScheduler(config_, runner_cnt, OnRun));
-  } else {
-    scheduler.reset(new DynamicBatchScheduler(config_, runner_cnt, OnRun));
-  }
-
-  return SetScheduler(std::move(scheduler));
-}
-
-void
-InferenceServable::AsyncRun(
-    std::shared_ptr<ModelInferStats> stats,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
-{
-  scheduler_->Enqueue(
-      stats, request_provider, response_provider, OnCompleteHandleInfer);
-}
-
-// Since callers are expecting synchronous behavior, this function
-// must wait until the request is processed and the response is
-// returned. This function can be simplified significantly once we
-// have [DLIS-124].
-void
-InferenceServable::Run(
-    std::shared_ptr<ModelInferStats> stats,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
-{
-  std::mutex lmu;
-  std::condition_variable lcv;
-  tensorflow::Status run_status;
-  bool run_completed = false;
-
-  // Add request to queue...
-  {
-    scheduler_->Enqueue(
-        stats, request_provider, response_provider,
-        [&lmu, &lcv, &run_status, &run_completed](tensorflow::Status status) {
-          // signal complete and propagate status
-          {
-            std::lock_guard<std::mutex> lk(lmu);
-            run_status = status;
-            run_completed = true;
-          }
-          lcv.notify_one();
-        });
-  }
-
-  // [DLIS-124] must wait for request to indicate complete...
-  {
-    std::chrono::seconds wait_timeout(1);
-    std::unique_lock<std::mutex> lk(lmu);
-    while (!run_completed) {
-      lcv.wait_for(lk, wait_timeout);
-    }
-  }
-
-  OnCompleteHandleInfer(run_status);
 }
 
 }}  // namespace nvidia::inferenceserver

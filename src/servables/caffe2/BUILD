@@ -64,11 +64,12 @@ cc_library(
          "netdef_bundle_c2.h"
     ],
     deps = [
+        "//src/core:backend",
         "//src/core:constants",
-        "//src/core:infer",
         "//src/core:logging",
         "//src/core:model_config_proto",
         "//src/core:model_config",
+        "//src/core:provider",
         "//src/core:server_status",
         "//src/core:utils",
     ],

@@ -35,8 +35,8 @@
 #include "grpc++/server.h"
 
 #include "src/core/api.pb.h"
-#include "src/core/infer.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/provider.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
@@ -132,10 +132,10 @@ class InferenceServer {
     tensorflow::Status Init(
         const std::string& model_name, const int64_t model_version,
         tfs::ServerCore* core);
-    InferenceServable* Backend() { return is_; }
+    InferenceBackend* Backend() { return is_; }
 
    private:
-    InferenceServable* is_;
+    InferenceBackend* is_;
     tfs::ServableHandle<GraphDefBundle> graphdef_bundle_;
     tfs::ServableHandle<PlanBundle> plan_bundle_;
     tfs::ServableHandle<NetDefBundle> netdef_bundle_;
