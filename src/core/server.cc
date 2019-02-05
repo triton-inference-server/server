@@ -51,13 +51,13 @@
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
-#include "src/core/infer.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/profile.h"
+#include "src/core/provider.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
@@ -171,7 +171,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     tensorflow::Status status = server->InitBackendState(
         request.model_name(), request.model_version(), backend);
     if (status.ok()) {
-      infer_stats->SetModelServable(backend->Backend());
+      infer_stats->SetModelBackend(backend->Backend());
 
       std::shared_ptr<GRPCInferRequestProvider> request_provider;
       status = GRPCInferRequestProvider::Create(
@@ -449,7 +449,7 @@ HTTPServiceImpl::Infer(
   tensorflow::Status status =
       server_->InitBackendState(model_name, model_version, backend);
   if (status.ok()) {
-    infer_stats->SetModelServable(backend->Backend());
+    infer_stats->SetModelBackend(backend->Backend());
 
     std::shared_ptr<HTTPInferRequestProvider> request_provider;
     status = HTTPInferRequestProvider::Create(
@@ -1554,7 +1554,7 @@ InferenceServer::InferBackendState::Init(
     model_spec.mutable_version()->set_value(model_version);
   }
 
-  // Get the InferenceServable appropriate for the request.
+  // Get the InferenceBackend appropriate for the request.
   Platform platform;
   tensorflow::Status status =
       ModelRepositoryManager::GetModelPlatform(model_name, &platform);
@@ -1563,31 +1563,31 @@ InferenceServer::InferBackendState::Init(
       case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
         status = core->GetServableHandle(model_spec, &(graphdef_bundle_));
         if (status.ok()) {
-          is_ = static_cast<InferenceServable*>(graphdef_bundle_.get());
+          is_ = static_cast<InferenceBackend*>(graphdef_bundle_.get());
         }
         break;
       case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
         status = core->GetServableHandle(model_spec, &(saved_model_bundle_));
         if (status.ok()) {
-          is_ = static_cast<InferenceServable*>(saved_model_bundle_.get());
+          is_ = static_cast<InferenceBackend*>(saved_model_bundle_.get());
         }
         break;
       case Platform::PLATFORM_TENSORRT_PLAN:
         status = core->GetServableHandle(model_spec, &(plan_bundle_));
         if (status.ok()) {
-          is_ = static_cast<InferenceServable*>(plan_bundle_.get());
+          is_ = static_cast<InferenceBackend*>(plan_bundle_.get());
         }
         break;
       case Platform::PLATFORM_CAFFE2_NETDEF:
         status = core->GetServableHandle(model_spec, &(netdef_bundle_));
         if (status.ok()) {
-          is_ = static_cast<InferenceServable*>(netdef_bundle_.get());
+          is_ = static_cast<InferenceBackend*>(netdef_bundle_.get());
         }
         break;
       case Platform::PLATFORM_CUSTOM:
         status = core->GetServableHandle(model_spec, &(custom_bundle_));
         if (status.ok()) {
-          is_ = static_cast<InferenceServable*>(custom_bundle_.get());
+          is_ = static_cast<InferenceBackend*>(custom_bundle_.get());
         }
         break;
       default:

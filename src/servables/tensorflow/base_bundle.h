@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/infer.h"
+#include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "tensorflow/core/lib/core/errors.h"
@@ -33,8 +33,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// Base for both GraphDef and SavedModel servables
-class BaseBundle : public InferenceServable {
+// Base for both GraphDef and SavedModel backends
+class BaseBundle : public InferenceBackend {
  public:
   BaseBundle() = default;
   BaseBundle(BaseBundle&&) = default;
@@ -121,7 +121,7 @@ class BaseBundle : public InferenceServable {
   TF_DISALLOW_COPY_AND_ASSIGN(BaseBundle);
   friend std::ostream& operator<<(std::ostream&, const BaseBundle&);
 
-  // The contexts for this servable.
+  // The contexts for this backend.
   std::vector<Context> contexts_;
 };
 
