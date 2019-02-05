@@ -54,8 +54,10 @@ class InferRequestProvider {
   // was requested.
   int64_t ModelVersion() const { return version_; }
 
-  // Get the request header for this inference request.
-  virtual const InferRequestHeader& RequestHeader() const = 0;
+  // Get the request header for this inference request that has been
+  // validated and normalized so that all inputs have shape and
+  // batch-byte-size defined.
+  const InferRequestHeader& RequestHeader() const { return request_header_; }
 
   // Get the next contiguous chunk of bytes for the 'idx'
   // input. Return a pointer to the chunk in 'content' and the length
@@ -68,29 +70,27 @@ class InferRequestProvider {
       bool force_contiguous) = 0;
 
  protected:
-  tensorflow::Status GetInputBatchByteSize(
-      const InferRequestHeader::Input& input, const ModelInput& input_config,
-      uint64_t* byte_size);
+  // Validate request header and modify as necessary so that every
+  // input has a shape and a batch-byte-size.
+  tensorflow::Status NormalizeRequestHeader(const InferenceBackend& is);
 
- private:
-  const std::string& model_name_;
+  const std::string model_name_;
   const int64_t version_;
+  InferRequestHeader request_header_;
 };
 
 //
-// Inference input provider for a GRPC inference request
+// Inference input provider for a GRPC inference request.
 //
 class GRPCInferRequestProvider : public InferRequestProvider {
  public:
-  // Initialize based on gRPC request
+  // Create a GRPCInferRequestProvider object. The 'request' object is
+  // captured by reference to avoid copying all the raw input tensor
+  // data... but this means that it's lifetime must persist longer
+  // than this provider.
   static tensorflow::Status Create(
       const InferenceBackend& is, const InferRequest& request,
       std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
-
-  const InferRequestHeader& RequestHeader() const override
-  {
-    return request_.meta_data();
-  }
 
   tensorflow::Status GetNextInputContent(
       int idx, const void** content, size_t* content_byte_size,
@@ -115,11 +115,6 @@ class HTTPInferRequestProvider : public InferRequestProvider {
       const std::string& request_header_str,
       std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
-  const InferRequestHeader& RequestHeader() const override
-  {
-    return request_header_;
-  }
-
   tensorflow::Status GetNextInputContent(
       int idx, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
@@ -130,7 +125,6 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   {
   }
 
-  InferRequestHeader request_header_;
   using Block = std::pair<const char*, size_t>;
   std::vector<std::vector<Block>> contents_;
   std::vector<size_t> contents_idx_;

@@ -243,7 +243,8 @@ CustomBundle::Context::Run(
                  << " request payloads";
 
   // Each payload will have the same number and shape for inputs. Get
-  // the shape for each input.
+  // the shape for each input into a vector suitable to passing via
+  // the custom backend interface.
   std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
       input_shapes;
   if (!payloads->empty()) {
@@ -251,22 +252,11 @@ CustomBundle::Context::Run(
         payloads->front().request_provider_->RequestHeader();
 
     for (const auto& input : request_header.input()) {
-      if (input.dims_size() > 0) {
-        std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
-        for (auto d : input.dims()) {
-          shape->push_back(d);
-        }
-        input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
-      } else {
-        const ModelInput* input_config;
-        TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
-
-        std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
-        for (auto d : input_config->dims()) {
-          shape->push_back(d);
-        }
-        input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
+      std::unique_ptr<std::vector<int64_t>> shape(new std::vector<int64_t>());
+      for (auto d : input.dims()) {
+        shape->push_back(d);
       }
+      input_shapes.emplace(std::make_pair(input.name(), std::move(shape)));
     }
   }
 
