@@ -349,7 +349,7 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
         size_t copied_byte_size = 0;
         while (payload.compute_status_.ok()) {
           const void* content;
-          size_t content_byte_size;
+          size_t content_byte_size = expected_byte_size - copied_byte_size;
           payload.compute_status_ =
               payload.request_provider_->GetNextInputContent(
                   input_idx, &content, &content_byte_size, false);

@@ -169,7 +169,7 @@ Context::GetInputTensor(
 
   while (true) {
     const void* content;
-    uint64_t content_byte_size;
+    uint64_t content_byte_size = expected_byte_size;
     if (!input_fn(input_context, name, &content, &content_byte_size)) {
       return kInputContents;
     }
