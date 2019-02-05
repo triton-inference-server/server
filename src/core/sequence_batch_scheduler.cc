@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,8 +41,8 @@ SequenceBatchScheduler::SequenceBatchScheduler(
     const ModelConfig& config, const uint32_t runner_cnt,
     StandardRunFunc OnSchedule)
 {
-  // Get the batch size to allow for each runner. This is 1 even if
-  // the model doesn't support batching.
+  // Get the batch size to allow for each runner. This is at least 1
+  // even if the model doesn't support batching.
   size_t batch_size = std::max(1, config.max_batch_size());
 
   // Create one SequenceBatch object for each requested runner. The
@@ -76,7 +76,7 @@ SequenceBatchScheduler::Enqueue(
   if (correlation_id == 0) {
     OnComplete(tensorflow::errors::InvalidArgument(
         "inference request to model '", request_provider->ModelName(),
-        "' must specify a correlation ID"));
+        "' must specify a non-zero correlation ID"));
     return;
   }
 
@@ -117,9 +117,12 @@ SequenceBatchScheduler::Enqueue(
       backlog_sequence_ids_.push_back(correlation_id);
     }
   } else {
+    // Correlation ID is known...
     target = &sb_itr->second;
   }
 
+  // If correlation ID doesn't have a slot just add this request to
+  // the backlog for that correlation ID.
   if (target->IsBacklog()) {
     target->backlog_.emplace_back(
         queue_timer, stats, request_provider, response_provider, OnComplete);
@@ -127,7 +130,7 @@ SequenceBatchScheduler::Enqueue(
   }
 
   std::shared_ptr<SequenceBatch> sb = target->sequence_batch_;
-  uint32_t slot = target->slot_;
+  const uint32_t slot = target->slot_;
 
   lock.unlock();
 
@@ -192,6 +195,17 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 
   {
     std::lock_guard<std::mutex> lock(mu_);
+
+    // All requests in this SequenceBatch must have the same shape for
+    // all inputs (since they are going to be executed together in a
+    // batch). If this is the first request into this SequenceBatch
+    // then create NULL version request provider that can stand in as
+    // representative when inference is issuing and there is no
+    // request available in one or more slots.
+    if (max_active_slot_ == -1) {
+      null_request_provider_.reset(
+          new NULLInferRequestProvider(request_provider->RequestHeader()));
+    }
 
     correlation_ids_[slot] = correlation_id;
     queues_[slot].emplace_back(
@@ -268,29 +282,27 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
         } else {
           // Collect payloads from slot 0 to max_active_slot_.
           for (int32_t slot = 0; slot <= max_active_slot_; ++slot) {
-            // If 'slot' is not active then need to send a dummy payload
-            // that "pads" batch so that other payloads stay in the
-            // correct slot.
-            if (correlation_ids_[slot] == 0) {
-              continue;
-            }
-
+            // If 'slot' is not active or doesn't have any requests
+            // then change the request provider to send dummy/null
+            // input tensors for this slot. We need this so that other
+            // payloads stay in the correct slot.
             std::deque<SequencePayload>& queue = queues_[slot];
 
-            // If 'slot' is active but doesn't have any requests then
-            // need to send a dummy payload that "pads"...
-            if (queue.empty()) {
-              continue;
+            if ((correlation_ids_[slot] == 0) || queue.empty()) {
+              std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer;
+              payloads->emplace_back(
+                  queue_timer, nullptr, null_request_provider_, nullptr,
+                  nullptr);
+            } else {
+              SequencePayload& slot_payload = queue.front();
+              payloads->emplace_back(
+                  slot_payload.queue_timer_, slot_payload.stats_,
+                  slot_payload.request_provider_,
+                  slot_payload.response_provider_,
+                  slot_payload.complete_function_);
+
+              queue.pop_front();
             }
-
-            SequencePayload& slot_payload = queue.front();
-
-            payloads->emplace_back(
-                slot_payload.queue_timer_, slot_payload.stats_,
-                slot_payload.request_provider_, slot_payload.response_provider_,
-                slot_payload.complete_function_);
-
-            queue.pop_front();
           }
         }
       }
@@ -317,11 +329,15 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
           // executions.
-          if (!found_success && final_status.ok()) {
+          if (!found_success && final_status.ok() &&
+              (payload.stats_ != nullptr)) {
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;
           }
-          payload.complete_function_(final_status);
+
+          if (payload.complete_function_ != nullptr) {
+            payload.complete_function_(final_status);
+          }
         }
       };
 

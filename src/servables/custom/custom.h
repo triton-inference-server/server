@@ -95,7 +95,9 @@ typedef struct custom_payload_struct {
 /// \param content Returns a pointer to the next contiguous block of
 /// content for the named input. Returns nullptr if there is no more
 /// content for the input.
-/// \param content_byte_size Returns the size, in bytes, of 'content'.
+/// \param content_byte_size Acts as both input and output. On input
+/// gives the maximum size expected for 'content'. Returns the actual
+/// size, in bytes, of 'content'.
 /// \return false if error, true if success.
 typedef bool (*CustomGetNextInputFn_t)(
     void* input_context, const char* name, const void** content,

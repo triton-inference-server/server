@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -38,6 +38,8 @@
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
+
+class NULLInferRequestProvider;
 
 // Scheduler that implements batching for a sequence of correlated
 // inferences.
@@ -114,13 +116,17 @@ class SequenceBatchScheduler : public Scheduler {
     std::mutex mu_;
     std::condition_variable cv_;
 
-    // The correlation ID of the requests using a batch "slot" or 0
+    // The request provider to use when an inference is issuing and
+    // there is no request available in a slot.
+    std::shared_ptr<NULLInferRequestProvider> null_request_provider_;
+
+    // The correlation ID of the requests using a batch slot or 0
     // (zero) if the slot is currently unused.
     std::vector<CorrelationID> correlation_ids_;
 
     // Queues holding inference requests. There are 'batch_size'
-    // queues, one for each batch "slot" where requests assigned to
-    // that slot are enqueued to wait for inferencing.
+    // queues, one for each batch slot where requests assigned to that
+    // slot are enqueued to wait for inferencing.
     std::vector<std::deque<SequencePayload>> queues_;
 
     // The maximum active slot. A value of -1 indicates that no slots

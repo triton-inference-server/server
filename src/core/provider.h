@@ -60,11 +60,16 @@ class InferRequestProvider {
   const InferRequestHeader& RequestHeader() const { return request_header_; }
 
   // Get the next contiguous chunk of bytes for the 'idx'
-  // input. Return a pointer to the chunk in 'content' and the length
-  // of the chunk in 'content_byte_size'. If there are no more bytes
-  // for the input return 'content' = nullptr. If 'force_contiguous'
-  // is true then the entire (remaining) input will be returned as a
-  // single chunk. In some cases this will require copying the data.
+  // input. Return a pointer to the chunk in 'content'.
+  // 'content_byte_size' acts as both input and output. On input
+  // 'content_byte_size' is a hint of the maximum chunk size that
+  // should be returned in 'content' and must be non-zero unless no
+  // additional input is expected. On return 'content_byte_size' gives
+  // the actual size of the chunk pointed to by 'content'. If there
+  // are no more bytes for the input return 'content' == nullptr. If
+  // 'force_contiguous' is true then the entire (remaining) input will
+  // be returned as a single chunk. In some cases this will require
+  // copying the data.
   virtual tensorflow::Status GetNextInputContent(
       int idx, const void** content, size_t* content_byte_size,
       bool force_contiguous) = 0;
@@ -80,7 +85,35 @@ class InferRequestProvider {
 };
 
 //
-// Inference input provider for a GRPC inference request.
+// Inference input provider that delivers all-zero tensor
+// content. This provider is only used internally to replace another
+// provider for a request that is cancelled or otherwise doesn't have
+// input available. A NULLInferRequestProvider object is thread safe
+// and unlike other providers can be used simultaneously by multiple
+// backend runners.
+//
+class NULLInferRequestProvider : public InferRequestProvider {
+ public:
+  explicit NULLInferRequestProvider(const InferRequestHeader& request_header)
+      : InferRequestProvider("<NULL>", -1)
+  {
+    request_header_ = request_header;
+  }
+
+  tensorflow::Status GetNextInputContent(
+      int idx, const void** content, size_t* content_byte_size,
+      bool force_contiguous) override;
+
+ private:
+  // A buffer of zero bytes that is used commonly as the NULL input.
+  static std::vector<uint8_t> buf_;
+
+  // Mutex to guard buf_
+  static std::mutex mu_;
+};
+
+//
+// Inference input provider for a GRPC inference request
 //
 class GRPCInferRequestProvider : public InferRequestProvider {
  public:
