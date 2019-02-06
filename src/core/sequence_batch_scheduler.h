@@ -34,12 +34,11 @@
 #include <unordered_map>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/provider.h"
 #include "src/core/scheduler.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
-
-class NULLInferRequestProvider;
 
 // Scheduler that implements batching for a sequence of correlated
 // inferences.
@@ -47,9 +46,9 @@ class SequenceBatchScheduler : public Scheduler {
  public:
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
-  SequenceBatchScheduler(
+  static tensorflow::Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardRunFunc OnSchedule);
+      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
   void Enqueue(
@@ -59,6 +58,15 @@ class SequenceBatchScheduler : public Scheduler {
       std::function<void(tensorflow::Status)> OnComplete) override;
 
  private:
+  tensorflow::Status CreateControlTensors(
+      const ModelConfig& config,
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+          start_input_overrides,
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+          continue_input_overrides,
+      std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+          notready_input_overrides);
+
   // Scheduler payload for each request.
   struct SequencePayload : public Scheduler::Payload {
     SequencePayload() = default;
@@ -83,7 +91,13 @@ class SequenceBatchScheduler : public Scheduler {
    public:
     SequenceBatch(
         const uint32_t runner_id, const size_t batch_size,
-        const ModelConfig& config, StandardRunFunc OnSchedule);
+        const ModelConfig& config, StandardRunFunc OnSchedule,
+        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+            start_input_overrides,
+        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+            continue_input_overrides,
+        const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+            notready_input_overrides);
     ~SequenceBatch();
 
     // Return the index within the batch that has no queued
@@ -116,13 +130,19 @@ class SequenceBatchScheduler : public Scheduler {
     std::mutex mu_;
     std::condition_variable cv_;
 
-    // The request provider to use when an inference is issuing and
-    // there is no request available in a slot.
-    std::shared_ptr<NULLInferRequestProvider> null_request_provider_;
+    // The request header needed to create a null provider to use when
+    // an inference is issuing and there is no request available in a
+    // slot.
+    InferRequestHeader null_request_header_;
 
     // The correlation ID of the requests using a batch slot or 0
     // (zero) if the slot is currently unused.
     std::vector<CorrelationID> correlation_ids_;
+
+    // Indicates that the slot has a new sequence. The runner thread
+    // uses this to notify the backend that this is the start of a new
+    // sequence.
+    std::vector<bool> first_sequence_request_;
 
     // Queues holding inference requests. There are 'batch_size'
     // queues, one for each batch slot where requests assigned to that
@@ -132,6 +152,16 @@ class SequenceBatchScheduler : public Scheduler {
     // The maximum active slot. A value of -1 indicates that no slots
     // are active in the bundle.
     int32_t max_active_slot_;
+
+    // The control values, delivered as input tensors, that should be
+    // used when starting a sequence, continuing a sequence, and
+    // showing that a sequence has not input available.
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>
+        start_input_overrides_;
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>
+        continue_input_overrides_;
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>
+        notready_input_overrides_;
   };
 
  private:

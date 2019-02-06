@@ -414,9 +414,6 @@ CustomBundle::Context::GetNextInput(
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
-  *content = nullptr;
-  *content_byte_size = 0;
-
   tensorflow::Status status = payload->request_provider_->GetNextInputContent(
       name, content, content_byte_size, false);
   return status.ok();

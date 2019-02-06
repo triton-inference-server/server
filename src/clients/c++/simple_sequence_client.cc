@@ -68,21 +68,12 @@ Usage(char** argv, const std::string& msg = std::string())
 }
 
 int32_t
-Send(
-    const std::unique_ptr<nic::InferContext>& ctx, int32_t control,
-    int32_t value)
+Send(const std::unique_ptr<nic::InferContext>& ctx, int32_t value)
 {
   // Initialize the inputs with the data.
-  std::shared_ptr<nic::InferContext::Input> icontrol, ivalue;
-  FAIL_IF_ERR(ctx->GetInput("CONTROL", &icontrol), "unable to get CONTROL");
+  std::shared_ptr<nic::InferContext::Input> ivalue;
   FAIL_IF_ERR(ctx->GetInput("INPUT", &ivalue), "unable to get INPUT");
-
-  FAIL_IF_ERR(icontrol->Reset(), "unable to reset CONTROL");
   FAIL_IF_ERR(ivalue->Reset(), "unable to reset INPUT");
-
-  FAIL_IF_ERR(
-      icontrol->SetRaw(reinterpret_cast<uint8_t*>(&control), sizeof(int32_t)),
-      "unable to set data for CONTROL");
   FAIL_IF_ERR(
       ivalue->SetRaw(reinterpret_cast<uint8_t*>(&value), sizeof(int32_t)),
       "unable to set data for INPUT");
@@ -106,22 +97,14 @@ Send(
 }
 
 std::shared_ptr<nic::InferContext::Request>
-AsyncSend(
-    const std::unique_ptr<nic::InferContext>& ctx, int32_t control,
-    int32_t value)
+AsyncSend(const std::unique_ptr<nic::InferContext>& ctx, int32_t value)
 {
   std::shared_ptr<nic::InferContext::Request> request;
+
   // Initialize the inputs with the data.
-  std::shared_ptr<nic::InferContext::Input> icontrol, ivalue;
-  FAIL_IF_ERR(ctx->GetInput("CONTROL", &icontrol), "unable to get CONTROL");
+  std::shared_ptr<nic::InferContext::Input> ivalue;
   FAIL_IF_ERR(ctx->GetInput("INPUT", &ivalue), "unable to get INPUT");
-
-  FAIL_IF_ERR(icontrol->Reset(), "unable to reset CONTROL");
   FAIL_IF_ERR(ivalue->Reset(), "unable to reset INPUT");
-
-  FAIL_IF_ERR(
-      icontrol->SetRaw(reinterpret_cast<uint8_t*>(&control), sizeof(int32_t)),
-      "unable to set data for CONTROL");
   FAIL_IF_ERR(
       ivalue->SetRaw(reinterpret_cast<uint8_t*>(&value), sizeof(int32_t)),
       "unable to set data for INPUT");
@@ -192,9 +175,9 @@ main(int argc, char** argv)
 
   nic::Error err;
 
-  // We use the custom "sequence" model which takes 2 inputs, one
-  // control and one the actual input value. The output is the
-  // accumulated value of the inputs. See src/custom/sequence.
+  // We use the custom "sequence" model which takes 1 input value. The
+  // output is the accumulated value of the inputs. See
+  // src/custom/sequence.
   std::string model_name = "simple_sequence";
 
   // Create 2 inference context with different correlation ID. We will
@@ -244,19 +227,18 @@ main(int argc, char** argv)
       warmup_ctx->SetRunOptions(*options),
       "unable to set warmup context options");
 
-  // Now send the inference sequences.. FIXME, for now must send the
-  // proper control values since TRTIS is not yet doing it.
+  // Now send the inference sequences..
   //
-  std::vector<int32_t> values{11, 7, 5, 3, 1, 0};
+  std::vector<int32_t> values{11, 7, 5, 3, 2, 0, 1};
   std::vector<int32_t> result0_list;
   std::vector<int32_t> result1_list;
   uint64_t seq0_ns;
   uint64_t seq1_ns;
 
   // Warmup the server to avoid time difference due to run order
-  Send(warmup_ctx, 1, 0);
+  Send(warmup_ctx, 0);
   for (int32_t v : values) {
-    Send(warmup_ctx, 0, v);
+    Send(warmup_ctx, v);
   }
 
   // Record the time of the sequence
@@ -279,10 +261,10 @@ main(int argc, char** argv)
 
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     // Send requests, first reset accumulator for the sequence.
-    request0_list.emplace_back(AsyncSend(ctxs[0], 1, 0));
+    request0_list.emplace_back(AsyncSend(ctxs[0], 0));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      request0_list.emplace_back(AsyncSend(ctxs[0], 0, v));
+      request0_list.emplace_back(AsyncSend(ctxs[0], v));
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
@@ -295,9 +277,9 @@ main(int argc, char** argv)
 
     // Repeat above but in a different Inference Context
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-    request1_list.emplace_back(AsyncSend(ctxs[1], 1, 0));
+    request1_list.emplace_back(AsyncSend(ctxs[1], 100));
     for (int32_t v : values) {
-      request1_list.emplace_back(AsyncSend(ctxs[1], 0, v));
+      request1_list.emplace_back(AsyncSend(ctxs[1], -v));
     }
     for (size_t i = 0; i < request1_list.size(); i++) {
       result1_list.push_back(AsyncReceive(ctxs[1], request1_list[i]));
@@ -309,10 +291,10 @@ main(int argc, char** argv)
   } else {
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     // Send requests, first reset accumulator for the sequence.
-    result0_list.push_back(Send(ctxs[0], 1, 0));
+    result0_list.push_back(Send(ctxs[0], 0));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      result0_list.push_back(Send(ctxs[0], 0, v));
+      result0_list.push_back(Send(ctxs[0], v));
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     seq0_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
@@ -320,9 +302,9 @@ main(int argc, char** argv)
 
     // Repeat above but in a different Inference Context
     clock_gettime(CLOCK_MONOTONIC, &start_time);
-    result1_list.push_back(Send(ctxs[1], 1, 0));
+    result1_list.push_back(Send(ctxs[1], 100));
     for (int32_t v : values) {
-      result1_list.push_back(Send(ctxs[1], 0, v));
+      result1_list.push_back(Send(ctxs[1], -v));
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     seq1_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
@@ -335,10 +317,25 @@ main(int argc, char** argv)
     std::cout << "non-streaming : streaming" << std::endl;
   }
   std::cout << seq0_ns << " ns : " << seq1_ns << " ns" << std::endl;
-  std::cout << "Results" << std::endl;
+
+  int32_t seq0_expected = 0;
+  int32_t seq1_expected = 100;
+
   for (size_t i = 0; i < result0_list.size(); i++) {
     std::cout << "[" << i << "] " << result0_list[i] << " : " << result1_list[i]
               << std::endl;
+
+    if ((seq0_expected != result0_list[i]) ||
+        (seq0_expected != result0_list[i])) {
+      std::cout << "[ expected ] " << seq0_expected << " : " << seq1_expected
+                << std::endl;
+      return 1;
+    }
+
+    if (i < values.size()) {
+      seq0_expected += values[i];
+      seq1_expected -= values[i];
+    }
   }
 
   return 0;

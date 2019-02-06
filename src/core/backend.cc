@@ -230,9 +230,11 @@ InferenceBackend::SetConfiguredScheduler(
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
-    scheduler.reset(new SequenceBatchScheduler(config_, runner_cnt, OnRun));
+    TF_RETURN_IF_ERROR(
+        SequenceBatchScheduler::Create(config_, runner_cnt, OnRun, &scheduler));
   } else {
-    scheduler.reset(new DynamicBatchScheduler(config_, runner_cnt, OnRun));
+    TF_RETURN_IF_ERROR(
+        DynamicBatchScheduler::Create(config_, runner_cnt, OnRun, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));
