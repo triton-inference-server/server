@@ -138,16 +138,11 @@ std::mutex NULLInferRequestProvider::mu_;
 
 tensorflow::Status
 NULLInferRequestProvider::GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
+    const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  if ((idx < 0) || (idx >= request_header_.input_size())) {
-    return tensorflow::errors::Internal("unexpected input index ", idx);
-  }
-
   if (content_byte_size == 0) {
     *content = nullptr;
-    *content_byte_size = 0;
   } else {
     std::lock_guard<std::mutex> lock(mu_);
 
@@ -211,7 +206,7 @@ GRPCInferRequestProvider::Create(
           provider->model_name_, "'");
     }
 
-    idx++;
+    provider->input_map_[io.name()] = idx++;
   }
 
   return tensorflow::Status::OK();
@@ -219,12 +214,15 @@ GRPCInferRequestProvider::Create(
 
 tensorflow::Status
 GRPCInferRequestProvider::GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
+    const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  if ((idx < 0) || (idx >= request_.raw_input_size())) {
-    return tensorflow::errors::Internal("unexpected input index ", idx);
+  const auto& pr = input_map_.find(name);
+  if (pr == input_map_.end()) {
+    return tensorflow::errors::Internal("unexpected input '", name, "'");
   }
+
+  const size_t idx = pr->second;
 
   if (content_delivered_[idx]) {
     *content = nullptr;
@@ -282,10 +280,12 @@ HTTPInferRequestProvider::Create(
     int v_idx = 0;
 
     // Get the byte-size for each input and from that get the blocks
-    // holding the that must data for that input
+    // holding the data for that input
     for (const auto& io : request_header.input()) {
+      provider->input_map_[io.name()] = provider->contents_.size();
       provider->contents_idx_.push_back(0);
       provider->contents_.emplace_back();
+
       auto& blocks = provider->contents_.back();
 
       uint64_t byte_size = io.batch_byte_size();
@@ -325,13 +325,15 @@ HTTPInferRequestProvider::Create(
 
 tensorflow::Status
 HTTPInferRequestProvider::GetNextInputContent(
-    int idx, const void** content, size_t* content_byte_size,
+    const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  if ((idx < 0) || ((size_t)idx >= contents_.size())) {
-    return tensorflow::errors::Internal("unexpected input index ", idx);
+  const auto& pr = input_map_.find(name);
+  if (pr == input_map_.end()) {
+    return tensorflow::errors::Internal("unexpected input '", name, "'");
   }
 
+  const size_t idx = pr->second;
   const size_t block_cnt = contents_[idx].size();
   const size_t block_idx = contents_idx_[idx];
 

@@ -59,7 +59,7 @@ class InferRequestProvider {
   // batch-byte-size defined.
   const InferRequestHeader& RequestHeader() const { return request_header_; }
 
-  // Get the next contiguous chunk of bytes for the 'idx'
+  // Get the next contiguous chunk of bytes for the 'name'd
   // input. Return a pointer to the chunk in 'content'.
   // 'content_byte_size' acts as both input and output. On input
   // 'content_byte_size' is a hint of the maximum chunk size that
@@ -71,7 +71,7 @@ class InferRequestProvider {
   // be returned as a single chunk. In some cases this will require
   // copying the data.
   virtual tensorflow::Status GetNextInputContent(
-      int idx, const void** content, size_t* content_byte_size,
+      const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) = 0;
 
  protected:
@@ -101,7 +101,7 @@ class NULLInferRequestProvider : public InferRequestProvider {
   }
 
   tensorflow::Status GetNextInputContent(
-      int idx, const void** content, size_t* content_byte_size,
+      const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
  private:
@@ -126,7 +126,7 @@ class GRPCInferRequestProvider : public InferRequestProvider {
       std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
 
   tensorflow::Status GetNextInputContent(
-      int idx, const void** content, size_t* content_byte_size,
+      const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
  private:
@@ -134,6 +134,9 @@ class GRPCInferRequestProvider : public InferRequestProvider {
 
   const InferRequest& request_;
   std::vector<bool> content_delivered_;
+
+  // Map from input name to the index in the request of that input.
+  std::unordered_map<std::string, size_t> input_map_;
 };
 
 //
@@ -149,7 +152,7 @@ class HTTPInferRequestProvider : public InferRequestProvider {
       std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
   tensorflow::Status GetNextInputContent(
-      int idx, const void** content, size_t* content_byte_size,
+      const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
  private:
@@ -162,6 +165,10 @@ class HTTPInferRequestProvider : public InferRequestProvider {
   std::vector<std::vector<Block>> contents_;
   std::vector<size_t> contents_idx_;
   std::vector<std::vector<char>> contiguous_buffers_;
+
+  // Map from input name to the index in contents_ that contains the
+  // data for the input.
+  std::unordered_map<std::string, size_t> input_map_;
 };
 
 //
@@ -217,8 +224,7 @@ class InferResponseProvider {
     std::unique_ptr<char[]> buffer_;
   };
 
-  // Ordered list of outputs as they "added" by
-  // GetOutputBuffer().
+  // Ordered list of outputs as they "added" by GetOutputBuffer().
   std::vector<Output> outputs_;
 };
 
