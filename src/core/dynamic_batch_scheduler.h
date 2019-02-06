@@ -42,9 +42,10 @@ class DynamicBatchScheduler : public Scheduler {
  public:
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
-  DynamicBatchScheduler(
+  static tensorflow::Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardRunFunc OnSchedule);
+      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
+
   ~DynamicBatchScheduler();
 
   // \see Scheduler::Enqueue()
@@ -55,6 +56,9 @@ class DynamicBatchScheduler : public Scheduler {
       std::function<void(tensorflow::Status)> OnComplete) override;
 
  private:
+  DynamicBatchScheduler(
+      const ModelConfig& config, const uint32_t runner_cnt,
+      StandardRunFunc OnSchedule);
   void SchedulerThread(const uint32_t runner_id, const int nice);
   void InitPendingShape(const InferRequestHeader& request);
   bool CompareWithPendingShape(const InferRequestHeader& request) const;

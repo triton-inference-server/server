@@ -310,6 +310,7 @@ cc_library(
         ":model_config_proto",
         ":scheduler",
         ":server_status_header",
+        ":utils",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],

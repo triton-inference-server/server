@@ -75,14 +75,28 @@ DynamicBatchScheduler::DynamicBatchScheduler(
         (uint64_t)config.dynamic_batching().max_queue_delay_microseconds() *
         1000;
   }
+}
+
+tensorflow::Status
+DynamicBatchScheduler::Create(
+    const ModelConfig& config, const uint32_t runner_cnt,
+    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
+{
+  DynamicBatchScheduler* dyna_sched =
+      new DynamicBatchScheduler(config, runner_cnt, OnSchedule);
+  std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
   // each scheduler thread with a runner.
   const int nice = GetCpuNiceLevel(config);
-  for (uint32_t c = 0; c < scheduler_thread_cnt_; ++c) {
-    scheduler_threads_.emplace_back(
-        new std::thread([this, c, nice]() { SchedulerThread(c, nice); }));
+  for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
+    sched->scheduler_threads_.emplace_back(new std::thread(
+        [dyna_sched, c, nice]() { dyna_sched->SchedulerThread(c, nice); }));
   }
+
+  scheduler->reset(sched.release());
+
+  return tensorflow::Status::OK();
 }
 
 DynamicBatchScheduler::~DynamicBatchScheduler()

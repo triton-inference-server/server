@@ -130,6 +130,38 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
   return tensorflow::Status::OK();
 }
 
+tensorflow::Status
+InferRequestProvider::SetInputContentOverride(
+    const std::shared_ptr<InputOverrideMap>& override)
+{
+  overrides_ = override;
+  return tensorflow::Status::OK();
+}
+
+bool
+InferRequestProvider::GetInputContentOverride(
+    const std::string& name, const void** content, size_t* content_byte_size)
+{
+  if (overrides_ != nullptr) {
+    const auto& pr = overrides_->find(name);
+    if (pr != overrides_->end()) {
+      if ((*content_byte_size == 0) ||
+          (overrides_consumed_.find(name) != overrides_consumed_.end())) {
+        *content = nullptr;
+        *content_byte_size = 0;
+      } else {
+        *content = reinterpret_cast<void*>(&(pr->second[0]));
+        *content_byte_size = pr->second.size();
+        overrides_consumed_.insert(name);
+      }
+
+      return true;
+    }
+  }
+
+  return false;
+}
+
 //
 // NULLInferRequestProvider
 //
@@ -141,9 +173,12 @@ NULLInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  if (content_byte_size == 0) {
+  if (*content_byte_size == 0) {
     *content = nullptr;
-  } else {
+    return tensorflow::Status::OK();
+  }
+
+  if (!GetInputContentOverride(name, content, content_byte_size)) {
     std::lock_guard<std::mutex> lock(mu_);
 
     // Must return content with all zero data. This is required by
@@ -217,20 +252,28 @@ GRPCInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  const auto& pr = input_map_.find(name);
-  if (pr == input_map_.end()) {
-    return tensorflow::errors::Internal("unexpected input '", name, "'");
+  if (*content_byte_size == 0) {
+    *content = nullptr;
+    return tensorflow::Status::OK();
   }
 
-  const size_t idx = pr->second;
+  if (!GetInputContentOverride(name, content, content_byte_size)) {
+    const auto& pr = input_map_.find(name);
+    if (pr == input_map_.end()) {
+      return tensorflow::errors::Internal("unexpected input '", name, "'");
+    }
 
-  if (content_delivered_[idx]) {
-    *content = nullptr;
-    *content_byte_size = 0;
-  } else {
-    const std::string& raw = request_.raw_input(idx);
-    *content = raw.c_str();
-    *content_byte_size = raw.size();
+    const size_t idx = pr->second;
+
+    if (content_delivered_[idx]) {
+      *content = nullptr;
+      *content_byte_size = 0;
+    } else {
+      const std::string& raw = request_.raw_input(idx);
+      *content = raw.c_str();
+      *content_byte_size = raw.size();
+    }
+
     content_delivered_[idx] = true;
   }
 
@@ -328,51 +371,58 @@ HTTPInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
-  const auto& pr = input_map_.find(name);
-  if (pr == input_map_.end()) {
-    return tensorflow::errors::Internal("unexpected input '", name, "'");
-  }
-
-  const size_t idx = pr->second;
-  const size_t block_cnt = contents_[idx].size();
-  const size_t block_idx = contents_idx_[idx];
-
-  if (block_idx >= block_cnt) {
+  if (*content_byte_size == 0) {
     *content = nullptr;
-    *content_byte_size = 0;
+    return tensorflow::Status::OK();
   }
-  // Return next block of data...
-  else if (!force_contiguous || ((block_idx + 1) >= block_cnt)) {
-    const auto& block = contents_[idx][block_idx];
-    *content = block.first;
-    *content_byte_size = block.second;
-    contents_idx_[idx]++;
-  }
-  // If remaining data needs to be returned in one contiguous region
-  // and there is more than one block remaining, then need to copy the
-  // content into a single contiguous buffer.
-  else {
-    size_t total_size = 0;
-    for (size_t i = block_idx; i < block_cnt; i++) {
-      const auto& block = contents_[idx][i];
-      total_size += block.second;
+
+  if (!GetInputContentOverride(name, content, content_byte_size)) {
+    const auto& pr = input_map_.find(name);
+    if (pr == input_map_.end()) {
+      return tensorflow::errors::Internal("unexpected input '", name, "'");
     }
 
-    contiguous_buffers_.emplace_back();
-    std::vector<char>& buf = contiguous_buffers_.back();
-    buf.reserve(total_size);
+    const size_t idx = pr->second;
+    const size_t block_cnt = contents_[idx].size();
+    const size_t block_idx = contents_idx_[idx];
 
-    for (size_t i = block_idx; i < block_cnt; i++) {
-      const auto& block = contents_[idx][i];
-      buf.insert(buf.end(), block.first, block.first + block.second);
+    if (block_idx >= block_cnt) {
+      *content = nullptr;
+      *content_byte_size = 0;
     }
-
-    if (buf.size() != total_size) {
-      return tensorflow::errors::Internal("contiguous input failed");
+    // Return next block of data...
+    else if (!force_contiguous || ((block_idx + 1) >= block_cnt)) {
+      const auto& block = contents_[idx][block_idx];
+      *content = block.first;
+      *content_byte_size = block.second;
+      contents_idx_[idx]++;
     }
+    // If remaining data needs to be returned in one contiguous region
+    // and there is more than one block remaining, then need to copy the
+    // content into a single contiguous buffer.
+    else {
+      size_t total_size = 0;
+      for (size_t i = block_idx; i < block_cnt; i++) {
+        const auto& block = contents_[idx][i];
+        total_size += block.second;
+      }
 
-    *content = &(buf[0]);
-    *content_byte_size = total_size;
+      contiguous_buffers_.emplace_back();
+      std::vector<char>& buf = contiguous_buffers_.back();
+      buf.reserve(total_size);
+
+      for (size_t i = block_idx; i < block_cnt; i++) {
+        const auto& block = contents_[idx][i];
+        buf.insert(buf.end(), block.first, block.first + block.second);
+      }
+
+      if (buf.size() != total_size) {
+        return tensorflow::errors::Internal("contiguous input failed");
+      }
+
+      *content = &(buf[0]);
+      *content_byte_size = total_size;
+    }
   }
 
   return tensorflow::Status::OK();

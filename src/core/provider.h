@@ -74,23 +74,47 @@ class InferRequestProvider {
       const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) = 0;
 
+  // Set content for named inputs. If the input already has content,
+  // this content will be in-place of existing content.
+  using InputOverrideMap =
+      std::unordered_map<std::string, std::vector<uint8_t>>;
+  tensorflow::Status SetInputContentOverride(
+      const std::shared_ptr<InputOverrideMap>& override);
+
  protected:
   // Validate request header and modify as necessary so that every
   // input has a shape and a batch-byte-size.
   tensorflow::Status NormalizeRequestHeader(const InferenceBackend& is);
 
+  // Get the override content for 'name'd input. Return a pointer to
+  // the override content in 'content'.  Return the override content
+  // byte-size in 'content_byte_size'.  Return true if there is
+  // override content (and so 'content' and 'content_byte_size' are
+  // valid) or false if there is no override content (and so 'content'
+  // and 'content_byte_size' are unchanged).
+  bool GetInputContentOverride(
+      const std::string& name, const void** content, size_t* content_byte_size);
+
   const std::string model_name_;
   const int64_t version_;
   InferRequestHeader request_header_;
+
+  // Input content overrides.
+  std::shared_ptr<InputOverrideMap> overrides_;
+
+  // The inputs that have had their override content consumed by a
+  // call to GetInputContentOverride. A given input override will only
+  // return the content once and on subsequent calls will return
+  // 'content' == nullptr to indicate that all the override content
+  // has been consumed.
+  std::set<std::string> overrides_consumed_;
 };
 
 //
 // Inference input provider that delivers all-zero tensor
 // content. This provider is only used internally to replace another
 // provider for a request that is cancelled or otherwise doesn't have
-// input available. A NULLInferRequestProvider object is thread safe
-// and unlike other providers can be used simultaneously by multiple
-// backend runners.
+// input available.
 //
 class NULLInferRequestProvider : public InferRequestProvider {
  public:
