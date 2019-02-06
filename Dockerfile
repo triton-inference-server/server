@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,7 +74,7 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                 CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
                 NCCL_INCLUDE_DIR="/usr/include/" \
                 NCCL_LIB_DIR="/usr/lib/" \
-                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_OPENCV=OFF USE_LEVELDB=OFF \
+                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
                 python setup.py install && python setup.py clean; \
              else \
                mkdir -p /opt/conda/lib/python3.6/site-packages/torch/lib; \
@@ -84,7 +84,6 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
                touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0; \
                touch /opt/conda/lib/libmkl_avx2.so; \
                touch /opt/conda/lib/libmkl_core.so; \
                touch /opt/conda/lib/libmkl_def.so; \
@@ -136,9 +135,6 @@ COPY --from=trtserver_caffe2 \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libmkldnn.so.0 \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_avx2.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_core.so /opt/tensorrtserver/lib/
