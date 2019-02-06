@@ -34,25 +34,99 @@
 #include "src/core/logging.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
+#include "src/core/utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
-SequenceBatchScheduler::SequenceBatchScheduler(
+tensorflow::Status
+SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardRunFunc OnSchedule)
+    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
 {
+  std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
+
   // Get the batch size to allow for each runner. This is at least 1
   // even if the model doesn't support batching.
   size_t batch_size = std::max(1, config.max_batch_size());
+
+  // Based on the model configuration create input tensors for control
+  // signals indicating sequence start, sequence continue, and
+  // sequence not ready.
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> start;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> cont;
+  std::shared_ptr<InferRequestProvider::InputOverrideMap> notready;
+  TF_RETURN_IF_ERROR(
+      sched->CreateControlTensors(config, &start, &cont, &notready));
 
   // Create one SequenceBatch object for each requested runner. The
   // SequenceBatch object has a thread that manages the batch of
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
-    std::shared_ptr<SequenceBatch> sb =
-        std::make_shared<SequenceBatch>(c, batch_size, config, OnSchedule);
-    batches_.push_back(sb);
+    std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
+        c, batch_size, config, OnSchedule, start, cont, notready);
+    sched->batches_.push_back(sb);
   }
+
+  scheduler->reset(sched.release());
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+SequenceBatchScheduler::CreateControlTensors(
+    const ModelConfig& config,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+        start_input_overrides,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+        continue_input_overrides,
+    std::shared_ptr<InferRequestProvider::InputOverrideMap>*
+        notready_input_overrides)
+{
+  // Currently only batch-size 1 requests are supported so only need
+  // to provide control vectors of that size.
+  *start_input_overrides =
+      std::make_shared<InferRequestProvider::InputOverrideMap>();
+  *continue_input_overrides =
+      std::make_shared<InferRequestProvider::InputOverrideMap>();
+  *notready_input_overrides =
+      std::make_shared<InferRequestProvider::InputOverrideMap>();
+
+  std::string tensor_name;
+  int32_t false_value, true_value;
+
+  // START
+  {
+    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &tensor_name,
+        &false_value, &true_value));
+    uint8_t* false_p = reinterpret_cast<uint8_t*>(&false_value);
+    uint8_t* true_p = reinterpret_cast<uint8_t*>(&true_value);
+    std::vector<uint8_t> false_vec(false_p, false_p + sizeof(false_value));
+    std::vector<uint8_t> true_vec(true_p, true_p + sizeof(true_value));
+
+    (*start_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
+    (*continue_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
+    (*notready_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
+  }
+
+  // READY
+  {
+    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &tensor_name,
+        &false_value, &true_value));
+    uint8_t* false_p = reinterpret_cast<uint8_t*>(&false_value);
+    uint8_t* true_p = reinterpret_cast<uint8_t*>(&true_value);
+    std::vector<uint8_t> false_vec(false_p, false_p + sizeof(false_value));
+    std::vector<uint8_t> true_vec(true_p, true_p + sizeof(true_value));
+
+    (*start_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
+    (*continue_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
+    (*notready_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
+  }
+
+  return tensorflow::Status::OK();
 }
 
 void
@@ -68,11 +142,20 @@ SequenceBatchScheduler::Enqueue(
   stats->StartQueueTimer(queue_timer.get());
 
   const auto& request_header = request_provider->RequestHeader();
-  const CorrelationID correlation_id = request_header.correlation_id();
+
+  // For now the request must have batch-size 1 since the sequence
+  // batcher does not yet support requests that statically batch.
+  if (request_header.batch_size() != 1) {
+    OnComplete(tensorflow::errors::InvalidArgument(
+        "inference request to model '", request_provider->ModelName(),
+        "' must specify batch-size 1 due to requirements of sequence batcher"));
+    return;
+  }
 
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) indicates that the request
   // doesn't have a correlation ID.
+  const CorrelationID correlation_id = request_header.correlation_id();
   if (correlation_id == 0) {
     OnComplete(tensorflow::errors::InvalidArgument(
         "inference request to model '", request_provider->ModelName(),
@@ -132,8 +215,6 @@ SequenceBatchScheduler::Enqueue(
   std::shared_ptr<SequenceBatch> sb = target->sequence_batch_;
   const uint32_t slot = target->slot_;
 
-  lock.unlock();
-
   sb->Enqueue(
       slot, correlation_id, queue_timer, stats, request_provider,
       response_provider, OnComplete);
@@ -141,10 +222,19 @@ SequenceBatchScheduler::Enqueue(
 
 SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     const uint32_t runner_id, const size_t batch_size,
-    const ModelConfig& config, StandardRunFunc OnSchedule)
+    const ModelConfig& config, StandardRunFunc OnSchedule,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        start_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        continue_input_overrides,
+    const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+        notready_input_overrides)
     : OnSchedule_(OnSchedule), scheduler_thread_exit_(false),
       scheduler_idle_(false), correlation_ids_(batch_size, 0),
-      queues_(batch_size), max_active_slot_(-1)
+      first_sequence_request_(batch_size, false), queues_(batch_size),
+      max_active_slot_(-1), start_input_overrides_(start_input_overrides),
+      continue_input_overrides_(continue_input_overrides),
+      notready_input_overrides_(notready_input_overrides)
 {
   // Create a scheduler thread associated with 'runner_id' that
   // executes the queued payloads.
@@ -199,12 +289,19 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     // All requests in this SequenceBatch must have the same shape for
     // all inputs (since they are going to be executed together in a
     // batch). If this is the first request into this SequenceBatch
-    // then create NULL version request provider that can stand in as
+    // then grab a copy of the request header that is needed to create
+    // NULL version request providers that can stand in as
     // representative when inference is issuing and there is no
     // request available in one or more slots.
     if (max_active_slot_ == -1) {
-      null_request_provider_.reset(
-          new NULLInferRequestProvider(request_provider->RequestHeader()));
+      null_request_header_ = request_provider->RequestHeader();
+    }
+
+    // Show that the slot has a new sequence if this is the first
+    // request for the correlation ID. The runner thread will use this
+    // to notify the backend that this is the start of a new sequence.
+    if (correlation_ids_[slot] == 0) {
+      first_sequence_request_[slot] = true;
     }
 
     correlation_ids_[slot] = correlation_id;
@@ -289,12 +386,30 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
             std::deque<SequencePayload>& queue = queues_[slot];
 
             if ((correlation_ids_[slot] == 0) || queue.empty()) {
+              auto null_request_provider =
+                  std::make_shared<NULLInferRequestProvider>(
+                      null_request_header_);
+              null_request_provider->SetInputContentOverride(
+                  notready_input_overrides_);
+
               std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer;
               payloads->emplace_back(
-                  queue_timer, nullptr, null_request_provider_, nullptr,
+                  queue_timer, nullptr, null_request_provider, nullptr,
                   nullptr);
             } else {
+              // If this is the first payload in a sequence then send
+              // the appropriate sequence start indicator to the
+              // backend.
               SequencePayload& slot_payload = queue.front();
+              if (first_sequence_request_[slot]) {
+                slot_payload.request_provider_->SetInputContentOverride(
+                    start_input_overrides_);
+                first_sequence_request_[slot] = false;
+              } else {
+                slot_payload.request_provider_->SetInputContentOverride(
+                    continue_input_overrides_);
+              }
+
               payloads->emplace_back(
                   slot_payload.queue_timer_, slot_payload.stats_,
                   slot_payload.request_provider_,
@@ -319,9 +434,28 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
 
     if ((payloads != nullptr) && !payloads->empty()) {
       auto OnCompleteQueuedPayloads = [payloads](tensorflow::Status status) {
+        // Payloads that don't have a completion function don't have
+        // anywhere to report their errors. Those errors could have
+        // caused other payloads to have issues (due to mis-alignment
+        // within the batch, etc.). So if any such payload has an
+        // error we just fail all payloads.
+        if (status.ok()) {
+          for (auto& payload : *payloads) {
+            if (payload.complete_function_ == nullptr) {
+              const tensorflow::Status& no_complete_status =
+                  payload.status_.ok() ? payload.compute_status_
+                                       : payload.status_;
+              if (!no_complete_status.ok()) {
+                status = no_complete_status;
+                break;
+              }
+            }
+          }
+        }
+
         bool found_success = false;
         for (auto& payload : *payloads) {
-          tensorflow::Status final_status =
+          const tensorflow::Status& final_status =
               status.ok() ? (payload.status_.ok() ? payload.compute_status_
                                                   : payload.status_)
                           : status;

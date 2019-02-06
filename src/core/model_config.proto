@@ -427,6 +427,80 @@ message ModelSequenceBatching
   //@@     batching. Default is 0.
   //@@
   int32 max_queue_delay_microseconds = 1;
+
+  //@@  .. cpp:var:: message Control
+  //@@
+  //@@     A control is a binary signal to a backend.
+  //@@
+  message Control
+  {
+    //@@
+    //@@    .. cpp:enum:: Kind
+    //@@
+    //@@       The kind of the control.
+    //@@
+    enum Kind {
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_START = 0
+      //@@
+      //@@         A new sequence is/is-not starting. If true a sequence is
+      //@@         starting, if false a sequence is continuing.
+      //@@
+      CONTROL_SEQUENCE_START = 0;
+
+      //@@      .. cpp:enumerator:: Kind::CONTROL_SEQUENCE_READY = 1
+      //@@
+      //@@         A sequence is/is-not ready for inference. If true the
+      //@@         input tensor data is valid and should be used. If false
+      //@@         the input tensor data is invalid and inferencing should
+      //@@         be "skipped".
+      //@@
+      CONTROL_SEQUENCE_READY = 1;
+    }
+
+    //@@    .. cpp:var:: Kind kind
+    //@@
+    //@@       The kind of this control.
+    //@@
+    Kind kind = 1;
+
+    //@@    .. cpp:var:: int32 int32_false_true (repeated)
+    //@@
+    //@@       The control's true and false setting is indicated by setting
+    //@@       an int32 value in a tensor. The tensor must be a
+    //@@       1-dimensional tensor with size equal to the batch size of
+    //@@       the request. 'int32_false_true' must have two entries: the
+    //@@       first the false value and the second the true value.
+    //@@
+    repeated int32 int32_false_true = 2;
+  }
+
+  //@@  .. cpp:var:: message ControlInput
+  //@@
+  //@@     The sequence control values to communicate by a model input.
+  //@@
+  message ControlInput
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       The name of the model input.
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: Control control (repeated)
+    //@@
+    //@@       The control value(s) that should be communicated to the
+    //@@       model using this model input.
+    //@@
+    repeated Control control = 2;
+  }
+
+  //@@  .. cpp:var:: ControlInput control_input (repeated)
+  //@@
+  //@@     The model input(s) that the server should use to communicate
+  //@@     sequence start, stop, ready and similar control values to the
+  //@@     model.
+  //@@
+  repeated ControlInput control_input = 2;
 }
 
 //@@

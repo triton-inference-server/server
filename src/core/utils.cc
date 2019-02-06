@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -46,6 +46,56 @@ GetModelVersionFromPath(const tensorflow::StringPiece& path, int64_t* version)
   if (!absl::SimpleAtoi(version_dir, version)) {
     return tensorflow::errors::Internal(
         "unable to determine model version from ", path);
+  }
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+GetSequenceControlProperties(
+    const ModelSequenceBatching& batcher, const std::string& model_name,
+    const ModelSequenceBatching::Control::Kind control_kind,
+    std::string* tensor_name, int32_t* false_value, int32_t* true_value)
+{
+  // Make sure the control kind is not mentioned multiple times.
+  bool seen = false;
+
+  for (const auto& control_input : batcher.control_input()) {
+    if (control_input.name().empty()) {
+      return tensorflow::errors::InvalidArgument(
+          "sequence batching control tensor must have a name for ", model_name);
+    }
+
+    for (const auto& c : control_input.control()) {
+      if (c.kind() == control_kind) {
+        if (seen) {
+          return tensorflow::errors::InvalidArgument(
+              "sequence batching specifies multiple ",
+              ModelSequenceBatching_Control_Kind_Name(control_kind),
+              " tensors for ", model_name);
+        }
+
+        if (c.int32_false_true_size() != 2) {
+          return tensorflow::errors::InvalidArgument(
+              "sequence batching control 'int32_false_true' must have exactly "
+              "2 entries for ",
+              ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
+              model_name);
+        }
+
+        *false_value = c.int32_false_true(0);
+        *true_value = c.int32_false_true(1);
+        *tensor_name = control_input.name();
+        seen = true;
+      }
+    }
+  }
+
+  if (!seen) {
+    return tensorflow::errors::InvalidArgument(
+        "sequence batching control tensor must specify a ",
+        ModelSequenceBatching_Control_Kind_Name(control_kind), " value for ",
+        model_name);
   }
 
   return tensorflow::Status::OK();
@@ -239,6 +289,30 @@ ValidateModelConfig(
           "dynamic batching maximum queue delay must be non-negative for ",
           config.name());
     }
+  }
+
+  // If sequence batching is specified make sure the control is
+  // specified correctly.
+  if (config.has_sequence_batching()) {
+    const auto& batcher = config.sequence_batching();
+    if (batcher.control_input_size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "sequence batching must specify at least one control tensor for ",
+          config.name());
+    }
+
+    // Make sure (exactly) one SEQUENCE_START and one SEQUENCE_READY
+    // control is specified.
+    std::string tensor_name;
+    int32_t false_value, true_value;
+    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &tensor_name,
+        &false_value, &true_value));
+    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+        config.sequence_batching(), config.name(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &tensor_name,
+        &false_value, &true_value));
   }
 
   // Make sure KIND_GPU instance group specifies at least one GPU and

@@ -29,6 +29,7 @@
 import argparse
 import numpy as np
 import os
+import sys
 import time
 from builtins import range
 from tensorrtserver.api import *
@@ -36,26 +37,22 @@ from tensorrtserver.api import *
 FLAGS = None
 
 
-def send(ctx, control, value):
-    # Create the tensor for CONTROL and INPUT values.
-    control_data = np.full(shape=[1], fill_value=control, dtype=np.int32)
+def send(ctx, value):
+    # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
 
-    result = ctx.run({ 'CONTROL' : (control_data,),
-                       'INPUT' : (value_data,) },
+    result = ctx.run({ 'INPUT' : (value_data,) },
                      { 'OUTPUT' : InferContext.ResultFormat.RAW },
                      1)
     return result
 
-def async_send(ctx, control, value):
-    # Create the tensor for CONTROL and INPUT values.
-    control_data = np.full(shape=[1], fill_value=control, dtype=np.int32)
+def async_send(ctx, value):
+    # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
 
-    request_id = ctx.async_run({ 'CONTROL' : (control_data,),
-                       'INPUT' : (value_data,) },
-                     { 'OUTPUT' : InferContext.ResultFormat.RAW },
-                     1)
+    request_id = ctx.async_run({ 'INPUT' : (value_data,) },
+                               { 'OUTPUT' : InferContext.ResultFormat.RAW },
+                               1)
     return request_id
 
 def async_receive(ctx, request_id):
@@ -75,9 +72,9 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     protocol = ProtocolType.from_str("grpc")
 
-    # We use the custom "sequence" model which takes 2 inputs, one
-    # control and one the actual input value. The output is the
-    # accumulated value of the inputs. See src/custom/sequence.
+    # We use the custom "sequence" model which takes 1 input
+    # value. The output is the accumulated value of the inputs. See
+    # src/custom/sequence.
     model_name = "simple_sequence"
     model_version = -1
     batch_size = 1
@@ -86,73 +83,70 @@ if __name__ == '__main__':
     # will use these to send to sequences of inference requests. Must
     # use a non-zero correlation ID since zero indicates no
     # correlation ID.
-    
+    values = [11, 7, 5, 3, 2, 0, 1]
+
     # For the two different contexts, one is using streaming while the other
     # isn't. Then we can compare their difference in sync/async runs
-    correlation_id0 = 1
+    correlation_id0 = 1000
     ctx0 = InferContext(FLAGS.url, protocol, model_name, model_version,
                         correlation_id=correlation_id0, verbose=FLAGS.verbose, streaming=True)
 
-    correlation_id1 = 2
+    correlation_id1 = 1001
     ctx1 = InferContext(FLAGS.url, protocol, model_name, model_version,
                         correlation_id=correlation_id1, verbose=FLAGS.verbose, streaming=False)
 
     # Create warmup context and warm up the server to avoid time difference due to run order
-    warmup_correlation_id1 = 3
+    warmup_correlation_id1 = 1234
     warmup_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
-                        correlation_id=warmup_correlation_id1, verbose=False, streaming=False)
-
-    # Now send the inference sequences.. FIXME, for now must send the
-    # proper control values since TRTIS is not yet doing it.
-    #
-    # First reset accumulator for both sequences.
-    values = [11, 7, 5, 3, 1, 0]
-    result0_list = []
-    result1_list = []
-    seq0_sec = 0
-    seq1_sec = 0
+                              correlation_id=warmup_correlation_id1, verbose=False, streaming=False)
 
     # warmup
-    send(warmup_ctx, control=1, value=0)
+    send(warmup_ctx, value=0)
     for v in values:
-        send(warmup_ctx, control=0, value=v)
+        send(warmup_ctx, value=v)
 
+    # Now send the inference sequences..
     ctxs = []
     if not FLAGS.reverse:
         ctxs = [ctx0, ctx1]
     else:
         ctxs = [ctx1, ctx0]
-    
+
+    result0_list = []
+    result1_list = []
+    seq0_sec = 0
+    seq1_sec = 0
+
     if FLAGS.async:
         request0_ids = []
         request1_ids = []
 
         start = time.time()
-        request0_ids.append(async_send(ctxs[0], control=1, value=0))
+        request0_ids.append(async_send(ctxs[0], value=0))
         for v in values:
-            request0_ids.append(async_send(ctxs[0], control=0, value=v))
+            request0_ids.append(async_send(ctxs[0], value=v))
         for request_id in request0_ids:
             result0_list.append(async_receive(ctxs[0], request_id))
         seq0_sec = time.time() - start
 
         start = time.time()
-        request1_ids.append(async_send(ctxs[1], control=1, value=0))
+        request1_ids.append(async_send(ctxs[1], value=100))
         for v in values:
-            request1_ids.append(async_send(ctxs[1], control=0, value=v))
+            request1_ids.append(async_send(ctxs[1], value=-v))
         for request_id in request1_ids:
             result1_list.append(async_receive(ctxs[1], request_id))
         seq1_sec = time.time() - start
     else:
         start = time.time()
-        result0_list.append(send(ctxs[0], control=1, value=0))
+        result0_list.append(send(ctxs[0], value=0))
         for v in values:
-            result0_list.append(send(ctxs[0], control=0, value=v))
+            result0_list.append(send(ctxs[0], value=v))
         seq0_sec = time.time() - start
 
         start = time.time()
-        result1_list.append(send(ctxs[1], control=1, value=0))
+        result1_list.append(send(ctxs[1], value=100))
         for v in values:
-            result1_list.append(send(ctxs[1], control=0, value=v))
+            result1_list.append(send(ctxs[1], value=-v))
         seq1_sec = time.time() - start
 
     NANOS = 1000000000
@@ -161,6 +155,20 @@ if __name__ == '__main__':
     else:
         print("non-streaming : streaming")
     print(str(seq0_sec * NANOS) + " ns : " + str(seq1_sec * NANOS) + " ns")
-    print("Results")
+
+    seq0_expected = 0
+    seq1_expected = 100
+
     for i in range(len(result0_list)):
-        print("[" + str(i) + "] " + str(result0_list[i]['OUTPUT'][0]) + " : " + str(result1_list[i]['OUTPUT'][0]))
+        print("[" + str(i) + "] " +
+              str(result0_list[i]['OUTPUT'][0][0]) + " : " +
+              str(result1_list[i]['OUTPUT'][0][0]))
+
+        if ((seq0_expected != result0_list[i]['OUTPUT'][0][0]) or
+            (seq1_expected != result1_list[i]['OUTPUT'][0][0])):
+            print("[ expected ] " + str(seq0_expected) + " : " + str(seq1_expected))
+            sys.exit(1)
+
+        if i < len(values):
+            seq0_expected += values[i]
+            seq1_expected -= values[i]
