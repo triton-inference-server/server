@@ -74,7 +74,7 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                 CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
                 NCCL_INCLUDE_DIR="/usr/include/" \
                 NCCL_LIB_DIR="/usr/lib/" \
-                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_OPENCV=OFF USE_LEVELDB=OFF \
+                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
                 python setup.py install && python setup.py clean; \
              else \
                mkdir -p /opt/conda/lib/python3.6/site-packages/torch/lib; \
