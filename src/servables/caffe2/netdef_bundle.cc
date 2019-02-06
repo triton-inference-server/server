@@ -347,54 +347,42 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
     const size_t expected_byte_size =
         request_header.batch_size() * batch1_byte_size;
 
-    int input_idx = 0;
-    for (const auto& input : request_header.input()) {
-      if (input.name() == name) {
-        size_t copied_byte_size = 0;
-        while (payload.compute_status_.ok()) {
-          const void* content;
-          size_t content_byte_size = expected_byte_size - copied_byte_size;
-          payload.compute_status_ =
-              payload.request_provider_->GetNextInputContent(
-                  input_idx, &content, &content_byte_size, false);
-          if (!payload.compute_status_.ok()) {
-            break;
-          }
-
-          // No more input content available then done with copying...
-          if (content == nullptr) {
-            break;
-          }
-
-          if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
-              total_byte_size) {
-            payload.compute_status_ = tensorflow::errors::InvalidArgument(
-                "unexpected size ",
-                buffer_copy_offset + copied_byte_size + content_byte_size,
-                " for inference input '", name, "', expecting ",
-                total_byte_size);
-            break;
-          }
-
-          memcpy(
-              static_cast<char*>(buffer) + buffer_copy_offset +
-                  copied_byte_size,
-              content, content_byte_size);
-          copied_byte_size += content_byte_size;
-        }
-
-        if (payload.compute_status_.ok() &&
-            (copied_byte_size != expected_byte_size)) {
-          payload.compute_status_ = tensorflow::errors::Internal(
-              "expected ", expected_byte_size,
-              " bytes of data for inference input '", name, "', got ",
-              copied_byte_size);
-        }
-
+    size_t copied_byte_size = 0;
+    while (payload.compute_status_.ok()) {
+      const void* content;
+      size_t content_byte_size = expected_byte_size - copied_byte_size;
+      payload.compute_status_ = payload.request_provider_->GetNextInputContent(
+          name, &content, &content_byte_size, false);
+      if (!payload.compute_status_.ok()) {
         break;
       }
 
-      input_idx++;
+      // No more input content available then done with copying...
+      if (content == nullptr) {
+        break;
+      }
+
+      if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
+          total_byte_size) {
+        payload.compute_status_ = tensorflow::errors::InvalidArgument(
+            "unexpected size ",
+            buffer_copy_offset + copied_byte_size + content_byte_size,
+            " for inference input '", name, "', expecting ", total_byte_size);
+        break;
+      }
+
+      memcpy(
+          static_cast<char*>(buffer) + buffer_copy_offset + copied_byte_size,
+          content, content_byte_size);
+      copied_byte_size += content_byte_size;
+    }
+
+    if (payload.compute_status_.ok() &&
+        (copied_byte_size != expected_byte_size)) {
+      payload.compute_status_ = tensorflow::errors::Internal(
+          "expected ", expected_byte_size,
+          " bytes of data for inference input '", name, "', got ",
+          copied_byte_size);
     }
 
     buffer_copy_offset += expected_byte_size;

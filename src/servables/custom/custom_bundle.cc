@@ -417,25 +417,9 @@ CustomBundle::Context::GetNextInput(
   *content = nullptr;
   *content_byte_size = 0;
 
-  const InferRequestHeader& request_header =
-      payload->request_provider_->RequestHeader();
-
-  int input_idx = 0;
-  for (const auto& input : request_header.input()) {
-    if (input.name() == name) {
-      tensorflow::Status status =
-          payload->request_provider_->GetNextInputContent(
-              input_idx, content, content_byte_size, false);
-      return status.ok();
-    }
-
-    input_idx++;
-  }
-
-  // Something went very wrong since unable to find the requested
-  // input.
-  LOG_ERROR << "can't get tensor values for unknown input '" << name << "'";
-  return false;
+  tensorflow::Status status = payload->request_provider_->GetNextInputContent(
+      name, content, content_byte_size, false);
+  return status.ok();
 }
 
 bool
