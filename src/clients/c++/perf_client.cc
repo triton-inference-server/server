@@ -476,7 +476,7 @@ class ConcurrencyManager {
     nic::Error err;
     // Create the context for inference of the specified model.
     if (streaming_) {
-      err = nic::StreamInferContext::Create(
+      err = nic::InferGrpcStreamContext::Create(
           ctx, url_, model_name_, model_version_, false);
     } else if (protocol_ == ProtocolType::HTTP) {
       err = nic::InferHttpContext::Create(
@@ -1268,7 +1268,7 @@ main(int argc, char** argv)
     Usage(argv, "latency threshold must be >= 0 for dynamic concurrency mode");
   }
   if (streaming && protocol != ProtocolType::GRPC) {
-    Usage(argv, "Streaming flag must be set with gRPC protocol");
+    Usage(argv, "Streaming is only allowed with gRPC protocol");
   }
 
   // trap SIGINT to allow threads to exit gracefully

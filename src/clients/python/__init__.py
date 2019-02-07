@@ -536,7 +536,7 @@ class InferContext:
         CLASS = 2
 
     def __init__(self, url, protocol, model_name, model_version=None,
-                 streaming=False, verbose=False, correlation_id=0):
+                 verbose=False, correlation_id=0, streaming=False):
         self._last_request_id = None
         self._last_request_model_name = None
         self._last_request_model_version = None

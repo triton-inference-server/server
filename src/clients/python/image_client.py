@@ -234,8 +234,8 @@ if __name__ == '__main__':
 
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
-    if FLAGS.streaming and protocol == ProtocolType.HTTP:
-        raise Exception("Streaming flag needs to be set with gRPC protocol.")
+    if FLAGS.streaming and protocol != ProtocolType.GRPC:
+        raise Exception("Streaming is only allowed with gRPC protocol")
 
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
@@ -244,7 +244,7 @@ if __name__ == '__main__':
         FLAGS.batch_size, FLAGS.verbose)
 
     ctx = InferContext(FLAGS.url, protocol, FLAGS.model_name,
-                       FLAGS.model_version, FLAGS.streaming, FLAGS.verbose)
+                       FLAGS.model_version, FLAGS.verbose, 0, FLAGS.streaming)
 
     filenames = []
     if os.path.isdir(FLAGS.image_filename):

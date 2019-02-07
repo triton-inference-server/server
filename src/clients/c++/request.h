@@ -565,7 +565,7 @@ class InferContext {
     friend class InferContext;
     friend class InferHttpContext;
     friend class InferGrpcContext;
-    friend class StreamInferContext;
+    friend class InferGrpcStreamContext;
     struct timespec request_start_;
     struct timespec request_end_;
     struct timespec send_start_;
@@ -1117,13 +1117,13 @@ class InferGrpcContext : public InferContext {
 };
 
 //==============================================================================
-/// StreamInferContext is the streaming instantiation of InferGrpcContext.
+/// InferGrpcStreamContext is the streaming instantiation of InferGrpcContext.
 /// All synchronous and asynchronous requests sent from this context will be
 /// sent in the same stream.
 ///
-class StreamInferContext : public InferGrpcContext {
+class InferGrpcStreamContext : public InferGrpcContext {
  public:
-  ~StreamInferContext() override;
+  ~InferGrpcStreamContext() override;
 
   /// Create streaming context that performs inference for a non-sequence model
   /// using the GRPC protocol.
@@ -1166,7 +1166,7 @@ class StreamInferContext : public InferGrpcContext {
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
 
  private:
-  StreamInferContext(
+  InferGrpcStreamContext(
       const std::string&, const std::string&, int64_t, CorrelationID, bool);
 
   // @see InferContext.AsyncTransfer()

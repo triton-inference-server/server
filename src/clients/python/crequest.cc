@@ -251,7 +251,7 @@ InferContextNew(
   if (err.IsOk()) {
     InferContextCtx* lctx = new InferContextCtx;
     if (streaming) {
-      err = nic::StreamInferContext::Create(
+      err = nic::InferGrpcStreamContext::Create(
           &(lctx->ctx), correlation_id, std::string(url),
           std::string(model_name), model_version, verbose);
     } else if (protocol == ProtocolType::HTTP) {

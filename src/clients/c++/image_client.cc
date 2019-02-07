@@ -547,7 +547,7 @@ main(int argc, char** argv)
     Usage(argv, "image file or image folder must be specified");
   }
   if (streaming && protocol != ProtocolType::GRPC) {
-    Usage(argv, "Streaming flag must be set with gRPC protocol");
+    Usage(argv, "Streaming is only allowed with gRPC protocol");
   }
 
   // Create the context for inference of the specified model. From it
@@ -556,7 +556,7 @@ main(int argc, char** argv)
   std::unique_ptr<nic::InferContext> ctx;
   nic::Error err;
   if (streaming) {
-    err = nic::StreamInferContext::Create(
+    err = nic::InferGrpcStreamContext::Create(
         &ctx, url, model_name, model_version, verbose);
   } else if (protocol == ProtocolType::HTTP) {
     err = nic::InferHttpContext::Create(

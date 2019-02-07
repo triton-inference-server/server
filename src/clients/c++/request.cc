@@ -2404,7 +2404,7 @@ class GrpcRequestImpl : public RequestImpl {
       InferContext::ResultMap* results);
 
   friend class InferGrpcContext;
-  friend class StreamInferContext;
+  friend class InferGrpcStreamContext;
 
   // Variables for GRPC call
   grpc::ClientContext grpc_context_;
@@ -2559,15 +2559,15 @@ InferGrpcContext::InitHelper(
       } else {
         const ModelConfig& model_info = itr->second.config();
 
-        this->max_batch_size_ =
+        max_batch_size_ =
             static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
 
         // Create inputs and outputs
         for (const auto& io : model_info.input()) {
-          this->inputs_.emplace_back(std::make_shared<InputImpl>(io));
+          inputs_.emplace_back(std::make_shared<InputImpl>(io));
         }
         for (const auto& io : model_info.output()) {
-          this->outputs_.emplace_back(std::make_shared<OutputImpl>(io));
+          outputs_.emplace_back(std::make_shared<OutputImpl>(io));
         }
       }
     }
@@ -2807,7 +2807,7 @@ InferGrpcContext::AsyncTransfer()
 //==============================================================================
 
 Error
-StreamInferContext::Create(
+InferGrpcStreamContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
     const std::string& model_name, int64_t model_version, bool verbose)
 {
@@ -2817,12 +2817,12 @@ StreamInferContext::Create(
 }
 
 Error
-StreamInferContext::Create(
+InferGrpcStreamContext::Create(
     std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, bool verbose)
 {
-  StreamInferContext* ctx_ptr = new StreamInferContext(
+  InferGrpcStreamContext* ctx_ptr = new InferGrpcStreamContext(
       server_url, model_name, model_version, correlation_id, verbose);
   ctx->reset(static_cast<InferContext*>(ctx_ptr));
 
@@ -2835,7 +2835,7 @@ StreamInferContext::Create(
   return err;
 }
 
-StreamInferContext::StreamInferContext(
+InferGrpcStreamContext::InferGrpcStreamContext(
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, CorrelationID correlation_id, bool verbose)
     : InferGrpcContext(
@@ -2843,10 +2843,10 @@ StreamInferContext::StreamInferContext(
 {
   stream_ = stub_->StreamInfer(&context_);
   // Initiate worker thread to read constantly
-  worker_ = std::thread(&StreamInferContext::AsyncTransfer, this);
+  worker_ = std::thread(&InferGrpcStreamContext::AsyncTransfer, this);
 }
 
-StreamInferContext::~StreamInferContext()
+InferGrpcStreamContext::~InferGrpcStreamContext()
 {
   exiting_ = true;
   stream_->WritesDone();
@@ -2855,7 +2855,7 @@ StreamInferContext::~StreamInferContext()
 }
 
 Error
-StreamInferContext::Run(ResultMap* results)
+InferGrpcStreamContext::Run(ResultMap* results)
 {
   // Actually calling AsyncRun() and GetAsyncRunResults()
   std::shared_ptr<Request> req;
@@ -2871,7 +2871,7 @@ StreamInferContext::Run(ResultMap* results)
 }
 
 Error
-StreamInferContext::AsyncRun(std::shared_ptr<Request>* async_request)
+InferGrpcStreamContext::AsyncRun(std::shared_ptr<Request>* async_request)
 {
   GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
   async_request->reset(static_cast<Request*>(current_context));
@@ -2902,7 +2902,7 @@ StreamInferContext::AsyncRun(std::shared_ptr<Request>* async_request)
 }
 
 void
-StreamInferContext::AsyncTransfer()
+InferGrpcStreamContext::AsyncTransfer()
 {
   InferResponse response;
   // End loop if Read() returns false
