@@ -30,6 +30,7 @@ import argparse
 import numpy as np
 import os
 from builtins import range
+from functools import partial
 from PIL import Image
 
 import grpc
@@ -197,43 +198,7 @@ def postprocess(results, filenames, batch_size):
         for cls in result.cls:
             print("    {} ({}) = {}".format(cls.idx, cls.label, cls.value))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
-                        help='Use asynchronous inference API')
-    parser.add_argument('-m', '--model-name', type=str, required=True,
-                        help='Name of model')
-    parser.add_argument('-x', '--model-version', type=int, required=False,
-                        help='Version of model. Default is to use latest version.')
-    parser.add_argument('-b', '--batch-size', type=int, required=False, default=1,
-                        help='Batch size. Default is 1.')
-    parser.add_argument('-c', '--classes', type=int, required=False, default=1,
-                        help='Number of class results to report. Default is 1.')
-    parser.add_argument('-s', '--scaling', type=str, choices=['NONE', 'INCEPTION', 'VGG'],
-                        required=False, default='NONE',
-                        help='Type of scaling to apply to image pixels. Default is NONE.')
-    parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8001',
-                        help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('image_filename', type=str, nargs='?', default=None,
-                        help='Input image.')
-    FLAGS = parser.parse_args()
-
-    # Create gRPC stub for communicating with the server
-    channel = grpc.insecure_channel(FLAGS.url)
-    grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
-
-    # Prepare request for Status gRPC
-    request = grpc_service_pb2.StatusRequest(model_name=FLAGS.model_name)
-    # Call and receive response from Status gRPC
-    response = grpc_stub.Status(request)
-    # Make sure the model matches our requirements, and get some
-    # properties of the model that we need for preprocessing
-    input_name, output_name, c, h, w, format, dtype = parse_model(
-        response, FLAGS.model_name, FLAGS.batch_size, FLAGS.verbose)
-
+def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS, result_filenames):
     # Prepare request for Infer gRPC
     # The meta data part can be reused across requests
     request = grpc_service_pb2.InferRequest()
@@ -270,9 +235,6 @@ if __name__ == '__main__':
     # Send requests of FLAGS.batch_size images. If the number of
     # images isn't an exact multiple of FLAGS.batch_size then just
     # start over with the first images until the batch is filled.
-    result_filenames = []
-    requests = []
-    responses = []
     image_idx = 0
     last_request = False
     while not last_request:
@@ -292,18 +254,73 @@ if __name__ == '__main__':
 
         request.raw_input.extend([input_bytes])
         result_filenames.append(input_filenames)
+        yield request
 
-        # Send request
-        if not FLAGS.async:
-            responses.append(grpc_stub.Infer(request))
-        else:
-            requests.append(grpc_stub.Infer.future(request))
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
+                        help='Enable verbose output')
+    parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
+                        help='Use asynchronous inference API')
+    parser.add_argument('--streaming', action="store_true", required=False, default=False,
+                        help='Use streaming inference API')
+    parser.add_argument('-m', '--model-name', type=str, required=True,
+                        help='Name of model')
+    parser.add_argument('-x', '--model-version', type=int, required=False,
+                        help='Version of model. Default is to use latest version.')
+    parser.add_argument('-b', '--batch-size', type=int, required=False, default=1,
+                        help='Batch size. Default is 1.')
+    parser.add_argument('-c', '--classes', type=int, required=False, default=1,
+                        help='Number of class results to report. Default is 1.')
+    parser.add_argument('-s', '--scaling', type=str, choices=['NONE', 'INCEPTION', 'VGG'],
+                        required=False, default='NONE',
+                        help='Type of scaling to apply to image pixels. Default is NONE.')
+    parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8001',
+                        help='Inference server URL. Default is localhost:8001.')
+    parser.add_argument('image_filename', type=str, nargs='?', default=None,
+                        help='Input image.')
+    FLAGS = parser.parse_args()
+
+    # Create gRPC stub for communicating with the server
+    channel = grpc.insecure_channel(FLAGS.url)
+    grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
+
+    # Prepare request for Status gRPC
+    request = grpc_service_pb2.StatusRequest(model_name=FLAGS.model_name)
+    # Call and receive response from Status gRPC
+    response = grpc_stub.Status(request)
+    # Make sure the model matches our requirements, and get some
+    # properties of the model that we need for preprocessing
+    input_name, output_name, c, h, w, format, dtype = parse_model(
+        response, FLAGS.model_name, FLAGS.batch_size, FLAGS.verbose)
+
+    filledRequestGenerator = partial(requestGenerator, input_name, output_name, c, h, w, format, dtype, FLAGS)
+
+    # Send requests of FLAGS.batch_size images. If the number of
+    # images isn't an exact multiple of FLAGS.batch_size then just
+    # start over with the first images until the batch is filled.
+    result_filenames = []
+    requests = []
+    responses = []
+
+    # Send request
+    if FLAGS.streaming:
+        responses = grpc_stub.StreamInfer(filledRequestGenerator(result_filenames))
+    else:
+        for request in filledRequestGenerator(result_filenames):
+            if not FLAGS.async:
+                responses.append(grpc_stub.Infer(request))
+            else:
+                requests.append(grpc_stub.Infer.future(request))
 
     # For async, retrieve results according to the send order
     if FLAGS.async:
         for request in requests:
             responses.append(request.result())
 
-    for idx in range(len(responses)):
+    idx = 0
+    for response in responses:
         print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
-        postprocess(responses[idx].meta_data.output, result_filenames[idx], FLAGS.batch_size)
+        postprocess(response.meta_data.output, result_filenames[idx], FLAGS.batch_size)
+        idx += 1
