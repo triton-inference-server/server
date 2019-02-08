@@ -58,6 +58,26 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+$SIMPLE_CLIENT -v -a >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $SIMPLE_CLIENT_PY -v -a >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_CLIENT -v -r -a >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $SIMPLE_CLIENT_PY -v -r -a >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
