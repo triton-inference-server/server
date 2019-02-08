@@ -68,8 +68,29 @@ Usage(char** argv, const std::string& msg = std::string())
 }
 
 int32_t
-Send(const std::unique_ptr<nic::InferContext>& ctx, int32_t value)
+Send(
+    const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
+    bool end_of_sequence = false)
 {
+  // Set the context options to do batch-size 1 requests. Also request
+  // that all output tensors be returned.
+  std::unique_ptr<nic::InferContext::Options> options;
+  FAIL_IF_ERR(
+      nic::InferContext::Options::Create(&options),
+      "unable to create inference options");
+
+  options->SetFlags(0);
+  if (end_of_sequence) {
+    options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_END, true);
+  }
+
+  options->SetBatchSize(1);
+  for (const auto& output : ctx->Outputs()) {
+    options->AddRawResult(output);
+  }
+
+  FAIL_IF_ERR(ctx->SetRunOptions(*options), "unable to set context 0 options");
+
   // Initialize the inputs with the data.
   std::shared_ptr<nic::InferContext::Input> ivalue;
   FAIL_IF_ERR(ctx->GetInput("INPUT", &ivalue), "unable to get INPUT");
@@ -97,9 +118,30 @@ Send(const std::unique_ptr<nic::InferContext>& ctx, int32_t value)
 }
 
 std::shared_ptr<nic::InferContext::Request>
-AsyncSend(const std::unique_ptr<nic::InferContext>& ctx, int32_t value)
+AsyncSend(
+    const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
+    bool end_of_sequence = false)
 {
   std::shared_ptr<nic::InferContext::Request> request;
+
+  // Set the context options to do batch-size 1 requests. Also request
+  // that all output tensors be returned.
+  std::unique_ptr<nic::InferContext::Options> options;
+  FAIL_IF_ERR(
+      nic::InferContext::Options::Create(&options),
+      "unable to create inference options");
+
+  options->SetFlags(0);
+  if (end_of_sequence) {
+    options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_END, true);
+  }
+
+  options->SetBatchSize(1);
+  for (const auto& output : ctx->Outputs()) {
+    options->AddRawResult(output);
+  }
+
+  FAIL_IF_ERR(ctx->SetRunOptions(*options), "unable to set context 0 options");
 
   // Initialize the inputs with the data.
   std::shared_ptr<nic::InferContext::Input> ivalue;
@@ -209,24 +251,6 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Set the context options to do batch-size 1 requests. Also request
-  // that the output tensor be returned.
-  std::unique_ptr<nic::InferContext::Options> options;
-  FAIL_IF_ERR(
-      nic::InferContext::Options::Create(&options),
-      "unable to create inference options");
-
-  options->SetBatchSize(1);
-  for (const auto& output : ctx0->Outputs()) {
-    options->AddRawResult(output);
-  }
-
-  FAIL_IF_ERR(ctx0->SetRunOptions(*options), "unable to set context 0 options");
-  FAIL_IF_ERR(ctx1->SetRunOptions(*options), "unable to set context 1 options");
-  FAIL_IF_ERR(
-      warmup_ctx->SetRunOptions(*options),
-      "unable to set warmup context options");
-
   // Now send the inference sequences..
   //
   std::vector<int32_t> values{11, 7, 5, 3, 2, 0, 1};
@@ -238,7 +262,7 @@ main(int argc, char** argv)
   // Warmup the server to avoid time difference due to run order
   Send(warmup_ctx, 0);
   for (int32_t v : values) {
-    Send(warmup_ctx, v);
+    Send(warmup_ctx, v, (v == 1) /* end-of-sequence */);
   }
 
   // Record the time of the sequence
@@ -264,7 +288,8 @@ main(int argc, char** argv)
     request0_list.emplace_back(AsyncSend(ctxs[0], 0));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      request0_list.emplace_back(AsyncSend(ctxs[0], v));
+      request0_list.emplace_back(
+          AsyncSend(ctxs[0], v, (v == 1) /* end-of-sequence */));
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
@@ -279,7 +304,8 @@ main(int argc, char** argv)
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     request1_list.emplace_back(AsyncSend(ctxs[1], 100));
     for (int32_t v : values) {
-      request1_list.emplace_back(AsyncSend(ctxs[1], -v));
+      request1_list.emplace_back(
+          AsyncSend(ctxs[1], -v, (v == 1) /* end-of-sequence */));
     }
     for (size_t i = 0; i < request1_list.size(); i++) {
       result1_list.push_back(AsyncReceive(ctxs[1], request1_list[i]));
@@ -294,7 +320,7 @@ main(int argc, char** argv)
     result0_list.push_back(Send(ctxs[0], 0));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      result0_list.push_back(Send(ctxs[0], v));
+      result0_list.push_back(Send(ctxs[0], v, (v == 1) /* end-of-sequence */));
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     seq0_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
@@ -304,7 +330,7 @@ main(int argc, char** argv)
     clock_gettime(CLOCK_MONOTONIC, &start_time);
     result1_list.push_back(Send(ctxs[1], 100));
     for (int32_t v : values) {
-      result1_list.push_back(Send(ctxs[1], -v));
+      result1_list.push_back(Send(ctxs[1], -v, (v == 1) /* end-of-sequence */));
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     seq1_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -

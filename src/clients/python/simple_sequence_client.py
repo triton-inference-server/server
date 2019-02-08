@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,23 +36,30 @@ from tensorrtserver.api import *
 
 FLAGS = None
 
-
-def send(ctx, value):
+def send(ctx, value, end_of_sequence=False):
     # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
+
+    flags = InferRequestHeader.FLAG_NONE
+    if end_of_sequence:
+        flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
 
     result = ctx.run({ 'INPUT' : (value_data,) },
                      { 'OUTPUT' : InferContext.ResultFormat.RAW },
-                     1)
+                     batch_size=1, flags=flags)
     return result
 
-def async_send(ctx, value):
+def async_send(ctx, value, end_of_sequence=False):
     # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
 
+    flags = InferRequestHeader.FLAG_NONE
+    if end_of_sequence:
+        flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
+
     request_id = ctx.async_run({ 'INPUT' : (value_data,) },
                                { 'OUTPUT' : InferContext.ResultFormat.RAW },
-                               1)
+                               batch_size=1, flags=flags)
     return request_id
 
 def async_receive(ctx, request_id):
@@ -103,7 +110,7 @@ if __name__ == '__main__':
     # warmup
     send(warmup_ctx, value=0)
     for v in values:
-        send(warmup_ctx, value=v)
+        send(warmup_ctx, value=v, end_of_sequence=(v == 1))
 
     # Now send the inference sequences..
     ctxs = []
@@ -124,7 +131,7 @@ if __name__ == '__main__':
         start = time.time()
         request0_ids.append(async_send(ctxs[0], value=0))
         for v in values:
-            request0_ids.append(async_send(ctxs[0], value=v))
+            request0_ids.append(async_send(ctxs[0], value=v, end_of_sequence=(v == 1)))
         for request_id in request0_ids:
             result0_list.append(async_receive(ctxs[0], request_id))
         seq0_sec = time.time() - start
@@ -132,7 +139,7 @@ if __name__ == '__main__':
         start = time.time()
         request1_ids.append(async_send(ctxs[1], value=100))
         for v in values:
-            request1_ids.append(async_send(ctxs[1], value=-v))
+            request1_ids.append(async_send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
         for request_id in request1_ids:
             result1_list.append(async_receive(ctxs[1], request_id))
         seq1_sec = time.time() - start
@@ -140,13 +147,13 @@ if __name__ == '__main__':
         start = time.time()
         result0_list.append(send(ctxs[0], value=0))
         for v in values:
-            result0_list.append(send(ctxs[0], value=v))
+            result0_list.append(send(ctxs[0], value=v, end_of_sequence=(v == 1)))
         seq0_sec = time.time() - start
 
         start = time.time()
         result1_list.append(send(ctxs[1], value=100))
         for v in values:
-            result1_list.append(send(ctxs[1], value=-v))
+            result1_list.append(send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
         seq1_sec = time.time() - start
 
     NANOS = 1000000000

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,6 +39,26 @@ package nvidia.inferenceserver;
 //@@
 message InferRequestHeader
 {
+  //@@  .. cpp:enum:: Flag
+  //@@
+  //@@     Flags that can be associated with an inference request.
+  //@@     All flags are packed bitwise into the 'flags' field and
+  //@@     so the value of each must be a power-of-2.
+  //@@
+  enum Flag {
+    //@@    .. cpp:enumerator:: Flag::FLAG_NONE = 0
+    //@@
+    //@@       Value indicating no flags are enabled.
+    //@@
+    FLAG_NONE = 0;
+
+    //@@    .. cpp:enumerator:: Flag::FLAG_SEQUENCE_END = 1
+    //@@
+    //@@       This request is the end of a related sequence of requests.
+    //@@
+    FLAG_SEQUENCE_END = 1;
+  }
+
   //@@  .. cpp:var:: message Input
   //@@
   //@@     Meta-data for an input tensor provided as part of an inferencing
@@ -116,6 +136,13 @@ message InferRequestHeader
   //@@
   uint64 id = 5;
 
+  //@@  .. cpp:var:: uint32 flags
+  //@@
+  //@@     The flags associated with this request. This field holds a bitwise-or
+  //@@     of all flag values.
+  //@@
+  uint32 flags = 6;
+
   //@@  .. cpp:var:: uint64 correlation_id
   //@@
   //@@     The correlation ID of the inference request. Default is 0, which
@@ -129,7 +156,7 @@ message InferRequestHeader
   //@@  .. cpp:var:: uint32 batch_size
   //@@
   //@@     The batch size of the inference request. This must be >= 1. For
-  //@@     models that don't support batching batch_size must be 1.
+  //@@     models that don't support batching, batch_size must be 1.
   //@@
   uint32 batch_size = 1;
 

@@ -162,6 +162,11 @@ class OptionsImpl : public InferContext::Options {
   OptionsImpl();
   ~OptionsImpl() = default;
 
+  bool Flag(InferRequestHeader::Flag flag) const override;
+  void SetFlag(InferRequestHeader::Flag flag, bool value) override;
+  uint32_t Flags() const override { return flags_; }
+  void SetFlags(uint32_t flags) override { flags_ = flags; }
+
   size_t BatchSize() const override { return batch_size_; }
   void SetBatchSize(size_t batch_size) override { batch_size_ = batch_size; }
 
@@ -186,11 +191,36 @@ class OptionsImpl : public InferContext::Options {
   const std::deque<OutputOptionsPair>& Outputs() const { return outputs_; }
 
  private:
+  uint32_t flags_;
   size_t batch_size_;
   std::deque<OutputOptionsPair> outputs_;
 };
 
-OptionsImpl::OptionsImpl() : batch_size_(0) {}
+OptionsImpl::OptionsImpl() : flags_(0), batch_size_(0) {}
+
+bool
+OptionsImpl::Flag(InferRequestHeader::Flag flag) const
+{
+  if (flag == InferRequestHeader::FLAG_NONE) {
+    return false;
+  }
+
+  uint32_t iflag = static_cast<uint32_t>(flag);
+  return (flags_ & iflag) != 0;
+}
+
+void
+OptionsImpl::SetFlag(InferRequestHeader::Flag flag, bool value)
+{
+  if (flag != InferRequestHeader::FLAG_NONE) {
+    uint32_t iflag = static_cast<uint32_t>(flag);
+    if (value) {
+      flags_ = flags_ | iflag;
+    } else {
+      flags_ = flags_ & ~iflag;
+    }
+  }
+}
 
 Error
 OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
@@ -1084,6 +1114,7 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
   // Create the InferRequestHeader protobuf. This protobuf will be
   // used for all subsequent requests.
   infer_request_.Clear();
+  infer_request_.set_flags(options.Flags());
   infer_request_.set_batch_size(batch_size_);
   infer_request_.set_correlation_id(correlation_id_);
 

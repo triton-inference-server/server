@@ -459,6 +459,29 @@ class InferContext {
     /// \return Error object indicating success or failure.
     static Error Create(std::unique_ptr<Options>* options);
 
+    /// Get the value of a request flag being used for all subsequent
+    /// inferences. Cannot be used with FLAG_NONE.
+    /// \param flag The flag to get the value for.
+    /// \return The true/false value currently set for the
+    /// flag. If 'flag' is FLAG_NONE then return false.
+    virtual bool Flag(InferRequestHeader::Flag flag) const = 0;
+
+    /// Set a request flag to be used for all subsequent inferences.
+    /// \param flag The flag to set. Cannot be used with FLAG_NONE.
+    /// \param value The true/false value to set for the flag. If
+    /// 'flag' is FLAG_NONE then do nothing.
+    virtual void SetFlag(InferRequestHeader::Flag flag, bool value) = 0;
+
+    /// Get the value of all request flags being used for all
+    /// subsequent inferences.
+    /// \return The bitwise-or of flag values as a single uint32_t
+    /// value.
+    virtual uint32_t Flags() const = 0;
+
+    /// Set all request flags to be used for all subsequent inferences.
+    /// \param flags The bitwise-or of flag values to set.
+    virtual void SetFlags(uint32_t flags) = 0;
+
     /// \return The batch size to use for all subsequent inferences.
     virtual size_t BatchSize() const = 0;
 
