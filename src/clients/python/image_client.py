@@ -209,6 +209,9 @@ if __name__ == '__main__':
                         help='Enable verbose output')
     parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
                         help='Use asynchronous inference API')
+    parser.add_argument('--streaming', action="store_true", required=False, default=False,
+                        help='Use streaming inference API. ' +
+                        'The flag is only available with gRPC protocol.')
     parser.add_argument('-m', '--model-name', type=str, required=True,
                         help='Name of model')
     parser.add_argument('-x', '--model-version', type=int, required=False,
@@ -231,14 +234,17 @@ if __name__ == '__main__':
 
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
+    if FLAGS.streaming and protocol != ProtocolType.GRPC:
+        raise Exception("Streaming is only allowed with gRPC protocol")
+
     # Make sure the model matches our requirements, and get some
     # properties of the model that we need for preprocessing
     input_name, output_name, c, h, w, format, dtype = parse_model(
         FLAGS.url, protocol, FLAGS.model_name,
         FLAGS.batch_size, FLAGS.verbose)
 
-    ctx = InferContext(FLAGS.url, protocol,
-                       FLAGS.model_name, FLAGS.model_version, FLAGS.verbose)
+    ctx = InferContext(FLAGS.url, protocol, FLAGS.model_name,
+                       FLAGS.model_version, FLAGS.verbose, 0, FLAGS.streaming)
 
     filenames = []
     if os.path.isdir(FLAGS.image_filename):

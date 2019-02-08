@@ -594,6 +594,8 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   const size_t batch_size = request_header_.batch_size();
   response_header->set_batch_size(batch_size);
 
+  response_header->set_id(request_header_.id());
+
   int output_idx = 0;
   for (const auto& output : outputs_) {
     auto poutput = response_header->add_output();

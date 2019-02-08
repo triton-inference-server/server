@@ -243,14 +243,18 @@ nic::Error*
 InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
     const char* model_name, int64_t model_version,
-    ni::CorrelationID correlation_id, bool verbose)
+    ni::CorrelationID correlation_id, bool streaming, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
   err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
     InferContextCtx* lctx = new InferContextCtx;
-    if (protocol == ProtocolType::HTTP) {
+    if (streaming) {
+      err = nic::InferGrpcStreamContext::Create(
+          &(lctx->ctx), correlation_id, std::string(url),
+          std::string(model_name), model_version, verbose);
+    } else if (protocol == ProtocolType::HTTP) {
       err = nic::InferHttpContext::Create(
           &(lctx->ctx), correlation_id, std::string(url),
           std::string(model_name), model_version, verbose);

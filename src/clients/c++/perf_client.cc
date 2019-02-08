@@ -26,6 +26,7 @@
 
 #include "src/clients/c++/request.h"
 
+#include <getopt.h>
 #include <math.h>
 #include <time.h>
 #include <unistd.h>
@@ -230,13 +231,13 @@ class ConcurrencyManager {
       std::unique_ptr<ConcurrencyManager>* manager, const bool verbose,
       const bool profile, const int32_t batch_size, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
-      const bool async, const std::string& model_name,
+      const bool streaming, const bool async, const std::string& model_name,
       const int64_t model_version, const std::string& url,
       const ProtocolType protocol)
   {
     manager->reset(new ConcurrencyManager(
         verbose, profile, batch_size, stable_offset, measurement_window_ms,
-        max_measurement_count, async, model_name, model_version, url,
+        max_measurement_count, streaming, async, model_name, model_version, url,
         protocol));
     (*manager)->pause_index_.reset(new size_t(0));
     (*manager)->request_timestamps_.reset(new TimestampVector());
@@ -393,15 +394,16 @@ class ConcurrencyManager {
   ConcurrencyManager(
       const bool verbose, const bool profile, const int32_t batch_size,
       const double stable_offset, const int32_t measurement_window_ms,
-      const size_t max_measurement_count, const bool async,
-      const std::string& model_name, const int64_t model_version,
-      const std::string& url, const ProtocolType protocol)
+      const size_t max_measurement_count, const bool streaming,
+      const bool async, const std::string& model_name,
+      const int64_t model_version, const std::string& url,
+      const ProtocolType protocol)
       : verbose_(verbose), profile_(profile), batch_size_(batch_size),
         stable_offset_(stable_offset),
         measurement_window_ms_(measurement_window_ms),
-        max_measurement_count_(max_measurement_count), async_(async),
-        model_name_(model_name), model_version_(model_version), url_(url),
-        protocol_(protocol)
+        max_measurement_count_(max_measurement_count), streaming_(streaming),
+        async_(async), model_name_(model_name), model_version_(model_version),
+        url_(url), protocol_(protocol)
   {
   }
 
@@ -459,6 +461,94 @@ class ConcurrencyManager {
               "unable to find status for model");
         } else {
           model_status->CopyFrom(itr->second);
+        }
+      }
+    }
+
+    return err;
+  }
+
+  nic::Error PrepareInfer(
+      std::unique_ptr<nic::InferContext>* ctx,
+      std::unique_ptr<nic::InferContext::Options>* options,
+      std::vector<uint8_t>& input_buffer)
+  {
+    nic::Error err;
+    // Create the context for inference of the specified model.
+    if (streaming_) {
+      err = nic::InferGrpcStreamContext::Create(
+          ctx, url_, model_name_, model_version_, false);
+    } else if (protocol_ == ProtocolType::HTTP) {
+      err = nic::InferHttpContext::Create(
+          ctx, url_, model_name_, model_version_, false);
+    } else {
+      err = nic::InferGrpcContext::Create(
+          ctx, url_, model_name_, model_version_, false);
+    }
+    if (!err.IsOk()) {
+      return err;
+    }
+
+    if (batch_size_ > (*ctx)->MaxBatchSize()) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "expecting batch size <= " + std::to_string((*ctx)->MaxBatchSize()) +
+              " for model '" + (*ctx)->ModelName() + "'");
+    }
+
+    // Prepare context for 'batch_size' batches. Request that all
+    // outputs be returned.
+    err = nic::InferContext::Options::Create(options);
+    if (!err.IsOk()) {
+      return err;
+    }
+
+    (*options)->SetBatchSize(batch_size_);
+    for (const auto& output : (*ctx)->Outputs()) {
+      (*options)->AddRawResult(output);
+    }
+
+    err = (*ctx)->SetRunOptions(*(*options));
+    if (!err.IsOk()) {
+      return err;
+    }
+
+    // Create a randomly initialized buffer that is large enough to
+    // provide the largest needed input. We (re)use this buffer for all
+    // input values.
+    size_t max_input_byte_size = 0;
+    for (const auto& input : (*ctx)->Inputs()) {
+      const int64_t bs = input->ByteSize();
+      if (bs < 0) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() +
+                "' has variable-size shape, unable to create input values for "
+                "model '" +
+                (*ctx)->ModelName() + "'");
+      }
+
+      max_input_byte_size =
+          std::max(max_input_byte_size, (size_t)input->ByteSize());
+    }
+
+    std::vector<uint8_t> input_buf(max_input_byte_size);
+    for (size_t i = 0; i < input_buf.size(); ++i) {
+      input_buf[i] = rand();
+    }
+    input_buffer.swap(input_buf);
+
+    // Initialize inputs to use random values...
+    for (const auto& input : (*ctx)->Inputs()) {
+      err = input->Reset();
+      if (!err.IsOk()) {
+        return err;
+      }
+
+      for (size_t i = 0; i < batch_size_; ++i) {
+        err = input->SetRaw(&input_buffer[0], (size_t)input->ByteSize());
+        if (!err.IsOk()) {
+          return err;
         }
       }
     }
@@ -668,82 +758,12 @@ class ConcurrencyManager {
       std::shared_ptr<size_t> pause_index, const size_t thread_index)
   {
     // Create the context for inference of the specified model.
+    std::vector<uint8_t> input_buf;
     std::unique_ptr<nic::InferContext> ctx;
-    if (protocol_ == ProtocolType::HTTP) {
-      *err = nic::InferHttpContext::Create(
-          &ctx, url_, model_name_, model_version_, false);
-    } else {
-      *err = nic::InferGrpcContext::Create(
-          &ctx, url_, model_name_, model_version_, false);
-    }
-    if (!err->IsOk()) {
-      return;
-    }
-
-    if (batch_size_ > ctx->MaxBatchSize()) {
-      *err = nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size <= " + std::to_string(ctx->MaxBatchSize()) +
-              " for model '" + ctx->ModelName() + "'");
-      return;
-    }
-
-    // Prepare context for 'batch_size' batches. Request that all
-    // outputs be returned.
     std::unique_ptr<nic::InferContext::Options> options;
-    *err = nic::InferContext::Options::Create(&options);
+    *err = PrepareInfer(&ctx, &options, input_buf);
     if (!err->IsOk()) {
       return;
-    }
-
-    options->SetBatchSize(batch_size_);
-    for (const auto& output : ctx->Outputs()) {
-      options->AddRawResult(output);
-    }
-
-    *err = ctx->SetRunOptions(*options);
-    if (!err->IsOk()) {
-      return;
-    }
-
-    // Create a randomly initialized buffer that is large enough to
-    // provide the largest needed input. We (re)use this buffer for all
-    // input values.
-    size_t max_input_byte_size = 0;
-    for (const auto& input : ctx->Inputs()) {
-      const int64_t bs = input->ByteSize();
-      if (bs < 0) {
-        *err = nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() +
-                "' has variable-size shape, unable to create input values for "
-                "model '" +
-                ctx->ModelName() + "'");
-        return;
-      }
-
-      max_input_byte_size =
-          std::max(max_input_byte_size, (size_t)input->ByteSize());
-    }
-
-    std::vector<uint8_t> input_buf(max_input_byte_size);
-    for (size_t i = 0; i < input_buf.size(); ++i) {
-      input_buf[i] = rand();
-    }
-
-    // Initialize inputs to use random values...
-    for (const auto& input : ctx->Inputs()) {
-      *err = input->Reset();
-      if (!err->IsOk()) {
-        return;
-      }
-
-      for (size_t i = 0; i < batch_size_; ++i) {
-        *err = input->SetRaw(&input_buf[0], (size_t)input->ByteSize());
-        if (!err->IsOk()) {
-          return;
-        }
-      }
     }
 
     // run inferencing until receiving exit signal to maintain server load.
@@ -794,82 +814,12 @@ class ConcurrencyManager {
       std::shared_ptr<size_t> pause_index)
   {
     // Create the context for inference of the specified model.
+    std::vector<uint8_t> input_buf;
     std::unique_ptr<nic::InferContext> ctx;
-    if (protocol_ == ProtocolType::HTTP) {
-      *err = nic::InferHttpContext::Create(
-          &ctx, url_, model_name_, model_version_, false);
-    } else {
-      *err = nic::InferGrpcContext::Create(
-          &ctx, url_, model_name_, model_version_, false);
-    }
-    if (!err->IsOk()) {
-      return;
-    }
-
-    if (batch_size_ > ctx->MaxBatchSize()) {
-      *err = nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size <= " + std::to_string(ctx->MaxBatchSize()) +
-              " for model '" + ctx->ModelName() + "'");
-      return;
-    }
-
-    // Prepare context for 'batch_size' batches. Request that all
-    // outputs be returned.
     std::unique_ptr<nic::InferContext::Options> options;
-    *err = nic::InferContext::Options::Create(&options);
+    *err = PrepareInfer(&ctx, &options, input_buf);
     if (!err->IsOk()) {
       return;
-    }
-
-    options->SetBatchSize(batch_size_);
-    for (const auto& output : ctx->Outputs()) {
-      options->AddRawResult(output);
-    }
-
-    *err = ctx->SetRunOptions(*options);
-    if (!err->IsOk()) {
-      return;
-    }
-
-    // Create a randomly initialized buffer that is large enough to
-    // provide the largest needed input. We (re)use this buffer for all
-    // input values.
-    size_t max_input_byte_size = 0;
-    for (const auto& input : ctx->Inputs()) {
-      const int64_t bs = input->ByteSize();
-      if (bs < 0) {
-        *err = nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() +
-                "' has variable-size shape, unable to create input values for "
-                "model '" +
-                ctx->ModelName() + "'");
-        return;
-      }
-
-      max_input_byte_size =
-          std::max(max_input_byte_size, (size_t)input->ByteSize());
-    }
-
-    std::vector<uint8_t> input_buf(max_input_byte_size);
-    for (size_t i = 0; i < input_buf.size(); ++i) {
-      input_buf[i] = rand();
-    }
-
-    // Initialize inputs to use random values...
-    for (const auto& input : ctx->Inputs()) {
-      *err = input->Reset();
-      if (!err->IsOk()) {
-        return;
-      }
-
-      for (size_t i = 0; i < batch_size_; ++i) {
-        *err = input->SetRaw(&input_buf[0], (size_t)input->ByteSize());
-        if (!err->IsOk()) {
-          return;
-        }
-      }
     }
 
     std::map<uint64_t, struct timespec> requests_start_time;
@@ -1001,6 +951,7 @@ class ConcurrencyManager {
   double stable_offset_;
   uint64_t measurement_window_ms_;
   size_t max_measurement_count_;
+  bool streaming_;
   bool async_;
   std::string model_name_;
   int64_t model_version_;
@@ -1145,6 +1096,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-t <number of concurrent requests>" << std::endl;
   std::cerr << "\t-d" << std::endl;
   std::cerr << "\t-a" << std::endl;
+  std::cerr << "\t--streaming" << std::endl;
   std::cerr << "\t-l <latency threshold (in msec)>" << std::endl;
   std::cerr << "\t-c <maximum concurrency>" << std::endl;
   std::cerr << "\t-s <deviation threshold for stable measurement"
@@ -1165,6 +1117,8 @@ Usage(char** argv, const std::string& msg = std::string())
       << " latency is above the threshold set (see -l)." << std::endl;
   std::cerr << "The -a flag changes the way to maintain concurrency level from"
             << " sending synchronous requests to sending asynchrnous requests."
+            << std::endl;
+  std::cerr << "The --streaming flag is only valid with gRPC protocol."
             << std::endl;
   std::cerr
       << "For -t, it indicates the number of starting concurrent requests if -d"
@@ -1219,6 +1173,7 @@ main(int argc, char** argv)
   bool profile = false;
   bool dynamic_concurrency_mode = false;
   bool profiling_asynchronous_infer = false;
+  bool streaming = false;
   uint64_t latency_threshold_ms = 0;
   int32_t batch_size = 1;
   int32_t concurrent_request_count = 1;
@@ -1232,10 +1187,17 @@ main(int argc, char** argv)
   std::string filename("");
   ProtocolType protocol = ProtocolType::HTTP;
 
+  static struct option long_options[] = {{"streaming", 0, 0, 0}, {0, 0, 0, 0}};
+
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vndac:u:m:x:b:t:p:i:l:r:s:f:")) != -1) {
+  while ((opt = getopt_long(
+              argc, argv, "vndac:u:m:x:b:t:p:i:l:r:s:f:", long_options,
+              NULL)) != -1) {
     switch (opt) {
+      case 0:
+        streaming = true;
+        break;
       case 'v':
         verbose = true;
         break;
@@ -1305,6 +1267,9 @@ main(int argc, char** argv)
   if (dynamic_concurrency_mode && latency_threshold_ms < 0) {
     Usage(argv, "latency threshold must be >= 0 for dynamic concurrency mode");
   }
+  if (streaming && protocol != ProtocolType::GRPC) {
+    Usage(argv, "Streaming is only allowed with gRPC protocol");
+  }
 
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
@@ -1313,7 +1278,7 @@ main(int argc, char** argv)
   std::unique_ptr<ConcurrencyManager> manager;
   err = ConcurrencyManager::Create(
       &manager, verbose, profile, batch_size, stable_offset,
-      measurement_window_ms, max_measurement_count,
+      measurement_window_ms, max_measurement_count, streaming,
       profiling_asynchronous_infer, model_name, model_version, url, protocol);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;

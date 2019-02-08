@@ -108,6 +108,14 @@ message InferRequestHeader
     Class cls = 3;
   }
 
+  //@@  .. cpp:var:: uint64 id
+  //@@
+  //@@     The ID of the inference request. The response of the request will
+  //@@     have the same ID in InferResponseHeader. The request sender can use
+  //@@     the ID to correlate the response to corresponding request if needed.
+  //@@
+  uint64 id = 5;
+
   //@@  .. cpp:var:: uint64 correlation_id
   //@@
   //@@     The correlation ID of the inference request. Default is 0, which
@@ -241,6 +249,14 @@ message InferResponseHeader
     //@@
     repeated Classes batch_classes = 3;
   }
+
+  //@@  .. cpp:var:: uint64 id
+  //@@
+  //@@     The ID of the inference response. The response will have the same ID
+  //@@     as the ID of its originated request. The request sender can use
+  //@@     the ID to correlate the response to corresponding request if needed.
+  //@@
+  uint64 id = 5;
 
   //@@  .. cpp:var:: string model_name
   //@@

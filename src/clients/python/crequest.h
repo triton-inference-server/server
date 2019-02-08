@@ -73,7 +73,7 @@ typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
     const char* model_name, int64_t model_version,
-    ni::CorrelationID correlation_id, bool verbose);
+    ni::CorrelationID correlation_id, bool streaming, bool verbose);
 void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);

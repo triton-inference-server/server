@@ -92,7 +92,7 @@ _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
-_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int64, c_uint64, c_bool]
+_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int64, c_uint64, c_bool, c_bool]
 _crequest_infer_ctx_del = _crequest.InferContextDelete
 _crequest_infer_ctx_del.argtypes = [c_void_p]
 _crequest_infer_ctx_set_options = _crequest.InferContextSetOptions
@@ -535,7 +535,8 @@ class InferContext:
         RAW = 1,
         CLASS = 2
 
-    def __init__(self, url, protocol, model_name, model_version=None, verbose=False, correlation_id=0):
+    def __init__(self, url, protocol, model_name, model_version=None,
+                 verbose=False, correlation_id=0, streaming=False):
         self._last_request_id = None
         self._last_request_model_name = None
         self._last_request_model_version = None
@@ -547,7 +548,8 @@ class InferContext:
             c_void_p(
                 _crequest_infer_ctx_new(
                     byref(self._ctx), url, int(protocol),
-                    model_name, imodel_version, correlation_id, verbose)))
+                    model_name, imodel_version, correlation_id,
+                    streaming, verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
