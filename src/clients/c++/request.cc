@@ -1024,7 +1024,7 @@ InferContext::InferContext(
     CorrelationID correlation_id, bool verbose)
     : model_name_(model_name), model_version_(model_version),
       correlation_id_(correlation_id), verbose_(verbose), batch_size_(0),
-      async_request_id_(0), worker_(), exiting_(true)
+      async_request_id_(1), worker_(), exiting_(false)
 {
 }
 
@@ -1745,6 +1745,7 @@ InferHttpContext::Create(
 {
   InferHttpContext* ctx_ptr = new InferHttpContext(
       server_url, model_name, model_version, correlation_id, verbose);
+  ctx->reset(static_cast<InferContext*>(ctx_ptr));
 
   // Get status of the model and create the inputs and outputs.
   std::unique_ptr<ServerStatusContext> sctx;
@@ -1780,9 +1781,7 @@ InferHttpContext::Create(
   ctx_ptr->sync_request_.reset(
       static_cast<Request*>(new HttpRequestImpl(0, ctx_ptr->inputs_)));
 
-  if (err.IsOk()) {
-    ctx->reset(static_cast<InferContext*>(ctx_ptr));
-  } else {
+  if (!err.IsOk()) {
     ctx->reset();
   }
 
@@ -1863,10 +1862,7 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
     return Error(
         RequestStatusCode::INTERNAL,
         "failed to start HTTP asynchronous client");
-  } else if (exiting_) {
-    // abusing variable here, exiting_ is true either when destructor is called
-    // or the worker thread is not actually created.
-    exiting_ = false;
+  } else if (!worker_.joinable()) {
     worker_ = std::thread(&InferHttpContext::AsyncTransfer, this);
   }
 
@@ -2073,6 +2069,7 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
   // size of the batch (see api.proto).
   uint64_t total_input_byte_size = 0;
   infer_request_.mutable_input()->Clear();
+  infer_request_.set_id(request->Id());
   for (const auto& io : inputs_) {
     total_input_byte_size += io->TotalByteSize();
 
@@ -2395,7 +2392,7 @@ ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
 
 class GrpcRequestImpl : public RequestImpl {
  public:
-  GrpcRequestImpl(const uint64_t id, const uintptr_t run_index);
+  GrpcRequestImpl(const uint64_t id);
 
   Error GetResults(
       const InferGrpcContext& ctx, InferContext::ResultMap* results);
@@ -2407,6 +2404,7 @@ class GrpcRequestImpl : public RequestImpl {
       InferContext::ResultMap* results);
 
   friend class InferGrpcContext;
+  friend class InferGrpcStreamContext;
 
   // Variables for GRPC call
   grpc::ClientContext grpc_context_;
@@ -2414,10 +2412,10 @@ class GrpcRequestImpl : public RequestImpl {
   InferResponse grpc_response_;
 };
 
-GrpcRequestImpl::GrpcRequestImpl(const uint64_t id, const uintptr_t run_index)
-    : RequestImpl(id)
+GrpcRequestImpl::GrpcRequestImpl(const uint64_t id)
+    : RequestImpl(id), grpc_status_()
 {
-  run_index_ = run_index;
+  run_index_ = id;
 }
 
 Error
@@ -2527,11 +2525,24 @@ InferGrpcContext::Create(
 {
   InferGrpcContext* ctx_ptr = new InferGrpcContext(
       server_url, model_name, model_version, correlation_id, verbose);
+  ctx->reset(static_cast<InferContext*>(ctx_ptr));
 
   // Create request context for synchronous request.
-  ctx_ptr->sync_request_.reset(
-      static_cast<Request*>(new GrpcRequestImpl(0, 0)));
+  ctx_ptr->sync_request_.reset(static_cast<Request*>(new GrpcRequestImpl(0)));
 
+  Error err = ctx_ptr->InitHelper(server_url, model_name, verbose);
+
+  if (!err.IsOk()) {
+    ctx->reset();
+  }
+
+  return err;
+}
+
+Error
+InferGrpcContext::InitHelper(
+    const std::string& server_url, const std::string& model_name, bool verbose)
+{
   // Get status of the model and create the inputs and outputs.
   std::unique_ptr<ServerStatusContext> sctx;
   Error err =
@@ -2548,26 +2559,19 @@ InferGrpcContext::Create(
       } else {
         const ModelConfig& model_info = itr->second.config();
 
-        ctx_ptr->max_batch_size_ =
+        max_batch_size_ =
             static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
 
         // Create inputs and outputs
         for (const auto& io : model_info.input()) {
-          ctx_ptr->inputs_.emplace_back(std::make_shared<InputImpl>(io));
+          inputs_.emplace_back(std::make_shared<InputImpl>(io));
         }
         for (const auto& io : model_info.output()) {
-          ctx_ptr->outputs_.emplace_back(std::make_shared<OutputImpl>(io));
+          outputs_.emplace_back(std::make_shared<OutputImpl>(io));
         }
       }
     }
   }
-
-  if (err.IsOk()) {
-    ctx->reset(static_cast<InferContext*>(ctx_ptr));
-  } else {
-    ctx->reset();
-  }
-
   return err;
 }
 
@@ -2633,22 +2637,14 @@ InferGrpcContext::Run(ResultMap* results)
 Error
 InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 {
-  if (exiting_) {
-    exiting_ = false;
+  if (!worker_.joinable()) {
     worker_ = std::thread(&InferGrpcContext::AsyncTransfer, this);
   }
-  uintptr_t run_index;
-  if (reusable_slot_.empty()) {
-    run_index = ongoing_async_requests_.size();
-  } else {
-    run_index = reusable_slot_.back();
-    reusable_slot_.pop_back();
-  }
 
-  GrpcRequestImpl* current_context =
-      new GrpcRequestImpl(async_request_id_++, run_index);
+  GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
   async_request->reset(static_cast<Request*>(current_context));
 
+  uintptr_t run_index = current_context->Id();
   auto insert_result = ongoing_async_requests_.emplace(
       std::make_pair(run_index, *async_request));
 
@@ -2692,11 +2688,14 @@ InferGrpcContext::GetAsyncRunResults(
   std::shared_ptr<GrpcRequestImpl> grpc_request =
       std::static_pointer_cast<GrpcRequestImpl>(async_request);
 
-  reusable_slot_.push_back(grpc_request->run_index_);
   grpc_request->timer_.Record(RequestTimers::Kind::RECEIVE_START);
   Error request_status = grpc_request->GetResults(*this, results);
   grpc_request->timer_.Record(RequestTimers::Kind::RECEIVE_END);
   err = UpdateStat(grpc_request->timer_);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    ongoing_async_requests_.erase(grpc_request->run_index_);
+  }
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }
@@ -2712,6 +2711,7 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
   // instances in the batch... so set the batch-byte-size to the total
   // size of the batch (see api.proto).
   infer_request_.mutable_input()->Clear();
+  infer_request_.set_id(request->Id());
   for (auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
 
@@ -2802,6 +2802,139 @@ InferGrpcContext::AsyncTransfer()
       cv_.notify_all();
     }
   } while (!exiting_);
+}
+
+//==============================================================================
+
+Error
+InferGrpcStreamContext::Create(
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::string& model_name, int64_t model_version, bool verbose)
+{
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
+      verbose);
+}
+
+Error
+InferGrpcStreamContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url, const std::string& model_name,
+    int64_t model_version, bool verbose)
+{
+  InferGrpcStreamContext* ctx_ptr = new InferGrpcStreamContext(
+      server_url, model_name, model_version, correlation_id, verbose);
+  ctx->reset(static_cast<InferContext*>(ctx_ptr));
+
+  Error err = ctx_ptr->InitHelper(server_url, model_name, verbose);
+
+  if (!err.IsOk()) {
+    ctx->reset();
+  }
+
+  return err;
+}
+
+InferGrpcStreamContext::InferGrpcStreamContext(
+    const std::string& server_url, const std::string& model_name,
+    int64_t model_version, CorrelationID correlation_id, bool verbose)
+    : InferGrpcContext(
+          server_url, model_name, model_version, correlation_id, verbose)
+{
+  stream_ = stub_->StreamInfer(&context_);
+  // Initiate worker thread to read constantly
+  worker_ = std::thread(&InferGrpcStreamContext::AsyncTransfer, this);
+}
+
+InferGrpcStreamContext::~InferGrpcStreamContext()
+{
+  exiting_ = true;
+  stream_->WritesDone();
+  // The reader thread will drain the stream properly
+  worker_.join();
+}
+
+Error
+InferGrpcStreamContext::Run(ResultMap* results)
+{
+  // Actually calling AsyncRun() and GetAsyncRunResults()
+  std::shared_ptr<Request> req;
+  Error err = AsyncRun(&req);
+  if (!err.IsOk()) {
+    return err;
+  }
+  err = GetAsyncRunResults(results, req, true);
+  if (!err.IsOk()) {
+    return err;
+  }
+  return Error::Success;
+}
+
+Error
+InferGrpcStreamContext::AsyncRun(std::shared_ptr<Request>* async_request)
+{
+  GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
+  async_request->reset(static_cast<Request*>(current_context));
+
+  uintptr_t run_index = current_context->Id();
+  auto insert_result = ongoing_async_requests_.emplace(
+      std::make_pair(run_index, *async_request));
+
+  if (!insert_result.second) {
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "Failed to insert new asynchronous request context.");
+  }
+
+  current_context->timer_.Reset();
+  current_context->timer_.Record(RequestTimers::Kind::SEND_START);
+  PreRunProcessing(*async_request);
+  current_context->timer_.Record(RequestTimers::Kind::SEND_END);
+
+  current_context->timer_.Record(RequestTimers::Kind::REQUEST_START);
+  bool ok = stream_->Write(request_);
+
+  if (ok) {
+    return Error::Success;
+  } else {
+    return Error(RequestStatusCode::INTERNAL, "Stream has been closed.");
+  }
+}
+
+void
+InferGrpcStreamContext::AsyncTransfer()
+{
+  InferResponse response;
+  // End loop if Read() returns false
+  // (stream ended and all responses are drained)
+  while (stream_->Read(&response)) {
+    if (exiting_) {
+      continue;
+    }
+
+    // Get request ID
+    uintptr_t run_index = response.meta_data().id();
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      auto itr = ongoing_async_requests_.find(run_index);
+      if (itr == ongoing_async_requests_.end()) {
+        fprintf(
+            stderr,
+            "Unexpected error: received completed request that"
+            " is not in the list of asynchronous requests.\n");
+        continue;
+      }
+
+      std::shared_ptr<GrpcRequestImpl> grpc_request =
+          std::static_pointer_cast<GrpcRequestImpl>(itr->second);
+      grpc_request->grpc_response_.Swap(&response);
+      grpc_request->timer_.Record(RequestTimers::Kind::REQUEST_END);
+      grpc_request->ready_ = true;
+    }
+    // send signal in case the main thread is waiting for response
+    cv_.notify_all();
+  }
+  stream_->Finish();
 }
 
 //==============================================================================

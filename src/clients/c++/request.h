@@ -565,6 +565,7 @@ class InferContext {
     friend class InferContext;
     friend class InferHttpContext;
     friend class InferGrpcContext;
+    friend class InferGrpcStreamContext;
     struct timespec request_start_;
     struct timespec request_end_;
     struct timespec send_start_;
@@ -1043,7 +1044,7 @@ class ServerStatusGrpcContext : public ServerStatusContext {
 ///
 class InferGrpcContext : public InferContext {
  public:
-  ~InferGrpcContext() override;
+  virtual ~InferGrpcContext() override;
 
   /// Create context that performs inference for a non-sequence model
   /// using the GRPC protocol.
@@ -1082,25 +1083,26 @@ class InferGrpcContext : public InferContext {
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
 
-  Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  virtual Error Run(ResultMap* results) override;
+  virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
       ResultMap* results, const std::shared_ptr<Request>& async_request,
       bool wait) override;
 
- private:
+ protected:
   InferGrpcContext(
       const std::string&, const std::string&, int64_t, CorrelationID, bool);
 
+  // Helper function to initialize the context
+  Error InitHelper(
+      const std::string& server_url, const std::string& model_name,
+      bool verbose);
+
   // @see InferContext.AsyncTransfer()
-  void AsyncTransfer() override;
+  virtual void AsyncTransfer() override;
 
   // @see InferContext.PreRunProcessing()
   Error PreRunProcessing(std::shared_ptr<Request>& request) override;
-
-  // additional vector contains 1-indexed key to available slots
-  // in async request map.
-  std::vector<uintptr_t> reusable_slot_;
 
   // The producer-consumer queue used to communicate asynchronously with
   // the GRPC runtime.
@@ -1112,6 +1114,68 @@ class InferGrpcContext : public InferContext {
   // request for GRPC call, one request object can be used for multiple calls
   // since it can be overwritten as soon as the GRPC send finishes.
   InferRequest request_;
+};
+
+//==============================================================================
+/// InferGrpcStreamContext is the streaming instantiation of InferGrpcContext.
+/// All synchronous and asynchronous requests sent from this context will be
+/// sent in the same stream.
+///
+class InferGrpcStreamContext : public InferGrpcContext {
+ public:
+  ~InferGrpcStreamContext() override;
+
+  /// Create streaming context that performs inference for a non-sequence model
+  /// using the GRPC protocol.
+  ///
+  /// \param ctx Returns a new InferGrpcContext object.
+  /// \param server_url The inference server name and port.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+      const std::string& model_name, int64_t model_version = -1,
+      bool verbose = false);
+
+  /// Create streaming context that performs inference for a sequence model
+  /// using a given correlation ID and the GRPC protocol.
+  ///
+  /// \param ctx Returns a new InferGrpcContext object.
+  /// \param correlation_id The correlation ID to use for all
+  /// inferences performed with this context. A value of 0 (zero)
+  /// indicates that no correlation ID should be used.
+  /// \param server_url The inference server name and port.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+      const std::string& server_url, const std::string& model_name,
+      int64_t model_version = -1, bool verbose = false);
+
+  Error Run(ResultMap* results) override;
+  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+
+ private:
+  InferGrpcStreamContext(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
+
+  // @see InferContext.AsyncTransfer()
+  void AsyncTransfer() override;
+
+  // gRPC objects for using the streaming API
+  grpc::ClientContext context_;
+  std::shared_ptr<grpc::ClientReaderWriter<InferRequest, InferResponse>>
+      stream_;
 };
 
 //==============================================================================

@@ -27,6 +27,7 @@
 #include "src/clients/c++/request.h"
 
 #include <dirent.h>
+#include <getopt.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -212,6 +213,7 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-a" << std::endl;
+  std::cerr << "\t--streaming" << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
   std::cerr << "\t-c <topk>" << std::endl;
   std::cerr << "\t-s <NONE|INCEPTION|VGG>" << std::endl;
@@ -224,6 +226,8 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::endl;
   std::cerr << "If -a is specified then asynchronous client API will be used. "
             << "Default is to use the synchronous API." << std::endl;
+  std::cerr << "The --streaming flag is only valid with gRPC protocol."
+            << std::endl;
   std::cerr
       << "For -b, a single image will be replicated and sent in a batch"
       << std::endl
@@ -474,6 +478,7 @@ main(int argc, char** argv)
 {
   bool verbose = false;
   bool async = false;
+  bool streaming = false;
   size_t batch_size = 1;
   size_t topk = 1;
   ScaleType scale = ScaleType::NONE;
@@ -483,10 +488,16 @@ main(int argc, char** argv)
   std::string url("localhost:8000");
   ProtocolType protocol = ProtocolType::HTTP;
 
+  static struct option long_options[] = {{"streaming", 0, 0, 0}, {0, 0, 0, 0}};
+
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vau:m:x:b:c:s:p:i:")) != -1) {
+  while ((opt = getopt_long(
+              argc, argv, "vau:m:x:b:c:s:p:i:", long_options, NULL)) != -1) {
     switch (opt) {
+      case 0:
+        streaming = true;
+        break;
       case 'v':
         verbose = true;
         break;
@@ -535,13 +546,19 @@ main(int argc, char** argv)
   if (optind >= argc) {
     Usage(argv, "image file or image folder must be specified");
   }
+  if (streaming && protocol != ProtocolType::GRPC) {
+    Usage(argv, "Streaming is only allowed with gRPC protocol");
+  }
 
   // Create the context for inference of the specified model. From it
   // extract and validate that the model meets the requirements for
   // image classification.
   std::unique_ptr<nic::InferContext> ctx;
   nic::Error err;
-  if (protocol == ProtocolType::HTTP) {
+  if (streaming) {
+    err = nic::InferGrpcStreamContext::Create(
+        &ctx, url, model_name, model_version, verbose);
+  } else if (protocol == ProtocolType::HTTP) {
     err = nic::InferHttpContext::Create(
         &ctx, url, model_name, model_version, verbose);
   } else {
