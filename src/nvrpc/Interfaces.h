@@ -74,6 +74,12 @@ class IContextLifeCycle : public IContext {
   virtual void OnLifeCycleStart() = 0;
   virtual void OnLifeCycleReset() = 0;
 
+  // Function to get the context which the current RPC is related to
+  virtual uintptr_t GetExecutionContext() = 0;
+
+  // Callback function to be called at the end of RPC execution
+  virtual void CompleteExecution(uintptr_t execution_context) = 0;
+
   virtual void FinishResponse() = 0;
   virtual void CancelResponse() = 0;
 };

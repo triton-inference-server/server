@@ -26,7 +26,9 @@
 //
 #pragma once
 
+#include <memory>
 #include <queue>
+#include <unordered_map>
 
 #include "src/nvrpc/Interfaces.h"
 
@@ -53,6 +55,16 @@ class BidirectionalStreamingLifeCycle : public IContextLifeCycle {
   ~BidirectionalStreamingLifeCycle() override {}
 
  protected:
+  // Execution context used to identify the completed response
+  // so that the resource can be released
+  template <class RequestType, class ResponseType>
+  struct ExecutionContext {
+    RequestType m_Request;
+    ResponseType m_Response;
+  };
+
+  using ExecutionContextType = ExecutionContext<RequestType, ResponseType>;
+
   // Class to wrap over the State function pointers to allow the use of
   // different tags while referencing to the same Context.
   // Executor Detag() the tag, which points to the StateContext, which contains
@@ -84,6 +96,9 @@ class BidirectionalStreamingLifeCycle : public IContextLifeCycle {
   // Function to actually process the request
   virtual void ExecuteRPC(RequestType& request, ResponseType& response) = 0;
 
+  uintptr_t GetExecutionContext() final override;
+  void CompleteExecution(uintptr_t execution_context) final override;
+
   void FinishResponse() final override;
   void CancelResponse() final override;
 
@@ -107,14 +122,14 @@ class BidirectionalStreamingLifeCycle : public IContextLifeCycle {
   // The mutex will be more useful once we can keep reading requests
   // without waiting for response to be sent
   std::mutex m_QueueMutex;
-  std::queue<RequestType> m_RequestQueue;
-  std::queue<ResponseType> m_ResponseQueue;
-  std::queue<ResponseType> m_ResponseWriteBackQueue;
+  std::unordered_map<uintptr_t, std::shared_ptr<ExecutionContextType>>
+      live_contexts;
+  std::queue<std::shared_ptr<ExecutionContextType>> m_WriteBackQueue;
+
+  std::shared_ptr<ExecutionContextType> m_ExecutionContext;
 
   StateContext<RequestType, ResponseType> m_ReadStateContext;
   StateContext<RequestType, ResponseType> m_WriteStateContext;
-
-  bool m_Executing;
 
   std::unique_ptr<::grpc::ServerContext> m_Context;
   std::unique_ptr<::grpc::ServerAsyncReaderWriter<ResponseType, RequestType>>
@@ -181,16 +196,13 @@ template <class Request, class Response>
 void
 BidirectionalStreamingLifeCycle<Request, Response>::Reset()
 {
-  std::queue<RequestType> empty_request_queue;
-  std::queue<ResponseType> empty_response_queue;
-  std::queue<ResponseType> empty_response_write_back_queue;
+  std::queue<std::shared_ptr<ExecutionContextType>> empty_queue;
   OnLifeCycleReset();
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
-    m_Executing = false;
-    m_RequestQueue.swap(empty_request_queue);
-    m_ResponseQueue.swap(empty_response_queue);
-    m_ResponseWriteBackQueue.swap(empty_response_write_back_queue);
+    m_WriteBackQueue.swap(empty_queue);
+    live_contexts.clear();
+    m_ExecutionContext.reset();
     m_Context.reset(new ::grpc::ServerContext);
     m_ReaderWriter.reset(
         new ::grpc::ServerAsyncReaderWriter<ResponseType, RequestType>(
@@ -217,12 +229,12 @@ BidirectionalStreamingLifeCycle<Request, Response>::StateInitializedDone(
   // Start reading once connection is created
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
-    m_RequestQueue.emplace();
+    m_ExecutionContext.reset(new ExecutionContext<Request, Response>);
     m_NextState = &BidirectionalStreamingLifeCycle<
         RequestType, ResponseType>::StateRequestDone;
   }
   m_ReaderWriter->Read(
-      &m_RequestQueue.back(), m_ReadStateContext.IContext::Tag());
+      &m_ExecutionContext->m_Request, m_ReadStateContext.IContext::Tag());
   return true;
 }
 
@@ -233,53 +245,42 @@ template <class Request, class Response>
 bool
 BidirectionalStreamingLifeCycle<Request, Response>::StateRequestDone(bool ok)
 {
-  // No more message to be read from this stream, however, if it is executing
-  // a request, then a ServerReaderWriter::Write() will be called. In that case,
-  // let WriteStateContext handle the reset procedure.
+  // No more message to be read from this stream, however, if there are still
+  // requests to be processed, then a ServerReaderWriter::Write() will be
+  // called. In that case, change m_NextState as hint for no more requests.
   if (!ok) {
     {
       std::lock_guard<std::mutex> lock(m_QueueMutex);
-      if (m_Executing) {
+      if (!live_contexts.empty() || !m_WriteBackQueue.empty()) {
+        // if state is not StateRequestDone, Finish() is called
+        // or is going to be called, don't "undo" the state change
+        if (m_NextState == &BidirectionalStreamingLifeCycle<
+                               RequestType, ResponseType>::StateRequestDone) {
+          m_NextState = &BidirectionalStreamingLifeCycle<
+              RequestType, ResponseType>::StateResponseDone;
+        }
         return true;
       }
     }
-    CancelResponse();
+    // No pending requests, finish the call
+    FinishResponse();
     return true;
   }
 
-  // Successfully receive request
-  bool should_execute = false;
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
 
-    m_ResponseQueue.emplace();
-
-    // At this stage, only start execution when executing flag is false
-    // (just received the first request in the queue).
-    // Other wise, ExecuteRPC() will be called in FinishResponse() to be sure
-    // that we only process next request after the previous request is completed
-    // Note that we only add item in response queue when we receive request
-    // successfully, FinishResponse() will use this
-    // information to determine if it should call ExecuteRPC()
-    if (!m_Executing) {
-      should_execute = true;
-      m_Executing = true;
-    }
-
-    // Start reading the next request
-    m_RequestQueue.emplace();
-    if (m_NextState == &BidirectionalStreamingLifeCycle<
-                           RequestType, ResponseType>::StateRequestDone) {
-      m_NextState = &BidirectionalStreamingLifeCycle<
-          RequestType, ResponseType>::StateResponseDone;
-    }
+    // Put the execution context in live context set
+    live_contexts.emplace(GetExecutionContext(), m_ExecutionContext);
   }
+  // Always start RPC on receiving request successfully
+  ExecuteRPC(m_ExecutionContext->m_Request, m_ExecutionContext->m_Response);
+
+  // Start reading the next request
+  m_ExecutionContext.reset(new ExecutionContext<Request, Response>);
   m_ReaderWriter->Read(
-      &m_RequestQueue.back(), m_ReadStateContext.IContext::Tag());
+      &m_ExecutionContext->m_Request, m_ReadStateContext.IContext::Tag());
 
-  if (should_execute) {
-    ExecuteRPC(m_RequestQueue.front(), m_ResponseQueue.front());
-  }
   return true;
 }
 
@@ -290,7 +291,8 @@ template <class Request, class Response>
 bool
 BidirectionalStreamingLifeCycle<Request, Response>::StateResponseDone(bool ok)
 {
-  // If write didn't go through, then the call is dead. Start reseting
+  // If write didn't go through, then the call is dead unexpectedly.
+  // Start reseting
   if (!ok) {
     CancelResponse();
     return true;
@@ -298,17 +300,31 @@ BidirectionalStreamingLifeCycle<Request, Response>::StateResponseDone(bool ok)
 
   // Done writing back one response
   bool should_write = true;
+  bool should_finish = false;
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
 
-    m_ResponseWriteBackQueue.pop();
-    should_write = !m_ResponseWriteBackQueue.empty();
+    // Front of the queue is done, clean up that execution context
+    m_WriteBackQueue.pop();
+    should_write = !m_WriteBackQueue.empty();
+
+    // check if all requests are processed
+    if (!should_write && live_contexts.empty() &&
+        m_NextState == &BidirectionalStreamingLifeCycle<
+                           RequestType, ResponseType>::StateResponseDone) {
+      should_finish = true;
+    }
+  }
+  if (should_finish) {
+    FinishResponse();
+    return true;
   }
   // Only call Write() if the write back queue is not empty,
-  // the FinishResponse() will call Write() otherwise.
+  // the CompleteExecution() will call Write() otherwise.
   if (should_write) {
     m_ReaderWriter->Write(
-        m_ResponseWriteBackQueue.front(), m_WriteStateContext.IContext::Tag());
+        m_WriteBackQueue.front()->m_Response,
+        m_WriteStateContext.IContext::Tag());
   }
   return true;
 }
@@ -321,55 +337,73 @@ BidirectionalStreamingLifeCycle<Request, Response>::StateFinishedDone(bool ok)
 }
 
 template <class Request, class Response>
+uintptr_t
+BidirectionalStreamingLifeCycle<Request, Response>::GetExecutionContext()
+{
+  return reinterpret_cast<uintptr_t>(m_ExecutionContext.get());
+}
+
+template <class Request, class Response>
 void
-BidirectionalStreamingLifeCycle<Request, Response>::FinishResponse()
+BidirectionalStreamingLifeCycle<Request, Response>::CompleteExecution(
+    uintptr_t execution_context)
 {
   bool should_write = false;
-  bool should_execute = true;
-  bool ok = true;
+  bool should_cancel = false;
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
-
-    should_write = m_ResponseWriteBackQueue.empty();
-    // Push queue::front() because we are not calling ExecuteRPC() concurrently
-    // on the same stream, the first item will always be the only completed item
-    // in the queue.
-    m_ResponseWriteBackQueue.push(std::move(m_ResponseQueue.front()));
-    m_RequestQueue.pop();
-    m_ResponseQueue.pop();
-    if (m_ResponseQueue.empty()) {
-      should_execute = false;
-      m_Executing = false;
+    auto it = live_contexts.find(execution_context);
+    if (it != live_contexts.end()) {
+      should_write = m_WriteBackQueue.empty();
+      m_WriteBackQueue.push(it->second);
+      live_contexts.erase(execution_context);
+    } else {
+      // Unexpected behavior, cancel the stream
+      should_cancel = true;
     }
+
+    // Check if the stream should have been cancelled but need to wait for RPCs
     if (m_NextState == &BidirectionalStreamingLifeCycle<
                            RequestType, ResponseType>::StateFinishedDone) {
-      ok = false;
-      m_Executing = false;
+      should_cancel = true;
     }
   }
-  if (!ok) {
+  if (should_cancel) {
     CancelResponse();
-    return;
   }
   if (should_write) {
     m_ReaderWriter->Write(
-        m_ResponseWriteBackQueue.front(), m_WriteStateContext.IContext::Tag());
+        m_WriteBackQueue.front()->m_Response,
+        m_WriteStateContext.IContext::Tag());
   }
-  if (should_execute) {
-    ExecuteRPC(m_RequestQueue.front(), m_ResponseQueue.front());
+}
+
+template <class Request, class Response>
+void
+BidirectionalStreamingLifeCycle<Request, Response>::FinishResponse()
+{
+  {
+    std::lock_guard<std::mutex> lock(m_QueueMutex);
+    m_NextState = &BidirectionalStreamingLifeCycle<
+        RequestType, ResponseType>::StateFinishedDone;
   }
+
+  m_ReaderWriter->Finish(::grpc::Status::CANCELLED, IContext::Tag());
 }
 
 template <class Request, class Response>
 void
 BidirectionalStreamingLifeCycle<Request, Response>::CancelResponse()
 {
+  // Need to be carefully in this case
+  // Only call Finish() when no RPC is being executed to avoid clearing
+  // request and response while they are being referenced in the RPC
   bool reset_ready = false;
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
     m_NextState = &BidirectionalStreamingLifeCycle<
         RequestType, ResponseType>::StateFinishedDone;
-    reset_ready = !m_Executing;
+    reset_ready = live_contexts.empty();
   }
   // Only call Finish() when no RPC is being executed to avoid clearing
   // request and response while they are being referenced in the RPC
