@@ -87,7 +87,7 @@ nic::Error* InferContextGetReadyAsyncRequest(
 //==============================================================================
 // InferContext::Options
 nic::Error* InferContextOptionsNew(
-    nic::InferContext::Options** ctx, uint64_t batch_size);
+    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size);
 void InferContextOptionsDelete(nic::InferContext::Options* ctx);
 nic::Error* InferContextOptionsAddRaw(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,

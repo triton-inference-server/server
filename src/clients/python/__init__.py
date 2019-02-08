@@ -34,6 +34,7 @@ import pkg_resources
 import struct
 import tensorrtserver.api.model_config_pb2
 from tensorrtserver.api.server_status_pb2 import ServerStatus
+from tensorrtserver.api.api_pb2 import *
 
 class _utf8(object):
     @classmethod
@@ -113,7 +114,7 @@ _crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_uint
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
-_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint64]
+_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint32, c_uint64]
 _crequest_infer_ctx_options_del = _crequest.InferContextOptionsDelete
 _crequest_infer_ctx_options_del.argtypes = [c_void_p]
 _crequest_infer_ctx_options_add_raw = _crequest.InferContextOptionsAddRaw
@@ -595,7 +596,7 @@ class InferContext:
         _raise_error("unknown result datatype " + ctype.value)
 
     def _prepare_request(self, inputs, outputs,
-                         batch_size, contiguous_input_values):
+                         flags, batch_size, contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
@@ -609,7 +610,7 @@ class InferContext:
         options = c_void_p()
         try:
             _raise_if_error(c_void_p(
-                _crequest_infer_ctx_options_new(byref(options), batch_size)))
+                _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if output_format == InferContext.ResultFormat.RAW:
@@ -774,7 +775,7 @@ class InferContext:
         _crequest_infer_ctx_del(self._ctx)
         self._ctx = None
 
-    def run(self, inputs, outputs, batch_size=1):
+    def run(self, inputs, outputs, batch_size=1, flags=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -798,6 +799,10 @@ class InferContext:
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
+
+        flags : int
+            The flags to use for the inference. The bitwise-or of
+            InferRequestHeader.Flag values.
 
         Returns
         -------
@@ -829,14 +834,14 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, inputs, outputs, batch_size=1):
+    def async_run(self, inputs, outputs, batch_size=1, flags=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -866,6 +871,10 @@ class InferContext:
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
 
+        flags : int
+            The flags to use for the inference. The bitwise-or of
+            InferRequestHeader.Flag values.
+
         Returns
         -------
         int
@@ -886,7 +895,7 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
 
         # Run asynchronous inference...
         c_request_id = c_uint64()
