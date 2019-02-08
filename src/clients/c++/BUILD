@@ -75,15 +75,6 @@ cc_library(
 )
 
 cc_library(
-    name = "streaming_sequence_client_main",
-    srcs = ["streaming_sequence_client.cc"],
-    deps = [
-        ":request",
-        "//src/core:model_config_proto",
-    ],
-)
-
-cc_library(
     name = "request",
     srcs = ["request.cc"],
     hdrs = ["request.h"],
@@ -148,17 +139,6 @@ cc_binary(
     name = "simple_sequence_client",
     deps = [
         ":simple_sequence_client_main",
-        ":request",
-    ],
-    linkopts = [
-        "-pthread", "-lcurl"
-    ],
-)
-
-cc_binary(
-    name = "streaming_sequence_client",
-    deps = [
-        ":streaming_sequence_client_main",
         ":request",
     ],
     linkopts = [
