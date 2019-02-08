@@ -2863,11 +2863,7 @@ InferGrpcStreamContext::Run(ResultMap* results)
   if (!err.IsOk()) {
     return err;
   }
-  err = GetAsyncRunResults(results, req, true);
-  if (!err.IsOk()) {
-    return err;
-  }
-  return Error::Success;
+  return GetAsyncRunResults(results, req, true);
 }
 
 Error
