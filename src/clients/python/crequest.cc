@@ -340,12 +340,14 @@ InferContextGetReadyAsyncRequest(
 
 //==============================================================================
 nic::Error*
-InferContextOptionsNew(nic::InferContext::Options** ctx, uint64_t batch_size)
+InferContextOptionsNew(
+    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size)
 {
   std::unique_ptr<nic::InferContext::Options> uctx;
   nic::Error err = nic::InferContext::Options::Create(&uctx);
   if (err.IsOk()) {
     *ctx = uctx.release();
+    (*ctx)->SetFlags(flags);
     (*ctx)->SetBatchSize(batch_size);
     return nullptr;
   }
