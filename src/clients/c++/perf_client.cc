@@ -489,10 +489,21 @@ class ConcurrencyManager {
       return err;
     }
 
-    if (batch_size_ > (*ctx)->MaxBatchSize()) {
+    uint64_t max_batch_size = (*ctx)->MaxBatchSize();
+
+    // Model specifying maximum batch size of 0 indicates that batching
+    // is not supported and so the input tensors do not expect a "N"
+    // dimension (and 'batch_size' should be 1 so that only a single
+    // image instance is inferred at a time).
+    if (max_batch_size == 0 && batch_size_ != 1) {
       return nic::Error(
           ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size <= " + std::to_string((*ctx)->MaxBatchSize()) +
+          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
+              "' which does not support batching");
+    } else if (batch_size_ > max_batch_size) {
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "expecting batch size <= " + std::to_string(max_batch_size) +
               " for model '" + (*ctx)->ModelName() + "'");
     }
 
