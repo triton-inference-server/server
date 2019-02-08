@@ -46,15 +46,17 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                skip_request_id_check=False):
+                skip_request_id_check=False, use_streaming=True):
     tester.assertTrue(use_http or use_grpc)
-    protocols = []
+    configs = []
     if use_http:
-        protocols.append(("localhost:8000", ProtocolType.HTTP))
+        configs.append(("localhost:8000", ProtocolType.HTTP, False))
     if use_grpc:
-        protocols.append(("localhost:8001", ProtocolType.GRPC))
+        configs.append(("localhost:8001", ProtocolType.GRPC, False))
+    if use_streaming:
+        configs.append(("localhost:8001", ProtocolType.GRPC, True))
 
-    for pair in protocols:
+    for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
 
         # outputs are sum and difference of inputs so set max input
@@ -134,7 +136,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 output_req["OUTPUT1"] = (InferContext.ResultFormat.CLASS, num_classes)
 
-        ctx = InferContext(pair[0], pair[1], model_name, model_version, True)
+        ctx = InferContext(config[0], config[1], model_name, model_version, True, streaming=config[2])
         results = ctx.run(
             { "INPUT0" : input0_list, "INPUT1" : input1_list },
             output_req, batch_size)
