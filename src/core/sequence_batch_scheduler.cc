@@ -321,6 +321,24 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 }
 
 void
+SequenceBatchScheduler::SequenceBatch::EndSequence(const int32_t slot)
+{
+  // This method assumes the required mu_ lock is already held. It is
+  // the caller's responsibility to ensure that is true.
+  first_sequence_request_[slot] = false;
+  correlation_ids_[slot] = 0;
+
+  // If 'slot' is the maximum active slot in the batch, then find the
+  // new maximum.
+  if (slot == max_active_slot_) {
+    do {
+      max_active_slot_--;
+    } while ((max_active_slot_ >= 0) &&
+             (correlation_ids_[max_active_slot_] == 0));
+  }
+}
+
+void
 SequenceBatchScheduler::SequenceBatch::SchedulerThread(
     const uint32_t runner_id, const int nice)
 {
@@ -365,27 +383,24 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
         }
       } else {
         // Make sure there is at least one request that needs to be
-        // handled.
-        bool have_request = false;
-        for (int32_t slot = 0; slot <= max_active_slot_; ++slot) {
-          if (!queues_[slot].empty()) {
-            have_request = true;
-            break;
-          }
+        // handled. Find the largest slot index that has a payload
+        // available...
+        int32_t max_slot = max_active_slot_;
+        while ((max_slot >= 0) && queues_[max_slot].empty()) {
+          max_slot--;
         }
 
-        if (!have_request) {
+        if (max_slot < 0) {
           wait_microseconds = default_wait_microseconds;
         } else {
           // Collect payloads from slot 0 to max_active_slot_.
-          for (int32_t slot = 0; slot <= max_active_slot_; ++slot) {
-            // If 'slot' is not active or doesn't have any requests
-            // then change the request provider to send dummy/null
-            // input tensors for this slot. We need this so that other
-            // payloads stay in the correct slot.
+          for (int32_t slot = 0; slot <= max_slot; ++slot) {
+            // If 'slot' doesn't have any requests then change the
+            // request provider to send dummy/null input tensors for
+            // this slot. We need this so that other payloads stay in
+            // the correct slot.
             std::deque<SequencePayload>& queue = queues_[slot];
-
-            if ((correlation_ids_[slot] == 0) || queue.empty()) {
+            if (queue.empty()) {
               auto null_request_provider =
                   std::make_shared<NULLInferRequestProvider>(
                       null_request_header_);
@@ -401,13 +416,24 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               // the appropriate sequence start indicator to the
               // backend.
               SequencePayload& slot_payload = queue.front();
+              const auto& request_provider = slot_payload.request_provider_;
+
               if (first_sequence_request_[slot]) {
-                slot_payload.request_provider_->SetInputContentOverride(
+                request_provider->SetInputContentOverride(
                     start_input_overrides_);
                 first_sequence_request_[slot] = false;
               } else {
-                slot_payload.request_provider_->SetInputContentOverride(
+                request_provider->SetInputContentOverride(
                     continue_input_overrides_);
+              }
+
+              // If this is the last payload in a sequence then reset
+              // the slot state to enable another sequence to start
+              // using the slot.
+              const auto& request_header = request_provider->RequestHeader();
+              if ((request_header.flags() &
+                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+                EndSequence(slot);
               }
 
               payloads->emplace_back(
@@ -453,6 +479,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
           }
         }
 
+        // Complete each payload by calling the competion function.
         bool found_success = false;
         for (auto& payload : *payloads) {
           const tensorflow::Status& final_status =
@@ -475,6 +502,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
         }
       };
 
+      // Run the backend...
       OnSchedule_(runner_id, payloads.get(), OnCompleteQueuedPayloads);
     }
   }  // end runner loop

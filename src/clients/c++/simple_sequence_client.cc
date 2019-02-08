@@ -225,10 +225,9 @@ main(int argc, char** argv)
   // Create 2 inference context with different correlation ID. We will
   // use these to send to sequences of inference requests. Must use a
   // non-zero correlation ID since zero indicates no correlation ID.
-  std::unique_ptr<nic::InferContext> ctx0, ctx1, warmup_ctx;
+  std::unique_ptr<nic::InferContext> ctx0, ctx1;
   const ni::CorrelationID correlation_id0 = 1;
   const ni::CorrelationID correlation_id1 = 2;
-  const ni::CorrelationID warmup_correlation_id = 3;
 
   // Create two different contexts, one is using streaming while the other
   // isn't. Then we can compare their difference in sync/async runs
@@ -238,11 +237,6 @@ main(int argc, char** argv)
     err = nic::InferGrpcContext::Create(
         &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
         verbose);
-  }
-  if (err.IsOk()) {
-    err = nic::InferGrpcContext::Create(
-        &warmup_ctx, warmup_correlation_id, url, model_name,
-        -1 /* model_version */, false);
   }
 
   if (!err.IsOk()) {
@@ -256,19 +250,6 @@ main(int argc, char** argv)
   std::vector<int32_t> values{11, 7, 5, 3, 2, 0, 1};
   std::vector<int32_t> result0_list;
   std::vector<int32_t> result1_list;
-  uint64_t seq0_ns;
-  uint64_t seq1_ns;
-
-  // Warmup the server to avoid time difference due to run order
-  Send(warmup_ctx, 0);
-  for (int32_t v : values) {
-    Send(warmup_ctx, v, (v == 1) /* end-of-sequence */);
-  }
-
-  // Record the time of the sequence
-  struct timespec start_time;
-  struct timespec end_time;
-  uint64_t NANOS = 1000000000;
 
   std::vector<std::unique_ptr<nic::InferContext>> ctxs;
   if (!reverse) {
@@ -283,58 +264,32 @@ main(int argc, char** argv)
     std::vector<std::shared_ptr<nic::InferContext::Request>> request0_list;
     std::vector<std::shared_ptr<nic::InferContext::Request>> request1_list;
 
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
     // Send requests, first reset accumulator for the sequence.
     request0_list.emplace_back(AsyncSend(ctxs[0], 0));
+    request1_list.emplace_back(AsyncSend(ctxs[1], 100));
     // Now send a sequence of values...
     for (int32_t v : values) {
       request0_list.emplace_back(
           AsyncSend(ctxs[0], v, (v == 1) /* end-of-sequence */));
+      request1_list.emplace_back(
+          AsyncSend(ctxs[1], -v, (v == 1) /* end-of-sequence */));
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
       result0_list.push_back(AsyncReceive(ctxs[0], request0_list[i]));
     }
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-    seq0_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
-              (start_time.tv_sec * NANOS + start_time.tv_nsec);
-
-    // Repeat above but in a different Inference Context
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-    request1_list.emplace_back(AsyncSend(ctxs[1], 100));
-    for (int32_t v : values) {
-      request1_list.emplace_back(
-          AsyncSend(ctxs[1], -v, (v == 1) /* end-of-sequence */));
-    }
     for (size_t i = 0; i < request1_list.size(); i++) {
       result1_list.push_back(AsyncReceive(ctxs[1], request1_list[i]));
     }
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-    seq1_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
-              (start_time.tv_sec * NANOS + start_time.tv_nsec);
   } else {
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
     // Send requests, first reset accumulator for the sequence.
     result0_list.push_back(Send(ctxs[0], 0));
+    result1_list.push_back(Send(ctxs[1], 100));
     // Now send a sequence of values...
     for (int32_t v : values) {
       result0_list.push_back(Send(ctxs[0], v, (v == 1) /* end-of-sequence */));
-    }
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    seq0_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
-              (start_time.tv_sec * NANOS + start_time.tv_nsec);
-
-    // Repeat above but in a different Inference Context
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-    result1_list.push_back(Send(ctxs[1], 100));
-    for (int32_t v : values) {
       result1_list.push_back(Send(ctxs[1], -v, (v == 1) /* end-of-sequence */));
     }
-    clock_gettime(CLOCK_MONOTONIC, &end_time);
-    seq1_ns = (end_time.tv_sec * NANOS + end_time.tv_nsec) -
-              (start_time.tv_sec * NANOS + start_time.tv_nsec);
   }
 
   if (!reverse) {
@@ -342,7 +297,6 @@ main(int argc, char** argv)
   } else {
     std::cout << "non-streaming : streaming" << std::endl;
   }
-  std::cout << seq0_ns << " ns : " << seq1_ns << " ns" << std::endl;
 
   int32_t seq0_expected = 0;
   int32_t seq1_expected = 100;

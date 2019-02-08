@@ -30,7 +30,6 @@ import argparse
 import numpy as np
 import os
 import sys
-import time
 from builtins import range
 from tensorrtserver.api import *
 
@@ -102,16 +101,6 @@ if __name__ == '__main__':
     ctx1 = InferContext(FLAGS.url, protocol, model_name, model_version,
                         correlation_id=correlation_id1, verbose=FLAGS.verbose, streaming=False)
 
-    # Create warmup context and warm up the server to avoid time difference due to run order
-    warmup_correlation_id1 = 1234
-    warmup_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
-                              correlation_id=warmup_correlation_id1, verbose=False, streaming=False)
-
-    # warmup
-    send(warmup_ctx, value=0)
-    for v in values:
-        send(warmup_ctx, value=v, end_of_sequence=(v == 1))
-
     # Now send the inference sequences..
     ctxs = []
     if not FLAGS.reverse:
@@ -121,47 +110,31 @@ if __name__ == '__main__':
 
     result0_list = []
     result1_list = []
-    seq0_sec = 0
-    seq1_sec = 0
 
     if FLAGS.async:
         request0_ids = []
         request1_ids = []
 
-        start = time.time()
         request0_ids.append(async_send(ctxs[0], value=0))
-        for v in values:
-            request0_ids.append(async_send(ctxs[0], value=v, end_of_sequence=(v == 1)))
-        for request_id in request0_ids:
-            result0_list.append(async_receive(ctxs[0], request_id))
-        seq0_sec = time.time() - start
-
-        start = time.time()
         request1_ids.append(async_send(ctxs[1], value=100))
         for v in values:
+            request0_ids.append(async_send(ctxs[0], value=v, end_of_sequence=(v == 1)))
             request1_ids.append(async_send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
+        for request_id in request0_ids:
+            result0_list.append(async_receive(ctxs[0], request_id))
         for request_id in request1_ids:
             result1_list.append(async_receive(ctxs[1], request_id))
-        seq1_sec = time.time() - start
     else:
-        start = time.time()
         result0_list.append(send(ctxs[0], value=0))
-        for v in values:
-            result0_list.append(send(ctxs[0], value=v, end_of_sequence=(v == 1)))
-        seq0_sec = time.time() - start
-
-        start = time.time()
         result1_list.append(send(ctxs[1], value=100))
         for v in values:
+            result0_list.append(send(ctxs[0], value=v, end_of_sequence=(v == 1)))
             result1_list.append(send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
-        seq1_sec = time.time() - start
 
-    NANOS = 1000000000
     if not FLAGS.reverse:
         print("streaming : non-streaming")
     else:
         print("non-streaming : streaming")
-    print(str(seq0_sec * NANOS) + " ns : " + str(seq1_sec * NANOS) + " ns")
 
     seq0_expected = 0
     seq1_expected = 100

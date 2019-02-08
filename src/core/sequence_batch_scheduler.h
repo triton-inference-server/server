@@ -117,6 +117,7 @@ class SequenceBatchScheduler : public Scheduler {
 
    private:
     void SchedulerThread(const uint32_t runner_id, const int nice);
+    void EndSequence(const int32_t slot);
 
     // Function to call to execute this batch of requests.
     const StandardRunFunc OnSchedule_;
