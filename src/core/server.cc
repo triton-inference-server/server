@@ -139,18 +139,20 @@ class StatusContext final
   void ExecuteRPC(
       StatusRequest& request, StatusResponse& response) final override
   {
-    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
-      ServerStatTimerScoped timer(
-          GetResources()->GetServer()->StatusManager(),
-          ServerStatTimerScoped::Kind::STATUS);
+    uintptr_t execution_context = this->GetExecutionContext();
+    GetResources()->GetMgmtThreadPool().enqueue(
+        [this, execution_context, &request, &response] {
+          ServerStatTimerScoped timer(
+              GetResources()->GetServer()->StatusManager(),
+              ServerStatTimerScoped::Kind::STATUS);
 
-      RequestStatus* request_status = response.mutable_request_status();
-      ServerStatus* server_status = response.mutable_server_status();
+          RequestStatus* request_status = response.mutable_request_status();
+          ServerStatus* server_status = response.mutable_server_status();
 
-      GetResources()->GetServer()->HandleStatus(
-          request_status, server_status, request.model_name());
-      this->FinishResponse();
-    });
+          GetResources()->GetServer()->HandleStatus(
+              request_status, server_status, request.model_name());
+          this->CompleteExecution(execution_context);
+        });
   }
 };
 
@@ -158,6 +160,7 @@ template <class LifeCycle>
 class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
+    uintptr_t execution_context = this->GetExecutionContext();
     auto server = this->GetResources()->GetServer();
     auto infer_stats = std::make_shared<ModelInferStats>(
         server->StatusManager(), request.model_name());
@@ -187,7 +190,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           server->HandleInfer(
               request_status, backend, request_provider, response_provider,
               infer_stats,
-              [this, request_status, &response, infer_stats, timer]() mutable {
+              [this, execution_context, request_status, &response, infer_stats,
+               timer]() mutable {
                 // If the response is an error then clear the meta-data
                 // and raw output as they may be partially or
                 // un-initialized.
@@ -196,7 +200,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
                   response.mutable_raw_output()->Clear();
                 }
 
-                this->FinishResponse();
+                this->CompleteExecution(execution_context);
                 timer.reset();
               },
               true  // async_frontend
@@ -216,7 +220,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
-      this->FinishResponse();
+      this->CompleteExecution(execution_context);
     }
   }
 };
@@ -235,15 +239,17 @@ class ProfileContext final
   void ExecuteRPC(
       ProfileRequest& request, ProfileResponse& response) final override
   {
-    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
-      auto server = GetResources()->GetServer();
-      ServerStatTimerScoped timer(
-          server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
+    uintptr_t execution_context = this->GetExecutionContext();
+    GetResources()->GetMgmtThreadPool().enqueue(
+        [this, execution_context, &request, &response] {
+          auto server = GetResources()->GetServer();
+          ServerStatTimerScoped timer(
+              server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
 
-      RequestStatus* request_status = response.mutable_request_status();
-      server->HandleProfile(request_status, request.cmd());
-      this->FinishResponse();
-    });
+          RequestStatus* request_status = response.mutable_request_status();
+          server->HandleProfile(request_status, request.cmd());
+          this->CompleteExecution(execution_context);
+        });
   }
 };
 
@@ -252,18 +258,20 @@ class HealthContext final
   void ExecuteRPC(
       HealthRequest& request, HealthResponse& response) final override
   {
-    GetResources()->GetMgmtThreadPool().enqueue([this, &request, &response] {
-      auto server = GetResources()->GetServer();
-      ServerStatTimerScoped timer(
-          server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
+    uintptr_t execution_context = this->GetExecutionContext();
+    GetResources()->GetMgmtThreadPool().enqueue(
+        [this, execution_context, &request, &response] {
+          auto server = GetResources()->GetServer();
+          ServerStatTimerScoped timer(
+              server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
 
-      RequestStatus* request_status = response.mutable_request_status();
-      bool health;
+          RequestStatus* request_status = response.mutable_request_status();
+          bool health;
 
-      server->HandleHealth(request_status, &health, request.mode());
-      response.set_health(health);
-      this->FinishResponse();
-    });
+          server->HandleHealth(request_status, &health, request.mode());
+          response.set_health(health);
+          this->CompleteExecution(execution_context);
+        });
   }
 };
 

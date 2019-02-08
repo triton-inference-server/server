@@ -51,6 +51,12 @@ class LifeCycleUnary : public IContextLifeCycle {
 
   virtual void ExecuteRPC(RequestType& request, ResponseType& response) = 0;
 
+  uintptr_t GetExecutionContext() final override { return 0; }
+  void CompleteExecution(uintptr_t execution_context) final override
+  {
+    FinishResponse();
+  }
+
   void FinishResponse() final override;
   void CancelResponse() final override;
 
