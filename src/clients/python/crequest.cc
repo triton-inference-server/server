@@ -249,6 +249,11 @@ InferContextNew(
   ProtocolType protocol;
   err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
+    if (streaming && protocol != ProtocolType::GRPC) {
+      return new nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "Streaming is only allowed with gRPC protocol");
+    }
     InferContextCtx* lctx = new InferContextCtx;
     if (streaming) {
       err = nic::InferGrpcStreamContext::Create(

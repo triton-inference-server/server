@@ -43,12 +43,18 @@ for each protocol.
 * :ref:`section-api-inference`: The inference API that accepts model
   inputs, runs inference and returns the requested outputs.
 
+GRPC only endpoint:
+
+* :ref:`section-api-stream-inference`: The stream inference API is the same
+  as the Inference API, except that once the connection is established,
+  the requests are sent in the same connection until it is closed.
+
 The HTTP endpoints can be used directly as described in this section,
 but for most use-cases, the preferred way to access the inference
-server is via the `C++ and Python Client libraries
+server is via the :ref:`C++ and Python Client libraries
 <section-client-libraries-and-examples>`.
 
-The GRPC endpoints can also be used via the `C++ and Python Client
+The GRPC endpoints can also be used via the :ref:`C++ and Python Client
 libraries <section-client-libraries-and-examples>` or a GRPC-generated
 API can be used directly as shown in the grpc_image_client.py example.
 
@@ -177,6 +183,21 @@ HTTP response code and the **NV-Status** response header. The
 **NV-Status** response header returns a text protobuf formatted
 :cpp:var:`RequestStatus <nvidia::inferenceserver::RequestStatus>`
 message.
+
+For GRPC the :cpp:var:`GRPCService
+<nvidia::inferenceserver::GRPCService>` uses the
+:cpp:var:`InferRequest <nvidia::inferenceserver::InferRequest>` and
+:cpp:var:`InferResponse <nvidia::inferenceserver::InferResponse>`
+messages to implement the endpoint. The response includes a
+:cpp:var:`RequestStatus <nvidia::inferenceserver::RequestStatus>`
+message indicating success or failure, :cpp:var:`InferResponseHeader
+<nvidia::inferenceserver::InferResponseHeader>` message giving
+response meta-data, and the raw output tensors.
+
+.. _section-api-stream-inference:
+
+Stream Inference
+----------------
 
 For GRPC the :cpp:var:`GRPCService
 <nvidia::inferenceserver::GRPCService>` uses the
