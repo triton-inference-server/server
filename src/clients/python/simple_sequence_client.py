@@ -35,11 +35,13 @@ from tensorrtserver.api import *
 
 FLAGS = None
 
-def send(ctx, value, end_of_sequence=False):
+def send(ctx, value, start_of_sequence=False, end_of_sequence=False):
     # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
 
     flags = InferRequestHeader.FLAG_NONE
+    if start_of_sequence:
+        flags = flags | InferRequestHeader.FLAG_SEQUENCE_START
     if end_of_sequence:
         flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
 
@@ -48,11 +50,13 @@ def send(ctx, value, end_of_sequence=False):
                      batch_size=1, flags=flags)
     return result
 
-def async_send(ctx, value, end_of_sequence=False):
+def async_send(ctx, value, start_of_sequence=False, end_of_sequence=False):
     # Create the tensor for INPUT.
     value_data = np.full(shape=[1], fill_value=value, dtype=np.int32)
 
     flags = InferRequestHeader.FLAG_NONE
+    if start_of_sequence:
+        flags = flags | InferRequestHeader.FLAG_SEQUENCE_START
     if end_of_sequence:
         flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
 
@@ -115,21 +119,25 @@ if __name__ == '__main__':
         request0_ids = []
         request1_ids = []
 
-        request0_ids.append(async_send(ctxs[0], value=0))
-        request1_ids.append(async_send(ctxs[1], value=100))
+        request0_ids.append(async_send(ctxs[0], value=0, start_of_sequence=True))
+        request1_ids.append(async_send(ctxs[1], value=100, start_of_sequence=True))
         for v in values:
-            request0_ids.append(async_send(ctxs[0], value=v, end_of_sequence=(v == 1)))
-            request1_ids.append(async_send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
+            request0_ids.append(async_send(ctxs[0], value=v,
+                                           start_of_sequence=False, end_of_sequence=(v == 1)))
+            request1_ids.append(async_send(ctxs[1], value=-v,
+                                           start_of_sequence=False, end_of_sequence=(v == 1)))
         for request_id in request0_ids:
             result0_list.append(async_receive(ctxs[0], request_id))
         for request_id in request1_ids:
             result1_list.append(async_receive(ctxs[1], request_id))
     else:
-        result0_list.append(send(ctxs[0], value=0))
-        result1_list.append(send(ctxs[1], value=100))
+        result0_list.append(send(ctxs[0], value=0, start_of_sequence=True))
+        result1_list.append(send(ctxs[1], value=100, start_of_sequence=True))
         for v in values:
-            result0_list.append(send(ctxs[0], value=v, end_of_sequence=(v == 1)))
-            result1_list.append(send(ctxs[1], value=-v, end_of_sequence=(v == 1)))
+            result0_list.append(send(ctxs[0], value=v,
+                                     start_of_sequence=False, end_of_sequence=(v == 1)))
+            result1_list.append(send(ctxs[1], value=-v,
+                                     start_of_sequence=False, end_of_sequence=(v == 1)))
 
     if not FLAGS.reverse:
         print("streaming : non-streaming")

@@ -41,13 +41,15 @@ def _range_repr_dtype(dtype):
         return np.int32
     return dtype
 
+# Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
-                skip_request_id_check=False, use_streaming=True):
-    tester.assertTrue(use_http or use_grpc)
+                skip_request_id_check=False, use_streaming=True,
+                correlation_id=0):
+    tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
         configs.append(("localhost:8000", ProtocolType.HTTP, False))
@@ -136,7 +138,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 output_req["OUTPUT1"] = (InferContext.ResultFormat.CLASS, num_classes)
 
-        ctx = InferContext(config[0], config[1], model_name, model_version, True, streaming=config[2])
+        ctx = InferContext(config[0], config[1], model_name, model_version,
+                           correlation_id=correlation_id, streaming=config[2],
+                           verbose=True)
         results = ctx.run(
             { "INPUT0" : input0_list, "INPUT1" : input1_list },
             output_req, batch_size)
