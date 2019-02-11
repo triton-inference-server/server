@@ -134,3 +134,6 @@ def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(
         pf, np.dtype(input_dtype).name, np.dtype(output0_dtype).name,
         np.dtype(output1_dtype).name)
+
+def get_sequence_model_name(pf, dtype):
+    return "{}_sequence_{}".format(pf, np.dtype(dtype).name)

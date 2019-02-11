@@ -70,7 +70,7 @@ Usage(char** argv, const std::string& msg = std::string())
 int32_t
 Send(
     const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
-    bool end_of_sequence = false)
+    bool start_of_sequence = false, bool end_of_sequence = false)
 {
   // Set the context options to do batch-size 1 requests. Also request
   // that all output tensors be returned.
@@ -80,6 +80,9 @@ Send(
       "unable to create inference options");
 
   options->SetFlags(0);
+  if (start_of_sequence) {
+    options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_START, true);
+  }
   if (end_of_sequence) {
     options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_END, true);
   }
@@ -120,7 +123,7 @@ Send(
 std::shared_ptr<nic::InferContext::Request>
 AsyncSend(
     const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
-    bool end_of_sequence = false)
+    bool start_of_sequence = false, bool end_of_sequence = false)
 {
   std::shared_ptr<nic::InferContext::Request> request;
 
@@ -132,6 +135,9 @@ AsyncSend(
       "unable to create inference options");
 
   options->SetFlags(0);
+  if (start_of_sequence) {
+    options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_START, true);
+  }
   if (end_of_sequence) {
     options->SetFlag(ni::InferRequestHeader::FLAG_SEQUENCE_END, true);
   }
@@ -265,14 +271,18 @@ main(int argc, char** argv)
     std::vector<std::shared_ptr<nic::InferContext::Request>> request1_list;
 
     // Send requests, first reset accumulator for the sequence.
-    request0_list.emplace_back(AsyncSend(ctxs[0], 0));
-    request1_list.emplace_back(AsyncSend(ctxs[1], 100));
+    request0_list.emplace_back(
+        AsyncSend(ctxs[0], 0, true /* start-of-sequence */));
+    request1_list.emplace_back(
+        AsyncSend(ctxs[1], 100, true /* start-of-sequence */));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      request0_list.emplace_back(
-          AsyncSend(ctxs[0], v, (v == 1) /* end-of-sequence */));
-      request1_list.emplace_back(
-          AsyncSend(ctxs[1], -v, (v == 1) /* end-of-sequence */));
+      request0_list.emplace_back(AsyncSend(
+          ctxs[0], v, false /* start-of-sequence */,
+          (v == 1) /* end-of-sequence */));
+      request1_list.emplace_back(AsyncSend(
+          ctxs[1], -v, false /* start-of-sequence */,
+          (v == 1) /* end-of-sequence */));
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
@@ -283,12 +293,16 @@ main(int argc, char** argv)
     }
   } else {
     // Send requests, first reset accumulator for the sequence.
-    result0_list.push_back(Send(ctxs[0], 0));
-    result1_list.push_back(Send(ctxs[1], 100));
+    result0_list.push_back(Send(ctxs[0], 0, true /* start-of-sequence */));
+    result1_list.push_back(Send(ctxs[1], 100, true /* start-of-sequence */));
     // Now send a sequence of values...
     for (int32_t v : values) {
-      result0_list.push_back(Send(ctxs[0], v, (v == 1) /* end-of-sequence */));
-      result1_list.push_back(Send(ctxs[1], -v, (v == 1) /* end-of-sequence */));
+      result0_list.push_back(Send(
+          ctxs[0], v, false /* start-of-sequence */,
+          (v == 1) /* end-of-sequence */));
+      result1_list.push_back(Send(
+          ctxs[1], -v, false /* start-of-sequence */,
+          (v == 1) /* end-of-sequence */));
     }
   }
 

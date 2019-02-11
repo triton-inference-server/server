@@ -45,7 +45,7 @@ if os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
 
-_max_queue_delay = 10000
+_max_queue_delay_ms = 10000
 _check_exception = None
 
 class BatcherTest(unittest.TestCase):
@@ -57,7 +57,7 @@ class BatcherTest(unittest.TestCase):
         if _check_exception is not None:
             raise _check_exception
 
-    def check_response(self, trial, bs, less_than, threshold_ms,
+    def check_response(self, trial, bs, thresholds,
                        requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16):
         global _check_exception
         try:
@@ -88,13 +88,16 @@ class BatcherTest(unittest.TestCase):
                 self.assertFalse(True, "unknown trial type: " + trial)
 
             end_ms = int(round(time.time() * 1000))
-            if less_than:
-                self.assertTrue((end_ms - start_ms) < threshold_ms,
-                                "expected less than " + str(threshold_ms) +
+
+            lt_ms = thresholds[0]
+            gt_ms = thresholds[1]
+            if lt_ms is not None:
+                self.assertTrue((end_ms - start_ms) < lt_ms,
+                                "expected less than " + str(lt_ms) +
                                 "ms response time, got " + str(end_ms - start_ms) + " ms")
-            else:
-                self.assertTrue((end_ms - start_ms) > threshold_ms,
-                                "expected greater than " + str(threshold_ms) +
+            if gt_ms is not None:
+                self.assertTrue((end_ms - start_ms) > gt_ms,
+                                "expected greater than " + str(gt_ms) +
                                 "ms response time, got " + str(end_ms - start_ms) + " ms")
         except Exception as ex:
             _check_exception = ex
@@ -109,7 +112,7 @@ class BatcherTest(unittest.TestCase):
         bconfig = ss.model_status[model_name].config.dynamic_batching
         self.assertTrue(2 in bconfig.preferred_batch_size)
         self.assertTrue(6 in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds, 10000000) # 10 secs
+        self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
 
     def check_status(self, url, protocol, model_name, static_bs, exec_cnt, infer_cnt):
         ctx = ServerStatusContext(url, protocol, model_name, True)
@@ -147,8 +150,8 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 2, True, 3000)
-                self.check_response(trial, 6, True, 3000)
+                self.check_response(trial, 2, (3000, None))
+                self.check_response(trial, 6, (3000, None))
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (2,6), 2, 8)
             except InferenceServerException as ex:
@@ -167,7 +170,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 1, False, _max_queue_delay)
+                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (1,), 1, 1)
             except InferenceServerException as ex:
@@ -186,7 +189,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 3, False, _max_queue_delay)
+                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (3,), 1, 3)
             except InferenceServerException as ex:
@@ -205,7 +208,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 7, True, 3000)
+                self.check_response(trial, 7, (3000, None))
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (7,), 1, 7)
             except InferenceServerException as ex:
@@ -229,10 +232,11 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'input_size': 16}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, False, _max_queue_delay),
+                                                args=(trial, 1,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
                                                 kwargs={'input_size': 8}))
                 threads[0].start()
                 time.sleep(1)
@@ -261,9 +265,11 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, False, _max_queue_delay)))
+                                                args=(trial, 1,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, False, _max_queue_delay - 2000)))
+                                                args=(trial, 3,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms - 2000))))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -291,11 +297,12 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, False, _max_queue_delay),
+                                                args=(trial, 1,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
                                                 kwargs={'input_size': 8}))
                 threads[0].start()
                 threads[1].start()
@@ -327,14 +334,14 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'input_size': 8}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, True, 3000),
+                                                args=(trial, 5, (3000, None)),
                                                 kwargs={'input_size': 8}))
                 threads[0].start()
                 threads[1].start()
@@ -365,9 +372,9 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 7, True, 3000)))
+                                                args=(trial, 7, (3000, None))))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -398,9 +405,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 4, False, _max_queue_delay)))
+                                                args=(trial, 4,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -427,10 +435,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",)}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",)}))
                 threads[0].start()
                 threads[1].start()
@@ -457,10 +465,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",)}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",)}))
                 threads[0].start()
                 threads[1].start()
@@ -488,10 +496,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",)}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",)}))
                 threads[0].start()
                 threads[1].start()
@@ -518,10 +526,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0","OUTPUT1")}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1","OUTPUT0")}))
                 threads[0].start()
                 threads[1].start()
@@ -555,9 +563,10 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 4, False, _max_queue_delay)))
+                                                args=(trial, 4,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -592,14 +601,14 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, True, 3000)))
+                                                args=(trial, 3, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000),
+                                                args=(trial, 1, (3000, None)),
                                                 kwargs={'input_size': 8}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, True, 3000),
+                                                args=(trial, 5, (3000, None)),
                                                 kwargs={'input_size': 8}))
                 threads[0].start()
                 threads[1].start()
@@ -633,17 +642,17 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 for t in threads:
                     t.start()
                 for t in threads:
@@ -675,11 +684,12 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, True, 3000)))
+                                                args=(trial, 1, (3000, None))))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, False, _max_queue_delay)))
+                                                args=(trial, 1,
+                                                      (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)

@@ -30,6 +30,7 @@
 #include <condition_variable>
 #include <deque>
 #include <mutex>
+#include <queue>
 #include <thread>
 #include <unordered_map>
 #include "src/core/model_config.h"
@@ -40,7 +41,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// Scheduler that implements batching for a sequence of correlated
+// Scheduler that implements batching across sequences of correlated
 // inferences.
 class SequenceBatchScheduler : public Scheduler {
  public:
@@ -57,6 +58,25 @@ class SequenceBatchScheduler : public Scheduler {
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(tensorflow::Status)> OnComplete) override;
 
+  // A batch-slot combination. The batch is represented by the index
+  // into 'batches_'.
+  struct BatchSlot {
+    BatchSlot() = default;
+    BatchSlot(const BatchSlot&) = default;
+    BatchSlot(size_t b, uint32_t s) : batcher_idx_(b), slot_(s) {}
+    size_t batcher_idx_;
+    uint32_t slot_;
+  };
+
+  // Show that a batch slot is no longer being used.
+  bool ReleaseBatchSlot(
+      const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads);
+
+  // For debugging, batcher reports how many waiting requests and
+  // returns true if the batcher should continue waiting.
+  bool DelayScheduler(
+      const uint32_t batcher_idx, const size_t cnt, const size_t total);
+
  private:
   tensorflow::Status CreateControlTensors(
       const ModelConfig& config,
@@ -67,31 +87,14 @@ class SequenceBatchScheduler : public Scheduler {
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           notready_input_overrides);
 
-  // Scheduler payload for each request.
-  struct SequencePayload : public Scheduler::Payload {
-    SequencePayload() = default;
-    SequencePayload(const SequencePayload& payload) = delete;
-    SequencePayload(SequencePayload&& payload) : Payload(std::move(payload)) {}
-    SequencePayload(
-        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
-        const std::shared_ptr<ModelInferStats>& stats,
-        const std::shared_ptr<InferRequestProvider>& request_provider,
-        const std::shared_ptr<InferResponseProvider>& response_provider,
-        const std::function<void(tensorflow::Status)> complete_function)
-        : Payload(
-              queue_timer, stats, request_provider, response_provider,
-              complete_function)
-    {
-    }
-  };
-
   // Queued requests for a model instance that will be sent through
   // that instance together in a batch.
   class SequenceBatch {
    public:
     SequenceBatch(
-        const uint32_t runner_id, const size_t batch_size,
-        const ModelConfig& config, StandardRunFunc OnSchedule,
+        SequenceBatchScheduler* base, const uint32_t batcher_idx,
+        const size_t batch_size, const ModelConfig& config,
+        StandardRunFunc OnSchedule,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             start_input_overrides,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -99,11 +102,6 @@ class SequenceBatchScheduler : public Scheduler {
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             notready_input_overrides);
     ~SequenceBatch();
-
-    // Return the index within the batch that has no queued
-    // requests. If there are multiple such indices return the lowest
-    // numbered one.
-    bool GetFreeSlot(uint32_t* slot);
 
     // Enqueue a payload into the appropriate queue for the requested
     // slot.
@@ -116,11 +114,16 @@ class SequenceBatchScheduler : public Scheduler {
         std::function<void(tensorflow::Status)> OnComplete);
 
    private:
-    void SchedulerThread(const uint32_t runner_id, const int nice);
-    void EndSequence(const int32_t slot);
+    void SchedulerThread(const int nice);
 
     // Function to call to execute this batch of requests.
     const StandardRunFunc OnSchedule_;
+
+    // The controlling scheduler.
+    SequenceBatchScheduler* const base_;
+
+    // The index of this batcher within the controlling scheduler.
+    const uint32_t batcher_idx_;
 
     // The thread scheduling payloads queued in this batch.
     std::unique_ptr<std::thread> scheduler_thread_;
@@ -136,23 +139,19 @@ class SequenceBatchScheduler : public Scheduler {
     // slot.
     InferRequestHeader null_request_header_;
 
-    // The correlation ID of the requests using a batch slot or 0
-    // (zero) if the slot is currently unused.
-    std::vector<CorrelationID> correlation_ids_;
-
-    // Indicates that the slot has a new sequence. The runner thread
-    // uses this to notify the backend that this is the start of a new
-    // sequence.
-    std::vector<bool> first_sequence_request_;
-
     // Queues holding inference requests. There are 'batch_size'
     // queues, one for each batch slot where requests assigned to that
     // slot are enqueued to wait for inferencing.
-    std::vector<std::deque<SequencePayload>> queues_;
+    std::vector<std::deque<Scheduler::Payload>> queues_;
 
     // The maximum active slot. A value of -1 indicates that no slots
     // are active in the bundle.
     int32_t max_active_slot_;
+
+    // Is each batch slot active or not. An empty queue for a batch
+    // slot does not mean its empty... it could just not have any
+    // requests pending at the moment.
+    std::vector<bool> active_slots_;
 
     // The control values, delivered as input tensors, that should be
     // used when starting a sequence, continuing a sequence, and
@@ -166,38 +165,42 @@ class SequenceBatchScheduler : public Scheduler {
   };
 
  private:
-  // The SequenceBatch's being managed by this scheduler.
-  std::vector<std::shared_ptr<SequenceBatch>> batches_;
-
-  // The target location for requests for a given correlation ID. The
-  // target is either a SequenceBatch or a backlog queue.
-  struct SequenceTarget {
-    // Return true if this target is a backlog queue, false if this
-    // target is a SequenceBatch_slot.
-    bool IsBacklog() const { return sequence_batch_ == nullptr; }
-
-    // If 'sequence_batch_' is non-null then the target is 'slot_'
-    // within 'sequence_batch_'.
-    std::shared_ptr<SequenceBatch> sequence_batch_;
-    uint32_t slot_;
-
-    // If 'sequence_batch_' is null then the target is a backlog
-    // queue.
-    std::deque<SequencePayload> backlog_;
+  struct BatchSlotCompare {
+    bool operator()(const BatchSlot& a, const BatchSlot& b) const
+    {
+      return a.slot_ > b.slot_;
+    }
   };
 
-  // Map from a request's correlation ID to the SequenceBatch+slot or backlog
-  // queue assigned to that correlation ID.
-  using SequenceTargetMap = std::unordered_map<CorrelationID, SequenceTarget>;
-  SequenceTargetMap sequence_to_target_map_;
-
-  // Ordered list of correlation IDs in the backlog. When a slot
-  // becomes available the first item from the backlog, if any, is
-  // used to fill that slot.
-  std::deque<CorrelationID> backlog_sequence_ids_;
-
-  // Mutex protecting correlation IDs -> SequenceBatch maps.
+  // Mutex
   std::mutex mu_;
+
+  // The SequenceBatchs being managed by this scheduler.
+  std::vector<std::shared_ptr<SequenceBatch>> batchers_;
+
+  // Map from a request's correlation ID to the BatchSlot assigned to
+  // that correlation ID.
+  using BatchSlotMap = std::unordered_map<CorrelationID, BatchSlot>;
+  BatchSlotMap sequence_to_batchslot_map_;
+
+  // Map from a request's correlation ID to the backlog queue
+  // collecting requests for that correlation ID.
+  using BacklogMap = std::unordered_map<
+      CorrelationID, std::shared_ptr<std::deque<Scheduler::Payload>>>;
+  BacklogMap sequence_to_backlog_map_;
+
+  // The ordered backlog of sequences waiting for a free slot.
+  std::deque<std::shared_ptr<std::deque<Scheduler::Payload>>> backlog_queues_;
+
+  // The batch/slot locations ready to accept a new sequence. Ordered
+  // from lowest slot-number to highest so that all batches grow at
+  // the same rate and attempt to remain as small as possible.
+  std::priority_queue<BatchSlot, std::vector<BatchSlot>, BatchSlotCompare>
+      ready_batch_slots_;
+
+  // Used for debugging.
+  size_t backlog_delay_cnt_;
+  std::vector<size_t> queue_request_cnts_;
 };
 
 }}  // namespace nvidia::inferenceserver
