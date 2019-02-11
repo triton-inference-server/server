@@ -52,11 +52,17 @@ message InferRequestHeader
     //@@
     FLAG_NONE = 0;
 
-    //@@    .. cpp:enumerator:: Flag::FLAG_SEQUENCE_END = 1
+    //@@    .. cpp:enumerator:: Flag::FLAG_SEQUENCE_START = 1 << 0
+    //@@
+    //@@       This request is the start of a related sequence of requests.
+    //@@
+    FLAG_SEQUENCE_START = 1;
+
+    //@@    .. cpp:enumerator:: Flag::FLAG_SEQUENCE_END = 1 << 1
     //@@
     //@@       This request is the end of a related sequence of requests.
     //@@
-    FLAG_SEQUENCE_END = 1;
+    FLAG_SEQUENCE_END = 2;
   }
 
   //@@  .. cpp:var:: message Input

@@ -45,6 +45,16 @@ SequenceBatchScheduler::Create(
 {
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
 
+  // For debugging,
+  const char* dstr = getenv("TRTSERVER_BACKLOG_DELAY_SCHEDULER");
+  sched->backlog_delay_cnt_ = 0;
+  if (dstr != nullptr) {
+    sched->backlog_delay_cnt_ = atoi(dstr);
+    LOG_INFO << "Delaying scheduler until " << sched->backlog_delay_cnt_
+             << " backlog queued payloads...";
+  }
+  sched->queue_request_cnts_.resize(runner_cnt, 0);
+
   // Get the batch size to allow for each runner. This is at least 1
   // even if the model doesn't support batching.
   size_t batch_size = std::max(1, config.max_batch_size());
@@ -63,8 +73,13 @@ SequenceBatchScheduler::Create(
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
-        c, batch_size, config, OnSchedule, start, cont, notready);
-    sched->batches_.push_back(sb);
+        sched.get(), c, batch_size, config, OnSchedule, start, cont, notready);
+    sched->batchers_.push_back(sb);
+
+    // All slots in the batch are initially ready for a new sequence.
+    for (size_t b = 0; b < batch_size; ++b) {
+      sched->ready_batch_slots_.push(SequenceBatchScheduler::BatchSlot(c, b));
+    }
   }
 
   scheduler->reset(sched.release());
@@ -143,8 +158,12 @@ SequenceBatchScheduler::Enqueue(
 
   const auto& request_header = request_provider->RequestHeader();
 
+  LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
+                 << request_provider->ModelName();
+
   // For now the request must have batch-size 1 since the sequence
-  // batcher does not yet support requests that statically batch.
+  // batcher does not yet support requests that are statically
+  // batched.
   if (request_header.batch_size() != 1) {
     OnComplete(tensorflow::errors::InvalidArgument(
         "inference request to model '", request_provider->ModelName(),
@@ -163,84 +182,209 @@ SequenceBatchScheduler::Enqueue(
     return;
   }
 
-  SequenceTarget* target = nullptr;
+  BatchSlot* target = nullptr;
+
+  const bool seq_start =
+      ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_START) != 0);
+  const bool seq_end =
+      ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) != 0);
 
   std::unique_lock<std::mutex> lock(mu_);
 
-  // If the request's correlation_id is new, then attempt to find a
-  // free slot to use for that ID. If one doesn't exist then put the
-  // request onto the backlog queue where it must wait for a slot to
-  // come free. If a free slot is found assign this and subsequent
-  // requests with this correlation ID to that same
-  // SequenceBatch+slot.
-  auto sb_itr = sequence_to_target_map_.find(correlation_id);
-  if (sb_itr == sequence_to_target_map_.end()) {
-    bool found_slot = false;
-    std::shared_ptr<SequenceBatch> isb;
-    uint32_t islot;
+  auto sb_itr = sequence_to_batchslot_map_.find(correlation_id);
+  auto bl_itr = sequence_to_backlog_map_.find(correlation_id);
 
-    // Look through the slots of the batches in order to find the
-    // first free slot. This method favors keeping the requests in the
-    // minimum number of model instances and creating large
-    // batches... another option would be to distribute the requests
-    // across all the instances.
-    for (const std::shared_ptr<SequenceBatch>& bsb : batches_) {
-      found_slot = bsb->GetFreeSlot(&islot);
-      if (found_slot) {
-        isb = bsb;
-        break;
-      }
-    }
-
-    target = &sequence_to_target_map_[correlation_id];
-    if (found_slot) {
-      target->sequence_batch_ = isb;
-      target->slot_ = islot;
-    } else {
-      backlog_sequence_ids_.push_back(correlation_id);
-    }
-  } else {
-    // Correlation ID is known...
-    target = &sb_itr->second;
-  }
-
-  // If correlation ID doesn't have a slot just add this request to
-  // the backlog for that correlation ID.
-  if (target->IsBacklog()) {
-    target->backlog_.emplace_back(
-        queue_timer, stats, request_provider, response_provider, OnComplete);
+  // If this request is not starting a new sequence its correlation ID
+  // should already be known with a target in either a slot or in the
+  // backlog. If it doesn't then the sequence wasn't started correctly
+  // or there has been a correlation ID conflict. In either case fail
+  // this request.
+  if (!seq_start && (sb_itr == sequence_to_batchslot_map_.end()) &&
+      (bl_itr == sequence_to_backlog_map_.end())) {
+    OnComplete(tensorflow::errors::InvalidArgument(
+        "inference request for sequence ", std::to_string(correlation_id),
+        " to model '", request_provider->ModelName(),
+        "' must specify the START flag on the first request of the sequence"));
     return;
   }
 
-  std::shared_ptr<SequenceBatch> sb = target->sequence_batch_;
+  // If this requests starts a new sequence but the correlation ID
+  // already has an in-progress sequence then that previous sequence
+  // did not end correctly, or there is a correlation ID conflict. In
+  // this case we continue the new sequence (in either backlog or
+  // slot). It is ok for a backlog/slot to have multiple starts... as
+  // long as it has a single end. The previous sequence that was not
+  // correctly ended will have its existing requests handled and then
+  // the new sequence will start.
+  if (seq_start && ((sb_itr != sequence_to_batchslot_map_.end()) ||
+                    (bl_itr != sequence_to_backlog_map_.end()))) {
+    LOG_WARNING
+        << "sequence " << correlation_id << " for model '"
+        << request_provider->ModelName()
+        << "' has a conflict. The previous sequence did not end before this "
+           "sequence start. Previous sequence will be terminated early.";
+  }
+
+  // This request already has an assigned slot...
+  if (sb_itr != sequence_to_batchslot_map_.end()) {
+    target = &sb_itr->second;
+  }
+  // This request already has a queue in the backlog...
+  else if (bl_itr != sequence_to_backlog_map_.end()) {
+    bl_itr->second->emplace_back(
+        queue_timer, stats, request_provider, response_provider, OnComplete);
+    // If the sequence is ending then forget correlation ID
+    // connection to this backlog queue. If another sequence starts
+    // with the same correlation ID it will be collected in another
+    // backlog queue.
+    if (seq_end) {
+      sequence_to_backlog_map_.erase(bl_itr);
+    }
+    return;
+  }
+  // This request does not have an assigned backlog or slot. By the
+  // above checks it must be starting. If there is a free slot
+  // available then assign this sequence to that slot...
+  else if (!ready_batch_slots_.empty()) {
+    target = &sequence_to_batchslot_map_[correlation_id];
+    *target = ready_batch_slots_.top();
+    ready_batch_slots_.pop();
+  }
+  // Last option is to assign this request to the backlog...
+  else {
+    auto backlog = std::make_shared<std::deque<Scheduler::Payload>>();
+    backlog_queues_.push_back(backlog);
+    backlog->emplace_back(
+        queue_timer, stats, request_provider, response_provider, OnComplete);
+    if (!seq_end) {
+      sequence_to_backlog_map_[correlation_id] = std::move(backlog);
+    }
+    return;
+  }
+
+  // At this point the request has been assigned to a slot. If the
+  // sequence is ending then stop tracking the correlation.
+  if (seq_end) {
+    sequence_to_batchslot_map_.erase(correlation_id);
+  }
+
+  // Enqueue request into batcher and slot.
+  const size_t batcher_idx = target->batcher_idx_;
   const uint32_t slot = target->slot_;
 
-  sb->Enqueue(
+  // No need to hold the lock while enqueuing in a specific batcher.
+  lock.unlock();
+
+  LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
+                 << request_provider->ModelName() << "' into batcher "
+                 << batcher_idx << ", slot " << slot;
+
+  batchers_[batcher_idx]->Enqueue(
       slot, correlation_id, queue_timer, stats, request_provider,
       response_provider, OnComplete);
 }
 
+bool
+SequenceBatchScheduler::ReleaseBatchSlot(
+    const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads)
+{
+  std::unique_lock<std::mutex> lock(mu_);
+
+  // If there is a backlogged sequence return it so that it can use
+  // the newly available slot.
+  if (!backlog_queues_.empty()) {
+    auto& backlog = backlog_queues_.front();
+    *payloads = std::move(*backlog);
+    backlog_queues_.pop_front();
+    if (!payloads->empty()) {  // should never be empty...
+      const auto& request_provider = payloads->back().request_provider_;
+      const auto& request_header = request_provider->RequestHeader();
+      const CorrelationID correlation_id = request_header.correlation_id();
+
+      // If the last queue entry is not an END request then the entire
+      // sequence is not contained in the backlog. In that case must
+      // update backlog and batchslot maps so that future requests get
+      // directed to the batch slot instead of the backlog.
+      const bool seq_end =
+          ((request_header.flags() & InferRequestHeader::FLAG_SEQUENCE_END) !=
+           0);
+      if (!seq_end) {
+        // Since the correlation ID is being actively collected in the
+        // backlog, there should not be any in-flight sequences with
+        // that same correlation ID that have an assigned slot.
+        if (sequence_to_batchslot_map_.find(correlation_id) !=
+            sequence_to_batchslot_map_.end()) {
+          LOG_ERROR << "internal: backlog sequence " << correlation_id
+                    << " conflicts with in-flight sequence for model '"
+                    << request_provider->ModelName() << "'";
+        }
+
+        sequence_to_backlog_map_.erase(correlation_id);
+        sequence_to_batchslot_map_[correlation_id] = batch_slot;
+      }
+
+      return false;
+    }
+  }
+
+  // There is no backlogged sequence so just release the batch slot
+  ready_batch_slots_.push(batch_slot);
+  return true;
+}
+
+bool
+SequenceBatchScheduler::DelayScheduler(
+    const uint32_t batcher_idx, const size_t cnt, const size_t total)
+{
+  std::unique_lock<std::mutex> lock(mu_);
+  queue_request_cnts_[batcher_idx] = cnt;
+
+  size_t seen = 0;
+  for (auto c : queue_request_cnts_) {
+    seen += c;
+  }
+
+  if (seen < total) {
+    return true;
+  }
+
+  if (backlog_delay_cnt_ > 0) {
+    size_t backlog_seen = 0;
+    for (const auto& q : backlog_queues_) {
+      backlog_seen += q->size();
+    }
+
+    if (backlog_seen < backlog_delay_cnt_) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 SequenceBatchScheduler::SequenceBatch::SequenceBatch(
-    const uint32_t runner_id, const size_t batch_size,
-    const ModelConfig& config, StandardRunFunc OnSchedule,
+    SequenceBatchScheduler* base, const uint32_t batcher_idx,
+    const size_t batch_size, const ModelConfig& config,
+    StandardRunFunc OnSchedule,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         continue_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         notready_input_overrides)
-    : OnSchedule_(OnSchedule), scheduler_thread_exit_(false),
-      scheduler_idle_(false), correlation_ids_(batch_size, 0),
-      first_sequence_request_(batch_size, false), queues_(batch_size),
-      max_active_slot_(-1), start_input_overrides_(start_input_overrides),
+    : OnSchedule_(OnSchedule), base_(base), batcher_idx_(batcher_idx),
+      scheduler_thread_exit_(false), scheduler_idle_(false),
+      queues_(batch_size), max_active_slot_(-1),
+      active_slots_(batch_size, false),
+      start_input_overrides_(start_input_overrides),
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
-  // Create a scheduler thread associated with 'runner_id' that
+  // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued payloads.
   const int nice = GetCpuNiceLevel(config);
-  scheduler_thread_.reset(new std::thread(
-      [this, runner_id, nice]() { SchedulerThread(runner_id, nice); }));
+  scheduler_thread_.reset(
+      new std::thread([this, nice]() { SchedulerThread(nice); }));
 }
 
 SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
@@ -253,23 +397,6 @@ SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
 
   cv_.notify_one();
   scheduler_thread_->join();
-}
-
-bool
-SequenceBatchScheduler::SequenceBatch::GetFreeSlot(uint32_t* slot)
-{
-  std::unique_lock<std::mutex> lock(mu_);
-
-  // A slot is free if it doesn't have a correlation ID assigned to it
-  // and there are no requests in the queue.
-  for (size_t i = 0; i < queues_.size(); ++i) {
-    if ((correlation_ids_[i] == 0) && queues_[i].empty()) {
-      *slot = i;
-      return true;
-    }
-  }
-
-  return false;
 }
 
 void
@@ -297,16 +424,10 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
       null_request_header_ = request_provider->RequestHeader();
     }
 
-    // Show that the slot has a new sequence if this is the first
-    // request for the correlation ID. The runner thread will use this
-    // to notify the backend that this is the start of a new sequence.
-    if (correlation_ids_[slot] == 0) {
-      first_sequence_request_[slot] = true;
-    }
-
-    correlation_ids_[slot] = correlation_id;
     queues_[slot].emplace_back(
         queue_timer, stats, request_provider, response_provider, OnComplete);
+
+    active_slots_[slot] = true;
     max_active_slot_ = std::max(max_active_slot_, static_cast<int32_t>(slot));
 
     // If runner is idle then wake it to service this request. We do
@@ -321,43 +442,25 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 }
 
 void
-SequenceBatchScheduler::SequenceBatch::EndSequence(const int32_t slot)
-{
-  // This method assumes the required mu_ lock is already held. It is
-  // the caller's responsibility to ensure that is true.
-  first_sequence_request_[slot] = false;
-  correlation_ids_[slot] = 0;
-
-  // If 'slot' is the maximum active slot in the batch, then find the
-  // new maximum.
-  if (slot == max_active_slot_) {
-    do {
-      max_active_slot_--;
-    } while ((max_active_slot_ >= 0) &&
-             (correlation_ids_[max_active_slot_] == 0));
-  }
-}
-
-void
-SequenceBatchScheduler::SequenceBatch::SchedulerThread(
-    const uint32_t runner_id, const int nice)
+SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
-    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread " << runner_id
-                   << " at nice " << nice << "...";
+    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
+                   << batcher_idx_ << " at nice " << nice << "...";
   } else {
-    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread " << runner_id
-                   << " at default nice (requested nice " << nice
-                   << " failed)...";
+    LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
+                   << batcher_idx_ << " at default nice (requested nice "
+                   << nice << " failed)...";
   }
 
-  // For debugging, delay start of thread until the queue contains the
-  // specified number of entries.
+  // For debugging, delay start of thread until queues contain the
+  // specified number of entries (across all SequenceBatchs in the
+  // scheduler).
   const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
     delay_cnt = atoi(dstr);
-    LOG_INFO << "Delaying scheduler thread " << runner_id << " until "
+    LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
              << delay_cnt << " queued payloads...";
   }
 
@@ -370,6 +473,9 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
     // Hold the lock for as short a time as possible.
     {
       std::unique_lock<std::mutex> lock(mu_);
+
+      bool adjust_max_active_slot = false;
+
       if (delay_cnt > 0) {
         wait_microseconds = 10 * 1000;
         // Debugging... wait until queues together contain at least
@@ -378,9 +484,12 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
         for (const auto& q : queues_) {
           total_size += q.size();
         }
-        if (total_size >= delay_cnt) {
+        if (!base_->DelayScheduler(batcher_idx_, total_size, delay_cnt)) {
           delay_cnt = 0;
         }
+        LOG_INFO << "Delaying scheduler thread " << batcher_idx_ << " until "
+                 << delay_cnt
+                 << " queued payloads, current total = " << total_size;
       } else {
         // Make sure there is at least one request that needs to be
         // handled. Find the largest slot index that has a payload
@@ -393,13 +502,13 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
         if (max_slot < 0) {
           wait_microseconds = default_wait_microseconds;
         } else {
-          // Collect payloads from slot 0 to max_active_slot_.
+          // Collect payloads from slot 0 to max_slot.
           for (int32_t slot = 0; slot <= max_slot; ++slot) {
             // If 'slot' doesn't have any requests then change the
             // request provider to send dummy/null input tensors for
             // this slot. We need this so that other payloads stay in
             // the correct slot.
-            std::deque<SequencePayload>& queue = queues_[slot];
+            std::deque<Scheduler::Payload>& queue = queues_[slot];
             if (queue.empty()) {
               auto null_request_provider =
                   std::make_shared<NULLInferRequestProvider>(
@@ -412,39 +521,70 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
                   queue_timer, nullptr, null_request_provider, nullptr,
                   nullptr);
             } else {
+              Scheduler::Payload& slot_payload = queue.front();
+              const auto& request_provider = slot_payload.request_provider_;
+              const auto& request_header = request_provider->RequestHeader();
+
               // If this is the first payload in a sequence then send
               // the appropriate sequence start indicator to the
               // backend.
-              SequencePayload& slot_payload = queue.front();
-              const auto& request_provider = slot_payload.request_provider_;
-
-              if (first_sequence_request_[slot]) {
+              if ((request_header.flags() &
+                   InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
                 request_provider->SetInputContentOverride(
                     start_input_overrides_);
-                first_sequence_request_[slot] = false;
               } else {
                 request_provider->SetInputContentOverride(
                     continue_input_overrides_);
               }
 
-              // If this is the last payload in a sequence then reset
-              // the slot state to enable another sequence to start
-              // using the slot.
-              const auto& request_header = request_provider->RequestHeader();
-              if ((request_header.flags() &
-                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
-                EndSequence(slot);
-              }
-
               payloads->emplace_back(
                   slot_payload.queue_timer_, slot_payload.stats_,
-                  slot_payload.request_provider_,
-                  slot_payload.response_provider_,
+                  request_provider, slot_payload.response_provider_,
                   slot_payload.complete_function_);
 
               queue.pop_front();
+
+              // If this is the last payload in a sequence then
+              // attempt to refill the slot with a sequence from the
+              // backlog. If there is no backlog show that the slot is
+              // no longer active, and if it is currently the maximum
+              // active slot note that we need to adjust
+              // max_active_slot_ once all slots are processed (we
+              // defer processing because multiple slots could have
+              // ending sequences).
+              if ((request_header.flags() &
+                   InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+                // Should never be anything in a queue after the END
+                // marker. If it happens that means we will clobber
+                // that request if/when we swap in a backlog sequence
+                // in ReleaseBatchSlot below.
+                if (!queue.empty()) {
+                  LOG_ERROR << "internal: unexpected requests after sequence "
+                               "end in slot "
+                            << slot << " for model '"
+                            << request_provider->ModelName() << "'";
+                }
+
+                SequenceBatchScheduler::BatchSlot batch_slot(
+                    batcher_idx_, slot);
+                bool released = base_->ReleaseBatchSlot(batch_slot, &queue);
+                if (released) {
+                  active_slots_[slot] = false;
+                  if (slot == max_active_slot_) {
+                    adjust_max_active_slot = true;
+                  }
+                }
+              }
             }
           }
+        }
+      }
+
+      // If one or more sequences ended, and one of them was in
+      // max_active_slot_, then need to find the new max_active_slot_.
+      if (adjust_max_active_slot) {
+        while ((max_active_slot_ >= 0) && !active_slots_[max_active_slot_]) {
+          max_active_slot_--;
         }
       }
 
@@ -503,11 +643,11 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
       };
 
       // Run the backend...
-      OnSchedule_(runner_id, payloads.get(), OnCompleteQueuedPayloads);
+      OnSchedule_(batcher_idx_, payloads.get(), OnCompleteQueuedPayloads);
     }
   }  // end runner loop
 
-  LOG_VERBOSE(1) << "Stopping sequence-batch scheduler thread " << runner_id
+  LOG_VERBOSE(1) << "Stopping sequence-batch scheduler thread " << batcher_idx_
                  << "...";
 }
 

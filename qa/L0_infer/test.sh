@@ -65,7 +65,9 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/qa_model_repository models && \
-        cp -r ../custom_models/* models/.
+        cp -r ../custom_models/custom_float32_* models/. && \
+        cp -r ../custom_models/custom_int32_* models/. && \
+        cp -r ../custom_models/custom_nobatch_* models/.
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do

@@ -635,7 +635,7 @@ InferenceServer::InferenceServer()
   http_port_ = 8000;
   grpc_port_ = 8001;
   metrics_port_ = 8002;
-  http_thread_cnt_ = 8;
+  http_thread_cnt_ = 16;
   strict_model_config_ = true;
   strict_readiness_ = true;
   profiling_enabled_ = false;
