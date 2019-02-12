@@ -43,7 +43,8 @@ for each protocol.
 * :ref:`section-api-inference`: The inference API that accepts model
   inputs, runs inference and returns the requested outputs.
 
-GRPC only endpoint:
+The inference server also exposes an endpoint based on GRPC streams that is
+only available when using the GRPC protocol:
 
 * :ref:`section-api-stream-inference`: The stream inference API is the same
   as the Inference API, except that once the connection is established,
