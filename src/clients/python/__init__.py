@@ -517,6 +517,10 @@ class InferContext:
         The correlation ID for the inference. If not specified (or if
         specified as 0), the inference will have no correlation ID.
 
+    streaming : bool
+        If True create streaming context. Streaming is only allowed with
+        gRPC protocol.
+
     verbose : bool
         If True generate verbose output.
 

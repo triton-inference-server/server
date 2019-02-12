@@ -414,3 +414,25 @@ String tensors are demonstrated in the C++ example application at
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_string_client.cc>`_
 and a Python version at `src/clients/python/simple\_string\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_string_client.py>`_.
+
+Stream Inference
+^^^^^^^^^^^^^^^^
+
+Some applications may prefer to send requests in one connection rather than
+establishing connections for individual requests. For instance, in the case
+where multiple instances of TensorRT Inference Server are created with the 
+purpose of load balancing, requests sent in different connections may be routed
+to different server instances. This scenario will not fit the need if the
+requests are correlated, where they are expected to be processed by the same
+model instance, like inferencing with sequence models. By using stream
+inference, the requests will be sent to the same server instance once the
+connection is established, and then they will be processed by the same model
+instance if proper :cpp:var:`correlation_id
+<nvidia::inferenceserver::InferRequestHeader::correlation_id>` is set.
+
+Stream inference and use of correlation ID are demonstrated in the C++ example
+application at
+`src/clients/c++/simple\_sequence\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_sequence_client.cc>`_
+and a Python version at `src/clients/python/simple\_sequence\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_sequence_client.py>`_.
