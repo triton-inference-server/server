@@ -388,7 +388,7 @@ BidirectionalStreamingLifeCycle<Request, Response>::FinishResponse()
         RequestType, ResponseType>::StateFinishedDone;
   }
 
-  m_ReaderWriter->Finish(::grpc::Status::CANCELLED, IContext::Tag());
+  m_ReaderWriter->Finish(::grpc::Status::OK, IContext::Tag());
 }
 
 template <class Request, class Response>
