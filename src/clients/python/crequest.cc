@@ -339,7 +339,9 @@ InferContextGetReadyAsyncRequest(
   // InferContextAsyncRun(). Thus we don't need to check ctx->requests.
   std::shared_ptr<nic::InferContext::Request> request;
   nic::Error err = ctx->ctx->GetReadyAsyncRequest(&request, wait);
-  *request_id = request->Id();
+  if (err.IsOk()) {
+    *request_id = request->Id();
+  }
   return new nic::Error(err);
 }
 
