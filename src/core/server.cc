@@ -170,6 +170,10 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
 
     RequestStatus* request_status = response.mutable_request_status();
 
+    // Get the request ID at top level so we can set the corresponding field
+    // in ResponseHeader even on inference failure
+    uint64_t id = request.meta_data().id();
+
     auto backend = std::make_shared<InferenceServer::InferBackendState>();
     tensorflow::Status status = server->InitBackendState(
         request.model_name(), request.model_version(), backend);
@@ -190,8 +194,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           server->HandleInfer(
               request_status, backend, request_provider, response_provider,
               infer_stats,
-              [this, execution_context, request_status, &response, infer_stats,
-               timer]() mutable {
+              [this, execution_context, id, request_status, &response,
+               infer_stats, timer]() mutable {
                 // If the response is an error then clear the meta-data
                 // and raw output as they may be partially or
                 // un-initialized.
@@ -200,6 +204,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
                   response.mutable_raw_output()->Clear();
                 }
 
+                response.mutable_meta_data()->set_id(id);
                 this->CompleteExecution(execution_context);
                 timer.reset();
               },
@@ -220,6 +225,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
+      response.mutable_meta_data()->set_id(id);
       this->CompleteExecution(execution_context);
     }
   }
@@ -453,6 +459,11 @@ HTTPServiceImpl::Infer(
 
   RequestStatus request_status;
 
+  InferRequestHeader request_header;
+  tensorflow::protobuf::TextFormat::ParseFromString(
+      infer_request_header_str, &request_header);
+  uint64_t id = request_header.id();
+
   auto backend = std::make_shared<InferenceServer::InferBackendState>();
   tensorflow::Status status =
       server_->InitBackendState(model_name, model_version, backend);
@@ -474,8 +485,8 @@ HTTPServiceImpl::Infer(
         server_->HandleInfer(
             &request_status, backend, request_provider, response_provider,
             infer_stats,
-            [&request_status, request_provider, response_provider, infer_stats,
-             req]() mutable {
+            [&request_status, id, request_provider, response_provider,
+             infer_stats, req]() mutable {
               if (request_status.code() == RequestStatusCode::SUCCESS) {
                 std::string format;
                 if (!req->QueryParam("format", &format)) {
@@ -487,30 +498,29 @@ HTTPServiceImpl::Infer(
                 // interpret the body. The entire response (including
                 // classifications) is serialized at the end of the
                 // body.
-                const InferResponseHeader& response_header =
-                    response_provider->ResponseHeader();
+                InferResponseHeader* response_header =
+                    response_provider->MutableResponseHeader();
+                response_header->set_id(id);
 
                 std::string rstr;
                 if (format == "binary") {
-                  response_header.SerializeToString(&rstr);
+                  response_header->SerializeToString(&rstr);
                 } else {
-                  rstr = response_header.DebugString();
+                  rstr = response_header->DebugString();
                 }
                 req->WriteResponseBytes(rstr.c_str(), rstr.size());
 
                 // We do this in destructive manner since we are the
                 // last one to use response header from the provider.
-                InferResponseHeader* brief_response_header =
-                    response_provider->MutableResponseHeader();
-                for (int i = 0; i < brief_response_header->output_size(); ++i) {
+                for (int i = 0; i < response_header->output_size(); ++i) {
                   InferResponseHeader::Output* output =
-                      brief_response_header->mutable_output(i);
+                      response_header->mutable_output(i);
                   output->clear_batch_classes();
                 }
 
                 req->OverwriteResponseHeader(
                     kInferResponseHTTPHeader,
-                    brief_response_header->ShortDebugString());
+                    response_header->ShortDebugString());
               }
             },
             false  // async frontend
@@ -520,6 +530,10 @@ HTTPServiceImpl::Infer(
   }
 
   if (!status.ok()) {
+    InferResponseHeader response_header;
+    response_header.set_id(id);
+    req->OverwriteResponseHeader(
+        kInferResponseHTTPHeader, response_header.ShortDebugString());
     LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
     infer_stats->SetFailed(true);
     RequestStatusFactory::Create(
