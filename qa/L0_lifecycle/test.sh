@@ -100,7 +100,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # give plenty of time for model to load (and fail to load)
-wait_for_model_stable 30
+wait_for_model_stable 120
 
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_modelfail >>$CLIENT_LOG 2>&1
