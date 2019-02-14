@@ -152,7 +152,7 @@ def preprocess(img, format, dtype, c, h, w, scaling):
     else:
         sample_img = img.convert('RGB')
 
-    resized_img = sample_img.resize((h, w), Image.BILINEAR)
+    resized_img = sample_img.resize((w, h), Image.BILINEAR)
     resized = np.array(resized_img)
     if resized.ndim == 2:
         resized = resized[:,:,np.newaxis]
