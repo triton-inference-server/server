@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/servables/tensorflow/base_bundle.h"
+#include "tensorflow/core/protobuf/meta_graph.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -43,6 +44,10 @@ class SavedModelBundle : public BaseBundle {
       IONameMap* input_name_map, IONameMap* output_name_map) override;
 
  private:
+  tensorflow::Status ValidateSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      const tensorflow::SignatureDef& sig);
+
   TF_DISALLOW_COPY_AND_ASSIGN(SavedModelBundle);
 };
 

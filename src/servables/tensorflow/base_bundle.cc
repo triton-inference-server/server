@@ -251,10 +251,6 @@ SetFixedSizedInputTensor(
   // input tensor. Skip payloads that had errors since they are not
   // included in the dynamic batch.
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_byte_size =
@@ -326,10 +322,6 @@ SetStringInputTensor(
   // input tensor. Skip payloads that had errors since they are not
   // included in the dynamic batch.
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_element_cnt =
@@ -411,10 +403,6 @@ ReadFixedSizedOutputTensor(
   size_t tensor_copy_offset = 0;
 
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_byte_size =
@@ -458,10 +446,6 @@ ReadStringOutputTensor(
   size_t tensor_element_idx = 0;
 
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_element_cnt =
@@ -502,6 +486,48 @@ ReadStringOutputTensor(
 
 }  // namespace
 
+void
+BaseBundle::Context::SetInput(
+    const std::string& name, const DataType datatype, const DimsList& dims,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    TensorVec* input_tensors)
+{
+  const tensorflow::DataType dtype = ConvertDataType(datatype);
+
+  // Get the shape of the input. The provider has already checked
+  // that the request shape is valid so don't need to do it here.
+  tensorflow::TensorShape shape;
+
+  // If model supports batching then prepend the batch dimension
+  // onto the input shape.
+  if (total_batch_size > 0) {
+    shape.AddDim(total_batch_size);
+  }
+
+  size_t batch1_element_cnt = 1;
+  for (auto dim : dims) {
+    shape.AddDim(dim);
+    batch1_element_cnt *= dim;
+  }
+
+  const std::string* input_tensor_name = &name;
+  const auto& tn_itr = input_name_map_.find(name);
+  if (tn_itr != input_name_map_.end()) {
+    input_tensor_name = &tn_itr->second;
+  }
+
+  input_tensors->emplace_back(
+      std::make_pair(*input_tensor_name, tensorflow::Tensor(dtype, shape)));
+  tensorflow::Tensor& tensor = input_tensors->back().second;
+
+  if (dtype != tensorflow::DT_STRING) {
+    const size_t batch1_byte_size =
+        batch1_element_cnt * tensorflow::DataTypeSize(dtype);
+    SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
+  } else {
+    SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
+  }
+}
 
 tensorflow::Status
 BaseBundle::Context::Run(
@@ -510,7 +536,7 @@ BaseBundle::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  const InferRequestHeader* input_request_header = nullptr;
+  std::shared_ptr<InferRequestProvider> input_request_provider;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -518,14 +544,17 @@ BaseBundle::Context::Run(
   // request provider so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
-    if (payload.status_.ok()) {
-      total_batch_size +=
-          payload.request_provider_->RequestHeader().batch_size();
-
-      // All payloads must have equally-sized input tensors so use any
-      // payload as the representative for the input tensors.
-      input_request_header = &(payload.request_provider_->RequestHeader());
+    if (!payload.status_.ok()) {
+      return tensorflow::errors::Internal(
+          "unexpected payload with non-OK status given to runner for '", name_,
+          "'");
     }
+
+    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+
+    // All payloads must have equally-sized input tensors so use any
+    // payload as the representative for the input tensors.
+    input_request_provider = payload.request_provider_;
   }
 
   // If there are no valid payloads then no need to run the
@@ -546,50 +575,33 @@ BaseBundle::Context::Run(
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
   // into the corresponding tensor.
-  using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
   TensorVec input_tensors;
 
-  for (const auto& input : input_request_header->input()) {
+  // Inputs from the request...
+  for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
 
     const ModelInput* input_config;
-    TF_RETURN_IF_ERROR(base->GetInput(input.name(), &input_config));
+    TF_RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
-    const tensorflow::DataType dtype =
-        ConvertDataType(input_config->data_type());
+    SetInput(
+        name, input_config->data_type(), input.dims(),
+        (max_batch_size_ == NO_BATCHING) ? 0 : total_batch_size, payloads,
+        &input_tensors);
+  }
 
-    // Get the shape of the input. The provider has already checked
-    // that the request shape is valid so don't need to do it here.
-    tensorflow::TensorShape shape;
-
-    // If model supports batching then prepend the batch dimension
-    // onto the input shape.
-    if (max_batch_size_ != NO_BATCHING) {
-      shape.AddDim(total_batch_size);
-    }
-
-    size_t batch1_element_cnt = 1;
-    for (auto dim : input.dims()) {
-      shape.AddDim(dim);
-      batch1_element_cnt *= dim;
-    }
-
-    const std::string* input_tensor_name = &name;
-    const auto& tn_itr = input_name_map_.find(name);
-    if (tn_itr != input_name_map_.end()) {
-      input_tensor_name = &tn_itr->second;
-    }
-
-    input_tensors.emplace_back(
-        std::make_pair(*input_tensor_name, tensorflow::Tensor(dtype, shape)));
-    tensorflow::Tensor& tensor = input_tensors.back().second;
-
-    if (dtype != tensorflow::DT_STRING) {
-      const size_t batch1_byte_size =
-          batch1_element_cnt * tensorflow::DataTypeSize(dtype);
-      SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
-    } else {
-      SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
+  // Additional inputs added to the provider...
+  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      input_override_map = input_request_provider->GetInputOverride();
+  if (input_override_map != nullptr) {
+    for (const auto& pr : *input_override_map) {
+      const std::string& name = pr.first;
+      const std::shared_ptr<InferRequestProvider::InputOverride>& override =
+          pr.second;
+      SetInput(
+          name, override->datatype_, override->dims_,
+          (max_batch_size_ == NO_BATCHING) ? 0 : total_batch_size, payloads,
+          &input_tensors);
     }
   }
 
@@ -597,10 +609,6 @@ BaseBundle::Context::Run(
   // payload. Skip payloads that have an error.
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     for (const auto& output : request_header.output()) {

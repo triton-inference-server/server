@@ -107,38 +107,67 @@ SequenceBatchScheduler::CreateControlTensors(
       std::make_shared<InferRequestProvider::InputOverrideMap>();
 
   std::string tensor_name;
+  DataType tensor_datatype;
   int32_t false_value, true_value;
 
   // START
   {
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &tensor_name,
-        &false_value, &true_value));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        true /* required */, &tensor_name, &tensor_datatype, &false_value,
+        &true_value));
     uint8_t* false_p = reinterpret_cast<uint8_t*>(&false_value);
     uint8_t* true_p = reinterpret_cast<uint8_t*>(&true_value);
-    std::vector<uint8_t> false_vec(false_p, false_p + sizeof(false_value));
-    std::vector<uint8_t> true_vec(true_p, true_p + sizeof(true_value));
 
-    (*start_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
-    (*continue_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
-    (*notready_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
+    auto false_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    false_override->content_.assign(false_p, false_p + sizeof(false_value));
+    false_override->dims_.Add(1);
+    false_override->datatype_ = tensor_datatype;
+
+    auto true_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    true_override->content_.assign(true_p, true_p + sizeof(true_value));
+    true_override->dims_.Add(1);
+    true_override->datatype_ = tensor_datatype;
+
+    (*start_input_overrides)
+        ->insert(std::make_pair(tensor_name, true_override));
+    (*continue_input_overrides)
+        ->insert(std::make_pair(tensor_name, false_override));
+    (*notready_input_overrides)
+        ->insert(std::make_pair(tensor_name, false_override));
   }
 
   // READY
   {
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &tensor_name,
-        &false_value, &true_value));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        true /* required */, &tensor_name, &tensor_datatype, &false_value,
+        &true_value));
     uint8_t* false_p = reinterpret_cast<uint8_t*>(&false_value);
     uint8_t* true_p = reinterpret_cast<uint8_t*>(&true_value);
-    std::vector<uint8_t> false_vec(false_p, false_p + sizeof(false_value));
-    std::vector<uint8_t> true_vec(true_p, true_p + sizeof(true_value));
 
-    (*start_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
-    (*continue_input_overrides)->insert(std::make_pair(tensor_name, true_vec));
-    (*notready_input_overrides)->insert(std::make_pair(tensor_name, false_vec));
+    auto false_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    false_override->content_.assign(false_p, false_p + sizeof(false_value));
+    false_override->dims_.Add(1);
+    false_override->datatype_ = tensor_datatype;
+
+    auto true_override =
+        std::make_shared<InferRequestProvider::InputOverride>();
+    true_override->content_.assign(true_p, true_p + sizeof(true_value));
+    true_override->dims_.Add(1);
+    true_override->datatype_ = tensor_datatype;
+
+    (*start_input_overrides)
+        ->insert(std::make_pair(tensor_name, true_override));
+    (*continue_input_overrides)
+        ->insert(std::make_pair(tensor_name, true_override));
+    (*notready_input_overrides)
+        ->insert(std::make_pair(tensor_name, false_override));
   }
 
   return tensorflow::Status::OK();
@@ -513,7 +542,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
               auto null_request_provider =
                   std::make_shared<NULLInferRequestProvider>(
                       null_request_header_);
-              null_request_provider->SetInputContentOverride(
+              null_request_provider->SetInputOverride(
                   notready_input_overrides_);
 
               std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer;
@@ -530,11 +559,9 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
               // backend.
               if ((request_header.flags() &
                    InferRequestHeader::FLAG_SEQUENCE_START) != 0) {
-                request_provider->SetInputContentOverride(
-                    start_input_overrides_);
+                request_provider->SetInputOverride(start_input_overrides_);
               } else {
-                request_provider->SetInputContentOverride(
-                    continue_input_overrides_);
+                request_provider->SetInputOverride(continue_input_overrides_);
               }
 
               payloads->emplace_back(

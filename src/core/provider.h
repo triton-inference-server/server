@@ -28,6 +28,7 @@
 #include "libevent/include/event2/buffer.h"
 #include "src/core/api.pb.h"
 #include "src/core/grpc_service.pb.h"
+#include "src/core/model_config.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 struct evbuffer;
@@ -76,9 +77,16 @@ class InferRequestProvider {
 
   // Set content for named inputs. If the input already has content,
   // this content will be in-place of existing content.
+  struct InputOverride {
+    std::vector<uint8_t> content_;
+    DimsList dims_;
+    DataType datatype_;
+  };
+
   using InputOverrideMap =
-      std::unordered_map<std::string, std::vector<uint8_t>>;
-  tensorflow::Status SetInputContentOverride(
+      std::unordered_map<std::string, std::shared_ptr<InputOverride>>;
+  const std::shared_ptr<InputOverrideMap>& GetInputOverride() const;
+  tensorflow::Status SetInputOverride(
       const std::shared_ptr<InputOverrideMap>& override);
 
  protected:
@@ -92,7 +100,7 @@ class InferRequestProvider {
   // override content (and so 'content' and 'content_byte_size' are
   // valid) or false if there is no override content (and so 'content'
   // and 'content_byte_size' are unchanged).
-  bool GetInputContentOverride(
+  bool GetInputOverrideContent(
       const std::string& name, const void** content, size_t* content_byte_size);
 
   const std::string model_name_;
@@ -103,7 +111,7 @@ class InferRequestProvider {
   std::shared_ptr<InputOverrideMap> overrides_;
 
   // The inputs that have had their override content consumed by a
-  // call to GetInputContentOverride. A given input override will only
+  // call to GetInputOverrideContent. A given input override will only
   // return the content once and on subsequent calls will return
   // 'content' == nullptr to indicate that all the override content
   // has been consumed.

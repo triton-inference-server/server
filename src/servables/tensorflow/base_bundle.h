@@ -79,6 +79,13 @@ class BaseBundle : public InferenceBackend {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
+    // Create TF tensor for an input.
+    using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
+    void SetInput(
+        const std::string& name, const DataType datatype, const DimsList& dims,
+        const size_t total_batch_size,
+        std::vector<Scheduler::Payload>* payloads, TensorVec* input_tensors);
+
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
     // is assigned to this context. A non-OK return status indicates

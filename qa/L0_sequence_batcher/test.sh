@@ -37,34 +37,50 @@ RET=0
 
 # Setup non-variable-size model stores. The same models are in each
 # store but they are configured as:
+#   models0 - four instance with non-batching model
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{1,2,4} && mkdir models{1,2,4}
+rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
 for m in \
+        $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32 \
+        $DATADIR/qa_sequence_model_repository/savedmodel_sequence_int32 \
         ../custom_models/custom_sequence_int32 ; do
     cp -r $m models1/. && \
         (cd models1/$(basename $m) && \
-            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds: 10000000/" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
     cp -r $m models2/. && \
         (cd models2/$(basename $m) && \
-            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds: 10000000/" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
     cp -r $m models4/. && \
         (cd models4/$(basename $m) && \
-            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds: 10000000/" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+done
+
+for m in \
+        $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32 \
+        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_int32 ; do
+    cp -r $m models0/. && \
+        (cd models0/$(basename $m) && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
 # Same test work on all models since they all have same total number
 # of batch slots.
-for model_instances in 1 2 4; do
-    export MODEL_INSTANCES=$model_instances
-    MODEL_DIR=models${model_instances}
+for model_trial in 0 1 2 4 ; do
+    export NO_BATCHING=1 &&
+        [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
+    export MODEL_INSTANCES=4 &&
+        [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
+
+    MODEL_DIR=models${model_trial}
 
     # Need to launch the server for each test so that the model status is
     # reset (which is used to make sure the correctly batch size was used
