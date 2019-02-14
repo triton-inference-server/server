@@ -39,11 +39,15 @@ tensorflow::Status GetModelVersionFromPath(
     const tensorflow::StringPiece& path, int64_t* version);
 
 /// Get the tensor name, false value, and true value for a sequence
-/// batcher control kind.
+/// batcher control kind. If 'required' is true then must find a
+/// tensor for the control. If 'required' is false, return
+/// 'tensor_name' as empty-string if the control is not mapped to any
+/// tensor.
 tensorflow::Status GetSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
-    std::string* tensor_name, int32_t* false_value, int32_t* true_value);
+    const bool required, std::string* tensor_name, DataType* tensor_datatype,
+    int32_t* false_value, int32_t* true_value);
 
 /// Read a ModelConfig and normalize it as expected by model servables.
 /// \param path The full-path to the directory containing the

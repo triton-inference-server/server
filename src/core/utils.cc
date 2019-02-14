@@ -55,7 +55,8 @@ tensorflow::Status
 GetSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
-    std::string* tensor_name, int32_t* false_value, int32_t* true_value)
+    const bool required, std::string* tensor_name, DataType* tensor_datatype,
+    int32_t* false_value, int32_t* true_value)
 {
   // Make sure the control kind is not mentioned multiple times.
   bool seen = false;
@@ -83,19 +84,31 @@ GetSequenceControlProperties(
               model_name);
         }
 
-        *false_value = c.int32_false_true(0);
-        *true_value = c.int32_false_true(1);
         *tensor_name = control_input.name();
+        if (tensor_datatype != nullptr) {
+          *tensor_datatype = DataType::TYPE_INT32;
+        }
+        if (false_value != nullptr) {
+          *false_value = c.int32_false_true(0);
+        }
+        if (true_value != nullptr) {
+          *true_value = c.int32_false_true(1);
+        }
+
         seen = true;
       }
     }
   }
 
   if (!seen) {
-    return tensorflow::errors::InvalidArgument(
-        "sequence batching control tensor must specify a ",
-        ModelSequenceBatching_Control_Kind_Name(control_kind), " value for ",
-        model_name);
+    if (required) {
+      return tensorflow::errors::InvalidArgument(
+          "sequence batching control tensor must specify a ",
+          ModelSequenceBatching_Control_Kind_Name(control_kind), " value for ",
+          model_name);
+    }
+
+    tensor_name->clear();
   }
 
   return tensorflow::Status::OK();
@@ -301,18 +314,17 @@ ValidateModelConfig(
           config.name());
     }
 
-    // Make sure (exactly) one SEQUENCE_START and one SEQUENCE_READY
+    // Make sure at most one SEQUENCE_START and one SEQUENCE_READY
     // control is specified.
     std::string tensor_name;
-    int32_t false_value, true_value;
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &tensor_name,
-        &false_value, &true_value));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        true /* required */, &tensor_name, nullptr, nullptr, nullptr));
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &tensor_name,
-        &false_value, &true_value));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+        true /* required */, &tensor_name, nullptr, nullptr, nullptr));
   }
 
   // Make sure KIND_GPU instance group specifies at least one GPU and

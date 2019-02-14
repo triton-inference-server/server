@@ -92,9 +92,22 @@ SavedModelBundle::CreateSession(
     output_name_map->insert({o.first, o.second.name()});
   }
 
+  size_t expected_input_cnt = (size_t)Config().input().size();
+
+  // If this is a sequence model then make sure that the required
+  // inputs are present in the model and have the correct shape and
+  // datatype.
+  if (Config().has_sequence_batching()) {
+    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, sig));
+    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, sig));
+    expected_input_cnt += 2;
+  }
+
   // Verify that the model configuration input and outputs match what
   // is expected by the signature def.
-  if (expected_inputs.size() != (size_t)Config().input().size()) {
+  if (expected_inputs.size() != expected_input_cnt) {
     return tensorflow::errors::InvalidArgument(
         "unable to load model '", Name(), "', configuration expects ",
         Config().input().size(), " inputs, model provides ",
@@ -154,6 +167,46 @@ SavedModelBundle::CreateSession(
   }
 
   *session = bundle->session.release();
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+SavedModelBundle::ValidateSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    const tensorflow::SignatureDef& sig)
+{
+  std::string tensor_name;
+  TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, true /* required */,
+      &tensor_name, nullptr, nullptr, nullptr));
+
+  const auto& iitr = sig.inputs().find(tensor_name);
+  if (iitr == sig.inputs().end()) {
+    return tensorflow::errors::Internal(
+        "configuration specified sequence control '", tensor_name,
+        "', but model does not provide that input");
+  }
+
+  // Control tensors must have shape [1].
+  DimsList dims;
+  dims.Add(1);
+
+  if (!CompareDimsExact(
+          iitr->second.tensor_shape(), dims, Config().max_batch_size() > 0)) {
+    return tensorflow::errors::InvalidArgument(
+        "unable to load model '", Name(), "', sequence control '", tensor_name,
+        "' dims ", DimsDebugString(iitr->second.tensor_shape()),
+        " don't match expected dims [1]");
+  }
+
+  // Currently only data-type int32 is supported for controls
+  if (!CompareDataType(iitr->second.dtype(), DataType::TYPE_INT32)) {
+    return tensorflow::errors::InvalidArgument(
+        "unable to load model '", Name(), "', sequence control '", tensor_name,
+        "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
+        " doesn't match required data-type TYPE_INT32");
+  }
 
   return tensorflow::Status::OK();
 }

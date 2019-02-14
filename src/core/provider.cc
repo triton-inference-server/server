@@ -130,8 +130,14 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
   return tensorflow::Status::OK();
 }
 
+const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+InferRequestProvider::GetInputOverride() const
+{
+  return overrides_;
+}
+
 tensorflow::Status
-InferRequestProvider::SetInputContentOverride(
+InferRequestProvider::SetInputOverride(
     const std::shared_ptr<InputOverrideMap>& override)
 {
   overrides_ = override;
@@ -139,7 +145,7 @@ InferRequestProvider::SetInputContentOverride(
 }
 
 bool
-InferRequestProvider::GetInputContentOverride(
+InferRequestProvider::GetInputOverrideContent(
     const std::string& name, const void** content, size_t* content_byte_size)
 {
   if (overrides_ != nullptr) {
@@ -150,8 +156,9 @@ InferRequestProvider::GetInputContentOverride(
         *content = nullptr;
         *content_byte_size = 0;
       } else {
-        *content = reinterpret_cast<void*>(&(pr->second[0]));
-        *content_byte_size = pr->second.size();
+        std::shared_ptr<InputOverride>& override = pr->second;
+        *content = reinterpret_cast<void*>(&(override->content_[0]));
+        *content_byte_size = override->content_.size();
         overrides_consumed_.insert(name);
       }
 
@@ -178,7 +185,7 @@ NULLInferRequestProvider::GetNextInputContent(
     return tensorflow::Status::OK();
   }
 
-  if (!GetInputContentOverride(name, content, content_byte_size)) {
+  if (!GetInputOverrideContent(name, content, content_byte_size)) {
     std::lock_guard<std::mutex> lock(mu_);
 
     // Must return content with all zero data. This is required by
@@ -257,7 +264,7 @@ GRPCInferRequestProvider::GetNextInputContent(
     return tensorflow::Status::OK();
   }
 
-  if (!GetInputContentOverride(name, content, content_byte_size)) {
+  if (!GetInputOverrideContent(name, content, content_byte_size)) {
     const auto& pr = input_map_.find(name);
     if (pr == input_map_.end()) {
       return tensorflow::errors::Internal("unexpected input '", name, "'");
@@ -376,7 +383,7 @@ HTTPInferRequestProvider::GetNextInputContent(
     return tensorflow::Status::OK();
   }
 
-  if (!GetInputContentOverride(name, content, content_byte_size)) {
+  if (!GetInputOverrideContent(name, content, content_byte_size)) {
     const auto& pr = input_map_.find(name);
     if (pr == input_map_.end()) {
       return tensorflow::errors::Internal("unexpected input '", name, "'");
