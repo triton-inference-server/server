@@ -1,0 +1,39 @@
+name: "control_tensor_multiple"
+platform: "custom"
+max_batch_size: 8
+sequence_batching {
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]

@@ -59,8 +59,11 @@ GetSequenceControlProperties(
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value)
 {
+  // Make sure same tensor is not configured for multiple controls
+  std::set<std::string> seen_tensors;
+
   // Make sure the control kind is not mentioned multiple times.
-  bool seen = false;
+  bool seen_control = false;
 
   for (const auto& control_input : batcher.control_input()) {
     if (control_input.name().empty()) {
@@ -68,9 +71,17 @@ GetSequenceControlProperties(
           "sequence batching control tensor must have a name for ", model_name);
     }
 
+    if (seen_tensors.find(control_input.name()) != seen_tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+          "sequence batching control tensor '", control_input.name(),
+          "' is specified for multiple control kinds for ", model_name);
+    }
+
+    seen_tensors.insert(control_input.name());
+
     for (const auto& c : control_input.control()) {
       if (c.kind() == control_kind) {
-        if (seen) {
+        if (seen_control) {
           return tensorflow::errors::InvalidArgument(
               "sequence batching specifies multiple ",
               ModelSequenceBatching_Control_Kind_Name(control_kind),
@@ -78,7 +89,7 @@ GetSequenceControlProperties(
         }
 
         *tensor_name = control_input.name();
-        seen = true;
+        seen_control = true;
 
         if (c.int32_false_true_size() > 0) {
           if (c.fp32_false_true_size() != 0) {
@@ -109,7 +120,7 @@ GetSequenceControlProperties(
         } else {
           if (c.fp32_false_true_size() == 0) {
             return tensorflow::errors::InvalidArgument(
-                "sequence batching must specify either 'int32_false_true' and "
+                "sequence batching must specify either 'int32_false_true' or "
                 "'fp32_false_true' for ",
                 ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
                 model_name);
@@ -137,7 +148,7 @@ GetSequenceControlProperties(
     }
   }
 
-  if (!seen) {
+  if (!seen_control) {
     if (required) {
       return tensorflow::errors::InvalidArgument(
           "sequence batching control tensor must specify a ",
