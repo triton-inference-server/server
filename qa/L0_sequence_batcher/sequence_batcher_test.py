@@ -40,16 +40,18 @@ import test_util as tu
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
-if os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = []
-else:
-    _trials = ("custom",)
-#    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
-
+_no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
+if _no_batching:
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch")
+elif os.environ['BATCHER_TYPE'] == "VARIABLE":
+    _trials = []
+else:
+    _trials = ("custom", "savedmodel", "graphdef")
+
 _protocols = ("http", "grpc")
-_max_queue_delay_ms = 10000
+_max_queue_delay_ms = 0
 _check_exception = None
 
 class SequenceBatcherTest(unittest.TestCase):
@@ -72,10 +74,10 @@ class SequenceBatcherTest(unittest.TestCase):
         """
         global _check_exception
 
-        if (trial == "savedmodel" or trial == "graphdef" or
-            trial == "netdef" or trial == "custom"):
+        if (("savedmodel" in trial) or ("graphdef" in trial) or
+            ("netdef" in trial) or ("custom" in trial)):
             tensor_shape = (1,)
-        elif trial == "plan":
+        elif "plan" in trial:
             tensor_shape = (1,1,1)
         else:
             self.assertFalse(True, "unknown trial type: " + trial)
@@ -168,10 +170,10 @@ class SequenceBatcherTest(unittest.TestCase):
         """
         global _check_exception
 
-        if (trial == "savedmodel" or trial == "graphdef" or
-            trial == "netdef" or trial == "custom"):
+        if (("savedmodel" in trial) or ("graphdef" in trial) or
+            ("netdef" in trial) or ("custom" in trial)):
             tensor_shape = (1,)
-        elif trial == "plan":
+        elif "plan" in trial:
             tensor_shape = (1,1,1)
         else:
             self.assertFalse(True, "unknown trial type: " + trial)
@@ -276,6 +278,17 @@ class SequenceBatcherTest(unittest.TestCase):
                         "expected model-inference-count " + str(infer_cnt) + ", got " +
                         str(vs[1].model_inference_count))
 
+    def get_expected_result(self, expected_result, value, trial, flag_str=None):
+        # Adjust the expected_result for models that
+        # couldn't implement the full accumulator. See
+        # qa/common/gen_qa_sequence_models.py for more
+        # information.
+        if (not _no_batching and ("custom" not in trial)) or ("graphdef" in trial):
+            expected_result = value
+            if (flag_str is not None) and ("start" in flag_str):
+                expected_result += 1
+        return expected_result
+
     def test_simple_sequence(self):
         # Send one sequence and check for correct accumulator
         # result. The result should be returned immediately.
@@ -301,8 +314,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                          (None, 7, None, None),
                                          (None, 8, None, None),
                                          ("end", 9, None, None)),
-                                        45,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(45, 9, trial, "end"),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.check_status(model_name, (1,), 9 * (idx + 1), 9 * (idx + 1))
@@ -326,8 +340,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start,end", 42, None, None),),
-                                        42,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(42, 42, trial, "start,end"),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.check_status(model_name, (1,), (idx + 1), (idx + 1))
@@ -340,7 +355,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # When 4 model instances the max-batch-size is 1 so can't test
         # since that gives a different error: "batch-size 2 exceeds
         # maximum batch size"
-        if _model_instances == 4:
+        if (_model_instances == 4) or _no_batching:
             return
 
         for trial in _trials:
@@ -358,9 +373,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          ("end", 9, None, None)),
-                                        10,
+                                        self.get_expected_result(10, 9, trial, "end"),
                                         protocol, batch_size=2,
-                                        sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -368,7 +384,9 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertEqual("inference:0", ex.server_id())
                     self.assertTrue(
                         ex.message().startswith(
-                            "inference request to model 'custom_sequence_int32' must specify batch-size 1 due to requirements of sequence batcher"))
+                            str("inference request to model '{}' must specify " +
+                                "batch-size 1 due to requirements of sequence " +
+                                "batcher").format(model_name)))
 
     def test_no_correlation_id(self):
         # Send sequence without correlation ID and check for error.
@@ -387,8 +405,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          ("end", 9, None, None)),
-                                        10,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(10, 9, trial, "end"),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -396,7 +415,8 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertEqual("inference:0", ex.server_id())
                     self.assertTrue(
                         ex.message().startswith(
-                            "inference request to model 'custom_sequence_int32' must specify a non-zero correlation ID"))
+                            str("inference request to model '{}' must specify a " +
+                                "non-zero correlation ID").format(model_name)))
 
     def test_no_sequence_start(self):
         # Send sequence without start flag for never before seen
@@ -417,8 +437,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                         ((None, 1, None, None),
                                          (None, 2, None, None),
                                          ("end", 3, None, None)),
-                                        6,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(6, 3, trial, "end"),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -426,7 +447,9 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertEqual("inference:0", ex.server_id())
                     self.assertTrue(
                         ex.message().startswith(
-                            "inference request for sequence 37469245 to model 'custom_sequence_int32' must specify the START flag on the first request of the sequence"))
+                            str("inference request for sequence 37469245 to " +
+                                "model '{}' must specify the START flag on the first " +
+                                "request of the sequence").format(model_name)))
 
     def test_no_sequence_start2(self):
         # Send sequence without start flag after sending a valid
@@ -449,8 +472,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                          (None, 2, None, None),
                                          ("end", 3, None, None),
                                          (None, 55, None, None)),
-                                        6,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(6, 3, trial, None),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_status(model_name, (1,), 3 * (idx + 1), 3 * (idx + 1))
                     self.check_deferred_exception()
@@ -459,7 +483,9 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertEqual("inference:0", ex.server_id())
                     self.assertTrue(
                         ex.message().startswith(
-                            "inference request for sequence 3 to model 'custom_sequence_int32' must specify the START flag on the first request of the sequence"))
+                            str("inference request for sequence 3 to model '{}' must " +
+                                "specify the START flag on the first request of " +
+                                "the sequence").format(model_name)))
 
     def test_no_sequence_end(self):
         # Send sequence without end flag. Use same correlation ID to
@@ -482,8 +508,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                          (None, 2, None, None),
                                          ("start", 42, None, None),
                                          ("end", 9, None, None)),
-                                        51,
-                                        protocol, sequence_name="{}_{}".format(self._testMethodName, protocol))
+                                        self.get_expected_result(51, 9, trial, "end"),
+                                        protocol, sequence_name="{}_{}".format(
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.check_status(model_name, (1,), 4 * (idx + 1), 4 * (idx + 1))
@@ -519,7 +546,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 2, None),
                            (None, 3, None),
                            ("end", 4, None)),
-                          10,
+                          self.get_expected_result(10, 4, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -531,7 +558,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 9, None),
                            (None, 5, None),
                            ("end", 13, None)),
-                          27,
+                          self.get_expected_result(27, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -571,7 +598,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            ("end", 3, None)),
-                          4,
+                          self.get_expected_result(4, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -583,7 +610,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 12, None),
                            (None, 13, None),
                            ("end", 14, None)),
-                          50,
+                          self.get_expected_result(50, 14, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -593,7 +620,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
-                          224,
+                          self.get_expected_result(224, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -605,7 +632,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 1112, None),
                            (None, 1113, None),
                            ("end", 1114, None)),
-                          4450,
+                          self.get_expected_result(4450, 1114, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -654,7 +681,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1, None),
                            (None, 2, None),
                            ("end", 3, None)),
-                          6,
+                          self.get_expected_result(6, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -665,7 +692,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 11, None),
                            (None, 12, None),
                            ("end", 13, None)),
-                          36,
+                          self.get_expected_result(36, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -676,7 +703,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 111, None),
                            (None, 112, None),
                            ("end", 113, None)),
-                          336,
+                          self.get_expected_result(336, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -687,7 +714,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          3336,
+                          self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -729,7 +756,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1, None),
                            (None, 2, None),
                            ("end", 3, None)),
-                          6,
+                          self.get_expected_result(6, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -740,7 +767,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 11, None),
                            (None, 12, None),
                            ("end", 13, None)),
-                          36,
+                          self.get_expected_result(36, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -751,7 +778,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 111, None),
                            (None, 112, None),
                            ("end", 113, None)),
-                          336,
+                          self.get_expected_result(336, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -762,7 +789,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          3336,
+                          self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -773,7 +800,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 11111, None),
                            (None, 11112, None),
                            ("end", 11113, None)),
-                          33336,
+                          self.get_expected_result(33336, 11113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -822,7 +849,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1, None),
                            (None, 2, None),
                            ("end", 3, None)),
-                          6,
+                          self.get_expected_result(6, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -832,7 +859,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            ("end", 13, None)),
-                          24,
+                          self.get_expected_result(24, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -842,7 +869,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
-                          224,
+                          self.get_expected_result(224, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -853,7 +880,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          3336,
+                          self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -862,7 +889,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
-                          11111,
+                          self.get_expected_result(11111, 11111, trial, "start,end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -871,7 +898,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 22222, None),),
-                          22222,
+                          self.get_expected_result(22222, 22222, trial, "start,end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -926,7 +953,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1, None),
                            (None, 2, None),
                            ("end", 3, None)),
-                          6,
+                          self.get_expected_result(6, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -936,7 +963,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            ("end", 13, None)),
-                          24,
+                          self.get_expected_result(24, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -946,7 +973,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
-                          224,
+                          self.get_expected_result(224, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -957,7 +984,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          3336,
+                          self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -966,7 +993,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
-                          11111,
+                          self.get_expected_result(11111, 11111, trial, "start,end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -977,7 +1004,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 22222, None),
                            (None, 22223, None),
                            ("end", 22224, 2000),),
-                          66669,
+                          self.get_expected_result(66669, 22224, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -1024,7 +1051,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1, None),
                            (None, 2, None),
                            ("end", 3, None)),
-                          6,
+                          self.get_expected_result(6, 3, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1035,7 +1062,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 11, None),
                            (None, 12, None),
                            ("end", 13, None)),
-                          36,
+                          self.get_expected_result(36, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1046,7 +1073,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 111, None),
                            (None, 112, None),
                            ("end", 113, None)),
-                          336,
+                          self.get_expected_result(336, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1057,7 +1084,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start", 1111, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          3336,
+                          self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1067,7 +1094,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            ("end", 11113, None)),
-                          22224,
+                          self.get_expected_result(22224, 11113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
@@ -1122,7 +1149,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 3, None)),
-                          4,
+                          self.get_expected_result(4, 3, trial, None),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1134,7 +1161,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 12, None),
                            (None, 12, None),
                            ("end", 13, None)),
-                          48,
+                          self.get_expected_result(48, 13, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1146,7 +1173,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 112, None),
                            (None, 112, None),
                            ("end", 113, None)),
-                          448,
+                          self.get_expected_result(448, 113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1158,7 +1185,7 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 1112, None),
                            (None, 1112, None),
                            ("end", 1113, None)),
-                          4448,
+                          self.get_expected_result(4448, 1113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
@@ -1168,7 +1195,7 @@ class SequenceBatcherTest(unittest.TestCase):
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            ("end", 11113, None)),
-                          22224,
+                          self.get_expected_result(22224, 11113, trial, "end"),
                           protocol),
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
 
