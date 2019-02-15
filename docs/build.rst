@@ -104,6 +104,9 @@ is based on `Sphinx <http://www.sphinx-doc.org>`_. `Doxygen
 <https://github.com/svenevs/exhale>`_ is used for C++ API
 docuementation.
 
+HTML Documentation
+^^^^^^^^^^^^^^^^^^
+
 To build the docs install the required dependencies::
 
   $ apt-get update
@@ -121,9 +124,12 @@ directory::
   $ cd docs
   $ make clean html
 
-To build the PDF version of documentation `LaTEX <https://www.tug.org/texlive/quickinstall.html>`
-needs to be installed first. Additional requirements of python modules
-can be met by simply running the following commands in docs directory::
+PDF Documentation
+^^^^^^^^^^^^^^^^^
+
+To build the PDF version of documentation, `TEX <https://www.tug.org/texlive/quickinstall.html>`_ needs
+to be installed first. Additional requirements of python modules can be met by simply running the following
+commands in docs directory::
 
   $ pip install -r requirements.txt
 
@@ -133,8 +139,12 @@ directory::
 
   $make clean latexpdf
 
-Corrections and enhancements in Documentation are always welcome however it is advised that before
-creating a pull request for the changes these are validated locally. A simple way to do it is to run web server
-inside *docs/build/html* directory with following command and navigate through the modified documentation in the browser
-at http://localhost:8000 ::
-  $ python -m SimpleHTTPServer		# run inside docs/build/html
+Updating Documentation
+----------------------
+
+Before creating a pull request for merging changes in documentation one can validate the same locally. It can be done
+by running simple HTTP server in *docs/build* diretory with command below and navigating to the documentation pages in
+the browser at http://localhost:8000. ::
+  
+  $ python -m SimpleHTTPServer
+
