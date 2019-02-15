@@ -1,0 +1,7 @@
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Packages are listed in chronological order. 
+breathe==4.11.1
+exhale==0.2.2
+nbsphinx==0.4.2
+sphinx==1.8.4
+sphinx_rtd_theme==0.4.3
