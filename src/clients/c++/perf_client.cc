@@ -140,6 +140,8 @@ typedef struct PerformanceStatusStruct {
 
   // Request count and elapsed time measured by client
   uint64_t client_request_count;
+  // Only record sequences that finish within the measurement window
+  uint64_t client_sequence_count;
   uint64_t client_duration_ns;
   uint64_t client_min_latency_ns;
   uint64_t client_max_latency_ns;
@@ -149,8 +151,10 @@ typedef struct PerformanceStatusStruct {
   uint64_t client_avg_request_time_ns;
   uint64_t client_avg_send_time_ns;
   uint64_t client_avg_receive_time_ns;
-  // Per infer stat
+  // Per sec stat
   int client_infer_per_sec;
+  int client_sequence_per_sec;
+  bool on_sequence_model;
 } PerfStatus;
 
 
@@ -189,7 +193,8 @@ enum ProtocolType { HTTP = 0, GRPC = 1 };
 // time of each request into a shared vector.
 //
 // The manager can adjust the number of concurrent requests by creating
-// new threads or by pausing existing threads (by pause_index_).
+// new threads or by reducing the concurrency that existing threads create
+// (see threads_concurrency_).
 // After the adjustment, the manager will actively measure the throughput until
 // it is stable. Once stable, the manager update the 'status_summary' based on
 // the most recent measurement.
@@ -208,12 +213,6 @@ class ConcurrencyManager {
   {
     early_exit = true;
     // wake up all threads
-    {
-      // Acquire lock first to make sure no worker thread is trying to pause
-      // (avoid dead lock)
-      std::lock_guard<std::mutex> lk(wake_mutex_);
-      *pause_index_ = threads_.size();
-    }
     wake_signal_.notify_all();
 
     size_t cnt = 0;
@@ -231,15 +230,14 @@ class ConcurrencyManager {
       std::unique_ptr<ConcurrencyManager>* manager, const bool verbose,
       const bool profile, const int32_t batch_size, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
-      const bool streaming, const bool async, const std::string& model_name,
-      const int64_t model_version, const std::string& url,
-      const ProtocolType protocol)
+      const bool streaming, const size_t max_threads,
+      const std::string& model_name, const int64_t model_version,
+      const std::string& url, const ProtocolType protocol)
   {
     manager->reset(new ConcurrencyManager(
         verbose, profile, batch_size, stable_offset, measurement_window_ms,
-        max_measurement_count, streaming, async, model_name, model_version, url,
-        protocol));
-    (*manager)->pause_index_.reset(new size_t(0));
+        max_measurement_count, streaming, max_threads, model_name,
+        model_version, url, protocol));
     (*manager)->request_timestamps_.reset(new TimestampVector());
     return nic::Error(ni::RequestStatusCode::SUCCESS);
   }
@@ -259,47 +257,32 @@ class ConcurrencyManager {
   {
     status_summary.concurrency = concurrent_request_count;
 
-    // Adjust concurrency level
-    {
-      // Acquire lock first to make sure no worker thread is trying to pause
-      // (avoid dead lock)
-      std::lock_guard<std::mutex> lk(wake_mutex_);
-      *pause_index_ = concurrent_request_count;
+    // Always prefer to create new threads if the maximum limit has not been met
+    while ((concurrent_request_count > threads_.size()) &&
+           (threads_.size() < max_threads_)) {
+      // Launch new thread for inferencing
+      threads_status_.emplace_back(
+          new nic::Error(ni::RequestStatusCode::SUCCESS));
+      threads_context_stat_.emplace_back(new nic::InferContext::Stat());
+      threads_concurrency_.emplace_back(new size_t(0));
+      threads_.emplace_back(
+          &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
+          threads_context_stat_.back(), threads_concurrency_.back());
     }
+
+    // Compute the new concurrency level for each thread (take ceiling)
+    size_t avg_concurrency =
+        (concurrent_request_count + threads_.size() - 1) / threads_.size();
+    size_t num_set = 0;
+    for (auto& thread_concurrency : threads_concurrency_) {
+      size_t num_need = concurrent_request_count - num_set;
+      *thread_concurrency =
+          (num_need < avg_concurrency) ? num_need : avg_concurrency;
+      num_set += *thread_concurrency;
+    }
+
+    // Make sure all threads will check their updated concurrency level
     wake_signal_.notify_all();
-
-    // Create new threads if we can not provide concurrency needed
-    if (!async_) {
-      while (concurrent_request_count > threads_.size()) {
-        // Launch new thread for inferencing
-        threads_status_.emplace_back(
-            new nic::Error(ni::RequestStatusCode::SUCCESS));
-        threads_context_stat_.emplace_back(new nic::InferContext::Stat());
-        size_t new_thread_index = threads_.size();
-        threads_.emplace_back(
-            &ConcurrencyManager::Infer, this, threads_status_.back(),
-            threads_context_stat_.back(), request_timestamps_, pause_index_,
-            new_thread_index);
-      }
-    } else {
-      // TODO: check how much extra latency async infer introduces.
-      // One worker thread still need to prepare the requests
-      // in sequence, intuitively, it seems like the concurrency level
-      // may not be as stable as using multiple worker threads. Maybe having
-      // multiple worker threads and each handles some number of requests?
-
-      // One worker thread is sufficient for async mode
-      if (threads_.size() == 0) {
-        // Launch new thread for inferencing
-        threads_status_.emplace_back(
-            new nic::Error(ni::RequestStatusCode::SUCCESS));
-        threads_context_stat_.emplace_back(new nic::InferContext::Stat());
-        threads_.emplace_back(
-            &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
-            threads_context_stat_.back(), request_timestamps_, pause_index_);
-      }
-    }
-
 
     std::cout << "Request concurrency: " << concurrent_request_count
               << std::endl;
@@ -388,22 +371,28 @@ class ConcurrencyManager {
   }
 
  private:
+  enum EventType {
+    NORMAL,
+    SEQ_START,
+    SEQ_END,
+  };
+
   using TimestampVector =
-      std::vector<std::pair<struct timespec, struct timespec>>;
+      std::vector<std::tuple<struct timespec, struct timespec, EventType>>;
 
   ConcurrencyManager(
       const bool verbose, const bool profile, const int32_t batch_size,
       const double stable_offset, const int32_t measurement_window_ms,
       const size_t max_measurement_count, const bool streaming,
-      const bool async, const std::string& model_name,
+      const size_t max_threads, const std::string& model_name,
       const int64_t model_version, const std::string& url,
       const ProtocolType protocol)
       : verbose_(verbose), profile_(profile), batch_size_(batch_size),
         stable_offset_(stable_offset),
         measurement_window_ms_(measurement_window_ms),
         max_measurement_count_(max_measurement_count), streaming_(streaming),
-        async_(async), model_name_(model_name), model_version_(model_version),
-        url_(url), protocol_(protocol)
+        max_threads_(max_threads), model_name_(model_name),
+        model_version_(model_version), url_(url), protocol_(protocol)
   {
   }
 
@@ -606,11 +595,11 @@ class ConcurrencyManager {
     uint64_t last_request_end_ns = 0;
     for (auto& timestamp : current_timestamps) {
       uint64_t request_start_time =
-          timestamp.first.tv_sec * ni::NANOS_PER_SECOND +
-          timestamp.first.tv_nsec;
+          std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
+          std::get<0>(timestamp).tv_nsec;
       uint64_t request_end_time =
-          timestamp.second.tv_sec * ni::NANOS_PER_SECOND +
-          timestamp.second.tv_nsec;
+          std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
+          std::get<1>(timestamp).tv_nsec;
       if ((first_request_start_ns > request_start_time) ||
           (first_request_start_ns == 0)) {
         first_request_start_ns = request_start_time;
@@ -634,16 +623,18 @@ class ConcurrencyManager {
 
     // Get measurement from requests that fall within the time interval
     size_t valid_timestamp_count = 0;
+    size_t valid_sequence_count = 0;
     uint64_t min_latency_ns = 0;
     uint64_t max_latency_ns = 0;
     uint64_t tol_latency_ns = 0;
     uint64_t tol_square_latency_us = 0;
     for (auto& timestamp : current_timestamps) {
       uint64_t request_start_ns =
-          timestamp.first.tv_sec * ni::NANOS_PER_SECOND +
-          timestamp.first.tv_nsec;
-      uint64_t request_end_ns = timestamp.second.tv_sec * ni::NANOS_PER_SECOND +
-                                timestamp.second.tv_nsec;
+          std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
+          std::get<0>(timestamp).tv_nsec;
+      uint64_t request_end_ns =
+          std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
+          std::get<1>(timestamp).tv_nsec;
 
       if (request_start_ns <= request_end_ns) {
         // Only counting requests that end within the time interval
@@ -658,6 +649,8 @@ class ConcurrencyManager {
           tol_square_latency_us +=
               (request_latency * request_latency) / (1000 * 1000);
           valid_timestamp_count++;
+          if (std::get<2>(timestamp) == EventType::SEQ_END)
+            valid_sequence_count++;
         }
       }
     }
@@ -669,11 +662,15 @@ class ConcurrencyManager {
           " Please use a larger time window.");
     }
 
+    summary.on_sequence_model = on_sequence_model_;
     summary.batch_size = batch_size_;
     summary.client_request_count = valid_timestamp_count;
+    summary.client_sequence_count = valid_sequence_count;
     summary.client_duration_ns = client_duration_ns;
     float client_duration_sec =
         (float)summary.client_duration_ns / ni::NANOS_PER_SECOND;
+    summary.client_sequence_per_sec =
+        (int)(valid_sequence_count / client_duration_sec);
     summary.client_infer_per_sec =
         (int)(valid_timestamp_count * summary.batch_size / client_duration_sec);
     summary.client_min_latency_ns = min_latency_ns;
@@ -762,67 +759,12 @@ class ConcurrencyManager {
   }
 
   // Function for worker threads
-  void Infer(
-      std::shared_ptr<nic::Error> err,
-      std::shared_ptr<nic::InferContext::Stat> stat,
-      std::shared_ptr<TimestampVector> timestamp,
-      std::shared_ptr<size_t> pause_index, const size_t thread_index)
-  {
-    // Create the context for inference of the specified model.
-    std::vector<uint8_t> input_buf;
-    std::unique_ptr<nic::InferContext> ctx;
-    std::unique_ptr<nic::InferContext::Options> options;
-    *err = PrepareInfer(&ctx, &options, input_buf);
-    if (!err->IsOk()) {
-      return;
-    }
-
-    // run inferencing until receiving exit signal to maintain server load.
-    do {
-      // Run inference to get output
-      std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-
-      // Record the start time of the request
-      struct timespec start_time;
-      clock_gettime(CLOCK_MONOTONIC, &start_time);
-
-      *err = ctx->Run(&results);
-
-      // Record the end time of the request
-      struct timespec end_time;
-      clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-      if (!err->IsOk()) {
-        return;
-      }
-
-      // Add the request timestamp to shared vector with proper locking
-      status_report_mutex_.lock();
-      // Critical section
-      request_timestamps_->emplace_back(std::make_pair(start_time, end_time));
-      // Update its InferContext statistic to shared Stat pointer
-      ctx->GetStat(stat.get());
-      status_report_mutex_.unlock();
-
-      // Wait if the thread should be paused
-      if (thread_index >= *pause_index) {
-        // Using conditional variable to be able to wake up pausing threads
-        std::unique_lock<std::mutex> lk(wake_mutex_);
-        wake_signal_.wait(lk, [thread_index, pause_index] {
-          return (thread_index < *pause_index);
-        });
-        lk.unlock();
-      }
-      // Stop inferencing if an early exit has been signaled.
-    } while (!early_exit);
-  }
-
-  // Function for worker threads
+  // [TODO] Change it to create one context per request for later compatible
+  // with sending sequences
   void AsyncInfer(
       std::shared_ptr<nic::Error> err,
       std::shared_ptr<nic::InferContext::Stat> stat,
-      std::shared_ptr<TimestampVector> timestamp,
-      std::shared_ptr<size_t> pause_index)
+      std::shared_ptr<size_t> concurrency)
   {
     // Create the context for inference of the specified model.
     std::vector<uint8_t> input_buf;
@@ -841,8 +783,8 @@ class ConcurrencyManager {
       std::shared_ptr<nic::InferContext::Request> request;
 
       // Create async requests such that the number of ongoing requests
-      // matches the concurrency level (here is '*pause_index')
-      while (requests_start_time.size() < *pause_index) {
+      // matches the concurrency level (here is '*concurrency')
+      while (requests_start_time.size() < *concurrency) {
         struct timespec start_time;
         clock_gettime(CLOCK_MONOTONIC, &start_time);
         *err = ctx->AsyncRun(&request);
@@ -852,7 +794,7 @@ class ConcurrencyManager {
         requests_start_time.emplace(request->Id(), start_time);
       }
 
-      if (requests_start_time.size() < *pause_index) {
+      if (requests_start_time.size() < *concurrency) {
         std::cerr << "This message shouldn't be printed twice in a row"
                   << std::endl;
       }
@@ -861,7 +803,7 @@ class ConcurrencyManager {
       // record the end time of the request
       while (true) {
         nic::Error tmp_err;
-        if (requests_start_time.size() >= *pause_index) {
+        if (requests_start_time.size() >= *concurrency) {
           tmp_err = ctx->GetReadyAsyncRequest(&request, true);
         } else {
           // Don't wait if worker needs to maintain concurrency level
@@ -892,10 +834,20 @@ class ConcurrencyManager {
         // Add the request timestamp to shared vector with proper locking
         status_report_mutex_.lock();
         // Critical section
-        request_timestamps_->emplace_back(std::make_pair(start_time, end_time));
+        // [TODO] set EventType based on event for later compatible with
+        // sequences
+        request_timestamps_->emplace_back(
+            std::make_tuple(start_time, end_time, EventType::NORMAL));
         // Update its InferContext statistic to shared Stat pointer
         ctx->GetStat(stat.get());
         status_report_mutex_.unlock();
+      }
+
+      // Wait if no request should be sent and it is not exiting
+      {
+        std::unique_lock<std::mutex> lock(wake_mutex_);
+        wake_signal_.wait(
+            lock, [concurrency]() { return early_exit || (*concurrency > 0); });
       }
 
       // Stop inferencing if an early exit has been signaled.
@@ -963,20 +915,21 @@ class ConcurrencyManager {
   uint64_t measurement_window_ms_;
   size_t max_measurement_count_;
   bool streaming_;
-  bool async_;
+  size_t max_threads_;
   std::string model_name_;
   int64_t model_version_;
   std::string url_;
   ProtocolType protocol_;
 
+  // [TODO] Will be determined when the infer context is created
+  bool on_sequence_model_;
+
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
   std::vector<std::shared_ptr<nic::Error>> threads_status_;
   std::vector<std::shared_ptr<nic::InferContext::Stat>> threads_context_stat_;
+  std::vector<std::shared_ptr<size_t>> threads_concurrency_;
 
-  // pause_index_ tells threads (with idx >= pause_index_) to pause sending
-  // requests such that load level can decrease without terminating threads.
-  std::shared_ptr<size_t> pause_index_;
   // Use condition variable to pause/continue worker threads
   std::condition_variable wake_signal_;
   std::mutex wake_mutex_;
@@ -1076,8 +1029,12 @@ Report(
 
   std::cout << "  Client: " << std::endl
             << "    Request count: " << summary.client_request_count
-            << std::endl
-            << "    Throughput: " << summary.client_infer_per_sec
+            << std::endl;
+  if (summary.on_sequence_model) {
+    std::cout << "    Sequence count: " << summary.client_sequence_count << " ("
+              << summary.client_sequence_per_sec << std::endl;
+  }
+  std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl
             << "    Avg latency: " << avg_latency_us << " usec"
             << " (standard deviation " << std_us << " usec)" << std::endl
@@ -1108,6 +1065,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-d" << std::endl;
   std::cerr << "\t-a" << std::endl;
   std::cerr << "\t--streaming" << std::endl;
+  std::cerr << "\t--max-threads <thread counts>" << std::endl;
   std::cerr << "\t-l <latency threshold (in msec)>" << std::endl;
   std::cerr << "\t-c <maximum concurrency>" << std::endl;
   std::cerr << "\t-s <deviation threshold for stable measurement"
@@ -1126,11 +1084,13 @@ Usage(char** argv, const std::string& msg = std::string())
       << "The -d flag enables dynamic concurrent request count where the number"
       << " of concurrent requests will increase linearly until the request"
       << " latency is above the threshold set (see -l)." << std::endl;
-  std::cerr << "The -a flag changes the way to maintain concurrency level from"
-            << " sending synchronous requests to sending asynchrnous requests."
-            << std::endl;
+  std::cerr << "The -a flag is deprecated. Enable it will not change"
+            << "perf client behaviors." << std::endl;
   std::cerr << "The --streaming flag is only valid with gRPC protocol."
             << std::endl;
+  std::cerr << "The --max-threads flag sets the maximum number of threads that"
+            << " will be created for providing desired concurrency."
+            << " Default is 16." << std::endl;
   std::cerr
       << "For -t, it indicates the number of starting concurrent requests if -d"
       << " flag is set." << std::endl;
@@ -1183,8 +1143,8 @@ main(int argc, char** argv)
   bool verbose = false;
   bool profile = false;
   bool dynamic_concurrency_mode = false;
-  bool profiling_asynchronous_infer = false;
   bool streaming = false;
+  size_t max_threads = 16;
   uint64_t latency_threshold_ms = 0;
   int32_t batch_size = 1;
   int32_t concurrent_request_count = 1;
@@ -1198,7 +1158,9 @@ main(int argc, char** argv)
   std::string filename("");
   ProtocolType protocol = ProtocolType::HTTP;
 
-  static struct option long_options[] = {{"streaming", 0, 0, 0}, {0, 0, 0, 0}};
+  // {name, has_arg, *flag, val}
+  static struct option long_options[] = {
+      {"streaming", 0, 0, 0}, {"max-threads", 1, 0, 1}, {0, 0, 0, 0}};
 
   // Parse commandline...
   int opt;
@@ -1208,6 +1170,9 @@ main(int argc, char** argv)
     switch (opt) {
       case 0:
         streaming = true;
+        break;
+      case 1:
+        max_threads = std::atoi(optarg);
         break;
       case 'v':
         verbose = true;
@@ -1255,7 +1220,8 @@ main(int argc, char** argv)
         filename = optarg;
         break;
       case 'a':
-        profiling_asynchronous_infer = true;
+        std::cerr << "WARNING: -a flag is deprecated. Enable it will not change"
+                  << "perf client behaviors." << std::endl;
         break;
       case '?':
         Usage(argv);
@@ -1281,6 +1247,9 @@ main(int argc, char** argv)
   if (streaming && protocol != ProtocolType::GRPC) {
     Usage(argv, "Streaming is only allowed with gRPC protocol");
   }
+  if (max_threads == 0) {
+    Usage(argv, "maximum number of threads must be > 0");
+  }
 
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
@@ -1289,8 +1258,8 @@ main(int argc, char** argv)
   std::unique_ptr<ConcurrencyManager> manager;
   err = ConcurrencyManager::Create(
       &manager, verbose, profile, batch_size, stable_offset,
-      measurement_window_ms, max_measurement_count, streaming,
-      profiling_asynchronous_infer, model_name, model_version, url, protocol);
+      measurement_window_ms, max_measurement_count, streaming, max_threads,
+      model_name, model_version, url, protocol);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
