@@ -368,6 +368,16 @@ batch sizes of 4 and 8, and a maximum delay time of 100 microseconds::
     max_queue_delay_microseconds: 100
   }
 
+The size of generated batches can be examined in aggregate using Count
+metrics, see :ref:`section-metrics`. TRTIS verbose logging can be used
+to examine the size of individual batches.
+
+The GRPC endpoint is recommended when using dynamic batching. With the
+HTTP endpoint, the --http-thread-count must be set larger than the
+preferred batch size. Otherwise the inference server will be unable to
+batch sufficient requests and will always hit the maximum delay timeout
+with partial batches. The GRPC endpoint does not have this limitation.
+
 .. _section-optimization-policy:
 
 Optimization Policy
