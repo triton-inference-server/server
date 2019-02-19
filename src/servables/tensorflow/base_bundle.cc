@@ -500,7 +500,7 @@ BaseBundle::Context::SetInput(
 
   // If model supports batching then prepend the batch dimension
   // onto the input shape.
-  if (total_batch_size > 0) {
+  if (max_batch_size_ != NO_BATCHING) {
     shape.AddDim(total_batch_size);
   }
 
@@ -585,9 +585,8 @@ BaseBundle::Context::Run(
     TF_RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     SetInput(
-        name, input_config->data_type(), input.dims(),
-        (max_batch_size_ == NO_BATCHING) ? 0 : total_batch_size, payloads,
-        &input_tensors);
+        name, input_config->data_type(), input.dims(), total_batch_size,
+        payloads, &input_tensors);
   }
 
   // Additional inputs added to the provider...
@@ -599,9 +598,8 @@ BaseBundle::Context::Run(
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
       SetInput(
-          name, override->datatype_, override->dims_,
-          (max_batch_size_ == NO_BATCHING) ? 0 : total_batch_size, payloads,
-          &input_tensors);
+          name, override->datatype_, override->dims_, total_batch_size,
+          payloads, &input_tensors);
     }
   }
 
