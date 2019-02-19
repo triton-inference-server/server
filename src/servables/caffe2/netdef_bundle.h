@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,6 +50,10 @@ class NetDefBundle : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
 
  private:
+  tensorflow::Status ValidateSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      std::vector<std::string>* input_names);
+
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
@@ -81,6 +85,13 @@ class NetDefBundle : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     tensorflow::Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+
+    // Set an input tensor data from payloads.
+    tensorflow::Status SetInput(
+        const std::string& name, const DataType datatype, const DimsList& dims,
+        const size_t total_batch_size,
+        std::vector<Scheduler::Payload>* payloads,
+        std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that

@@ -44,11 +44,11 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch")
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     _trials = []
 else:
-    _trials = ("custom", "savedmodel", "graphdef")
+    _trials = ("custom", "savedmodel", "graphdef", "netdef")
 
 _protocols = ("http", "grpc")
 _max_queue_delay_ms = 0
@@ -283,7 +283,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_sequence_models.py for more
         # information.
-        if (not _no_batching and ("custom" not in trial)) or ("graphdef" in trial):
+        if ((not _no_batching and ("custom" not in trial)) or
+            ("graphdef" in trial) or ("netdef" in trial)):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1

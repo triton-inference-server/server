@@ -222,9 +222,7 @@ NetDefBundle::CreateExecutionContext(
   contexts_.emplace_back(instance_name, gpu_device, mbs);
   Context& context = contexts_.back();
 
-  // Extract input and output names from the config and use them to
-  // create a Caffe2 workspace. We can't cross the raw protobuf across
-  // this boundary (since Caffe2 build may use a different protobuf).
+  // Extract input and output names from the config...
   std::vector<std::string> input_names;
   for (const auto& io : Config().input()) {
     input_names.push_back(io.name());
@@ -234,18 +232,49 @@ NetDefBundle::CreateExecutionContext(
     output_names.push_back(io.name());
   }
 
-  Caffe2Workspace* c2ws;
-  Caffe2Workspace::Error err = Caffe2WorkspaceCreate(
-      &c2ws, Config().name(), Config().max_batch_size(), input_names,
-      output_names, gpu_device, imn_itr->second, mn_itr->second);
-  if (!err.IsOk()) {
-    return tensorflow::errors::Internal(err.Message());
+  // If this is a sequence model then add the required inputs...
+  if (Config().has_sequence_batching()) {
+    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names));
+    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names));
   }
 
-  context.workspace_.reset(c2ws);
+  try {
+    // Create a Caffe2 workspace. We can't cross the raw protobuf
+    // across this boundary (since Caffe2 build may use a different
+    // protobuf).
+    Caffe2Workspace* c2ws;
+    Caffe2Workspace::Error err = Caffe2WorkspaceCreate(
+        &c2ws, Config().name(), Config().max_batch_size(), input_names,
+        output_names, gpu_device, imn_itr->second, mn_itr->second);
+    if (!err.IsOk()) {
+      return tensorflow::errors::Internal(err.Message());
+    }
+
+    context.workspace_.reset(c2ws);
+  }
+  catch (const std::exception& ex) {
+    return tensorflow::errors::Internal(
+        "load failed for '", Config().name(), "': ", ex.what());
+  }
 
   TF_RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
   TF_RETURN_IF_ERROR(context.ValidateOutputs(Config().output()));
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+NetDefBundle::ValidateSequenceControl(
+    const ModelSequenceBatching::Control::Kind control_kind,
+    std::vector<std::string>* input_names)
+{
+  std::string tensor_name;
+  TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+      Config().sequence_batching(), Name(), control_kind, true /* required */,
+      &tensor_name, nullptr, nullptr, nullptr));
+  input_names->push_back(tensor_name);
 
   return tensorflow::Status::OK();
 }
@@ -335,13 +364,8 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
   size_t buffer_copy_offset = 0;
 
   // Visit the payloads in order and copy the input tensors to
-  // 'buffer'. Skip payloads that had errors since they are not
-  // included in the dynamic batch.
+  // 'buffer'.
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_byte_size =
@@ -427,10 +451,6 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
   size_t content_offset = 0;
 
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      continue;
-    }
-
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
     const size_t expected_byte_size =
@@ -459,6 +479,39 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
   return tensorflow::Status::OK();
 }
 
+tensorflow::Status
+NetDefBundle::Context::SetInput(
+    const std::string& name, const DataType datatype, const DimsList& dims,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<char[]>>* input_buffers)
+{
+  // Get the shape of the input. The provider has already checked that
+  // the request shape is valid so don't need to do it here.
+  std::vector<int64_t> shape;
+
+  // If model supports batching then prepend the batch dimension
+  // onto the input shape.
+  if (max_batch_size_ != NO_BATCHING) {
+    shape.push_back(total_batch_size);
+  }
+
+  size_t batch1_element_cnt = 1;
+  for (auto dim : dims) {
+    shape.push_back(dim);
+    batch1_element_cnt *= dim;
+  }
+
+  // Checked at initialization time to make sure that STRING is not
+  // being used for an input, so can just assume fixed-sized here.
+  const Caffe2Workspace::DataType dtype = ConvertDataType(datatype);
+  const size_t batch1_byte_size =
+      batch1_element_cnt * GetDataTypeByteSize(datatype);
+  const size_t total_byte_size = total_batch_size * batch1_byte_size;
+
+  return SetFixedSizedInputTensor(
+      name, shape, dtype, batch1_byte_size, total_byte_size, payloads,
+      input_buffers);
+}
 
 tensorflow::Status
 NetDefBundle::Context::Run(
@@ -467,7 +520,7 @@ NetDefBundle::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  const InferRequestHeader* input_request_header = nullptr;
+  std::shared_ptr<InferRequestProvider> input_request_provider;
 
   // For each request in 'payloads' collect the total batch size for
   // this inference execution. The batch-size, number of inputs, and
@@ -475,14 +528,17 @@ NetDefBundle::Context::Run(
   // request provider so don't need to do that here.
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
-    if (payload.status_.ok()) {
-      total_batch_size +=
-          payload.request_provider_->RequestHeader().batch_size();
-
-      // All payloads must have equally-sized input tensors so use any
-      // payload as the representative for the input tensors.
-      input_request_header = &(payload.request_provider_->RequestHeader());
+    if (!payload.status_.ok()) {
+      return tensorflow::errors::Internal(
+          "unexpected payload with non-OK status given to runner for '", name_,
+          "'");
     }
+
+    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+
+    // All payloads must have equally-sized input tensors so use any
+    // payload as the representative for the input tensors.
+    input_request_provider = payload.request_provider_;
   }
 
   // If there are no valid payloads then no need to run the
@@ -507,39 +563,31 @@ NetDefBundle::Context::Run(
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
   // into the corresponding tensor.
-  for (const auto& input : input_request_header->input()) {
+
+  // Inputs from the request...
+  for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
 
     const ModelInput* input_config;
     TF_RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
-    // Get the shape of the input.  The provider has already checked
-    // that the request shape is valid so don't need to do it here.
-    std::vector<int64_t> shape;
+    TF_RETURN_IF_ERROR(SetInput(
+        name, input_config->data_type(), input.dims(), total_batch_size,
+        payloads, &input_buffers));
+  }
 
-    // If model supports batching then prepend the batch dimension
-    // onto the input shape.
-    if (max_batch_size_ != NO_BATCHING) {
-      shape.push_back(total_batch_size);
+  // Additional inputs added to the provider...
+  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      input_override_map = input_request_provider->GetInputOverride();
+  if (input_override_map != nullptr) {
+    for (const auto& pr : *input_override_map) {
+      const std::string& name = pr.first;
+      const std::shared_ptr<InferRequestProvider::InputOverride>& override =
+          pr.second;
+      TF_RETURN_IF_ERROR(SetInput(
+          name, override->datatype_, override->dims_, total_batch_size,
+          payloads, &input_buffers));
     }
-
-    size_t batch1_element_cnt = 1;
-    for (auto dim : input.dims()) {
-      shape.push_back(dim);
-      batch1_element_cnt *= dim;
-    }
-
-    // Checked at initialization time to make sure that STRING is not
-    // being used for an input, so can just assume fixed-sized here.
-    const Caffe2Workspace::DataType dtype =
-        ConvertDataType(input_config->data_type());
-    const size_t batch1_byte_size =
-        batch1_element_cnt * GetDataTypeByteSize(input_config->data_type());
-    const size_t total_byte_size = total_batch_size * batch1_byte_size;
-
-    TF_RETURN_IF_ERROR(SetFixedSizedInputTensor(
-        name, shape, dtype, batch1_byte_size, total_byte_size, payloads,
-        &input_buffers));
   }
 
   // Run...

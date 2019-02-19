@@ -43,6 +43,7 @@ RET=0
 #   models4 - four instances with batch-size 1
 rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
 for m in \
+        $DATADIR/qa_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/savedmodel_sequence_int32 \
         ../custom_models/custom_sequence_int32 ; do
@@ -64,6 +65,7 @@ for m in \
 done
 
 for m in \
+        $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_int32 ; do
     cp -r $m models0/. && \
