@@ -372,12 +372,12 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size;
 
     size_t copied_byte_size = 0;
-    while (payload.compute_status_.ok()) {
+    while (payload.status_.ok()) {
       const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
-      payload.compute_status_ = payload.request_provider_->GetNextInputContent(
+      payload.status_ = payload.request_provider_->GetNextInputContent(
           name, &content, &content_byte_size, false);
-      if (!payload.compute_status_.ok()) {
+      if (!payload.status_.ok()) {
         break;
       }
 
@@ -388,7 +388,7 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
 
       if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
           total_byte_size) {
-        payload.compute_status_ = tensorflow::errors::InvalidArgument(
+        payload.status_ = tensorflow::errors::InvalidArgument(
             "unexpected size ",
             buffer_copy_offset + copied_byte_size + content_byte_size,
             " for inference input '", name, "', expecting ", total_byte_size);
@@ -401,9 +401,8 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
       copied_byte_size += content_byte_size;
     }
 
-    if (payload.compute_status_.ok() &&
-        (copied_byte_size != expected_byte_size)) {
-      payload.compute_status_ = tensorflow::errors::Internal(
+    if (payload.status_.ok() && (copied_byte_size != expected_byte_size)) {
+      payload.status_ = tensorflow::errors::Internal(
           "expected ", expected_byte_size,
           " bytes of data for inference input '", name, "', got ",
           copied_byte_size);
@@ -469,7 +468,7 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
       }
 
       if (!status.ok()) {
-        payload.compute_status_ = status;
+        payload.status_ = status;
       }
     }
 

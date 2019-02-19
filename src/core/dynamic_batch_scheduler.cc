@@ -233,9 +233,7 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
         bool found_success = false;
         for (auto& payload : *payloads) {
           tensorflow::Status final_status =
-              status.ok() ? (payload.status_.ok() ? payload.compute_status_
-                                                  : payload.status_)
-                          : status;
+              status.ok() ? payload.status_ : status;
 
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0

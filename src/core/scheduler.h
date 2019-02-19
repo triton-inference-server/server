@@ -49,7 +49,7 @@ class Scheduler {
           request_provider_(std::move(payload.request_provider_)),
           response_provider_(std::move(payload.response_provider_)),
           complete_function_(std::move(payload.complete_function_)),
-          status_(payload.status_), compute_status_(payload.compute_status_)
+          status_(payload.status_)
     {
     }
     Payload(
@@ -62,8 +62,7 @@ class Scheduler {
           request_provider_(request_provider),
           response_provider_(response_provider),
           complete_function_(complete_function),
-          status_(tensorflow::Status::OK()),
-          compute_status_(tensorflow::Status::OK())
+          status_(tensorflow::Status::OK())
     {
     }
 
@@ -73,7 +72,6 @@ class Scheduler {
     std::shared_ptr<InferResponseProvider> response_provider_;
     std::function<void(tensorflow::Status)> complete_function_;
     tensorflow::Status status_;
-    tensorflow::Status compute_status_;
   };
 
   // The prototype for the run function that will be called by the

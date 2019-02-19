@@ -257,12 +257,12 @@ SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size;
 
     size_t copied_byte_size = 0;
-    while (payload.compute_status_.ok()) {
+    while (payload.status_.ok()) {
       const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
-      payload.compute_status_ = payload.request_provider_->GetNextInputContent(
+      payload.status_ = payload.request_provider_->GetNextInputContent(
           input_name, &content, &content_byte_size, false);
-      if (!payload.compute_status_.ok()) {
+      if (!payload.status_.ok()) {
         break;
       }
 
@@ -273,7 +273,7 @@ SetFixedSizedInputTensor(
 
       if ((tensor_copy_offset + copied_byte_size + content_byte_size) >
           ((size_t)flat.size())) {
-        payload.compute_status_ = tensorflow::errors::InvalidArgument(
+        payload.status_ = tensorflow::errors::InvalidArgument(
             "unexpected size ",
             tensor_copy_offset + copied_byte_size + content_byte_size,
             " for inference input '", input_name, "', expecting ", flat.size());
@@ -287,9 +287,8 @@ SetFixedSizedInputTensor(
       copied_byte_size += content_byte_size;
     }
 
-    if (payload.compute_status_.ok() &&
-        (copied_byte_size != expected_byte_size)) {
-      payload.compute_status_ = tensorflow::errors::Internal(
+    if (payload.status_.ok() && (copied_byte_size != expected_byte_size)) {
+      payload.status_ = tensorflow::errors::Internal(
           "expected ", expected_byte_size,
           " bytes of data for inference input '", input_name, "', got ",
           copied_byte_size);
@@ -330,9 +329,9 @@ SetStringInputTensor(
 
     const void* vcontent;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
-    payload.compute_status_ = payload.request_provider_->GetNextInputContent(
+    payload.status_ = payload.request_provider_->GetNextInputContent(
         input_name, &vcontent, &content_byte_size, true);
-    if (!payload.compute_status_.ok()) {
+    if (!payload.status_.ok()) {
       FillStringTensor(
           tensor, tensor_element_idx + element_idx,
           expected_element_cnt - element_idx);
@@ -346,7 +345,7 @@ SetStringInputTensor(
     // itself with no null-terminator.
     while (content_byte_size >= sizeof(uint32_t)) {
       if (element_idx >= expected_element_cnt) {
-        payload.compute_status_ = tensorflow::errors::InvalidArgument(
+        payload.status_ = tensorflow::errors::InvalidArgument(
             "unexpected number of string elements ", element_idx + 1,
             " for inference input '", input_name, "', expecting ",
             expected_element_cnt);
@@ -361,7 +360,7 @@ SetStringInputTensor(
       content_byte_size -= sizeof(uint32_t);
 
       if (content_byte_size < len) {
-        payload.compute_status_ = tensorflow::errors::InvalidArgument(
+        payload.status_ = tensorflow::errors::InvalidArgument(
             "incomplete string data for inference input '", input_name,
             "', expecting string of length ", len, " but only ",
             content_byte_size, " bytes available");
@@ -379,8 +378,8 @@ SetStringInputTensor(
       element_idx++;
     }
 
-    if (payload.compute_status_.ok() && (element_idx != expected_element_cnt)) {
-      payload.compute_status_ = tensorflow::errors::Internal(
+    if (payload.status_.ok() && (element_idx != expected_element_cnt)) {
+      payload.status_ = tensorflow::errors::Internal(
           "expected ", expected_element_cnt, " strings for inference input '",
           input_name, "', got ", element_idx);
       FillStringTensor(
@@ -417,10 +416,10 @@ ReadFixedSizedOutputTensor(
       tensorflow::Status status = payload.response_provider_->GetOutputBuffer(
           output_name, &content, expected_byte_size, shape);
       if (!status.ok()) {
-        payload.compute_status_ = status;
+        payload.status_ = status;
       } else {
         if ((tensor_copy_offset + expected_byte_size) > ((size_t)flat.size())) {
-          payload.compute_status_ = tensorflow::errors::InvalidArgument(
+          payload.status_ = tensorflow::errors::InvalidArgument(
               "unexpected size ", tensor_copy_offset + expected_byte_size,
               " for inference output '", output_name, "', expecting ",
               flat.size());
@@ -476,7 +475,7 @@ ReadStringOutputTensor(
             content, reinterpret_cast<const void*>(serialized.c_str()),
             serialized.size());
       } else {
-        payload.compute_status_ = status;
+        payload.status_ = status;
       }
     }
 
