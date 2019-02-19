@@ -527,13 +527,12 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
           request_header.batch_size() * batch1_byte_size;
 
       size_t copied_byte_size = 0;
-      while (payload.compute_status_.ok()) {
+      while (payload.status_.ok()) {
         const void* content;
         size_t content_byte_size = expected_byte_size - copied_byte_size;
-        payload.compute_status_ =
-            payload.request_provider_->GetNextInputContent(
-                name, &content, &content_byte_size, false);
-        if (!payload.compute_status_.ok()) {
+        payload.status_ = payload.request_provider_->GetNextInputContent(
+            name, &content, &content_byte_size, false);
+        if (!payload.status_.ok()) {
           break;
         }
 
@@ -544,7 +543,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
         if ((binding_copy_offset + copied_byte_size + content_byte_size) >
             byte_sizes_[bindex]) {
-          payload.compute_status_ = tensorflow::errors::InvalidArgument(
+          payload.status_ = tensorflow::errors::InvalidArgument(
               "unexpected size ",
               binding_copy_offset + copied_byte_size + content_byte_size,
               " for inference input '", name, "', expecting ",
@@ -557,7 +556,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
                 copied_byte_size,
             content, content_byte_size, cudaMemcpyHostToDevice, stream_);
         if (err != cudaSuccess) {
-          payload.compute_status_ = tensorflow::errors::Internal(
+          payload.status_ = tensorflow::errors::Internal(
               "failed to copy input values to GPU for input '", name,
               "': ", cudaGetErrorString(err));
           break;
@@ -566,9 +565,8 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         copied_byte_size += content_byte_size;
       }
 
-      if (payload.compute_status_.ok() &&
-          (copied_byte_size != expected_byte_size)) {
-        payload.compute_status_ = tensorflow::errors::Internal(
+      if (payload.status_.ok() && (copied_byte_size != expected_byte_size)) {
+        payload.status_ = tensorflow::errors::Internal(
             "expected ", expected_byte_size,
             " bytes of data for inference input '", name, "', got ",
             copied_byte_size);
@@ -647,7 +645,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
         }
 
         if (!status.ok()) {
-          payload.compute_status_ = status;
+          payload.status_ = status;
         }
       }
 
