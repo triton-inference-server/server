@@ -648,11 +648,8 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
         if (status.ok()) {
           for (auto& payload : *payloads) {
             if (payload.complete_function_ == nullptr) {
-              const tensorflow::Status& no_complete_status =
-                  payload.status_.ok() ? payload.compute_status_
-                                       : payload.status_;
-              if (!no_complete_status.ok()) {
-                status = no_complete_status;
+              if (!payload.status_.ok()) {
+                status = payload.status_;
                 break;
               }
             }
@@ -663,9 +660,7 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
         bool found_success = false;
         for (auto& payload : *payloads) {
           const tensorflow::Status& final_status =
-              status.ok() ? (payload.status_.ok() ? payload.compute_status_
-                                                  : payload.status_)
-                          : status;
+              status.ok() ? payload.status_ : status;
 
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
