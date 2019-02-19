@@ -254,6 +254,99 @@ instance_group [
         cfile.write(config)
 
 
+def create_netdef_modelfile(
+        create_savedmodel, models_dir, model_version, max_batch, dtype):
+
+    c2_dtype = np_to_c2_dtype(dtype)
+    model_name = tu.get_sequence_model_name(
+        "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
+
+    # Create the model. For now don't implement a proper accumulator
+    # just return the 0 if not-ready and 'INPUT'+'START' otherwise...
+    # the tests know to expect this.
+    model = c2model_helper.ModelHelper(name=model_name)
+    model.net.Add(["INPUT", "START"], "add")
+    model.net.Sub(["READY", "READY"], "zeros")
+    model.net.NE(["READY", "zeros"], "compare")
+    model.net.Where(["compare", "add", "zeros"], "OUTPUT")
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(model_version_dir + "/model.netdef", "wb") as f:
+        f.write(model.Proto().SerializeToString())
+    with open(model_version_dir + "/init_model.netdef", "wb") as f:
+        f.write(model.InitProto().SerializeToString())
+
+
+def create_netdef_modelconfig(
+        create_savedmodel, models_dir, model_version, max_batch, dtype):
+
+    model_name = tu.get_sequence_model_name(
+        "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "caffe2_netdef"
+max_batch_size: {}
+sequence_batching {{
+  max_queue_delay_microseconds: 0
+  control_input [
+    {{
+      name: "START"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+}}
+input [
+  {{
+    name: "INPUT"
+    data_type: {}
+    dims: [ 1 ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: {}
+    dims: [ 1 ]
+  }}
+]
+instance_group [
+  {{
+    kind: KIND_CPU
+  }}
+]
+'''.format(model_name, max_batch,
+           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_models(models_dir, dtype):
     model_version = 1
 
@@ -269,11 +362,11 @@ def create_models(models_dir, dtype):
         create_tf_modelconfig(True, models_dir, model_version, 0, dtype);
         create_tf_modelfile(True, models_dir, model_version, 0, dtype);
 
-#    if FLAGS.netdef:
-#        create_netdef_modelconfig(
-#            models_dir, 8, model_version, dtype, (1,));
-#        create_netdef_modelfile(
-#            models_dir, 0, model_version, dtype, (1,));
+    if FLAGS.netdef:
+        create_netdef_modelconfig(True, models_dir, model_version, 8, dtype);
+        create_netdef_modelfile(True, models_dir, model_version, 8, dtype);
+        create_netdef_modelconfig(True, models_dir, model_version, 0, dtype);
+        create_netdef_modelfile(True, models_dir, model_version, 0, dtype);
 
 #    if FLAGS.tensorrt:
 #        create_tensorrt_modelconfig(

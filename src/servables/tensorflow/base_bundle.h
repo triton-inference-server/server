@@ -81,6 +81,8 @@ class BaseBundle : public InferenceBackend {
 
     // Create TF tensor for an input.
     using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
+
+    // Set an input tensor data from payloads.
     void SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
