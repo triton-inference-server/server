@@ -56,7 +56,8 @@ GetSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
     const bool required, std::string* tensor_name, DataType* tensor_datatype,
-    int32_t* false_value, int32_t* true_value)
+    float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
+    int32_t* int32_true_value)
 {
   // Make sure the control kind is not mentioned multiple times.
   bool seen = false;
@@ -76,26 +77,62 @@ GetSequenceControlProperties(
               " tensors for ", model_name);
         }
 
-        if (c.int32_false_true_size() != 2) {
-          return tensorflow::errors::InvalidArgument(
-              "sequence batching control 'int32_false_true' must have exactly "
-              "2 entries for ",
-              ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
-              model_name);
-        }
-
         *tensor_name = control_input.name();
-        if (tensor_datatype != nullptr) {
-          *tensor_datatype = DataType::TYPE_INT32;
-        }
-        if (false_value != nullptr) {
-          *false_value = c.int32_false_true(0);
-        }
-        if (true_value != nullptr) {
-          *true_value = c.int32_false_true(1);
-        }
-
         seen = true;
+
+        if (c.int32_false_true_size() > 0) {
+          if (c.fp32_false_true_size() != 0) {
+            return tensorflow::errors::InvalidArgument(
+                "sequence batching specifies both 'int32_false_true' and "
+                "'fp32_false_true' for ",
+                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
+                model_name);
+          }
+
+          if (c.int32_false_true_size() != 2) {
+            return tensorflow::errors::InvalidArgument(
+                "sequence batching control 'int32_false_true' must have "
+                "exactly 2 entries for ",
+                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
+                model_name);
+          }
+
+          if (tensor_datatype != nullptr) {
+            *tensor_datatype = DataType::TYPE_INT32;
+          }
+          if (int32_false_value != nullptr) {
+            *int32_false_value = c.int32_false_true(0);
+          }
+          if (int32_true_value != nullptr) {
+            *int32_true_value = c.int32_false_true(1);
+          }
+        } else {
+          if (c.fp32_false_true_size() == 0) {
+            return tensorflow::errors::InvalidArgument(
+                "sequence batching must specify either 'int32_false_true' and "
+                "'fp32_false_true' for ",
+                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
+                model_name);
+          }
+
+          if (c.fp32_false_true_size() != 2) {
+            return tensorflow::errors::InvalidArgument(
+                "sequence batching control 'fp32_false_true' must have exactly "
+                "2 entries for ",
+                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
+                model_name);
+          }
+
+          if (tensor_datatype != nullptr) {
+            *tensor_datatype = DataType::TYPE_FP32;
+          }
+          if (fp32_false_value != nullptr) {
+            *fp32_false_value = c.fp32_false_true(0);
+          }
+          if (fp32_true_value != nullptr) {
+            *fp32_true_value = c.fp32_false_true(1);
+          }
+        }
       }
     }
   }
@@ -320,11 +357,13 @@ ValidateModelConfig(
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
-        true /* required */, &tensor_name, nullptr, nullptr, nullptr));
+        true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
+        nullptr));
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
-        true /* required */, &tensor_name, nullptr, nullptr, nullptr));
+        true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
+        nullptr));
   }
 
   // Make sure KIND_GPU instance group specifies at least one GPU and

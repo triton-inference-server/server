@@ -122,6 +122,9 @@ def np_to_trt_dtype(np_dtype):
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, max_batch, dtype):
 
+    if not tu.validate_for_tf_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+        return
+
     tf_dtype = np_to_tf_dtype(dtype)
 
     # Create the model. If non-batching then don't include the batch
@@ -129,8 +132,8 @@ def create_tf_modelfile(
     tf.reset_default_graph()
     if create_savedmodel and (max_batch == 0):
         input0 = tf.placeholder(tf_dtype, [1,], "INPUT")
-        start0 = tf.placeholder(tf.int32, [1,], "START")
-        ready0 = tf.placeholder(tf.int32, [1,], "READY")
+        start0 = tf.placeholder(tf_dtype, [1,], "START")
+        ready0 = tf.placeholder(tf_dtype, [1,], "READY")
         acc = tf.get_variable("ACC", [1,], dtype=tf_dtype)
         tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
         newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
@@ -141,14 +144,14 @@ def create_tf_modelfile(
         # accumulated values since that forces the size of the output
         # to the size of the variable (which must be a max-batch-size
         # vector since require one accumulator each), instead of the
-        # output shape being [None, 1]. So instead we just return the
-        # 0 if not-ready and 'INPUT'+'START' otherwise... the tests
-        # know to expect this.
+        # output shape being [None, 1]. So instead we just return 0 if
+        # not-ready and 'INPUT'+'START' otherwise... the tests know to
+        # expect this.
         input0 = tf.placeholder(tf_dtype, [None,1], "INPUT")
-        start0 = tf.placeholder(tf.int32, [None,1], "START")
-        ready0 = tf.placeholder(tf.int32, [None,1], "READY")
+        start0 = tf.placeholder(tf_dtype, [None,1], "START")
+        ready0 = tf.placeholder(tf_dtype, [None,1], "READY")
         tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
-                       tf.zeros(tf.shape(input0), dtype=tf.int32))
+                       tf.zeros(tf.shape(input0), dtype=tf_dtype))
         output0 = tf.identity(tmp, name="OUTPUT")
 
     # Use a different model name for the non-batching variant
@@ -186,6 +189,9 @@ def create_tf_modelfile(
 def create_tf_modelconfig(
         create_savedmodel, models_dir, model_version, max_batch, dtype):
 
+    if not tu.validate_for_tf_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+        return
+
     # Use a different model name for the non-batching variant
     if create_savedmodel:
         model_name = tu.get_sequence_model_name(
@@ -207,7 +213,7 @@ sequence_batching {{
       control [
         {{
           kind: CONTROL_SEQUENCE_START
-          int32_false_true: [ 0, 1 ]
+          {}_false_true: [ 0, 1 ]
         }}
       ]
     }},
@@ -216,7 +222,7 @@ sequence_batching {{
       control [
         {{
           kind: CONTROL_SEQUENCE_READY
-          int32_false_true: [ 0, 1 ]
+          {}_false_true: [ 0, 1 ]
         }}
       ]
     }}
@@ -243,7 +249,10 @@ instance_group [
 ]
 '''.format(model_name,
            "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-           max_batch, np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+           max_batch,
+           "int32" if dtype == np.int32 else "fp32",
+           "int32" if dtype == np.int32 else "fp32",
+           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -257,13 +266,16 @@ instance_group [
 def create_netdef_modelfile(
         create_savedmodel, models_dir, model_version, max_batch, dtype):
 
+    if not tu.validate_for_c2_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+        return
+
     c2_dtype = np_to_c2_dtype(dtype)
     model_name = tu.get_sequence_model_name(
         "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
 
     # Create the model. For now don't implement a proper accumulator
-    # just return the 0 if not-ready and 'INPUT'+'START' otherwise...
-    # the tests know to expect this.
+    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
+    # tests know to expect this.
     model = c2model_helper.ModelHelper(name=model_name)
     model.net.Add(["INPUT", "START"], "add")
     model.net.Sub(["READY", "READY"], "zeros")
@@ -286,6 +298,9 @@ def create_netdef_modelfile(
 def create_netdef_modelconfig(
         create_savedmodel, models_dir, model_version, max_batch, dtype):
 
+    if not tu.validate_for_c2_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+        return
+
     model_name = tu.get_sequence_model_name(
         "netdef_nobatch" if max_batch == 0 else "netdef", dtype)
     config_dir = models_dir + "/" + model_name
@@ -301,7 +316,7 @@ sequence_batching {{
       control [
         {{
           kind: CONTROL_SEQUENCE_START
-          int32_false_true: [ 0, 1 ]
+          {}_false_true: [ 0, 1 ]
         }}
       ]
     }},
@@ -310,7 +325,7 @@ sequence_batching {{
       control [
         {{
           kind: CONTROL_SEQUENCE_READY
-          int32_false_true: [ 0, 1 ]
+          {}_false_true: [ 0, 1 ]
         }}
       ]
     }}
@@ -336,6 +351,121 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "int32" if dtype == np.int32 else "fp32",
+           "int32" if dtype == np.int32 else "fp32",
+           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
+def create_plan_modelfile(
+        create_savedmodel, models_dir, model_version, max_batch, dtype):
+
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, [1,1,1], [1,1,1], [1,1,1]):
+        return
+
+    trt_dtype = np_to_trt_dtype(dtype)
+
+    # Create the model. For now don't implement a proper accumulator
+    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
+    # tests know to expect this.
+    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
+    builder = trt.infer.create_infer_builder(G_LOGGER)
+    network = builder.create_network()
+    in0 = network.add_input("INPUT", trt_dtype, [1, 1, 1])
+    start0 = network.add_input("START", trt_dtype, [1, 1, 1])
+    ready0 = network.add_input("READY", trt_dtype, [1, 1, 1])
+    add = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(add.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+
+    out0.get_output(0).set_name("OUTPUT")
+    network.mark_output(out0.get_output(0))
+
+    builder.set_max_batch_size(max(1, max_batch))
+    builder.set_max_workspace_size(1 << 20)
+    engine = builder.build_cuda_engine(network)
+    network.destroy()
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    lengine = trt.lite.Engine(engine_stream=engine.serialize(),
+                              max_batch_size=max(1, max_batch))
+    lengine.save(model_version_dir + "/model.plan")
+    engine.destroy()
+    builder.destroy()
+
+
+def create_plan_modelconfig(
+        create_savedmodel, models_dir, model_version, max_batch, dtype):
+
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, [1,1,1], [1,1,1], [1,1,1]):
+        return
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+sequence_batching {{
+  max_queue_delay_microseconds: 0
+  control_input [
+    {{
+      name: "START"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+}}
+input [
+  {{
+    name: "INPUT"
+    data_type: {}
+    dims: [ 1, 1, 1 ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: {}
+    dims: [ 1, 1, 1 ]
+  }}
+]
+instance_group [
+  {{
+    kind: KIND_GPU
+  }}
+]
+'''.format(model_name, max_batch,
+           "int32" if dtype == np.int32 else "fp32",
+           "int32" if dtype == np.int32 else "fp32",
            np_to_model_dtype(dtype), np_to_model_dtype(dtype))
 
     try:
@@ -368,11 +498,12 @@ def create_models(models_dir, dtype):
         create_netdef_modelconfig(True, models_dir, model_version, 0, dtype);
         create_netdef_modelfile(True, models_dir, model_version, 0, dtype);
 
-#    if FLAGS.tensorrt:
-#        create_tensorrt_modelconfig(
-#            models_dir, 8, model_version, dtype, (1,1,1));
-#        create_tensorrt_modelfile(
-#            models_dir, 0, model_version, dtype, (1,1,1));
+    if FLAGS.tensorrt:
+        create_plan_modelconfig(True, models_dir, model_version, 8, dtype);
+        create_plan_modelfile(True, models_dir, model_version, 8, dtype);
+        create_plan_modelconfig(True, models_dir, model_version, 0, dtype);
+        create_plan_modelfile(True, models_dir, model_version, 0, dtype);
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -403,6 +534,7 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
+        create_models(FLAGS.models_dir, np.float32)
         create_models(FLAGS.models_dir, np.int32)
 
     # Tests with models that accept variable-shape input/output tensors

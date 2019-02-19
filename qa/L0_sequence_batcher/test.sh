@@ -43,9 +43,10 @@ RET=0
 #   models4 - four instances with batch-size 1
 rm -fr *.log *.serverlog models{0,1,2,4} && mkdir models{0,1,2,4}
 for m in \
+        $DATADIR/qa_sequence_model_repository/plan_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/savedmodel_sequence_int32 \
+        $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32 \
         ../custom_models/custom_sequence_int32 ; do
     cp -r $m models1/. && \
         (cd models1/$(basename $m) && \
@@ -65,9 +66,10 @@ for m in \
 done
 
 for m in \
+        $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32 \
-        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_int32 ; do
+        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32 ; do
     cp -r $m models0/. && \
         (cd models0/$(basename $m) && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
