@@ -371,14 +371,8 @@ class ConcurrencyManager {
   }
 
  private:
-  enum EventType {
-    NORMAL,
-    SEQ_START,
-    SEQ_END,
-  };
-
-  using TimestampVector =
-      std::vector<std::tuple<struct timespec, struct timespec, EventType>>;
+  using TimestampVector = std::vector<std::tuple<
+      struct timespec, struct timespec, ni::InferRequestHeader::Flag>>;
 
   ConcurrencyManager(
       const bool verbose, const bool profile, const int32_t batch_size,
@@ -392,7 +386,8 @@ class ConcurrencyManager {
         measurement_window_ms_(measurement_window_ms),
         max_measurement_count_(max_measurement_count), streaming_(streaming),
         max_threads_(max_threads), model_name_(model_name),
-        model_version_(model_version), url_(url), protocol_(protocol)
+        model_version_(model_version), url_(url), protocol_(protocol),
+        on_sequence_model_(false)
   {
   }
 
@@ -498,14 +493,18 @@ class ConcurrencyManager {
 
     // Prepare context for 'batch_size' batches. Request that all
     // outputs be returned.
-    err = nic::InferContext::Options::Create(options);
-    if (!err.IsOk()) {
-      return err;
-    }
+    // Only set options if it has not been created, otherwise,
+    // assuming that the options for this model has been created previously
+    if (*options == nullptr) {
+      err = nic::InferContext::Options::Create(options);
+      if (!err.IsOk()) {
+        return err;
+      }
 
-    (*options)->SetBatchSize(batch_size_);
-    for (const auto& output : (*ctx)->Outputs()) {
-      (*options)->AddRawResult(output);
+      (*options)->SetBatchSize(batch_size_);
+      for (const auto& output : (*ctx)->Outputs()) {
+        (*options)->AddRawResult(output);
+      }
     }
 
     err = (*ctx)->SetRunOptions(*(*options));
@@ -532,11 +531,13 @@ class ConcurrencyManager {
           std::max(max_input_byte_size, (size_t)input->ByteSize());
     }
 
-    std::vector<uint8_t> input_buf(max_input_byte_size);
-    for (size_t i = 0; i < input_buf.size(); ++i) {
-      input_buf[i] = rand();
+    if (input_buffer.size() == 0) {
+      std::vector<uint8_t> input_buf(max_input_byte_size);
+      for (size_t i = 0; i < input_buf.size(); ++i) {
+        input_buf[i] = rand();
+      }
+      input_buffer.swap(input_buf);
     }
-    input_buffer.swap(input_buf);
 
     // Initialize inputs to use random values...
     for (const auto& input : (*ctx)->Inputs()) {
@@ -649,7 +650,8 @@ class ConcurrencyManager {
           tol_square_latency_us +=
               (request_latency * request_latency) / (1000 * 1000);
           valid_timestamp_count++;
-          if (std::get<2>(timestamp) == EventType::SEQ_END)
+          if (std::get<2>(timestamp) ==
+              ni::InferRequestHeader::FLAG_SEQUENCE_END)
             valid_sequence_count++;
         }
       }
@@ -761,86 +763,128 @@ class ConcurrencyManager {
   // Function for worker threads
   // [TODO] Change it to create one context per request for later compatible
   // with sending sequences
+  // [TODO] we actually need to use StatusContext first to acquire model config
+  // which can indicate model type ("scheduling_choice")
   void AsyncInfer(
       std::shared_ptr<nic::Error> err,
       std::shared_ptr<nic::InferContext::Stat> stat,
       std::shared_ptr<size_t> concurrency)
   {
-    // Create the context for inference of the specified model.
     std::vector<uint8_t> input_buf;
-    std::unique_ptr<nic::InferContext> ctx;
-    std::unique_ptr<nic::InferContext::Options> options;
-    *err = PrepareInfer(&ctx, &options, input_buf);
-    if (!err->IsOk()) {
-      return;
-    }
+    std::unique_ptr<nic::InferContext::Options> options(nullptr);
 
-    std::map<uint64_t, struct timespec> requests_start_time;
+    std::vector<std::unique_ptr<nic::InferContext>> ctxs;
+    std::vector<bool> ctxs_working;
+    std::vector<std::map<
+        uint64_t, std::pair<struct timespec, ni::InferRequestHeader::Flag>>>
+        requests_start_time;
+
     // run inferencing until receiving exit signal to maintain server load.
+    // [TODO] match "concurrency" based on number of "sequences" rather than
+    //    number of in-flight requests (one seq can generate multiple requests)
     do {
+      // Create the context for inference of the specified model.
+      size_t num_reqs = *concurrency;
+      while (num_reqs > ctxs.size()) {
+        ctxs.emplace_back();
+        ctxs_working.push_back(false);
+        requests_start_time.emplace_back();
+        *err = PrepareInfer(&(ctxs.back()), &options, input_buf);
+        if (!err->IsOk()) {
+          return;
+        }
+      }
       // Run inference to get output
       std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
       std::shared_ptr<nic::InferContext::Request> request;
 
       // Create async requests such that the number of ongoing requests
-      // matches the concurrency level (here is '*concurrency')
-      while (requests_start_time.size() < *concurrency) {
-        struct timespec start_time;
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
-        *err = ctx->AsyncRun(&request);
-        if (!err->IsOk()) {
-          return;
+      // matches the concurrency level (here is 'num_reqs')
+      size_t seq_length = on_sequence_model_ ? 5 /* [TODO] random length */ : 1;
+      for (size_t idx = 0; idx < num_reqs; idx++) {
+        if (!ctxs_working[idx]) {
+          // Create requests
+          ni::InferRequestHeader::Flag flag = ni::InferRequestHeader::FLAG_NONE;
+          for (size_t i = 0; i < seq_length; i++) {
+            if (on_sequence_model_) {
+              if (i == 0) {
+                flag = ni::InferRequestHeader::FLAG_SEQUENCE_START;
+              } else if (i == seq_length - 1) {
+                flag = ni::InferRequestHeader::FLAG_SEQUENCE_END;
+              } else {
+                flag = ni::InferRequestHeader::FLAG_NONE;
+              }
+              options->SetFlag(
+                  ni::InferRequestHeader::FLAG_SEQUENCE_START,
+                  flag == ni::InferRequestHeader::FLAG_SEQUENCE_START);
+              options->SetFlag(
+                  ni::InferRequestHeader::FLAG_SEQUENCE_END,
+                  flag == ni::InferRequestHeader::FLAG_SEQUENCE_END);
+              ctxs[idx]->SetRunOptions(*options);
+            }
+            struct timespec start_time;
+            clock_gettime(CLOCK_MONOTONIC, &start_time);
+            *err = ctxs[idx]->AsyncRun(&request);
+            if (!err->IsOk()) {
+              return;
+            }
+            requests_start_time[idx].emplace(
+                request->Id(), std::make_pair(start_time, flag));
+          }
+          ctxs_working[idx] = true;
         }
-        requests_start_time.emplace(request->Id(), start_time);
-      }
-
-      if (requests_start_time.size() < *concurrency) {
-        std::cerr << "This message shouldn't be printed twice in a row"
-                  << std::endl;
       }
 
       // Get any request that is completed and
       // record the end time of the request
-      while (true) {
-        nic::Error tmp_err;
-        if (requests_start_time.size() >= *concurrency) {
-          tmp_err = ctx->GetReadyAsyncRequest(&request, true);
-        } else {
-          // Don't wait if worker needs to maintain concurrency level
-          // Just make sure all completed requests at the moment
-          // are measured correctly
-          tmp_err = ctx->GetReadyAsyncRequest(&request, false);
+      // [TODO] separate the send / recv to different threads
+      bool keep_loop = true;
+      while (keep_loop) {
+        keep_loop = false;
+        for (size_t idx = 0; idx < ctxs.size(); idx++) {
+          if (ctxs_working[idx]) {
+            nic::Error tmp_err =
+                ctxs[idx]->GetReadyAsyncRequest(&request, false);
+
+            if (tmp_err.Code() == ni::RequestStatusCode::UNAVAILABLE) {
+              continue;
+            } else if (!tmp_err.IsOk()) {
+              *err = tmp_err;
+              return;
+            }
+            // keep the loop until no more ready requests in all contexts
+            keep_loop = true;
+            *err = ctxs[idx]->GetAsyncRunResults(&results, request, true);
+
+            struct timespec end_time;
+            clock_gettime(CLOCK_MONOTONIC, &end_time);
+
+            if (!err->IsOk()) {
+              return;
+            }
+
+            auto itr = requests_start_time[idx].find(request->Id());
+            struct timespec start_time = itr->second.first;
+            ni::InferRequestHeader::Flag flag = itr->second.second;
+            requests_start_time[idx].erase(itr);
+
+            if (!on_sequence_model_ ||
+                flag == ni::InferRequestHeader::FLAG_SEQUENCE_END) {
+              ctxs_working[idx] = false;
+            }
+
+            // Add the request timestamp to shared vector with proper locking
+            status_report_mutex_.lock();
+            // Critical section
+            // [TODO] set EventType based on event for later compatible with
+            // sequences
+            request_timestamps_->emplace_back(
+                std::make_tuple(start_time, end_time, flag));
+            // Update its InferContext statistic to shared Stat pointer
+            ctxs[idx]->GetStat(stat.get());
+            status_report_mutex_.unlock();
+          }
         }
-
-        if (tmp_err.Code() == ni::RequestStatusCode::UNAVAILABLE) {
-          break;
-        } else if (!tmp_err.IsOk()) {
-          *err = tmp_err;
-          return;
-        }
-        *err = ctx->GetAsyncRunResults(&results, request, true);
-
-        struct timespec end_time;
-        clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-        if (!err->IsOk()) {
-          return;
-        }
-
-        auto itr = requests_start_time.find(request->Id());
-        struct timespec start_time = itr->second;
-        requests_start_time.erase(itr);
-
-        // Add the request timestamp to shared vector with proper locking
-        status_report_mutex_.lock();
-        // Critical section
-        // [TODO] set EventType based on event for later compatible with
-        // sequences
-        request_timestamps_->emplace_back(
-            std::make_tuple(start_time, end_time, EventType::NORMAL));
-        // Update its InferContext statistic to shared Stat pointer
-        ctx->GetStat(stat.get());
-        status_report_mutex_.unlock();
       }
 
       // Wait if no request should be sent and it is not exiting
