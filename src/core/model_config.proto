@@ -466,12 +466,22 @@ message ModelSequenceBatching
     //@@    .. cpp:var:: int32 int32_false_true (repeated)
     //@@
     //@@       The control's true and false setting is indicated by setting
-    //@@       an int32 value in a tensor. The tensor must be a
+    //@@       a value in an int32 tensor. The tensor must be a
     //@@       1-dimensional tensor with size equal to the batch size of
     //@@       the request. 'int32_false_true' must have two entries: the
     //@@       first the false value and the second the true value.
     //@@
     repeated int32 int32_false_true = 2;
+
+    //@@    .. cpp:var:: float fp32_false_true (repeated)
+    //@@
+    //@@       The control's true and false setting is indicated by setting
+    //@@       a value in a fp32 tensor. The tensor must be a
+    //@@       1-dimensional tensor with size equal to the batch size of
+    //@@       the request. 'fp32_false_true' must have two entries: the
+    //@@       first the false value and the second the true value.
+    //@@
+    repeated float fp32_false_true = 3;
   }
 
   //@@  .. cpp:var:: message ControlInput

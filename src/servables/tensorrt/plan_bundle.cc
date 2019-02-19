@@ -234,8 +234,9 @@ PlanBundle::CreateExecutionContext(
   context.byte_sizes_ = new uint64_t[num_expected_bindings];
   context.buffers_ = new void*[num_expected_bindings]();  // init to nullptr
 
-  TF_RETURN_IF_ERROR(context.InitializeInputBindings(Config().input()));
-  TF_RETURN_IF_ERROR(context.InitializeOutputBindings(Config().output()));
+  TF_RETURN_IF_ERROR(context.InitializeConfigInputBindings(Config().input()));
+  TF_RETURN_IF_ERROR(context.InitializeSequenceControlInputBindings(Config()));
+  TF_RETURN_IF_ERROR(context.InitializeConfigOutputBindings(Config().output()));
 
   // Make sure every index is initialized.
   for (int i = 0; i < num_expected_bindings; ++i) {
@@ -271,69 +272,110 @@ PlanBundle::CreateExecutionContext(
 }
 
 tensorflow::Status
-PlanBundle::Context::InitializeInputBindings(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+PlanBundle::Context::InitializeInputBinding(
+    const std::string& input_name, const DataType input_datatype,
+    const DimsList& input_dims)
 {
-  for (const auto& io : ios) {
-    TF_RETURN_IF_ERROR(ValidateModelInput(io));
+  int index = engine_->getBindingIndex(input_name.c_str());
+  if (index < 0) {
+    return tensorflow::errors::NotFound(
+        "input '", input_name, "' not found for ", name_);
+  }
 
-    int index = engine_->getBindingIndex(io.name().c_str());
-    if (index < 0) {
-      return tensorflow::errors::NotFound(
-          "input '", io.name(), "' not found for ", name_);
+  if (buffers_[index] != nullptr) {
+    return tensorflow::errors::InvalidArgument(
+        "input '", input_name, "' has already appeared as an ",
+        "input or output for ", name_);
+  }
+
+  if (!engine_->bindingIsInput(index)) {
+    return tensorflow::errors::InvalidArgument(
+        "input '", input_name, "' is expected to be an output in model for ",
+        name_);
+  }
+
+  DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
+  if (dt != input_datatype) {
+    return tensorflow::errors::InvalidArgument(
+        "input '", input_name, "' datatype is ", DataType_Name(input_datatype),
+        ", model specifies ", DataType_Name(dt), " for ", name_);
+  }
+
+  nvinfer1::Dims dims = engine_->getBindingDimensions(index);
+  if (!CompareDims(dims, input_dims)) {
+    return tensorflow::errors::InvalidArgument(
+        "input '", input_name, "' dims ", DimsDebugString(dims),
+        " don't match configuration dims ", DimsDebugString(input_dims),
+        " for ", name_);
+  }
+
+  const uint64_t byte_size = GetByteSize(max_batch_size_, dt, input_dims);
+  if (byte_size == 0) {
+    return tensorflow::errors::Internal(
+        "unable to calculate size for input '", input_name, " for ", name_);
+  }
+
+  // Allocate CUDA memory
+  void* buffer;
+  cudaError_t err = cudaMalloc(&buffer, byte_size);
+  if (err != cudaSuccess) {
+    return tensorflow::errors::Internal(
+        "unable to allocate memory for input '", input_name, " for ", name_,
+        ": ", cudaGetErrorString(err));
+  }
+
+  byte_sizes_[index] = byte_size;
+  buffers_[index] = buffer;
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+PlanBundle::Context::InitializeSequenceControlInputBindings(
+    const ModelConfig& config)
+{
+  if (config.has_sequence_batching()) {
+    std::vector<ModelSequenceBatching::Control::Kind> kinds{
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY};
+
+    for (const ModelSequenceBatching::Control::Kind control_kind : kinds) {
+      std::string tensor_name;
+      DataType tensor_datatype;
+      TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+          config.sequence_batching(), config.name(), control_kind,
+          true /* required */, &tensor_name, &tensor_datatype, nullptr, nullptr,
+          nullptr, nullptr));
+
+      // Control tensors must have shape [1,1,1].
+      DimsList dims;
+      dims.Add(1);
+      dims.Add(1);
+      dims.Add(1);
+
+      TF_RETURN_IF_ERROR(
+          InitializeInputBinding(tensor_name, tensor_datatype, dims));
     }
-
-    if (buffers_[index] != nullptr) {
-      return tensorflow::errors::InvalidArgument(
-          "input '", io.name(), "' has already appeared as an ",
-          "input or output for ", name_);
-    }
-
-    if (!engine_->bindingIsInput(index)) {
-      return tensorflow::errors::InvalidArgument(
-          "input '", io.name(), "' is expected to be an output in model for ",
-          name_);
-    }
-
-    DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
-    if (dt != io.data_type()) {
-      return tensorflow::errors::InvalidArgument(
-          "input '", io.name(), "' datatype is ", DataType_Name(io.data_type()),
-          ", model specifies ", DataType_Name(dt), " for ", name_);
-    }
-
-    nvinfer1::Dims dims = engine_->getBindingDimensions(index);
-    if (!CompareDims(dims, io.dims())) {
-      return tensorflow::errors::InvalidArgument(
-          "input '", io.name(), "' dims ", DimsDebugString(dims),
-          " don't match configuration dims ", DimsDebugString(io.dims()),
-          " for ", name_);
-    }
-
-    const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
-    if (byte_size == 0) {
-      return tensorflow::errors::Internal(
-          "unable to calculate size for input '", io.name(), " for ", name_);
-    }
-
-    // Allocate CUDA memory
-    void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, byte_size);
-    if (err != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "unable to allocate memory for input '", io.name(), " for ", name_,
-          ": ", cudaGetErrorString(err));
-    }
-
-    byte_sizes_[index] = byte_size;
-    buffers_[index] = buffer;
   }
 
   return tensorflow::Status::OK();
 }
 
 tensorflow::Status
-PlanBundle::Context::InitializeOutputBindings(
+PlanBundle::Context::InitializeConfigInputBindings(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+{
+  for (const auto& io : ios) {
+    TF_RETURN_IF_ERROR(ValidateModelInput(io));
+    TF_RETURN_IF_ERROR(
+        InitializeInputBinding(io.name(), io.data_type(), io.dims()));
+  }
+
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+PlanBundle::Context::InitializeConfigOutputBindings(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
@@ -440,7 +482,9 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
   size_t total_batch_size = 0;
   for (auto& payload : *payloads) {
     if (!payload.status_.ok()) {
-      continue;
+      return tensorflow::errors::Internal(
+          "unexpected payload with non-OK status given to runner for '", name_,
+          "'");
     }
 
     total_batch_size += payload.request_provider_->RequestHeader().batch_size();
@@ -477,10 +521,6 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     // GPU. Skip payloads that had errors since they are not included
     // in the dynamic batch.
     for (auto& payload : *payloads) {
-      if (!payload.status_.ok()) {
-        continue;
-      }
-
       const InferRequestHeader& request_header =
           payload.request_provider_->RequestHeader();
       const size_t expected_byte_size =

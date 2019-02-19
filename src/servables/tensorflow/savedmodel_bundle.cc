@@ -177,9 +177,10 @@ SavedModelBundle::ValidateSequenceControl(
     const tensorflow::SignatureDef& sig)
 {
   std::string tensor_name;
+  DataType tensor_datatype;
   TF_RETURN_IF_ERROR(GetSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, true /* required */,
-      &tensor_name, nullptr, nullptr, nullptr));
+      &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
 
   const auto& iitr = sig.inputs().find(tensor_name);
   if (iitr == sig.inputs().end()) {
@@ -200,12 +201,11 @@ SavedModelBundle::ValidateSequenceControl(
         " don't match expected dims [1]");
   }
 
-  // Currently only data-type int32 is supported for controls
-  if (!CompareDataType(iitr->second.dtype(), DataType::TYPE_INT32)) {
+  if (!CompareDataType(iitr->second.dtype(), tensor_datatype)) {
     return tensorflow::errors::InvalidArgument(
         "unable to load model '", Name(), "', sequence control '", tensor_name,
         "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
-        " doesn't match required data-type TYPE_INT32");
+        " doesn't match required data-type ", DataType_Name(tensor_datatype));
   }
 
   return tensorflow::Status::OK();

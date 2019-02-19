@@ -44,11 +44,11 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch")
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     _trials = []
 else:
-    _trials = ("custom", "savedmodel", "graphdef", "netdef")
+    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan")
 
 _protocols = ("http", "grpc")
 _max_queue_delay_ms = 0
@@ -278,13 +278,19 @@ class SequenceBatcherTest(unittest.TestCase):
                         "expected model-inference-count " + str(infer_cnt) + ", got " +
                         str(vs[1].model_inference_count))
 
+    def get_datatype(self, trial):
+        # Get the datatype to use based on what models are available (see test.sh)
+        if ("plan" in trial) or ("savedmodel" in trial):
+            return np.float32
+        return np.int32
+
     def get_expected_result(self, expected_result, value, trial, flag_str=None):
         # Adjust the expected_result for models that
         # couldn't implement the full accumulator. See
         # qa/common/gen_qa_sequence_models.py for more
         # information.
         if ((not _no_batching and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial)):
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial)):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
@@ -297,13 +303,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 5,
+                    self.check_sequence(trial, model_name, dtype, 5,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
@@ -331,13 +338,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 99,
+                    self.check_sequence(trial, model_name, dtype, 99,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start,end", 42, None, None),),
@@ -363,13 +371,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 27,
+                    self.check_sequence(trial, model_name, dtype, 27,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
@@ -395,13 +404,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 0, # correlation_id = 0
+                    self.check_sequence(trial, model_name, dtype, 0, # correlation_id = 0
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
@@ -426,13 +436,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 37469245,
+                    self.check_sequence(trial, model_name, dtype, 37469245,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         ((None, 1, None, None),
@@ -460,13 +471,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 3,
+                    self.check_sequence(trial, model_name, dtype, 3,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
@@ -496,13 +508,14 @@ class SequenceBatcherTest(unittest.TestCase):
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
                 try:
-                    model_name = tu.get_sequence_model_name(trial, np.int32)
+                    dtype = self.get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
                     self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(trial, model_name, np.int32, 4566,
+                    self.check_sequence(trial, model_name, dtype, 4566,
                                         (3000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
@@ -525,7 +538,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # batch-size 2 inferences.
         for trial in _trials:
             try:
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
                 protocol = "streaming"
 
                 self.check_setup(model_name)
@@ -540,7 +554,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 987,
+                    args=(trial, model_name, dtype, 987,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -552,7 +566,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 988,
+                    args=(trial, model_name, dtype, 988,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 0, None),
@@ -579,7 +593,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # applied correctly for the longer sequences.
         for trial in _trials:
             try:
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
                 protocol = "streaming"
 
                 self.check_setup(model_name)
@@ -594,7 +609,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -604,7 +619,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -616,7 +631,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -626,7 +641,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -661,7 +676,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # batch-size 4 inferences.
         for trial in _trials:
             try:
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
                 protocol = "streaming"
 
                 self.check_setup(model_name)
@@ -676,7 +692,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -687,7 +703,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -698,7 +714,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -709,7 +725,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -737,7 +753,8 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             try:
                 protocol = "streaming"
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
 
@@ -751,7 +768,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -762,7 +779,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -773,7 +790,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -784,7 +801,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -795,7 +812,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1005,
+                    args=(trial, model_name, dtype, 1005,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
@@ -830,7 +847,8 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             try:
                 protocol = "streaming"
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
 
@@ -844,7 +862,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -855,7 +873,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -865,7 +883,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -875,7 +893,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -886,7 +904,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1005,
+                    args=(trial, model_name, dtype, 1005,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
@@ -895,7 +913,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1006,
+                    args=(trial, model_name, dtype, 1006,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 22222, None),),
@@ -934,7 +952,8 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             try:
                 protocol = "streaming"
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
 
@@ -948,7 +967,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -959,7 +978,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -969,7 +988,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -979,7 +998,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -990,7 +1009,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1005,
+                    args=(trial, model_name, dtype, 1005,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
@@ -999,7 +1018,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1006,
+                    args=(trial, model_name, dtype, 1006,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 22222, None),
@@ -1032,7 +1051,8 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             try:
                 protocol = "streaming"
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
 
@@ -1046,7 +1066,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -1057,7 +1077,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -1068,7 +1088,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -1079,7 +1099,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -1090,7 +1110,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
@@ -1131,7 +1151,8 @@ class SequenceBatcherTest(unittest.TestCase):
         for trial in _trials:
             try:
                 protocol = "streaming"
-                model_name = tu.get_sequence_model_name(trial, np.int32)
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
 
@@ -1145,7 +1166,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
@@ -1155,7 +1176,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1002,
+                    args=(trial, model_name, dtype, 1002,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
@@ -1167,7 +1188,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1003,
+                    args=(trial, model_name, dtype, 1003,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
@@ -1179,7 +1200,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1004,
+                    args=(trial, model_name, dtype, 1004,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
@@ -1191,7 +1212,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
-                    args=(trial, model_name, np.int32, 1001,
+                    args=(trial, model_name, dtype, 1001,
                           (3000, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),

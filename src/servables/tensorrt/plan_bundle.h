@@ -79,9 +79,14 @@ class PlanBundle : public InferenceBackend {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
-    tensorflow::Status InitializeInputBindings(
+    tensorflow::Status InitializeInputBinding(
+        const std::string& input_name, const DataType input_datatype,
+        const DimsList& input_dims);
+    tensorflow::Status InitializeSequenceControlInputBindings(
+        const ModelConfig& config);
+    tensorflow::Status InitializeConfigInputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    tensorflow::Status InitializeOutputBindings(
+    tensorflow::Status InitializeConfigOutputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Run model to execute for one or more requests. This function
