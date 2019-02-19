@@ -273,7 +273,7 @@ NetDefBundle::ValidateSequenceControl(
   std::string tensor_name;
   TF_RETURN_IF_ERROR(GetSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, true /* required */,
-      &tensor_name, nullptr, nullptr, nullptr));
+      &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
   input_names->push_back(tensor_name);
 
   return tensorflow::Status::OK();

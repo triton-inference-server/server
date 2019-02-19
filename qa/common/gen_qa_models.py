@@ -344,7 +344,6 @@ def create_savedmodel_modelconfig(
 
     if not tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
-
         return
 
     # Unpack version policy
@@ -540,8 +539,8 @@ def create_plan_modelfile(
     network = builder.create_network()
     in0 = network.add_input("INPUT0", trt_input_dtype, input_shape)
     in1 = network.add_input("INPUT1", trt_input_dtype, input_shape)
-    add = network.add_element_wise(in0, in1, trt.infer.ElementWiseOperation.SUM)
-    sub = network.add_element_wise(in0, in1, trt.infer.ElementWiseOperation.SUB)
+    add = network.add_elementwise(in0, in1, trt.infer.ElementWiseOperation.SUM)
+    sub = network.add_elementwise(in0, in1, trt.infer.ElementWiseOperation.SUB)
 
     out0 = add if not swap else sub
     out1 = sub if not swap else add
