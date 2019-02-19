@@ -28,6 +28,7 @@
 
 #include <getopt.h>
 #include <math.h>
+#include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 #include <algorithm>
@@ -232,14 +233,15 @@ class ConcurrencyManager {
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
       const bool streaming, const size_t max_threads,
       const std::string& model_name, const int64_t model_version,
-      const std::string& url, const ProtocolType protocol)
+      const std::string& url, const ProtocolType protocol,
+      const size_t sequence_length)
   {
+    nic::Error err = nic::Error::Success;
     manager->reset(new ConcurrencyManager(
         verbose, profile, batch_size, stable_offset, measurement_window_ms,
         max_measurement_count, streaming, max_threads, model_name,
-        model_version, url, protocol));
-    (*manager)->request_timestamps_.reset(new TimestampVector());
-    return nic::Error(ni::RequestStatusCode::SUCCESS);
+        model_version, url, protocol, sequence_length, err));
+    return err;
   }
 
   // Step will adjust the number of concurrent requests to be the same as
@@ -371,8 +373,8 @@ class ConcurrencyManager {
   }
 
  private:
-  using TimestampVector = std::vector<std::tuple<
-      struct timespec, struct timespec, ni::InferRequestHeader::Flag>>;
+  using TimestampVector =
+      std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
 
   ConcurrencyManager(
       const bool verbose, const bool profile, const int32_t batch_size,
@@ -380,15 +382,24 @@ class ConcurrencyManager {
       const size_t max_measurement_count, const bool streaming,
       const size_t max_threads, const std::string& model_name,
       const int64_t model_version, const std::string& url,
-      const ProtocolType protocol)
+      const ProtocolType protocol, const size_t sequence_length,
+      nic::Error& err)
       : verbose_(verbose), profile_(profile), batch_size_(batch_size),
         stable_offset_(stable_offset),
         measurement_window_ms_(measurement_window_ms),
         max_measurement_count_(max_measurement_count), streaming_(streaming),
         max_threads_(max_threads), model_name_(model_name),
         model_version_(model_version), url_(url), protocol_(protocol),
-        on_sequence_model_(false)
+        sequence_length_(sequence_length), on_sequence_model_(false),
+        current_correlation_id_(0)
   {
+    request_timestamps_.reset(new TimestampVector());
+
+    ni::ModelStatus model_status;
+    err = GetModelStatus(&model_status);
+    if (err.IsOk()) {
+      on_sequence_model_ = model_status.config().has_sequence_batching();
+    }
   }
 
   nic::Error StartProfile()
@@ -458,16 +469,25 @@ class ConcurrencyManager {
       std::vector<uint8_t>& input_buffer)
   {
     nic::Error err;
-    // Create the context for inference of the specified model.
+    // Create the context for inference of the specified model,
+    // make sure to use an unused correlation id on sequence model.
+    ni::CorrelationID correlation_id = 0;
+    {
+      std::lock_guard<std::mutex> lock(correlation_id_mutex_);
+      if (on_sequence_model_) {
+        current_correlation_id_++;
+        correlation_id = current_correlation_id_;
+      }
+    }
     if (streaming_) {
       err = nic::InferGrpcStreamContext::Create(
-          ctx, url_, model_name_, model_version_, false);
+          ctx, correlation_id, url_, model_name_, model_version_, false);
     } else if (protocol_ == ProtocolType::HTTP) {
       err = nic::InferHttpContext::Create(
-          ctx, url_, model_name_, model_version_, false);
+          ctx, correlation_id, url_, model_name_, model_version_, false);
     } else {
       err = nic::InferGrpcContext::Create(
-          ctx, url_, model_name_, model_version_, false);
+          ctx, correlation_id, url_, model_name_, model_version_, false);
     }
     if (!err.IsOk()) {
       return err;
@@ -650,7 +670,7 @@ class ConcurrencyManager {
           tol_square_latency_us +=
               (request_latency * request_latency) / (1000 * 1000);
           valid_timestamp_count++;
-          if (std::get<2>(timestamp) ==
+          if (std::get<2>(timestamp) &
               ni::InferRequestHeader::FLAG_SEQUENCE_END)
             valid_sequence_count++;
         }
@@ -760,11 +780,18 @@ class ConcurrencyManager {
     return err;
   }
 
+  size_t GetRandomSequenceLength()
+  {
+    int random_offset =
+        ((2.0 * rand() / double(RAND_MAX)) - 1.0) * 0.2 * sequence_length_;
+    size_t res = sequence_length_ + random_offset;
+    if (int(sequence_length_) + random_offset <= 0) {
+      res = 1;
+    }
+    return res;
+  }
+
   // Function for worker threads
-  // [TODO] Change it to create one context per request for later compatible
-  // with sending sequences
-  // [TODO] we actually need to use StatusContext first to acquire model config
-  // which can indicate model type ("scheduling_choice")
   void AsyncInfer(
       std::shared_ptr<nic::Error> err,
       std::shared_ptr<nic::InferContext::Stat> stat,
@@ -775,13 +802,10 @@ class ConcurrencyManager {
 
     std::vector<std::unique_ptr<nic::InferContext>> ctxs;
     std::vector<bool> ctxs_working;
-    std::vector<std::map<
-        uint64_t, std::pair<struct timespec, ni::InferRequestHeader::Flag>>>
+    std::vector<std::map<uint64_t, std::pair<struct timespec, uint32_t>>>
         requests_start_time;
 
     // run inferencing until receiving exit signal to maintain server load.
-    // [TODO] match "concurrency" based on number of "sequences" rather than
-    //    number of in-flight requests (one seq can generate multiple requests)
     do {
       // Create the context for inference of the specified model.
       size_t num_reqs = *concurrency;
@@ -800,26 +824,25 @@ class ConcurrencyManager {
 
       // Create async requests such that the number of ongoing requests
       // matches the concurrency level (here is 'num_reqs')
-      size_t seq_length = on_sequence_model_ ? 5 /* [TODO] random length */ : 1;
+      size_t seq_length = on_sequence_model_ ? GetRandomSequenceLength() : 1;
       for (size_t idx = 0; idx < num_reqs; idx++) {
         if (!ctxs_working[idx]) {
           // Create requests
-          ni::InferRequestHeader::Flag flag = ni::InferRequestHeader::FLAG_NONE;
           for (size_t i = 0; i < seq_length; i++) {
+            uint32_t flags = 0;
             if (on_sequence_model_) {
               if (i == 0) {
-                flag = ni::InferRequestHeader::FLAG_SEQUENCE_START;
-              } else if (i == seq_length - 1) {
-                flag = ni::InferRequestHeader::FLAG_SEQUENCE_END;
-              } else {
-                flag = ni::InferRequestHeader::FLAG_NONE;
+                flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
+              }
+              if (i == seq_length - 1) {
+                flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
               }
               options->SetFlag(
                   ni::InferRequestHeader::FLAG_SEQUENCE_START,
-                  flag == ni::InferRequestHeader::FLAG_SEQUENCE_START);
+                  flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
               options->SetFlag(
                   ni::InferRequestHeader::FLAG_SEQUENCE_END,
-                  flag == ni::InferRequestHeader::FLAG_SEQUENCE_END);
+                  flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
               ctxs[idx]->SetRunOptions(*options);
             }
             struct timespec start_time;
@@ -829,7 +852,7 @@ class ConcurrencyManager {
               return;
             }
             requests_start_time[idx].emplace(
-                request->Id(), std::make_pair(start_time, flag));
+                request->Id(), std::make_pair(start_time, flags));
           }
           ctxs_working[idx] = true;
         }
@@ -865,21 +888,19 @@ class ConcurrencyManager {
 
             auto itr = requests_start_time[idx].find(request->Id());
             struct timespec start_time = itr->second.first;
-            ni::InferRequestHeader::Flag flag = itr->second.second;
+            uint32_t flags = itr->second.second;
             requests_start_time[idx].erase(itr);
 
             if (!on_sequence_model_ ||
-                flag == ni::InferRequestHeader::FLAG_SEQUENCE_END) {
+                (flags & ni::InferRequestHeader::FLAG_SEQUENCE_END)) {
               ctxs_working[idx] = false;
             }
 
             // Add the request timestamp to shared vector with proper locking
             status_report_mutex_.lock();
             // Critical section
-            // [TODO] set EventType based on event for later compatible with
-            // sequences
             request_timestamps_->emplace_back(
-                std::make_tuple(start_time, end_time, flag));
+                std::make_tuple(start_time, end_time, flags));
             // Update its InferContext statistic to shared Stat pointer
             ctxs[idx]->GetStat(stat.get());
             status_report_mutex_.unlock();
@@ -964,9 +985,11 @@ class ConcurrencyManager {
   int64_t model_version_;
   std::string url_;
   ProtocolType protocol_;
+  size_t sequence_length_;
 
-  // [TODO] Will be determined when the infer context is created
   bool on_sequence_model_;
+  ni::CorrelationID current_correlation_id_;
+  std::mutex correlation_id_mutex_;
 
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
@@ -1076,7 +1099,7 @@ Report(
             << std::endl;
   if (summary.on_sequence_model) {
     std::cout << "    Sequence count: " << summary.client_sequence_count << " ("
-              << summary.client_sequence_per_sec << std::endl;
+              << summary.client_sequence_per_sec << " seq/sec)" << std::endl;
   }
   std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl
@@ -1123,6 +1146,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
+  std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "The -d flag enables dynamic concurrent request count where the number"
@@ -1175,6 +1199,12 @@ Usage(char** argv, const std::string& msg = std::string())
       << "numbered version) of the model will be used." << std::endl;
   std::cerr << "For -i, available protocols are gRPC and HTTP. Default is HTTP."
             << std::endl;
+  std::cerr
+      << "For --sequence-length, it indicates the base length of a sequence"
+      << " used for sequence models. A sequence with length x will be composed"
+      << " of x requests to be sent as the elements in the sequence. The length"
+      << " of the actual sequence will be within +/- 20% of the base length."
+      << std::endl;
 
   exit(1);
 }
@@ -1189,6 +1219,8 @@ main(int argc, char** argv)
   bool dynamic_concurrency_mode = false;
   bool streaming = false;
   size_t max_threads = 16;
+  // average length of a sentence
+  size_t sequence_length = 20;
   uint64_t latency_threshold_ms = 0;
   int32_t batch_size = 1;
   int32_t concurrent_request_count = 1;
@@ -1203,8 +1235,10 @@ main(int argc, char** argv)
   ProtocolType protocol = ProtocolType::HTTP;
 
   // {name, has_arg, *flag, val}
-  static struct option long_options[] = {
-      {"streaming", 0, 0, 0}, {"max-threads", 1, 0, 1}, {0, 0, 0, 0}};
+  static struct option long_options[] = {{"streaming", 0, 0, 0},
+                                         {"max-threads", 1, 0, 1},
+                                         {"sequence-length", 1, 0, 2},
+                                         {0, 0, 0, 0}};
 
   // Parse commandline...
   int opt;
@@ -1217,6 +1251,9 @@ main(int argc, char** argv)
         break;
       case 1:
         max_threads = std::atoi(optarg);
+        break;
+      case 2:
+        sequence_length = std::atoi(optarg);
         break;
       case 'v':
         verbose = true;
@@ -1294,6 +1331,12 @@ main(int argc, char** argv)
   if (max_threads == 0) {
     Usage(argv, "maximum number of threads must be > 0");
   }
+  if (sequence_length == 0) {
+    sequence_length = 20;
+    std::cerr << "WARNING: using an invalid sequence length. Perf client will"
+              << " use default value if it is measuring on sequence model."
+              << std::endl;
+  }
 
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
@@ -1303,7 +1346,7 @@ main(int argc, char** argv)
   err = ConcurrencyManager::Create(
       &manager, verbose, profile, batch_size, stable_offset,
       measurement_window_ms, max_measurement_count, streaming, max_threads,
-      model_name, model_version, url, protocol);
+      model_name, model_version, url, protocol, sequence_length);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
