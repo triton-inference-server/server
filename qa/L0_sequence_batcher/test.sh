@@ -131,6 +131,7 @@ for model_trial in 0 1 2 4 ; do
                 test_backlog_fill_no_end \
                 test_backlog_same_correlation_id \
                 test_backlog_same_correlation_id_no_end \
+                test_backlog_sequence_timeout \
                 test_half_batch \
                 test_skip_batch \
                 test_full_batch \
@@ -143,7 +144,8 @@ for model_trial in 0 1 2 4 ; do
                 [[ "$i" != "test_backlog_fill_no_end" ]] &&
                 [[ "$i" != "test_backlog_fill" ]] && export TRTSERVER_DELAY_SCHEDULER=16 &&
                 [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
-                [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=12
+                [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
+                [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
             SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
             SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
             run_server

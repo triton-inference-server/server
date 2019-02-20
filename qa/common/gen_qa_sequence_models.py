@@ -206,7 +206,7 @@ name: "{}"
 platform: "{}"
 max_batch_size: {}
 sequence_batching {{
-  max_queue_delay_microseconds: 0
+  max_sequence_idle_microseconds: 5000000
   control_input [
     {{
       name: "START"
@@ -309,7 +309,7 @@ name: "{}"
 platform: "caffe2_netdef"
 max_batch_size: {}
 sequence_batching {{
-  max_queue_delay_microseconds: 0
+  max_sequence_idle_microseconds: 5000000
   control_input [
     {{
       name: "START"
@@ -422,7 +422,7 @@ name: "{}"
 platform: "tensorrt_plan"
 max_batch_size: {}
 sequence_batching {{
-  max_queue_delay_microseconds: 0
+  max_sequence_idle_microseconds: 5000000
   control_input [
     {{
       name: "START"

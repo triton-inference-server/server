@@ -200,9 +200,6 @@ SequenceBatchScheduler::Enqueue(
 
   const auto& request_header = request_provider->RequestHeader();
 
-  LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
-                 << request_provider->ModelName();
-
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
   // batched.
@@ -273,6 +270,10 @@ SequenceBatchScheduler::Enqueue(
   }
   // This request already has a queue in the backlog...
   else if (bl_itr != sequence_to_backlog_map_.end()) {
+    LOG_VERBOSE(1)
+        << "Enqueuing sequence inference request into backlog for model '"
+        << request_provider->ModelName();
+
     bl_itr->second->emplace_back(
         queue_timer, stats, request_provider, response_provider, OnComplete);
     // If the sequence is ending then forget correlation ID
@@ -294,6 +295,10 @@ SequenceBatchScheduler::Enqueue(
   }
   // Last option is to assign this request to the backlog...
   else {
+    LOG_VERBOSE(1)
+        << "Enqueuing sequence inference request into new backlog for model '"
+        << request_provider->ModelName();
+
     auto backlog = std::make_shared<std::deque<Scheduler::Payload>>();
     backlog_queues_.push_back(backlog);
     backlog->emplace_back(
@@ -328,12 +333,20 @@ SequenceBatchScheduler::Enqueue(
 
 bool
 SequenceBatchScheduler::ReleaseBatchSlot(
-    const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads)
+    const BatchSlot& batch_slot, const CorrelationID force_end_correlation_id,
+    std::deque<Scheduler::Payload>* payloads)
 {
   std::unique_lock<std::mutex> lock(mu_);
 
-  // If there is a backlogged sequence return it so that it can use
-  // the newly available slot.
+  // If a force_end_correlation_id is given, then that correlation ID is being
+  // forcibly ended from its slot and so must be removed from the
+  // sequence map.
+  if (force_end_correlation_id != 0) {
+    sequence_to_batchslot_map_.erase(force_end_correlation_id);
+  }
+
+  // If there is a backlogged sequence and it is requested, return it
+  // so that it can use the newly available slot.
   if (!backlog_queues_.empty()) {
     auto& backlog = backlog_queues_.front();
     *payloads = std::move(*backlog);
@@ -415,9 +428,11 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         notready_input_overrides)
     : OnSchedule_(OnSchedule), base_(base), batcher_idx_(batcher_idx),
+      max_sequence_idle_ns_(
+          config.sequence_batching().max_sequence_idle_microseconds() * 1000),
       scheduler_thread_exit_(false), scheduler_idle_(false),
       queues_(batch_size), max_active_slot_(-1),
-      active_slots_(batch_size, false),
+      slot_correlation_ids_(batch_size, 0), slot_idle_timeouts_(batch_size, 0),
       start_input_overrides_(start_input_overrides),
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
@@ -469,7 +484,8 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     queues_[slot].emplace_back(
         queue_timer, stats, request_provider, response_provider, OnComplete);
 
-    active_slots_[slot] = true;
+    slot_correlation_ids_[slot] = correlation_id;
+    slot_idle_timeouts_[slot] = 0;
     max_active_slot_ = std::max(max_active_slot_, static_cast<int32_t>(slot));
 
     // If runner is idle then wake it to service this request. We do
@@ -511,6 +527,10 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
   while (!scheduler_thread_exit_) {
     auto payloads = std::make_shared<std::vector<Scheduler::Payload>>();
     uint64_t wait_microseconds = 0;
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t now_ns = now.tv_sec * NANOS_PER_SECOND + now.tv_nsec;
 
     // Hold the lock for as short a time as possible.
     {
@@ -563,6 +583,8 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
                   queue_timer, nullptr, null_request_provider, nullptr,
                   nullptr);
             } else {
+              slot_idle_timeouts_[slot] = now_ns + max_sequence_idle_ns_;
+
               Scheduler::Payload& slot_payload = queue.front();
               const auto& request_provider = slot_payload.request_provider_;
               const auto& request_header = request_provider->RequestHeader();
@@ -594,6 +616,11 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
               // ending sequences).
               if ((request_header.flags() &
                    InferRequestHeader::FLAG_SEQUENCE_END) != 0) {
+                LOG_VERBOSE(1)
+                    << "Ending sequence for model '"
+                    << request_provider->ModelName() << "' in batcher "
+                    << batcher_idx_ << ", slot " << slot;
+
                 // Should never be anything in a queue after the END
                 // marker. If it happens that means we will clobber
                 // that request if/when we swap in a backlog sequence
@@ -607,9 +634,9 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
 
                 SequenceBatchScheduler::BatchSlot batch_slot(
                     batcher_idx_, slot);
-                bool released = base_->ReleaseBatchSlot(batch_slot, &queue);
+                bool released = base_->ReleaseBatchSlot(batch_slot, 0, &queue);
                 if (released) {
-                  active_slots_[slot] = false;
+                  slot_correlation_ids_[slot] = 0;
                   if (slot == max_active_slot_) {
                     adjust_max_active_slot = true;
                   }
@@ -620,10 +647,38 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
         }
       }
 
+      // If an active slot's idle timeout is exceeded, release it.
+      for (int32_t slot = 0; slot <= max_active_slot_; ++slot) {
+        const uint64_t timeout = slot_idle_timeouts_[slot];
+        if ((slot_correlation_ids_[slot] != 0) && (timeout != 0) &&
+            (timeout <= now_ns)) {
+          LOG_VERBOSE(1) << "Aborting sequence in batcher " << batcher_idx_
+                         << ", slot " << slot;
+
+          std::deque<Scheduler::Payload>& queue = queues_[slot];
+          if (!queue.empty()) {
+            LOG_ERROR
+                << "internal: unexpected idle timeout for sequence in slot "
+                << slot;
+          }
+
+          SequenceBatchScheduler::BatchSlot batch_slot(batcher_idx_, slot);
+          bool released = base_->ReleaseBatchSlot(
+              batch_slot, slot_correlation_ids_[slot], &queue);
+          if (released) {
+            slot_correlation_ids_[slot] = 0;
+            if (slot == max_active_slot_) {
+              adjust_max_active_slot = true;
+            }
+          }
+        }
+      }
+
       // If one or more sequences ended, and one of them was in
       // max_active_slot_, then need to find the new max_active_slot_.
       if (adjust_max_active_slot) {
-        while ((max_active_slot_ >= 0) && !active_slots_[max_active_slot_]) {
+        while ((max_active_slot_ >= 0) &&
+               (slot_correlation_ids_[max_active_slot_] == 0)) {
           max_active_slot_--;
         }
       }
