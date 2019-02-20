@@ -403,13 +403,13 @@ message ModelDynamicBatching
   //@@
   repeated int32 preferred_batch_size = 1;
 
-  //@@  .. cpp:var:: int32 max_queue_delay_microseconds
+  //@@  .. cpp:var:: uint64 max_queue_delay_microseconds
   //@@
   //@@     The maximum time, in microseconds, a request will be delayed in
   //@@     the scheduling queue to wait for additional requests for
   //@@     batching. Default is 0.
   //@@
-  int32 max_queue_delay_microseconds = 2;
+  uint64 max_queue_delay_microseconds = 2;
 }
 
 //@@
@@ -420,13 +420,17 @@ message ModelDynamicBatching
 //@@
 message ModelSequenceBatching
 {
-  //@@  .. cpp:var:: uint32 max_queue_delay_microseconds
+  //@@  .. cpp:var:: uint64 max_sequence_idle_microseconds
   //@@
-  //@@     The maximum time, in microseconds, a request will be delayed in
-  //@@     the scheduling queue to wait for additional requests for
-  //@@     batching. Default is 0.
+  //@@     The maximum time, in microseconds, that a sequence is allowed to
+  //@@     be idle before it is aborted. The inference server considers a
+  //@@     sequence idle when it does not have any inference request queued
+  //@@     for the sequence. If this limit is exceeded, the inference server
+  //@@     will free the batch slot allocated by the sequence and make it
+  //@@     available for another sequence. If not specified (or specified as
+  //@@     zero) a default value of 1000000 (1 second) is used.
   //@@
-  int32 max_queue_delay_microseconds = 1;
+  uint64 max_sequence_idle_microseconds = 1;
 
   //@@  .. cpp:var:: message Control
   //@@
