@@ -236,6 +236,15 @@ GetNormalizedModelConfig(
     }
   }
 
+  // If sequence batching is specified...
+  if (config->has_sequence_batching()) {
+    // Set default idle is not specified.
+    if (config->sequence_batching().max_sequence_idle_microseconds() == 0) {
+      config->mutable_sequence_batching()->set_max_sequence_idle_microseconds(
+          1000 * 1000);
+    }
+  }
+
   // Make sure there is at least one instance_group.
   if (config->instance_group().size() == 0) {
     ModelInstanceGroup* group = config->add_instance_group();
@@ -344,18 +353,13 @@ ValidateModelConfig(
             config.name());
       }
     }
-
-    if (config.dynamic_batching().max_queue_delay_microseconds() < 0) {
-      return tensorflow::errors::InvalidArgument(
-          "dynamic batching maximum queue delay must be non-negative for ",
-          config.name());
-    }
   }
 
   // If sequence batching is specified make sure the control is
   // specified correctly.
   if (config.has_sequence_batching()) {
     const auto& batcher = config.sequence_batching();
+
     if (batcher.control_input_size() == 0) {
       return tensorflow::errors::InvalidArgument(
           "sequence batching must specify at least one control tensor for ",
@@ -366,12 +370,12 @@ ValidateModelConfig(
     // control is specified.
     std::string tensor_name;
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
-        config.sequence_batching(), config.name(),
+        batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
     TF_RETURN_IF_ERROR(GetSequenceControlProperties(
-        config.sequence_batching(), config.name(),
+        batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));

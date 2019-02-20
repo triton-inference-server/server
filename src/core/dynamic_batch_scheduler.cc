@@ -72,8 +72,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     }
 
     pending_batch_delay_ns_ =
-        (uint64_t)config.dynamic_batching().max_queue_delay_microseconds() *
-        1000;
+        config.dynamic_batching().max_queue_delay_microseconds() * 1000;
   }
 }
 

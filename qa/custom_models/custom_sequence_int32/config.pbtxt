@@ -29,7 +29,7 @@ platform: "custom"
 max_batch_size: 8
 default_model_filename: "libsequence.so"
 sequence_batching {
-  max_queue_delay_microseconds: 0
+  max_sequence_idle_microseconds: 5000000
   control_input [
     {
       name: "START"

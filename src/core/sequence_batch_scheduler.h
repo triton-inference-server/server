@@ -70,7 +70,8 @@ class SequenceBatchScheduler : public Scheduler {
 
   // Show that a batch slot is no longer being used.
   bool ReleaseBatchSlot(
-      const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads);
+      const BatchSlot& batch_slot, const CorrelationID force_end_correlation_id,
+      std::deque<Scheduler::Payload>* payloads);
 
   // For debugging, batcher reports how many waiting requests and
   // returns true if the batcher should continue waiting.
@@ -125,6 +126,10 @@ class SequenceBatchScheduler : public Scheduler {
     // The index of this batcher within the controlling scheduler.
     const uint32_t batcher_idx_;
 
+    // The max_sequence_idle_microseconds value for this scheduler (in
+    // nanoseconds)
+    const uint64_t max_sequence_idle_ns_;
+
     // The thread scheduling payloads queued in this batch.
     std::unique_ptr<std::thread> scheduler_thread_;
     bool scheduler_thread_exit_;
@@ -151,7 +156,12 @@ class SequenceBatchScheduler : public Scheduler {
     // Is each batch slot active or not. An empty queue for a batch
     // slot does not mean its empty... it could just not have any
     // requests pending at the moment.
-    std::vector<bool> active_slots_;
+    std::vector<CorrelationID> slot_correlation_ids_;
+
+    // For each slot the time when the slot becomes idle. If this
+    // timeout is reached the slot will be freed under the assumption
+    // that the sequence failed to END for some reason.
+    std::vector<int64_t> slot_idle_timeouts_;
 
     // The control values, delivered as input tensors, that should be
     // used when starting a sequence, continuing a sequence, and

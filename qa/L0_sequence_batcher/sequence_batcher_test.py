@@ -51,7 +51,7 @@ else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan")
 
 _protocols = ("http", "grpc")
-_max_queue_delay_ms = 0
+_max_sequence_idle_ms = 5000
 _check_exception = None
 
 class SequenceBatcherTest(unittest.TestCase):
@@ -218,8 +218,6 @@ class SequenceBatcherTest(unittest.TestCase):
                         { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
                         batch_size=batch_size, flags=flags))
 
-                seq_end_ms = int(round(time.time() * 1000))
-
                 # Wait for the results in the order sent
                 result = None
                 for id in result_ids:
@@ -228,6 +226,8 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue("OUTPUT" in results)
                     result = results["OUTPUT"][0][0]
                     print("{}: {}".format(sequence_name, result))
+
+                seq_end_ms = int(round(time.time() * 1000))
 
                 self.assertEqual(result, expected_result)
 
@@ -253,7 +253,7 @@ class SequenceBatcherTest(unittest.TestCase):
         self.assertTrue(model_name in ss.model_status,
                         "expected status for model " + model_name)
         bconfig = ss.model_status[model_name].config.sequence_batching
-        self.assertEqual(bconfig.max_queue_delay_microseconds, _max_queue_delay_ms * 1000) # 10 secs
+        self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
 
     def check_status(self, model_name, static_bs, exec_cnt, infer_cnt):
         ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
@@ -555,7 +555,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 987,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -567,7 +567,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 988,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 0, None),
                            (None, 9, None),
@@ -610,7 +610,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            ("end", 3, None)),
@@ -620,7 +620,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            (None, 12, None),
@@ -632,7 +632,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
@@ -642,7 +642,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -693,7 +693,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -704,7 +704,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            (None, 12, None),
@@ -715,7 +715,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            (None, 112, None),
@@ -726,7 +726,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -769,7 +769,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -780,7 +780,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            (None, 12, None),
@@ -791,7 +791,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            (None, 112, None),
@@ -802,7 +802,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -813,7 +813,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            (None, 11112, None),
@@ -863,7 +863,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -874,7 +874,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            ("end", 13, None)),
@@ -884,7 +884,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
@@ -894,7 +894,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -905,7 +905,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
@@ -914,7 +914,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 22222, None),),
                           self.get_expected_result(22222, 22222, trial, "start,end"),
@@ -968,7 +968,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -979,7 +979,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            ("end", 13, None)),
@@ -989,7 +989,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            ("end", 113, None)),
@@ -999,7 +999,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -1010,7 +1010,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
@@ -1019,7 +1019,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 22222, None),
                            (None, 22223, None),
@@ -1067,7 +1067,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 2, None),
@@ -1078,7 +1078,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            (None, 12, None),
@@ -1089,7 +1089,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            (None, 112, None),
@@ -1100,7 +1100,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -1111,7 +1111,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            ("end", 11113, None)),
@@ -1167,7 +1167,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1, None),
                            (None, 3, None)),
@@ -1177,7 +1177,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11, None),
                            (None, 12, None),
@@ -1189,7 +1189,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 111, None),
                            (None, 112, None),
@@ -1201,7 +1201,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 1111, None),
                            (None, 1112, None),
@@ -1213,7 +1213,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
-                          (3000, None),
+                          (None, None),
                           # (flag_str, value, pre_delay_ms)
                           (("start", 11111, None),
                            ("end", 11113, None)),
@@ -1233,6 +1233,112 @@ class SequenceBatcherTest(unittest.TestCase):
                 self.check_status(model_name, (1,), 4 * _model_instances, 16)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_backlog_sequence_timeout(self):
+        # Test model instances together are configured with
+        # total-max-batch-size 4. Send 4 sequences in parallel and
+        # make sure they get completely batched into batch-size 4
+        # inferences. The sequences do not have end markers and so
+        # should timeout and allow a 5th sequence to come out of the
+        # backlog and finish.
+
+        # Only works with 1 model instance since otherwise an instance
+        # can run ahead and handle more work than expected (leads to
+        # intermittent failures)
+        if _model_instances != 1:
+            return
+
+        for trial in _trials:
+            try:
+                protocol = "streaming"
+                dtype = self.get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
+
+                self.check_setup(model_name)
+
+                # Need scheduler to wait for queue to contain all
+                # inferences for all sequences.
+                self.assertTrue("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_DELAY_SCHEDULER"]), 4)
+                self.assertTrue("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertEqual(int(os.environ["TRTSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+
+                threads = []
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1001,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1, None),
+                           (None, 3, _max_sequence_idle_ms + 1000)),
+                          self.get_expected_result(4, 3, trial, None),
+                          protocol),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1002,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 11, None),
+                           (None, 12, _max_sequence_idle_ms / 2),
+                           (None, 12, _max_sequence_idle_ms / 2),
+                           ("end", 13, _max_sequence_idle_ms / 2)),
+                          self.get_expected_result(48, 13, trial, None),
+                          protocol),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1003,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 111, None),
+                           (None, 112, _max_sequence_idle_ms / 2),
+                           (None, 112, _max_sequence_idle_ms / 2),
+                           ("end", 113, _max_sequence_idle_ms / 2)),
+                          self.get_expected_result(448, 113, trial, None),
+                          protocol),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1004,
+                          (None, None),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 1111, None),
+                           (None, 1112, _max_sequence_idle_ms / 2),
+                           (None, 1112, _max_sequence_idle_ms / 2),
+                           ("end", 1113, _max_sequence_idle_ms / 2)),
+                          self.get_expected_result(4448, 1113, trial, None),
+                          protocol),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                threads.append(threading.Thread(
+                    target=self.check_sequence_async,
+                    args=(trial, model_name, dtype, 1005,
+                          (None, _max_sequence_idle_ms - 2000),
+                          # (flag_str, value, pre_delay_ms)
+                          (("start", 11111, None),
+                           ("end", 11113, None)),
+                          self.get_expected_result(22224, 11113, trial, "end"),
+                          protocol),
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+
+                threads[0].start()
+                threads[1].start()
+                threads[2].start()
+                threads[3].start()
+                time.sleep(2)
+                threads[4].start()
+                for t in threads:
+                    t.join()
+
+                self.check_deferred_exception()
+                self.assertTrue(False, "expected error")
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith(
+                        str("inference request for sequence 1001 to " +
+                            "model '{}' must specify the START flag on the first " +
+                            "request of the sequence").format(model_name)))
 
 if __name__ == '__main__':
     unittest.main()
