@@ -273,15 +273,13 @@ class ConcurrencyManager {
           threads_contexts_stat_.back(), threads_concurrency_.back());
     }
 
-    // Compute the new concurrency level for each thread (take ceiling)
-    size_t avg_concurrency =
-        (concurrent_request_count + threads_.size() - 1) / threads_.size();
-    size_t num_set = 0;
-    for (auto& thread_concurrency : threads_concurrency_) {
-      size_t num_need = concurrent_request_count - num_set;
-      *thread_concurrency =
-          (num_need < avg_concurrency) ? num_need : avg_concurrency;
-      num_set += *thread_concurrency;
+    // Compute the new concurrency level for each thread (take floor)
+    // and spread the remaining value
+    size_t avg_concurrency = concurrent_request_count / threads_.size();
+    size_t threads_add_one = concurrent_request_count % threads_.size();
+    for (size_t i = 0; i < threads_concurrency_.size(); i++) {
+      *(threads_concurrency_[i]) =
+          avg_concurrency + (i < threads_add_one ? 1 : 0);
     }
 
     // Make sure all threads will check their updated concurrency level
