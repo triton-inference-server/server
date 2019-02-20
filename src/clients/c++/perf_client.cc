@@ -265,11 +265,12 @@ class ConcurrencyManager {
       // Launch new thread for inferencing
       threads_status_.emplace_back(
           new nic::Error(ni::RequestStatusCode::SUCCESS));
-      threads_context_stat_.emplace_back(new nic::InferContext::Stat());
+      threads_contexts_stat_.emplace_back(
+          new std::vector<nic::InferContext::Stat>());
       threads_concurrency_.emplace_back(new size_t(0));
       threads_.emplace_back(
           &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
-          threads_context_stat_.back(), threads_concurrency_.back());
+          threads_contexts_stat_.back(), threads_concurrency_.back());
     }
 
     // Compute the new concurrency level for each thread (take ceiling)
@@ -580,15 +581,17 @@ class ConcurrencyManager {
   nic::Error GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat)
   {
     std::lock_guard<std::mutex> lk(status_report_mutex_);
-    for (auto& context_stat : threads_context_stat_) {
-      contexts_stat->completed_request_count +=
-          context_stat->completed_request_count;
-      contexts_stat->cumulative_total_request_time_ns +=
-          context_stat->cumulative_total_request_time_ns;
-      contexts_stat->cumulative_send_time_ns +=
-          context_stat->cumulative_send_time_ns;
-      contexts_stat->cumulative_receive_time_ns +=
-          context_stat->cumulative_receive_time_ns;
+    for (auto& thread_contexts_stat : threads_contexts_stat_) {
+      for (auto& context_stat : (*thread_contexts_stat)) {
+        contexts_stat->completed_request_count +=
+            context_stat.completed_request_count;
+        contexts_stat->cumulative_total_request_time_ns +=
+            context_stat.cumulative_total_request_time_ns;
+        contexts_stat->cumulative_send_time_ns +=
+            context_stat.cumulative_send_time_ns;
+        contexts_stat->cumulative_receive_time_ns +=
+            context_stat.cumulative_receive_time_ns;
+      }
     }
     return nic::Error::Success;
   }
@@ -794,7 +797,7 @@ class ConcurrencyManager {
   // Function for worker threads
   void AsyncInfer(
       std::shared_ptr<nic::Error> err,
-      std::shared_ptr<nic::InferContext::Stat> stat,
+      std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
       std::shared_ptr<size_t> concurrency)
   {
     std::vector<uint8_t> input_buf;
@@ -812,6 +815,7 @@ class ConcurrencyManager {
       while (num_reqs > ctxs.size()) {
         ctxs.emplace_back();
         ctxs_working.push_back(false);
+        stats->emplace_back();
         requests_start_time.emplace_back();
         *err = PrepareInfer(&(ctxs.back()), &options, input_buf);
         if (!err->IsOk()) {
@@ -902,7 +906,7 @@ class ConcurrencyManager {
             request_timestamps_->emplace_back(
                 std::make_tuple(start_time, end_time, flags));
             // Update its InferContext statistic to shared Stat pointer
-            ctxs[idx]->GetStat(stat.get());
+            ctxs[idx]->GetStat(&((*stats)[idx]));
             status_report_mutex_.unlock();
           }
         }
@@ -994,7 +998,8 @@ class ConcurrencyManager {
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
   std::vector<std::shared_ptr<nic::Error>> threads_status_;
-  std::vector<std::shared_ptr<nic::InferContext::Stat>> threads_context_stat_;
+  std::vector<std::shared_ptr<std::vector<nic::InferContext::Stat>>>
+      threads_contexts_stat_;
   std::vector<std::shared_ptr<size_t>> threads_concurrency_;
 
   // Use condition variable to pause/continue worker threads
