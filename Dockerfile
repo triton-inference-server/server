@@ -114,6 +114,12 @@ RUN apt-get update && \
             libopencv-core-dev \
             libtool
 
+# Use the PYVER version of python
+RUN rm -f /usr/bin/python && \
+    rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
+    ln -s /usr/bin/python$PYVER /usr/bin/python && \
+    ln -s /usr/bin/python$PYVER /usr/bin/python`echo $PYVER | cut -c1-1`
+
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python$PYVER get-pip.py && \
     rm get-pip.py
@@ -208,17 +214,19 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
                bazel build -c opt src/clients/...; \
              fi' && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa) && \
-    mkdir -p /opt/tensorrtserver/bin && \
-    cp bazel-bin/src/clients/c++/image_client /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/clients/c++/perf_client /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_client /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_string_client /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_sequence_client /opt/tensorrtserver/bin/. && \
-    mkdir -p /opt/tensorrtserver/lib && \
-    cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/. && \
-    cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/. && \
-    mkdir -p /opt/tensorrtserver/pip && \
-    bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/pip/. && \
+    mkdir -p /tmp/client/bin && \
+    cp bazel-bin/src/clients/c++/image_client /tmp/client/bin/. && \
+    cp bazel-bin/src/clients/c++/perf_client /tmp/client/bin/. && \
+    cp bazel-bin/src/clients/c++/simple_client /tmp/client/bin/. && \
+    cp bazel-bin/src/clients/c++/simple_string_client /tmp/client/bin/. && \
+    cp bazel-bin/src/clients/c++/simple_sequence_client /tmp/client/bin/. && \
+    mkdir -p /tmp/client/lib && \
+    cp bazel-bin/src/clients/c++/librequest.so /tmp/client/lib/. && \
+    cp bazel-bin/src/clients/c++/librequest.a /tmp/client/lib/. && \
+    mkdir -p /tmp/client/pip && \
+    bazel-bin/src/clients/python/build_pip /tmp/client/pip/. && \
+    (cd /tmp/client && tar zcf /opt/tensorrtserver/tensorrtserver_clients.tar.gz *) && \
+    (cd /opt/tensorrtserver && tar zxf tensorrtserver_clients.tar.gz) && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/.; \
                cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
