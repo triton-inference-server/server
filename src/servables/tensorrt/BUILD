@@ -28,12 +28,11 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-load('@tf_serving//tensorflow_serving:serving.bzl', 'serving_proto_library')
+load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
-serving_proto_library(
+cc_proto_library(
     name = "plan_bundle_proto",
     srcs = ["plan_bundle.proto"],
-    cc_api_version = 2,
     deps = [
         "@org_tensorflow//tensorflow/core:protos_all_cc",
         "@protobuf_archive//:cc_wkt_protos",
