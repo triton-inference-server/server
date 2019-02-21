@@ -28,32 +28,26 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-load('@protobuf_archive//:protobuf.bzl', 'py_proto_library')
-load('@tf_serving//tensorflow_serving:serving.bzl', 'serving_proto_library')
-load('@tf_serving//tensorflow_serving:serving.bzl', 'serving_proto_library_py')
+load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
+load('@com_google_protobuf//:protobuf.bzl', 'py_proto_library')
 
-serving_proto_library(
+cc_proto_library(
     name = "api_proto",
     srcs = ["api.proto"],
-    cc_api_version = 2,
-    deps = [
-    ],
 )
 
-serving_proto_library_py(
+py_proto_library(
     name = "api_proto_py_pb2",
     srcs = ["api.proto"],
-    proto_library = "api_proto",
-    deps = [
-    ],
+    srcs_version = "PY2AND3",
 )
 
-serving_proto_library(
+cc_proto_library(
     name = "grpc_service_proto",
     srcs = ["grpc_service.proto"],
-    has_services = 1,
-    cc_api_version = 2,
-    cc_grpc_version = 1,
+    use_grpc_plugin = True,
+    default_runtime="@com_google_protobuf//:protobuf",
+    protoc="@com_google_protobuf//:protoc",
     deps = [
         ":api_proto",
         ":request_status_proto",
@@ -66,55 +60,49 @@ py_proto_library(
     srcs = ["grpc_service.proto"],
     use_grpc_plugin = True,
     srcs_version = "PY2AND3",
-    default_runtime="@protobuf_archive//:protobuf_python",
-    protoc="@protobuf_archive//:protoc",
+    default_runtime="@com_google_protobuf//:protobuf_python",
+    protoc="@com_google_protobuf//:protoc",
+    deps = [
+        ":api_proto_py_pb2",
+        ":request_status_proto_py_pb2",
+        ":server_status_proto_py_pb2",
+    ],
 )
 
-serving_proto_library(
+cc_proto_library(
     name = "model_config_proto",
     srcs = ["model_config.proto"],
-    cc_api_version = 2,
-    deps = [
-    ],
 )
 
-serving_proto_library_py(
+py_proto_library(
     name = "model_config_proto_py_pb2",
     srcs = ["model_config.proto"],
-    proto_library = "model_config_proto",
-    deps = [
-    ],
+    srcs_version = "PY2AND3",
 )
 
-serving_proto_library(
+cc_proto_library(
     name = "request_status_proto",
     srcs = ["request_status.proto"],
-    cc_api_version = 2,
-    deps = [
-    ],
 )
 
-serving_proto_library_py(
+py_proto_library(
     name = "request_status_proto_py_pb2",
     srcs = ["request_status.proto"],
-    proto_library = "request_status_proto",
-    deps = [
-    ],
+    srcs_version = "PY2AND3",
 )
 
-serving_proto_library(
+cc_proto_library(
     name = "server_status_proto",
     srcs = ["server_status.proto"],
-    cc_api_version = 2,
     deps = [
         ":model_config_proto",
     ],
 )
 
-serving_proto_library_py(
+py_proto_library(
     name = "server_status_proto_py_pb2",
     srcs = ["server_status.proto"],
-    proto_library = "server_status_proto",
+    srcs_version = "PY2AND3",
     deps = [
         ":model_config_proto_py_pb2",
     ],
