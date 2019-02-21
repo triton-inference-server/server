@@ -120,9 +120,9 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 def create_tf_modelfile(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     tf_dtype = np_to_tf_dtype(dtype)
@@ -147,7 +147,7 @@ def create_tf_modelfile(
         # output shape being [None, 1]. So instead we just return 0 if
         # not-ready and 'INPUT'+'START' otherwise... the tests know to
         # expect this.
-        input0 = tf.placeholder(tf_dtype, [None,1], "INPUT")
+        input0 = tf.placeholder(tf_dtype, [None,] + tu.shape_to_tf_shape(shape), "INPUT")
         start0 = tf.placeholder(tf_dtype, [None,1], "START")
         ready0 = tf.placeholder(tf_dtype, [None,1], "READY")
         tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
@@ -187,9 +187,9 @@ def create_tf_modelfile(
                                  "model.graphdef", as_text=False)
 
 def create_tf_modelconfig(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_tf_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+    if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     # Use a different model name for the non-batching variant
@@ -232,7 +232,7 @@ input [
   {{
     name: "INPUT"
     data_type: {}
-    dims: [ 1 ]
+    dims: [ {} ]
   }}
 ]
 output [
@@ -252,7 +252,8 @@ instance_group [
            max_batch,
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
-           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -264,9 +265,9 @@ instance_group [
 
 
 def create_netdef_modelfile(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_c2_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+    if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     c2_dtype = np_to_c2_dtype(dtype)
@@ -296,9 +297,9 @@ def create_netdef_modelfile(
 
 
 def create_netdef_modelconfig(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_c2_model(dtype, dtype, dtype, [1,], [1,], [1,]):
+    if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -335,7 +336,7 @@ input [
   {{
     name: "INPUT"
     data_type: {}
-    dims: [ 1 ]
+    dims: [ {} ]
   }}
 ]
 output [
@@ -353,7 +354,8 @@ instance_group [
 '''.format(model_name, max_batch,
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
-           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -365,9 +367,9 @@ instance_group [
 
 
 def create_plan_modelfile(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, [1,1,1], [1,1,1], [1,1,1]):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     trt_dtype = np_to_trt_dtype(dtype)
@@ -378,7 +380,7 @@ def create_plan_modelfile(
     G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
     builder = trt.infer.create_infer_builder(G_LOGGER)
     network = builder.create_network()
-    in0 = network.add_input("INPUT", trt_dtype, [1, 1, 1])
+    in0 = network.add_input("INPUT", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1, 1, 1])
     ready0 = network.add_input("READY", trt_dtype, [1, 1, 1])
     add = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
@@ -409,9 +411,9 @@ def create_plan_modelfile(
 
 
 def create_plan_modelconfig(
-        create_savedmodel, models_dir, model_version, max_batch, dtype):
+        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, [1,1,1], [1,1,1], [1,1,1]):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -448,7 +450,7 @@ input [
   {{
     name: "INPUT"
     data_type: {}
-    dims: [ 1, 1, 1 ]
+    dims: [ {} ]
   }}
 ]
 output [
@@ -466,7 +468,8 @@ instance_group [
 '''.format(model_name, max_batch,
            "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
-           np_to_model_dtype(dtype), np_to_model_dtype(dtype))
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -477,32 +480,36 @@ instance_group [
         cfile.write(config)
 
 
-def create_models(models_dir, dtype):
+def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
     if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, 8, dtype);
-        create_tf_modelfile(False, models_dir, model_version, 8, dtype);
-        create_tf_modelconfig(False, models_dir, model_version, 0, dtype);
-        create_tf_modelfile(False, models_dir, model_version, 0, dtype);
+        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape);
+        create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape);
+        if no_batch:
+            create_tf_modelconfig(False, models_dir, model_version, 0, dtype, shape);
+            create_tf_modelfile(False, models_dir, model_version, 0, dtype, shape);
 
     if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, 8, dtype);
-        create_tf_modelfile(True, models_dir, model_version, 8, dtype);
-        create_tf_modelconfig(True, models_dir, model_version, 0, dtype);
-        create_tf_modelfile(True, models_dir, model_version, 0, dtype);
+        create_tf_modelconfig(True, models_dir, model_version, 8, dtype, shape);
+        create_tf_modelfile(True, models_dir, model_version, 8, dtype, shape);
+        if no_batch:
+            create_tf_modelconfig(True, models_dir, model_version, 0, dtype, shape);
+            create_tf_modelfile(True, models_dir, model_version, 0, dtype, shape);
 
     if FLAGS.netdef:
-        create_netdef_modelconfig(True, models_dir, model_version, 8, dtype);
-        create_netdef_modelfile(True, models_dir, model_version, 8, dtype);
-        create_netdef_modelconfig(True, models_dir, model_version, 0, dtype);
-        create_netdef_modelfile(True, models_dir, model_version, 0, dtype);
+        create_netdef_modelconfig(True, models_dir, model_version, 8, dtype, shape);
+        create_netdef_modelfile(True, models_dir, model_version, 8, dtype, shape);
+        if no_batch:
+            create_netdef_modelconfig(True, models_dir, model_version, 0, dtype, shape);
+            create_netdef_modelfile(True, models_dir, model_version, 0, dtype, shape);
 
     if FLAGS.tensorrt:
-        create_plan_modelconfig(True, models_dir, model_version, 8, dtype);
-        create_plan_modelfile(True, models_dir, model_version, 8, dtype);
-        create_plan_modelconfig(True, models_dir, model_version, 0, dtype);
-        create_plan_modelfile(True, models_dir, model_version, 0, dtype);
+        create_plan_modelconfig(True, models_dir, model_version, 8, dtype, shape + [1, 1]);
+        create_plan_modelfile(True, models_dir, model_version, 8, dtype, shape + [1, 1]);
+        if no_batch:
+            create_plan_modelconfig(True, models_dir, model_version, 0, dtype, shape + [1, 1]);
+            create_plan_modelfile(True, models_dir, model_version, 0, dtype, shape + [1, 1]);
 
 
 if __name__ == '__main__':
@@ -534,9 +541,10 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
-        create_models(FLAGS.models_dir, np.float32)
-        create_models(FLAGS.models_dir, np.int32)
+        create_models(FLAGS.models_dir, np.float32, [1,])
+        create_models(FLAGS.models_dir, np.int32, [1,])
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
-        pass
+        create_models(FLAGS.models_dir, np.int32, [-1,], False)
+        create_models(FLAGS.models_dir, np.float32, [-1,], False)

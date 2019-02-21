@@ -46,7 +46,7 @@ _model_instances = int(os.environ['MODEL_INSTANCES'])
 if _no_batching:
     _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch")
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = []
+    _trials = ("savedmodel", "graphdef", "netdef")
 else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan")
 
