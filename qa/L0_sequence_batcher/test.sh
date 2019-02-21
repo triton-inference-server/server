@@ -76,12 +76,27 @@ for m in \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
+# Setup variable-size model store.
+#   modelsv - one instance with batch-size 4
+rm -fr modelsv && mkdir modelsv
+for m in \
+        $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
+        $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_int32 \
+        $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 ; do
+    cp -r $m modelsv/. && \
+        (cd modelsv/$(basename $m) && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+done
+
 # Same test work on all models since they all have same total number
 # of batch slots.
-for model_trial in 0 1 2 4 ; do
+for model_trial in v 0 1 2 4 ; do
     export NO_BATCHING=1 &&
         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
-    export MODEL_INSTANCES=4 &&
+    export MODEL_INSTANCES=1 &&
+        [[ "$model_trial" != "v" ]] && export MODEL_INSTANCES=4 &&
         [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
 
     MODEL_DIR=models${model_trial}
@@ -90,86 +105,85 @@ for model_trial in 0 1 2 4 ; do
     # reset (which is used to make sure the correctly batch size was used
     # for execution). Test everything with fixed-tensor-size models and
     # variable-tensor-size models.
-    for model_type in FIXED; do    # add VARIABLE
-        export BATCHER_TYPE=$model_type
-        MODEL_PATH=$MODEL_DIR && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
-        for i in \
-                test_simple_sequence \
-                test_length1_sequence \
-                test_batch_size \
-                test_no_sequence_start \
-                test_no_sequence_start2 \
-                test_no_sequence_end \
-                test_no_correlation_id ; do
-            SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
-            SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
-            run_server
-            if [ "$SERVER_PID" == "0" ]; then
-                echo -e "\n***\n*** Failed to start $SERVER\n***"
-                cat $SERVER_LOG
-                exit 1
-            fi
+    export BATCHER_TYPE="VARIABLE" &&
+        [[ "$model_trial" != "v" ]] && export BATCHER_TYPE="FIXED"
 
-            echo "Test: $i" >>$CLIENT_LOG
+    for i in \
+            test_simple_sequence \
+            test_length1_sequence \
+            test_batch_size \
+            test_no_sequence_start \
+            test_no_sequence_start2 \
+            test_no_sequence_end \
+            test_no_correlation_id ; do
+        SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
+        SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-            set +e
-            python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-            set -e
+        echo "Test: $i" >>$CLIENT_LOG
 
-            kill $SERVER_PID
-            wait $SERVER_PID
-        done
+        set +e
+        python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
 
-        # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
-        # scheduler is delayed and requests can collect in the queue.
-        for i in \
-                test_backlog_fill \
-                test_backlog_fill_no_end \
-                test_backlog_same_correlation_id \
-                test_backlog_same_correlation_id_no_end \
-                test_backlog_sequence_timeout \
-                test_half_batch \
-                test_skip_batch \
-                test_full_batch \
-                test_backlog ; do
-            export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
-                [[ "$i" != "test_backlog_fill_no_end" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
-                [[ "$i" != "test_backlog_fill" ]] &&
-                [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
-            export TRTSERVER_DELAY_SCHEDULER=10 &&
-                [[ "$i" != "test_backlog_fill_no_end" ]] &&
-                [[ "$i" != "test_backlog_fill" ]] && export TRTSERVER_DELAY_SCHEDULER=16 &&
-                [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
-                [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
-                [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
-            SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
-            SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
-            run_server
-            if [ "$SERVER_PID" == "0" ]; then
-                echo -e "\n***\n*** Failed to start $SERVER\n***"
-                cat $SERVER_LOG
-                exit 1
-            fi
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
 
-            echo "Test: $i" >>$CLIENT_LOG
+    # Tests that require TRTSERVER_DELAY_SCHEDULER so that the
+    # scheduler is delayed and requests can collect in the queue.
+    for i in \
+        test_backlog_fill \
+            test_backlog_fill_no_end \
+            test_backlog_same_correlation_id \
+            test_backlog_same_correlation_id_no_end \
+            test_backlog_sequence_timeout \
+            test_half_batch \
+            test_skip_batch \
+            test_full_batch \
+            test_backlog ; do
+        export TRTSERVER_BACKLOG_DELAY_SCHEDULER=3 &&
+            [[ "$i" != "test_backlog_fill_no_end" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=2 &&
+            [[ "$i" != "test_backlog_fill" ]] &&
+            [[ "$i" != "test_backlog_same_correlation_id" ]] && export TRTSERVER_BACKLOG_DELAY_SCHEDULER=0
+        export TRTSERVER_DELAY_SCHEDULER=10 &&
+            [[ "$i" != "test_backlog_fill_no_end" ]] &&
+            [[ "$i" != "test_backlog_fill" ]] && export TRTSERVER_DELAY_SCHEDULER=16 &&
+            [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
+            [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
+            [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
+        SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
+        SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-            set +e
-            python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-            set -e
+        echo "Test: $i" >>$CLIENT_LOG
 
-            unset TRTSERVER_DELAY_SCHEDULER
-            unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
-            kill $SERVER_PID
-            wait $SERVER_PID
-        done
+        set +e
+        python $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+        set -e
+
+        unset TRTSERVER_DELAY_SCHEDULER
+        unset TRTSERVER_BACKLOG_DELAY_SCHEDULER
+        kill $SERVER_PID
+        wait $SERVER_PID
     done
 done
 

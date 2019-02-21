@@ -38,9 +38,10 @@
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
-## /tmp/qa_variable_model_repository, and
-## /tmp/qa_sequence_model_repository directories containing all the
-## models needed for CI testing.
+## /tmp/qa_variable_model_repository,
+## /tmp/qa_sequence_model_repository, and
+## /tmp/qa_variable_sequence_model_repository directories containing
+## all the models needed for CI testing.
 ##
 ############################################################################
 
@@ -54,11 +55,13 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/qa_model_repository
 HOST_VARDESTDIR=/tmp/qa_variable_model_repository
 HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
+HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
 
-rm -fr $HOST_DESTDIR $HOST_VARDESTDIR $HOST_SEQDESTDIR
+rm -fr $HOST_DESTDIR $HOST_VARDESTDIR $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_SEQDESTDIR
+mkdir -p $HOST_VARSEQDESTDIR
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
@@ -75,6 +78,7 @@ SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 SEQDESTDIR=/tmp/seqmodels
+VARSEQDESTDIR=/tmp/varseqmodels
 
 # PyTorch
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
@@ -88,6 +92,8 @@ python3 $SRCDIR/gen_qa_models.py --netdef --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --netdef --variable --models_dir=$VARSEQDESTDIR
+chown -R $(id -u):$(id -g) $VARSEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
@@ -102,6 +108,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -120,6 +127,8 @@ python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
+chown -R $(id -u):$(id -g) $VARSEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -134,6 +143,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
@@ -152,6 +162,8 @@ python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
+python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
+chown -R $(id -u):$(id -g) $VARSEQDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
@@ -166,6 +178,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
+       --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
