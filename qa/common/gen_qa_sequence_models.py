@@ -125,20 +125,31 @@ def create_tf_modelfile(
     if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
-    tf_dtype = np_to_tf_dtype(dtype)
+    tf_input_dtype = np_to_tf_dtype(dtype)
+    tf_dtype = tf_input_dtype
+
+    # If the input is a string then use int32 for operation and just
+    # cast to/from string for input and output.
+    if tf_input_dtype == tf.string:
+        tf_dtype = tf.int32
 
     # Create the model. If non-batching then don't include the batch
     # dimension.
     tf.reset_default_graph()
     if create_savedmodel and (max_batch == 0):
-        input0 = tf.placeholder(tf_dtype, [1,], "INPUT")
+        input0 = tf.placeholder(tf_input_dtype, [1,], "INPUT")
+        if tf_input_dtype == tf.string:
+            input0 = tf.strings.to_number(tf.strings.join(["0", input0]), tf_dtype)
         start0 = tf.placeholder(tf_dtype, [1,], "START")
         ready0 = tf.placeholder(tf_dtype, [1,], "READY")
         acc = tf.get_variable("ACC", [1,], dtype=tf_dtype)
         tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
         newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
         assign = tf.assign(acc, newacc)
-        output0 = tf.identity(assign, name="OUTPUT")
+        if tf_input_dtype == tf.string:
+            output0 = tf.dtypes.as_string(assign, name="OUTPUT")
+        else:
+            output0 = tf.identity(assign, name="OUTPUT")
     else:
         # For batching we can't use a tf.variable to hold the
         # accumulated values since that forces the size of the output
@@ -147,12 +158,17 @@ def create_tf_modelfile(
         # output shape being [None, 1]. So instead we just return 0 if
         # not-ready and 'INPUT'+'START' otherwise... the tests know to
         # expect this.
-        input0 = tf.placeholder(tf_dtype, [None,] + tu.shape_to_tf_shape(shape), "INPUT")
+        input0 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(shape), "INPUT")
+        if tf_input_dtype == tf.string:
+            input0 = tf.strings.to_number(tf.strings.join(["0", input0]), tf_dtype)
         start0 = tf.placeholder(tf_dtype, [None,1], "START")
         ready0 = tf.placeholder(tf_dtype, [None,1], "READY")
         tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
                        tf.zeros(tf.shape(input0), dtype=tf_dtype))
-        output0 = tf.identity(tmp, name="OUTPUT")
+        if tf_input_dtype == tf.string:
+            output0 = tf.dtypes.as_string(tmp, name="OUTPUT")
+        else:
+            output0 = tf.identity(tmp, name="OUTPUT")
 
     # Use a different model name for the non-batching variant
     if create_savedmodel:
@@ -250,8 +266,8 @@ instance_group [
 '''.format(model_name,
            "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
            max_batch,
-           "int32" if dtype == np.int32 else "fp32",
-           "int32" if dtype == np.int32 else "fp32",
+           "fp32" if dtype == np.float32 else "int32",
+           "fp32" if dtype == np.float32 else "int32",
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype))
 
@@ -543,8 +559,10 @@ if __name__ == '__main__':
     if not FLAGS.variable:
         create_models(FLAGS.models_dir, np.float32, [1,])
         create_models(FLAGS.models_dir, np.int32, [1,])
+        create_models(FLAGS.models_dir, np_dtype_string, [1,])
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
         create_models(FLAGS.models_dir, np.int32, [-1,], False)
         create_models(FLAGS.models_dir, np.float32, [-1,], False)
+        create_models(FLAGS.models_dir, np_dtype_string, [-1,], False)

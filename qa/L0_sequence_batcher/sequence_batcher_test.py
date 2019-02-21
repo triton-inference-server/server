@@ -28,6 +28,7 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
+from builtins import str
 from future.utils import iteritems
 import os
 import time
@@ -115,7 +116,13 @@ class SequenceBatcherTest(unittest.TestCase):
 
                     input_list = list()
                     for b in range(batch_size):
-                        input_list.append(np.full(tensor_shape, value, dtype=input_dtype))
+                        if input_dtype == np.object:
+                            in0 = np.full(tensor_shape, value, dtype=np.int32)
+                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                            in0 = in0n.reshape(tensor_shape)
+                        else:
+                            in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                        input_list.append(in0)
 
                     start_ms = int(round(time.time() * 1000))
                     results = ctx.run(
@@ -143,7 +150,11 @@ class SequenceBatcherTest(unittest.TestCase):
                         time.sleep(delay_ms[1] / 1000.0)
 
                 seq_end_ms = int(round(time.time() * 1000))
-                self.assertEqual(result, expected_result)
+
+                if input_dtype == np.object:
+                    self.assertEqual(int(result), expected_result)
+                else:
+                    self.assertEqual(result, expected_result)
 
                 if sequence_thresholds is not None:
                     lt_ms = sequence_thresholds[0]
@@ -209,7 +220,13 @@ class SequenceBatcherTest(unittest.TestCase):
 
                     input_list = list()
                     for b in range(batch_size):
-                        input_list.append(np.full(tensor_shape, value, dtype=input_dtype))
+                        if input_dtype == np.object:
+                            in0 = np.full(tensor_shape, value, dtype=np.int32)
+                            in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
+                            in0 = in0n.reshape(tensor_shape)
+                        else:
+                            in0 = np.full(tensor_shape, value, dtype=input_dtype)
+                        input_list.append(in0)
 
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
@@ -229,7 +246,10 @@ class SequenceBatcherTest(unittest.TestCase):
 
                 seq_end_ms = int(round(time.time() * 1000))
 
-                self.assertEqual(result, expected_result)
+                if input_dtype == np.object:
+                    self.assertEqual(int(result), expected_result)
+                else:
+                    self.assertEqual(result, expected_result)
 
                 if sequence_thresholds is not None:
                     lt_ms = sequence_thresholds[0]
@@ -282,6 +302,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # Get the datatype to use based on what models are available (see test.sh)
         if ("plan" in trial) or ("savedmodel" in trial):
             return np.float32
+        if "graphdef" in trial:
+            return np.dtype(object)
         return np.int32
 
     def get_expected_result(self, expected_result, value, trial, flag_str=None):
@@ -311,7 +333,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 5,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          (None, 2, None, None),
@@ -346,7 +368,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 99,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start,end", 42, None, None),),
                                         self.get_expected_result(42, 42, trial, "start,end"),
@@ -379,7 +401,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 27,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          ("end", 9, None, None)),
@@ -412,7 +434,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 0, # correlation_id = 0
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          ("end", 9, None, None)),
@@ -444,7 +466,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 37469245,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         ((None, 1, None, None),
                                          (None, 2, None, None),
@@ -479,7 +501,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 3,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          (None, 2, None, None),
@@ -516,7 +538,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertFalse("TRTSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
                     self.check_sequence(trial, model_name, dtype, 4566,
-                                        (3000, None),
+                                        (4000, None),
                                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                                         (("start", 1, None, None),
                                          (None, 2, None, None),
