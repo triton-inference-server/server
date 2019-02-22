@@ -27,6 +27,7 @@ lib_files = [
 
 genrule(
     name = "libevhtp-srcs",
+    srcs = ["@com_github_libevent_libevent//:libevent-files"],
     outs = include_files + lib_files,
     cmd = "\n".join([
         "export INSTALL_DIR=$$(pwd)/$(@D)/libevhtp",
@@ -51,7 +52,6 @@ cc_library(
     ],
     hdrs = include_files,
     includes = ["libevhtp/include"],
-    deps = ["@com_github_libevent_libevent//:libevent"],
     linkstatic = 1,
 )
 
