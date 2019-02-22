@@ -39,7 +39,8 @@ class CustomBundle : public InferenceBackend {
   CustomBundle(CustomBundle&&) = default;
 
   tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+      const tensorflow::StringPiece& path,
+      const std::vector<std::string>& server_params, const ModelConfig& config);
 
   // Create a context for execution for each instance for the custom
   // 'models'.
@@ -141,6 +142,7 @@ class CustomBundle : public InferenceBackend {
     CustomExecuteFn_t ExecuteFn_;
   };
 
+  std::vector<std::string> server_params_;
   std::vector<Context> contexts_;
 };
 

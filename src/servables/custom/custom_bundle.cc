@@ -85,10 +85,13 @@ CustomBundle::Context::~Context()
 
 tensorflow::Status
 CustomBundle::Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
+    const tensorflow::StringPiece& path,
+    const std::vector<std::string>& server_params, const ModelConfig& config)
 {
   TF_RETURN_IF_ERROR(ValidateModelConfig(config, kCustomPlatform));
   TF_RETURN_IF_ERROR(SetModelConfig(path, config));
+
+  server_params_ = server_params;
 
   return tensorflow::Status::OK();
 }
@@ -202,6 +205,14 @@ CustomBundle::CreateExecutionContext(
   init_data.serialized_model_config = serialized_config.c_str();
   init_data.serialized_model_config_size = serialized_config.size();
   init_data.gpu_device_id = gpu_device;
+
+  std::vector<const char*> server_param_values;
+  for (const auto& param : server_params_) {
+    server_param_values.push_back(param.c_str());
+  }
+
+  init_data.server_parameter_cnt = server_param_values.size();
+  init_data.server_parameters = &server_param_values[0];
 
   int err = context.InitializeFn_(&init_data, &context.library_context_handle_);
   if (err != 0) {
