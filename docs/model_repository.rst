@@ -324,8 +324,7 @@ Custom Backend API
 
 A custom backend must implement the C interface defined in `custom.h
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_. The
-interface is also documented in the `API Reference
-<file:///home/david/dev/github/NVIDIA/tensorrt-inference-server/docs/build/html/cpp_api/file_src_servables_custom_custom.h.html>`_.
+interface is also documented in the API Reference.
 
 Example Custom Backend
 ^^^^^^^^^^^^^^^^^^^^^^
