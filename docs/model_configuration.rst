@@ -214,7 +214,7 @@ For TensorFlow each value is in the tensorflow namespace. For example,
 tensorflow::DT_FLOAT is the 32-bit floating-point value.
 
 For Caffe2 each value is in the caffe2 namespace and is prepended with
-TensorProto_DataType_. For example, caffe2::TensorProto_DataType_FLOAT
+TensorProto\_DataType\_. For example, caffe2::TensorProto_DataType_FLOAT
 is the 32-bit floating-point datatype.
 
 For Numpy each value is in the numpy module. For example, numpy.float32
