@@ -38,11 +38,27 @@ extern "C" {
 /// CPU.
 #define CUSTOM_NO_GPU_DEVICE -1
 
+/// The number of server parameters provided to custom backend for
+/// initialization. This must keep aligned with CustomServerParameter
+/// enum values.
+#define CUSTOM_SERVER_PARAMETER_CNT 2
+
+/// The server parameter values provided to custom backends. New
+/// values must be added using the next greater integer value and
+/// CUSTOM_SERVER_PARAMETER_CNT must be updated to match.
+typedef enum custom_serverparamkind_enum {
+  /// The inference server version.
+  INFERENCE_SERVER_VERSION = 0,
+
+  /// The absolute path to the root directory of the model repository.
+  MODEL_REPOSITORY_PATH = 1
+} CustomServerParameter;
+
 // The initialization information provided to a custom backend when it
 // is created.
 typedef struct custom_initdata_struct {
   /// Serialized representation of the model configuration. This
-  /// serialization is owned by the caller and so must be copied if a
+  /// serialization is owned by the caller and must be copied if a
   /// persistent copy of required by the custom backend.
   const char* serialized_model_config;
 
@@ -52,6 +68,16 @@ typedef struct custom_initdata_struct {
   /// The GPU device ID to initialize for, or CUSTOM_NO_GPU_DEVICE if
   /// should initialize for CPU.
   int gpu_device_id;
+
+  /// The number of server parameters (i.e. the length of
+  /// 'server_parameters').
+  size_t server_parameter_cnt;
+
+  /// The server parameter values as null-terminated strings, indexed
+  /// by CustomServerParameter. This strings are owned by the caller
+  /// and must be copied if a persistent copy of required by the
+  /// custom backend.
+  const char** server_parameters;
 } CustomInitializeData;
 
 /// A payload represents the input tensors and the required output
@@ -63,7 +89,8 @@ typedef struct custom_payload_struct {
   /// The number of inputs included in this payload.
   uint32_t input_cnt;
 
-  /// The 'input_cnt' names of the inputs included in this payload.
+  /// For each of the 'input_cnt' inputs, the name of the input as a
+  /// null-terminated string.
   const char** input_names;
 
   /// For each of the 'input_cnt' inputs, the number of dimensions in
@@ -79,9 +106,10 @@ typedef struct custom_payload_struct {
   /// the backend.
   uint32_t output_cnt;
 
-  /// The 'output_cnt' names of the outputs that must be computed for
-  /// this payload. Each name must be one of the names from the model
-  /// configuration, but all outputs do not need to be computed.
+  /// For each of the 'output_cnt' outputs, the name of the output as
+  /// a null-terminated string.  Each name must be one of the names
+  /// from the model configuration, but all outputs do not need to be
+  /// computed.
   const char** required_output_names;
 
   /// The context to use with CustomGetNextInput callback function to

@@ -75,10 +75,19 @@ CreateCustomBundle(
     }
   }
 
+  // Create the vector of server parameter values, indexed by the
+  // CustomServerParameter value.
+  std::vector<std::string> server_params(CUSTOM_SERVER_PARAMETER_CNT);
+  server_params[CustomServerParameter::INFERENCE_SERVER_VERSION] =
+      adapter_config.inference_server_version();
+  server_params[CustomServerParameter::MODEL_REPOSITORY_PATH] =
+      adapter_config.model_repository_path();
+
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
   bundle->reset(new CustomBundle);
-  tensorflow::Status status = (*bundle)->Init(path, model_config);
+  tensorflow::Status status =
+      (*bundle)->Init(path, server_params, model_config);
   if (status.ok()) {
     status = (*bundle)->CreateExecutionContexts(custom_paths);
   }

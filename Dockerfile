@@ -232,6 +232,7 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
                cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
                mkdir -p /opt/tensorrtserver/custom; \
                cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/.; \
+               cp bazel-bin/src/custom/param/libparam.so /opt/tensorrtserver/custom/.; \
                cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/.; \
              else \
                pip install --upgrade /opt/tensorrtserver/pip/tensorrtserver-*.whl numpy pillow; \

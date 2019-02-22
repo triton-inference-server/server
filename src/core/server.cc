@@ -1539,6 +1539,8 @@ InferenceServer::BuildPlatformConfigMap(
   //// Custom
   {
     CustomBundleSourceAdapterConfig custom_config;
+    custom_config.set_inference_server_version(version_);
+    custom_config.set_model_repository_path(model_store_path_);
     custom_source_adapter_config.PackFrom(custom_config);
   }
 

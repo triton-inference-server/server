@@ -29,4 +29,11 @@ syntax = "proto3";
 package nvidia.inferenceserver;
 
 // Config proto for CustomBundleSourceAdapter.
-message CustomBundleSourceAdapterConfig {}
+message CustomBundleSourceAdapterConfig
+{
+  // The inference server version.
+  string inference_server_version = 1;
+
+  // The absolute path to the model repository root.
+  string model_repository_path = 2;
+}
