@@ -131,3 +131,13 @@ tf_serving_workspace()
 load("@org_tensorflow//tensorflow:version_check.bzl", "check_bazel_version_at_least")
 
 check_bazel_version_at_least("0.15.0")
+
+new_http_archive(
+    name = "com_github_libevhtp",
+    urls = [
+        "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip",
+    ],
+    sha256 = "3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb",
+    strip_prefix = "libevhtp-1.2.18",
+    build_file = "libevhtp.BUILD",
+)

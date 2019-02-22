@@ -37,6 +37,9 @@
 #include <utility>
 #include <vector>
 
+#include "evhtp/evhtp.h"
+#include "libevent/include/event2/buffer.h"
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/wrappers.pb.h"
@@ -87,10 +90,6 @@
 #include "tensorflow_serving/core/availability_preserving_policy.h"
 #include "tensorflow_serving/core/servable_handle.h"
 #include "tensorflow_serving/model_servers/server_core.h"
-#include "tensorflow_serving/util/net_http/server/public/httpserver.h"
-#include "tensorflow_serving/util/net_http/server/public/response_code_enum.h"
-#include "tensorflow_serving/util/net_http/server/public/server_request_interface.h"
-#include "tensorflow_serving/util/threadpool_executor.h"
 
 #include "src/nvrpc/Context.h"
 #include "src/nvrpc/Executor.h"
@@ -284,7 +283,7 @@ class HealthContext final
 //
 // Handle HTTP requests
 //
-class HTTPServiceImpl {
+class HTTPServiceImpl : public HTTPService {
  public:
   explicit HTTPServiceImpl(InferenceServer* server)
       : server_(server),
@@ -294,90 +293,128 @@ class HTTPServiceImpl {
   {
   }
 
-  tfs::net_http::RequestHandler Dispatch(
-      tfs::net_http::ServerRequestInterface* req);
+  static void Dispatch(evhtp_request_t* req, void* arg);
+
+  tensorflow::Status Start(uint16_t port, int thread_cnt) override;
+
+  tensorflow::Status Stop() override;
 
  private:
-  void Handle(tfs::net_http::ServerRequestInterface* req);
-  tfs::net_http::HTTPStatusCode Health(
-      tfs::net_http::ServerRequestInterface* req,
-      const std::string& health_uri);
-  tfs::net_http::HTTPStatusCode Profile(
-      tfs::net_http::ServerRequestInterface* req,
-      const std::string& profile_uri);
-  tfs::net_http::HTTPStatusCode Infer(
-      tfs::net_http::ServerRequestInterface* req, const std::string& infer_uri);
-  tfs::net_http::HTTPStatusCode Status(
-      tfs::net_http::ServerRequestInterface* req,
-      const std::string& status_uri);
+  void Handle(evhtp_request_t* req);
+  void Health(evhtp_request_t* req, const std::string& health_uri);
+  void Profile(evhtp_request_t* req, const std::string& profile_uri);
+  void Infer(evhtp_request_t* req, const std::string& infer_uri);
+  void Status(evhtp_request_t* req, const std::string& status_uri);
+  static std::string ToMethodString(htp_method method);
 
   InferenceServer* server_;
   re2::RE2 api_regex_;
   re2::RE2 health_regex_;
   re2::RE2 infer_regex_;
   re2::RE2 status_regex_;
+
+  evhtp_t* htp_;
+  struct event_base* evbase_;
+  std::thread worker_;
 };
 
-tfs::net_http::RequestHandler
-HTTPServiceImpl::Dispatch(tfs::net_http::ServerRequestInterface* req)
+tensorflow::Status
+HTTPServiceImpl::Start(uint16_t port, int thread_cnt)
 {
-  return
-      [this](tfs::net_http::ServerRequestInterface* req) { this->Handle(req); };
+  if (!worker_.joinable()) {
+    evbase_ = event_base_new();
+    htp_ = evhtp_new(evbase_, NULL);
+    evhtp_set_gencb(htp_, HTTPServiceImpl::Dispatch, this);
+    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt, NULL);
+    evhtp_bind_socket(htp_, "0.0.0.0", port, 1024);
+    worker_ = std::thread(event_base_loop, evbase_, 0);
+    return tensorflow::Status::OK();
+  }
+
+  return tensorflow::Status(
+      tensorflow::error::ALREADY_EXISTS, "HTTP server is already running.");
+}
+
+tensorflow::Status
+HTTPServiceImpl::Stop()
+{
+  if (worker_.joinable()) {
+    event_base_loopexit(evbase_, NULL);
+    worker_.join();
+    return tensorflow::Status::OK();
+  }
+
+  return tensorflow::Status(
+      tensorflow::error::UNAVAILABLE, "HTTP server is not running.");
+}
+
+std::string
+HTTPServiceImpl::ToMethodString(htp_method method)
+{
+  switch (method) {
+    case htp_method_GET:
+      return "GET";
+    case htp_method_POST:
+      return "POST";
+    case htp_method_PUT:
+      return "PUT";
+    case htp_method_DELETE:
+      return "DELETE";
+    default:
+      return "UNKNOWN: " + std::to_string(method);
+  }
 }
 
 void
-HTTPServiceImpl::Handle(tfs::net_http::ServerRequestInterface* req)
+HTTPServiceImpl::Dispatch(evhtp_request_t* req, void* arg)
 {
-  LOG_VERBOSE(1) << "HTTP request: " << req->http_method() << " "
-                 << req->uri_path();
+  (static_cast<HTTPServiceImpl*>(arg))->Handle(req);
+}
 
-  tfs::net_http::HTTPStatusCode status =
-      tfs::net_http::HTTPStatusCode::BAD_REQUEST;
+void
+HTTPServiceImpl::Handle(evhtp_request_t* req)
+{
+  LOG_VERBOSE(1) << "HTTP request: " << ToMethodString(req->method) << " "
+                 << req->uri->path->full;
 
   std::string endpoint, rest;
   if (RE2::FullMatch(
-          std::string(req->uri_path()), api_regex_, &endpoint, &rest)) {
+          std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
     // health
     if (endpoint == "health") {
-      status = Health(req, rest);
+      Health(req, rest);
     }
     // profile
     else if (endpoint == "profile") {
-      status = Profile(req, rest);
+      Profile(req, rest);
     }
     // infer
     else if (endpoint == "infer") {
-      status = Infer(req, rest);
+      Infer(req, rest);
     }
     // status
     else if (endpoint == "status") {
-      status = Status(req, rest);
+      Status(req, rest);
     }
   }
-
-  if (status != tfs::net_http::HTTPStatusCode::OK) {
-    LOG_VERBOSE(1) << "HTTP error: " << req->http_method() << " "
-                   << req->uri_path() << " - " << static_cast<int>(status);
-  }
-
-  req->ReplyWithStatus(status);
 }
 
-tfs::net_http::HTTPStatusCode
-HTTPServiceImpl::Health(
-    tfs::net_http::ServerRequestInterface* req, const std::string& health_uri)
+void
+HTTPServiceImpl::Health(evhtp_request_t* req, const std::string& health_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
 
-  if (req->http_method() != "GET") {
-    return tfs::net_http::HTTPStatusCode::METHOD_NA;
+  if (ToMethodString(req->method) != "GET") {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
   }
 
   std::string mode;
   if (!health_uri.empty()) {
     if (!RE2::FullMatch(health_uri, health_regex_, &mode)) {
-      return tfs::net_http::HTTPStatusCode::BAD_REQUEST;
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
     }
   }
 
@@ -385,59 +422,64 @@ HTTPServiceImpl::Health(
   bool health;
   server_->HandleHealth(&request_status, &health, mode);
 
-  req->OverwriteResponseHeader(
-      kStatusHTTPHeader, request_status.ShortDebugString());
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
-  return (
-      (health) ? tfs::net_http::HTTPStatusCode::OK
-               : tfs::net_http::HTTPStatusCode::BAD_REQUEST);
+  evhtp_send_reply(req, (health) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
 }
 
-tfs::net_http::HTTPStatusCode
-HTTPServiceImpl::Profile(
-    tfs::net_http::ServerRequestInterface* req, const std::string& profile_uri)
+void
+HTTPServiceImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
 
-  if (req->http_method() != "GET") {
-    return tfs::net_http::HTTPStatusCode::METHOD_NA;
+  if (ToMethodString(req->method) != "GET") {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
   }
 
   if (!profile_uri.empty() && (profile_uri != "/")) {
-    return tfs::net_http::HTTPStatusCode::BAD_REQUEST;
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
   }
 
   std::string cmd;
-  if (!req->QueryParam("cmd", &cmd)) {
-    cmd.clear();
+  const char* cmd_c_str = evhtp_kv_find(req->uri->query, "cmd");
+  if (cmd_c_str != NULL) {
+    cmd = std::string(cmd_c_str);
   }
 
   RequestStatus request_status;
   server_->HandleProfile(&request_status, cmd);
 
-  req->OverwriteResponseHeader(
-      kStatusHTTPHeader, request_status.ShortDebugString());
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
-  return (
-      (request_status.code() == RequestStatusCode::SUCCESS)
-          ? tfs::net_http::HTTPStatusCode::OK
-          : tfs::net_http::HTTPStatusCode::BAD_REQUEST);
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
 }
 
-tfs::net_http::HTTPStatusCode
-HTTPServiceImpl::Infer(
-    tfs::net_http::ServerRequestInterface* req, const std::string& infer_uri)
+void
+HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
 {
-  if (req->http_method() != "POST") {
-    return tfs::net_http::HTTPStatusCode::METHOD_NA;
+  if (ToMethodString(req->method) != "POST") {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
   }
 
   std::string model_name, model_version_str;
   if (!infer_uri.empty()) {
     if (!RE2::FullMatch(
             infer_uri, infer_regex_, &model_name, &model_version_str)) {
-      return tfs::net_http::HTTPStatusCode::BAD_REQUEST;
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
     }
   }
 
@@ -452,8 +494,8 @@ HTTPServiceImpl::Infer(
   infer_stats->StartRequestTimer(timer.get());
   infer_stats->SetRequestedVersion(model_version);
 
-  absl::string_view infer_request_header =
-      req->GetRequestHeader(kInferRequestHTTPHeader);
+  absl::string_view infer_request_header = absl::string_view(
+      evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
   std::string infer_request_header_str(
       infer_request_header.data(), infer_request_header.size());
 
@@ -472,14 +514,14 @@ HTTPServiceImpl::Infer(
 
     std::shared_ptr<HTTPInferRequestProvider> request_provider;
     status = HTTPInferRequestProvider::Create(
-        req->InputBuffer(), *(backend->Backend()), model_name, model_version,
+        req->buffer_in, *(backend->Backend()), model_name, model_version,
         infer_request_header_str, &request_provider);
     if (status.ok()) {
       infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
       std::shared_ptr<HTTPInferResponseProvider> response_provider;
       status = HTTPInferResponseProvider::Create(
-          req->OutputBuffer(), *(backend->Backend()),
+          req->buffer_out, *(backend->Backend()),
           request_provider->RequestHeader(), &response_provider);
       if (status.ok()) {
         server_->HandleInfer(
@@ -489,7 +531,11 @@ HTTPServiceImpl::Infer(
              infer_stats, req]() mutable {
               if (request_status.code() == RequestStatusCode::SUCCESS) {
                 std::string format;
-                if (!req->QueryParam("format", &format)) {
+                const char* format_c_str =
+                    evhtp_kv_find(req->uri->query, "format");
+                if (format_c_str != NULL) {
+                  format = std::string(format_c_str);
+                } else {
                   format = "text";
                 }
 
@@ -508,7 +554,7 @@ HTTPServiceImpl::Infer(
                 } else {
                   rstr = response_header->DebugString();
                 }
-                req->WriteResponseBytes(rstr.c_str(), rstr.size());
+                evbuffer_add(req->buffer_out, rstr.c_str(), rstr.size());
 
                 // We do this in destructive manner since we are the
                 // last one to use response header from the provider.
@@ -517,10 +563,11 @@ HTTPServiceImpl::Infer(
                       response_header->mutable_output(i);
                   output->clear_batch_classes();
                 }
-
-                req->OverwriteResponseHeader(
-                    kInferResponseHTTPHeader,
-                    response_header->ShortDebugString());
+                evhtp_headers_add_header(
+                    req->headers_out,
+                    evhtp_header_new(
+                        kInferResponseHTTPHeader,
+                        response_header->ShortDebugString().c_str(), 1, 1));
               }
             },
             false  // async frontend
@@ -532,8 +579,11 @@ HTTPServiceImpl::Infer(
   if (!status.ok()) {
     InferResponseHeader response_header;
     response_header.set_id(id);
-    req->OverwriteResponseHeader(
-        kInferResponseHTTPHeader, response_header.ShortDebugString());
+    evhtp_headers_add_header(
+        req->headers_out,
+        evhtp_header_new(
+            kInferResponseHTTPHeader,
+            response_header.ShortDebugString().c_str(), 1, 1));
     LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
     infer_stats->SetFailed(true);
     RequestStatusFactory::Create(
@@ -541,31 +591,36 @@ HTTPServiceImpl::Infer(
   }
 
   // this part still needs to be implemented in the completer
-  req->OverwriteResponseHeader(
-      kStatusHTTPHeader, request_status.ShortDebugString());
-  req->OverwriteResponseHeader("Content-Type", "application/octet-stream");
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
 
-  return (
-      (request_status.code() == RequestStatusCode::SUCCESS)
-          ? tfs::net_http::HTTPStatusCode::OK
-          : tfs::net_http::HTTPStatusCode::BAD_REQUEST);
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
 }
 
-tfs::net_http::HTTPStatusCode
-HTTPServiceImpl::Status(
-    tfs::net_http::ServerRequestInterface* req, const std::string& status_uri)
+void
+HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
 
-  if (req->http_method() != "GET") {
-    return tfs::net_http::HTTPStatusCode::METHOD_NA;
+  if (ToMethodString(req->method) != "GET") {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
   }
 
   std::string model_name;
   if (!status_uri.empty()) {
     if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
-      return tfs::net_http::HTTPStatusCode::BAD_REQUEST;
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
     }
   }
 
@@ -576,27 +631,37 @@ HTTPServiceImpl::Status(
   // If got status successfully then send it...
   if (request_status.code() == RequestStatusCode::SUCCESS) {
     std::string format;
-    if (!req->QueryParam("format", &format)) {
+    const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+    if (format_c_str != NULL) {
+      format = std::string(format_c_str);
+    } else {
       format = "text";
     }
 
+    std::string server_status_str;
     if (format == "binary") {
-      std::string server_status_str;
       server_status.SerializeToString(&server_status_str);
-      req->WriteResponseString(server_status_str);
-      req->OverwriteResponseHeader("Content-Type", "application/octet-stream");
+      evbuffer_add(
+          req->buffer_out, server_status_str.c_str(), server_status_str.size());
+      evhtp_headers_add_header(
+          req->headers_out,
+          evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
     } else {
-      req->WriteResponseString(server_status.DebugString());
+      server_status_str = server_status.DebugString();
+      evbuffer_add(
+          req->buffer_out, server_status_str.c_str(), server_status_str.size());
     }
   }
 
-  req->OverwriteResponseHeader(
-      kStatusHTTPHeader, request_status.ShortDebugString());
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
-  return (
-      (request_status.code() == RequestStatusCode::SUCCESS)
-          ? tfs::net_http::HTTPStatusCode::OK
-          : tfs::net_http::HTTPStatusCode::BAD_REQUEST);
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
 }
 
 // Scoped increment / decrement of atomic
@@ -1111,7 +1176,7 @@ InferenceServer::Wait()
   }
 
   if (http_server_ != nullptr) {
-    http_server_->WaitForTermination();
+    http_server_->Stop();
   }
 }
 
@@ -1181,52 +1246,16 @@ InferenceServer::StartGrpcServer()
   return std::move(server);
 }
 
-namespace {
-
-class HTTPRequestExecutor final : public tfs::net_http::EventExecutor {
- public:
-  // Create executor for HTTP server. Seems to require at least 2
-  // threads or else it hangs.
-  explicit HTTPRequestExecutor(int num_threads)
-      : executor_(
-            tensorflow::Env::Default(), "httpserver", std::max(2, num_threads))
-  {
-  }
-
-  void Schedule(std::function<void()> fn) override { executor_.Schedule(fn); }
-
- private:
-  tfs::ThreadPoolExecutor executor_;
-};
-
-}  // namespace
-
-std::unique_ptr<tfs::net_http::HTTPServerInterface>
+std::unique_ptr<HTTPService>
 InferenceServer::StartHttpServer()
 {
-  auto options = absl::make_unique<tfs::net_http::ServerOptions>();
-  options->AddPort(static_cast<uint32_t>(http_port_));
-  options->SetExecutor(
-      absl::make_unique<HTTPRequestExecutor>(http_thread_cnt_));
-
-  auto server = tfs::net_http::CreateEvHTTPServer(std::move(options));
-  if (server != nullptr) {
-    std::shared_ptr<HTTPServiceImpl> service =
-        std::make_shared<HTTPServiceImpl>(this);
-
-    tfs::net_http::RequestHandlerOptions handler_options;
-    server->RegisterRequestDispatcher(
-        [service](tfs::net_http::ServerRequestInterface* req) {
-          return service->Dispatch(req);
-        },
-        handler_options);
-
-    if (!server->StartAcceptingRequests()) {
-      server.reset();
-    }
+  std::unique_ptr<HTTPService> service(new HTTPServiceImpl(this));
+  tensorflow::Status status = service->Start(http_port_, http_thread_cnt_);
+  if (!status.ok()) {
+    service.reset();
   }
 
-  return std::move(server);
+  return std::move(service);
 }
 
 void

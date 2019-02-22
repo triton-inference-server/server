@@ -42,7 +42,6 @@
 #include "src/core/server_status.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow_serving/model_servers/server_core.h"
-#include "tensorflow_serving/util/net_http/server/public/httpserver.h"
 
 #include "src/nvrpc/Server.h"
 
@@ -56,6 +55,12 @@ class GraphDefBundle;
 class NetDefBundle;
 class PlanBundle;
 class SavedModelBundle;
+
+class HTTPService {
+ public:
+  virtual tensorflow::Status Start(uint16_t port, int thread_cnt) = 0;
+  virtual tensorflow::Status Stop() = 0;
+};
 
 // Inference server information.
 class InferenceServer {
@@ -152,7 +157,7 @@ class InferenceServer {
   void Start();
 
   std::unique_ptr<nvrpc::Server> StartGrpcServer();
-  std::unique_ptr<tfs::net_http::HTTPServerInterface> StartHttpServer();
+  std::unique_ptr<HTTPService> StartHttpServer();
   tensorflow::Status ParseProtoTextFile(
       const std::string& file, google::protobuf::Message* message);
   tfs::PlatformConfigMap BuildPlatformConfigMap(
@@ -199,7 +204,7 @@ class InferenceServer {
   std::unique_ptr<tfs::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
 
-  std::unique_ptr<tfs::net_http::HTTPServerInterface> http_server_;
+  std::unique_ptr<HTTPService> http_server_;
 
   std::unique_ptr<nvrpc::Server> grpc_server_;
 };
