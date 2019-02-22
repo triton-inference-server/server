@@ -197,9 +197,13 @@ CustomBundle::CreateExecutionContext(
   // associated with this specific instance.
   std::string serialized_config;
   Config().SerializeToString(&serialized_config);
-  int err = context.InitializeFn_(
-      serialized_config.c_str(), serialized_config.size(), gpu_device,
-      &context.library_context_handle_);
+
+  CustomInitializeData init_data;
+  init_data.serialized_model_config = serialized_config.c_str();
+  init_data.serialized_model_config_size = serialized_config.size();
+  init_data.gpu_device_id = gpu_device;
+
+  int err = context.InitializeFn_(&init_data, &context.library_context_handle_);
   if (err != 0) {
     return tensorflow::errors::Internal(
         "initialize error for '", Name(), "': (", err, ") ",

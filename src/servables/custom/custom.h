@@ -33,50 +33,68 @@ extern "C" {
 #endif
 
 /// GPU device number that indicates that no GPU is available for a
-/// context. In CustomInitialize this value is used for 'gpu_device_id' to
-/// indicate that the model must execute on the CPU.
+/// context. In CustomInitializeData this value is used for
+/// 'gpu_device_id' to indicate that the model must execute on the
+/// CPU.
 #define CUSTOM_NO_GPU_DEVICE -1
 
-// A payload represents the input tensors and the required output
-// needed for execution in the backend.
+// The initialization information provided to a custom backend when it
+// is created.
+typedef struct custom_initdata_struct {
+  /// Serialized representation of the model configuration. This
+  /// serialization is owned by the caller and so must be copied if a
+  /// persistent copy of required by the custom backend.
+  const char* serialized_model_config;
+
+  /// The size of 'serialized_model_config', in bytes.
+  size_t serialized_model_config_size;
+
+  /// The GPU device ID to initialize for, or CUSTOM_NO_GPU_DEVICE if
+  /// should initialize for CPU.
+  int gpu_device_id;
+} CustomInitializeData;
+
+/// A payload represents the input tensors and the required output
+/// needed for execution in the backend.
 typedef struct custom_payload_struct {
-  // The size of the batch represented by this payload.
+  /// The size of the batch represented by this payload.
   uint32_t batch_size;
 
-  // The number of inputs included in this payload.
+  /// The number of inputs included in this payload.
   uint32_t input_cnt;
 
-  // The 'input_cnt' names of the inputs included in this payload.
+  /// The 'input_cnt' names of the inputs included in this payload.
   const char** input_names;
 
-  // For each of the 'input_cnt' inputs, the number of dimensions in
-  // the input's shape, not including the batch dimension.
+  /// For each of the 'input_cnt' inputs, the number of dimensions in
+  /// the input's shape, not including the batch dimension.
   const size_t* input_shape_dim_cnts;
 
-  // For each of the 'input_cnt' inputs, the shape of the input, not
-  // including the batch dimension.
+  /// For each of the 'input_cnt' inputs, the shape of the input, not
+  /// including the batch dimension.
   const int64_t** input_shape_dims;
 
-  // The number of outputs that must be computed for this payload. Can
-  // be 0 to indicate that no outputs are required from the backend.
+  /// The number of outputs that must be computed for this
+  /// payload. Can be 0 to indicate that no outputs are required from
+  /// the backend.
   uint32_t output_cnt;
 
-  // The 'output_cnt' names of the outputs that must be computed for
-  // this payload. Each name must be one of the names from the model
-  // configuration, but all outputs do not need to be computed.
+  /// The 'output_cnt' names of the outputs that must be computed for
+  /// this payload. Each name must be one of the names from the model
+  /// configuration, but all outputs do not need to be computed.
   const char** required_output_names;
 
-  // The context to use with CustomGetNextInput callback function to
-  // get the input tensor values for this payload.
+  /// The context to use with CustomGetNextInput callback function to
+  /// get the input tensor values for this payload.
   void* input_context;
 
-  // The context to use with CustomGetOutput callback function to get
-  // the buffer for output tensor values for this payload.
+  /// The context to use with CustomGetOutput callback function to get
+  /// the buffer for output tensor values for this payload.
   void* output_context;
 
-  // The error code indicating success or failure from execution. A
-  // value of 0 (zero) indicates success, all other values indicate
-  // failure and are backend defined.
+  /// The error code indicating success or failure from execution. A
+  /// value of 0 (zero) indicates success, all other values indicate
+  /// failure and are backend defined.
   int error_code;
 } CustomPayload;
 
@@ -126,7 +144,7 @@ typedef bool (*CustomGetOutputFn_t)(
     int64_t* shape_dims, uint64_t content_byte_size, void** content);
 
 /// Type for the CustomInitialize function.
-typedef int (*CustomInitializeFn_t)(const char*, size_t, int, void**);
+typedef int (*CustomInitializeFn_t)(const CustomInitializeData*, void**);
 
 /// Type for the CustomFinalize function.
 typedef int (*CustomFinalizeFn_t)(void*);
@@ -139,26 +157,17 @@ typedef int (*CustomExecuteFn_t)(
     void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
     CustomGetOutputFn_t);
 
-/// Initialize the custom shared library for a given model
-/// configuration and get the associated custom context.
+/// Initialize the custom backend for a given model configuration and
+/// get the associated custom context.
 ///
-/// \param serialized_model_config Serialized representation of the
-/// model configuration to use for initialization. This serialization
-/// is owned by the caller and so must be copied if a persistent
-/// copy of required by the shared library.
-/// \param serialized_model_config_size The size of serialized_model_config,
-/// in bytes.
-/// \param gpu_device_id The GPU device ID to initialize for, or
-/// CUSTOM_NO_GPU_DEVICE if should initialize for CPU.
+/// \param data The CustomInitializeData provided for initialization.
 /// \param custom_context Returns the opaque handle to the custom
 /// state associated with this initialization. Returns nullptr if
 /// no context associated with the initialization.
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomInitialize(
-    const char* serialized_model_config, size_t serialized_model_config_size,
-    int gpu_device_id, void** custom_context);
+int CustomInitialize(const CustomInitializeData* data, void** custom_context);
 
 /// Finalize a custom context. All state associated with the context
 /// should be freed.

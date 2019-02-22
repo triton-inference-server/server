@@ -323,20 +323,18 @@ Context::Execute(
 extern "C" {
 
 int
-CustomInitialize(
-    const char* serialized_model_config, size_t serialized_model_config_size,
-    int gpu_device_id, void** custom_context)
+CustomInitialize(const CustomInitializeData* data, void** custom_context)
 {
   // Convert the serialized model config to a ModelConfig object.
   ModelConfig model_config;
-  if (!model_config.ParseFromString(
-          std::string(serialized_model_config, serialized_model_config_size))) {
+  if (!model_config.ParseFromString(std::string(
+          data->serialized_model_config, data->serialized_model_config_size))) {
     return kInvalidModelConfig;
   }
 
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context = new Context(model_config, gpu_device_id);
+  Context* context = new Context(model_config, data->gpu_device_id);
   int err = context->Init();
   if (err != kSuccess) {
     return err;
