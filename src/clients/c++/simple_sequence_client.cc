@@ -320,7 +320,7 @@ main(int argc, char** argv)
               << std::endl;
 
     if ((seq0_expected != result0_list[i]) ||
-        (seq0_expected != result0_list[i])) {
+        (seq1_expected != result1_list[i])) {
       std::cout << "[ expected ] " << seq0_expected << " : " << seq1_expected
                 << std::endl;
       return 1;
