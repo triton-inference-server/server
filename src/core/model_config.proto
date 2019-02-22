@@ -518,6 +518,20 @@ message ModelSequenceBatching
 }
 
 //@@
+//@@.. cpp:var:: message ModelParameter
+//@@
+//@@   A model parameter.
+//@@
+message ModelParameter
+{
+  //@@  .. cpp:var:: string string_value
+  //@@
+  //@@     The string value of the parameter.
+  //@@
+  string string_value = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelConfig
 //@@
 //@@   A model configuration.
@@ -636,11 +650,18 @@ message ModelConfig
   //@@
   map<string, string> cc_model_filenames = 9;
 
-  //@@  .. cpp:var:: map<string,string> tags
+  //@@  .. cpp:var:: map<string,string> metric_tags
   //@@
-  //@@     Optional model tags. User-specific key-value pairs for this
-  //@@     model. These tags are applied to the metrics reported on the HTTP
-  //@@     metrics port.
+  //@@     Optional metric tags. User-specific key-value pairs for metrics
+  //@@     reported for this model. These tags are applied to the metrics
+  //@@     reported on the HTTP metrics port.
   //@@
-  map<string, string> tags = 10;
+  map<string, string> metric_tags = 10;
+
+  //@@  .. cpp:var:: map<string,ModelParameter> parameters
+  //@@
+  //@@     Optional model parameters. User-specified parameter values that
+  //@@     are made available to custom backends.
+  //@@
+  map<string, ModelParameter> parameters = 14;
 }

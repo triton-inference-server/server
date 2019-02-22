@@ -184,7 +184,7 @@ InferenceBackend::SetModelConfig(
 {
   config_ = config;
   TF_RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
-  for (const auto& tag : config_.tags()) {
+  for (const auto& tag : config_.metric_tags()) {
     tags_.insert(
         std::map<std::string, std::string>::value_type(tag.first, tag.second));
   }

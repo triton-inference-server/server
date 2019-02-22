@@ -56,6 +56,8 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp -r docs/examples/model_repository/simple_string qa/L0_simple_string_example/models/. && \
     mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/. && \
+    mkdir -p qa/L0_custom_param/models/param/1 && \
+    cp /opt/tensorrtserver/custom/libparam.so qa/L0_custom_param/models/param/1/. && \
     mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     cp /opt/tensorrtserver/custom/libsequence.so qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
