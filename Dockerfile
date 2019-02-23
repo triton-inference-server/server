@@ -218,10 +218,15 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mkdir -p /tmp/client/lib && \
     cp bazel-bin/src/clients/c++/librequest.so /tmp/client/lib/. && \
     cp bazel-bin/src/clients/c++/librequest.a /tmp/client/lib/. && \
-    mkdir -p /tmp/client/pip && \
-    bazel-bin/src/clients/python/build_pip /tmp/client/pip/. && \
-    (cd /tmp/client && tar zcf /opt/tensorrtserver/tensorrtserver_clients.tar.gz *) && \
-    (cd /opt/tensorrtserver && tar zxf tensorrtserver_clients.tar.gz) && \
+    mkdir -p /tmp/client/python && \
+    cp src/clients/python/image_client.py /tmp/client/python/. && \
+    cp src/clients/python/grpc_image_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_string_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_sequence_client.py /tmp/client/python/. && \
+    bazel-bin/src/clients/python/build_pip /tmp/client/python/. && \
+    (cd /tmp/client && tar zcf /opt/tensorrtserver/v${TRTIS_VERSION}.clients.tar.gz *) && \
+    (cd /opt/tensorrtserver && tar zxf v${TRTIS_VERSION}.clients.tar.gz) && \
     bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
                cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/.; \
                cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
@@ -230,7 +235,7 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
                cp bazel-bin/src/custom/param/libparam.so /opt/tensorrtserver/custom/.; \
                cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/.; \
              else \
-               pip install --upgrade /opt/tensorrtserver/pip/tensorrtserver-*.whl numpy pillow; \
+               pip install --upgrade /opt/tensorrtserver/python/tensorrtserver-*.whl numpy pillow; \
              fi' && \
     bazel clean --expunge && \
     rm -rf /root/.cache/bazel && \

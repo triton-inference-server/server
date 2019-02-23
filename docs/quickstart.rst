@@ -105,7 +105,13 @@ Building From Source Code
 Make sure you complete the steps in :ref:`section-prerequisites`
 before attempting to build the inference server. To build the
 inference server from source, change to the root directory of the
-GitHub repo and use docker to build::
+GitHub repo and checkout the release version of the branch that you
+want to build (or the master branch if you want to build the
+under-development version)::
+
+  $ git checkout r19.02
+
+Then use docker to build::
 
   $ docker build --pull -t tensorrtserver
 
@@ -177,9 +183,17 @@ For more information, see
 Building The Client Examples
 ----------------------------
 
-To build the C++ client library, C++ and Python examples, and a Python
-wheel file for the Python client library, change to the root directory
-of the GitHub repo and use docker to build::
+The provided Dockerfile can be used to build just the client libraries
+and examples. First change directory to the root of the repo and
+checkout the release version of the branch that you want to build (or
+the master branch if you want to build the under-development
+version). The branch you use for the client build should match the
+version of the inference server you are using::
+
+  $ git checkout r19.02
+
+Then use docker to build the C++ client library, C++ and Python
+examples, and a Python wheel file for the Python client library::
 
   $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
 

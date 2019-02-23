@@ -49,7 +49,7 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp /opt/tensorrtserver/bin/simple_string_client qa/clients/. && \
     cp /opt/tensorrtserver/bin/simple_sequence_client qa/clients/. && \
     cp /opt/tensorrtserver/bin/caffe2plan qa/common/. && \
-    cp /opt/tensorrtserver/pip/tensorrtserver*.whl qa/pkgs/. && \
+    cp /opt/tensorrtserver/python/tensorrtserver*.whl qa/pkgs/. && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_string_example/models && \

@@ -49,7 +49,12 @@ inference server provides the following features:
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
   TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
-  TensorFlow-TensorRT integrated models.
+  TensorFlow-TensorRT integrated models. Variable-size input and
+  output tensors are allowed if supported by the framework. See
+  `Capabilities
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/capabilities.html#capabilities>`_
+  for detailed support information for each framework.
+
 * `Custom backend support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. The inference server
   allows individual models to be implemented with custom backends
@@ -57,18 +62,22 @@ inference server provides the following features:
   model can implement any logic desired, while still benefiting from
   the GPU support, concurrent execution, dynamic batching and other
   features provided by the server.
+
 * The inference server `monitors the model repository
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#modifying-the-model-repository>`_
   for any change and dynamically reloads the model(s) when necessary,
   without requiring a server restart. Models and model versions can be
   added and removed, and model configurations can be modified while
   the server is running.
+
 * Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
+
 * `Concurrent model execution support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple
   models (or multiple instances of the same model) can run
   simultaneously on the same GPU.
+
 * Batching support. For models that support batching, the server can
   accept requests for a batch of inputs and respond with the
   corresponding batch of outputs. The inference server also supports
@@ -77,14 +86,17 @@ inference server provides the following features:
   where individual inference requests are dynamically combined
   together to improve inference throughput. Dynamic batching is
   transparent to the client requesting inference.
+
 * `Model repositories
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
   may reside on a locally accessible file system (e.g. NFS) or in
   Google Cloud Storage.
+
 * Readiness and liveness `health endpoints
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_
   suitable for any orchestration or deployment framework, such as
   Kubernetes.
+
 * `Metrics
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_
   indicating GPU utiliization, server throughput, and server latency.
@@ -100,37 +112,26 @@ this release is `r19.02
 Backwards Compatibility
 -----------------------
 
-The inference server is still in beta. As a result, we sometimes make
-non-backwards-compatible changes. You must rebuild the client
-libraries and any client applications you use to talk to the inference
-server to make sure they stay in sync with the server.
+The inference server exits beta with the 1.0.0 version included in the
+the 19.03 release. Starting with version 1.0.0 the following
+interfaces will maintain backwards compatibilty. If you have model
+configuration files, custom backends, or clients that use the
+inference server HTTP or GRPC APIs (either directly or through the
+client libraries) from releases prior to 19.03 you should edit and
+rebuild those as necessary to match the version 1.0.0 APIs.
 
-Compared to the r19.02 release, the master branch has the following
-non-backward-compatible changes:
+These inferfaces will maintain backwards compatibility for all future
+1.x.y releases:
 
-* The inference request header for inputs and outputs no longer allow
-  the byte_size field. See InferRequestHeader::Input and
-  InferRequestHeader::Output in `api.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_.
+* Model configuration as defined in `model_config.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_.
 
-* The inference response header no longer returns the batch-1
-  byte_size field for each output. Instead the shape and byte-size for
-  the full output batch is returned. See InferResponseHeader::Output
-  in `api.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_.
+* The inference server HTTP and GRPC APIs as defined in `api.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_
+  and `grpc_service.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_.
 
-* The inference response header reports the model version as a 64-bit
-  integer (previously reported as an unsigned 32-bit integer). See
-  InferResponseHeader.model_version in `api.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_,
-  InferRequest.model_version in `grpc_service.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_server.proto>`_,
-  and ModelStatus.version_status in `server_status.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/server_status.proto>`_.
-
-* For custom backends, the CustomGetOutputFn function signature has
-  changed to require the backend to report the shape of each computed
-  output. See CustomGetOutputFn_t in `custom.h
+* The custom backend interface as defined in `custom.h
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_.
 
 Documentation
@@ -152,6 +153,16 @@ and `Support Matrix
 <https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html>`_
 indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe which GPUs are supported by the inference server.
+
+Blog Posts
+^^^^^^^^^^
+
+* `NVIDIA TensorRT Inference Server Boosts Deep Learning Inference
+  <https://devblogs.nvidia.com/nvidia-serves-deep-learning-inference/>`_.
+
+* `GPU-Accelerated Inference for Kubernetes with the NVIDIA TensorRT
+  Inference Server and Kubeflow
+  <https://www.kubeflow.org/blog/nvidia_tensorrt/>`_.
 
 Contributing
 ------------
