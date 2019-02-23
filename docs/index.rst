@@ -69,8 +69,9 @@ NVIDIA TensorRT Inference Server
 
 .. toctree::
    :maxdepth: 2
-   :caption: API Reference
+   :caption: Reference
 
+   capabilities
    protobuf_api/protobuf_api_root
    cpp_api/cpp_api_root
    python_api

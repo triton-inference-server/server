@@ -62,9 +62,17 @@ Building the Client Libraries and Examples
 ------------------------------------------
 
 The provided Dockerfile can be used to build just the client libraries
-and examples. Issue the following command to build the C++ client
-library, C++ and Python examples, and a Python wheel file for the
-Python client library::
+and examples. First change directory to the root of the repo and
+checkout the release version of the branch that you want to build (or
+the master branch if you want to build the under-development
+version). The branch you use for the client build should match the
+version of the inference server you are using::
+
+  $ git checkout r19.02
+
+Then, issue the following command to build the C++ client library, C++
+and Python examples, and a Python wheel file for the Python client
+library::
 
   $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
 
@@ -88,23 +96,25 @@ In the client image you can find the example executables in
 
 If your host sytem is Ubuntu-16.04, an alternative to running the
 examples within the tensorrtserver_clients container is to instead
-copy the libraries and examples from the docker image to the host
-system::
+download the client libraries and examples from the `GitHub release
+page <https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
+corresponding to the release you are interested in::
 
-  $ docker run -it --rm -v/tmp:/tmp/host tensorrtserver_clients
-  # cp /opt/tensorrtserver/bin/image_client /tmp/host/.
-  # cp /opt/tensorrtserver/bin/perf_client /tmp/host/.
-  # cp /opt/tensorrtserver/bin/simple_client /tmp/host/.
-  # cp /opt/tensorrtserver/pip/tensorrtserver-*.whl /tmp/host/.
-  # cp /opt/tensorrtserver/lib/librequest.* /tmp/host/.
+  $ mkdir tensorrtserver_clients
+  $ cd tensorrtserver_clients
+  $ wget https://github.com/NVIDIA/tensorrt-inference-server/archive/v0.12.0.clients.tar.gz
+  $ tar xzf v0.12.0.clients.tar.gz
 
-You can now access the files from /tmp on the host system. To run the
-C++ examples you must install some dependencies on your host system::
+You can now find client example binaries in bin/, c++ libraries in
+lib/, and Python client examples and wheel file in python/.
+
+To run the C++ examples you must install some dependencies on your
+Ubuntu-16.04 host system::
 
   $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev
 
 To run the Python examples you will need to additionally install the
-client whl file and some other dependencies::
+wheel file and some other dependencies::
 
   $ apt-get install python3 python3-pip
   $ pip3 install --user --upgrade tensorrtserver-*.whl numpy pillow
@@ -420,7 +430,7 @@ Stream Inference
 
 Some applications may prefer to send requests in one connection rather than
 establishing connections for individual requests. For instance, in the case
-where multiple instances of TensorRT Inference Server are created with the 
+where multiple instances of TensorRT Inference Server are created with the
 purpose of load balancing, requests sent in different connections may be routed
 to different server instances. This scenario will not fit the need if the
 requests are correlated, where they are expected to be processed by the same

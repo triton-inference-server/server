@@ -40,8 +40,13 @@ Building the Server
 -------------------
 
 To build a release version of the TensorRT Inference Server container,
-change directory to the root of the repo and issue the following
-command::
+change directory to the root of the repo and checkout the release
+version of the branch that you want to build (or the master branch if
+you want to build the under-development version)::
+
+  $ git checkout r19.02
+
+Then use docker to build::
 
   $ docker build --pull -t tensorrtserver .
 
@@ -80,8 +85,8 @@ of the C++ and Python client libraries and example executables with::
   # mkdir -p /opt/tensorrtserver/lib
   # cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/.
   # cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/.
-  # mkdir -p /opt/tensorrtserver/pip
-  # bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/pip/.
+  # mkdir -p /opt/tensorrtserver/python
+  # bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/python/.
 
 Some source changes seem to cause bazel to get confused and not
 correctly rebuild all required sources. You can force bazel to rebuild
