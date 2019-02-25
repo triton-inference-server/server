@@ -212,7 +212,11 @@ CustomBundle::CreateExecutionContext(
   }
 
   init_data.server_parameter_cnt = server_param_values.size();
-  init_data.server_parameters = &server_param_values[0];
+  if (server_param_values.size() > 0) {
+    init_data.server_parameters = &server_param_values[0];
+  } else {
+    init_data.server_parameters = nullptr;
+  }
 
   int err = context.InitializeFn_(&init_data, &context.library_context_handle_);
   if (err != 0) {

@@ -40,7 +40,8 @@ TEST_F(CustomBundleTest, ModelConfigSanity)
       [](const std::string& path,
          const ModelConfig& config) -> tensorflow::Status {
     std::unique_ptr<CustomBundle> bundle(new CustomBundle());
-    tensorflow::Status status = bundle->Init(path, config);
+    std::vector<std::string> server_params;
+    tensorflow::Status status = bundle->Init(path, server_params, config);
     if (status.ok()) {
       std::unordered_map<std::string, std::string> custom_paths;
 
