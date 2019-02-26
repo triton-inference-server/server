@@ -320,9 +320,12 @@ class HTTPServiceImpl : public HTTPService {
       Request(
           evhtp_request_t* req, uint64_t id,
           std::shared_ptr<HTTPInferRequestProvider> request_provider,
-          std::shared_ptr<HTTPInferResponseProvider> response_provider)
+          std::shared_ptr<HTTPInferResponseProvider> response_provider,
+          std::shared_ptr<ModelInferStats> infer_stats,
+          std::shared_ptr<ModelInferStats::ScopedTimer> timer)
           : done(false), req(req), id(id), request_provider(request_provider),
-            response_provider(response_provider){};
+            response_provider(response_provider), infer_stats(infer_stats),
+            timer(timer){};
 
      private:
       friend class HTTPServiceImpl;
@@ -333,6 +336,8 @@ class HTTPServiceImpl : public HTTPService {
       RequestStatus request_status;
       std::shared_ptr<HTTPInferRequestProvider> request_provider;
       std::shared_ptr<HTTPInferResponseProvider> response_provider;
+      std::shared_ptr<ModelInferStats> infer_stats;
+      std::shared_ptr<ModelInferStats::ScopedTimer> timer;
     };
 
     ThreadWiseService(evthr_t* thread) : thread_(thread){};
@@ -375,14 +380,16 @@ class HTTPServiceImpl : public HTTPService {
     Request* Enqueue(
         evhtp_request_t* req, uint64_t id,
         std::shared_ptr<HTTPInferRequestProvider> request_provider,
-        std::shared_ptr<HTTPInferResponseProvider> response_provider)
+        std::shared_ptr<HTTPInferResponseProvider> response_provider,
+        std::shared_ptr<ModelInferStats> infer_stats,
+        std::shared_ptr<ModelInferStats::ScopedTimer> timer)
     {
       Request* res = nullptr;
       evhtp_request_pause(req);
       {
         std::lock_guard<std::mutex> lock(mtx_);
-        requests_.push_back(
-            new Request(req, id, request_provider, response_provider));
+        requests_.push_back(new Request(
+            req, id, request_provider, response_provider, infer_stats, timer));
         res = requests_.back();
       }
       return res;
@@ -437,8 +444,8 @@ class HTTPServiceImpl : public HTTPService {
       evhtp_headers_add_header(
           req->req->headers_out,
           evhtp_header_new(
-              kStatusHTTPHeader,
-              req->request_status.ShortDebugString().c_str(), 1, 1));
+              kStatusHTTPHeader, req->request_status.ShortDebugString().c_str(),
+              1, 1));
       evhtp_headers_add_header(
           req->req->headers_out,
           evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
@@ -688,8 +695,8 @@ HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
         evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
         evthr_t* thread = htpconn->thread;
         ThreadWiseService* requests = (ThreadWiseService*)evthr_get_aux(thread);
-        ThreadWiseService::Request* request =
-            requests->Enqueue(req, id, request_provider, response_provider);
+        ThreadWiseService::Request* request = requests->Enqueue(
+            req, id, request_provider, response_provider, infer_stats, timer);
         server_->HandleInfer(
             &(request->request_status), backend, request->request_provider,
             request->response_provider, infer_stats,
