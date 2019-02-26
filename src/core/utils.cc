@@ -241,7 +241,7 @@ GetNormalizedModelConfig(
     // Set default idle is not specified.
     if (config->sequence_batching().max_sequence_idle_microseconds() == 0) {
       config->mutable_sequence_batching()->set_max_sequence_idle_microseconds(
-          1000 * 1000);
+          SEQUENCE_IDLE_DEFAULT_MICROSECONDS);
     }
   }
 
