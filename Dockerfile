@@ -186,14 +186,6 @@ RUN sha1sum -c tools/patch/tfs/checksums && \
           /workspace/serving/tensorflow_serving/util/retrier.cc && \
     patch -i tools/patch/tfs/util/BUILD \
           /workspace/serving/tensorflow_serving/util/BUILD && \
-    patch -i tools/patch/tfs/util/net_http/server/internal/evhttp_request.cc \
-          /workspace/serving/tensorflow_serving/util/net_http/server/internal/evhttp_request.cc && \
-    patch -i tools/patch/tfs/util/net_http/server/internal/evhttp_request.h \
-          /workspace/serving/tensorflow_serving/util/net_http/server/internal/evhttp_request.h && \
-    patch -i tools/patch/tfs/util/net_http/server/public/BUILD \
-          /workspace/serving/tensorflow_serving/util/net_http/server/public/BUILD && \
-    patch -i tools/patch/tfs/util/net_http/server/public/server_request_interface.h \
-          /workspace/serving/tensorflow_serving/util/net_http/server/public/server_request_interface.h && \
     patch -i tools/patch/tfs/workspace.bzl \
           /workspace/serving/tensorflow_serving/workspace.bzl
 

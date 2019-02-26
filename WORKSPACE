@@ -139,5 +139,5 @@ new_http_archive(
     ],
     sha256 = "3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb",
     strip_prefix = "libevhtp-1.2.18",
-    build_file = "libevhtp.BUILD",
+    build_file = "third_party/libevhtp.BUILD",
 )
