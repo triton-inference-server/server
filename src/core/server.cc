@@ -34,6 +34,7 @@
 #include <csignal>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -305,12 +306,11 @@ class HTTPServiceImpl : public HTTPService {
   void Profile(evhtp_request_t* req, const std::string& profile_uri);
   void Infer(evhtp_request_t* req, const std::string& infer_uri);
   void Status(evhtp_request_t* req, const std::string& status_uri);
-  static std::string ToMethodString(htp_method method);
 
   static void thread_init(evhtp_t* htp, evthr_t* thread, void* arg);
   static void thread_exit(evhtp_t* htp, evthr_t* thread, void* arg);
 
-  // class object associated to evhtp thread, requests received are bounded
+  // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
   // corresponding thread send back reply
   class ThreadWiseService {
@@ -319,146 +319,43 @@ class HTTPServiceImpl : public HTTPService {
      public:
       Request(
           evhtp_request_t* req, uint64_t id,
-          std::shared_ptr<HTTPInferRequestProvider> request_provider,
-          std::shared_ptr<HTTPInferResponseProvider> response_provider,
-          std::shared_ptr<ModelInferStats> infer_stats,
-          std::shared_ptr<ModelInferStats::ScopedTimer> timer)
-          : done(false), req(req), id(id), request_provider(request_provider),
-            response_provider(response_provider), infer_stats(infer_stats),
-            timer(timer){};
+          const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+          const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+          const std::shared_ptr<ModelInferStats>& infer_stats,
+          const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
+          : req_(req), id_(id), request_provider_(request_provider),
+            response_provider_(response_provider), infer_stats_(infer_stats),
+            timer_(timer){};
 
      private:
       friend class HTTPServiceImpl;
       friend class ThreadWiseService;
-      bool done;
-      evhtp_request_t* req;
-      uint64_t id;
-      RequestStatus request_status;
-      std::shared_ptr<HTTPInferRequestProvider> request_provider;
-      std::shared_ptr<HTTPInferResponseProvider> response_provider;
-      std::shared_ptr<ModelInferStats> infer_stats;
-      std::shared_ptr<ModelInferStats::ScopedTimer> timer;
+      evhtp_request_t* req_;
+      uint64_t id_;
+      RequestStatus request_status_;
+      std::shared_ptr<HTTPInferRequestProvider> request_provider_;
+      std::shared_ptr<HTTPInferResponseProvider> response_provider_;
+      std::shared_ptr<ModelInferStats> infer_stats_;
+      std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
     };
 
-    ThreadWiseService(evthr_t* thread) : thread_(thread){};
+    explicit ThreadWiseService(evthr_t* thread) : thread_(thread){};
     ~ThreadWiseService() = default;
 
-    static void ReplyCallback(evthr_t* thr, void* arg, void* shared)
-    {
-      ThreadWiseService* requests = (ThreadWiseService*)arg;
-      Request* request = nullptr;
-      {
-        std::lock_guard<std::mutex> lock(requests->mtx_);
-        // Using iterator will cause segfault
-        for (size_t i = 0; i < requests->requests_.size(); i++) {
-          if (requests->requests_[i]->done) {
-            request = requests->requests_[i];
-            requests->requests_.erase(requests->requests_.begin() + i);
-          }
-        }
-      }
-      if (request == nullptr) {
-        return;
-      }
-
-      evhtp_send_reply(
-          request->req,
-          (request->request_status.code() == RequestStatusCode::SUCCESS)
-              ? EVHTP_RES_OK
-              : EVHTP_RES_BADREQ);
-      evhtp_request_resume(request->req);
-      // Clean up once triggered
-      delete request;
-      {
-        std::lock_guard<std::mutex> lock(requests->mtx_);
-        if (requests->requests_.size() > 0) {
-          evthr_defer(requests->thread_, ReplyCallback, requests);
-        }
-      }
-    }
+    static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
     Request* Enqueue(
         evhtp_request_t* req, uint64_t id,
-        std::shared_ptr<HTTPInferRequestProvider> request_provider,
-        std::shared_ptr<HTTPInferResponseProvider> response_provider,
-        std::shared_ptr<ModelInferStats> infer_stats,
-        std::shared_ptr<ModelInferStats::ScopedTimer> timer)
-    {
-      Request* res = nullptr;
-      evhtp_request_pause(req);
-      {
-        std::lock_guard<std::mutex> lock(mtx_);
-        requests_.push_back(new Request(
-            req, id, request_provider, response_provider, infer_stats, timer));
-        res = requests_.back();
-      }
-      return res;
-    };
+        const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+        const std::shared_ptr<ModelInferStats>& infer_stats,
+        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
 
-    void FinalizeHTTPResponse(Request* req)
-    {
-      InferResponseHeader* response_header =
-          req->response_provider->MutableResponseHeader();
-      if (req->request_status.code() == RequestStatusCode::SUCCESS) {
-        std::string format;
-        const char* format_c_str =
-            evhtp_kv_find(req->req->uri->query, "format");
-        if (format_c_str != NULL) {
-          format = std::string(format_c_str);
-        } else {
-          format = "text";
-        }
-
-        // The description of the raw outputs needs to go in
-        // the kInferResponseHTTPHeader since it is needed to
-        // interpret the body. The entire response (including
-        // classifications) is serialized at the end of the
-        // body.
-        response_header->set_id(req->id);
-
-        std::string rstr;
-        if (format == "binary") {
-          response_header->SerializeToString(&rstr);
-        } else {
-          rstr = response_header->DebugString();
-        }
-        evbuffer_add(req->req->buffer_out, rstr.c_str(), rstr.size());
-
-        // We do this in destructive manner since we are the
-        // last one to use response header from the provider.
-        for (int i = 0; i < response_header->output_size(); ++i) {
-          InferResponseHeader::Output* output =
-              response_header->mutable_output(i);
-          output->clear_batch_classes();
-        }
-      } else {
-        evbuffer_drain(req->req->buffer_out, -1);
-        response_header->Clear();
-        response_header->set_id(req->id);
-      }
-      evhtp_headers_add_header(
-          req->req->headers_out,
-          evhtp_header_new(
-              kInferResponseHTTPHeader,
-              response_header->ShortDebugString().c_str(), 1, 1));
-      evhtp_headers_add_header(
-          req->req->headers_out,
-          evhtp_header_new(
-              kStatusHTTPHeader, req->request_status.ShortDebugString().c_str(),
-              1, 1));
-      evhtp_headers_add_header(
-          req->req->headers_out,
-          evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-      {
-        std::lock_guard<std::mutex> lock(mtx_);
-        req->done = true;
-        evthr_defer(thread_, ReplyCallback, this);
-      }
-    }
+    void FinalizeHTTPResponse(Request* req);
 
    private:
     std::mutex mtx_;
-    std::vector<Request*> requests_;
+    std::set<Request*> requests_;
     evthr_t* thread_;
   };
 
@@ -472,19 +369,6 @@ class HTTPServiceImpl : public HTTPService {
   struct event_base* evbase_;
   std::thread worker_;
 };
-
-void
-HTTPServiceImpl::thread_init(evhtp_t* htp, evthr_t* thread, void* arg)
-{
-  evthr_set_aux(thread, new ThreadWiseService(thread));
-}
-
-void
-HTTPServiceImpl::thread_exit(evhtp_t* htp, evthr_t* thread, void* arg)
-{
-  ThreadWiseService* requests = (ThreadWiseService*)evthr_get_aux(thread);
-  delete requests;
-}
 
 tensorflow::Status
 HTTPServiceImpl::Start(uint16_t port, int thread_cnt)
@@ -516,23 +400,6 @@ HTTPServiceImpl::Stop()
       tensorflow::error::UNAVAILABLE, "HTTP server is not running.");
 }
 
-std::string
-HTTPServiceImpl::ToMethodString(htp_method method)
-{
-  switch (method) {
-    case htp_method_GET:
-      return "GET";
-    case htp_method_POST:
-      return "POST";
-    case htp_method_PUT:
-      return "PUT";
-    case htp_method_DELETE:
-      return "DELETE";
-    default:
-      return "UNKNOWN: " + std::to_string(method);
-  }
-}
-
 void
 HTTPServiceImpl::Dispatch(evhtp_request_t* req, void* arg)
 {
@@ -542,7 +409,7 @@ HTTPServiceImpl::Dispatch(evhtp_request_t* req, void* arg)
 void
 HTTPServiceImpl::Handle(evhtp_request_t* req)
 {
-  LOG_VERBOSE(1) << "HTTP request: " << ToMethodString(req->method) << " "
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
   std::string endpoint, rest;
@@ -551,20 +418,28 @@ HTTPServiceImpl::Handle(evhtp_request_t* req)
     // health
     if (endpoint == "health") {
       Health(req, rest);
+      return;
     }
     // profile
     else if (endpoint == "profile") {
       Profile(req, rest);
+      return;
     }
     // infer
     else if (endpoint == "infer") {
       Infer(req, rest);
+      return;
     }
     // status
     else if (endpoint == "status") {
       Status(req, rest);
+      return;
     }
   }
+
+  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
+                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
 }
 
 void
@@ -573,7 +448,7 @@ HTTPServiceImpl::Health(evhtp_request_t* req, const std::string& health_uri)
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
 
-  if (ToMethodString(req->method) != "GET") {
+  if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
@@ -604,7 +479,7 @@ HTTPServiceImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
 
-  if (ToMethodString(req->method) != "GET") {
+  if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
@@ -637,7 +512,7 @@ HTTPServiceImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
 void
 HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
 {
-  if (ToMethodString(req->method) != "POST") {
+  if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
@@ -694,14 +569,14 @@ HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
       if (status.ok()) {
         evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
         evthr_t* thread = htpconn->thread;
-        ThreadWiseService* requests = (ThreadWiseService*)evthr_get_aux(thread);
-        ThreadWiseService::Request* request = requests->Enqueue(
+        ThreadWiseService* service = (ThreadWiseService*)evthr_get_aux(thread);
+        ThreadWiseService::Request* request = service->Enqueue(
             req, id, request_provider, response_provider, infer_stats, timer);
         server_->HandleInfer(
-            &(request->request_status), backend, request->request_provider,
-            request->response_provider, infer_stats,
-            [requests, request]() mutable {
-              requests->FinalizeHTTPResponse(request);
+            &(request->request_status_), backend, request->request_provider_,
+            request->response_provider_, infer_stats,
+            [service, request]() mutable {
+              service->FinalizeHTTPResponse(request);
             },
             true  // async frontend
         );
@@ -744,7 +619,7 @@ HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
 
-  if (ToMethodString(req->method) != "GET") {
+  if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
@@ -795,6 +670,114 @@ HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
       req, (request_status.code() == RequestStatusCode::SUCCESS)
                ? EVHTP_RES_OK
                : EVHTP_RES_BADREQ);
+}
+
+void
+HTTPServiceImpl::thread_init(evhtp_t* htp, evthr_t* thread, void* arg)
+{
+  evthr_set_aux(thread, new ThreadWiseService(thread));
+}
+
+void
+HTTPServiceImpl::thread_exit(evhtp_t* htp, evthr_t* thread, void* arg)
+{
+  ThreadWiseService* service = (ThreadWiseService*)evthr_get_aux(thread);
+  delete service;
+}
+
+void
+HTTPServiceImpl::ThreadWiseService::ReplyCallback(
+    evthr_t* thr, void* arg, void* shared)
+{
+  Request* request = (Request*)arg;
+
+  evhtp_send_reply(
+      request->req_,
+      (request->request_status_.code() == RequestStatusCode::SUCCESS)
+          ? EVHTP_RES_OK
+          : EVHTP_RES_BADREQ);
+  evhtp_request_resume(request->req_);
+  // Clean up once triggered
+  delete request;
+}
+
+HTTPServiceImpl::ThreadWiseService::Request*
+HTTPServiceImpl::ThreadWiseService::Enqueue(
+    evhtp_request_t* req, uint64_t id,
+    const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+    const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+    const std::shared_ptr<ModelInferStats>& infer_stats,
+    const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
+{
+  Request* res = nullptr;
+  evhtp_request_pause(req);
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    res = new Request(
+        req, id, request_provider, response_provider, infer_stats, timer);
+    requests_.insert(res);
+  }
+  return res;
+}
+
+void
+HTTPServiceImpl::ThreadWiseService::FinalizeHTTPResponse(Request* req)
+{
+  InferResponseHeader* response_header =
+      req->response_provider_->MutableResponseHeader();
+  if (req->request_status_.code() == RequestStatusCode::SUCCESS) {
+    std::string format;
+    const char* format_c_str = evhtp_kv_find(req->req_->uri->query, "format");
+    if (format_c_str != NULL) {
+      format = std::string(format_c_str);
+    } else {
+      format = "text";
+    }
+
+    // The description of the raw outputs needs to go in
+    // the kInferResponseHTTPHeader since it is needed to
+    // interpret the body. The entire response (including
+    // classifications) is serialized at the end of the
+    // body.
+    response_header->set_id(req->id_);
+
+    std::string rstr;
+    if (format == "binary") {
+      response_header->SerializeToString(&rstr);
+    } else {
+      rstr = response_header->DebugString();
+    }
+    evbuffer_add(req->req_->buffer_out, rstr.c_str(), rstr.size());
+
+    // We do this in destructive manner since we are the
+    // last one to use response header from the provider.
+    for (int i = 0; i < response_header->output_size(); ++i) {
+      InferResponseHeader::Output* output = response_header->mutable_output(i);
+      output->clear_batch_classes();
+    }
+  } else {
+    evbuffer_drain(req->req_->buffer_out, -1);
+    response_header->Clear();
+    response_header->set_id(req->id_);
+  }
+  evhtp_headers_add_header(
+      req->req_->headers_out,
+      evhtp_header_new(
+          kInferResponseHTTPHeader, response_header->ShortDebugString().c_str(),
+          1, 1));
+  evhtp_headers_add_header(
+      req->req_->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, req->request_status_.ShortDebugString().c_str(), 1,
+          1));
+  evhtp_headers_add_header(
+      req->req_->headers_out,
+      evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    requests_.erase(req);
+    evthr_defer(thread_, ReplyCallback, req);
+  }
 }
 
 // Scoped increment / decrement of atomic
