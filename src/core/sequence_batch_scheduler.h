@@ -127,8 +127,8 @@ class SequenceBatchScheduler : public Scheduler {
     const uint32_t batcher_idx_;
 
     // The max_sequence_idle_microseconds value for this scheduler (in
-    // nanoseconds)
-    const uint64_t max_sequence_idle_ns_;
+    // nanoseconds).
+    uint64_t max_sequence_idle_ns_;
 
     // The thread scheduling payloads queued in this batch.
     std::unique_ptr<std::thread> scheduler_thread_;

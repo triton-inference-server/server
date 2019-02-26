@@ -437,6 +437,13 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
       continue_input_overrides_(continue_input_overrides),
       notready_input_overrides_(notready_input_overrides)
 {
+  // max_sequence_idle_ns_ shound be non-zero based on normalization
+  // done in utils.cc for max_sequence_idle_microseconds... but make
+  // sure here since we depend on it being non-zero.
+  if (max_sequence_idle_ns_ == 0) {
+    max_sequence_idle_ns_ = SEQUENCE_IDLE_DEFAULT_MICROSECONDS * 1000;
+  }
+
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued payloads.
   const int nice = GetCpuNiceLevel(config);
