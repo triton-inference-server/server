@@ -80,9 +80,9 @@ nic::Error* InferContextSetOptions(
 nic::Error* InferContextRun(InferContextCtx* ctx);
 nic::Error* InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id);
 nic::Error* InferContextGetAsyncRunResults(
-    InferContextCtx* ctx, size_t request_id, bool wait);
+    InferContextCtx* ctx, bool* is_ready, size_t request_id, bool wait);
 nic::Error* InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, size_t* request_id, bool wait);
+    InferContextCtx* ctx, bool* is_ready, size_t* request_id, bool wait);
 
 //==============================================================================
 // InferContext::Options

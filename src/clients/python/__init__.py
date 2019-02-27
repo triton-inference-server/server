@@ -57,9 +57,6 @@ _crequest_error_del.argtypes = [c_void_p]
 _crequest_error_isok = _crequest.ErrorIsOk
 _crequest_error_isok.restype = c_bool
 _crequest_error_isok.argtypes = [c_void_p]
-_crequest_error_isunavailable = _crequest.ErrorIsUnavailable
-_crequest_error_isunavailable.restype = c_bool
-_crequest_error_isunavailable.argtypes = [c_void_p]
 _crequest_error_msg = _crequest.ErrorMessage
 _crequest_error_msg.restype = c_char_p
 _crequest_error_msg.argtypes = [c_void_p]
@@ -107,10 +104,10 @@ _crequest_infer_ctx_async_run.restype = c_void_p
 _crequest_infer_ctx_async_run.argtypes = [c_void_p, POINTER(c_uint64)]
 _crequest_infer_ctx_get_async_run_results = _crequest.InferContextGetAsyncRunResults
 _crequest_infer_ctx_get_async_run_results.restype = c_void_p
-_crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, c_uint64, c_bool]
+_crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, POINTER(c_bool), c_uint64, c_bool]
 _crequest_infer_ctx_get_ready_async_request = _crequest.InferContextGetReadyAsyncRequest
 _crequest_infer_ctx_get_ready_async_request.restype = c_void_p
-_crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_uint64), c_bool]
+_crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_bool), POINTER(c_uint64), c_bool]
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
@@ -945,16 +942,15 @@ class InferContext:
 
         """
         # Get async run results
+        c_is_ready = c_bool()
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
-            self._ctx, request_id, wait))
+            self._ctx, byref(c_is_ready), request_id, wait))
 
-        if not wait:
-            isunavailable = _crequest_error_isunavailable(err)
-            if isunavailable:
-                _crequest_error_del(err)
-                return None
-
+        
         self._last_request_id = _raise_if_error(err)
+
+        if not c_is_ready.value:
+            return None
 
         requested_outputs = self._requested_outputs_dict[request_id]
         del self._requested_outputs_dict[request_id]
@@ -986,17 +982,15 @@ class InferContext:
 
         """
         # Get async run results
+        c_is_ready = c_bool()
         c_request_id = c_uint64()
         err = c_void_p(_crequest_infer_ctx_get_ready_async_request(
-            self._ctx, byref(c_request_id), wait))
-
-        if not wait:
-            isunavailable = _crequest_error_isunavailable(err)
-            if isunavailable:
-                _crequest_error_del(err)
-                return None
+            self._ctx, byref(c_is_ready), byref(c_request_id), wait))
 
         _raise_if_error(err)
+
+        if not c_is_ready.value:
+            return None
 
         return c_request_id.value
 

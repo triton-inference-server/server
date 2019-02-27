@@ -1182,28 +1182,28 @@ InferContext::UpdateStat(const RequestTimers& timer)
 }
 
 Error
-InferContext::GetReadyAsyncRequest(std::shared_ptr<Request>* request, bool wait)
+InferContext::GetReadyAsyncRequest(
+    std::shared_ptr<Request>* request, bool* is_ready, bool wait)
 {
+  *is_ready = false;
   if (ongoing_async_requests_.size() == 0) {
     return Error(
         RequestStatusCode::UNAVAILABLE,
         "No asynchronous requests have been sent");
   }
 
-  Error err;
   std::unique_lock<std::mutex> lock(mutex_);
-  cv_.wait(lock, [&err, request, this, wait] {
+  cv_.wait(lock, [is_ready, request, this, wait] {
     for (auto& ongoing_async_request : this->ongoing_async_requests_) {
       if (std::static_pointer_cast<RequestImpl>(ongoing_async_request.second)
               ->ready_) {
         *request = ongoing_async_request.second;
-        err = Error::Success;
+        *is_ready = true;
         return true;
       }
     }
 
     if (!wait) {
-      err = Error(RequestStatusCode::UNAVAILABLE, "No completed request.");
       return true;
     } else {
       return false;
@@ -1211,13 +1211,14 @@ InferContext::GetReadyAsyncRequest(std::shared_ptr<Request>* request, bool wait)
   });
 
   lock.unlock();
-  return err;
+  return Error::Success;
 }
 
 Error
 InferContext::IsRequestReady(
-    const std::shared_ptr<Request>& async_request, bool wait)
+    const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait)
 {
+  *is_ready = false;
   if (ongoing_async_requests_.size() == 0) {
     return Error(
         RequestStatusCode::INVALID_ARG,
@@ -1234,23 +1235,19 @@ InferContext::IsRequestReady(
         "No matched asynchronous request found.");
   }
 
-  Error err = Error::Success;
   std::unique_lock<std::mutex> lock(mutex_);
-  cv_.wait(lock, [&err, &request, wait] {
+  cv_.wait(lock, [is_ready, &request, wait] {
     if (!request->ready_) {
       if (wait) {
         return false;
-      } else {
-        err = Error(RequestStatusCode::UNAVAILABLE, "Request is not ready.");
       }
+    } else {
+      *is_ready = true;
     }
     return true;
   });
 
-  if (!err.IsOk()) {
-    lock.unlock();
-    return err;
-  } else {
+  if (*is_ready) {
     ongoing_async_requests_.erase(itr->first);
   }
   lock.unlock();
@@ -1940,11 +1937,11 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferHttpContext::GetAsyncRunResults(
-    ResultMap* results, const std::shared_ptr<Request>& async_request,
-    bool wait)
+    ResultMap* results, bool* is_ready,
+    const std::shared_ptr<Request>& async_request, bool wait)
 {
-  Error err = IsRequestReady(async_request, wait);
-  if (!err.IsOk()) {
+  Error err = IsRequestReady(async_request, is_ready, wait);
+  if (!err.IsOk() || !(*is_ready)) {
     return err;
   }
   std::shared_ptr<HttpRequestImpl> http_request =
@@ -2708,11 +2705,11 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 
 Error
 InferGrpcContext::GetAsyncRunResults(
-    ResultMap* results, const std::shared_ptr<Request>& async_request,
-    bool wait)
+    ResultMap* results, bool* is_ready,
+    const std::shared_ptr<Request>& async_request, bool wait)
 {
-  Error err = IsRequestReady(async_request, wait);
-  if (!err.IsOk()) {
+  Error err = IsRequestReady(async_request, is_ready, wait);
+  if (!err.IsOk() || !(*is_ready)) {
     return err;
   }
 
@@ -2894,7 +2891,8 @@ InferGrpcStreamContext::Run(ResultMap* results)
   if (!err.IsOk()) {
     return err;
   }
-  return GetAsyncRunResults(results, req, true);
+  bool is_ready;
+  return GetAsyncRunResults(results, &is_ready, req, true);
 }
 
 Error

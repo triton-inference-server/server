@@ -669,26 +669,26 @@ class InferContext {
   /// 'async_request'.
   /// \param results Returns Result objects holding inference results
   /// as a map from output name to Result object.
+  /// \param is_ready Returns boolean that indicates if the results are ready,
+  /// the results are valid only if is_ready returns true.
   /// \param async_request Request handle to retrieve results.
   /// \param wait If true, block until the request completes. Otherwise, return
   /// immediately.
-  /// \return Error object indicating success or failure. Success will be
-  /// returned only if the request has been completed succesfully. UNAVAILABLE
-  /// will be returned if 'wait' is false and the request is not ready.
+  /// \return Error object indicating success or failure.
   virtual Error GetAsyncRunResults(
-      ResultMap* results, const std::shared_ptr<Request>& async_request,
-      bool wait) = 0;
+      ResultMap* results, bool* is_ready,
+      const std::shared_ptr<Request>& async_request, bool wait) = 0;
 
   /// Get any one completed asynchronous request.
   /// \param async_request Returns the Request object holding the
   /// completed request.
+  /// \param is_ready Returns boolean that indicates if the request is ready,
+  /// the async_request returned is valid only if is_ready returns true.
   /// \param wait If true, block until the request completes. Otherwise, return
   /// immediately.
-  /// \return Error object indicating success or failure. Success will be
-  /// returned only if a completed request was returned.. UNAVAILABLE
-  /// will be returned if 'wait' is false and no request is ready.
+  /// \return Error object indicating success or failure.
   Error GetReadyAsyncRequest(
-      std::shared_ptr<Request>* async_request, bool wait);
+      std::shared_ptr<Request>* async_request, bool* is_ready, bool wait);
 
  protected:
   InferContext(const std::string&, int64_t, CorrelationID, bool);
@@ -703,7 +703,7 @@ class InferContext {
   // is ready. If the request is valid and wait == true,
   // the function will block until request is ready.
   Error IsRequestReady(
-      const std::shared_ptr<Request>& async_request, bool wait);
+      const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait);
 
   // Update the context stat with the given timer
   Error UpdateStat(const RequestTimers& timer);
@@ -931,8 +931,8 @@ class InferHttpContext : public InferContext {
   Error Run(ResultMap* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-      ResultMap* results, const std::shared_ptr<Request>& async_request,
-      bool wait) override;
+      ResultMap* results, bool* is_ready,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
   static size_t RequestProvider(void*, size_t, size_t, void*);
@@ -1109,8 +1109,8 @@ class InferGrpcContext : public InferContext {
   virtual Error Run(ResultMap* results) override;
   virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error GetAsyncRunResults(
-      ResultMap* results, const std::shared_ptr<Request>& async_request,
-      bool wait) override;
+      ResultMap* results, bool* is_ready,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
 
  protected:
   InferGrpcContext(
