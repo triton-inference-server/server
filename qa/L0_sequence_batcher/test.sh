@@ -117,7 +117,7 @@ for model_trial in v 0 1 2 4 ; do
             test_no_sequence_end \
             test_no_correlation_id ; do
         SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
-        SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
+        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -162,7 +162,7 @@ for model_trial in v 0 1 2 4 ; do
             [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
-        SERVER_LOG="./$i.$MODEL_DIR.$model_type.serverlog"
+        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
