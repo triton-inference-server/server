@@ -65,6 +65,12 @@ output [
     dims: [ 1 ]
   }
 ]
+parameters [
+  {
+    key: "execute_delay_ms"
+    value: { string_value: "3" }
+  }
+]
 instance_group [
   {
     kind: KIND_CPU
