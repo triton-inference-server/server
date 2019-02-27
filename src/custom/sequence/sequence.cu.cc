@@ -24,7 +24,9 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <chrono>
 #include <string>
+#include <thread>
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
@@ -95,13 +97,23 @@ class Context {
   // execute on CPU.
   const int gpu_device_;
 
+  // Delay to introduce into execution, in milliseconds.
+  int execute_delay_ms_;
+
   // Accumulators maintained by this context, one for each batch slot.
   std::vector<int32_t> accumulator_;
 };
 
 Context::Context(const ModelConfig& model_config, const int gpu_device)
-    : model_config_(model_config), gpu_device_(gpu_device)
+    : model_config_(model_config), gpu_device_(gpu_device), execute_delay_ms_(0)
 {
+  if (model_config_.parameters_size() > 0) {
+    const auto itr = model_config_.parameters().find("execute_delay_ms");
+    if (itr != model_config_.parameters().end()) {
+      execute_delay_ms_ = std::stoi(itr->second.string_value());
+    }
+  }
+
   accumulator_.resize(std::max(1, model_config_.max_batch_size()));
 }
 
@@ -230,6 +242,11 @@ Context::Execute(
 
   if (payload_cnt > accumulator_.size()) {
     return kBatchTooBig;
+  }
+
+  // Delay if requested...
+  if (execute_delay_ms_ > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(execute_delay_ms_));
   }
 
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {

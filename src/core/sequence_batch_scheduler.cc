@@ -499,7 +499,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
       // should release the slot but otherwise do nothing with the
       // payload.
       if (idle_sb_itr != sequence_to_batchslot_map_.end()) {
-        LOG_VERBOSE(1) << "Enqueue force-end in batcher "
+        LOG_VERBOSE(1) << "reaper enqueuing force-end in batcher "
                        << idle_sb_itr->second.batcher_idx_ << ", slot "
                        << idle_sb_itr->second.slot_ << " for sequence "
                        << idle_correlation_id;
@@ -517,14 +517,17 @@ SequenceBatchScheduler::ReaperThread(const int nice)
         // in the future to check if it is assigned to a slot.
         auto idle_bl_itr = sequence_to_backlog_map_.find(idle_correlation_id);
         if (idle_bl_itr != sequence_to_backlog_map_.end()) {
-          LOG_VERBOSE(1)
-              << "Sequence in backlog so extending idle for sequence "
-              << idle_correlation_id;
+          LOG_VERBOSE(1) << "reaper found idle sequence in backlog so "
+                            "extending timeout for sequence "
+                         << idle_correlation_id;
           wait_microseconds =
               std::min(wait_microseconds, backlog_idle_wait_microseconds);
+          ++cid_itr;
+        } else {
+          LOG_VERBOSE(1) << "ignoring stale idle for sequence "
+                         << idle_correlation_id;
+          cid_itr = correlation_id_timestamps_.erase(cid_itr);
         }
-
-        ++cid_itr;
       }
     }
 

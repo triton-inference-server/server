@@ -617,6 +617,9 @@ class InferContext {
   /// performed.
   uint64_t MaxBatchSize() const { return max_batch_size_; }
 
+  /// \return The correlation ID associated with the context.
+  CorrelationID CorrelationId() const { return correlation_id_; }
+
   /// \return The inputs of the model.
   const std::vector<std::shared_ptr<Input>>& Inputs() const { return inputs_; }
 

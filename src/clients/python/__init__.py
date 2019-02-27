@@ -502,8 +502,7 @@ class InferContext:
         The protocol used to communicate with the server.
 
     model_name : str
-        The name of the model to get status for, or None to get status
-        for all models managed by the server.
+        The name of the model to use for inference.
 
     model_version : int
         The version of the model to use for inference,
@@ -539,6 +538,7 @@ class InferContext:
 
     def __init__(self, url, protocol, model_name, model_version=None,
                  verbose=False, correlation_id=0, streaming=False):
+        self._correlation_id = correlation_id
         self._last_request_id = None
         self._last_request_model_name = None
         self._last_request_model_version = None
@@ -775,6 +775,17 @@ class InferContext:
         """
         _crequest_infer_ctx_del(self._ctx)
         self._ctx = None
+
+    def correlation_id(self):
+        """Get the correlation ID associated with the context.
+
+        Returns
+        -------
+        int
+            The correlation ID.
+
+        """
+        return self._correlation_id
 
     def run(self, inputs, outputs, batch_size=1, flags=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
