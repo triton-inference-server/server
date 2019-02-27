@@ -702,9 +702,11 @@ main(int argc, char** argv)
 
   // For async, retrieve results according to the send order
   if (async) {
+    bool is_ready;
     for (auto& request : requests) {
       results.emplace_back();
-      err = ctx->GetAsyncRunResults(&(results.back()), request, true);
+      err =
+          ctx->GetAsyncRunResults(&(results.back()), &is_ready, request, true);
       if (!err.IsOk()) {
         std::cerr << "failed receiving infer response: " << err << std::endl;
         exit(1);
