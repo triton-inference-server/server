@@ -45,6 +45,9 @@ namespace nvidia { namespace inferenceserver {
 // inferences.
 class SequenceBatchScheduler : public Scheduler {
  public:
+  SequenceBatchScheduler() = default;
+  ~SequenceBatchScheduler();
+
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
   static tensorflow::Status Create(
@@ -70,15 +73,16 @@ class SequenceBatchScheduler : public Scheduler {
 
   // Show that a batch slot is no longer being used.
   bool ReleaseBatchSlot(
-      const BatchSlot& batch_slot, const CorrelationID force_end_correlation_id,
-      std::deque<Scheduler::Payload>* payloads);
+      const BatchSlot& batch_slot, std::deque<Scheduler::Payload>* payloads);
 
-  // For debugging, batcher reports how many waiting requests and
-  // returns true if the batcher should continue waiting.
+  // For debugging/testing, batcher reports how many waiting requests
+  // and returns true if the batcher should continue waiting.
   bool DelayScheduler(
       const uint32_t batcher_idx, const size_t cnt, const size_t total);
 
  private:
+  void ReaperThread(const int nice);
+
   tensorflow::Status CreateControlTensors(
       const ModelConfig& config,
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
@@ -126,16 +130,12 @@ class SequenceBatchScheduler : public Scheduler {
     // The index of this batcher within the controlling scheduler.
     const uint32_t batcher_idx_;
 
-    // The max_sequence_idle_microseconds value for this scheduler (in
-    // nanoseconds).
-    uint64_t max_sequence_idle_ns_;
-
     // The thread scheduling payloads queued in this batch.
     std::unique_ptr<std::thread> scheduler_thread_;
     bool scheduler_thread_exit_;
     bool scheduler_idle_;
 
-    // Mutex protecting correlation IDs, queues, max-active-slots.
+    // Mutex protecting correlation queues, etc.
     std::mutex mu_;
     std::condition_variable cv_;
 
@@ -158,11 +158,6 @@ class SequenceBatchScheduler : public Scheduler {
     // requests pending at the moment.
     std::vector<CorrelationID> slot_correlation_ids_;
 
-    // For each slot the time when the slot becomes idle. If this
-    // timeout is reached the slot will be freed under the assumption
-    // that the sequence failed to END for some reason.
-    std::vector<int64_t> slot_idle_timeouts_;
-
     // The control values, delivered as input tensors, that should be
     // used when starting a sequence, continuing a sequence, and
     // showing that a sequence has not input available.
@@ -182,8 +177,16 @@ class SequenceBatchScheduler : public Scheduler {
     }
   };
 
+  // The max_sequence_idle_microseconds value for this scheduler.
+  uint64_t max_sequence_idle_microseconds_;
+
   // Mutex
   std::mutex mu_;
+
+  // The reaper thread
+  std::unique_ptr<std::thread> reaper_thread_;
+  std::condition_variable reaper_cv_;
+  bool reaper_thread_exit_;
 
   // The SequenceBatchs being managed by this scheduler.
   std::vector<std::shared_ptr<SequenceBatch>> batchers_;
@@ -208,7 +211,11 @@ class SequenceBatchScheduler : public Scheduler {
   std::priority_queue<BatchSlot, std::vector<BatchSlot>, BatchSlotCompare>
       ready_batch_slots_;
 
-  // Used for debugging.
+  // For each correlation ID the most recently seen timestamp, in
+  // microseconds, for a request using that correlation ID.
+  std::unordered_map<CorrelationID, uint64_t> correlation_id_timestamps_;
+
+  // Used for debugging/testing.
   size_t backlog_delay_cnt_;
   std::vector<size_t> queue_request_cnts_;
 };
