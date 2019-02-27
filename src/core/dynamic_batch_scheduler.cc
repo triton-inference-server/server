@@ -153,8 +153,8 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
                    << " failed)...";
   }
 
-  // For debugging, delay start of threads until the queue contains
-  // the specified number of entries.
+  // For debugging/testing, delay start of threads until the queue
+  // contains the specified number of entries.
   const char* dstr = getenv("TRTSERVER_DELAY_SCHEDULER");
   size_t delay_cnt = 0;
   if (dstr != nullptr) {
@@ -174,7 +174,8 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
     {
       std::unique_lock<std::mutex> lock(mu_);
       if (delay_cnt > 0) {
-        // Debugging... wait until queue contains 'delay_cnt' items...
+        // Debugging/testing... wait until queue contains 'delay_cnt'
+        // items...
         wait_microseconds = 10 * 1000;
         if (queue_.size() >= delay_cnt) {
           delay_cnt = 0;
