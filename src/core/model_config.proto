@@ -518,6 +518,62 @@ message ModelSequenceBatching
 }
 
 //@@
+//@@.. cpp:var:: message ModelEnsembling
+//@@
+//@@   Model ensembling configuration. These settings control how the inputs
+//@@   and outputs of the models are mapped together.
+//@@
+message ModelEnsembling
+{
+  //@@  .. cpp:var:: message Step
+  //@@
+  //@@     The step specifies a model included in the ensemble and how its
+  //@@     inputs and outputs are mapped to names that is recognizable within
+  //@@     the ensemble.
+  //@@
+  message Step
+  {
+    //@@    .. cpp:var:: string model_name
+    //@@
+    //@@       The name of the model.
+    //@@
+    string model_name = 1;
+
+    //@@  .. cpp:var:: map<string,string> input_alias_map
+    //@@
+    //@@     Map from the inputs specified in the model cofig to aliases
+    //@@     that is used within the ensemble. The alias should have the same
+    //@@     data type and dimensions as the input. As implied in key value
+    //@@     order, each input of the model should only map to one alias.
+    //@@     However, mapping multiple inputs to the same alias is allowed
+    //@@     as long as the data type and dimensions are matched.
+    //@@
+    map<string, string> input_alias_map = 2;
+
+    //@@  .. cpp:var:: map<string,string> alias_output_map
+    //@@
+    //@@     Map from aliases that is used within the ensemble to the outputs
+    //@@     specified in the model cofig. The alias will have the same
+    //@@     data type and dimensions as the output. As implied in key value
+    //@@     order, each alias can only map to one output in one model, however,
+    //@@     one alias may be mapped to multiple outputs across models
+    //@@     as long as the data type and dimensions are matched,
+    //@@     the content of the alias will be overwritten by the newest output.
+    //@@
+    map<string, string> alias_output_map = 3;
+  }
+
+  //@@  .. cpp:var:: Step step (repeated)
+  //@@
+  //@@     The model(s) and the input output mappings used within the ensemble,
+  //@@     it needs to contain a Step message specifying the mapping between
+  //@@     aliases and the inputs / outputs of the ensemble, the model name will
+  //@@     be the name specified in the model config.
+  //@@
+  repeated Step step = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelParameter
 //@@
 //@@   A model parameter.
@@ -623,6 +679,17 @@ message ModelConfig
     //@@       improve inference throughput.
     //@@
     ModelSequenceBatching sequence_batching = 13;
+
+    //@@    .. cpp:var:: ModelEnsembling ensemble_scheduling
+    //@@
+    //@@       If specified, enables the model-ensembling scheduling
+    //@@       policy. With model-ensembling, inference requests
+    //@@       will be processed according to the specification, such as an
+    //@@       execution sequence of models. The input specified in this model
+    //@@       config will be the input for the ensemble, and the output
+    //@@       specified will be the output of the ensemble.
+    //@@
+    ModelEnsembling ensemble_scheduling = 15;
   }
 
   //@@  .. cpp:var:: ModelInstanceGroup instance_group (repeated)
