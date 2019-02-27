@@ -301,56 +301,40 @@ class HTTPServiceImpl : public HTTPService {
   tensorflow::Status Stop() override;
 
  private:
+  // Class object associated to evhtp thread, requests received are bounded
+  // with the thread that accepts it. Need to keep track of that and let the
+  // corresponding thread send back the reply
+  class InferRequest {
+   public:
+    InferRequest(
+        evhtp_request_t* req, uint64_t id,
+        const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+        const std::shared_ptr<ModelInferStats>& infer_stats,
+        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
+
+    void FinalizeResponse();
+
+   private:
+    friend class HTTPServiceImpl;
+    evhtp_request_t* req_;
+    evthr_t* thread_;
+    uint64_t id_;
+    RequestStatus request_status_;
+    std::shared_ptr<HTTPInferRequestProvider> request_provider_;
+    std::shared_ptr<HTTPInferResponseProvider> response_provider_;
+    std::shared_ptr<ModelInferStats> infer_stats_;
+    std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
+  };
+
   void Handle(evhtp_request_t* req);
   void Health(evhtp_request_t* req, const std::string& health_uri);
   void Profile(evhtp_request_t* req, const std::string& profile_uri);
   void Infer(evhtp_request_t* req, const std::string& infer_uri);
   void Status(evhtp_request_t* req, const std::string& status_uri);
 
-  static void thread_init(evhtp_t* htp, evthr_t* thread, void* arg);
-  static void thread_exit(evhtp_t* htp, evthr_t* thread, void* arg);
-
-  // Class object associated to evhtp thread, requests received are bounded
-  // with the thread that accepts it. Need to keep track of that and let the
-  // corresponding thread send back reply
-  class ThreadWiseService {
-   public:
-    class Request {
-     public:
-      Request(
-          evhtp_request_t* req, uint64_t id,
-          const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
-          const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-          const std::shared_ptr<ModelInferStats>& infer_stats,
-          const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
-          : req_(req), id_(id), request_provider_(request_provider),
-            response_provider_(response_provider), infer_stats_(infer_stats),
-            timer_(timer)
-      {
-      }
-
-     private:
-      friend class HTTPServiceImpl;
-      friend class ThreadWiseService;
-      evhtp_request_t* req_;
-      uint64_t id_;
-      RequestStatus request_status_;
-      std::shared_ptr<HTTPInferRequestProvider> request_provider_;
-      std::shared_ptr<HTTPInferResponseProvider> response_provider_;
-      std::shared_ptr<ModelInferStats> infer_stats_;
-      std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
-    };
-
-    explicit ThreadWiseService(evthr_t* thread) : thread_(thread) {}
-    ~ThreadWiseService() = default;
-
-    static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
-
-    void FinalizeHTTPResponse(const std::shared_ptr<Request>& req);
-
-   private:
-    evthr_t* thread_;
-  };
+  void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
+  static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
   InferenceServer* server_;
   re2::RE2 api_regex_;
@@ -370,7 +354,7 @@ HTTPServiceImpl::Start(uint16_t port, int thread_cnt)
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_set_gencb(htp_, HTTPServiceImpl::Dispatch, this);
-    evhtp_use_threads_wexit(htp_, thread_init, thread_exit, thread_cnt, NULL);
+    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port, 1024);
     worker_ = std::thread(event_base_loop, evbase_, 0);
     return tensorflow::Status::OK();
@@ -560,20 +544,12 @@ HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
           req->buffer_out, *(backend->Backend()),
           request_provider->RequestHeader(), &response_provider);
       if (status.ok()) {
-        evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
-        evthr_t* thread = htpconn->thread;
-        ThreadWiseService* service = (ThreadWiseService*)evthr_get_aux(thread);
-        evhtp_request_pause(req);
-        std::shared_ptr<ThreadWiseService::Request> request(
-            new ThreadWiseService::Request(
-                req, id, request_provider, response_provider, infer_stats,
-                timer));
+        std::shared_ptr<InferRequest> request(new InferRequest(
+            req, id, request_provider, response_provider, infer_stats, timer));
         server_->HandleInfer(
             &(request->request_status_), backend, request->request_provider_,
             request->response_provider_, infer_stats,
-            [service, request]() mutable {
-              service->FinalizeHTTPResponse(request);
-            },
+            [this, request]() mutable { this->FinishInferResponse(request); },
             true  // async frontend
         );
       }
@@ -669,21 +645,7 @@ HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
 }
 
 void
-HTTPServiceImpl::thread_init(evhtp_t* htp, evthr_t* thread, void* arg)
-{
-  evthr_set_aux(thread, new ThreadWiseService(thread));
-}
-
-void
-HTTPServiceImpl::thread_exit(evhtp_t* htp, evthr_t* thread, void* arg)
-{
-  ThreadWiseService* service = (ThreadWiseService*)evthr_get_aux(thread);
-  delete service;
-}
-
-void
-HTTPServiceImpl::ThreadWiseService::ReplyCallback(
-    evthr_t* thr, void* arg, void* shared)
+HTTPServiceImpl::ReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   evhtp_request_t* request = (evhtp_request_t*)arg;
 
@@ -692,14 +654,35 @@ HTTPServiceImpl::ThreadWiseService::ReplyCallback(
 }
 
 void
-HTTPServiceImpl::ThreadWiseService::FinalizeHTTPResponse(
-    const std::shared_ptr<Request>& req)
+HTTPServiceImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
+{
+  req->FinalizeResponse();
+  evthr_defer(req->thread_, ReplyCallback, req->req_);
+}
+
+HTTPServiceImpl::InferRequest::InferRequest(
+    evhtp_request_t* req, uint64_t id,
+    const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+    const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+    const std::shared_ptr<ModelInferStats>& infer_stats,
+    const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
+    : req_(req), id_(id), request_provider_(request_provider),
+      response_provider_(response_provider), infer_stats_(infer_stats),
+      timer_(timer)
+{
+  evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
+  thread_ = htpconn->thread;
+  evhtp_request_pause(req);
+}
+
+void
+HTTPServiceImpl::InferRequest::FinalizeResponse()
 {
   InferResponseHeader* response_header =
-      req->response_provider_->MutableResponseHeader();
-  if (req->request_status_.code() == RequestStatusCode::SUCCESS) {
+      response_provider_->MutableResponseHeader();
+  if (request_status_.code() == RequestStatusCode::SUCCESS) {
     std::string format;
-    const char* format_c_str = evhtp_kv_find(req->req_->uri->query, "format");
+    const char* format_c_str = evhtp_kv_find(req_->uri->query, "format");
     if (format_c_str != NULL) {
       format = std::string(format_c_str);
     } else {
@@ -711,7 +694,7 @@ HTTPServiceImpl::ThreadWiseService::FinalizeHTTPResponse(
     // interpret the body. The entire response (including
     // classifications) is serialized at the end of the
     // body.
-    response_header->set_id(req->id_);
+    response_header->set_id(id_);
 
     std::string rstr;
     if (format == "binary") {
@@ -719,7 +702,7 @@ HTTPServiceImpl::ThreadWiseService::FinalizeHTTPResponse(
     } else {
       rstr = response_header->DebugString();
     }
-    evbuffer_add(req->req_->buffer_out, rstr.c_str(), rstr.size());
+    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
 
     // We do this in destructive manner since we are the
     // last one to use response header from the provider.
@@ -728,29 +711,26 @@ HTTPServiceImpl::ThreadWiseService::FinalizeHTTPResponse(
       output->clear_batch_classes();
     }
   } else {
-    evbuffer_drain(req->req_->buffer_out, -1);
+    evbuffer_drain(req_->buffer_out, -1);
     response_header->Clear();
-    response_header->set_id(req->id_);
+    response_header->set_id(id_);
   }
   evhtp_headers_add_header(
-      req->req_->headers_out,
+      req_->headers_out,
       evhtp_header_new(
           kInferResponseHTTPHeader, response_header->ShortDebugString().c_str(),
           1, 1));
   evhtp_headers_add_header(
-      req->req_->headers_out,
+      req_->headers_out,
       evhtp_header_new(
-          kStatusHTTPHeader, req->request_status_.ShortDebugString().c_str(), 1,
-          1));
+          kStatusHTTPHeader, request_status_.ShortDebugString().c_str(), 1, 1));
   evhtp_headers_add_header(
-      req->req_->headers_out,
+      req_->headers_out,
       evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
 
-  req->req_->status =
-      (req->request_status_.code() == RequestStatusCode::SUCCESS)
-          ? EVHTP_RES_OK
-          : EVHTP_RES_BADREQ;
-  evthr_defer(thread_, ReplyCallback, req->req_);
+  req_->status = (request_status_.code() == RequestStatusCode::SUCCESS)
+                     ? EVHTP_RES_OK
+                     : EVHTP_RES_BADREQ;
 }
 
 // Scoped increment / decrement of atomic
