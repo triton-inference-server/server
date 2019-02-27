@@ -50,12 +50,6 @@ ErrorIsOk(nic::Error* ctx)
   return ctx->IsOk();
 }
 
-bool
-ErrorIsUnavailable(nic::Error* ctx)
-{
-  return (ctx->Code() == ni::RequestStatusCode::UNAVAILABLE);
-}
-
 const char*
 ErrorMessage(nic::Error* ctx)
 {
@@ -314,13 +308,14 @@ InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id)
 
 nic::Error*
 InferContextGetAsyncRunResults(
-    InferContextCtx* ctx, size_t request_id, bool wait)
+    InferContextCtx* ctx, bool* is_ready, size_t request_id, bool wait)
 {
   for (auto itr = ctx->requests.begin(); itr != ctx->requests.end(); itr++) {
     if ((*itr)->Id() == request_id) {
       ctx->results.clear();
-      nic::Error err = ctx->ctx->GetAsyncRunResults(&ctx->results, *itr, wait);
-      if (err.IsOk()) {
+      nic::Error err =
+          ctx->ctx->GetAsyncRunResults(&ctx->results, is_ready, *itr, wait);
+      if (*is_ready) {
         ctx->requests.erase(itr);
       }
       return new nic::Error(err);
@@ -333,13 +328,13 @@ InferContextGetAsyncRunResults(
 
 nic::Error*
 InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, size_t* request_id, bool wait)
+    InferContextCtx* ctx, bool* is_ready, size_t* request_id, bool wait)
 {
   // Here we assume that all asynchronous request is created by calling
   // InferContextAsyncRun(). Thus we don't need to check ctx->requests.
   std::shared_ptr<nic::InferContext::Request> request;
-  nic::Error err = ctx->ctx->GetReadyAsyncRequest(&request, wait);
-  if (err.IsOk()) {
+  nic::Error err = ctx->ctx->GetReadyAsyncRequest(&request, is_ready, wait);
+  if (*is_ready) {
     *request_id = request->Id();
   }
   return new nic::Error(err);

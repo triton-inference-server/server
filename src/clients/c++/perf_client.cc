@@ -868,18 +868,20 @@ class ConcurrencyManager {
         keep_loop = false;
         for (size_t idx = 0; idx < ctxs.size(); idx++) {
           if (ctxs_working[idx]) {
-            nic::Error tmp_err =
-                ctxs[idx]->GetReadyAsyncRequest(&request, false);
+            bool is_ready;
+            *err = ctxs[idx]->GetReadyAsyncRequest(&request, &is_ready, false);
 
-            if (tmp_err.Code() == ni::RequestStatusCode::UNAVAILABLE) {
-              continue;
-            } else if (!tmp_err.IsOk()) {
-              *err = tmp_err;
+            if (!err->IsOk()) {
               return;
+            }
+
+            if (!is_ready) {
+              continue;
             }
             // keep the loop until no more ready requests in all contexts
             keep_loop = true;
-            *err = ctxs[idx]->GetAsyncRunResults(&results, request, true);
+            *err = ctxs[idx]->GetAsyncRunResults(
+                &results, &is_ready, request, true);
 
             struct timespec end_time;
             clock_gettime(CLOCK_MONOTONIC, &end_time);
