@@ -329,6 +329,8 @@ cc_library(
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
         "//src/servables/tensorrt:plan_bundle_source_adapter",
         "//src/servables/custom:custom_bundle_source_adapter",
+        "@com_github_libevhtp//:libevhtp",
+        "@com_github_libevent_libevent//:libevent",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
@@ -338,9 +340,6 @@ cc_library(
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
         "@tf_serving//tensorflow_serving/core:availability_preserving_policy",
         "@tf_serving//tensorflow_serving/model_servers:server_core",
-        "@tf_serving//tensorflow_serving/util:threadpool_executor",
-        "@tf_serving//tensorflow_serving/util/net_http/server/public:http_server",
-        "@tf_serving//tensorflow_serving/util/net_http/server/public:http_server_api",
     ],
 )
 

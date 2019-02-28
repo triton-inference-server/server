@@ -4,8 +4,4 @@ a4a19d5058e08441bce56444fa09e6b96fe0ab16  /workspace/serving/tensorflow_serving/
 4b3aab50d2bd6113c2e52e87fdd938dcfa828dd4  /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto
 39a0fdd3f0fbc2f2ed13a97335be63f16cadc607  /workspace/serving/tensorflow_serving/util/retrier.cc
 1f7d5d15099bda729b4e9803327d7dedbe037988  /workspace/serving/tensorflow_serving/util/BUILD
-a004e360a37db3d26574dd18140c2179c9708fa1  /workspace/serving/tensorflow_serving/util/net_http/server/public/BUILD
 1c4491ac158453e4fd91b7048f875204e024c731  /workspace/serving/tensorflow_serving/workspace.bzl
-398d07e915232885501cad3899ffa9d7463a9d1e  /workspace/serving/tensorflow_serving/util/net_http/server/public/server_request_interface.h
-b3b14127c76ef9c7206c914cdf8a45494829ef9f  /workspace/serving/tensorflow_serving/util/net_http/server/internal/evhttp_request.cc
-59e8834fc9d51eee3503805f9d7b38d2742796d4  /workspace/serving/tensorflow_serving/util/net_http/server/internal/evhttp_request.h
