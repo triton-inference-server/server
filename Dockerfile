@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.01-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.01-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.01-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.02-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.02-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.02-py3
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
