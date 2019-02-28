@@ -32,9 +32,9 @@ NVIDIA TensorRT Inference Server
 
     **NOTE: You are currently on the master branch which tracks
     under-development progress towards the next release. The latest
-    release of the TensorRT Inference Server is 0.10.0 beta and is
-    available on branch** `r19.01
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.01>`_.
+    release of the TensorRT Inference Server is 0.11.0 beta and is
+    available on branch** `r19.02
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.02>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -91,11 +91,11 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 0.10.0 beta and
-corresponds to the 19.01 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 0.11.0 beta and
+corresponds to the 19.02 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r19.01
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.01>`_.
+this release is `r19.02
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.02>`_.
 
 Backwards Compatibility
 -----------------------
@@ -105,7 +105,7 @@ non-backwards-compatible changes. You must rebuild the client
 libraries and any client applications you use to talk to the inference
 server to make sure they stay in sync with the server.
 
-Compared to the r19.01 release, the master branch has the following
+Compared to the r19.02 release, the master branch has the following
 non-backward-compatible changes:
 
 * The inference request header for inputs and outputs no longer allow
