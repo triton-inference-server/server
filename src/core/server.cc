@@ -313,7 +313,7 @@ class HTTPServiceImpl : public HTTPService {
         const std::shared_ptr<ModelInferStats>& infer_stats,
         const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
 
-    void FinalizeResponse();
+    evhtp_res FinalizeResponse();
 
    private:
     friend class HTTPServiceImpl;
@@ -334,7 +334,8 @@ class HTTPServiceImpl : public HTTPService {
   void Status(evhtp_request_t* req, const std::string& status_uri);
 
   void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
-  static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
+  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
+  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
   InferenceServer* server_;
   re2::RE2 api_regex_;
@@ -645,19 +646,29 @@ HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
 }
 
 void
-HTTPServiceImpl::ReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPServiceImpl::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   evhtp_request_t* request = (evhtp_request_t*)arg;
+  evhtp_send_reply(request, EVHTP_RES_OK);
+  evhtp_request_resume(request);
+}
 
-  evhtp_send_reply(request, request->status);
+void
+HTTPServiceImpl::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+{
+  evhtp_request_t* request = (evhtp_request_t*)arg;
+  evhtp_send_reply(request, EVHTP_RES_BADREQ);
   evhtp_request_resume(request);
 }
 
 void
 HTTPServiceImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
 {
-  req->FinalizeResponse();
-  evthr_defer(req->thread_, ReplyCallback, req->req_);
+  if (req->FinalizeResponse() == EVHTP_RES_OK) {
+    evthr_defer(req->thread_, OKReplyCallback, req->req_);
+  } else {
+    evthr_defer(req->thread_, BADReplyCallback, req->req_);
+  }
 }
 
 HTTPServiceImpl::InferRequest::InferRequest(
@@ -675,7 +686,7 @@ HTTPServiceImpl::InferRequest::InferRequest(
   evhtp_request_pause(req);
 }
 
-void
+evhtp_res
 HTTPServiceImpl::InferRequest::FinalizeResponse()
 {
   InferResponseHeader* response_header =
@@ -728,9 +739,9 @@ HTTPServiceImpl::InferRequest::FinalizeResponse()
       req_->headers_out,
       evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
 
-  req_->status = (request_status_.code() == RequestStatusCode::SUCCESS)
-                     ? EVHTP_RES_OK
-                     : EVHTP_RES_BADREQ;
+  return (request_status_.code() == RequestStatusCode::SUCCESS)
+             ? EVHTP_RES_OK
+             : EVHTP_RES_BADREQ;
 }
 
 // Scoped increment / decrement of atomic
