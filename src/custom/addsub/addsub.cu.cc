@@ -63,6 +63,7 @@ enum ErrorCodes {
   kOutputBuffer,
   kCudaMalloc,
   kCudaMemcpy,
+  kCudaExecute,
   kCudaStream
 };
 
@@ -671,11 +672,19 @@ Context::ExecuteGPU(
         payload.error_code = kCudaMemcpy;
         break;
       }
+
+      // Wait for all compute and memcpy to complete before going onto
+      // the next output. We share CUDA buffers across outputs so need
+      // to finish with this payload before starting the next.
+      cuerr = cudaStreamSynchronize(stream_);
+      if (cuerr != cudaSuccess) {
+        LOG_ERROR << "failed to copy output values from GPU for addsub: "
+                  << cudaGetErrorString(cuerr);
+        payload.error_code = kCudaExecute;
+        break;
+      }
     }
   }
-
-  // Wait for all compute and memcpy to complete before returning.
-  cudaStreamSynchronize(stream_);
 
   return kSuccess;
 }
@@ -759,6 +768,8 @@ CustomErrorString(void* custom_context, int errcode)
       return "cudaMalloc failed";
     case kCudaMemcpy:
       return "cudaMemcpy failed";
+    case kCudaExecute:
+      return "cuda execution failed";
     case kCudaStream:
       return "failed to create CUDA stream";
     default:
