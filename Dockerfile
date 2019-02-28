@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.02-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.02-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.02-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.03-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.03-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.03-py3
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
@@ -97,7 +97,7 @@ RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=0.12.0dev
+ARG TRTIS_VERSION=1.0.0dev
 ARG TRTIS_CONTAINER_VERSION=19.03dev
 ARG PYVER=3.5
 ARG BUILD_CLIENTS_ONLY=0
@@ -253,7 +253,7 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=0.12.0dev
+ARG TRTIS_VERSION=1.0.0dev
 ARG TRTIS_CONTAINER_VERSION=19.03dev
 ARG PYVER=3.5
 

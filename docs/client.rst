@@ -68,7 +68,7 @@ the master branch if you want to build the under-development
 version). The branch you use for the client build should match the
 version of the inference server you are using::
 
-  $ git checkout r19.02
+  $ git checkout r19.03
 
 Then, issue the following command to build the C++ client library, C++
 and Python examples, and a Python wheel file for the Python client
@@ -102,8 +102,8 @@ corresponding to the release you are interested in::
 
   $ mkdir tensorrtserver_clients
   $ cd tensorrtserver_clients
-  $ wget https://github.com/NVIDIA/tensorrt-inference-server/archive/v0.12.0.clients.tar.gz
-  $ tar xzf v0.12.0.clients.tar.gz
+  $ wget https://github.com/NVIDIA/tensorrt-inference-server/archive/v1.0.0.clients.tar.gz
+  $ tar xzf v1.0.0.clients.tar.gz
 
 You can now find client example binaries in bin/, c++ libraries in
 lib/, and Python client examples and wheel file in python/.
