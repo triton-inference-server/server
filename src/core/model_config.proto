@@ -520,55 +520,50 @@ message ModelSequenceBatching
 //@@
 //@@.. cpp:var:: message ModelEnsembling
 //@@
-//@@   Model ensembling configuration. These settings control how the inputs
-//@@   and outputs of the models are mapped together.
+//@@   Model ensembling configuration. These settings specify the models that
+//@@   compose the ensemble and how data flows between the models.
 //@@
 message ModelEnsembling
 {
   //@@  .. cpp:var:: message Step
   //@@
-  //@@     The step specifies a model included in the ensemble and how its
-  //@@     inputs and outputs are mapped to names that is recognizable within
-  //@@     the ensemble.
+  //@@     Each step specifies a model included in the ensemble,
+  //@@     maps ensemble tensor names to the model input tensors,
+  //@@     and maps model output tensors to ensemble tensor names
   //@@
   message Step
   {
     //@@    .. cpp:var:: string model_name
     //@@
-    //@@       The name of the model.
+    //@@       The name of the model to execute for this step of the ensemble.
     //@@
     string model_name = 1;
 
-    //@@  .. cpp:var:: map<string,string> input_alias_map
+    //@@  .. cpp:var:: map<string,string> input_map
     //@@
-    //@@     Map from the inputs specified in the model cofig to aliases
-    //@@     that is used within the ensemble. The alias should have the same
-    //@@     data type and dimensions as the input. As implied in key value
-    //@@     order, each input of the model should only map to one alias.
-    //@@     However, mapping multiple inputs to the same alias is allowed
-    //@@     as long as the data type and dimensions are matched.
+    //@@     Map from ensemble tensor name to name of an input tensor on this
+    //@@     step's model. The ensemble tensor must have the same data type and
+    //@@     shape as the model input. Each model input must be assigned to
+    //@@     one ensemble tensor, but the same ensemble tensor can be assigned
+    //@@     to multiple model inputs.
     //@@
-    map<string, string> input_alias_map = 2;
+    map<string, string> input_map = 2;
 
-    //@@  .. cpp:var:: map<string,string> alias_output_map
+    //@@  .. cpp:var:: map<string,string> output_map
     //@@
-    //@@     Map from aliases that is used within the ensemble to the outputs
-    //@@     specified in the model cofig. The alias will have the same
-    //@@     data type and dimensions as the output. As implied in key value
-    //@@     order, each alias can only map to one output in one model, however,
-    //@@     one alias may be mapped to multiple outputs across models
-    //@@     as long as the data type and dimensions are matched,
-    //@@     the content of the alias will be overwritten by the newest output.
+    //@@     Map from ensemble tensor name to name of an output tensor on this
+    //@@     step's model. The data type and shape of the ensemble tensor will
+    //@@     be inferred from the model output. Each model output must be
+    //@@     assigned to one ensemble tensor, but the same ensemble tensor can
+    //@@     be assigned to multiple model outputs, where the content of
+    //@@     the ensemble tensor will be overwritten by the newest model output.
     //@@
-    map<string, string> alias_output_map = 3;
+    map<string, string> output_map = 3;
   }
 
   //@@  .. cpp:var:: Step step (repeated)
   //@@
-  //@@     The model(s) and the input output mappings used within the ensemble,
-  //@@     it needs to contain a Step message specifying the mapping between
-  //@@     aliases and the inputs / outputs of the ensemble, the model name will
-  //@@     be the name specified in the model config.
+  //@@     The model(s) and the input / output mappings used within the ensemble.
   //@@
   repeated Step step = 1;
 }
