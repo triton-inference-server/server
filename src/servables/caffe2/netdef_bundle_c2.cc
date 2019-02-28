@@ -90,7 +90,7 @@ namespace {
 
 bool
 CompareOutputShape(
-    const std::vector<int64_t>& config_shape, const at::IntList& output_shape)
+    const std::vector<int64_t>& config_shape, const at::IntArrayRef& output_shape)
 {
   if (config_shape.size() != output_shape.size()) {
     return false;
@@ -106,7 +106,7 @@ CompareOutputShape(
 }
 
 const std::string
-DimsDebugString(const at::IntList& dims)
+DimsDebugString(const at::IntArrayRef& dims)
 {
   bool first = true;
   std::string str;
@@ -528,15 +528,15 @@ Caffe2WorkspaceImpl::GetOutputTensor(
         std::string(pr.second.name()));
   }
 
-  if (!CompareOutputShape(shape, output->dims())) {
+  if (!CompareOutputShape(shape, output->sizes())) {
     return Error(
-        "unexpected shape " + DimsDebugString(output->dims()) +
+        "unexpected shape " + DimsDebugString(output->sizes()) +
         " for inference output '" + name + "', expecting " +
         DimsDebugString(shape));
   }
 
   content_shape->clear();
-  for (auto d : output->dims()) {
+  for (auto d : output->sizes()) {
     content_shape->push_back(d);
   }
 
