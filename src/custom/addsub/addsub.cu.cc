@@ -70,7 +70,9 @@ enum ErrorCodes {
 // Context object. All state must be kept in this object.
 class Context {
  public:
-  Context(const ModelConfig& config, const int gpu_device);
+  Context(
+      const std::string& instance_name, const ModelConfig& config,
+      const int gpu_device);
   ~Context();
 
   // Initialize the context. Validate that the model configuration,
@@ -100,6 +102,9 @@ class Context {
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
+  // The name of this instance of the backend.
+  const std::string instance_name_;
+
   // The model configuration.
   const ModelConfig model_config_;
 
@@ -122,11 +127,13 @@ class Context {
   cudaStream_t stream_;
 };
 
-Context::Context(const ModelConfig& model_config, const int gpu_device)
-    : model_config_(model_config), gpu_device_(gpu_device),
-      datatype_(DataType::TYPE_INVALID), cuda_buffer_byte_size_(0),
-      cuda_input0_(nullptr), cuda_input1_(nullptr), cuda_output_(nullptr),
-      stream_(nullptr)
+Context::Context(
+    const std::string& instance_name, const ModelConfig& model_config,
+    const int gpu_device)
+    : instance_name_(instance_name), model_config_(model_config),
+      gpu_device_(gpu_device), datatype_(DataType::TYPE_INVALID),
+      cuda_buffer_byte_size_(0), cuda_input0_(nullptr), cuda_input1_(nullptr),
+      cuda_output_(nullptr), stream_(nullptr)
 {
 }
 
@@ -717,7 +724,8 @@ CustomInitialize(const CustomInitializeData* data, void** custom_context)
 
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context = new Context(model_config, data->gpu_device_id);
+  Context* context = new Context(
+      std::string(data->instance_name), model_config, data->gpu_device_id);
   int err = context->Init();
   if (err != kSuccess) {
     return err;

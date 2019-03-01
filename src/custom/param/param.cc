@@ -55,8 +55,8 @@ enum ErrorCodes {
 class Context {
  public:
   Context(
-      const ModelConfig& config, const size_t server_parameter_cnt,
-      const char** server_parameters);
+      const std::string& instance_name, const ModelConfig& config,
+      const size_t server_parameter_cnt, const char** server_parameters);
 
   // Initialize the context. Validate that the model configuration,
   // etc. is something that we can handle.
@@ -68,6 +68,9 @@ class Context {
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
+  // The name of this instance of the backend.
+  const std::string instance_name_;
+
   // The model configuration.
   const ModelConfig model_config_;
 
@@ -76,9 +79,9 @@ class Context {
 };
 
 Context::Context(
-    const ModelConfig& model_config, const size_t server_parameter_cnt,
-    const char** server_parameters)
-    : model_config_(model_config)
+    const std::string& instance_name, const ModelConfig& model_config,
+    const size_t server_parameter_cnt, const char** server_parameters)
+    : instance_name_(instance_name), model_config_(model_config)
 {
   // Must make a copy of server_parameters since we don't own those
   // strings.
@@ -196,7 +199,8 @@ CustomInitialize(const CustomInitializeData* data, void** custom_context)
   // Create the context and validate that the model configuration is
   // something that we can handle.
   Context* context = new Context(
-      model_config, data->server_parameter_cnt, data->server_parameters);
+      std::string(data->instance_name), model_config,
+      data->server_parameter_cnt, data->server_parameters);
   int err = context->Init();
   if (err != kSuccess) {
     return err;
