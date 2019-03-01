@@ -623,7 +623,8 @@ std::unique_ptr<HTTPServer>
 InferenceServer::StartHttpServer()
 {
   std::unique_ptr<HTTPServer> service;
-  tensorflow::Status status = HTTPServer::Create(this, http_port_, http_thread_cnt_, &service);
+  tensorflow::Status status =
+      HTTPServer::Create(this, http_port_, http_thread_cnt_, &service);
   if (status.ok()) {
     status = service->Start();
   }
@@ -774,7 +775,8 @@ InferenceServer::HandleInfer(
     return;
   }
 
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
+  std::shared_ptr<ScopedAtomicIncrement> inflight(
+      new ScopedAtomicIncrement(inflight_request_counter_));
   const uint64_t request_id = NextRequestId();
 
   // Need to capture 'backend' to keep it alive... it goes away when
@@ -782,8 +784,8 @@ InferenceServer::HandleInfer(
   // and we don't want that to happen when a request is in flight.
   auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, backend,
                                 response_provider, request_status, request_id,
-                                infer_stats](
-                                   tensorflow::Status status) mutable {
+                                infer_stats,
+                                inflight](tensorflow::Status status) mutable {
     if (status.ok()) {
       status = response_provider->FinalizeResponse(*(backend->Backend()));
       if (status.ok()) {
@@ -801,8 +803,7 @@ InferenceServer::HandleInfer(
   };
 
   backend->Backend()->Run(
-      infer_stats, request_provider, response_provider,
-      OnCompleteHandleInfer);
+      infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
 void
