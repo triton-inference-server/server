@@ -28,6 +28,7 @@
 #include <string>
 #include "src/core/autofill.h"
 #include "src/core/model_config.pb.h"
+#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
@@ -41,7 +42,9 @@ namespace nvidia { namespace inferenceserver {
 class AutoFillSavedModel : public AutoFill {
  public:
   static tensorflow::Status Create(
-      const std::string& model_name, const std::string& model_path,
+      const std::string& model_name,
+      const ::google::protobuf::Any& platform_config,
+      const std::string& model_path,
       std::unique_ptr<AutoFillSavedModel>* autofill);
   tensorflow::Status Fix(ModelConfig* config) override;
 
