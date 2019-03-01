@@ -551,19 +551,18 @@ message ModelEnsembling
 
     //@@  .. cpp:var:: map<string,string> output_map
     //@@
-    //@@     Map from ensemble tensor name to name of an output tensor on this
-    //@@     step's model. The data type and shape of the ensemble tensor will
-    //@@     be inferred from the model output. Each model output must be
-    //@@     assigned to one ensemble tensor, but the same ensemble tensor can
-    //@@     be assigned to multiple model outputs, where the content of
-    //@@     the ensemble tensor will be overwritten by the newest model output.
+    //@@     Map from name of an output tensor on this step's model to ensemble
+    //@@     tensor name. The data type and shape of the ensemble tensor will
+    //@@     be inferred from the model output. It is optional to assign all
+    //@@     model outputs to ensemble tensors. One ensemble tensor name
+    //@@     can appear in an output map only once.
     //@@
     map<string, string> output_map = 3;
   }
 
   //@@  .. cpp:var:: Step step (repeated)
   //@@
-  //@@     The model(s) and the input / output mappings used within the ensemble.
+  //@@     The models and the input / output mappings used within the ensemble.
   //@@
   repeated Step step = 1;
 }
