@@ -151,8 +151,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
                 response.mutable_meta_data()->set_id(id);
                 this->CompleteExecution(execution_context);
                 timer.reset();
-              },
-              true  // async_frontend
+              }
           );
         }
       }

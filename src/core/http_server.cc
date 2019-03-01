@@ -308,8 +308,7 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
         server_->HandleInfer(
             &(request->request_status_), backend, request->request_provider_,
             request->response_provider_, infer_stats,
-            [this, request]() mutable { this->FinishInferResponse(request); },
-            true  // async frontend
+            [this, request]() mutable { this->FinishInferResponse(request); }
         );
       }
     }

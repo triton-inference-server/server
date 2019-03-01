@@ -67,19 +67,10 @@ class InferenceBackend {
   // Get the tags of model being served.
   const std::map<std::string, std::string>& Tags() const { return tags_; }
 
-  // Run inference using the provided request to produce outputs in
-  // the provide response. This method should be called by synchronous
-  // frontends.
+  // Run inference using the provided request to produce outputs in the provide
+  // response. The inference will run asynchronously and "OnCompleteHandleInfer"
+  // callback will be called once the inference is completed
   void Run(
-      std::shared_ptr<ModelInferStats> stats,
-      std::shared_ptr<InferRequestProvider> request_provider,
-      std::shared_ptr<InferResponseProvider> response_provider,
-      std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
-
-  // Run inference using the provided request to produce outputs in
-  // the provide response. This method should be called by
-  // asynchronous frontends.
-  void AsyncRun(
       std::shared_ptr<ModelInferStats> stats,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,

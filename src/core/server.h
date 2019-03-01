@@ -87,7 +87,7 @@ class InferenceServer {
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
       std::shared_ptr<ModelInferStats> infer_stats,
-      std::function<void()> OnCompleteInferRPC, bool async_frontend);
+      std::function<void()> OnCompleteInferRPC);
 
   // Update the RequestStatus object and ServerStatus object with the
   // status of the model. If 'model_name' is empty, update with the

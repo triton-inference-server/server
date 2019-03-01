@@ -764,7 +764,7 @@ InferenceServer::HandleInfer(
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
-    std::function<void()> OnCompleteInferRPC, bool async_frontend)
+    std::function<void()> OnCompleteInferRPC)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     RequestStatusFactory::Create(
@@ -800,15 +800,9 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
-  if (async_frontend) {
-    backend->Backend()->AsyncRun(
-        infer_stats, request_provider, response_provider,
-        OnCompleteHandleInfer);
-  } else {
-    backend->Backend()->Run(
-        infer_stats, request_provider, response_provider,
-        OnCompleteHandleInfer);
-  }
+  backend->Backend()->Run(
+      infer_stats, request_provider, response_provider,
+      OnCompleteHandleInfer);
 }
 
 void
