@@ -39,6 +39,8 @@
 
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
+#include "src/core/grpc_server.h"
+#include "src/core/http_server.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.h"

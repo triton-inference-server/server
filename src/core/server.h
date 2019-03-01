@@ -33,8 +33,6 @@
 #include <unordered_map>
 
 #include "src/core/api.pb.h"
-#include "src/core/grpc_server.h"
-#include "src/core/http_server.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
 #include "src/core/request_status.pb.h"
@@ -52,6 +50,8 @@ class GraphDefBundle;
 class NetDefBundle;
 class PlanBundle;
 class SavedModelBundle;
+class GRPCServer;
+class HTTPServer;
 
 // Inference server information.
 class InferenceServer {
