@@ -32,11 +32,12 @@ namespace nvidia { namespace inferenceserver {
 class InferenceServer;
 class GRPCServer : private nvrpc::Server {
  public:
-  static tensorflow::Status Create(InferenceServer* server,
-      uint16_t port,
+  static tensorflow::Status Create(
+      InferenceServer* server, uint16_t port,
       std::unique_ptr<GRPCServer>* grpc_server);
   tensorflow::Status Start();
   tensorflow::Status Stop();
+
  private:
   GRPCServer(const std::string& addr);
 };

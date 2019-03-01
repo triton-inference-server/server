@@ -24,16 +24,16 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "src/core/http_server.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "evhtp/evhtp.h"
 #include "libevent/include/event2/buffer.h"
 #include "re2/re2.h"
-#include "src/core/server.h"
-#include "src/core/http_server.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/request_status.h"
+#include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -42,7 +42,8 @@ namespace nvidia { namespace inferenceserver {
 //
 class HTTPServerImpl : public HTTPServer {
  public:
-  explicit HTTPServerImpl(InferenceServer* server, uint16_t port, int thread_cnt)
+  explicit HTTPServerImpl(
+      InferenceServer* server, uint16_t port, int thread_cnt)
       : server_(server), port_(port), thread_cnt_(thread_cnt),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
@@ -308,8 +309,7 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
         server_->HandleInfer(
             &(request->request_status_), backend, request->request_provider_,
             request->response_provider_, infer_stats,
-            [this, request]() mutable { this->FinishInferResponse(request); }
-        );
+            [this, request]() mutable { this->FinishInferResponse(request); });
       }
     }
   }
@@ -497,12 +497,14 @@ HTTPServerImpl::InferRequest::FinalizeResponse()
       evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
 
   return (request_status_.code() == RequestStatusCode::SUCCESS)
-                     ? EVHTP_RES_OK
-                     : EVHTP_RES_BADREQ;
+             ? EVHTP_RES_OK
+             : EVHTP_RES_BADREQ;
 }
 
 tensorflow::Status
-HTTPServer::Create(InferenceServer* server, uint16_t port, int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
+HTTPServer::Create(
+    InferenceServer* server, uint16_t port, int thread_cnt,
+    std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPServerImpl(server, port, thread_cnt));
   return tensorflow::Status::OK();

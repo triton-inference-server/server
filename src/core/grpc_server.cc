@@ -151,8 +151,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
                 response.mutable_meta_data()->set_id(id);
                 this->CompleteExecution(execution_context);
                 timer.reset();
-              }
-          );
+              });
         }
       }
     }
@@ -223,21 +222,20 @@ class HealthContext final
         });
   }
 };
-} // namespace
+}  // namespace
 
-GRPCServer::GRPCServer(const std::string& addr)
- : nvrpc::Server(addr)
-{
-}
+GRPCServer::GRPCServer(const std::string& addr) : nvrpc::Server(addr) {}
 
 tensorflow::Status
-GRPCServer::Create(InferenceServer* server, uint16_t port, std::unique_ptr<GRPCServer>* grpc_server)
+GRPCServer::Create(
+    InferenceServer* server, uint16_t port,
+    std::unique_ptr<GRPCServer>* grpc_server)
 {
   // DLIS-162 - provide global defaults and cli overridable options
   g_Resources = std::make_shared<AsyncResources>(
       server,  // InferenceServer*,
-      1,     // infer threads
-      1      // mgmt threads
+      1,       // infer threads
+      1        // mgmt threads
   );
 
   LOG_INFO << "Building nvrpc server";

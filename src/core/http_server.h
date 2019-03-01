@@ -31,8 +31,8 @@ namespace nvidia { namespace inferenceserver {
 class InferenceServer;
 class HTTPServer {
  public:
-  static tensorflow::Status Create(InferenceServer* server,
-      uint16_t port, int thread_cnt,
+  static tensorflow::Status Create(
+      InferenceServer* server, uint16_t port, int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
   virtual tensorflow::Status Start() = 0;
   virtual tensorflow::Status Stop() = 0;
