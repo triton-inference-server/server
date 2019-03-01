@@ -306,8 +306,8 @@ cc_library(
 
 cc_library(
     name = "server",
-    srcs = ["server.cc"],
-    hdrs = ["server.h"],
+    srcs = ["server.cc", "http_server.cc", "grpc_server.cc"],
+    hdrs = ["server.h", "http_server.h", "grpc_server.h"],
     deps = [
         ":api_proto",
         ":constants",
@@ -331,7 +331,6 @@ cc_library(
         "//src/servables/custom:custom_bundle_source_adapter",
         "@com_github_libevhtp//:libevhtp",
         "@com_github_libevent_libevent//:libevent",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
         "@grpc//:grpc++_unsecure",

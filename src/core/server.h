@@ -32,9 +32,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "grpc++/server.h"
-
 #include "src/core/api.pb.h"
+#include "src/core/grpc_server.h"
+#include "src/core/http_server.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
 #include "src/core/request_status.pb.h"
@@ -42,9 +42,6 @@
 #include "src/core/server_status.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow_serving/model_servers/server_core.h"
-
-#include "src/nvrpc/Server.h"
-
 
 namespace tfs = tensorflow::serving;
 
@@ -55,12 +52,6 @@ class GraphDefBundle;
 class NetDefBundle;
 class PlanBundle;
 class SavedModelBundle;
-
-class HTTPService {
- public:
-  virtual tensorflow::Status Start(uint16_t port, int thread_cnt) = 0;
-  virtual tensorflow::Status Stop() = 0;
-};
 
 // Inference server information.
 class InferenceServer {
@@ -156,8 +147,8 @@ class InferenceServer {
   // Start server running and listening on gRPC and/or HTTP endpoints.
   void Start();
 
-  std::unique_ptr<nvrpc::Server> StartGrpcServer();
-  std::unique_ptr<HTTPService> StartHttpServer();
+  std::unique_ptr<GRPCServer> StartGrpcServer();
+  std::unique_ptr<HTTPServer> StartHttpServer();
   tensorflow::Status ParseProtoTextFile(
       const std::string& file, google::protobuf::Message* message);
   tfs::PlatformConfigMap BuildPlatformConfigMap(
@@ -204,9 +195,9 @@ class InferenceServer {
   std::unique_ptr<tfs::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
 
-  std::unique_ptr<HTTPService> http_server_;
+  std::unique_ptr<HTTPServer> http_server_;
 
-  std::unique_ptr<nvrpc::Server> grpc_server_;
+  std::unique_ptr<GRPCServer> grpc_server_;
 };
 
 }}  // namespace nvidia::inferenceserver
