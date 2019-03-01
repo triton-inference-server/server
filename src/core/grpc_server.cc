@@ -24,20 +24,19 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "src/core/grpc_server.h"
+
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
 #include "grpc++/server_builder.h"
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "grpc/grpc.h"
-
 #include "src/core/constants.h"
-#include "src/core/grpc_server.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/logging.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
-
 #include "src/nvrpc/Context.h"
 #include "src/nvrpc/Executor.h"
 #include "src/nvrpc/Resources.h"
