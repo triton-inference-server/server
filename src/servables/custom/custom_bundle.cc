@@ -68,7 +68,7 @@ CustomBundle::Context::Context(Context&& o)
 
 CustomBundle::Context::~Context()
 {
-  LOG_VERBOSE(1) << "~CustomBundle::Context ";
+  LOG_VERBOSE(1) << "~CustomBundle::Context " << name_;
   if (FinalizeFn_ != nullptr) {
     int err = FinalizeFn_(library_context_handle_);
     if (err != 0) {
@@ -202,6 +202,7 @@ CustomBundle::CreateExecutionContext(
   Config().SerializeToString(&serialized_config);
 
   CustomInitializeData init_data;
+  init_data.instance_name = instance_name.c_str();
   init_data.serialized_model_config = serialized_config.c_str();
   init_data.serialized_model_config_size = serialized_config.size();
   init_data.gpu_device_id = gpu_device;
@@ -483,7 +484,8 @@ operator<<(std::ostream& out, const CustomBundle& pb)
     out << "  name=" << context.name_ << ", gpu="
         << ((context.gpu_device_ == CustomBundle::Context::NO_GPU_DEVICE)
                 ? "<none>"
-                : std::to_string(context.gpu_device_));
+                : std::to_string(context.gpu_device_))
+        << std::endl;
   }
 
   return out;
