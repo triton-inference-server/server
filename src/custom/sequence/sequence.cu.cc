@@ -73,7 +73,9 @@ enum ErrorCodes {
 // Context object. All state must be kept in this object.
 class Context {
  public:
-  Context(const ModelConfig& config, const int gpu_device);
+  Context(
+      const std::string& instance_name, const ModelConfig& config,
+      const int gpu_device);
   ~Context();
 
   // Initialize the context. Validate that the model configuration,
@@ -90,6 +92,9 @@ class Context {
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
       const size_t expected_byte_size, std::vector<uint8_t>* input);
 
+  // The name of this instance of the backend.
+  const std::string instance_name_;
+
   // The model configuration.
   const ModelConfig model_config_;
 
@@ -104,8 +109,11 @@ class Context {
   std::vector<int32_t> accumulator_;
 };
 
-Context::Context(const ModelConfig& model_config, const int gpu_device)
-    : model_config_(model_config), gpu_device_(gpu_device), execute_delay_ms_(0)
+Context::Context(
+    const std::string& instance_name, const ModelConfig& model_config,
+    const int gpu_device)
+    : instance_name_(instance_name), model_config_(model_config),
+      gpu_device_(gpu_device), execute_delay_ms_(0)
 {
   if (model_config_.parameters_size() > 0) {
     const auto itr = model_config_.parameters().find("execute_delay_ms");
@@ -351,7 +359,8 @@ CustomInitialize(const CustomInitializeData* data, void** custom_context)
 
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context = new Context(model_config, data->gpu_device_id);
+  Context* context = new Context(
+      std::string(data->instance_name), model_config, data->gpu_device_id);
   int err = context->Init();
   if (err != kSuccess) {
     return err;

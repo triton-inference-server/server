@@ -57,6 +57,10 @@ typedef enum custom_serverparamkind_enum {
 // The initialization information provided to a custom backend when it
 // is created.
 typedef struct custom_initdata_struct {
+  /// The name of this instance of the custom backend. Instance names
+  /// are unique.
+  const char* instance_name;
+
   /// Serialized representation of the model configuration. This
   /// serialization is owned by the caller and must be copied if a
   /// persistent copy of required by the custom backend.
