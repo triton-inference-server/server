@@ -99,7 +99,8 @@ class InferenceBackend {
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a servable.
   tensorflow::Status SetConfiguredScheduler(
-      const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun);
+      const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
+      Scheduler::StandardRunFunc OnRun);
 
  private:
   // Configuration of the model that this servable represents.
