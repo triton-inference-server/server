@@ -49,23 +49,6 @@ CustomBundle::Context::Context(
 {
 }
 
-CustomBundle::Context::Context(Context&& o)
-    : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_), library_handle_(o.library_handle_),
-      library_context_handle_(o.library_context_handle_),
-      InitializeFn_(o.InitializeFn_), FinalizeFn_(o.FinalizeFn_),
-      ErrorStringFn_(o.ErrorStringFn_), ExecuteFn_(o.ExecuteFn_)
-{
-  o.gpu_device_ = NO_GPU_DEVICE;
-  o.max_batch_size_ = NO_BATCHING;
-  o.library_handle_ = nullptr;
-  o.library_context_handle_ = nullptr;
-  o.InitializeFn_ = nullptr;
-  o.FinalizeFn_ = nullptr;
-  o.ErrorStringFn_ = nullptr;
-  o.ExecuteFn_ = nullptr;
-}
-
 CustomBundle::Context::~Context()
 {
   LOG_VERBOSE(1) << "~CustomBundle::Context " << name_;
@@ -186,15 +169,16 @@ CustomBundle::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
 
-  contexts_.emplace_back(instance_name, gpu_device, mbs);
-  Context& context = contexts_.back();
+  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  const std::unique_ptr<Context>& context = contexts_.back();
 
   // 'mn_itr->second' is the path to the shared library file to use
   // for that context (e.g. model_name/1/libcustom.so). Load that
   // library as it provides the custom backend implementation.
   TF_RETURN_IF_ERROR(LoadCustom(
-      mn_itr->second, &context.library_handle_, &context.InitializeFn_,
-      &context.FinalizeFn_, &context.ErrorStringFn_, &context.ExecuteFn_));
+      mn_itr->second, &(context->library_handle_), &(context->InitializeFn_),
+      &(context->FinalizeFn_), &(context->ErrorStringFn_),
+      &(context->ExecuteFn_)));
 
   // Call the initialization function to get the custom context
   // associated with this specific instance.
@@ -219,11 +203,12 @@ CustomBundle::CreateExecutionContext(
     init_data.server_parameters = nullptr;
   }
 
-  int err = context.InitializeFn_(&init_data, &context.library_context_handle_);
+  int err =
+      context->InitializeFn_(&init_data, &(context->library_context_handle_));
   if (err != 0) {
     return tensorflow::errors::Internal(
         "initialize error for '", Name(), "': (", err, ") ",
-        context.LibraryErrorString(err));
+        context->LibraryErrorString(err));
   }
 
   return tensorflow::Status::OK();
@@ -252,11 +237,11 @@ CustomBundle::Run(
     if (payload.stats_ != nullptr) {
       compute_timers.emplace_back();
       payload.stats_->StartComputeTimer(&compute_timers.back());
-      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
 }
 
 tensorflow::Status
@@ -481,10 +466,10 @@ operator<<(std::ostream& out, const CustomBundle& pb)
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
-    out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == CustomBundle::Context::NO_GPU_DEVICE)
+    out << "  name=" << context->name_ << ", gpu="
+        << ((context->gpu_device_ == CustomBundle::Context::NO_GPU_DEVICE)
                 ? "<none>"
-                : std::to_string(context.gpu_device_))
+                : std::to_string(context->gpu_device_))
         << std::endl;
   }
 
