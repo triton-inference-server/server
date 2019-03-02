@@ -41,7 +41,8 @@ namespace nvidia { namespace inferenceserver {
 tensorflow::Status
 SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
+    StandardInitFunc OnInit, StandardRunFunc OnSchedule,
+    std::unique_ptr<Scheduler>* scheduler)
 {
   std::unique_ptr<SequenceBatchScheduler> sched(new SequenceBatchScheduler());
 
@@ -77,7 +78,8 @@ SequenceBatchScheduler::Create(
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
     std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
-        sched.get(), c, batch_size, config, OnSchedule, start, cont, notready);
+        sched.get(), c, batch_size, config, OnInit, OnSchedule, start, cont,
+        notready);
     sched->batchers_.push_back(sb);
 
     // All slots in the batch are initially ready for a new sequence.
@@ -546,7 +548,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
 SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t batch_size, const ModelConfig& config,
+    const size_t batch_size, const ModelConfig& config, StandardInitFunc OnInit,
     StandardRunFunc OnSchedule,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         start_input_overrides,
@@ -554,9 +556,9 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
         continue_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         notready_input_overrides)
-    : OnSchedule_(OnSchedule), base_(base), batcher_idx_(batcher_idx),
-      scheduler_thread_exit_(false), scheduler_idle_(false),
-      queues_(batch_size), max_active_slot_(-1),
+    : OnInit_(OnInit), OnSchedule_(OnSchedule), base_(base),
+      batcher_idx_(batcher_idx), scheduler_thread_exit_(false),
+      scheduler_idle_(false), queues_(batch_size), max_active_slot_(-1),
       slot_correlation_ids_(batch_size, 0),
       start_input_overrides_(start_input_overrides),
       continue_input_overrides_(continue_input_overrides),
@@ -633,6 +635,16 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
     LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
                    << batcher_idx_ << " at default nice (requested nice "
                    << nice << " failed)...";
+  }
+
+  // Initialize using the thread. If error then just exit this thread
+  // now... that means the corresponding model instance will not have
+  // any runner and so will not get used for execution.
+  tensorflow::Status init_status = OnInit_(batcher_idx_);
+  if (!init_status.ok()) {
+    LOG_ERROR << "Initialization failed for sequence-batch scheduler thread "
+              << batcher_idx_ << ": " << init_status.error_message();
+    return;
   }
 
   // For debugging and testing, delay start of thread until queues

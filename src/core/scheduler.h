@@ -74,6 +74,15 @@ class Scheduler {
     tensorflow::Status status_;
   };
 
+  // The prototype for the initialization function that will be called
+  // by the "standard" schedulers created based on a model's
+  // scheduling_choice settings. The init function is called once by
+  // the runner that will later execute payloads for 'runner_idx'. A
+  // non-OK error status indicates an initialization error that
+  // prevents scheduler from using the runner.
+  using StandardInitFunc =
+      std::function<tensorflow::Status(uint32_t runner_idx)>;
+
   // The prototype for the run function that will be called by the
   // "standard" schedulers created based on a model's
   // scheduling_choice settings. The run function must accept a

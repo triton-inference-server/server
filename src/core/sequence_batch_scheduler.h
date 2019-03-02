@@ -52,7 +52,8 @@ class SequenceBatchScheduler : public Scheduler {
   // function to call when a request is scheduled.
   static tensorflow::Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
+      StandardInitFunc OnInit, StandardRunFunc OnSchedule,
+      std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
   void Enqueue(
@@ -99,7 +100,7 @@ class SequenceBatchScheduler : public Scheduler {
     SequenceBatch(
         SequenceBatchScheduler* base, const uint32_t batcher_idx,
         const size_t batch_size, const ModelConfig& config,
-        StandardRunFunc OnSchedule,
+        StandardInitFunc OnInit, StandardRunFunc OnSchedule,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             start_input_overrides,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -120,6 +121,9 @@ class SequenceBatchScheduler : public Scheduler {
 
    private:
     void SchedulerThread(const int nice);
+
+    // Function the scheduler will call to initialize a runner.
+    const StandardInitFunc OnInit_;
 
     // Function to call to execute this batch of requests.
     const StandardRunFunc OnSchedule_;

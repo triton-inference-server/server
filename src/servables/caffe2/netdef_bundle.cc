@@ -149,6 +149,9 @@ NetDefBundle::CreateExecutionContexts(
   // this model. Each runner is exclusively tied to the context.
   TF_RETURN_IF_ERROR(SetConfiguredScheduler(
       total_context_cnt,
+      [](uint32_t runner_idx) -> tensorflow::Status {
+        return tensorflow::Status::OK();
+      },
       [this](
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(tensorflow::Status)> func) {

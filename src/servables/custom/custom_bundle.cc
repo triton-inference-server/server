@@ -111,10 +111,13 @@ CustomBundle::CreateExecutionContexts(
   // this model. Each runner is exclusively tied to the context.
   TF_RETURN_IF_ERROR(SetConfiguredScheduler(
       total_context_cnt,
+      [this](uint32_t runner_idx) -> tensorflow::Status {
+        return InitBackend(runner_idx);
+      },
       [this](
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
           std::function<void(tensorflow::Status)> func) {
-        Run(runner_idx, payloads, func);
+        RunBackend(runner_idx, payloads, func);
       }));
 
   LOG_VERBOSE(1) << "custom bundle for " << Name() << std::endl << *this;
@@ -180,16 +183,31 @@ CustomBundle::CreateExecutionContext(
       &(context->FinalizeFn_), &(context->ErrorStringFn_),
       &(context->ExecuteFn_)));
 
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+CustomBundle::InitBackend(uint32_t runner_idx)
+{
+  // Each runner executes using the corresponding context...
+  if (runner_idx >= contexts_.size()) {
+    return tensorflow::errors::Internal(
+        "unexpected runner index", runner_idx, ", max allowed ",
+        contexts_.size());
+  }
+
+  const auto& context = contexts_[runner_idx];
+
   // Call the initialization function to get the custom context
   // associated with this specific instance.
   std::string serialized_config;
   Config().SerializeToString(&serialized_config);
 
   CustomInitializeData init_data;
-  init_data.instance_name = instance_name.c_str();
+  init_data.instance_name = context->name_.c_str();
   init_data.serialized_model_config = serialized_config.c_str();
   init_data.serialized_model_config_size = serialized_config.size();
-  init_data.gpu_device_id = gpu_device;
+  init_data.gpu_device_id = context->gpu_device_;
 
   std::vector<const char*> server_param_values;
   for (const auto& param : server_params_) {
@@ -215,7 +233,7 @@ CustomBundle::CreateExecutionContext(
 }
 
 void
-CustomBundle::Run(
+CustomBundle::RunBackend(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
     std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
 {
