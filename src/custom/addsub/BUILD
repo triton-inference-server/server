@@ -46,7 +46,6 @@ cc_library(
     copts = cuda_default_copts(),
     deps = [
         ":addsub_kernels",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
