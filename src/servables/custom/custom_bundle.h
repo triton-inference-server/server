@@ -78,7 +78,7 @@ class CustomBundle : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
+    Context(Context&& o) = delete;
     ~Context();
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
@@ -143,7 +143,7 @@ class CustomBundle : public InferenceBackend {
   };
 
   std::vector<std::string> server_params_;
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const CustomBundle& pb);
