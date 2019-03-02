@@ -51,9 +51,12 @@ class CustomBundle : public InferenceBackend {
       const std::unordered_map<std::string, std::string>& libraries);
 
  private:
+  // Init model on the context associated with 'runner_idx'.
+  tensorflow::Status InitBackend(uint32_t runner_idx);
+
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
-  void Run(
+  void RunBackend(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
       std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
 

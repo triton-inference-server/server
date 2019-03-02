@@ -41,10 +41,10 @@ namespace nvidia { namespace inferenceserver {
 
 DynamicBatchScheduler::DynamicBatchScheduler(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardRunFunc OnSchedule)
-    : OnSchedule_(OnSchedule), scheduler_thread_cnt_(runner_cnt),
-      idle_scheduler_thread_cnt_(0), pending_batch_size_(0),
-      pending_batch_queue_cnt_(0)
+    StandardInitFunc OnInit, StandardRunFunc OnSchedule)
+    : OnInit_(OnInit), OnSchedule_(OnSchedule),
+      scheduler_thread_cnt_(runner_cnt), idle_scheduler_thread_cnt_(0),
+      pending_batch_size_(0), pending_batch_queue_cnt_(0)
 {
   dynamic_batching_enabled_ = config.has_dynamic_batching();
   scheduler_threads_exit_.store(false);
@@ -79,10 +79,11 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 tensorflow::Status
 DynamicBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
-    StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler)
+    StandardInitFunc OnInit, StandardRunFunc OnSchedule,
+    std::unique_ptr<Scheduler>* scheduler)
 {
   DynamicBatchScheduler* dyna_sched =
-      new DynamicBatchScheduler(config, runner_cnt, OnSchedule);
+      new DynamicBatchScheduler(config, runner_cnt, OnInit, OnSchedule);
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
 
   // Create one scheduler thread for each requested runner. Associate
@@ -151,6 +152,16 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
     LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
                    << " at default nice (requested nice " << nice
                    << " failed)...";
+  }
+
+  // Initialize using the thread. If error then just exit this thread
+  // now... that means the corresponding model instance will not have
+  // any runner and so will not get used for execution.
+  tensorflow::Status init_status = OnInit_(runner_id);
+  if (!init_status.ok()) {
+    LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread "
+              << runner_id << ": " << init_status.error_message();
+    return;
   }
 
   // For debugging/testing, delay start of threads until the queue
