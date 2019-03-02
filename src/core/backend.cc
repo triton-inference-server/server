@@ -223,18 +223,19 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 
 tensorflow::Status
 InferenceBackend::SetConfiguredScheduler(
-    const uint32_t runner_cnt, Scheduler::StandardRunFunc OnRun)
+    const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
+    Scheduler::StandardRunFunc OnRun)
 {
   std::unique_ptr<Scheduler> scheduler;
 
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
-    TF_RETURN_IF_ERROR(
-        SequenceBatchScheduler::Create(config_, runner_cnt, OnRun, &scheduler));
+    TF_RETURN_IF_ERROR(SequenceBatchScheduler::Create(
+        config_, runner_cnt, OnInit, OnRun, &scheduler));
   } else {
-    TF_RETURN_IF_ERROR(
-        DynamicBatchScheduler::Create(config_, runner_cnt, OnRun, &scheduler));
+    TF_RETURN_IF_ERROR(DynamicBatchScheduler::Create(
+        config_, runner_cnt, OnInit, OnRun, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));

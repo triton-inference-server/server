@@ -44,7 +44,8 @@ class DynamicBatchScheduler : public Scheduler {
   // function to call when a request is scheduled.
   static tensorflow::Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardRunFunc OnSchedule, std::unique_ptr<Scheduler>* scheduler);
+      StandardInitFunc OnInit, StandardRunFunc OnSchedule,
+      std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
 
@@ -58,11 +59,14 @@ class DynamicBatchScheduler : public Scheduler {
  private:
   DynamicBatchScheduler(
       const ModelConfig& config, const uint32_t runner_cnt,
-      StandardRunFunc OnSchedule);
+      StandardInitFunc OnInit, StandardRunFunc OnSchedule);
   void SchedulerThread(const uint32_t runner_id, const int nice);
   void InitPendingShape(const InferRequestHeader& request);
   bool CompareWithPendingShape(const InferRequestHeader& request) const;
   uint64_t GetDynamicBatch();
+
+  // Function the scheduler will call to initialize a runner.
+  const StandardInitFunc OnInit_;
 
   // Function the scheduler will call to schedule a payload(s) for
   // execution.
