@@ -26,12 +26,14 @@
 
 #include <string>
 #include "cuda/include/cuda.h"
-#include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
 #include "src/custom/addsub/kernel.h"
 #include "src/servables/custom/custom.h"
+
+#define LOG_ERROR std::cerr
+#define LOG_INFO std::cout
 
 // This custom backend takes two input tensors (any shape but must
 // have the same shape) and produces two output tensors (with same
@@ -61,6 +63,7 @@ enum ErrorCodes {
   kInputContents,
   kInputSize,
   kOutputBuffer,
+  kCudaDevice,
   kCudaMalloc,
   kCudaMemcpy,
   kCudaExecute,
@@ -263,11 +266,22 @@ Context::Init()
 
   // Additional initialization if executing on the GPU...
   if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
+    // Very important to set the CUDA device before performing any
+    // CUDA API calls. The device is maintained per-CPU-thread, and
+    // the same CPU thread will always be used with this instance of
+    // the backend, so only need to set the device once.
+    cudaError_t cuerr = cudaSetDevice(gpu_device_);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "failed to set CUDA device to " << gpu_device_ << ": "
+                << cudaGetErrorString(cuerr);
+      return kCudaDevice;
+    }
+
     // Create a CUDA stream for this context so that it executes
     // independently of other instances of this backend.
     const int cuda_stream_priority =
         GetCudaStreamPriority(model_config_.optimization().priority());
-    cudaError_t cuerr = cudaStreamCreateWithPriority(
+    cuerr = cudaStreamCreateWithPriority(
         &stream_, cudaStreamDefault, cuda_stream_priority);
     if (cuerr != cudaSuccess) {
       LOG_ERROR << "unable to create stream for addsub backend: "
@@ -541,8 +555,6 @@ Context::ExecuteGPU(
     return kSuccess;
   }
 
-  cudaSetDevice(gpu_device_);
-
   // For performance, we would typically execute all payloads together
   // as a single batch by first gathering the inputs from across the
   // payloads and then scattering the outputs across the payloads.
@@ -589,7 +601,6 @@ Context::ExecuteGPU(
     // Make sure the CUDA memory buffers are large enough for this
     // payload. If not increase their size.
     if (batchn_byte_size > cuda_buffer_byte_size_) {
-      FreeCudaBuffers();
       err = AllocateCudaBuffers(batchn_byte_size);
       if (err != kSuccess) {
         payload.error_code = err;
@@ -642,7 +653,7 @@ Context::ExecuteGPU(
         continue;
       }
 
-      int block_size = 1024;
+      int block_size = std::min(batchn_element_count, (uint64_t)1024);
       int grid_size = (batchn_element_count + block_size - 1) / block_size;
       if (!strncmp(output_name, "OUTPUT0", strlen("OUTPUT0"))) {
         if (datatype_ == DataType::TYPE_INT32) {
@@ -670,7 +681,15 @@ Context::ExecuteGPU(
         }
       }
 
-      cudaError_t cuerr = cudaMemcpyAsync(
+      cudaError_t cuerr = cudaGetLastError();
+      if (cuerr != cudaSuccess) {
+        LOG_ERROR << "failed to launch kernel: " << cudaGetErrorString(cuerr)
+                  << std::endl;
+        payload.error_code = kCudaExecute;
+        break;
+      }
+
+      cuerr = cudaMemcpyAsync(
           obuffer, cuda_output_, batchn_byte_size, cudaMemcpyDeviceToHost,
           stream_);
       if (cuerr != cudaSuccess) {
@@ -679,18 +698,15 @@ Context::ExecuteGPU(
         payload.error_code = kCudaMemcpy;
         break;
       }
-
-      // Wait for all compute and memcpy to complete before going onto
-      // the next output. We share CUDA buffers across outputs so need
-      // to finish with this payload before starting the next.
-      cuerr = cudaStreamSynchronize(stream_);
-      if (cuerr != cudaSuccess) {
-        LOG_ERROR << "failed to copy output values from GPU for addsub: "
-                  << cudaGetErrorString(cuerr);
-        payload.error_code = kCudaExecute;
-        break;
-      }
     }
+  }
+
+  // Wait for all compute and memcpy to complete.
+  cudaError_t cuerr = cudaStreamSynchronize(stream_);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "failed to synchronize GPU for addsub: "
+              << cudaGetErrorString(cuerr);
+    return kCudaExecute;
   }
 
   return kSuccess;
@@ -772,6 +788,8 @@ CustomErrorString(void* custom_context, int errcode)
       return "unexpected size for input tensor";
     case kOutputBuffer:
       return "unable to get buffer for output tensor values";
+    case kCudaDevice:
+      return "cudaSetDevice failed";
     case kCudaMalloc:
       return "cudaMalloc failed";
     case kCudaMemcpy:
