@@ -33,6 +33,9 @@
 #include "src/core/logging.h"
 #include "src/core/utils.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow_serving/config/platform_config.pb.h"
+
+namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
@@ -44,8 +47,9 @@ ModelConfigTestBase::ValidateInit(
   result->clear();
 
   ModelConfig config;
+  tfs::PlatformConfigMap platform_map;
   tensorflow::Status status =
-      GetNormalizedModelConfig(model_path, autofill, &config);
+      GetNormalizedModelConfig(model_path, platform_map, autofill, &config);
   if (!status.ok()) {
     result->append(status.ToString());
     return false;

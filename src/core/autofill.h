@@ -28,6 +28,9 @@
 #include <string>
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow_serving/config/platform_config.pb.h"
+
+namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
@@ -35,8 +38,10 @@ class AutoFill {
  public:
   /// Create an AutoFill object for a specific model.
   static tensorflow::Status Create(
-      const std::string& model_name, const std::string& model_path,
-      const ModelConfig& config, std::unique_ptr<AutoFill>* autofill);
+      const std::string& model_name,
+      const tfs::PlatformConfigMap& platform_config_map,
+      const std::string& model_path, const ModelConfig& config,
+      std::unique_ptr<AutoFill>* autofill);
 
   /// Autofill settings in a configuration.
   virtual tensorflow::Status Fix(ModelConfig* config) = 0;

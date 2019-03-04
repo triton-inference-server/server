@@ -164,7 +164,8 @@ GetSequenceControlProperties(
 
 tensorflow::Status
 GetNormalizedModelConfig(
-    const tensorflow::StringPiece& path, const bool autofill,
+    const tensorflow::StringPiece& path,
+    const tfs::PlatformConfigMap& platform_config_map, const bool autofill,
     ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
@@ -180,8 +181,8 @@ GetNormalizedModelConfig(
   if (autofill) {
     const std::string model_name(tensorflow::io::Basename(path));
     std::unique_ptr<AutoFill> af;
-    TF_RETURN_IF_ERROR(
-        AutoFill::Create(model_name, std::string(path), *config, &af));
+    TF_RETURN_IF_ERROR(AutoFill::Create(
+        model_name, platform_config_map, std::string(path), *config, &af));
     TF_RETURN_IF_ERROR(af->Fix(config));
 
     LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
