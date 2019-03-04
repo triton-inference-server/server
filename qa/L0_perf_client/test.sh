@@ -28,7 +28,7 @@
 CLIENT_LOG="./perf_client.log"
 PERF_CLIENT=../clients/perf_client
 
-DATADIR=`pwd`/models
+DATADIR=/data/inferenceserver/qa_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=$DATADIR
@@ -39,12 +39,6 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-rm -fr models && \
-    cp -r /data/inferenceserver/qa_variable_model_repository models && \
-    cp -r ../custom_models/custom_float32_* models/. && \
-    cp -r ../custom_models/custom_int32_* models/. && \
-    cp -r ../custom_models/custom_nobatch_* models/.
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -53,7 +47,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 # Test perf client behavior on different model with different batch size
-for MODEL in custom_nobatch_int32_int32_int32 custom_int32_int32_int32; do
+for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Valid batch size
     set +e
     $PERF_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -t 1 -p20000 -b 1 >$CLIENT_LOG 2>&1
