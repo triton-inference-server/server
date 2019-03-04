@@ -498,11 +498,13 @@ class ConcurrencyManager {
     // is not supported and so the input tensors do not expect a "N"
     // dimension (and 'batch_size' should be 1 so that only a single
     // image instance is inferred at a time).
-    if (max_batch_size == 0 && batch_size_ != 1) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
-              "' which does not support batching");
+    if (max_batch_size == 0) {
+      if (batch_size_ != 1) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "expecting batch size 1 for model '" + (*ctx)->ModelName() +
+                "' which does not support batching");
+      }
     } else if (batch_size_ > max_batch_size) {
       return nic::Error(
           ni::RequestStatusCode::INVALID_ARG,
