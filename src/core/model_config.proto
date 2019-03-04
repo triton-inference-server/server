@@ -518,6 +518,56 @@ message ModelSequenceBatching
 }
 
 //@@
+//@@.. cpp:var:: message ModelEnsembling
+//@@
+//@@   Model ensembling configuration. These settings specify the models that
+//@@   compose the ensemble and how data flows between the models.
+//@@
+message ModelEnsembling
+{
+  //@@  .. cpp:var:: message Step
+  //@@
+  //@@     Each step specifies a model included in the ensemble,
+  //@@     maps ensemble tensor names to the model input tensors,
+  //@@     and maps model output tensors to ensemble tensor names
+  //@@
+  message Step
+  {
+    //@@    .. cpp:var:: string model_name
+    //@@
+    //@@       The name of the model to execute for this step of the ensemble.
+    //@@
+    string model_name = 1;
+
+    //@@  .. cpp:var:: map<string,string> input_map
+    //@@
+    //@@     Map from ensemble tensor name to name of an input tensor on this
+    //@@     step's model. The ensemble tensor must have the same data type and
+    //@@     shape as the model input. Each model input must be assigned to
+    //@@     one ensemble tensor, but the same ensemble tensor can be assigned
+    //@@     to multiple model inputs.
+    //@@
+    map<string, string> input_map = 2;
+
+    //@@  .. cpp:var:: map<string,string> output_map
+    //@@
+    //@@     Map from name of an output tensor on this step's model to ensemble
+    //@@     tensor name. The data type and shape of the ensemble tensor will
+    //@@     be inferred from the model output. It is optional to assign all
+    //@@     model outputs to ensemble tensors. One ensemble tensor name
+    //@@     can appear in an output map only once.
+    //@@
+    map<string, string> output_map = 3;
+  }
+
+  //@@  .. cpp:var:: Step step (repeated)
+  //@@
+  //@@     The models and the input / output mappings used within the ensemble.
+  //@@
+  repeated Step step = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelParameter
 //@@
 //@@   A model parameter.
@@ -623,6 +673,17 @@ message ModelConfig
     //@@       improve inference throughput.
     //@@
     ModelSequenceBatching sequence_batching = 13;
+
+    //@@    .. cpp:var:: ModelEnsembling ensemble_scheduling
+    //@@
+    //@@       If specified, enables the model-ensembling scheduling
+    //@@       policy. With model-ensembling, inference requests
+    //@@       will be processed according to the specification, such as an
+    //@@       execution sequence of models. The input specified in this model
+    //@@       config will be the input for the ensemble, and the output
+    //@@       specified will be the output of the ensemble.
+    //@@
+    ModelEnsembling ensemble_scheduling = 15;
   }
 
   //@@  .. cpp:var:: ModelInstanceGroup instance_group (repeated)
