@@ -31,6 +31,7 @@
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
+#include "tensorflow_serving/config/platform_config.pb.h"
 
 namespace tfs = tensorflow::serving;
 
@@ -47,7 +48,8 @@ class ModelRepositoryManager {
   /// information in each model configuration.
   /// \return The error status.
   static tensorflow::Status Create(
-      const std::string& repository_path, const bool autofill);
+      const std::string& repository_path,
+      const tfs::PlatformConfigMap& platform_config_map, const bool autofill);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -96,12 +98,14 @@ class ModelRepositoryManager {
   using ModelInfoMap = std::unordered_map<std::string, ModelInfo>;
 
   ModelRepositoryManager(
-      const std::string& repository_path, const bool autofill);
+      const std::string& repository_path,
+      const tfs::PlatformConfigMap& platform_config_map, const bool autofill);
   ~ModelRepositoryManager() = default;
 
   static ModelRepositoryManager* singleton;
 
   const std::string repository_path_;
+  const tfs::PlatformConfigMap platform_config_map_;
   const bool autofill_;
 
   std::mutex poll_mu_;

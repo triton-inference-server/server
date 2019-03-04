@@ -41,7 +41,9 @@ namespace nvidia { namespace inferenceserver {
 //
 tensorflow::Status
 AutoFillSavedModel::Create(
-    const std::string& model_name, const std::string& model_path,
+    const std::string& model_name,
+    const ::google::protobuf::Any& platform_config,
+    const std::string& model_path,
     std::unique_ptr<AutoFillSavedModel>* autofill)
 {
   std::set<std::string> version_dirs;
@@ -73,7 +75,10 @@ AutoFillSavedModel::Create(
       tensorflow::io::JoinPath(version_path, savedmodel_dir);
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
+  SavedModelBundleSourceAdapterConfig saved_model_config;
+  platform_config.UnpackTo(&saved_model_config);
   tensorflow::SessionOptions session_options;
+  session_options.config = saved_model_config.session_config();
   tensorflow::SignatureDef sig;
   TF_RETURN_IF_ERROR(LoadSavedModel(
       model_name, savedmodel_path, session_options, &bundle, &sig));

@@ -103,21 +103,25 @@ IsModified(const std::string& path, int64_t* last_ns)
 ModelRepositoryManager* ModelRepositoryManager::singleton = nullptr;
 
 ModelRepositoryManager::ModelRepositoryManager(
-    const std::string& repository_path, const bool autofill)
-    : repository_path_(repository_path), autofill_(autofill)
+    const std::string& repository_path,
+    const tfs::PlatformConfigMap& platform_config_map, const bool autofill)
+    : repository_path_(repository_path),
+      platform_config_map_(platform_config_map), autofill_(autofill)
 {
 }
 
 tensorflow::Status
 ModelRepositoryManager::Create(
-    const std::string& repository_path, const bool autofill)
+    const std::string& repository_path,
+    const tfs::PlatformConfigMap& platform_config_map, const bool autofill)
 {
   if (singleton != nullptr) {
     return tensorflow::errors::AlreadyExists(
         "ModelRepositoryManager singleton already created");
   }
 
-  singleton = new ModelRepositoryManager(repository_path, autofill);
+  singleton = new ModelRepositoryManager(
+      repository_path, platform_config_map, autofill);
 
   return tensorflow::Status::OK();
 }
@@ -256,7 +260,8 @@ ModelRepositoryManager::Poll(
       // the model configuration (autofill) from the model
       // definition. In all cases normalize and validate the config.
       TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
-          full_path, singleton->autofill_, &model_config));
+          full_path, singleton->platform_config_map_, singleton->autofill_,
+          &model_config));
       TF_RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
 
       model_info.platform_ = GetPlatform(model_config.platform());
