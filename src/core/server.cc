@@ -373,8 +373,8 @@ InferenceServer::Init(int argc, char** argv)
   // Create the global manager for the repository. Add all models'
   // into the server core 'options' so that they are eagerly loaded
   // below when ServerCore is created.
-  status =
-      ModelRepositoryManager::Create(model_store_path_, !strict_model_config_);
+  status = ModelRepositoryManager::Create(
+      model_store_path_, options.platform_config_map, !strict_model_config_);
   if (!status.ok()) {
     LogInitError(status.error_message());
     return !exit_on_error;

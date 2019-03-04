@@ -27,6 +27,9 @@
 
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "tensorflow_serving/config/platform_config.pb.h"
+
+namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
@@ -58,7 +61,8 @@ tensorflow::Status GetSequenceControlProperties(
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 tensorflow::Status GetNormalizedModelConfig(
-    const tensorflow::StringPiece& path, const bool autofill,
+    const tensorflow::StringPiece& path,
+    const tfs::PlatformConfigMap& platform_config_map, const bool autofill,
     ModelConfig* config);
 
 /// Validate that a model is specified correctly (excluding inputs and

@@ -99,8 +99,10 @@ AutoFillSimple::Fix(ModelConfig* config)
 //
 tensorflow::Status
 AutoFill::Create(
-    const std::string& model_name, const std::string& model_path,
-    const ModelConfig& config, std::unique_ptr<AutoFill>* autofill)
+    const std::string& model_name,
+    const tfs::PlatformConfigMap& platform_config_map,
+    const std::string& model_path, const ModelConfig& config,
+    std::unique_ptr<AutoFill>* autofill)
 {
   autofill->reset();
 
@@ -112,8 +114,11 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillSavedModel> afsm;
-    tensorflow::Status status =
-        AutoFillSavedModel::Create(model_name, model_path, &afsm);
+    auto& platform_config = platform_config_map.platform_configs()
+                                .at(kTensorFlowSavedModelPlatform)
+                                .source_adapter_config();
+    tensorflow::Status status = AutoFillSavedModel::Create(
+        model_name, platform_config, model_path, &afsm);
     if (status.ok()) {
       *autofill = std::move(afsm);
       return tensorflow::Status::OK();

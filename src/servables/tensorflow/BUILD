@@ -54,6 +54,7 @@ cc_library(
     hdrs = ["autofill.h"],
     deps = [
         ":loader",
+        ":savedmodel_bundle_proto",
         ":tf_utils",
         "//src/core:autofill_header",
         "//src/core:logging",
