@@ -34,27 +34,13 @@
 #include <csignal>
 #include <iostream>
 #include <memory>
-#include <set>
 #include <utility>
 #include <vector>
 
-#include "evhtp/evhtp.h"
-#include "libevent/include/event2/buffer.h"
-
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-#include "google/protobuf/wrappers.pb.h"
-#include "grpc++/security/server_credentials.h"
-#include "grpc++/server.h"
-#include "grpc++/server_builder.h"
-#include "grpc++/server_context.h"
-#include "grpc++/support/status.h"
-#include "grpc/grpc.h"
-#include "re2/re2.h"
-
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service.grpc.pb.h"
+#include "src/core/grpc_server.h"
+#include "src/core/http_server.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.h"
@@ -92,657 +78,9 @@
 #include "tensorflow_serving/core/servable_handle.h"
 #include "tensorflow_serving/model_servers/server_core.h"
 
-#include "src/nvrpc/Context.h"
-#include "src/nvrpc/Executor.h"
-#include "src/nvrpc/Resources.h"
-#include "src/nvrpc/Server.h"
-#include "src/nvrpc/Service.h"
-#include "src/nvrpc/ThreadPool.h"
-
-using nvrpc::BaseContext;
-using nvrpc::BidirectionalStreamingLifeCycle;
-using nvrpc::Context;
-using nvrpc::LifeCycleUnary;
-using nvrpc::ThreadPool;
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
-
-class AsyncResources : public nvrpc::Resources {
- public:
-  explicit AsyncResources(
-      InferenceServer* server, int infer_threads, int mgmt_threads)
-      : m_Server(server), m_MgmtThreadPool(mgmt_threads),
-        m_InferThreadPool(infer_threads)
-  {
-  }
-
-  InferenceServer* GetServer() { return m_Server; }
-  ThreadPool& GetMgmtThreadPool() { return m_MgmtThreadPool; }
-  ThreadPool& GetInferThreadPool() { return m_InferThreadPool; }
-
- private:
-  InferenceServer* m_Server;
-
-  // We can and should get specific on thread affinity.  It might not be as
-  // important on the frontend, but the backend threadpool should be aligned
-  // with the respective devices.
-  ThreadPool m_MgmtThreadPool;
-  ThreadPool m_InferThreadPool;
-};
-
-static std::shared_ptr<AsyncResources> g_Resources;
-
-class StatusContext final
-    : public Context<StatusRequest, StatusResponse, AsyncResources> {
-  void ExecuteRPC(
-      StatusRequest& request, StatusResponse& response) final override
-  {
-    uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          ServerStatTimerScoped timer(
-              GetResources()->GetServer()->StatusManager(),
-              ServerStatTimerScoped::Kind::STATUS);
-
-          RequestStatus* request_status = response.mutable_request_status();
-          ServerStatus* server_status = response.mutable_server_status();
-
-          GetResources()->GetServer()->HandleStatus(
-              request_status, server_status, request.model_name());
-          this->CompleteExecution(execution_context);
-        });
-  }
-};
-
-template <class LifeCycle>
-class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
-  void ExecuteRPC(InferRequest& request, InferResponse& response) final override
-  {
-    uintptr_t execution_context = this->GetExecutionContext();
-    auto server = this->GetResources()->GetServer();
-    auto infer_stats = std::make_shared<ModelInferStats>(
-        server->StatusManager(), request.model_name());
-    auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
-    infer_stats->StartRequestTimer(timer.get());
-    infer_stats->SetRequestedVersion(request.model_version());
-
-    RequestStatus* request_status = response.mutable_request_status();
-
-    // Get the request ID at top level so we can set the corresponding field
-    // in ResponseHeader even on inference failure
-    uint64_t id = request.meta_data().id();
-
-    auto backend = std::make_shared<InferenceServer::InferBackendState>();
-    tensorflow::Status status = server->InitBackendState(
-        request.model_name(), request.model_version(), backend);
-    if (status.ok()) {
-      infer_stats->SetModelBackend(backend->Backend());
-
-      std::shared_ptr<GRPCInferRequestProvider> request_provider;
-      status = GRPCInferRequestProvider::Create(
-          *(backend->Backend()), request, &request_provider);
-      if (status.ok()) {
-        infer_stats->SetBatchSize(
-            request_provider->RequestHeader().batch_size());
-
-        std::shared_ptr<GRPCInferResponseProvider> response_provider;
-        status = GRPCInferResponseProvider::Create(
-            request.meta_data(), &response, &response_provider);
-        if (status.ok()) {
-          server->HandleInfer(
-              request_status, backend, request_provider, response_provider,
-              infer_stats,
-              [this, execution_context, id, request_status, &response,
-               infer_stats, timer]() mutable {
-                // If the response is an error then clear the meta-data
-                // and raw output as they may be partially or
-                // un-initialized.
-                if (request_status->code() != RequestStatusCode::SUCCESS) {
-                  response.mutable_meta_data()->Clear();
-                  response.mutable_raw_output()->Clear();
-                }
-
-                response.mutable_meta_data()->set_id(id);
-                this->CompleteExecution(execution_context);
-                timer.reset();
-              },
-              true  // async_frontend
-          );
-        }
-      }
-    }
-
-    if (!status.ok()) {
-      LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
-      infer_stats->SetFailed(true);
-      RequestStatusFactory::Create(
-          request_status, 0 /* request_id */, server->Id(), status);
-
-      // If the response is an error then clear the meta-data and raw
-      // output as they may be partially or un-initialized.
-      response.mutable_meta_data()->Clear();
-      response.mutable_raw_output()->Clear();
-
-      response.mutable_meta_data()->set_id(id);
-      this->CompleteExecution(execution_context);
-    }
-  }
-};
-
-class InferContext final
-    : public InferBaseContext<LifeCycleUnary<InferRequest, InferResponse>> {
-};
-
-class StreamInferContext final
-    : public InferBaseContext<
-          BidirectionalStreamingLifeCycle<InferRequest, InferResponse>> {
-};
-
-class ProfileContext final
-    : public Context<ProfileRequest, ProfileResponse, AsyncResources> {
-  void ExecuteRPC(
-      ProfileRequest& request, ProfileResponse& response) final override
-  {
-    uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          auto server = GetResources()->GetServer();
-          ServerStatTimerScoped timer(
-              server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
-
-          RequestStatus* request_status = response.mutable_request_status();
-          server->HandleProfile(request_status, request.cmd());
-          this->CompleteExecution(execution_context);
-        });
-  }
-};
-
-class HealthContext final
-    : public Context<HealthRequest, HealthResponse, AsyncResources> {
-  void ExecuteRPC(
-      HealthRequest& request, HealthResponse& response) final override
-  {
-    uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          auto server = GetResources()->GetServer();
-          ServerStatTimerScoped timer(
-              server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
-
-          RequestStatus* request_status = response.mutable_request_status();
-          bool health;
-
-          server->HandleHealth(request_status, &health, request.mode());
-          response.set_health(health);
-          this->CompleteExecution(execution_context);
-        });
-  }
-};
-
-//
-// Handle HTTP requests
-//
-class HTTPServiceImpl : public HTTPService {
- public:
-  explicit HTTPServiceImpl(InferenceServer* server)
-      : server_(server),
-        api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
-        health_regex_(R"(/(live|ready))"),
-        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
-  {
-  }
-
-  static void Dispatch(evhtp_request_t* req, void* arg);
-
-  tensorflow::Status Start(uint16_t port, int thread_cnt) override;
-
-  tensorflow::Status Stop() override;
-
- private:
-  // Class object associated to evhtp thread, requests received are bounded
-  // with the thread that accepts it. Need to keep track of that and let the
-  // corresponding thread send back the reply
-  class InferRequest {
-   public:
-    InferRequest(
-        evhtp_request_t* req, uint64_t id,
-        const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
-        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-        const std::shared_ptr<ModelInferStats>& infer_stats,
-        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
-
-    evhtp_res FinalizeResponse();
-
-   private:
-    friend class HTTPServiceImpl;
-    evhtp_request_t* req_;
-    evthr_t* thread_;
-    uint64_t id_;
-    RequestStatus request_status_;
-    std::shared_ptr<HTTPInferRequestProvider> request_provider_;
-    std::shared_ptr<HTTPInferResponseProvider> response_provider_;
-    std::shared_ptr<ModelInferStats> infer_stats_;
-    std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
-  };
-
-  void Handle(evhtp_request_t* req);
-  void Health(evhtp_request_t* req, const std::string& health_uri);
-  void Profile(evhtp_request_t* req, const std::string& profile_uri);
-  void Infer(evhtp_request_t* req, const std::string& infer_uri);
-  void Status(evhtp_request_t* req, const std::string& status_uri);
-
-  void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
-  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
-
-  InferenceServer* server_;
-  re2::RE2 api_regex_;
-  re2::RE2 health_regex_;
-  re2::RE2 infer_regex_;
-  re2::RE2 status_regex_;
-
-  evhtp_t* htp_;
-  struct event_base* evbase_;
-  std::thread worker_;
-};
-
-tensorflow::Status
-HTTPServiceImpl::Start(uint16_t port, int thread_cnt)
-{
-  if (!worker_.joinable()) {
-    evbase_ = event_base_new();
-    htp_ = evhtp_new(evbase_, NULL);
-    evhtp_set_gencb(htp_, HTTPServiceImpl::Dispatch, this);
-    evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt, NULL);
-    evhtp_bind_socket(htp_, "0.0.0.0", port, 1024);
-    worker_ = std::thread(event_base_loop, evbase_, 0);
-    return tensorflow::Status::OK();
-  }
-
-  return tensorflow::Status(
-      tensorflow::error::ALREADY_EXISTS, "HTTP server is already running.");
-}
-
-tensorflow::Status
-HTTPServiceImpl::Stop()
-{
-  if (worker_.joinable()) {
-    event_base_loopexit(evbase_, NULL);
-    worker_.join();
-    return tensorflow::Status::OK();
-  }
-
-  return tensorflow::Status(
-      tensorflow::error::UNAVAILABLE, "HTTP server is not running.");
-}
-
-void
-HTTPServiceImpl::Dispatch(evhtp_request_t* req, void* arg)
-{
-  (static_cast<HTTPServiceImpl*>(arg))->Handle(req);
-}
-
-void
-HTTPServiceImpl::Handle(evhtp_request_t* req)
-{
-  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
-                 << req->uri->path->full;
-
-  std::string endpoint, rest;
-  if (RE2::FullMatch(
-          std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
-    // health
-    if (endpoint == "health") {
-      Health(req, rest);
-      return;
-    }
-    // profile
-    else if (endpoint == "profile") {
-      Profile(req, rest);
-      return;
-    }
-    // infer
-    else if (endpoint == "infer") {
-      Infer(req, rest);
-      return;
-    }
-    // status
-    else if (endpoint == "status") {
-      Status(req, rest);
-      return;
-    }
-  }
-
-  LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
-                 << " - " << static_cast<int>(EVHTP_RES_BADREQ);
-  evhtp_send_reply(req, EVHTP_RES_BADREQ);
-}
-
-void
-HTTPServiceImpl::Health(evhtp_request_t* req, const std::string& health_uri)
-{
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string mode;
-  if (!health_uri.empty()) {
-    if (!RE2::FullMatch(health_uri, health_regex_, &mode)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
-  }
-
-  RequestStatus request_status;
-  bool health;
-  server_->HandleHealth(&request_status, &health, mode);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(req, (health) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
-}
-
-void
-HTTPServiceImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
-{
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  if (!profile_uri.empty() && (profile_uri != "/")) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  std::string cmd;
-  const char* cmd_c_str = evhtp_kv_find(req->uri->query, "cmd");
-  if (cmd_c_str != NULL) {
-    cmd = std::string(cmd_c_str);
-  }
-
-  RequestStatus request_status;
-  server_->HandleProfile(&request_status, cmd);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-}
-
-void
-HTTPServiceImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
-{
-  if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string model_name, model_version_str;
-  if (!infer_uri.empty()) {
-    if (!RE2::FullMatch(
-            infer_uri, infer_regex_, &model_name, &model_version_str)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
-  }
-
-  int64_t model_version = -1;
-  if (!model_version_str.empty()) {
-    model_version = std::atoll(model_version_str.c_str());
-  }
-
-  auto infer_stats =
-      std::make_shared<ModelInferStats>(server_->StatusManager(), model_name);
-  auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
-  infer_stats->StartRequestTimer(timer.get());
-  infer_stats->SetRequestedVersion(model_version);
-
-  absl::string_view infer_request_header = absl::string_view(
-      evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
-  std::string infer_request_header_str(
-      infer_request_header.data(), infer_request_header.size());
-
-  RequestStatus request_status;
-
-  InferRequestHeader request_header;
-  tensorflow::protobuf::TextFormat::ParseFromString(
-      infer_request_header_str, &request_header);
-  uint64_t id = request_header.id();
-
-  auto backend = std::make_shared<InferenceServer::InferBackendState>();
-  tensorflow::Status status =
-      server_->InitBackendState(model_name, model_version, backend);
-  if (status.ok()) {
-    infer_stats->SetModelBackend(backend->Backend());
-
-    std::shared_ptr<HTTPInferRequestProvider> request_provider;
-    status = HTTPInferRequestProvider::Create(
-        req->buffer_in, *(backend->Backend()), model_name, model_version,
-        infer_request_header_str, &request_provider);
-    if (status.ok()) {
-      infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
-
-      std::shared_ptr<HTTPInferResponseProvider> response_provider;
-      status = HTTPInferResponseProvider::Create(
-          req->buffer_out, *(backend->Backend()),
-          request_provider->RequestHeader(), &response_provider);
-      if (status.ok()) {
-        std::shared_ptr<InferRequest> request(new InferRequest(
-            req, id, request_provider, response_provider, infer_stats, timer));
-        server_->HandleInfer(
-            &(request->request_status_), backend, request->request_provider_,
-            request->response_provider_, infer_stats,
-            [this, request]() mutable { this->FinishInferResponse(request); },
-            true  // async frontend
-        );
-      }
-    }
-  }
-
-  if (!status.ok()) {
-    InferResponseHeader response_header;
-    response_header.set_id(id);
-    evhtp_headers_add_header(
-        req->headers_out,
-        evhtp_header_new(
-            kInferResponseHTTPHeader,
-            response_header.ShortDebugString().c_str(), 1, 1));
-    LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
-    infer_stats->SetFailed(true);
-    RequestStatusFactory::Create(
-        &request_status, 0 /* request_id */, server_->Id(), status);
-
-    // this part still needs to be implemented in the completer
-    evhtp_headers_add_header(
-        req->headers_out, evhtp_header_new(
-                              kStatusHTTPHeader,
-                              request_status.ShortDebugString().c_str(), 1, 1));
-    evhtp_headers_add_header(
-        req->headers_out,
-        evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-
-    evhtp_send_reply(
-        req, (request_status.code() == RequestStatusCode::SUCCESS)
-                 ? EVHTP_RES_OK
-                 : EVHTP_RES_BADREQ);
-  }
-}
-
-void
-HTTPServiceImpl::Status(evhtp_request_t* req, const std::string& status_uri)
-{
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string model_name;
-  if (!status_uri.empty()) {
-    if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
-  }
-
-  RequestStatus request_status;
-  ServerStatus server_status;
-  server_->HandleStatus(&request_status, &server_status, model_name);
-
-  // If got status successfully then send it...
-  if (request_status.code() == RequestStatusCode::SUCCESS) {
-    std::string format;
-    const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-    if (format_c_str != NULL) {
-      format = std::string(format_c_str);
-    } else {
-      format = "text";
-    }
-
-    std::string server_status_str;
-    if (format == "binary") {
-      server_status.SerializeToString(&server_status_str);
-      evbuffer_add(
-          req->buffer_out, server_status_str.c_str(), server_status_str.size());
-      evhtp_headers_add_header(
-          req->headers_out,
-          evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-    } else {
-      server_status_str = server_status.DebugString();
-      evbuffer_add(
-          req->buffer_out, server_status_str.c_str(), server_status_str.size());
-    }
-  }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-}
-
-void
-HTTPServiceImpl::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
-{
-  evhtp_request_t* request = (evhtp_request_t*)arg;
-  evhtp_send_reply(request, EVHTP_RES_OK);
-  evhtp_request_resume(request);
-}
-
-void
-HTTPServiceImpl::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
-{
-  evhtp_request_t* request = (evhtp_request_t*)arg;
-  evhtp_send_reply(request, EVHTP_RES_BADREQ);
-  evhtp_request_resume(request);
-}
-
-void
-HTTPServiceImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
-{
-  if (req->FinalizeResponse() == EVHTP_RES_OK) {
-    evthr_defer(req->thread_, OKReplyCallback, req->req_);
-  } else {
-    evthr_defer(req->thread_, BADReplyCallback, req->req_);
-  }
-}
-
-HTTPServiceImpl::InferRequest::InferRequest(
-    evhtp_request_t* req, uint64_t id,
-    const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
-    const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-    const std::shared_ptr<ModelInferStats>& infer_stats,
-    const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
-    : req_(req), id_(id), request_provider_(request_provider),
-      response_provider_(response_provider), infer_stats_(infer_stats),
-      timer_(timer)
-{
-  evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
-  thread_ = htpconn->thread;
-  evhtp_request_pause(req);
-}
-
-evhtp_res
-HTTPServiceImpl::InferRequest::FinalizeResponse()
-{
-  InferResponseHeader* response_header =
-      response_provider_->MutableResponseHeader();
-  if (request_status_.code() == RequestStatusCode::SUCCESS) {
-    std::string format;
-    const char* format_c_str = evhtp_kv_find(req_->uri->query, "format");
-    if (format_c_str != NULL) {
-      format = std::string(format_c_str);
-    } else {
-      format = "text";
-    }
-
-    // The description of the raw outputs needs to go in
-    // the kInferResponseHTTPHeader since it is needed to
-    // interpret the body. The entire response (including
-    // classifications) is serialized at the end of the
-    // body.
-    response_header->set_id(id_);
-
-    std::string rstr;
-    if (format == "binary") {
-      response_header->SerializeToString(&rstr);
-    } else {
-      rstr = response_header->DebugString();
-    }
-    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
-
-    // We do this in destructive manner since we are the
-    // last one to use response header from the provider.
-    for (int i = 0; i < response_header->output_size(); ++i) {
-      InferResponseHeader::Output* output = response_header->mutable_output(i);
-      output->clear_batch_classes();
-    }
-  } else {
-    evbuffer_drain(req_->buffer_out, -1);
-    response_header->Clear();
-    response_header->set_id(id_);
-  }
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new(
-          kInferResponseHTTPHeader, response_header->ShortDebugString().c_str(),
-          1, 1));
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status_.ShortDebugString().c_str(), 1, 1));
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-
-  return (request_status_.code() == RequestStatusCode::SUCCESS)
-             ? EVHTP_RES_OK
-             : EVHTP_RES_BADREQ;
-}
 
 // Scoped increment / decrement of atomic
 class ScopedAtomicIncrement {
@@ -1252,7 +590,7 @@ InferenceServer::Wait()
   }
 
   if (grpc_server_) {
-    grpc_server_->Shutdown();
+    grpc_server_->Stop();
   }
 
   if (http_server_ != nullptr) {
@@ -1268,69 +606,31 @@ InferenceServer::InitBackendState(
   return backend->Init(model_name, model_version, core_.get());
 }
 
-std::unique_ptr<nvrpc::Server>
+std::unique_ptr<GRPCServer>
 InferenceServer::StartGrpcServer()
 {
-  // DLIS-162 - provide global defaults and cli overridable options
-  g_Resources = std::make_shared<AsyncResources>(
-      this,  // InferenceServer*,
-      1,     // infer threads
-      1      // mgmt threads
-  );
-  // PlanBundle::SetInferenceManager(g_Resources);
+  std::unique_ptr<GRPCServer> server;
+  tensorflow::Status status = GRPCServer::Create(this, grpc_port_, &server);
+  if (status.ok()) {
+    status = server->Start();
+  }
 
-  LOG_INFO << "Building nvrpc server";
-  const std::string addr = "0.0.0.0:" + std::to_string(grpc_port_);
-  auto server = nvrpc::make_unique<nvrpc::Server>(addr);
-
-  server->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
-
-  LOG_INFO << "Register TensorRT GRPCService";
-  auto inferenceService = server->RegisterAsyncService<GRPCService>();
-
-  LOG_INFO << "Register Infer RPC";
-  auto rpcInfer = inferenceService->RegisterRPC<InferContext>(
-      &GRPCService::AsyncService::RequestInfer);
-
-  LOG_INFO << "Register StreamInfer RPC";
-  auto rpcStreamInfer = inferenceService->RegisterRPC<StreamInferContext>(
-      &GRPCService::AsyncService::RequestStreamInfer);
-
-  LOG_INFO << "Register Status RPC";
-  auto rpcStatus = inferenceService->RegisterRPC<StatusContext>(
-      &GRPCService::AsyncService::RequestStatus);
-
-  LOG_INFO << "Register Profile RPC";
-  auto rpcProfile = inferenceService->RegisterRPC<ProfileContext>(
-      &GRPCService::AsyncService::RequestProfile);
-
-  LOG_INFO << "Register Health RPC";
-  auto rpcHealth = inferenceService->RegisterRPC<HealthContext>(
-      &GRPCService::AsyncService::RequestHealth);
-
-  LOG_INFO << "Register Executor";
-  auto executor = server->RegisterExecutor(new ::nvrpc::Executor(1));
-
-  // You can register RPC execution contexts from any registered RPC on any
-  // executor.
-  executor->RegisterContexts(
-      rpcInfer, g_Resources, 1000);  // Configurable DLIS-161
-  executor->RegisterContexts(
-      rpcStreamInfer, g_Resources, 100);  // Configurable DLIS-161
-  executor->RegisterContexts(rpcStatus, g_Resources, 1);
-  executor->RegisterContexts(rpcHealth, g_Resources, 1);
-  executor->RegisterContexts(rpcProfile, g_Resources, 1);
-
-  server->AsyncRun();
-
+  if (!status.ok()) {
+    server.reset();
+  }
   return std::move(server);
 }
 
-std::unique_ptr<HTTPService>
+std::unique_ptr<HTTPServer>
 InferenceServer::StartHttpServer()
 {
-  std::unique_ptr<HTTPService> service(new HTTPServiceImpl(this));
-  tensorflow::Status status = service->Start(http_port_, http_thread_cnt_);
+  std::unique_ptr<HTTPServer> service;
+  tensorflow::Status status =
+      HTTPServer::Create(this, http_port_, http_thread_cnt_, &service);
+  if (status.ok()) {
+    status = service->Start();
+  }
+
   if (!status.ok()) {
     service.reset();
   }
@@ -1467,7 +767,7 @@ InferenceServer::HandleInfer(
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
-    std::function<void()> OnCompleteInferRPC, bool async_frontend)
+    std::function<void()> OnCompleteInferRPC)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     RequestStatusFactory::Create(
@@ -1477,7 +777,8 @@ InferenceServer::HandleInfer(
     return;
   }
 
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
+  std::shared_ptr<ScopedAtomicIncrement> inflight(
+      new ScopedAtomicIncrement(inflight_request_counter_));
   const uint64_t request_id = NextRequestId();
 
   // Need to capture 'backend' to keep it alive... it goes away when
@@ -1485,8 +786,8 @@ InferenceServer::HandleInfer(
   // and we don't want that to happen when a request is in flight.
   auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, backend,
                                 response_provider, request_status, request_id,
-                                infer_stats](
-                                   tensorflow::Status status) mutable {
+                                infer_stats,
+                                inflight](tensorflow::Status status) mutable {
     if (status.ok()) {
       status = response_provider->FinalizeResponse(*(backend->Backend()));
       if (status.ok()) {
@@ -1503,15 +804,8 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
-  if (async_frontend) {
-    backend->Backend()->AsyncRun(
-        infer_stats, request_provider, response_provider,
-        OnCompleteHandleInfer);
-  } else {
-    backend->Backend()->Run(
-        infer_stats, request_provider, response_provider,
-        OnCompleteHandleInfer);
-  }
+  backend->Backend()->Run(
+      infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
 void

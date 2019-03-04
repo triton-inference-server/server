@@ -241,7 +241,7 @@ InferenceBackend::SetConfiguredScheduler(
 }
 
 void
-InferenceBackend::AsyncRun(
+InferenceBackend::Run(
     std::shared_ptr<ModelInferStats> stats,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
@@ -249,49 +249,6 @@ InferenceBackend::AsyncRun(
 {
   scheduler_->Enqueue(
       stats, request_provider, response_provider, OnCompleteHandleInfer);
-}
-
-// Since callers are expecting synchronous behavior, this function
-// must wait until the request is processed and the response is
-// returned. This function can be simplified significantly once we
-// have [DLIS-124].
-void
-InferenceBackend::Run(
-    std::shared_ptr<ModelInferStats> stats,
-    std::shared_ptr<InferRequestProvider> request_provider,
-    std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
-{
-  std::mutex lmu;
-  std::condition_variable lcv;
-  tensorflow::Status run_status;
-  bool run_completed = false;
-
-  // Add request to queue...
-  {
-    scheduler_->Enqueue(
-        stats, request_provider, response_provider,
-        [&lmu, &lcv, &run_status, &run_completed](tensorflow::Status status) {
-          // signal complete and propagate status
-          {
-            std::lock_guard<std::mutex> lk(lmu);
-            run_status = status;
-            run_completed = true;
-          }
-          lcv.notify_one();
-        });
-  }
-
-  // [DLIS-124] must wait for request to indicate complete...
-  {
-    std::chrono::seconds wait_timeout(1);
-    std::unique_lock<std::mutex> lk(lmu);
-    while (!run_completed) {
-      lcv.wait_for(lk, wait_timeout);
-    }
-  }
-
-  OnCompleteHandleInfer(run_status);
 }
 
 }}  // namespace nvidia::inferenceserver
