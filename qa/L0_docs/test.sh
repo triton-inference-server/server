@@ -30,9 +30,11 @@ TEST_LOG="./docs.log"
 rm -f $TEST_LOG
 RET=0
 
+# tornado=5.1.1, later version introduced a "TypeError: 'type' object
+# is not subscriptable" bug
 apt-get update && \
     apt-get install -y --no-install-recommends doxygen && \
-    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
+    pip install --upgrade tornado==5.1.1 sphinx sphinx-rtd-theme nbsphinx exhale && \
     pip install --upgrade /opt/tensorrtserver/python/tensorrtserver-*.whl
 
 set +e
