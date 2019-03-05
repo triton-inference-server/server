@@ -35,6 +35,10 @@ source ../common/util.sh
 
 RET=0
 
+# Must run on a single device or else the TRTSERVER_DELAY_SCHEDULER
+# can fail when the requests are distributed to multiple devices.
+CUDA_VISIBLE_DEVICES=0
+
 # Setup non-variable-size model store
 rm -fr *.log *.serverlog models && mkdir models
 for m in \
