@@ -115,11 +115,11 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillSavedModel> afsm;
     ::google::protobuf::Any platform_config;
-    auto it = platform_config_map.platform_configs()
-                                .find(kTensorFlowSavedModelPlatform);
+    auto it = platform_config_map.platform_configs().find(
+        kTensorFlowSavedModelPlatform);
     if (it != platform_config_map.platform_configs().end()) {
       platform_config = it->second.source_adapter_config();
-    } 
+    }
     tensorflow::Status status = AutoFillSavedModel::Create(
         model_name, platform_config, model_path, &afsm);
     if (status.ok()) {
