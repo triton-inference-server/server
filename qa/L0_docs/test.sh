@@ -32,12 +32,11 @@ RET=0
 
 apt-get update && \
     apt-get install -y --no-install-recommends doxygen && \
-    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale && \
-    pip install --upgrade /opt/tensorrtserver/python/tensorrtserver-*.whl
+    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
 set +e
 
-(cd /workspace/docs && \
+(cd docs && \
         make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
