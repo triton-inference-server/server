@@ -57,8 +57,37 @@ RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
 
 RUN pip install --upgrade setuptools grpcio-tools
 
+# Build the client library and examples
 WORKDIR /workspace
 COPY Makefile.client .
 COPY VERSION .
 COPY src src
 RUN make -j4 -f Makefile.client all
+
+# Collect the client artifacts into a tar
+RUN mkdir -p /tmp/client/bin && \
+    cp build/image_client /tmp/client/bin/. && \
+    cp build/perf_client /tmp/client/bin/. && \
+    cp build/simple_client /tmp/client/bin/. && \
+    cp build/simple_string_client /tmp/client/bin/. && \
+    cp build/simple_sequence_client /tmp/client/bin/. && \
+    mkdir -p /tmp/client/lib && \
+    cp build/librequest.so /tmp/client/lib/. && \
+    cp build/librequest.a /tmp/client/lib/. && \
+    mkdir -p /tmp/client/python && \
+    cp src/clients/python/image_client.py /tmp/client/python/. && \
+    cp src/clients/python/grpc_image_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_string_client.py /tmp/client/python/. && \
+    cp src/clients/python/simple_sequence_client.py /tmp/client/python/. && \
+    cp build/dist/dist/*.whl /tmp/client/python/. && \
+    export VERSION=`cat /workspace/VERSION` && \
+    (cd /tmp/client && tar zcf /workspace/v$VERSION.clients.tar.gz *)
+
+# Install an image needed by the quickstart and other documentation.
+COPY qa/images/mug.jpg images/mug.jpg
+
+# Install the dependencies needed to run the client examples. These
+# are not needed for building but including them allows this image to
+# be used to run the client examples.
+RUN pip install --upgrade build/dist/dist/tensorrtserver-*.whl numpy pillow

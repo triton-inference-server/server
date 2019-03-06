@@ -75,6 +75,7 @@ LIBREQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -ldl
 
 CMN_SRCS    := $(CPPDIR)/request.cc $(SRCDIR)/core/model_config.cc
 CMN_OBJS    := $(addprefix $(BUILDDIR)/, $(CMN_SRCS:%.cc=%.o))
+CMN_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -ldl
 
 PY_SRCS     := $(PYTHONDIR)/__init__.py
 PY_SETUP    := $(PYTHONDIR)/setup.py
@@ -114,8 +115,10 @@ DEPS         = $(IMAGE_OBJS:.o=.d) $(PERF_OBJS:.o=.d) \
 .SUFFIXES:
 .SECONDARY: $(PROTO_HDRS) $(PROTO_SRCS) $(PROTO_PY) $(PROTO_CP)
 
-all: pip $(BUILDDIR)/image_client $(BUILDDIR)/perf_client \
-     $(BUILDDIR)/simple_client $(BUILDDIR)/simple_sequence_client
+all: pip $(BUILDDIR)/librequest.so $(BUILDDIR)/librequest.a \
+     $(BUILDDIR)/image_client $(BUILDDIR)/perf_client \
+     $(BUILDDIR)/simple_client $(BUILDDIR)/simple_sequence_client \
+     $(BUILDDIR)/simple_string_client
 
 # Need to fix protoc compiled imports (see
 # https://github.com/google/protobuf/issues/1491). The 'sed' command
@@ -151,6 +154,12 @@ $(PYTHONDIR)/crequest.cc $(PYTHONDIR)/crequest.h: $(GRPC_HDRS)
 
 $(BUILDDIR)/src/clients/python/libcrequest.so: $(LIBREQ_OBJS) $(PROTO_OBJS) $(GRPC_OBJS) $(CMN_OBJS)
 	$(CXX) -shared -o $@ $^ $(LIBREQ_LDFLAGS)
+
+$(BUILDDIR)/librequest.so: $(CMN_OBJS)
+	$(CXX) -shared -o $@ $^ $(CMN_LDFLAGS)
+
+$(BUILDDIR)/librequest.a: $(CMN_OBJS)
+	ar rvs $@ $^
 
 $(BUILDDIR)/image_client: $(IMAGE_OBJS) $(PROTO_OBJS) $(GRPC_OBJS) $(CMN_OBJS)
 	$(CXX) -o $@ $^ $(IMAGE_LDFLAGS)
