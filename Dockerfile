@@ -37,8 +37,6 @@ ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.02-py3
 ############################################################################
 FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 
-ARG BUILD_CLIENTS_ONLY=0
-
 # We cannot just pull libraries from the PyTorch container... we need
 # to:
 #   - copy over netdef_bundle_c2 interface so it can build with other
@@ -68,29 +66,13 @@ RUN sha1sum -c /tmp/patch/caffe2/checksums && \
 # line where we turn off features not needed for trtserver
 WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
-RUN bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
-               cd pytorch && \
-               TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5+PTX" \
-                CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
-                NCCL_INCLUDE_DIR="/usr/include/" \
-                NCCL_LIB_DIR="/usr/lib/" \
-                NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
-                python setup.py install && python setup.py clean; \
-             else \
-               mkdir -p /opt/conda/lib/python3.6/site-packages/torch/lib; \
-               mkdir -p /opt/conda/lib; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so; \
-               touch /opt/conda/lib/python3.6/site-packages/torch/lib/libc10_cuda.so; \
-               touch /opt/conda/lib/libmkl_avx2.so; \
-               touch /opt/conda/lib/libmkl_core.so; \
-               touch /opt/conda/lib/libmkl_def.so; \
-               touch /opt/conda/lib/libmkl_gnu_thread.so; \
-               touch /opt/conda/lib/libmkl_intel_lp64.so; \
-               touch /opt/conda/lib/libmkl_rt.so; \
-               touch /opt/conda/lib/libmkl_vml_def.so; fi'
+RUN cd pytorch && \
+    TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5+PTX" \
+      CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
+      NCCL_INCLUDE_DIR="/usr/include/" \
+      NCCL_LIB_DIR="/usr/lib/" \
+      NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
+      python setup.py install && python setup.py clean
 
 ############################################################################
 ## Build stage: Build inference server based on TensorFlow container
@@ -100,7 +82,6 @@ FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 ARG TRTIS_VERSION=1.1.0dev
 ARG TRTIS_CONTAINER_VERSION=19.03dev
 ARG PYVER=3.5
-ARG BUILD_CLIENTS_ONLY=0
 
 # The TFServing release branch must match the TF release used by
 # TENSORFLOW_IMAGE
@@ -111,10 +92,7 @@ ARG TFS_BRANCH=r1.12
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             automake \
-            libcurl3-dev \
             libgoogle-glog0v5 \
-            libopencv-dev \
-            libopencv-core-dev \
             libtool
 
 # Use the PYVER version of python
@@ -122,12 +100,6 @@ RUN rm -f /usr/bin/python && \
     rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
     ln -s /usr/bin/python$PYVER /usr/bin/python && \
     ln -s /usr/bin/python$PYVER /usr/bin/python`echo $PYVER | cut -c1-1`
-
-RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python$PYVER get-pip.py && \
-    rm get-pip.py
-
-RUN pip install --upgrade setuptools
 
 # Caffe2 library requirements...
 COPY --from=trtserver_caffe2 \
@@ -195,48 +167,22 @@ RUN sha1sum -c tools/patch/tfs/checksums && \
 ENV TF_NEED_GCP 1
 ENV TF_NEED_S3 1
 
-# Build the server, clients and any testing artifacts
+# Build the server and any testing artifacts
 RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mv .bazelrc .bazelrc.orig && \
     cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
-    bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
-               bazel build -c opt --config=cuda \
-                     src/servers/trtserver \
-                     src/custom/... \
-                     src/clients/... \
-                     src/test/...; \
-             else \
-               bazel build -c opt src/clients/...; \
-             fi' && \
+    bazel build -c opt --config=cuda \
+          src/servers/trtserver \
+          src/custom/... \
+          src/test/... && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa) && \
-    mkdir -p /tmp/client/bin && \
-    cp bazel-bin/src/clients/c++/image_client /tmp/client/bin/. && \
-    cp bazel-bin/src/clients/c++/perf_client /tmp/client/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_client /tmp/client/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_string_client /tmp/client/bin/. && \
-    cp bazel-bin/src/clients/c++/simple_sequence_client /tmp/client/bin/. && \
-    mkdir -p /tmp/client/lib && \
-    cp bazel-bin/src/clients/c++/librequest.so /tmp/client/lib/. && \
-    cp bazel-bin/src/clients/c++/librequest.a /tmp/client/lib/. && \
-    mkdir -p /tmp/client/python && \
-    cp src/clients/python/image_client.py /tmp/client/python/. && \
-    cp src/clients/python/grpc_image_client.py /tmp/client/python/. && \
-    cp src/clients/python/simple_client.py /tmp/client/python/. && \
-    cp src/clients/python/simple_string_client.py /tmp/client/python/. && \
-    cp src/clients/python/simple_sequence_client.py /tmp/client/python/. && \
-    bazel-bin/src/clients/python/build_pip /tmp/client/python/. && \
-    (cd /tmp/client && tar zcf /opt/tensorrtserver/v${TRTIS_VERSION}.clients.tar.gz *) && \
-    (cd /opt/tensorrtserver && tar zxf v${TRTIS_VERSION}.clients.tar.gz) && \
-    bash -c 'if [ "$BUILD_CLIENTS_ONLY" != "1" ]; then \
-               cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/.; \
-               cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/.; \
-               mkdir -p /opt/tensorrtserver/custom; \
-               cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/.; \
-               cp bazel-bin/src/custom/param/libparam.so /opt/tensorrtserver/custom/.; \
-               cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/.; \
-             else \
-               pip install --upgrade /opt/tensorrtserver/python/tensorrtserver-*.whl numpy pillow; \
-             fi' && \
+    mkdir -p /opt/tensorrtserver/bin && \
+    cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/. && \
+    cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/. && \
+    mkdir -p /opt/tensorrtserver/custom && \
+    cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
+    cp bazel-bin/src/custom/param/libparam.so /opt/tensorrtserver/custom/. && \
+    cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/. && \
     bazel clean --expunge && \
     rm -rf /root/.cache/bazel && \
     rm -rf /tmp/*

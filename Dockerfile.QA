@@ -30,46 +30,63 @@
 
 ARG BASE_IMAGE=tensorrtserver
 ARG BUILD_IMAGE=tensorrtserver_build
+ARG CLIENT_IMAGE=tensorrtserver_client
 
 ############################################################################
-## Build necessary artifacts needed for CI and initialize the qa/ directory.
+## Copy artifacts from build container
 ############################################################################
-FROM ${BUILD_IMAGE} AS trtserver_qa
+FROM ${BUILD_IMAGE} AS build
 
+# Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
-RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
-    cp src/clients/python/grpc_image_client.py qa/clients/. && \
-    cp src/clients/python/image_client.py qa/clients/. && \
-    cp src/clients/python/simple_client.py qa/clients/. && \
-    cp src/clients/python/simple_string_client.py qa/clients/. && \
-    cp src/clients/python/simple_sequence_client.py qa/clients/. && \
-    cp /opt/tensorrtserver/bin/image_client qa/clients/. && \
-    cp /opt/tensorrtserver/bin/perf_client qa/clients/. && \
-    cp /opt/tensorrtserver/bin/simple_client qa/clients/. && \
-    cp /opt/tensorrtserver/bin/simple_string_client qa/clients/. && \
-    cp /opt/tensorrtserver/bin/simple_sequence_client qa/clients/. && \
+RUN mkdir -p qa/common && \
     cp /opt/tensorrtserver/bin/caffe2plan qa/common/. && \
-    cp /opt/tensorrtserver/python/tensorrtserver*.whl qa/pkgs/. && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_string_example/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_simple_string_example/models/. && \
     mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/L0_simple_custom_example/models/simple/1/. && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/L0_simple_custom_example/models/simple/1/. && \
     mkdir -p qa/L0_custom_param/models/param/1 && \
-    cp /opt/tensorrtserver/custom/libparam.so qa/L0_custom_param/models/param/1/. && \
+    cp /opt/tensorrtserver/custom/libparam.so \
+       qa/L0_custom_param/models/param/1/. && \
     mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
-    cp /opt/tensorrtserver/custom/libsequence.so qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
+    cp /opt/tensorrtserver/custom/libsequence.so \
+       qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
     mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/custom_models/custom_int32_int32_int32/1/. && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/custom_models/custom_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
     mkdir -p qa/custom_models/custom_float32_float32_float32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/custom_models/custom_float32_float32_float32/1/. && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/custom_models/custom_float32_float32_float32/1/. && \
     mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
-    cp /opt/tensorrtserver/custom/libsequence.so qa/custom_models/custom_sequence_int32/1/.
+    cp /opt/tensorrtserver/custom/libsequence.so \
+       qa/custom_models/custom_sequence_int32/1/.
+
+# Generating the docs requires the docs source and the source code so
+# copy that into L0_docs so that it is available when that test runs.
+RUN cp VERSION qa/L0_docs/. && \
+    cp -r docs qa/L0_docs/. && \
+    cp -r src qa/L0_docs/.
+
+############################################################################
+## Copy artifacts from client container
+############################################################################
+FROM ${CLIENT_IMAGE} AS client
+
+WORKDIR /workspace
+COPY --from=build /workspace/qa/ qa/
+RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
+    cp /tmp/client/bin/* qa/clients/. && \
+    cp /tmp/client/python/*.py qa/clients/. && \
+    cp /tmp/client/python/tensorrtserver*.whl qa/pkgs/.
 
 ############################################################################
 ## Create CI enabled image
@@ -107,7 +124,7 @@ RUN pip install --upgrade numpy future grpcio
 
 # CI expects tests in /opt/tensorrtserver/qa
 WORKDIR /opt/tensorrtserver
-COPY --from=trtserver_qa /workspace/qa/ qa/
+COPY --from=client /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.

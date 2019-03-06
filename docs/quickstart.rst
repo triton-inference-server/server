@@ -94,7 +94,7 @@ and the example client applications.
 
 #. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Build the example client applications <section-building-the-client-examples>`.
+#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
 .. _section-building-from-source-code:
@@ -120,7 +120,7 @@ example client applications.
 
 #. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Build the example client applications <section-building-the-client-examples>`.
+#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
 .. _section-run-tensorrt-inference-server:
@@ -178,15 +178,15 @@ the server is ready to receive inference requests.
 For more information, see
 :ref:`section-checking-inference-server-status`.
 
-.. _section-building-the-client-examples:
+.. _section-getting-the-client-examples:
 
-Building The Client Examples
-----------------------------
+Getting The Client Examples
+---------------------------
 
-The provided Dockerfile can be used to build just the client libraries
-and examples. First change directory to the root of the repo and
-checkout the release version of the branch that you want to build (or
-the master branch if you want to build the under-development
+The provided Dockerfile.client can be used to build the client
+libraries and examples. First change directory to the root of the repo
+and checkout the release version of the branch that you want to build
+(or the master branch if you want to build the under-development
 version). The branch you use for the client build should match the
 version of the inference server you are using::
 
@@ -195,31 +195,33 @@ version of the inference server you are using::
 Then use docker to build the C++ client library, C++ and Python
 examples, and a Python wheel file for the Python client library::
 
-  $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
+  $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
-After the build completes, the tensorrtserver_clients Docker image
+After the build completes, the tensorrtserver_client Docker image
 will contain the built client libraries and examples. Run the client
 image so that the client examples can access the inference server
 running in its own container::
 
-  $ docker run -it --rm --net=host tensorrtserver_clients
+  $ docker run -it --rm --net=host tensorrtserver_client
 
-For more information, see
-:ref:`section-building-the-client-libraries-and-examples`.
+It is also possible to build the client examples without Docker and
+for some platforms per-compiled client examples are available. For
+more information, see
+:ref:`section-getting-the-client-libraries-and-examples`.
 
 .. _section-running-the-image-classification-example:
 
 Running The Image Classification Example
 ----------------------------------------
 
-From within the tensorrtserver_clients image, run the example
+From within the tensorrtserver_client image, run the example
 image-client application to perform image classification using the
 example resnet50_netdef from the example model repository.
 
 To send a request for the resnet50_netdef (Caffe2) model from the
 example model repository for an image from the qa/images directory::
 
-  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ /tmp/client/bin/image_client -m resnet50_netdef -s INCEPTION images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -227,7 +229,7 @@ example model repository for an image from the qa/images directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python3 /workspace/src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ python3 /tmp/client/python/image_client.py -m resnet50_netdef -s INCEPTION images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061

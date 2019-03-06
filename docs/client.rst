@@ -31,9 +31,9 @@ Client Libraries and Examples
 =============================
 
 The inference server *client libraries* make it easy to communicate
-with the TensorRT Inference Server from you C++ or Python
+with the TensorRT Inference Server from your C++ or Python
 application. Using these libraries you can send either HTTP or GRPC
-requests to server to check status or health and to make inference
+requests to the server to check status or health and to make inference
 requests.
 
 A couple of example applications show how to use the client libraries
@@ -56,17 +56,24 @@ to perform image classification and to test performance:
 
 .. build-client-begin-marker-do-not-remove
 
-.. _section-building-the-client-libraries-and-examples:
+.. _section-getting-the-client-libraries-and-examples:
 
-Building the Client Libraries and Examples
+Getting the Client Libraries and Examples
 ------------------------------------------
 
-The provided Dockerfile can be used to build just the client libraries
-and examples. First change directory to the root of the repo and
-checkout the release version of the branch that you want to build (or
-the master branch if you want to build the under-development
-version). The branch you use for the client build should match the
-version of the inference server you are using::
+The provided Makefile.client and Dockerfile.client can be used to
+build the client libraries and examples. As an alternative to building
+it is also possible to download the pre-build client libraries and
+examples from GitHub.
+
+Build Using Dockerfile
+^^^^^^^^^^^^^^^^^^^^^^
+
+To build the libaries and examples, first change directory to the root
+of the repo and checkout the release version of the branch that you
+want to build (or the master branch if you want to build the
+under-development version). The branch you use for the client build
+should match the version of the inference server you are using::
 
   $ git checkout r19.02
 
@@ -74,39 +81,56 @@ Then, issue the following command to build the C++ client library, C++
 and Python examples, and a Python wheel file for the Python client
 library::
 
-  $ docker build -t tensorrtserver_clients --target trtserver_build --build-arg "BUILD_CLIENTS_ONLY=1" .
+  $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
 You can optionally add *-\\-build-arg "PYVER=<ver>"* to set the Python
 version that you want the Python client library built for. Supported
 values for *<ver>* are 2.6 and 3.5, with 3.5 being the default.
 
-After the build completes the tensorrtserver_clients docker image will
-contain the built client libraries and examples. The easiest way to
-try the examples described in the following sections is to run the
-client image with -\\-net=host so that the client examples can access
-the inference server running in its own container (see
-:ref:`section-running-the-inference-server` for more information about
-running the inference server)::
+After the build completes the tensorrtserver_client docker image will
+contain the built client libraries and examples, and will also be
+configured with all the dependencies required to run those example
+within the container. The easiest way to try the examples described in
+the following sections is to run the client image with -\\-net=host so
+that the client examples can access the inference server running in
+its own container (see :ref:`section-running-the-inference-server` for
+more information about running the inference server)::
 
-  $ docker run -it --rm --net=host tensorrtserver_clients
+  $ docker run -it --rm --net=host tensorrtserver_client
 
-In the client image you can find the example executables in
-/opt/tensorrtserver/bin, and the Python wheel in
-/opt/tensorrtserver/pip.
+In the tensorrtserver_client image you can find the C++ library and
+example executables in /workspace/build, and the Python examples in
+/workspace/src/clients/python. A tar file containing all the library
+and example binaries and Python scripts is at
+/workspace/v<version>.clients.tar.gz.
+
+Build Using Makefile
+^^^^^^^^^^^^^^^^^^^^
+
+The actual client build is performed by Makefile.client. The build
+dependencies and requirements are shown in Dockerfile.client. To build
+without Docker you must first install those dependencies. The Makefile
+can also be targeted for other OSes and platforms. We welcome any
+updates that expand the Makefiles functionality and allow the clients
+to be built on additional platforms.
+
+Download From GitHub
+^^^^^^^^^^^^^^^^^^^^
 
 If your host sytem is Ubuntu-16.04, an alternative to running the
-examples within the tensorrtserver_clients container is to instead
+examples within the tensorrtserver_client container is to instead
 download the client libraries and examples from the `GitHub release
 page <https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
 corresponding to the release you are interested in::
 
-  $ mkdir tensorrtserver_clients
-  $ cd tensorrtserver_clients
+  $ mkdir tensorrtserver_client
+  $ cd tensorrtserver_client
   $ wget https://github.com/NVIDIA/tensorrt-inference-server/archive/v1.0.0.clients.tar.gz
   $ tar xzf v1.0.0.clients.tar.gz
 
-You can now find client example binaries in bin/, c++ libraries in
-lib/, and Python client examples and wheel file in python/.
+After untar you can find the client example binaries in bin/,
+libraries in lib/, and Python client examples and wheel file in
+python/.
 
 To run the C++ examples you must install some dependencies on your
 Ubuntu-16.04 host system::
@@ -365,9 +389,9 @@ and a Python version at `src/clients/python/simple\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
 demonstrate basic client API usage.
 
-To run the the C++ version of the simple example, first build as
-described in :ref:`section-building-the-client-libraries-and-examples`
-and then::
+To run the the C++ version of the simple example, first build or
+download it as described in
+:ref:`section-getting-the-client-libraries-and-examples` and then::
 
   $ /opt/tensorrtserver/bin/simple_client
   0 + 1 = 1
@@ -403,9 +427,10 @@ and then::
   15 + 1 = 16
   15 - 1 = 14
 
-To run the the Python version of the simple example, first build as
-described in :ref:`section-building-the-client-libraries-and-examples`
-and install the tensorrtserver whl, then::
+To run the the Python version of the simple example, first build or
+download it as described in
+:ref:`section-getting-the-client-libraries-and-examples` and install
+the tensorrtserver whl, then::
 
   $ python3 /workspace/src/clients/python/simple_client.py
 
