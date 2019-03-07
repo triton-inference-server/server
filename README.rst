@@ -30,10 +30,15 @@
 NVIDIA TensorRT Inference Server
 ================================
 
-    **NOTE: You are currently on the master branch which tracks
-    under-development progress towards the next release. The latest
-    release of the TensorRT Inference Server is 0.11.0 beta and is
-    available on branch** `r19.02
+    **VISIT US AT GTC 2019: The TensorRT Inference Server will be
+    featured in multiple presentations. You can also meet some of the
+    developers at a "Connect with the Experts" session on Wed. 3/20 at
+    12:00.** https://www.nvidia.com/gtc/
+
+    **LATEST RELEASE: You are currently on the master branch which
+    tracks under-development progress towards the next release. The
+    latest release of the TensorRT Inference Server is 0.11.0 beta and
+    is available on branch** `r19.02
     <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.02>`_.
 
 .. overview-begin-marker-do-not-remove
