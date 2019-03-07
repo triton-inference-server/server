@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <unordered_map>
+#include <deque>
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
@@ -75,6 +77,16 @@ tensorflow::Status GetNormalizedModelConfig(
 /// is not valid.
 tensorflow::Status ValidateModelConfig(
     const ModelConfig& config, const std::string& expected_platform);
+
+/// Validate that the ensembles are specified correctly. Assuming that the
+/// inputs and outputs specified in all model configurations are accurate.
+/// \param config_map Map from model name to model configuration to validate.
+/// It contains the model configurations of the ensembles and the models
+/// in the ensembles.
+/// \return The error status. A non-OK status indicates the configuration
+/// is not valid.
+tensorflow::Status ValidateEnsembleConfig(
+    std::unordered_map<std::string, ModelConfig> config_map);
 
 /// Validate that input is specified correctly in a model
 /// configuration.

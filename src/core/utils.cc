@@ -26,6 +26,7 @@
 
 #include "src/core/utils.h"
 
+#include <set>
 #include "absl/strings/numbers.h"
 #include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
@@ -36,6 +37,202 @@
 #include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
+
+namespace {
+
+struct TensorNode {
+  TensorNode(std::string model, DataType type, DimsList dims)
+    : model_name(model), type(type), dims(dims), ready(false)
+  {
+  }
+
+  std::string model_name;
+  DataType type;
+  DimsList dims;
+  bool ready;
+  std::vector<struct TensorNode*> prev_nodes;
+  std::vector<struct TensorNode*> next_nodes;
+};
+
+std::string
+DimsListToString(const DimsList& list) {
+  std::string res = "[ ";
+  for (const auto& dim : list) {
+    res = res + std::to_string(dim) + " ";
+  }
+  return res + "]";
+}
+
+tensorflow::Status
+ValidateTensorConsistency(
+  const struct TensorNode& lhs, const struct TensorNode& rhs,
+  const std::string& message)
+{
+  if (lhs.type != rhs.type) {
+    return tensorflow::errors::InvalidArgument(
+      message, "inconsistent data type: ", lhs.type,
+      " is inferred from model ", lhs.model_name, " while ",
+      rhs.type, " is inferred from model ", rhs.model_name);
+  }
+  bool consistent = (lhs.dims.size() == rhs.dims.size());
+  if (consistent) {
+    for (size_t i = 0; i < lhs.dims.size(); i++) {
+      if (lhs.dims[i] != rhs.dims[i]) {
+        consistent = false;
+        break;
+      }
+    }
+  }
+  if (!consistent) {
+    return tensorflow::errors::InvalidArgument(
+      message, "inconsistent shape: ", DimsListToString(lhs.dims),
+      " is inferred from model ", lhs.model_name,
+      " while ", DimsListToString(rhs.dims),
+      " is inferred from model ", rhs.model_name);
+  }
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+ValidateEnsembleConfig(
+  const std::string& ensemble,
+  const std::unordered_map<std::string, ModelConfig>& config_map,
+  const std::unordered_map<std::string, std::string>& invalid_model_names,
+  std::unordered_map<std::string, bool>& ensembles,
+  std::deque<std::string>& ensemble_dependency)
+{
+  std::unordered_map<std::string, struct TensorNode> ensemble_tensors;
+
+  const auto& ensemble_config = config_map.at(ensemble);
+  for (const auto& step : ensemble_config.ensemble_scheduling().step()) {
+    const auto& model_name = step.model_name();
+    if (invalid_model_names.find(model_name) != invalid_model_names.end()) {
+      return tensorflow::errors::InvalidArgument(
+        "ensemble ", ensemble, " contains invalid model ",
+        model_name, " : ", invalid_model_names.at(model_name));
+    }
+    auto it = config_map.find(model_name);
+    if (it == config_map.end()) {
+      return tensorflow::errors::InvalidArgument(
+        "ensemble ", ensemble, " contains model ",
+        model_name, " which is not in the available models");
+    }
+    const auto& model_config = it->second;
+    if (model_config.max_batch_size() < ensemble_config.max_batch_size()) {
+      return tensorflow::errors::InvalidArgument(
+        "ensemble ", ensemble, " allows maximum batch size ",
+        ensemble_config.max_batch_size(), ", but it contains model ",
+        model_name, " which only allows  maximum batch size to be ",
+        model_config.max_batch_size());
+    }
+    
+    if (model_config.has_ensemble_scheduling()) {
+      for (const auto& name : ensemble_dependency) {
+        if (name == model_name) {
+          return tensorflow::errors::InvalidArgument(
+            "circular dependency between ensembles: ",
+            name, " -> ... -> ", ensemble, " -> ", name);
+        }
+      }
+
+      if ((ensembles.find(model_name))->second == false) {
+        ensemble_dependency.push_back(ensemble);
+        TF_RETURN_IF_ERROR(ValidateEnsembleConfig(model_name, config_map, invalid_model_names, ensembles, ensemble_dependency));
+        ensemble_dependency.pop_back();
+      }
+    }
+
+    // map ensemble tensors
+    for (const auto& input_map : step.input_map()) {
+      for (const auto& model_input : model_config.input()) {
+        if (model_input.name() == input_map.second) {
+          struct TensorNode model_tensor(step.model_name(), model_input.data_type(), model_input.dims());
+          auto it = ensemble_tensors.find(input_map.first);
+          if (it != ensemble_tensors.end()) {
+            TF_RETURN_IF_ERROR(ValidateTensorConsistency(it->second, model_tensor,
+            "in ensemble " + ensemble + ", ensemble tensor " + input_map.first + ": "));
+          } else {
+            ensemble_tensors.emplace(std::make_pair(input_map.first, model_tensor));
+          }
+        }
+      }
+    }
+    for (const auto& output_map : step.output_map()) {
+      for (const auto& model_output : model_config.output()) {
+        if (model_output.name() == output_map.first) {
+          struct TensorNode model_tensor(step.model_name(), model_output.data_type(), model_output.dims());
+          auto it = ensemble_tensors.find(output_map.second);
+          if (it != ensemble_tensors.end()) {
+            TF_RETURN_IF_ERROR(ValidateTensorConsistency(it->second, model_tensor,
+            "in ensemble " + ensemble + ", ensemble tensor " + output_map.second + ": "));
+          } else {
+            ensemble_tensors.emplace(std::make_pair(output_map.second, model_tensor));
+          }
+        }
+      }
+    }
+
+    // link ensemble tensors
+    for (const auto& output_map : step.output_map()) {
+      auto& node = ensemble_tensors.find(output_map.second)->second;
+      for (const auto& input_map : step.input_map()) {
+        auto& prev_node = ensemble_tensors.find(input_map.first)->second;
+        node.prev_nodes.push_back(&prev_node);
+        prev_node.next_nodes.push_back(&node);
+      }
+    }
+  }
+
+  // Check data flow
+  std::deque<struct TensorNode*> ready_queue;
+  for (const auto& input : ensemble_config.input()) {
+    auto it = ensemble_tensors.find(input.name());
+    if (it == ensemble_tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+        "in ensemble ", ensemble, ", no mapping from ensemble input ",
+        input.name(), " to model input is found.");
+    }
+    it->second.ready = true;
+    ready_queue.push_back(&(it->second));
+  }
+  while (!ready_queue.empty()) {
+    auto& ready_node = ready_queue.front();
+    for (auto& next_node : ready_node->next_nodes) {
+      if (next_node->ready) {
+        continue;
+      }
+      bool next_node_ready = true;
+      for (auto& prev_node : next_node->prev_nodes) {
+        if (!prev_node->ready) {
+          next_node_ready = false;
+          break;
+        }
+      }
+      next_node->ready = next_node_ready;
+      if (next_node_ready) {
+        ready_queue.push_back(next_node);
+      }
+    }
+    ready_queue.pop_front();
+  }
+  for (const auto& output : ensemble_config.output()) {
+    auto it = ensemble_tensors.find(output.name());
+    if (it == ensemble_tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+        "in ensemble ", ensemble, ", no mapping from model output to ",
+        "ensemble output ", output.name(), " is found.");
+    }
+    if (!it->second.ready) {
+      return tensorflow::errors::InvalidArgument(
+        "in ensemble ", ensemble, ", no data will be written to ",
+        "ensemble output ", output.name(), " under optimistic assumption.");
+    }
+  }
+  (ensembles.find(ensemble))->second = true;
+  return tensorflow::Status::OK();
+}
+
+} // namespace
 
 tensorflow::Status
 GetModelVersionFromPath(const tensorflow::StringPiece& path, int64_t* version)
@@ -206,6 +403,8 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kCaffe2NetDefFilename);
     } else if (config->platform() == kCustomPlatform) {
       config->set_default_model_filename(kCustomFilename);
+    } else if (config->platform() == kEnsemblePlatform) {
+      // No actual model file is needed to be loaded for ensemble.
     } else {
       return tensorflow::errors::Internal(
           "unexpected platform type ", config->platform(), " for ",
@@ -244,6 +443,11 @@ GetNormalizedModelConfig(
       config->mutable_sequence_batching()->set_max_sequence_idle_microseconds(
           SEQUENCE_IDLE_DEFAULT_MICROSECONDS);
     }
+  }
+
+  // If model ensembling is specified...
+  if (config->has_ensemble_scheduling()) {
+    return tensorflow::Status::OK();
   }
 
   // Make sure there is at least one instance_group.
@@ -326,6 +530,33 @@ ValidateModelConfig(
   if (!expected_platform.empty() && (config.platform() != expected_platform)) {
     return tensorflow::errors::NotFound(
         "expected model of type ", expected_platform, " for ", config.name());
+  }
+
+  // Validate ensemble schudling first as it will make other validations
+  // not necessary.
+  if (config.has_ensemble_scheduling()) {
+    if (config.platform() != kEnsemblePlatform) {
+      return tensorflow::errors::InvalidArgument(
+            "ensemble scheduling can not be set for model ",
+            config.name(), " whose platform is not ",
+            kEnsemblePlatform);
+    }
+    if (config.instance_group().size() != 0) {
+      return tensorflow::errors::InvalidArgument(
+            "instance group should not be specified for ensemble ",
+            config.name());
+    }
+    if (config.has_optimization()) {
+      return tensorflow::errors::InvalidArgument(
+            "optimization should not be specified for ensemble ",
+            config.name());
+    }
+    return tensorflow::Status::OK();
+  } else if (config.platform() == kEnsemblePlatform) {
+    return tensorflow::errors::InvalidArgument(
+          "ensemble scheduling must be set for ensemble ",
+          config.name(), " whose platform is ",
+          kEnsemblePlatform);
   }
 
   if (!config.has_version_policy()) {
@@ -424,6 +655,50 @@ ValidateModelConfig(
     }
   }
 
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status ValidateEnsembleConfig(
+    const std::unordered_map<std::string, ModelConfig>& config_map)
+{
+  std::unordered_map<std::string, std::string> invalid_model_names;
+  std::unordered_map<std::string, bool> ensembles;
+
+  for (const auto& pair : config_map) {
+    tensorflow::Status status;
+    for (const auto& input : pair.second.input()) {
+      status = ValidateModelInput(input);
+      if (!status.ok()) {
+        break;
+      }
+    }
+    if (status.ok()) {
+      for (const auto& output : pair.second.output()) {
+        status = ValidateModelOutput(output);
+        if (!status.ok()) {
+          break;
+        }
+      }
+    }
+    if (!status.ok()) {
+      // Return error if the inputs / outputs of one ensemble is not correct.
+      if (pair.second.has_ensemble_scheduling()) {
+        return tensorflow::errors::InvalidArgument(
+              "ensemble", pair.first, ": ", status.error_message());
+      }
+      invalid_model_names.emplace(pair.first, status.error_message());
+    } else if (pair.second.has_ensemble_scheduling()) {
+      ensembles.emplace(std::make_pair(pair.first, false));
+    }
+  }
+
+  std::deque<std::string> ensemble_dependency;
+  for (const auto& pair : ensembles) {
+    if (pair.second) {
+      continue;
+    }
+    TF_RETURN_IF_ERROR(ValidateEnsembleConfig(pair.first, config_map, invalid_model_names, ensembles, ensemble_dependency));
+  }
   return tensorflow::Status::OK();
 }
 
