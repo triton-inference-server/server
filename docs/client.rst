@@ -264,7 +264,25 @@ The perf\_client example application located at
 `src/clients/c++/perf\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/perf_client.cc>`_
 uses the C++ client API to send concurrent requests to the server to
-measure latency and inferences per second under varying client loads.
+measure latency and inferences-per-second under varying client loads.
+
+To create each load level the perf\_client maintains a constant number
+of outstanding inference requests to the server. The lowest load level
+is created by having one outstanding request to the server. When that
+request completes (i.e. the response is received from the server), the
+perf\_client immediately sends another request. The next highest load
+level is created by having two outstanding requests to the server.
+When one of those requests completes, the perf\_client immediately
+sends another request so that there are always exactly two inference
+requests in-flight at all times. The next highest load level is
+created with three outstanding requests, etc.
+
+At each load level the perf\_client measures the throughput and
+latency over a time window, and then repeats until the measurements
+until it gets stable values. The perf\_client then increases the load
+level and measures again. This repeats until the perf\_client reaches
+one of the specified limits, either the maximum latency value is
+reached or the maximum concurrency value is reached.
 
 To use perf\_client you must first have a running inference server
 that is serving one or more models. The perf\_client application works
@@ -277,11 +295,11 @@ Follow the instructions in :ref:`section-running-the-inference-server`
 to launch the inference server using the model repository.
 
 The perf\_client application has two major modes. In the first mode
-you specify how many concurrent clients you want to simulate and
-perf\_client finds a stable latency and inferences/second for that
-level of concurrency. Use the \-t flag to control concurrency and \-v
-to see verbose output. The following example simulates four clients
-continuously sending requests to the inference server::
+you specify how many concurrent outstanding inference requests you
+want and perf\_client finds a stable latency and inferences/second for
+that level of concurrency. Use the \-t flag to control concurrency and
+\-v to see verbose output. The following example uses four outstanding
+inference requests to the inference server::
 
   $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -t4 -v
   *** Measurement Settings ***
@@ -302,10 +320,15 @@ continuously sending requests to the inference server::
       Avg request latency: 17886 usec (overhead 55 usec + queue 26 usec + compute 17805 usec)
 
 In the second mode perf\_client will generate an inferences/second
-vs. latency curve by increasing concurrency until a specific latency
-limit or concurrency limit is reached. This mode is enabled by using
-the \-d option and \-l to specify the latency limit and optionally the
-\-c to specify a maximum concurrency limit::
+vs. latency curve by increasing request concurrency until a specific
+latency limit or concurrency limit is reached. This mode is enabled by
+using the \-d option and \-l option to specify the latency limit, and
+optionally the \-c option to specify a maximum concurrency limit. By
+default the initial concurrency value is one, but the \-t option can
+be used to select a different starting value. The following example
+measures latency and inferences/second starting with request
+concurrency one and increasing until request concurrency equals three
+or average request latency exceeds 50 milliseconds::
 
   $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
   *** Measurement Settings ***
@@ -349,7 +372,7 @@ the \-d option and \-l to specify the latency limit and optionally the
   Concurrency: 2, 173 infer/sec, latency 11523 usec
   Concurrency: 3, 193 infer/sec, latency 15518 usec
 
-Use the \-f flag to generate a file containing CSV output of the
+Use the \-f option to generate a file containing CSV output of the
 results::
 
   $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
