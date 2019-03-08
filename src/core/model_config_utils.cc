@@ -401,6 +401,28 @@ ValidateModelConfig(
       return tensorflow::errors::InvalidArgument(
           "optimization should not be specified for ensemble ", config.name());
     }
+
+    // Make sure step is not empty and all fields are set
+    if (config.ensemble_scheduling().step_size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify 'step' for ensemble ", config.name());
+    }
+    for (const auto& element : config.ensemble_scheduling().step()) {
+      if (element.model_name().empty()) {
+        return tensorflow::errors::InvalidArgument(
+            "must specify 'model_name' in step of ensemble ", config.name());
+      }
+      if (!element.input_map().size() == 0) {
+        return tensorflow::errors::InvalidArgument(
+            "must specify one or more 'input_map' in step of ensemble ",
+            config.name());
+      }
+      if (!element.output_map().size() == 0) {
+        return tensorflow::errors::InvalidArgument(
+            "must specify one or more 'output_map' in step of ensemble ",
+            config.name());
+      }
+    }
   }
   // if not specifed, then must validate platform and instance_group
   else {
