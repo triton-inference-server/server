@@ -125,6 +125,15 @@ TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
     if (!status.ok()) {
       actual.append(status.ToString());
     }
+
+    std::string fail_expected;
+    CompareActualWithExpected(model_base_path, actual, &fail_expected);
+
+    EXPECT_TRUE(fail_expected.empty());
+    if (!fail_expected.empty()) {
+      LOG_ERROR << "Expected:" << std::endl << fail_expected;
+      LOG_ERROR << "Actual:" << std::endl << actual;
+    }
   }
 }
 
