@@ -31,6 +31,8 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
+class RequestStatus;
+class ServerStatus;
 
 class GRPCServer : private nvrpc::Server {
  public:

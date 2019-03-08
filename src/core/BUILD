@@ -337,8 +337,6 @@ cc_library(
     deps = [
         ":api_proto",
         ":constants",
-        ":grpc_server",
-        ":http_server",
         ":logging",
         ":model_config",
         ":model_config_proto",
@@ -351,6 +349,7 @@ cc_library(
         ":server_header",
         ":server_status_header",
         ":server_status_proto",
+        ":status",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
@@ -473,4 +472,18 @@ cc_library(
         ":model_config_utils",
         ":status",
     ],
+)
+
+cc_binary(
+    name = "libtrtserver.so",
+    deps = [
+        ":server",
+    ],
+    linkopts = [
+        "-pthread",
+        "-L/usr/local/cuda/lib64/stubs",
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime"
+    ],
+    linkshared = 1,
 )
