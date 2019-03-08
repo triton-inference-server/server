@@ -147,10 +147,9 @@ ValidateEnsembleConfig(
       }
     }
     for (const auto& model_input : model_config.input()) {
-      bool found = false;
+      size_t mapped_cnt = 0;
       for (const auto& input_map : step.input_map()) {
-        found = (model_input.name() == input_map.second);
-        if (found) {
+        if (model_input.name() == input_map.second) {
           TensorNode model_tensor(
               step.model_name(), model_input.data_type(), model_input.dims());
           auto it = ensemble_tensors.find(input_map.first);
@@ -163,32 +162,40 @@ ValidateEnsembleConfig(
             ensemble_tensors.emplace(
                 std::make_pair(input_map.first, model_tensor));
           }
+          mapped_cnt++;
         }
       }
-      if (!found) {
+      if (mapped_cnt == 0) {
         return tensorflow::errors::InvalidArgument(
             "in ensemble ", ensemble, ", input ", model_input.name(),
             " in model ", model_config.name(),
             " is not mapped to any ensemble tensors");
+      } else if (mapped_cnt > 1) {
+        return tensorflow::errors::InvalidArgument(
+            "in ensemble ", ensemble, ", input ", model_input.name(),
+            " in model ", model_config.name(),
+            " is mapped to multiple ensemble tensors");
       }
     }
 
     // Check no multiple mappings to same ensemble tensor
     // and no mapping from invalid outputs
-    std::set<std::string> mapped;
+    std::set<std::string> output_names;
+    for (const auto& model_output : model_config.output()) {
+      output_names.insert(model_output.name());
+    }
     for (const auto& output_map : step.output_map()) {
-      if (mapped.find(output_map.second) == mapped.end()) {
-        mapped.insert(output_map.second);
-      } else {
+      if (output_names.find(output_map.first) == output_names.end()) {
         return tensorflow::errors::InvalidArgument(
-            "in ensemble " + ensemble + ", multiple outputs in model ",
-            model_config.name(), " are mapped to the same ensemble tensor ",
-            output_map.second);
+            "in ensemble ", ensemble, ", ensemble tensor ", output_map.second,
+            " is mapped from non-existing output ", output_map.first,
+            " in model ", step.model_name());
       }
-      bool found = false;
+    }
+    for (const auto& output_map : step.output_map()) {
+      size_t mapped_cnt = 0;
       for (const auto& model_output : model_config.output()) {
-        found = (model_output.name() == output_map.first);
-        if (found) {
+        if (model_output.name() == output_map.first) {
           TensorNode model_tensor(
               step.model_name(), model_output.data_type(), model_output.dims());
           auto it = ensemble_tensors.find(output_map.second);
@@ -201,13 +208,14 @@ ValidateEnsembleConfig(
             ensemble_tensors.emplace(
                 std::make_pair(output_map.second, model_tensor));
           }
+          mapped_cnt++;
         }
       }
-      if (!found) {
+      if (mapped_cnt > 1) {
         return tensorflow::errors::InvalidArgument(
-            "in ensemble ", ensemble, ", ensemble tensor ", output_map.second,
-            " is mapped from non-existing output ", output_map.first,
-            " in model ", step.model_name());
+            "in ensemble " + ensemble + ", multiple outputs in model ",
+            model_config.name(), " are mapped to the same ensemble tensor ",
+            output_map.second);
       }
     }
 
@@ -255,6 +263,14 @@ ValidateEnsembleConfig(
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", no data will be written to ",
           "ensemble output ", output.name(), " under optimistic assumption");
+    }
+  }
+  for (const auto& tensor : ensemble_tensors) {
+    if (!tensor.second.ready) {
+      return tensorflow::errors::InvalidArgument(
+          "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
+          " is redundant as no data will be written to it under optimistic "
+          "assumption");
     }
   }
   (ensembles.find(ensemble))->second = true;

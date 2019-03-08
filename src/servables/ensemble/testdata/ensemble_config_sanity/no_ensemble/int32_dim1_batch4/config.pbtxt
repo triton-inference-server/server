@@ -1,4 +1,4 @@
-name: "int32_dims1_batch4"
+name: "int32_dim1_batch4"
 max_batch_size: 4
 platform: "custom"
 input [
