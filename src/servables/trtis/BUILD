@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,6 +50,8 @@ cc_test(
     ],
     deps = [
         "//src/core:constants",
+        "//src/core:logging",
+        "//src/core:utils",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",

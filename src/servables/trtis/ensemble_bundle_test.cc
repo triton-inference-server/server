@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,14 +24,62 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <unordered_map>
 #include "src/core/constants.h"
+#include "src/core/logging.h"
+#include "src/core/utils.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
 class EnsembleBundleTest : public ModelConfigTestBase {
  public:
+  bool GetModelConfigsInRepository(
+    const std::string& model_base_path,
+    std::unordered_map<std::string, ModelConfig>& config_map,
+    std::string* result);
 };
+
+bool
+EnsembleBundleTest::GetModelConfigsInRepository(
+  const std::string& model_base_path,
+  std::unordered_map<std::string, ModelConfig>& config_map,
+  std::string* result)
+{
+  result->clear();
+  config_map.clear();
+
+  std::vector<std::string> models;
+  TF_CHECK_OK(
+      tensorflow::Env::Default()->GetChildren(model_base_path, &models));
+
+  for (const auto& model_name : models) {
+    const auto model_path =
+        tensorflow::io::JoinPath(model_base_path, model_name);
+
+    if (!tensorflow::Env::Default()->IsDirectory(model_path).ok()) {
+      continue;
+    }
+
+    ModelConfig config;
+    tfs::PlatformConfigMap platform_map;
+    tensorflow::Status status =
+        GetNormalizedModelConfig(model_path, platform_map, false, &config);
+    if (!status.ok()) {
+      result->append(status.ToString());
+      return false;
+    }
+
+    status = ValidateModelConfig(config, std::string());
+    if (!status.ok()) {
+      result->append(status.ToString());
+      return false;
+    }
+
+    config_map[config.name()] = config;
+  }
+  return true;
+}
 
 TEST_F(EnsembleBundleTest, ModelConfigSanity)
 {
@@ -48,6 +96,34 @@ TEST_F(EnsembleBundleTest, ModelConfigSanity)
   ValidateOne(
       "inference_server/src/servables/trtis/testdata/model_config_sanity",
       true /* autofill */, std::string() /* platform */, init_func);
+}
+
+TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
+{
+  std::string error;
+  std::unordered_map<std::string, ModelConfig> config_map;
+
+  const std::string test_repo_path = tensorflow::io::JoinPath(getenv("TEST_SRCDIR"),
+          "inference_server/src/servables/trtis/testdata/ensemble_config_sanity");
+  std::vector<std::string> model_repos;
+  TF_CHECK_OK(
+      tensorflow::Env::Default()->GetChildren(test_repo_path, &model_repos));
+    
+  for (const auto& repo : model_repos) {
+    const std::string model_base_path =
+        tensorflow::io::JoinPath(test_repo_path, repo);
+    if (GetModelConfigsInRepository(model_base_path, config_map, &error) == false) {
+      EXPECT_TRUE(error.empty());
+      LOG_ERROR << "Unexpected error while loading model configs:" << std::endl
+                << error;
+    }
+
+    std::string actual;
+    tensorflow::Status status = ValidateEnsembleConfig(config_map);
+    if (!status.ok()) {
+      actual.append(status.ToString());
+    }
+  }
 }
 
 }}}  // namespace nvidia::inferenceserver::test

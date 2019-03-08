@@ -1,0 +1,43 @@
+name: "inconsistent_shape"
+max_batch_size: 2
+platform: "trtis_ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "fp32_dim1_batch4"
+      input_map {
+        key: "data"
+        value: "input"
+      }
+      output_map {
+        key: "output"
+        value: "temp_tensor"
+      }
+    },
+    {
+      model_name: "fp32_dim3_batch4"
+      input_map {
+        key: "temp_tensor"
+        value: "input"
+      }
+      output_map {
+        key: "output"
+        value: "prob"
+      }
+    }
+  ]
+}
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]

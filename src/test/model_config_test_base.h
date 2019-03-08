@@ -45,6 +45,7 @@ class ModelConfigTestBase : public ::testing::Test {
   void ValidateOne(
       const std::string& test_repository_rpath, bool autofill,
       const std::string& platform, BundleInitFunc init_func);
+  void CompareActualWithExpected(const std::string& expected_path, const std::string& actual, std::string* fail_expected);
 };
 
 }}}  // namespace nvidia::inferenceserver::test

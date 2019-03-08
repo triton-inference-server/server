@@ -1,0 +1,32 @@
+name: "fp32_dim1_batch4_input4"
+max_batch_size: 4
+platform: "custom"
+input [
+  {
+    name: "input1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "input2"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "input3"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "input4"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]

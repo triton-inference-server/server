@@ -126,36 +126,7 @@ ModelConfigTestBase::ValidateOne(
     std::string actual, fail_expected;
     ValidateInit(model_path, autofill, init_func, &actual);
 
-    // The actual output must match *one of* the "expected*" files.
-    std::vector<std::string> children;
-    if (tensorflow::Env::Default()->GetChildren(model_path, &children).ok()) {
-      for (const auto& child : children) {
-        std::string real_child = child.substr(0, child.find_first_of('/'));
-        if (real_child.find("expected") == 0) {
-          const auto expected_path =
-              tensorflow::io::JoinPath(model_path, real_child);
-          LOG_INFO << "Comparing with " << expected_path;
-
-          std::ifstream expected_file(expected_path);
-          std::string expected(
-              (std::istreambuf_iterator<char>(expected_file)),
-              (std::istreambuf_iterator<char>()));
-          std::string truncated_actual;
-          if (expected.size() < actual.size()) {
-            truncated_actual = actual.substr(0, expected.size());
-          } else {
-            truncated_actual = actual;
-          }
-
-          if (expected != truncated_actual) {
-            fail_expected = expected;
-          } else {
-            fail_expected.clear();
-            break;
-          }
-        }
-      }
-    }
+    CompareActualWithExpected(model_path, actual, &fail_expected);
 
     EXPECT_TRUE(fail_expected.empty());
     if (!fail_expected.empty()) {
@@ -165,4 +136,40 @@ ModelConfigTestBase::ValidateOne(
   }
 }
 
+void
+ModelConfigTestBase::CompareActualWithExpected(
+  const std::string& expected_path,
+  const std::string& actual, std::string* fail_expected)
+{
+  // The actual output must match *one of* the "expected*" files.
+  std::vector<std::string> children;
+  if (tensorflow::Env::Default()->GetChildren(expected_path, &children).ok()) {
+    for (const auto& child : children) {
+      std::string real_child = child.substr(0, child.find_first_of('/'));
+      if (real_child.find("expected") == 0) {
+        const auto expected_file_path =
+            tensorflow::io::JoinPath(expected_path, real_child);
+        LOG_INFO << "Comparing with " << expected_file_path;
+
+        std::ifstream expected_file(expected_file_path);
+        std::string expected(
+            (std::istreambuf_iterator<char>(expected_file)),
+            (std::istreambuf_iterator<char>()));
+        std::string truncated_actual;
+        if (expected.size() < actual.size()) {
+          truncated_actual = actual.substr(0, expected.size());
+        } else {
+          truncated_actual = actual;
+        }
+
+        if (expected != truncated_actual) {
+          *fail_expected = expected;
+        } else {
+          fail_expected->clear();
+          break;
+        }
+      }
+    }
+  }
+}
 }}}  // namespace nvidia::inferenceserver::test
