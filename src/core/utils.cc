@@ -495,67 +495,66 @@ GetNormalizedModelConfig(
     }
   }
 
-  // If model ensembling is specified...
-  if (config->has_ensemble_scheduling()) {
-    return tensorflow::Status::OK();
-  }
-
-  // Make sure there is at least one instance_group.
-  if (config->instance_group().size() == 0) {
-    ModelInstanceGroup* group = config->add_instance_group();
-    group->set_name(config->name());
-  }
-
-  int device_cnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-  if (cuerr == cudaErrorNoDevice) {
-    device_cnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "unable to get number of CUDA devices for ", config->name(), ": ",
-        cudaGetErrorString(cuerr));
-  }
-
-  // Assign default name, kind and count to each instance group that
-  // doesn't give those values explicitly. For KIND_GPU, set GPUs to
-  // all available if not specified explicitly.
-  size_t cnt = 0;
-  for (auto& group : *config->mutable_instance_group()) {
-    // Name
-    if (group.name().empty()) {
-      group.set_name(config->name() + "_" + std::to_string(cnt));
+  // If model ensembling is specified, don't attempt to normalize instance_group
+  // as it is not allowed in ensemble scheduling
+  if (!config->has_ensemble_scheduling()) {
+    // Make sure there is at least one instance_group.
+    if (config->instance_group().size() == 0) {
+      ModelInstanceGroup* group = config->add_instance_group();
+      group->set_name(config->name());
     }
-    cnt++;
 
-    // For KIND_AUTO... if there are no GPUs or if any of the listed
-    // 'gpu's are not present, then use KIND_CPU.
-    if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-      if (device_cnt == 0) {
-        group.set_kind(ModelInstanceGroup::KIND_CPU);
-      } else {
-        for (const int32_t gid : group.gpus()) {
-          if ((gid < 0) || (gid >= device_cnt)) {
-            group.set_kind(ModelInstanceGroup::KIND_CPU);
-            break;
+    int device_cnt;
+    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
+    if (cuerr == cudaErrorNoDevice) {
+      device_cnt = 0;
+    } else if (cuerr != cudaSuccess) {
+      return tensorflow::errors::Internal(
+          "unable to get number of CUDA devices for ", config->name(), ": ",
+          cudaGetErrorString(cuerr));
+    }
+
+    // Assign default name, kind and count to each instance group that
+    // doesn't give those values explicitly. For KIND_GPU, set GPUs to
+    // all available if not specified explicitly.
+    size_t cnt = 0;
+    for (auto& group : *config->mutable_instance_group()) {
+      // Name
+      if (group.name().empty()) {
+        group.set_name(config->name() + "_" + std::to_string(cnt));
+      }
+      cnt++;
+
+      // For KIND_AUTO... if there are no GPUs or if any of the listed
+      // 'gpu's are not present, then use KIND_CPU.
+      if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
+        if (device_cnt == 0) {
+          group.set_kind(ModelInstanceGroup::KIND_CPU);
+        } else {
+          for (const int32_t gid : group.gpus()) {
+            if ((gid < 0) || (gid >= device_cnt)) {
+              group.set_kind(ModelInstanceGroup::KIND_CPU);
+              break;
+            }
           }
+        }
+
+        if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
+          group.set_kind(ModelInstanceGroup::KIND_GPU);
         }
       }
 
-      if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-        group.set_kind(ModelInstanceGroup::KIND_GPU);
+      // Count
+      if (group.count() < 1) {
+        group.set_count(1);
       }
-    }
 
-    // Count
-    if (group.count() < 1) {
-      group.set_count(1);
-    }
-
-    // GPUs
-    if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
-        (group.gpus().size() == 0)) {
-      for (int d = 0; d < device_cnt; d++) {
-        group.add_gpus(d);
+      // GPUs
+      if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
+          (group.gpus().size() == 0)) {
+        for (int d = 0; d < device_cnt; d++) {
+          group.add_gpus(d);
+        }
       }
     }
   }
@@ -582,38 +581,9 @@ ValidateModelConfig(
         "expected model of type ", expected_platform, " for ", config.name());
   }
 
-  // Validate ensemble schudling first as it will make other validations
-  // not necessary.
-  if (config.has_ensemble_scheduling()) {
-    if (config.platform() != kEnsemblePlatform) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble scheduling can not be set for model ", config.name(),
-          " whose platform is not ", kEnsemblePlatform);
-    }
-    if (config.instance_group().size() != 0) {
-      return tensorflow::errors::InvalidArgument(
-          "instance group should not be specified for ensemble ",
-          config.name());
-    }
-    if (config.has_optimization()) {
-      return tensorflow::errors::InvalidArgument(
-          "optimization should not be specified for ensemble ", config.name());
-    }
-    return tensorflow::Status::OK();
-  } else if (config.platform() == kEnsemblePlatform) {
-    return tensorflow::errors::InvalidArgument(
-        "ensemble scheduling must be set for ensemble ", config.name(),
-        " whose platform is ", kEnsemblePlatform);
-  }
-
   if (!config.has_version_policy()) {
     return tensorflow::errors::InvalidArgument(
         "must specify 'version policy' for ", config.name());
-  }
-
-  if (config.instance_group().size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify one or more 'instance group's for ", config.name());
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -660,45 +630,77 @@ ValidateModelConfig(
         nullptr));
   }
 
-  // Make sure KIND_GPU instance group specifies at least one GPU and
-  // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
-  // not specify any GPUs.
-  int dcnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
-    dcnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for validation of model ", config.name(),
-        ": ", cudaGetErrorString(cuerr));
-  }
+  // If ensemble scheduling is specified make sure the other fields are
+  // specified correctly.
+  if (config.has_ensemble_scheduling()) {
+    if (config.platform() != kEnsemblePlatform) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble scheduling can not be set for model ", config.name(),
+          " whose platform is not ", kEnsemblePlatform);
+    }
+    if (config.instance_group().size() != 0) {
+      return tensorflow::errors::InvalidArgument(
+          "instance group should not be specified for ensemble ",
+          config.name());
+    }
+    if (config.has_optimization()) {
+      return tensorflow::errors::InvalidArgument(
+          "optimization should not be specified for ensemble ", config.name());
+    }
+  } 
+  // if not specifed, then must validate platform and instance_group
+  else {
+    if (config.platform() == kEnsemblePlatform) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble scheduling must be set for ensemble ", config.name(),
+          " whose platform is ", kEnsemblePlatform);
+    }
 
-  for (const auto& group : config.instance_group()) {
-    if (group.kind() == ModelInstanceGroup::KIND_GPU) {
-      if (group.gpus().size() == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "instance group ", group.name(), " of model ", config.name(),
-            " has kind KIND_GPU but specifies no GPUs");
-      }
+    if (config.instance_group().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'instance group's for ", config.name());
+    }
 
-      for (const int32_t gid : group.gpus()) {
-        if ((gid < 0) || (gid >= dcnt)) {
+    // Make sure KIND_GPU instance group specifies at least one GPU and
+    // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
+    // not specify any GPUs.
+    int dcnt;
+    cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
+    if (cuerr == cudaErrorNoDevice) {
+      dcnt = 0;
+    } else if (cuerr != cudaSuccess) {
+      return tensorflow::errors::Internal(
+          "failed to get device count for validation of model ", config.name(),
+          ": ", cudaGetErrorString(cuerr));
+    }
+
+    for (const auto& group : config.instance_group()) {
+      if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+        if (group.gpus().size() == 0) {
           return tensorflow::errors::InvalidArgument(
               "instance group ", group.name(), " of model ", config.name(),
-              " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
-              (dcnt - 1));
+              " has kind KIND_GPU but specifies no GPUs");
         }
-      }
-    } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
-      if (group.gpus().size() > 0) {
-        return tensorflow::errors::InvalidArgument(
+
+        for (const int32_t gid : group.gpus()) {
+          if ((gid < 0) || (gid >= dcnt)) {
+            return tensorflow::errors::InvalidArgument(
+                "instance group ", group.name(), " of model ", config.name(),
+                " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
+                (dcnt - 1));
+          }
+        }
+      } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+        if (group.gpus().size() > 0) {
+          return tensorflow::errors::InvalidArgument(
+              "instance group ", group.name(), " of model ", config.name(),
+              " has kind KIND_CPU but specifies one or more GPUs");
+        }
+      } else {
+        return tensorflow::errors::Internal(
             "instance group ", group.name(), " of model ", config.name(),
-            " has kind KIND_CPU but specifies one or more GPUs");
+            " has unexpected kind KIND_AUTO");
       }
-    } else {
-      return tensorflow::errors::Internal(
-          "instance group ", group.name(), " of model ", config.name(),
-          " has unexpected kind KIND_AUTO");
     }
   }
 
