@@ -35,16 +35,16 @@ namespace nvidia { namespace inferenceserver { namespace test {
 class EnsembleBundleTest : public ModelConfigTestBase {
  public:
   bool GetModelConfigsInRepository(
-    const std::string& model_base_path,
-    std::unordered_map<std::string, ModelConfig>& config_map,
-    std::string* result);
+      const std::string& model_base_path,
+      std::unordered_map<std::string, ModelConfig>& config_map,
+      std::string* result);
 };
 
 bool
 EnsembleBundleTest::GetModelConfigsInRepository(
-  const std::string& model_base_path,
-  std::unordered_map<std::string, ModelConfig>& config_map,
-  std::string* result)
+    const std::string& model_base_path,
+    std::unordered_map<std::string, ModelConfig>& config_map,
+    std::string* result)
 {
   result->clear();
   config_map.clear();
@@ -103,16 +103,18 @@ TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
   std::string error;
   std::unordered_map<std::string, ModelConfig> config_map;
 
-  const std::string test_repo_path = tensorflow::io::JoinPath(getenv("TEST_SRCDIR"),
-          "inference_server/src/servables/trtis/testdata/ensemble_config_sanity");
+  const std::string test_repo_path = tensorflow::io::JoinPath(
+      getenv("TEST_SRCDIR"),
+      "inference_server/src/servables/trtis/testdata/ensemble_config_sanity");
   std::vector<std::string> model_repos;
   TF_CHECK_OK(
       tensorflow::Env::Default()->GetChildren(test_repo_path, &model_repos));
-    
+
   for (const auto& repo : model_repos) {
     const std::string model_base_path =
         tensorflow::io::JoinPath(test_repo_path, repo);
-    if (GetModelConfigsInRepository(model_base_path, config_map, &error) == false) {
+    if (GetModelConfigsInRepository(model_base_path, config_map, &error) ==
+        false) {
       EXPECT_TRUE(error.empty());
       LOG_ERROR << "Unexpected error while loading model configs:" << std::endl
                 << error;

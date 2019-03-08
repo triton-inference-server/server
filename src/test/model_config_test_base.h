@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -45,7 +45,9 @@ class ModelConfigTestBase : public ::testing::Test {
   void ValidateOne(
       const std::string& test_repository_rpath, bool autofill,
       const std::string& platform, BundleInitFunc init_func);
-  void CompareActualWithExpected(const std::string& expected_path, const std::string& actual, std::string* fail_expected);
+  void CompareActualWithExpected(
+      const std::string& expected_path, const std::string& actual,
+      std::string* fail_expected);
 };
 
 }}}  // namespace nvidia::inferenceserver::test

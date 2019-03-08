@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -138,8 +138,8 @@ ModelConfigTestBase::ValidateOne(
 
 void
 ModelConfigTestBase::CompareActualWithExpected(
-  const std::string& expected_path,
-  const std::string& actual, std::string* fail_expected)
+    const std::string& expected_path, const std::string& actual,
+    std::string* fail_expected)
 {
   // The actual output must match *one of* the "expected*" files.
   std::vector<std::string> children;

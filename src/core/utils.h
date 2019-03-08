@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <unordered_map>
 #include <deque>
+#include <unordered_map>
 #include "src/core/model_config.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
@@ -86,7 +86,7 @@ tensorflow::Status ValidateModelConfig(
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 tensorflow::Status ValidateEnsembleConfig(
-    std::unordered_map<std::string, ModelConfig> config_map);
+    const std::unordered_map<std::string, ModelConfig>& config_map);
 
 /// Validate that input is specified correctly in a model
 /// configuration.
