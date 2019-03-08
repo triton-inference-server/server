@@ -70,23 +70,8 @@ Within the container you can perform an incremental server build
 with::
 
   # cd /workspace
-  # bazel build -c opt --config=cuda src/servers/trtserver
+  # bazel build -c opt src/servers/trtserver
   # cp /workspace/bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/trtserver
-
-Similarly, within the container you can perform an incremental build
-of the C++ and Python client libraries and example executables with::
-
-  # cd /workspace
-  # bazel build -c opt --config=cuda src/clients/…
-  # mkdir -p /opt/tensorrtserver/bin
-  # cp bazel-bin/src/clients/c++/image_client /opt/tensorrtserver/bin/.
-  # cp bazel-bin/src/clients/c++/perf_client /opt/tensorrtserver/bin/.
-  # cp bazel-bin/src/clients/c++/simple_client /opt/tensorrtserver/bin/.
-  # mkdir -p /opt/tensorrtserver/lib
-  # cp bazel-bin/src/clients/c++/librequest.so /opt/tensorrtserver/lib/.
-  # cp bazel-bin/src/clients/c++/librequest.a /opt/tensorrtserver/lib/.
-  # mkdir -p /opt/tensorrtserver/python
-  # bazel-bin/src/clients/python/build_pip /opt/tensorrtserver/python/.
 
 Some source changes seem to cause bazel to get confused and not
 correctly rebuild all required sources. You can force bazel to rebuild
