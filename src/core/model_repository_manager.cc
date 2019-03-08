@@ -29,7 +29,7 @@
 
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/utils.h"
+#include "src/core/model_config_utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"

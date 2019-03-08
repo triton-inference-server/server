@@ -26,8 +26,9 @@
 
 #include <unordered_map>
 #include "src/core/constants.h"
+#include "src/core/ensemble_utils.h"
 #include "src/core/logging.h"
-#include "src/core/utils.h"
+#include "src/core/model_config_utils.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
@@ -94,7 +95,7 @@ TEST_F(EnsembleBundleTest, ModelConfigSanity)
 
   // Check model config sanity against ensemble's own test cases
   ValidateOne(
-      "inference_server/src/servables/trtis/testdata/model_config_sanity",
+      "inference_server/src/servables/ensemble/testdata/model_config_sanity",
       true /* autofill */, std::string() /* platform */, init_func);
 }
 
@@ -105,7 +106,8 @@ TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
 
   const std::string test_repo_path = tensorflow::io::JoinPath(
       getenv("TEST_SRCDIR"),
-      "inference_server/src/servables/trtis/testdata/ensemble_config_sanity");
+      "inference_server/src/servables/ensemble/testdata/"
+      "ensemble_config_sanity");
   std::vector<std::string> model_repos;
   TF_CHECK_OK(
       tensorflow::Env::Default()->GetChildren(test_repo_path, &model_repos));

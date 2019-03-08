@@ -31,7 +31,7 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 filegroup(
-    name = "trtis_testdata",
+    name = "ensemble_testdata",
     srcs = glob(
         ["testdata/**/*"]),
 )
@@ -46,12 +46,13 @@ cc_test(
         "-lnvonnxparser_runtime"
     ],
     data = [
-        ":trtis_testdata"
+        ":ensemble_testdata"
     ],
     deps = [
         "//src/core:constants",
+        "//src/core:ensemble_utils",
         "//src/core:logging",
-        "//src/core:utils",
+        "//src/core:model_config_utils",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",

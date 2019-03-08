@@ -53,7 +53,7 @@ cc_binary(
         "//src/core:server",
         "//src/core:server_status",
         "//src/core:server_status_proto",
-        "//src/core:utils",
+        "//src/core:model_config_utils",
         "@org_tensorflow//tensorflow/contrib:contrib_kernels",
         "@org_tensorflow//tensorflow/contrib:contrib_ops_op_lib",
         "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
