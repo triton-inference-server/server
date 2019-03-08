@@ -1,4 +1,4 @@
-name: "unreachable_output"
+name: "redundant_tensor_as_output"
 max_batch_size: 2
 platform: "ensemble"
 ensemble_scheduling {
@@ -11,49 +11,26 @@ ensemble_scheduling {
       }
       output_map {
         key: "output"
-        value: "temp_tensor_4"
+        value: "temp_tensor_1"
       }
     },
     {
       model_name: "fp32_dim1_batch4_output3"
       input_map {
-        key: "data"
+        key: "temp_tensor_1"
         value: "input"
       }
       output_map {
         key: "output1"
-        value: "temp_tensor_1"
+        value: "prob"
       }
       output_map {
         key: "output2"
-        value: "temp_tensor_2"
+        value: "prob_2"
       }
       output_map {
         key: "output3"
-        value: "temp_tensor_3"
-      }
-    },
-    {
-      model_name: "fp32_dim1_batch4_input4"
-      input_map {
-        key: "temp_tensor_1"
-        value: "input1"
-      }
-      input_map {
-        key: "temp_tensor_2"
-        value: "input2"
-      }
-      input_map {
-        key: "temp_tensor_3"
-        value: "input3"
-      }
-      input_map {
-        key: "temp_tensor_4"
-        value: "input4"
-      }
-      output_map {
-        key: "output"
-        value: "prob"
+        value: "temp_tensor_2"
       }
     }
   ]

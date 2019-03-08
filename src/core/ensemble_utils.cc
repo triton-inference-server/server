@@ -257,19 +257,31 @@ ValidateEnsembleConfig(
     }
     ready_queue.pop_front();
   }
+  std::set<std::string> ensemble_outputs;
   for (const auto& output : ensemble_config.output()) {
     auto it = ensemble_tensors.find(output.name());
     if (!it->second.ready) {
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", no data will be written to ",
           "ensemble output ", output.name(), " under optimistic assumption");
+    } else {
+      ensemble_outputs.insert(it->first);
     }
   }
   for (const auto& tensor : ensemble_tensors) {
+    if (ensemble_outputs.find(tensor.first) != ensemble_outputs.end()) {
+      continue;
+    }
     if (!tensor.second.ready) {
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
           " is redundant as no data will be written to it under optimistic "
+          "assumption");
+    } else if (tensor.second.next_nodes.size() == 0) {
+      if (ensemble)
+      return tensorflow::errors::InvalidArgument(
+          "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
+          " is redundant as it will not be used in any models under optimistic "
           "assumption");
     }
   }
