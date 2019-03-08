@@ -51,8 +51,6 @@ class NetDefBundle;
 class PlanBundle;
 class SavedModelBundle;
 class EnsembleBundle;
-class GRPCServer;
-class HTTPServer;
 
 // Inference server information.
 class InferenceServer {
@@ -62,18 +60,16 @@ class InferenceServer {
   // Construct an inference server.
   InferenceServer();
 
-  // Initialize the server.
-  // Return true on success, false otherwise.
-  bool Init(int argc, char** argv);
+  // Initialize the server. Return true on success, false otherwise.
+  bool Init();
 
   // Stop the server.  Return true if all models are unloaded, false
   // if exit timeout occurs.
   bool Stop();
 
-  // Poll the model repository for changes, if enabled. Returns
-  // immediately if polling is not enabled. Otherwise returns when
-  // server stops.
-  void PollModelRepository();
+  // Check the model repository for changes and update server state
+  // based on those changes.
+  Status PollModelRepository();
 
   // Run health check indicated by 'mode'
   void HandleHealth(
@@ -99,24 +95,54 @@ class InferenceServer {
       RequestStatus* request_status, ServerStatus* server_status,
       const std::string& model_name);
 
-  // Return the server version.
-  const std::string& Version() const { return version_; }
-
-  // Return the ID of the server.
-  const std::string& Id() const { return id_; }
-
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
 
-  // Return the HTTP port of the server, or -1 if HTTP is not enabled.
-  int HttpPort() const { return http_port_; }
+  // Return the server version.
+  const std::string& Version() const { return version_; }
 
-  // Return the gRPC port of the server, or -1 if gRPC is not enabled.
-  int GrpcPort() const { return grpc_port_; }
+  // Get / set the ID of the server.
+  const std::string& Id() const { return id_; }
+  void SetId(const std::string& id) { id_ = id; }
 
-  // Return the metrics port of the server, or -1 if metrics are not
-  // enabled.
-  int MetricsPort() const { return metrics_port_; }
+  // Get / set the model repository path
+  const std::string& ModelStorePath() const { return model_store_path_; }
+  void SetModelStorePath(const std::string& p) { model_store_path_ = p; }
+
+  // Get / set strict model configuration enable.
+  bool StrictModelConfigEnabled() const { return strict_model_config_; }
+  void SetStrictModelConfigEnabled(bool e) { strict_model_config_ = e; }
+
+  // Get / set strict readiness enable.
+  bool StrictReadinessEnabled() const { return strict_readiness_; }
+  void SetStrictReadinessEnabled(bool e) { strict_readiness_ = e; }
+
+  // Get / set profiling enable.
+  bool ProfilingEnabled() const { return profiling_enabled_; }
+  void SetProfilingEnabled(bool e) { profiling_enabled_ = e; }
+
+  // Get / set the rate of repository polling, in seconds. A value of
+  // 0 indicates no polling.
+  uint32_t RepositoryPollSeconds() const { return repository_poll_secs_; }
+  void SetRepositoryPollSeconds(uint32_t s) { repository_poll_secs_ = s; }
+
+  // Get / set the server exit timeout, in seconds.
+  int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
+  void SetExitTimeoutSeconds(int32_t s) { exit_timeout_secs_ = std::max(0, s); }
+
+  // Get / set Tensorflow soft placement enable.
+  bool TensorFlowSoftPlacementEnabled() const
+  {
+    return tf_soft_placement_enabled_;
+  }
+  void SetTensorFlowSoftPlacementEnabled(bool e)
+  {
+    tf_soft_placement_enabled_ = e;
+  }
+
+  // Get / set Tensorflow GPU memory fraction.
+  float TensorFlowGPUMemoryFraction() const { return tf_gpu_memory_fraction_; }
+  void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
 
   // Return the status manager for this server.
   std::shared_ptr<ServerStatusManager> StatusManager() const
@@ -148,39 +174,25 @@ class InferenceServer {
       const std::shared_ptr<InferBackendHandle>& handle);
 
  private:
-  // Start server running and listening on gRPC and/or HTTP endpoints.
-  void Start();
-
-  std::unique_ptr<GRPCServer> StartGrpcServer();
-  std::unique_ptr<HTTPServer> StartHttpServer();
-
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;
 
   // Return the next request ID for this server.
   uint64_t NextRequestId() { return next_request_id_++; }
 
-  // Helper function to perform repeated task during initialization.
-  void LogInitError(const std::string& msg);
-
   std::string version_;
   std::string id_;
-
-  // Use -1 for a port to indicate the corresponding service is
-  // disabled
-  int http_port_;
-  int grpc_port_;
-  int metrics_port_;
+  uint64_t start_time_ns_;
 
   std::string model_store_path_;
-  int http_thread_cnt_;
   bool strict_model_config_;
   bool strict_readiness_;
   bool profiling_enabled_;
-  bool poll_model_repository_enabled_;
   uint32_t repository_poll_secs_;
   uint32_t exit_timeout_secs_;
-  uint64_t start_time_ns_;
+
+  bool tf_soft_placement_enabled_;
+  float tf_gpu_memory_fraction_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;
@@ -194,10 +206,6 @@ class InferenceServer {
 
   std::unique_ptr<tfs::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
-
-  std::unique_ptr<HTTPServer> http_server_;
-
-  std::unique_ptr<GRPCServer> grpc_server_;
 };
 
 }}  // namespace nvidia::inferenceserver

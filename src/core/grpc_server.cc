@@ -44,7 +44,6 @@
 #include "src/nvrpc/Service.h"
 #include "src/nvrpc/ThreadPool.h"
 
-
 using nvrpc::BaseContext;
 using nvrpc::BidirectionalStreamingLifeCycle;
 using nvrpc::Context;

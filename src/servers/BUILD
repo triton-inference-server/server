@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,32 +28,13 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-cc_library(
-    name = "main",
-    srcs = ["main.cc"],
-    deps = [
-        "//src/core:logging",
-        "//src/core:server",
-    ],
-)
-
 cc_binary(
     name = "trtserver",
+    srcs = ["main.cc"],
     deps = [
-        ":main",
-        "//src/core:api_proto",
-        "//src/core:logging",
-        "//src/core:metrics",
-        "//src/core:model_config",
-        "//src/core:model_config_proto",
-        "//src/core:model_repository_manager",
-        "//src/core:profile",
-        "//src/core:request_status",
-        "//src/core:request_status_proto",
+        "//src/core:grpc_server",
+        "//src/core:http_server",
         "//src/core:server",
-        "//src/core:server_status",
-        "//src/core:server_status_proto",
-        "//src/core:model_config_utils",
         "@org_tensorflow//tensorflow/contrib:contrib_kernels",
         "@org_tensorflow//tensorflow/contrib:contrib_ops_op_lib",
         "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
