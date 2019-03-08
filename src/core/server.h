@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,6 +50,7 @@ class GraphDefBundle;
 class NetDefBundle;
 class PlanBundle;
 class SavedModelBundle;
+class EnsembleBundle;
 class GRPCServer;
 class HTTPServer;
 
@@ -137,6 +138,7 @@ class InferenceServer {
     tfs::ServableHandle<NetDefBundle> netdef_bundle_;
     tfs::ServableHandle<SavedModelBundle> saved_model_bundle_;
     tfs::ServableHandle<CustomBundle> custom_bundle_;
+    tfs::ServableHandle<EnsembleBundle> ensemble_bundle_;
   };
 
   tensorflow::Status CreateBackendHandle(

@@ -62,6 +62,8 @@
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
+#include "src/servables/ensemble/ensemble_bundle.h"
+#include "src/servables/ensemble/ensemble_bundle.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/lib/strings/str_util.h"
@@ -881,6 +883,7 @@ InferenceServer::BuildPlatformConfigMap(
   ::google::protobuf::Any plan_source_adapter_config;
   ::google::protobuf::Any netdef_source_adapter_config;
   ::google::protobuf::Any custom_source_adapter_config;
+  ::google::protobuf::Any ensemble_source_adapter_config;
 
   //// Tensorflow GraphDef
   {
@@ -947,6 +950,13 @@ InferenceServer::BuildPlatformConfigMap(
     custom_source_adapter_config.PackFrom(custom_config);
   }
 
+  //// Ensemble
+  {
+    EnsembleBundleSourceAdapterConfig ensemble_config;
+    ensemble_config.set_inference_server(reinterpret_cast<uint64_t>(this));
+    ensemble_source_adapter_config.PackFrom(ensemble_config);
+  }
+
   tfs::PlatformConfigMap platform_config_map;
 
   (*(*platform_config_map
@@ -961,6 +971,8 @@ InferenceServer::BuildPlatformConfigMap(
         .mutable_source_adapter_config()) = plan_source_adapter_config;
   (*(*platform_config_map.mutable_platform_configs())[kCustomPlatform]
         .mutable_source_adapter_config()) = custom_source_adapter_config;
+  (*(*platform_config_map.mutable_platform_configs())[kEnsemblePlatform]
+        .mutable_source_adapter_config()) = ensemble_source_adapter_config;
 
   return platform_config_map;
 }
@@ -1015,6 +1027,12 @@ InferenceServer::InferBackendHandle::Init(
         status = core->GetServableHandle(model_spec, &(custom_bundle_));
         if (status.ok()) {
           is_ = static_cast<InferenceBackend*>(custom_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_ENSEMBLE:
+        status = core->GetServableHandle(model_spec, &(ensemble_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceBackend*>(ensemble_bundle_.get());
         }
         break;
       default:
