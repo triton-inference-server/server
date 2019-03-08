@@ -287,23 +287,23 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
       infer_request_header_str, &request_header);
   uint64_t id = request_header.id();
 
-  auto backend = std::make_shared<InferenceServer::InferBackendState>();
+  auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
   tensorflow::Status status =
-      server_->InitBackendState(model_name, model_version, backend);
+      server_->CreateBackendHandle(model_name, model_version, backend);
   if (status.ok()) {
-    infer_stats->SetModelBackend(backend->Backend());
+    infer_stats->SetModelBackend((*backend)());
 
     std::shared_ptr<HTTPInferRequestProvider> request_provider;
     status = HTTPInferRequestProvider::Create(
-        req->buffer_in, *(backend->Backend()), model_name, model_version,
+        req->buffer_in, *((*backend)()), model_name, model_version,
         infer_request_header_str, &request_provider);
     if (status.ok()) {
       infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
       std::shared_ptr<HTTPInferResponseProvider> response_provider;
       status = HTTPInferResponseProvider::Create(
-          req->buffer_out, *(backend->Backend()),
-          request_provider->RequestHeader(), &response_provider);
+          req->buffer_out, *((*backend)()), request_provider->RequestHeader(),
+          &response_provider);
       if (status.ok()) {
         std::shared_ptr<InferRequest> request(new InferRequest(
             req, id, request_provider, response_provider, infer_stats, timer));

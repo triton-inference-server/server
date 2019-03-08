@@ -117,15 +117,15 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     // in ResponseHeader even on inference failure
     uint64_t id = request.meta_data().id();
 
-    auto backend = std::make_shared<InferenceServer::InferBackendState>();
-    tensorflow::Status status = server->InitBackendState(
+    auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
+    tensorflow::Status status = server->CreateBackendHandle(
         request.model_name(), request.model_version(), backend);
     if (status.ok()) {
-      infer_stats->SetModelBackend(backend->Backend());
+      infer_stats->SetModelBackend((*backend)());
 
       std::shared_ptr<GRPCInferRequestProvider> request_provider;
       status = GRPCInferRequestProvider::Create(
-          *(backend->Backend()), request, &request_provider);
+          *((*backend)()), request, &request_provider);
       if (status.ok()) {
         infer_stats->SetBatchSize(
             request_provider->RequestHeader().batch_size());

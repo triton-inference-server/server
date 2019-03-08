@@ -277,8 +277,8 @@ InferenceServer::Init(int argc, char** argv)
 
   LOG_INFO << "Initializing TensorRT Inference Server";
 
-  // So the server was init with default value first, then the settings
-  // will be modified after parsing arguments
+  // The server is initialized with default values first, and then the
+  // settings will be modified after parsing the arguments.
   id_ = server_id;
   http_port_ = allow_http ? http_port : -1;
   grpc_port_ = allow_grpc ? grpc_port : -1;
@@ -599,11 +599,11 @@ InferenceServer::Wait()
 }
 
 tensorflow::Status
-InferenceServer::InitBackendState(
+InferenceServer::CreateBackendHandle(
     const std::string& model_name, const int64_t model_version,
-    const std::shared_ptr<InferBackendState>& backend)
+    const std::shared_ptr<InferBackendHandle>& handle)
 {
-  return backend->Init(model_name, model_version, core_.get());
+  return handle->Init(model_name, model_version, core_.get());
 }
 
 std::unique_ptr<GRPCServer>
@@ -763,7 +763,7 @@ InferenceServer::HandleProfile(
 void
 InferenceServer::HandleInfer(
     RequestStatus* request_status,
-    const std::shared_ptr<InferBackendState>& backend,
+    const std::shared_ptr<InferBackendHandle>& backend,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
@@ -789,7 +789,7 @@ InferenceServer::HandleInfer(
                                 infer_stats,
                                 inflight](tensorflow::Status status) mutable {
     if (status.ok()) {
-      status = response_provider->FinalizeResponse(*(backend->Backend()));
+      status = response_provider->FinalizeResponse(*(*backend)());
       if (status.ok()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
@@ -804,7 +804,7 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
-  backend->Backend()->Run(
+  (*backend)()->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
@@ -966,10 +966,10 @@ InferenceServer::BuildPlatformConfigMap(
 }
 
 //
-// InferBackendState
+// InferBackendHandle
 //
 tensorflow::Status
-InferenceServer::InferBackendState::Init(
+InferenceServer::InferBackendHandle::Init(
     const std::string& model_name, const int64_t model_version,
     tfs::ServerCore* core)
 {
