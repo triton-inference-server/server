@@ -56,7 +56,7 @@ class HTTPServer;
 // Inference server information.
 class InferenceServer {
  public:
-  class InferBackendState;
+  class InferBackendHandle;
 
   // Construct an inference server.
   InferenceServer();
@@ -83,7 +83,7 @@ class InferenceServer {
   // update RequestStatus object with the status of the inference.
   void HandleInfer(
       RequestStatus* request_status,
-      const std::shared_ptr<InferBackendState>& backend,
+      const std::shared_ptr<InferBackendHandle>& backend,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
       std::shared_ptr<ModelInferStats> infer_stats,
@@ -121,14 +121,14 @@ class InferenceServer {
     return status_manager_;
   }
 
- public:
-  class InferBackendState {
+  // A handle to a backend.
+  class InferBackendHandle {
    public:
-    InferBackendState() : is_(nullptr) {}
+    InferBackendHandle() : is_(nullptr) {}
     tensorflow::Status Init(
         const std::string& model_name, const int64_t model_version,
         tfs::ServerCore* core);
-    InferenceBackend* Backend() { return is_; }
+    InferenceBackend* operator()() { return is_; }
 
    private:
     InferenceBackend* is_;
@@ -139,9 +139,9 @@ class InferenceServer {
     tfs::ServableHandle<CustomBundle> custom_bundle_;
   };
 
-  tensorflow::Status InitBackendState(
+  tensorflow::Status CreateBackendHandle(
       const std::string& model_name, const int64_t model_version,
-      const std::shared_ptr<InferBackendState>& backend);
+      const std::shared_ptr<InferBackendHandle>& handle);
 
  private:
   // Start server running and listening on gRPC and/or HTTP endpoints.
