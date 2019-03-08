@@ -38,13 +38,13 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: 8000
-      targetPort: 8000
+      targetPort: http
       name: http-inference-server
     - port: 8001
-      targetPort: 8001
+      targetPort: grpc
       name: grpc-inference-server
     - port: 8002
-      targetPort: 8002
+      targetPort: metrics
       name: metrics-inference-server
   selector:
     app: {{ template "nvidia-inference-server.name" . }}
