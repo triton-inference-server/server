@@ -28,6 +28,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "nvidia-inference-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "nvidia-inference-server.name" . }}
     chart: {{ template "nvidia-inference-server.chart" . }}
