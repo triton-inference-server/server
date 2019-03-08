@@ -171,7 +171,7 @@ ENV TF_NEED_S3 1
 RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mv .bazelrc .bazelrc.orig && \
     cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
-    bazel build -c opt --config=cuda \
+    bazel build -c opt \
           src/servers/trtserver \
           src/custom/... \
           src/test/... && \

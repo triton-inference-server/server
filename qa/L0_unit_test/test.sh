@@ -40,7 +40,7 @@ set +e
 # Return code 3 indicates a test failure so ignore that failure as we
 # use 'show_testlogs' to parse out more specific error messages.
 (cd /workspace && \
-        bazel test -c opt --config=cuda --verbose_failures --cache_test_results=no \
+        bazel test -c opt --verbose_failures --cache_test_results=no \
               --build_tests_only -- $(bazel query "tests($UNIT_TESTS)")) > $TEST_LOG 2>&1
 BLDRET=$?
 if [ $BLDRET -ne 0 ]; then
