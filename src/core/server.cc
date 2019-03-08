@@ -39,8 +39,6 @@
 
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_server.h"
-#include "src/core/http_server.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/model_config.h"
@@ -65,7 +63,6 @@
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
 #include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/util/command_line_flags.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
 #include "tensorflow_serving/core/availability_preserving_policy.h"
@@ -221,224 +218,49 @@ InferenceServer::InferenceServer()
   }
 
   id_ = "inference:0";
-  http_port_ = 8000;
-  grpc_port_ = 8001;
-  metrics_port_ = 8002;
-  http_thread_cnt_ = 16;
   strict_model_config_ = true;
   strict_readiness_ = true;
   profiling_enabled_ = false;
-  poll_model_repository_enabled_ = true;
-  repository_poll_secs_ = 15;
   exit_timeout_secs_ = 30;
+  repository_poll_secs_ = 15;
+
+  tf_soft_placement_enabled_ = true;
+  tf_gpu_memory_fraction_ = 0.0;
 
   inflight_request_counter_ = 0;
 
   status_manager_.reset(new ServerStatusManager(version_));
 }
 
-void
-InferenceServer::LogInitError(const std::string& msg)
-{
-  LOG_ERROR << msg;
-  ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
-}
-
 bool
-InferenceServer::Init(int argc, char** argv)
+InferenceServer::Init()
 {
   Status status;
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
 
-  std::string server_id("inference:0");
-  std::string model_store_path;
-
-  // On error, the init process will stop.
-  // The difference is if the server will be terminated.
-  bool exit_on_error = true;
-  bool strict_model_config = strict_model_config_;
-  bool strict_readiness = strict_readiness_;
-  bool allow_profiling = profiling_enabled_;
-  bool tf_soft_placement_enabled = true;
-  float tf_gpu_memory_fraction = 0.0;
-  bool allow_poll_model_repository = poll_model_repository_enabled_;
-  int32_t repository_poll_secs = repository_poll_secs_;
-  int32_t exit_timeout_secs = exit_timeout_secs_;
-
-  bool allow_http = true;
-  bool allow_grpc = true;
-  bool allow_metrics = true;
-  int32_t http_port = http_port_;
-  int32_t grpc_port = grpc_port_;
-  int32_t metrics_port = metrics_port_;
-  int32_t http_thread_cnt = http_thread_cnt_;
-
-  bool log_info = true;
-  bool log_warn = true;
-  bool log_error = true;
-  int32_t log_verbose = 0;
-
-  std::vector<tensorflow::Flag> flag_list = {
-      tensorflow::Flag("log-info", &log_info, "Enable/Disable info logging"),
-      tensorflow::Flag(
-          "log-warning", &log_warn, "Enable/Disable warning logging"),
-      tensorflow::Flag("log-error", &log_error, "Enable/Disable error logging"),
-      tensorflow::Flag("log-verbose", &log_verbose, "Verbose logging level"),
-      tensorflow::Flag("id", &server_id, "Identifier for this server"),
-      tensorflow::Flag(
-          "model-store", &model_store_path, "Path to model store directory."),
-      tensorflow::Flag(
-          "exit-on-error", &exit_on_error,
-          "Exit the inference server if an error occurs during "
-          "initialization."),
-      tensorflow::Flag(
-          "strict-model-config", &strict_model_config,
-          "If true model configuration files must be provided and all required "
-          "configuration settings must be specified. If false the model "
-          "configuration may be absent or only partially specified and the "
-          "server will attempt to derive the missing required configuration."),
-      tensorflow::Flag(
-          "strict-readiness", &strict_readiness,
-          "If true /api/health/ready endpoint indicates ready if the server "
-          "is responsive and all models are available. If false "
-          "/api/health/ready endpoint indicates ready if server is responsive "
-          "even "
-          "if some/all models are unavailable."),
-      tensorflow::Flag(
-          "allow-profiling", &allow_profiling, "Allow server profiling."),
-      tensorflow::Flag(
-          "allow-http", &allow_http,
-          "Allow the server to listen on for HTTP requests."),
-      tensorflow::Flag(
-          "allow-grpc", &allow_grpc,
-          "Allow the server to listen on for gRPC requests."),
-      tensorflow::Flag(
-          "allow-metrics", &allow_metrics,
-          "Allow the server to provide prometheus metrics."),
-      tensorflow::Flag(
-          "http-port", &http_port,
-          "The port for the server to listen on for HTTP requests."),
-      tensorflow::Flag(
-          "grpc-port", &grpc_port,
-          "The port for the server to listen on for gRPC requests."),
-      tensorflow::Flag(
-          "metrics-port", &metrics_port,
-          "The port exposing prometheus metrics."),
-      tensorflow::Flag(
-          "http-thread-count", &http_thread_cnt,
-          "Number of threads handling HTTP requests."),
-      tensorflow::Flag(
-          "allow-poll-model-repository", &allow_poll_model_repository,
-          "Poll the model repository to detect changes. The poll rate is "
-          "controlled by 'repository-poll-secs'."),
-      tensorflow::Flag(
-          "repository-poll-secs", &repository_poll_secs,
-          "Interval in seconds between each poll of the model repository to "
-          "check "
-          "for changes. A value of zero indicates that the repository is "
-          "checked "
-          "only a single time at startup. Valid only when "
-          "--allow-poll-model-repository=true is specified."),
-      tensorflow::Flag(
-          "exit-timeout-secs", &exit_timeout_secs,
-          "Timeout (in seconds) when exiting to wait for in-flight inferences "
-          "to "
-          "finish. After the timeout expires the server exits even if "
-          "inferences "
-          "are still in flight."),
-      tensorflow::Flag(
-          "tf-allow-soft-placement", &tf_soft_placement_enabled,
-          "Instruct TensorFlow to use CPU implementation of an operation when "
-          "a "
-          "GPU implementation is not available."),
-      tensorflow::Flag(
-          "tf-gpu-memory-fraction", &tf_gpu_memory_fraction,
-          "Reserve a portion of GPU memory for TensorFlow models. Default "
-          "value "
-          "0.0 indicates that TensorFlow should dynamically allocate memory as "
-          "needed. Value of 1.0 indicates that TensorFlow should allocate all "
-          "of "
-          "GPU memory."),
-  };
-
-  std::string usage = tensorflow::Flags::Usage(argv[0], flag_list);
-  const bool parse_result = tensorflow::Flags::Parse(&argc, argv, flag_list);
-  if (!parse_result) {
-    LogInitError(usage);
-    return false;
-  }
-
-
-  LOG_ENABLE_INFO(log_info);
-  LOG_ENABLE_WARNING(log_warn);
-  LOG_ENABLE_ERROR(log_error);
-  LOG_SET_VERBOSE(log_verbose);
-
   LOG_INFO << "Initializing TensorRT Inference Server";
-
-  // The server is initialized with default values first, and then the
-  // settings will be modified after parsing the arguments.
-  id_ = server_id;
-  http_port_ = allow_http ? http_port : -1;
-  grpc_port_ = allow_grpc ? grpc_port : -1;
-  metrics_port_ = allow_metrics ? metrics_port : -1;
-  model_store_path_ = model_store_path;
-  http_thread_cnt_ = http_thread_cnt;
-  strict_model_config_ = strict_model_config;
-  strict_readiness_ = strict_readiness;
-  profiling_enabled_ = allow_profiling;
-  poll_model_repository_enabled_ = allow_poll_model_repository;
-  repository_poll_secs_ = std::max(0, repository_poll_secs);
-  exit_timeout_secs_ = std::max(0, exit_timeout_secs);
-
-  if (argc != 1) {
-    LOG_ERROR << "Unrecognized option: " << argv[1];
-    LogInitError(usage);
-    return false;
-  }
 
   if (model_store_path_.empty()) {
     LOG_ERROR << "--model-store must be specified";
-    LogInitError(usage);
-    return false;
-  }
-
-  if (!allow_http && !allow_grpc) {
-    LOG_ERROR << "At least one of the following options must be true: "
-              << "--allow-http, --allow-grpc";
-    LogInitError(usage);
-    return false;
-  } else if (allow_http && allow_grpc && http_port == grpc_port) {
-    LOG_ERROR << "The server cannot listen to HTTP requests "
-              << "and gRPC requests at the same port";
-    LogInitError(usage);
-    return false;
-  } else if (
-      allow_metrics && ((allow_grpc && (metrics_port == grpc_port)) ||
-                        (allow_http && (metrics_port == http_port)))) {
-    LOG_ERROR << "The server cannot provide metrics on same port used for "
-              << "HTTP or gRPC requests";
-    LogInitError(usage);
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return false;
   }
 
   // Initialize metrics reporting port.
-  if (metrics_port_ >= 0) {
-    LOG_INFO << "Reporting prometheus metrics on port " << metrics_port_;
-    Metrics::Initialize(metrics_port_);
+  int metrics_port = 8002;  // FIXME
+  if (metrics_port >= 0) {
+    LOG_INFO << "Reporting prometheus metrics on port " << metrics_port;
+    Metrics::Initialize(metrics_port);
   }
 
-  // Start the HTTP and/or gRPC server accepting connections.
-  Start();
-
   // Disable profiling at server start. Server API can be used to
-  // start/stop profiling (unless disabled as indicated by
-  // 'allow_profiling').
+  // start/stop profiling.
   status = ProfileStopAll();
   if (!status.IsOk()) {
-    LogInitError(status.Message());
-    return !exit_on_error;
+    LOG_ERROR << status.Message();
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return false;
   }
 
   // For ServerCore Options, we leave servable_state_monitor_creator unspecified
@@ -453,13 +275,12 @@ InferenceServer::Init(int argc, char** argv)
   // in TFS so that repository is only checked a single time at
   // startup.
   options.max_num_load_retries = 0;
-  options.file_system_poll_wait_seconds =
-      (poll_model_repository_enabled_) ? repository_poll_secs_ : 0;
+  options.file_system_poll_wait_seconds = repository_poll_secs_;
 
   PlatformConfigMap platform_configs;
   BuildPlatformConfigMap(
-      version_, model_store_path_, strict_model_config_, tf_gpu_memory_fraction,
-      tf_soft_placement_enabled, &platform_configs,
+      version_, model_store_path_, strict_model_config_,
+      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, &platform_configs,
       &options.platform_config_map);
   LOG_VERBOSE(1) << options.platform_config_map.DebugString();
 
@@ -469,21 +290,24 @@ InferenceServer::Init(int argc, char** argv)
   status = ModelRepositoryManager::Create(
       model_store_path_, platform_configs, !strict_model_config_);
   if (!status.IsOk()) {
-    LogInitError(status.Message());
-    return !exit_on_error;
+    LOG_ERROR << status.Message();
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return false;
   }
 
   std::set<std::string> added, deleted, modified, unmodified;
   status =
       ModelRepositoryManager::Poll(&added, &deleted, &modified, &unmodified);
   if (!status.IsOk()) {
-    LogInitError(status.Message());
-    return !exit_on_error;
+    LOG_ERROR << status.Message();
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return false;
   }
 
   if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
-    LogInitError("Unexpected initial state for model repository");
-    return !exit_on_error;
+    LOG_ERROR << "Unexpected initial state for model repository";
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return false;
   }
 
   for (const auto& name : added) {
@@ -491,14 +315,16 @@ InferenceServer::Init(int argc, char** argv)
         options.model_server_config.mutable_model_config_list()->add_config();
     status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
     if (!status.IsOk()) {
-      LogInitError("Internal: model repository manager inconsistency");
-      return !exit_on_error;
+      LOG_ERROR << "Internal: model repository manager inconsistency";
+      ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+      return false;
     }
 
     status = status_manager_->InitForModel(name);
     if (!status.IsOk()) {
-      LogInitError(status.Message());
-      return !exit_on_error;
+      LOG_ERROR << status.Message();
+      ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+      return false;
     }
   }
 
@@ -511,9 +337,8 @@ InferenceServer::Init(int argc, char** argv)
       tfs::ServerCore::Create(std::move(options), &core_);
   if (!tfstatus.ok()) {
     LOG_ERROR << tfstatus;
-    if (exit_on_error) {
-      return false;
-    }
+    ready_state_ = ServerReadyState::SERVER_READY;
+    return false;
   }
 
   ready_state_ = ServerReadyState::SERVER_READY;
@@ -572,125 +397,70 @@ InferenceServer::Stop()
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
-  if (grpc_server_) {
-    grpc_server_->Stop();
-  }
-
-  if (http_server_ != nullptr) {
-    http_server_->Stop();
-  }
-
   return false;
 }
 
-void
+Status
 InferenceServer::PollModelRepository()
 {
-  Status status;
+  LOG_VERBOSE(1) << "Polling model repository";
 
-  // If model load/unload is enabled for the model store, then
-  // periodically look for changes and update the loaded model
-  // configurations appropriately.
-  if (poll_model_repository_enabled_) {
-    while (ready_state_ != ServerReadyState::SERVER_EXITING) {
-      if (ready_state_ == ServerReadyState::SERVER_READY) {
-        std::set<std::string> added, deleted, modified, unmodified;
-        status = ModelRepositoryManager::Poll(
-            &added, &deleted, &modified, &unmodified);
-        if (!status.IsOk()) {
-          LOG_ERROR << "Failed to poll model repository: " << status.Message();
-          goto next;
-        }
+  // Look for changes and update the loaded model configurations
+  // appropriately.
+  if (ready_state_ == ServerReadyState::SERVER_READY) {
+    std::set<std::string> added, deleted, modified, unmodified;
+    RETURN_IF_ERROR(
+        ModelRepositoryManager::Poll(&added, &deleted, &modified, &unmodified));
 
-        // Nothing to do if no model adds, deletes or modifies.
-        if (added.empty() && deleted.empty() && modified.empty()) {
-          goto next;
-        }
+    // Nothing to do if no model adds, deletes or modifies.
+    if (added.empty() && deleted.empty() && modified.empty()) {
+      return Status::Success;
+    }
 
-        // There was a change in the model repository so need to
-        // create a new TFS model configuration and reload it into the
-        // server to cause the appropriate models to be loaded and
-        // unloaded.
-        tfs::ModelServerConfig msc;
-        msc.mutable_model_config_list();
+    // There was a change in the model repository so need to
+    // create a new TFS model configuration and reload it into the
+    // server to cause the appropriate models to be loaded and
+    // unloaded.
+    tfs::ModelServerConfig msc;
+    msc.mutable_model_config_list();
 
-        // Added models should be loaded and be initialized for status
-        // reporting.
-        for (const auto& name : added) {
-          tfs::ModelConfig* tfs_config =
-              msc.mutable_model_config_list()->add_config();
-          status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-          if (!status.IsOk()) {
-            LOG_ERROR << "Failed to create server config for '" << name
-                      << "': " << status.Message();
-            goto next;
-          }
+    // Added models should be loaded and be initialized for status
+    // reporting.
+    for (const auto& name : added) {
+      tfs::ModelConfig* tfs_config =
+          msc.mutable_model_config_list()->add_config();
+      RETURN_IF_ERROR(
+          ModelRepositoryManager::GetTFSModelConfig(name, tfs_config));
+      RETURN_IF_ERROR(status_manager_->InitForModel(name));
+    }
 
-          status = status_manager_->InitForModel(name);
-          if (!status.IsOk()) {
-            LOG_ERROR << "Failed to initialize status for '" << name
-                      << "': " << status.Message();
-            goto next;
-          }
-        }
+    // Keep unmodified models...
+    for (const auto& name : unmodified) {
+      tfs::ModelConfig* tfs_config =
+          msc.mutable_model_config_list()->add_config();
+      RETURN_IF_ERROR(
+          ModelRepositoryManager::GetTFSModelConfig(name, tfs_config));
+    }
 
-        // Keep unmodified models...
-        for (const auto& name : unmodified) {
-          tfs::ModelConfig* tfs_config =
-              msc.mutable_model_config_list()->add_config();
-          status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-          if (!status.IsOk()) {
-            LOG_ERROR << "Failed to create server config for '" << name
-                      << "': " << status.Message();
-            goto next;
-          }
-        }
+    RETURN_IF_TF_ERROR(core_->ReloadConfig(msc));
 
-        {
-          tensorflow::Status tfstatus = core_->ReloadConfig(msc);
-          if (!tfstatus.ok()) {
-            LOG_ERROR << "Failed to reload model configurations: " << tfstatus;
-            goto next;
-          }
-        }
-
-        // If there are any modified model, (re)load them to pick up
-        // the changes. We want to keep the current status information
-        // so don't re-init it.
-        if (!modified.empty()) {
-          for (const auto& name : modified) {
-            tfs::ModelConfig* tfs_config =
-                msc.mutable_model_config_list()->add_config();
-            status =
-                ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-            if (!status.IsOk()) {
-              LOG_ERROR << "Failed to create server config for '" << name
-                        << "': " << status.Message();
-              goto next;
-            }
-            status = status_manager_->UpdateConfigForModel(name);
-            if (!status.IsOk()) {
-              LOG_ERROR << "Failed to reload model config for '" << name
-                        << "': " << status.Message();
-              goto next;
-            }
-          }
-
-          {
-            tensorflow::Status tfstatus = core_->ReloadConfig(msc);
-            if (!tfstatus.ok()) {
-              LOG_ERROR << "Failed to reload modified model configurations: "
-                        << tfstatus;
-              goto next;
-            }
-          }
-        }
+    // If there are any modified model, (re)load them to pick up
+    // the changes. We want to keep the current status information
+    // so don't re-init it.
+    if (!modified.empty()) {
+      for (const auto& name : modified) {
+        tfs::ModelConfig* tfs_config =
+            msc.mutable_model_config_list()->add_config();
+        RETURN_IF_ERROR(
+            ModelRepositoryManager::GetTFSModelConfig(name, tfs_config));
+        RETURN_IF_ERROR(status_manager_->UpdateConfigForModel(name));
       }
 
-    next:
-      std::this_thread::sleep_for(std::chrono::seconds(repository_poll_secs_));
+      RETURN_IF_TF_ERROR(core_->ReloadConfig(msc));
     }
   }
+
+  return Status::Success;
 }
 
 Status
@@ -699,65 +469,6 @@ InferenceServer::CreateBackendHandle(
     const std::shared_ptr<InferBackendHandle>& handle)
 {
   return handle->Init(model_name, model_version, core_.get());
-}
-
-std::unique_ptr<GRPCServer>
-InferenceServer::StartGrpcServer()
-{
-  std::unique_ptr<GRPCServer> server;
-  Status status = GRPCServer::Create(this, grpc_port_, &server);
-  if (status.IsOk()) {
-    status = server->Start();
-  }
-
-  if (!status.IsOk()) {
-    server.reset();
-  }
-  return std::move(server);
-}
-
-std::unique_ptr<HTTPServer>
-InferenceServer::StartHttpServer()
-{
-  std::unique_ptr<HTTPServer> service;
-  Status status =
-      HTTPServer::Create(this, http_port_, http_thread_cnt_, &service);
-  if (status.IsOk()) {
-    status = service->Start();
-  }
-
-  if (!status.IsOk()) {
-    service.reset();
-  }
-
-  return std::move(service);
-}
-
-void
-InferenceServer::Start()
-{
-  LOG_INFO << "Starting server '" << id_ << "' listening on";
-
-  // Enable gRPC endpoint if requested...
-  if (grpc_port_ != -1) {
-    LOG_INFO << " localhost:" << std::to_string(grpc_port_)
-             << " for gRPC requests";
-    grpc_server_ = StartGrpcServer();
-    if (grpc_server_ == nullptr) {
-      LOG_ERROR << "Failed to start gRPC server";
-    }
-  }
-
-  // Enable HTTP endpoint if requested...
-  if (http_port_ != -1) {
-    LOG_INFO << " localhost:" << std::to_string(http_port_)
-             << " for HTTP requests";
-
-    http_server_ = StartHttpServer();
-    if (http_server_ == nullptr) {
-      LOG_ERROR << "Failed to start HTTP server";
-    }
-  }
 }
 
 void
