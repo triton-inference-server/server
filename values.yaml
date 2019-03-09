@@ -27,7 +27,7 @@
 replicaCount: 1
 
 image:
-  imageName: nvcr.io/nvidia/tensorrtserver:18.12-py3
+  imageName: nvcr.io/nvidia/tensorrtserver:19.02-py3
   pullPolicy: IfNotPresent
   modelRepositoryPath: gs://trtis-kubeflow/model_repository
   numGpus: 1
