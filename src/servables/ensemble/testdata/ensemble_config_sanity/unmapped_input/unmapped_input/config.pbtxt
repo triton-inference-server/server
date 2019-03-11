@@ -4,17 +4,6 @@ platform: "ensemble"
 ensemble_scheduling {
   step [
     {
-      model_name: "fp32_dim1_batch4"
-      input_map {
-        key: "data"
-        value: "input"
-      }
-      output_map {
-        key: "output"
-        value: "temp_tensor_4"
-      }
-    },
-    {
       model_name: "fp32_dim1_batch4_output3"
       input_map {
         key: "data"
@@ -22,15 +11,15 @@ ensemble_scheduling {
       }
       output_map {
         key: "output1"
-        value: "temp_tensor_1"
-      }
-      output_map {
-        key: "output2"
         value: "temp_tensor_2"
       }
       output_map {
-        key: "output3"
+        key: "output2"
         value: "temp_tensor_3"
+      }
+      output_map {
+        key: "output3"
+        value: "temp_tensor_4"
       }
     },
     {

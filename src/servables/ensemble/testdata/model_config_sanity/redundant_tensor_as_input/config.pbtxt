@@ -22,13 +22,13 @@ ensemble_scheduling {
       }
       output_map {
         key: "output"
-        value: "temp_tensor_4"
+        value: "temp_tensor_6"
       }
     },
     {
       model_name: "fp32_dim1_batch4_output3"
       input_map {
-        key: "data"
+        key: "temp_tensor_4"
         value: "input"
       }
       output_map {

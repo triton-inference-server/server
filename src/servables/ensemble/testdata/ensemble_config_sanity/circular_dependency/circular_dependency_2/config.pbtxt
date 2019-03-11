@@ -18,14 +18,14 @@ ensemble_scheduling {
 }
 input [
   {
-    name: "data"
+    name: "input"
     data_type: TYPE_FP32
     dims: [ 16 ]
   }
 ]
 output [
   {
-    name: "prob"
+    name: "output"
     data_type: TYPE_FP32
     dims: [ 16 ]
   }
