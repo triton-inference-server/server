@@ -33,6 +33,14 @@ namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
+struct EnsembleTensor {
+  EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
+  bool ready;
+  bool isOutput;
+  std::vector<EnsembleTensor*> prev_nodes;
+  std::vector<EnsembleTensor*> next_nodes;
+};
+
 /// Get version of a model from the path containing the model
 /// definition file.
 /// \param path The path to the model definition file.
@@ -83,6 +91,18 @@ tensorflow::Status ValidateModelConfig(
 /// is not valid.
 tensorflow::Status ValidateEnsembleSchedulingConfig(
     const ModelConfig& ensemble_config);
+
+/// Build a graph that represents the data flow in the ensemble specifieed in
+/// given model config. the node (ensemble tensor) in the graph can be looked
+/// up using its name as key.
+/// \param ensemble_config The model configuration that specifies
+/// ensemble_scheduling field.
+/// \param keyed_ensemble_graph Returned the ensemble graph.
+/// \return The error status. A non-OK status indicates the build fails because
+/// the ensemble configuration is not valid.
+tensorflow::Status BuildEnsembleGraph(
+    const ModelConfig& ensemble_config,
+    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph);
 
 /// Validate that input is specified correctly in a model
 /// configuration.

@@ -118,8 +118,8 @@ TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
     if (GetModelConfigsInRepository(model_base_path, config_map, &error) ==
         false) {
       EXPECT_TRUE(error.empty());
-      LOG_ERROR << "Unexpected error while loading model configs in "
-                << repo << ":" << std::endl
+      LOG_ERROR << "Unexpected error while loading model configs in " << repo
+                << ":" << std::endl
                 << error;
       continue;
     }
