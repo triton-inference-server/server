@@ -35,8 +35,6 @@
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 #include "src/servables/custom/loader.h"
-#include "tensorflow/c/c_api.h"
-#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -66,20 +64,20 @@ CustomBundle::Context::~Context()
   library_handle_ = nullptr;
 }
 
-tensorflow::Status
+Status
 CustomBundle::Init(
-    const tensorflow::StringPiece& path,
-    const std::vector<std::string>& server_params, const ModelConfig& config)
+    const std::string& path, const std::vector<std::string>& server_params,
+    const ModelConfig& config)
 {
-  TF_RETURN_IF_ERROR(ValidateModelConfig(config, kCustomPlatform));
-  TF_RETURN_IF_ERROR(SetModelConfig(path, config));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kCustomPlatform));
+  RETURN_IF_ERROR(SetModelConfig(path, config));
 
   server_params_ = server_params;
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 CustomBundle::CreateExecutionContexts(
     const std::unordered_map<std::string, std::string>& libraries)
 {
@@ -91,7 +89,7 @@ CustomBundle::CreateExecutionContexts(
       if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
-        TF_RETURN_IF_ERROR(CreateExecutionContext(
+        RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, Context::NO_GPU_DEVICE, libraries));
         total_context_cnt++;
       } else {
@@ -99,7 +97,7 @@ CustomBundle::CreateExecutionContexts(
           const std::string instance_name = group.name() + "_" +
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
-          TF_RETURN_IF_ERROR(
+          RETURN_IF_ERROR(
               CreateExecutionContext(instance_name, gpu_device, libraries));
           total_context_cnt++;
         }
@@ -109,22 +107,20 @@ CustomBundle::CreateExecutionContexts(
 
   // Create a scheduler with one thread for each context available for
   // this model. Each runner is exclusively tied to the context.
-  TF_RETURN_IF_ERROR(SetConfiguredScheduler(
+  RETURN_IF_ERROR(SetConfiguredScheduler(
       total_context_cnt,
-      [this](uint32_t runner_idx) -> tensorflow::Status {
-        return InitBackend(runner_idx);
-      },
+      [this](uint32_t runner_idx) -> Status { return InitBackend(runner_idx); },
       [this](
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(tensorflow::Status)> func) {
+          std::function<void(Status)> func) {
         RunBackend(runner_idx, payloads, func);
       }));
 
   LOG_VERBOSE(1) << "custom bundle for " << Name() << std::endl << *this;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 CustomBundle::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::string>& libraries)
@@ -141,9 +137,10 @@ CustomBundle::CreateExecutionContext(
     cudaDeviceProp cuprops;
     cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "unable to get CUDA device properties for ", Name(), ": ",
-          cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unable to get CUDA device properties for " + Name() + ": " +
+              cudaGetErrorString(cuerr));
     }
 
     cc = std::to_string(cuprops.major) + "." + std::to_string(cuprops.minor);
@@ -155,8 +152,9 @@ CustomBundle::CreateExecutionContext(
 
   const auto& mn_itr = libraries.find(cc_model_filename);
   if (mn_itr == libraries.end()) {
-    return tensorflow::errors::Internal(
-        "unable to find Custom model '", cc_model_filename, "' for ", Name());
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to find Custom model '" +
+                                         cc_model_filename + "' for " + Name());
   }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -178,22 +176,23 @@ CustomBundle::CreateExecutionContext(
   // 'mn_itr->second' is the path to the shared library file to use
   // for that context (e.g. model_name/1/libcustom.so). Load that
   // library as it provides the custom backend implementation.
-  TF_RETURN_IF_ERROR(LoadCustom(
+  RETURN_IF_ERROR(LoadCustom(
       mn_itr->second, &(context->library_handle_), &(context->InitializeFn_),
       &(context->FinalizeFn_), &(context->ErrorStringFn_),
       &(context->ExecuteFn_)));
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 CustomBundle::InitBackend(uint32_t runner_idx)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
-    return tensorflow::errors::Internal(
-        "unexpected runner index", runner_idx, ", max allowed ",
-        contexts_.size());
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " + std::to_string(contexts_.size()));
   }
 
   const auto& context = contexts_[runner_idx];
@@ -224,24 +223,26 @@ CustomBundle::InitBackend(uint32_t runner_idx)
   int err =
       context->InitializeFn_(&init_data, &(context->library_context_handle_));
   if (err != 0) {
-    return tensorflow::errors::Internal(
-        "initialize error for '", Name(), "': (", err, ") ",
-        context->LibraryErrorString(err));
+    return Status(
+        RequestStatusCode::INTERNAL, "initialize error for '" + Name() +
+                                         "': (" + std::to_string(err) + ") " +
+                                         context->LibraryErrorString(err));
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 void
 CustomBundle::RunBackend(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
+    std::function<void(Status)> OnCompleteQueuedPayloads)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
-    OnCompleteQueuedPayloads(tensorflow::errors::Internal(
-        "unexpected runner index", runner_idx, ", max allowed ",
-        contexts_.size()));
+    OnCompleteQueuedPayloads(Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected runner index" + std::to_string(runner_idx) +
+            ", max allowed " + std::to_string(contexts_.size())));
     return;
   }
 
@@ -262,7 +263,7 @@ CustomBundle::RunBackend(
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
 }
 
-tensorflow::Status
+Status
 CustomBundle::Context::Run(
     CustomBundle* base, std::vector<Scheduler::Payload>* payloads)
 {
@@ -299,10 +300,11 @@ CustomBundle::Context::Run(
   uint32_t total_inputs = 0;
   uint32_t total_requested_outputs = 0;
   for (auto& payload : *payloads) {
-    if (!payload.status_.ok()) {
-      return tensorflow::errors::Internal(
-          "unexpected payload with non-OK status given to custom runner for '",
-          name_, "'");
+    if (!payload.status_.IsOk()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected payload with non-OK status given to custom runner for '" +
+              name_ + "'");
     }
 
     const InferRequestHeader& request_header =
@@ -317,16 +319,17 @@ CustomBundle::Context::Run(
   // inference. The payloads will have their error status set so can
   // just return.
   if (total_batch_size == 0) {
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
   // total_batch_size can be 1 for models that don't support batching
   // (i.e. max_batch_size_ == 0).
   if ((total_batch_size != 1) &&
       (total_batch_size > (uint32_t)max_batch_size_)) {
-    return tensorflow::errors::Internal(
-        "dynamic batch size ", total_batch_size, " for '", name_,
-        "', max allowed is ", max_batch_size_);
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
+            name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
   // We use the following to hold pointers to all the input and output
@@ -372,9 +375,10 @@ CustomBundle::Context::Run(
     for (const auto& input : request_header.input()) {
       auto itr = input_shapes.find(input.name());
       if (itr == input_shapes.end()) {
-        return tensorflow::errors::Internal(
-            "unable to find shape for input '", input.name(), "' for '", name_,
-            "'");
+        return Status(
+            RequestStatusCode::INTERNAL, "unable to find shape for input '" +
+                                             input.name() + "' for '" + name_ +
+                                             "'");
       }
 
       std::unique_ptr<std::vector<int64_t>>& shape = itr->second;
@@ -412,21 +416,24 @@ CustomBundle::Context::Run(
       library_context_handle_, custom_payloads.size(), &custom_payloads[0],
       CustomGetNextInput, CustomGetOutput);
   if (err != 0) {
-    return tensorflow::errors::Internal(
-        "execute error for '", name_, "': (", err, ") ",
-        LibraryErrorString(err));
+    return Status(
+        RequestStatusCode::INTERNAL, "execute error for '" + name_ + "': (" +
+                                         std::to_string(err) + ") " +
+                                         LibraryErrorString(err));
   }
 
   // Transfer payload errors back to the Payload objects.
   for (size_t i = 0; i < custom_payloads.size(); ++i) {
     if (custom_payloads[i].error_code != 0) {
-      (*payloads)[i].status_ = tensorflow::errors::Internal(
-          "payload error for '", name_, "': (", custom_payloads[i].error_code,
-          ") ", LibraryErrorString(custom_payloads[i].error_code));
+      (*payloads)[i].status_ = Status(
+          RequestStatusCode::INTERNAL,
+          "payload error for '" + name_ + "': (" +
+              std::to_string(custom_payloads[i].error_code) + ") " +
+              LibraryErrorString(custom_payloads[i].error_code));
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 bool
@@ -437,9 +444,9 @@ CustomBundle::Context::GetNextInput(
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
-  tensorflow::Status status = payload->request_provider_->GetNextInputContent(
+  Status status = payload->request_provider_->GetNextInputContent(
       name, content, content_byte_size, false);
-  return status.ok();
+  return status.IsOk();
 }
 
 bool
@@ -457,9 +464,9 @@ CustomBundle::Context::GetOutput(
   // OK status as an indication that the output should not be written.
   if (payload->response_provider_ != nullptr) {
     std::vector<int64_t> shape(shape_dims, shape_dims + shape_dim_cnt);
-    tensorflow::Status status = payload->response_provider_->GetOutputBuffer(
+    Status status = payload->response_provider_->GetOutputBuffer(
         name, content, content_byte_size, shape);
-    return status.ok();
+    return status.IsOk();
   }
 
   return true;

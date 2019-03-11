@@ -64,16 +64,16 @@ EnsembleBundleTest::GetModelConfigsInRepository(
 
     ModelConfig config;
     tfs::PlatformConfigMap platform_map;
-    tensorflow::Status status =
+    Status status =
         GetNormalizedModelConfig(model_path, platform_map, false, &config);
-    if (!status.ok()) {
-      result->append(status.ToString());
+    if (!status.IsOk()) {
+      result->append(status.AsString());
       return false;
     }
 
     status = ValidateModelConfig(config, std::string());
-    if (!status.ok()) {
-      result->append(status.ToString());
+    if (!status.IsOk()) {
+      result->append(status.AsString());
       return false;
     }
 
@@ -84,10 +84,9 @@ EnsembleBundleTest::GetModelConfigsInRepository(
 
 TEST_F(EnsembleBundleTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func =
-      [](const std::string& path,
-         const ModelConfig& config) -> tensorflow::Status {
-    return tensorflow::Status::OK();
+  BundleInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
+    return Status::Success;
   };
 
   // Standard testing...
@@ -125,9 +124,9 @@ TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
     }
 
     std::string actual;
-    tensorflow::Status status = ValidateEnsembleConfig(config_map);
-    if (!status.ok()) {
-      actual.append(status.ToString());
+    Status status = ValidateEnsembleConfig(config_map);
+    if (!status.IsOk()) {
+      actual.append(status.AsString());
     }
 
     std::string fail_expected;

@@ -113,7 +113,7 @@ cc_library(
     hdrs = ["autofill.h"],
     deps = [
         ":model_config",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
@@ -130,7 +130,6 @@ cc_library(
         "//src/servables/caffe2:autofill",
         "//src/servables/tensorflow:autofill",
         "//src/servables/tensorrt:autofill",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -150,11 +149,10 @@ cc_library(
         ":logging",
         ":metrics",
         ":model_config_proto",
+        ":model_config_utils",
         ":scheduler",
         ":sequence_batch_scheduler",
-        ":model_config_utils",
-        "@com_github_libevent_libevent//:libevent",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
     ],
 )
 
@@ -164,8 +162,8 @@ cc_library(
     deps = [
         ":api_proto",
         ":grpc_service_proto",
+        ":status",
         "@com_github_libevent_libevent//:libevent",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -180,7 +178,6 @@ cc_library(
         ":model_config",
         ":model_config_utils",
         "@com_github_libevent_libevent//:libevent",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -189,6 +186,8 @@ cc_library(
     srcs = ["label_provider.cc"],
     hdrs = ["label_provider.h"],
     deps = [
+        ":constants",
+        ":status",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -210,8 +209,7 @@ cc_library(
         ":logging",
         "@prometheus//core:core",
         "@prometheus//pull:pull",
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        "@local_config_cuda//cuda:cuda_headers",
     ],
 )
 
@@ -245,7 +243,7 @@ cc_library(
         ":model_config",
         ":model_config_proto",
         ":model_config_utils",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
@@ -256,8 +254,8 @@ cc_library(
     srcs = ["profile.cc"],
     hdrs = ["profile.h"],
     deps = [
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
+        "@local_config_cuda//cuda:cuda_headers",
     ],
 )
 
@@ -265,8 +263,8 @@ cc_library(
     name = "scheduler",
     hdrs = ["scheduler.h"],
     deps = [
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":server_status_header",
+        ":status",
     ],
 )
 
@@ -283,8 +281,7 @@ cc_library(
         ":model_config_proto",
         ":scheduler",
         ":server_status_header",
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
     ],
 )
 
@@ -298,11 +295,25 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
+        ":model_config_utils",
         ":scheduler",
         ":server_status_header",
-        ":model_config_utils",
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
+    ],
+)
+
+cc_library(
+    name = "server_header",
+    hdrs = ["server.h"],
+    deps = [
+        ":api_proto",
+        ":provider",
+        ":model_config_proto",
+        ":request_status_proto",
+        ":server_status_header",
+        ":server_status_proto",
+        ":status",
+        "@tf_serving//tensorflow_serving/model_servers:server_core",
     ],
 )
 
@@ -317,6 +328,7 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
+        ":model_config_utils",
         ":model_repository_manager",
         ":profile",
         ":provider",
@@ -325,7 +337,6 @@ cc_library(
         ":server_header",
         ":server_status_header",
         ":server_status_proto",
-        ":model_config_utils",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
@@ -333,25 +344,9 @@ cc_library(
         "//src/servables/custom:custom_bundle_source_adapter",
         "//src/servables/ensemble:ensemble_bundle_source_adapter",
         "@com_github_libevent_libevent//:libevent",
-        "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
         "@tf_serving//tensorflow_serving/core:availability_preserving_policy",
-        "@tf_serving//tensorflow_serving/model_servers:server_core",
-    ],
-)
-
-cc_library(
-    name = "server_header",
-    hdrs = ["server.h"],
-    deps = [
-        ":api_proto",
-        ":provider",
-        ":model_config_proto",
-        ":request_status_proto",
-        ":server_status_header",
-        ":server_status_proto",
-        "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/model_servers:server_core",
     ],
 )
@@ -367,11 +362,11 @@ cc_library(
         ":request_status",
         ":request_status_proto",
         ":server_header",
+        ":status",
         "@com_github_libevhtp//:libevhtp",
         "@com_github_libevent_libevent//:libevent",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -387,9 +382,9 @@ cc_library(
         ":request_status",
         ":request_status_proto",
         ":server_header",
+        ":status",
         "//src/nvrpc:nvrpc",
         "@grpc//:grpc++_unsecure",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
 )
 
@@ -400,7 +395,7 @@ cc_library(
         ":model_config_proto",
         ":model_repository_manager",
         ":server_status_proto",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
     ],
 )
@@ -415,8 +410,16 @@ cc_library(
         ":logging",
         ":metrics",
         ":server_status_header",
-        "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/core:servable_state",
+    ],
+)
+
+cc_library(
+    name = "status",
+    srcs = ["status.cc"],
+    hdrs = ["status.h"],
+    deps = [
+        ":request_status_proto",
     ],
 )
 
@@ -426,7 +429,7 @@ cc_library(
     hdrs = ["request_status.h"],
     deps = [
         ":request_status_proto",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
     ],
 )
 
@@ -440,8 +443,7 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
@@ -454,6 +456,6 @@ cc_library(
         ":logging",
         ":model_config_proto",
         ":model_config_utils",
-        "@org_tensorflow//tensorflow/core:lib",
+        ":status",
     ],
 )

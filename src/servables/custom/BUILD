@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,10 +33,6 @@ load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 cc_proto_library(
     name = "custom_bundle_proto",
     srcs = ["custom_bundle.proto"],
-    deps = [
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
-        "@protobuf_archive//:cc_wkt_protos",
-    ],
 )
 
 cc_library(
@@ -57,10 +53,11 @@ cc_library(
         "//src/core:constants",
         "//src/core:logging",
         "//src/core:model_config_proto",
+        "//src/core:model_config_utils",
         "//src/core:model_config",
         "//src/core:provider",
         "//src/core:server_status",
-        "//src/core:model_config_utils",
+        "//src/core:status",
     ],
 )
 
@@ -76,6 +73,7 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
+        "//src/core:status",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -92,6 +90,7 @@ cc_library(
     deps = [
         ":custom",
         "//src/core:logging",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -108,6 +107,7 @@ cc_test(
     deps = [
         ":custom_bundle",
         "//src/core:constants",
+        "//src/core:status",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",

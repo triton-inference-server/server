@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -36,12 +36,11 @@ class NetDefBundleTest : public ModelConfigTestBase {
 
 TEST_F(NetDefBundleTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func =
-      [](const std::string& path,
-         const ModelConfig& config) -> tensorflow::Status {
+  BundleInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
     std::unique_ptr<NetDefBundle> bundle(new NetDefBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
+    Status status = bundle->Init(path, config);
+    if (status.IsOk()) {
       std::unordered_map<std::string, std::vector<char>> netdef_blobs;
 
       for (const auto& filename : std::vector<std::string>{

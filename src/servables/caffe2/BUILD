@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,10 +33,6 @@ load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 cc_proto_library(
     name = "netdef_bundle_proto",
     srcs = ["netdef_bundle.proto"],
-    deps = [
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
-        "@protobuf_archive//:cc_wkt_protos",
-    ],
 )
 
 cc_library(
@@ -46,6 +42,7 @@ cc_library(
     deps = [
         "//src/core:autofill_header",
         "//src/core:constants",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -71,6 +68,7 @@ cc_library(
         "//src/core:provider",
         "//src/core:server_status",
         "//src/core:model_config_utils",
+        "//src/core:status",
     ],
 )
 
@@ -85,7 +83,9 @@ cc_library(
         "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-         "//src/core:model_config_utils",
+        "//src/core:model_config_utils",
+        "//src/core:status",
+        "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",

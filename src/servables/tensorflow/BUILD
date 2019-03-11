@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,6 @@ cc_proto_library(
     srcs = ["graphdef_bundle.proto"],
     deps = [
         "@org_tensorflow//tensorflow/core:protos_all_cc",
-        "@protobuf_archive//:cc_wkt_protos",
     ],
 )
 
@@ -44,7 +43,6 @@ cc_proto_library(
     srcs = ["savedmodel_bundle.proto"],
     deps = [
         "@org_tensorflow//tensorflow/core:protos_all_cc",
-        "@protobuf_archive//:cc_wkt_protos",
     ],
 )
 
@@ -58,8 +56,8 @@ cc_library(
         ":tf_utils",
         "//src/core:autofill_header",
         "//src/core:logging",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
-        "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -71,7 +69,7 @@ cc_library(
     deps = [
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "@org_tensorflow//tensorflow/core:lib",
+        "@org_tensorflow//tensorflow/core:protos_all_cc",
     ],
 )
 
@@ -81,8 +79,8 @@ cc_library(
     hdrs = ["loader.h"],
     deps = [
         "//src/core:logging",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
     ],
 )
@@ -96,9 +94,10 @@ cc_library(
         "//src/core:constants",
         "//src/core:logging",
         "//src/core:model_config_proto",
+        "//src/core:model_config_utils",
         "//src/core:provider",
         "//src/core:server_status",
-        "//src/core:model_config_utils",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -112,6 +111,7 @@ cc_library(
         ":base_bundle",
         ":tf_utils",
         "//src/core:model_config",
+        "//src/core:status",
     ],
 )
 
@@ -127,12 +127,12 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
+        "//src/core:status",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
         "@tf_serving//tensorflow_serving/core:storage_path",
         "@tf_serving//tensorflow_serving/util:optional",
-        "@org_tensorflow//tensorflow/core:core_cpu",
         "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
@@ -147,6 +147,7 @@ cc_library(
         ":loader",
         ":tf_utils",
         "//src/core:model_config",
+        "//src/core:status",
     ],
 )
 
@@ -194,6 +195,7 @@ cc_test(
     deps = [
         ":graphdef_bundle",
         "//src/core:constants",
+        "//src/core:status",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
@@ -216,6 +218,7 @@ cc_test(
     deps = [
         ":savedmodel_bundle",
         "//src/core:constants",
+        "//src/core:status",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",

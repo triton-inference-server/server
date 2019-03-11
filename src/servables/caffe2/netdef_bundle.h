@@ -28,8 +28,8 @@
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
+#include "src/core/status.h"
 #include "src/servables/caffe2/netdef_bundle_c2.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -38,19 +38,18 @@ class NetDefBundle : public InferenceBackend {
   NetDefBundle() = default;
   NetDefBundle(NetDefBundle&&) = default;
 
-  tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+  Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
   // serialized netdefs specified in 'models'.
-  tensorflow::Status CreateExecutionContexts(
+  Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::vector<char>>& models);
-  tensorflow::Status CreateExecutionContext(
+  Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models);
 
  private:
-  tensorflow::Status ValidateSequenceControl(
+  Status ValidateSequenceControl(
       const ModelSequenceBatching::Control::Kind control_kind,
       std::vector<std::string>* input_names);
 
@@ -58,7 +57,7 @@ class NetDefBundle : public InferenceBackend {
   // execute for one or more requests.
   void Run(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(NetDefBundle);
@@ -81,13 +80,13 @@ class NetDefBundle : public InferenceBackend {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
-    tensorflow::Status ValidateInputs(
+    Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    tensorflow::Status ValidateOutputs(
+    Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Set an input tensor data from payloads.
-    tensorflow::Status SetInput(
+    Status SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
@@ -99,18 +98,18 @@ class NetDefBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(
+    Status Run(
         const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads);
 
     // Set an input tensor from one or more payloads.
-    tensorflow::Status SetFixedSizedInputTensor(
+    Status SetFixedSizedInputTensor(
         const std::string& input_name, const std::vector<int64_t>& shape,
         const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Read an output tensor into one or more payloads.
-    tensorflow::Status ReadFixedSizedOutputTensor(
+    Status ReadFixedSizedOutputTensor(
         const std::string& name, const std::vector<int64_t>& shape,
         const Caffe2Workspace::DataType dtype, const size_t dtype_byte_size,
         const size_t total_batch_size,

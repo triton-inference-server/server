@@ -87,6 +87,12 @@ enum RequestStatusCode {
   //@@     Error code indicating an unsupported request or operation.
   //@@
   UNSUPPORTED = 7;
+
+  //@@  .. cpp:enumerator:: RequestStatusCode::ALREADY_EXISTS = 8
+  //@@
+  //@@     Error code indicating an already existing resource.
+  //@@
+  ALREADY_EXISTS = 8;
 }
 
 //@@

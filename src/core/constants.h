@@ -62,4 +62,12 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 constexpr int SCHEDULER_DEFAULT_NICE = 5;
 constexpr uint64_t SEQUENCE_IDLE_DEFAULT_MICROSECONDS = 1000 * 1000;
 
+#define DISALLOW_COPY(TypeName) TypeName(const TypeName&) = delete;
+
+#define DISALLOW_ASSIGN(TypeName) void operator=(const TypeName&) = delete;
+
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  DISALLOW_COPY(TypeName)                  \
+  DISALLOW_ASSIGN(TypeName)
+
 }}  // namespace nvidia::inferenceserver

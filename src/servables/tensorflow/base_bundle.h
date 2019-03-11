@@ -28,7 +28,7 @@
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 #include "tensorflow/core/public/session.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -39,16 +39,15 @@ class BaseBundle : public InferenceBackend {
   BaseBundle() = default;
   BaseBundle(BaseBundle&&) = default;
 
-  tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+  Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance of the
   // tensorflow model specified in 'paths'. The model can be either a
   // graphdef or savedmodel
-  tensorflow::Status CreateExecutionContexts(
+  Status CreateExecutionContexts(
       const tensorflow::ConfigProto& session_config,
       const std::unordered_map<std::string, std::string>& paths);
-  tensorflow::Status CreateExecutionContext(
+  Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const tensorflow::ConfigProto& session_config,
       const std::unordered_map<std::string, std::string>& paths);
@@ -57,7 +56,7 @@ class BaseBundle : public InferenceBackend {
   using IONameMap = std::unordered_map<std::string, std::string>;
 
   // Load model and create a corresponding session object.
-  virtual tensorflow::Status CreateSession(
+  virtual Status CreateSession(
       const tensorflow::SessionOptions& options, const int gpu_device,
       const std::string& model_path, tensorflow::Session** session,
       IONameMap* input_name_map, IONameMap* output_name_map) = 0;
@@ -94,7 +93,7 @@ class BaseBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(
+    Status Run(
         const BaseBundle* base, std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
@@ -124,7 +123,7 @@ class BaseBundle : public InferenceBackend {
   // execute for one or more requests.
   void Run(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(BaseBundle);

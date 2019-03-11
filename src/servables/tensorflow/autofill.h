@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,10 +29,8 @@
 #include "src/core/autofill.h"
 #include "src/core/model_config.pb.h"
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
-#include "tensorflow/c/c_api.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -41,12 +39,12 @@ namespace nvidia { namespace inferenceserver {
 //
 class AutoFillSavedModel : public AutoFill {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       const std::string& model_name,
       const ::google::protobuf::Any& platform_config,
       const std::string& model_path,
       std::unique_ptr<AutoFillSavedModel>* autofill);
-  tensorflow::Status Fix(ModelConfig* config) override;
+  Status Fix(ModelConfig* config) override;
 
  private:
   AutoFillSavedModel(
@@ -65,10 +63,10 @@ class AutoFillSavedModel : public AutoFill {
 //
 class AutoFillGraphDef : public AutoFill {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       const std::string& model_name, const std::string& model_path,
       std::unique_ptr<AutoFillGraphDef>* autofill);
-  tensorflow::Status Fix(ModelConfig* config) override;
+  Status Fix(ModelConfig* config) override;
 
  private:
   AutoFillGraphDef(const std::string& model_name) : AutoFill(model_name) {}

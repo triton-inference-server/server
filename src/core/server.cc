@@ -64,16 +64,8 @@
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/platform/init_main.h"
-#include "tensorflow/core/platform/protobuf.h"
-#include "tensorflow/core/platform/types.h"
-#include "tensorflow/core/protobuf/config.pb.h"
 #include "tensorflow/core/util/command_line_flags.h"
-#include "tensorflow_serving/apis/model.pb.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
 #include "tensorflow_serving/core/availability_preserving_policy.h"
@@ -143,7 +135,7 @@ InferenceServer::LogInitError(const std::string& msg)
 bool
 InferenceServer::Init(int argc, char** argv)
 {
-  tensorflow::Status status;
+  Status status;
 
   ready_state_ = ServerReadyState::SERVER_INITIALIZING;
 
@@ -338,8 +330,8 @@ InferenceServer::Init(int argc, char** argv)
   // start/stop profiling (unless disabled as indicated by
   // 'allow_profiling').
   status = ProfileStopAll();
-  if (!status.ok()) {
-    LogInitError(status.error_message());
+  if (!status.IsOk()) {
+    LogInitError(status.Message());
     return !exit_on_error;
   }
 
@@ -365,8 +357,8 @@ InferenceServer::Init(int argc, char** argv)
   } else {
     status =
         ParseProtoTextFile(platform_config_file, &options.platform_config_map);
-    if (!status.ok()) {
-      LogInitError(status.error_message());
+    if (!status.IsOk()) {
+      LogInitError(status.Message());
       return !exit_on_error;
     }
   }
@@ -377,16 +369,16 @@ InferenceServer::Init(int argc, char** argv)
   // below when ServerCore is created.
   status = ModelRepositoryManager::Create(
       model_store_path_, options.platform_config_map, !strict_model_config_);
-  if (!status.ok()) {
-    LogInitError(status.error_message());
+  if (!status.IsOk()) {
+    LogInitError(status.Message());
     return !exit_on_error;
   }
 
   std::set<std::string> added, deleted, modified, unmodified;
   status =
       ModelRepositoryManager::Poll(&added, &deleted, &modified, &unmodified);
-  if (!status.ok()) {
-    LogInitError(status.error_message());
+  if (!status.IsOk()) {
+    LogInitError(status.Message());
     return !exit_on_error;
   }
 
@@ -399,14 +391,14 @@ InferenceServer::Init(int argc, char** argv)
     tfs::ModelConfig* tfs_config =
         options.model_server_config.mutable_model_config_list()->add_config();
     status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-    if (!status.ok()) {
+    if (!status.IsOk()) {
       LogInitError("Internal: model repository manager inconsistency");
       return !exit_on_error;
     }
 
     status = status_manager_->InitForModel(name);
-    if (!status.ok()) {
-      LogInitError(status.error_message());
+    if (!status.IsOk()) {
+      LogInitError(status.Message());
       return !exit_on_error;
     }
   }
@@ -416,9 +408,10 @@ InferenceServer::Init(int argc, char** argv)
   // Create the server core. We assume that any failure is due to a
   // model not loading correctly so we just continue if not exiting on
   // error.
-  status = tfs::ServerCore::Create(std::move(options), &core_);
-  if (!status.ok()) {
-    LOG_ERROR << status;
+  tensorflow::Status tfstatus =
+      tfs::ServerCore::Create(std::move(options), &core_);
+  if (!tfstatus.ok()) {
+    LOG_ERROR << tfstatus;
     if (exit_on_error) {
       return false;
     }
@@ -443,9 +436,9 @@ InferenceServer::Close()
   // Reload an empty configuration to cause all models to unload.
   tfs::ModelServerConfig msc;
   msc.mutable_model_config_list();
-  tensorflow::Status status = core_->ReloadConfig(msc);
-  if (!status.ok()) {
-    LOG_ERROR << "Failed to gracefully unload models: " << status;
+  tensorflow::Status tfstatus = core_->ReloadConfig(msc);
+  if (!tfstatus.ok()) {
+    LOG_ERROR << "Failed to gracefully unload models: " << tfstatus;
   }
 
   // Wait for all in-flight requests to complete and all loaded models
@@ -477,7 +470,7 @@ InferenceServer::Close()
     }
 
     exit_timeout_iters--;
-    tensorflow::Env::Default()->SleepForMicroseconds(1000 * 1000);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
   return false;
@@ -486,7 +479,7 @@ InferenceServer::Close()
 void
 InferenceServer::Wait()
 {
-  tensorflow::Status status;
+  Status status;
 
   // If model load/unload is enabled for the model store, then
   // periodically look for changes and update the loaded model
@@ -497,9 +490,8 @@ InferenceServer::Wait()
         std::set<std::string> added, deleted, modified, unmodified;
         status = ModelRepositoryManager::Poll(
             &added, &deleted, &modified, &unmodified);
-        if (!status.ok()) {
-          LOG_ERROR << "Failed to poll model repository: "
-                    << status.error_message();
+        if (!status.IsOk()) {
+          LOG_ERROR << "Failed to poll model repository: " << status.Message();
           goto next;
         }
 
@@ -521,16 +513,16 @@ InferenceServer::Wait()
           tfs::ModelConfig* tfs_config =
               msc.mutable_model_config_list()->add_config();
           status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-          if (!status.ok()) {
+          if (!status.IsOk()) {
             LOG_ERROR << "Failed to create server config for '" << name
-                      << "': " << status.error_message();
+                      << "': " << status.Message();
             goto next;
           }
 
           status = status_manager_->InitForModel(name);
-          if (!status.ok()) {
+          if (!status.IsOk()) {
             LOG_ERROR << "Failed to initialize status for '" << name
-                      << "': " << status.error_message();
+                      << "': " << status.Message();
             goto next;
           }
         }
@@ -540,18 +532,19 @@ InferenceServer::Wait()
           tfs::ModelConfig* tfs_config =
               msc.mutable_model_config_list()->add_config();
           status = ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-          if (!status.ok()) {
+          if (!status.IsOk()) {
             LOG_ERROR << "Failed to create server config for '" << name
-                      << "': " << status.error_message();
+                      << "': " << status.Message();
             goto next;
           }
         }
 
-        status = core_->ReloadConfig(msc);
-        if (!status.ok()) {
-          LOG_ERROR << "Failed to reload model configurations: "
-                    << status.error_message();
-          goto next;
+        {
+          tensorflow::Status tfstatus = core_->ReloadConfig(msc);
+          if (!tfstatus.ok()) {
+            LOG_ERROR << "Failed to reload model configurations: " << tfstatus;
+            goto next;
+          }
         }
 
         // If there are any modified model, (re)load them to pick up
@@ -563,31 +556,32 @@ InferenceServer::Wait()
                 msc.mutable_model_config_list()->add_config();
             status =
                 ModelRepositoryManager::GetTFSModelConfig(name, tfs_config);
-            if (!status.ok()) {
+            if (!status.IsOk()) {
               LOG_ERROR << "Failed to create server config for '" << name
-                        << "': " << status.error_message();
+                        << "': " << status.Message();
               goto next;
             }
             status = status_manager_->UpdateConfigForModel(name);
-            if (!status.ok()) {
+            if (!status.IsOk()) {
               LOG_ERROR << "Failed to reload model config for '" << name
-                        << "': " << status.error_message();
+                        << "': " << status.Message();
               goto next;
             }
           }
 
-          status = core_->ReloadConfig(msc);
-          if (!status.ok()) {
-            LOG_ERROR << "Failed to reload modified model configurations: "
-                      << status.error_message();
-            goto next;
+          {
+            tensorflow::Status tfstatus = core_->ReloadConfig(msc);
+            if (!tfstatus.ok()) {
+              LOG_ERROR << "Failed to reload modified model configurations: "
+                        << tfstatus;
+              goto next;
+            }
           }
         }
       }
 
     next:
-      tensorflow::Env::Default()->SleepForMicroseconds(
-          repository_poll_secs_ * 1000 * 1000);
+      std::this_thread::sleep_for(std::chrono::seconds(repository_poll_secs_));
     }
   }
 
@@ -600,7 +594,7 @@ InferenceServer::Wait()
   }
 }
 
-tensorflow::Status
+Status
 InferenceServer::CreateBackendHandle(
     const std::string& model_name, const int64_t model_version,
     const std::shared_ptr<InferBackendHandle>& handle)
@@ -612,12 +606,12 @@ std::unique_ptr<GRPCServer>
 InferenceServer::StartGrpcServer()
 {
   std::unique_ptr<GRPCServer> server;
-  tensorflow::Status status = GRPCServer::Create(this, grpc_port_, &server);
-  if (status.ok()) {
+  Status status = GRPCServer::Create(this, grpc_port_, &server);
+  if (status.IsOk()) {
     status = server->Start();
   }
 
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     server.reset();
   }
   return std::move(server);
@@ -627,13 +621,13 @@ std::unique_ptr<HTTPServer>
 InferenceServer::StartHttpServer()
 {
   std::unique_ptr<HTTPServer> service;
-  tensorflow::Status status =
+  Status status =
       HTTPServer::Create(this, http_port_, http_thread_cnt_, &service);
-  if (status.ok()) {
+  if (status.IsOk()) {
     status = service->Start();
   }
 
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     service.reset();
   }
 
@@ -705,10 +699,10 @@ InferenceServer::HandleHealth(
       }
 
       ServerStatus server_status;
-      tensorflow::Status status = status_manager_->Get(
+      Status status = status_manager_->Get(
           &server_status, id_, ready_state_, UptimeNs(), monitor);
 
-      *health = status.ok();
+      *health = status.IsOk();
       if (*health) {
         for (const auto& ms : server_status.model_status()) {
           for (const auto& vs : ms.second.version_status()) {
@@ -788,11 +782,10 @@ InferenceServer::HandleInfer(
   // and we don't want that to happen when a request is in flight.
   auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, backend,
                                 response_provider, request_status, request_id,
-                                infer_stats,
-                                inflight](tensorflow::Status status) mutable {
-    if (status.ok()) {
+                                infer_stats, inflight](Status status) mutable {
+    if (status.IsOk()) {
       status = response_provider->FinalizeResponse(*(*backend)());
-      if (status.ok()) {
+      if (status.IsOk()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
         return;
@@ -801,7 +794,7 @@ InferenceServer::HandleInfer(
 
     // Report only stats that are relevant for a failed inference run.
     infer_stats->SetFailed(true);
-    LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
+    LOG_VERBOSE(1) << "Infer failed: " << status.Message();
     RequestStatusFactory::Create(request_status, request_id, id_, status);
     OnCompleteInferRPC();
   };
@@ -859,22 +852,22 @@ InferenceServer::UptimeNs() const
   return now_ns - start_time_ns_;
 }
 
-tensorflow::Status
+Status
 InferenceServer::ParseProtoTextFile(
     const std::string& file, google::protobuf::Message* message)
 {
   std::unique_ptr<tensorflow::ReadOnlyMemoryRegion> file_data;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_TF_ERROR(
       tensorflow::Env::Default()->NewReadOnlyMemoryRegionFromFile(
           file, &file_data));
   std::string file_data_str(
       reinterpret_cast<const char*>(file_data->data()), file_data->length());
-  if (tensorflow::protobuf::TextFormat::ParseFromString(
-          file_data_str, message)) {
-    return tensorflow::Status::OK();
+  if (google::protobuf::TextFormat::ParseFromString(file_data_str, message)) {
+    return Status::Success;
   } else {
-    return tensorflow::errors::InvalidArgument(
-        "Invalid protobuf file: '", file, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "Invalid protobuf file: '" + file + "'");
   }
 }
 
@@ -983,7 +976,7 @@ InferenceServer::BuildPlatformConfigMap(
 //
 // InferBackendHandle
 //
-tensorflow::Status
+Status
 InferenceServer::InferBackendHandle::Init(
     const std::string& model_name, const int64_t model_version,
     tfs::ServerCore* core)
@@ -998,43 +991,46 @@ InferenceServer::InferBackendHandle::Init(
 
   // Get the InferenceBackend appropriate for the request.
   Platform platform;
-  tensorflow::Status status =
+  Status status =
       ModelRepositoryManager::GetModelPlatform(model_name, &platform);
-  if (status.ok()) {
+  if (status.IsOk()) {
+    tensorflow::Status tfstatus;
+    is_ = nullptr;
+
     switch (platform) {
       case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
-        status = core->GetServableHandle(model_spec, &(graphdef_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(graphdef_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(graphdef_bundle_.get());
         }
         break;
       case Platform::PLATFORM_TENSORFLOW_SAVEDMODEL:
-        status = core->GetServableHandle(model_spec, &(saved_model_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(saved_model_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(saved_model_bundle_.get());
         }
         break;
       case Platform::PLATFORM_TENSORRT_PLAN:
-        status = core->GetServableHandle(model_spec, &(plan_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(plan_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(plan_bundle_.get());
         }
         break;
       case Platform::PLATFORM_CAFFE2_NETDEF:
-        status = core->GetServableHandle(model_spec, &(netdef_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(netdef_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(netdef_bundle_.get());
         }
         break;
       case Platform::PLATFORM_CUSTOM:
-        status = core->GetServableHandle(model_spec, &(custom_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(custom_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(custom_bundle_.get());
         }
         break;
       case Platform::PLATFORM_ENSEMBLE:
-        status = core->GetServableHandle(model_spec, &(ensemble_bundle_));
-        if (status.ok()) {
+        tfstatus = core->GetServableHandle(model_spec, &(ensemble_bundle_));
+        if (tfstatus.ok()) {
           is_ = static_cast<InferenceBackend*>(ensemble_bundle_.get());
         }
         break;
@@ -1043,9 +1039,10 @@ InferenceServer::InferBackendHandle::Init(
     }
   }
 
-  if (!status.ok() || (is_ == nullptr)) {
-    status = tensorflow::errors::Unavailable(
-        "Inference request for unknown model '", model_name, "'");
+  if (is_ == nullptr) {
+    status = Status(
+        RequestStatusCode::UNAVAILABLE,
+        "Inference request for unknown model '" + model_name + "'");
   }
 
   return status;

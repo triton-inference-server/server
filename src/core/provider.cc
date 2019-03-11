@@ -26,16 +26,16 @@
 
 #include "src/core/provider.h"
 
+#include <google/protobuf/text_format.h>
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
 {
   const ModelConfig& model_config = is.Config();
@@ -43,8 +43,9 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
   // Make sure the request has a batch-size > 0. Even for models that
   // don't support batching the requested batch size must be 1.
   if (request_header_.batch_size() < 1) {
-    return tensorflow::errors::InvalidArgument(
-        "inference request batch-size must be >= 1 for '", model_name_, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "inference request batch-size must be >= 1 for '" + model_name_ + "'");
   }
 
   // Make sure request batch-size doesn't exceed what is supported by
@@ -52,34 +53,38 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
   // batch-size will still be 1.
   if ((request_header_.batch_size() != 1) &&
       ((int)request_header_.batch_size() > model_config.max_batch_size())) {
-    return tensorflow::errors::InvalidArgument(
-        "inference request batch-size must be <= ",
-        std::to_string(model_config.max_batch_size()), " for '", model_name_,
-        "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "inference request batch-size must be <= " +
+            std::to_string(model_config.max_batch_size()) + " for '" +
+            model_name_ + "'");
   }
 
   // Make sure that the request is providing the same number of inputs
   // as is expected by the model.
   if (request_header_.input_size() != model_config.input_size()) {
-    return tensorflow::errors::InvalidArgument(
-        "expected ", model_config.input_size(), " inputs but got ",
-        request_header_.input_size(), " inputs for model '", model_name_, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "expected " + std::to_string(model_config.input_size()) +
+            " inputs but got " + std::to_string(request_header_.input_size()) +
+            " inputs for model '" + model_name_ + "'");
   }
 
   // Update each input to have shape and batch-byte-size.
   uint64_t bs = 0;
   for (InferRequestHeader::Input& io : *request_header_.mutable_input()) {
     const ModelInput* input_config;
-    TF_RETURN_IF_ERROR(is.GetInput(io.name(), &input_config));
+    RETURN_IF_ERROR(is.GetInput(io.name(), &input_config));
 
     // If the inference request specifies a shape for an input, make
     // sure it matches what the model expects and then calculate the
     // expected input size from that shape.
     if (io.dims_size() > 0) {
       if (!CompareDimsWithWildcard(io.dims(), input_config->dims())) {
-        return tensorflow::errors::InvalidArgument(
-            "unexpected shape for input '", io.name(), "' for model '",
-            model_name_, "'");
+        return Status(
+            RequestStatusCode::INVALID_ARG, "unexpected shape for input '" +
+                                                io.name() + "' for model '" +
+                                                model_name_ + "'");
       }
 
       bs = GetByteSize(input_config->data_type(), io.dims());
@@ -89,10 +94,11 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
       // size from the model configuration.
       for (auto dim : input_config->dims()) {
         if (dim < 0) {
-          return tensorflow::errors::InvalidArgument(
-              "model supports variable-size for input '", io.name(),
-              "', request must specify input shape for model '", model_name_,
-              "'");
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "model supports variable-size for input '" + io.name() +
+                  "', request must specify input shape for model '" +
+                  model_name_ + "'");
         }
 
         io.add_dims(dim);
@@ -108,17 +114,20 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
     if (IsFixedSizeDataType(input_config->data_type())) {
       bs *= request_header_.batch_size();
       if ((io.batch_byte_size() != 0) && (io.batch_byte_size() != bs)) {
-        return tensorflow::errors::InvalidArgument(
-            "specific batch-byte-size for input '", io.name(),
-            "' does not match expected byte-size calculated from shape and "
-            "datatype for model '",
-            model_name_, "'");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "specific batch-byte-size for input '" + io.name() +
+                "' does not match expected byte-size calculated from shape and "
+                "datatype for model '" +
+                model_name_ + "'");
       }
     } else {
       if (io.batch_byte_size() == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "batch-byte-size must be specified for input '", io.name(),
-            "' with non-fixed-size datatype for model '", model_name_, "'");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "batch-byte-size must be specified for input '" + io.name() +
+                "' with non-fixed-size datatype for model '" + model_name_ +
+                "'");
       }
 
       bs = io.batch_byte_size();
@@ -127,7 +136,7 @@ InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
     io.set_batch_byte_size(bs);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
@@ -136,12 +145,12 @@ InferRequestProvider::GetInputOverride() const
   return overrides_;
 }
 
-tensorflow::Status
+Status
 InferRequestProvider::SetInputOverride(
     const std::shared_ptr<InputOverrideMap>& override)
 {
   overrides_ = override;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 bool
@@ -175,14 +184,14 @@ InferRequestProvider::GetInputOverrideContent(
 std::vector<uint8_t> NULLInferRequestProvider::buf_;
 std::mutex NULLInferRequestProvider::mu_;
 
-tensorflow::Status
+Status
 NULLInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
@@ -200,7 +209,7 @@ NULLInferRequestProvider::GetNextInputContent(
     *content = &(buf_[0]);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 //
@@ -213,7 +222,7 @@ GRPCInferRequestProvider::GRPCInferRequestProvider(
   content_delivered_.resize(request_.raw_input_size(), false);
 }
 
-tensorflow::Status
+Status
 GRPCInferRequestProvider::Create(
     const InferenceBackend& is, const InferRequest& request,
     std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
@@ -224,17 +233,19 @@ GRPCInferRequestProvider::Create(
   infer_provider->reset(provider);
 
   provider->request_header_ = request.meta_data();
-  TF_RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
+  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
 
   const InferRequestHeader& request_header = provider->request_header_;
 
   // Make sure that the request is providing the same number of raw
   // input tensor data.
   if (request_header.input_size() != request.raw_input_size()) {
-    return tensorflow::errors::InvalidArgument(
-        "expected tensor data for ", request_header.input_size(),
-        " inputs but got ", request.raw_input_size(),
-        " sets of data for model '", provider->model_name_, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "expected tensor data for " +
+            std::to_string(request_header.input_size()) + " inputs but got " +
+            std::to_string(request.raw_input_size()) +
+            " sets of data for model '" + provider->model_name_ + "'");
   }
 
   // Verify that the batch-byte-size of each input matches the size of
@@ -242,32 +253,35 @@ GRPCInferRequestProvider::Create(
   size_t idx = 0;
   for (const auto& io : request_header.input()) {
     if (io.batch_byte_size() != request.raw_input(idx).size()) {
-      return tensorflow::errors::InvalidArgument(
-          "unexpected size ", request.raw_input(idx).size(), " for input '",
-          io.name(), "', expecting ", io.batch_byte_size(), " for model '",
-          provider->model_name_, "'");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected size " + std::to_string(request.raw_input(idx).size()) +
+              " for input '" + io.name() + "', expecting " +
+              std::to_string(io.batch_byte_size()) + " for model '" +
+              provider->model_name_ + "'");
     }
 
     provider->input_map_[io.name()] = idx++;
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GRPCInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
     const auto& pr = input_map_.find(name);
     if (pr == input_map_.end()) {
-      return tensorflow::errors::Internal("unexpected input '", name, "'");
+      return Status(
+          RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
 
     const size_t idx = pr->second;
@@ -284,13 +298,13 @@ GRPCInferRequestProvider::GetNextInputContent(
     content_delivered_[idx] = true;
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 //
 // HTTPInferRequestProvider
 //
-tensorflow::Status
+Status
 HTTPInferRequestProvider::Create(
     evbuffer* input_buffer, const InferenceBackend& is,
     const std::string& model_name, const int64_t model_version,
@@ -300,13 +314,14 @@ HTTPInferRequestProvider::Create(
   auto provider = new HTTPInferRequestProvider(model_name, model_version);
   infer_provider->reset(provider);
 
-  if (!tensorflow::protobuf::TextFormat::ParseFromString(
+  if (!google::protobuf::TextFormat::ParseFromString(
           request_header_str, &(provider->request_header_))) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to parse request for model '", model_name, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to parse request for model '" + model_name + "'");
   }
 
-  TF_RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
+  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
 
   const InferRequestHeader& request_header = provider->request_header_;
 
@@ -323,7 +338,8 @@ HTTPInferRequestProvider::Create(
     struct evbuffer_iovec* v = static_cast<struct evbuffer_iovec*>(
         alloca(sizeof(struct evbuffer_iovec) * n));
     if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return tensorflow::errors::Internal(
+      return Status(
+          RequestStatusCode::INTERNAL,
           "unexpected error getting input buffers ");
     }
 
@@ -358,35 +374,39 @@ HTTPInferRequestProvider::Create(
       }
 
       if (byte_size != 0) {
-        return tensorflow::errors::InvalidArgument(
-            "unexpected size for input '", io.name(), "', missing expecting ",
-            byte_size, " bytes for model '", model_name, "'");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size for input '" + io.name() +
+                "', missing expecting " + std::to_string(byte_size) +
+                " bytes for model '" + model_name + "'");
       }
     }
 
     if (v_idx != n) {
-      return tensorflow::errors::InvalidArgument(
-          "unexpected additional input data for model '", model_name, "'");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected additional input data for model '" + model_name + "'");
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 HTTPInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
     const auto& pr = input_map_.find(name);
     if (pr == input_map_.end()) {
-      return tensorflow::errors::Internal("unexpected input '", name, "'");
+      return Status(
+          RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
 
     const size_t idx = pr->second;
@@ -424,7 +444,7 @@ HTTPInferRequestProvider::GetNextInputContent(
       }
 
       if (buf.size() != total_size) {
-        return tensorflow::errors::Internal("contiguous input failed");
+        return Status(RequestStatusCode::INTERNAL, "contiguous input failed");
       }
 
       *content = &(buf[0]);
@@ -432,11 +452,11 @@ HTTPInferRequestProvider::GetNextInputContent(
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 
-tensorflow::Status
+Status
 GRPCInferResponseProvider::Create(
     const InferRequestHeader& request_header, InferResponse* response,
     std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
@@ -445,7 +465,7 @@ GRPCInferResponseProvider::Create(
       new GRPCInferResponseProvider(request_header, response);
   infer_provider->reset(provider);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 const InferResponseHeader&
@@ -460,13 +480,13 @@ GRPCInferResponseProvider::MutableResponseHeader()
   return response_->mutable_meta_data();
 }
 
-tensorflow::Status
+Status
 GRPCInferResponseProvider::GetOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape)
 {
   Output* output;
-  TF_RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
+  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
 
   // Must always add a raw output into the list so that the number and
@@ -478,7 +498,7 @@ GRPCInferResponseProvider::GetOutputBuffer(
     *content = static_cast<void*>(&((*raw_output)[0]));
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 HTTPInferResponseProvider::HTTPInferResponseProvider(
@@ -487,7 +507,7 @@ HTTPInferResponseProvider::HTTPInferResponseProvider(
 {
 }
 
-tensorflow::Status
+Status
 HTTPInferResponseProvider::Create(
     evbuffer* output_buffer, const InferenceBackend& is,
     const InferRequestHeader& request_header,
@@ -497,7 +517,7 @@ HTTPInferResponseProvider::Create(
       new HTTPInferResponseProvider(output_buffer, request_header);
   infer_provider->reset(provider);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 const InferResponseHeader&
@@ -512,7 +532,7 @@ HTTPInferResponseProvider::MutableResponseHeader()
   return &response_header_;
 }
 
-tensorflow::Status
+Status
 HTTPInferResponseProvider::GetOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape)
@@ -520,7 +540,7 @@ HTTPInferResponseProvider::GetOutputBuffer(
   *content = nullptr;
 
   Output* output;
-  TF_RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
+  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
 
   if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
@@ -528,15 +548,18 @@ HTTPInferResponseProvider::GetOutputBuffer(
     struct evbuffer_iovec output_iovec;
     if (evbuffer_reserve_space(
             output_buffer_, content_byte_size, &output_iovec, 1) != 1) {
-      return tensorflow::errors::Internal(
-          "failed to reserve ", content_byte_size,
-          " bytes in output tensor buffer");
+      return Status(
+          RequestStatusCode::INTERNAL, "failed to reserve " +
+                                           std::to_string(content_byte_size) +
+                                           " bytes in output tensor buffer");
     }
 
     if (output_iovec.iov_len < content_byte_size) {
-      return tensorflow::errors::Internal(
-          "reserved ", output_iovec.iov_len,
-          " bytes in output tensor buffer, need ", content_byte_size);
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "reserved " + std::to_string(output_iovec.iov_len) +
+              " bytes in output tensor buffer, need " +
+              std::to_string(content_byte_size));
     }
 
     output_iovec.iov_len = content_byte_size;
@@ -549,12 +572,13 @@ HTTPInferResponseProvider::GetOutputBuffer(
     // entry in output_iovec), this seems to be a valid assumption.
     if (evbuffer_commit_space(output_buffer_, &output_iovec, 1) != 0) {
       *content = nullptr;
-      return tensorflow::errors::Internal(
+      return Status(
+          RequestStatusCode::INTERNAL,
           "failed to commit output tensors to output buffer");
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 namespace {
@@ -610,14 +634,15 @@ InferResponseProvider::RequiresOutput(const std::string& name)
   return output_map_.find(name) != output_map_.end();
 }
 
-tensorflow::Status
+Status
 InferResponseProvider::CheckAndSetIfBufferedOutput(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape, Output** output)
 {
   const auto& pr = output_map_.find(name);
   if (pr == output_map_.end()) {
-    return tensorflow::errors::Internal("unexpected output '", name, "'");
+    return Status(
+        RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
   }
 
   outputs_.emplace_back();
@@ -634,10 +659,10 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
 
   *output = loutput;
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 {
   InferResponseHeader* response_header = MutableResponseHeader();
@@ -673,12 +698,13 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
     } else {
       // Class result...
       const ModelOutput* output_config;
-      TF_RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
+      RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
 
       const auto& pr = output_map_.find(output.name_);
       if (pr == output_map_.end()) {
-        return tensorflow::errors::Internal(
-            "can't find request meta-data for output '", output.name_, "'");
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "can't find request meta-data for output '" + output.name_ + "'");
       }
       const InferRequestHeader::Output* request_output = pr->second;
 
@@ -747,17 +773,18 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
           break;
 
         default:
-          return tensorflow::errors::InvalidArgument(
-              "class result not available for output '", output.name_,
-              "' due to unsupported type '",
-              DataType_Name(output_config->data_type()), "'");
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "class result not available for output '" + output.name_ +
+                  "' due to unsupported type '" +
+                  DataType_Name(output_config->data_type()) + "'");
       }
     }
 
     output_idx++;
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

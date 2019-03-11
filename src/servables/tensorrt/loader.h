@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #pragma once
 
 #include <NvInfer.h>
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -41,7 +41,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param engine Returns the ICudaEngine object, or nullptr if failed
 /// to create
 /// \return Error status.
-tensorflow::Status LoadPlan(
+Status LoadPlan(
     const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
     nvinfer1::ICudaEngine** engine);
 

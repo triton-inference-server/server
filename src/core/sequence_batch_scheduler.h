@@ -37,7 +37,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
 #include "src/core/scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -50,7 +50,7 @@ class SequenceBatchScheduler : public Scheduler {
 
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
-  static tensorflow::Status Create(
+  static Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
       StandardInitFunc OnInit, StandardRunFunc OnSchedule,
       std::unique_ptr<Scheduler>* scheduler);
@@ -60,7 +60,7 @@ class SequenceBatchScheduler : public Scheduler {
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(tensorflow::Status)> OnComplete) override;
+      std::function<void(Status)> OnComplete) override;
 
   // A batch-slot combination. The batch is represented by the index
   // into 'batches_'.
@@ -84,7 +84,7 @@ class SequenceBatchScheduler : public Scheduler {
  private:
   void ReaperThread(const int nice);
 
-  tensorflow::Status CreateControlTensors(
+  Status CreateControlTensors(
       const ModelConfig& config,
       std::shared_ptr<InferRequestProvider::InputOverrideMap>*
           start_input_overrides,
@@ -117,7 +117,7 @@ class SequenceBatchScheduler : public Scheduler {
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
-        std::function<void(tensorflow::Status)> OnComplete);
+        std::function<void(Status)> OnComplete);
 
    private:
     void SchedulerThread(const int nice);

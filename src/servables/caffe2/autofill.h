@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,16 +28,16 @@
 #include <string>
 #include "src/core/autofill.h"
 #include "src/core/model_config.pb.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
 class AutoFillNetDef : public AutoFill {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       const std::string& model_name, const std::string& model_path,
       std::unique_ptr<AutoFillNetDef>* autofill);
-  tensorflow::Status Fix(ModelConfig* config) override;
+  Status Fix(ModelConfig* config) override;
 
  private:
   AutoFillNetDef(const std::string& model_name) : AutoFill(model_name) {}

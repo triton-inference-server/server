@@ -39,21 +39,22 @@
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
-GetModelVersionFromPath(const tensorflow::StringPiece& path, int64_t* version)
+Status
+GetModelVersionFromPath(const std::string& path, int64_t* version)
 {
   auto version_dir = tensorflow::io::Basename(path);
 
   // Determine the version from the last segment of 'path'
   if (!absl::SimpleAtoi(version_dir, version)) {
-    return tensorflow::errors::Internal(
-        "unable to determine model version from ", path);
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to determine model version from " + path);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GetSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
@@ -69,14 +70,17 @@ GetSequenceControlProperties(
 
   for (const auto& control_input : batcher.control_input()) {
     if (control_input.name().empty()) {
-      return tensorflow::errors::InvalidArgument(
-          "sequence batching control tensor must have a name for ", model_name);
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor must have a name for " +
+              model_name);
     }
 
     if (seen_tensors.find(control_input.name()) != seen_tensors.end()) {
-      return tensorflow::errors::InvalidArgument(
-          "sequence batching control tensor '", control_input.name(),
-          "' is specified for multiple control kinds for ", model_name);
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor '" + control_input.name() +
+              "' is specified for multiple control kinds for " + model_name);
     }
 
     seen_tensors.insert(control_input.name());
@@ -84,10 +88,11 @@ GetSequenceControlProperties(
     for (const auto& c : control_input.control()) {
       if (c.kind() == control_kind) {
         if (seen_control) {
-          return tensorflow::errors::InvalidArgument(
-              "sequence batching specifies multiple ",
-              ModelSequenceBatching_Control_Kind_Name(control_kind),
-              " tensors for ", model_name);
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "sequence batching specifies multiple " +
+                  ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                  " tensors for " + model_name);
         }
 
         *tensor_name = control_input.name();
@@ -95,19 +100,21 @@ GetSequenceControlProperties(
 
         if (c.int32_false_true_size() > 0) {
           if (c.fp32_false_true_size() != 0) {
-            return tensorflow::errors::InvalidArgument(
+            return Status(
+                RequestStatusCode::INVALID_ARG,
                 "sequence batching specifies both 'int32_false_true' and "
-                "'fp32_false_true' for ",
-                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
-                model_name);
+                "'fp32_false_true' for " +
+                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    " for " + model_name);
           }
 
           if (c.int32_false_true_size() != 2) {
-            return tensorflow::errors::InvalidArgument(
+            return Status(
+                RequestStatusCode::INVALID_ARG,
                 "sequence batching control 'int32_false_true' must have "
-                "exactly 2 entries for ",
-                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
-                model_name);
+                "exactly 2 entries for " +
+                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    " for " + model_name);
           }
 
           if (tensor_datatype != nullptr) {
@@ -121,19 +128,21 @@ GetSequenceControlProperties(
           }
         } else {
           if (c.fp32_false_true_size() == 0) {
-            return tensorflow::errors::InvalidArgument(
+            return Status(
+                RequestStatusCode::INVALID_ARG,
                 "sequence batching must specify either 'int32_false_true' or "
-                "'fp32_false_true' for ",
-                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
-                model_name);
+                "'fp32_false_true' for " +
+                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    " for " + model_name);
           }
 
           if (c.fp32_false_true_size() != 2) {
-            return tensorflow::errors::InvalidArgument(
+            return Status(
+                RequestStatusCode::INVALID_ARG,
                 "sequence batching control 'fp32_false_true' must have exactly "
-                "2 entries for ",
-                ModelSequenceBatching_Control_Kind_Name(control_kind), " for ",
-                model_name);
+                "2 entries for " +
+                    ModelSequenceBatching_Control_Kind_Name(control_kind) +
+                    " for " + model_name);
           }
 
           if (tensor_datatype != nullptr) {
@@ -152,30 +161,30 @@ GetSequenceControlProperties(
 
   if (!seen_control) {
     if (required) {
-      return tensorflow::errors::InvalidArgument(
-          "sequence batching control tensor must specify a ",
-          ModelSequenceBatching_Control_Kind_Name(control_kind), " value for ",
-          model_name);
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching control tensor must specify a " +
+              ModelSequenceBatching_Control_Kind_Name(control_kind) +
+              " value for " + model_name);
     }
 
     tensor_name->clear();
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GetNormalizedModelConfig(
-    const tensorflow::StringPiece& path,
-    const tfs::PlatformConfigMap& platform_config_map, const bool autofill,
-    ModelConfig* config)
+    const std::string& path, const tfs::PlatformConfigMap& platform_config_map,
+    const bool autofill, ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = tensorflow::io::JoinPath(path, kModelConfigPbTxt);
   if (autofill && !tensorflow::Env::Default()->FileExists(config_path).ok()) {
     config->Clear();
   } else {
-    TF_RETURN_IF_ERROR(
+    RETURN_IF_TF_ERROR(
         ReadTextProto(tensorflow::Env::Default(), config_path, config));
   }
 
@@ -183,16 +192,17 @@ GetNormalizedModelConfig(
   if (autofill) {
     const std::string model_name(tensorflow::io::Basename(path));
     std::unique_ptr<AutoFill> af;
-    TF_RETURN_IF_ERROR(AutoFill::Create(
+    RETURN_IF_ERROR(AutoFill::Create(
         model_name, platform_config_map, std::string(path), *config, &af));
-    TF_RETURN_IF_ERROR(af->Fix(config));
+    RETURN_IF_ERROR(af->Fix(config));
 
     LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
   }
 
   if (config->platform().empty()) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify platform for model '", config->name(), "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "must specify platform for model '" + config->name() + "'");
   }
 
   // If 'default_model_filename' is not specified set it appropriately
@@ -211,9 +221,10 @@ GetNormalizedModelConfig(
     } else if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
     } else {
-      return tensorflow::errors::Internal(
-          "unexpected platform type ", config->platform(), " for ",
-          config->name());
+      return Status(
+          RequestStatusCode::INTERNAL, "unexpected platform type " +
+                                           config->platform() + " for " +
+                                           config->name());
     }
   }
 
@@ -264,9 +275,10 @@ GetNormalizedModelConfig(
     if (cuerr == cudaErrorNoDevice) {
       device_cnt = 0;
     } else if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "unable to get number of CUDA devices for ", config->name(), ": ",
-          cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unable to get number of CUDA devices for " + config->name() + ": " +
+              cudaGetErrorString(cuerr));
     }
 
     // Assign default name, kind and count to each instance group that
@@ -314,31 +326,36 @@ GetNormalizedModelConfig(
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateModelConfig(
     const ModelConfig& config, const std::string& expected_platform)
 {
   if (config.name().empty()) {
-    return tensorflow::errors::InvalidArgument(
+    return Status(
+        RequestStatusCode::INVALID_ARG,
         "model configuration must specify 'name'");
   }
 
   if (config.platform().empty()) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify 'platform' for ", config.name());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "must specify 'platform' for " + config.name());
   }
 
   if (!expected_platform.empty() && (config.platform() != expected_platform)) {
-    return tensorflow::errors::NotFound(
-        "expected model of type ", expected_platform, " for ", config.name());
+    return Status(
+        RequestStatusCode::NOT_FOUND, "expected model of type " +
+                                          expected_platform + " for " +
+                                          config.name());
   }
 
   if (!config.has_version_policy()) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify 'version policy' for ", config.name());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "must specify 'version policy' for " + config.name());
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -347,14 +364,16 @@ ValidateModelConfig(
   if (config.has_dynamic_batching()) {
     for (const auto size : config.dynamic_batching().preferred_batch_size()) {
       if (size <= 0) {
-        return tensorflow::errors::InvalidArgument(
-            "dynamic batching preferred size must be positive for ",
-            config.name());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "dynamic batching preferred size must be positive for " +
+                config.name());
       }
       if (size > config.max_batch_size()) {
-        return tensorflow::errors::InvalidArgument(
-            "dynamic batching preferred size must be <= max batch size for ",
-            config.name());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "dynamic batching preferred size must be <= max batch size for " +
+                config.name());
       }
     }
   }
@@ -365,20 +384,21 @@ ValidateModelConfig(
     const auto& batcher = config.sequence_batching();
 
     if (batcher.control_input_size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "sequence batching must specify at least one control tensor for ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "sequence batching must specify at least one control tensor for " +
+              config.name());
     }
 
     // Make sure at most one SEQUENCE_START and one SEQUENCE_READY
     // control is specified.
     std::string tensor_name;
-    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
         nullptr));
-    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetSequenceControlProperties(
         batcher, config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         true /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
@@ -388,17 +408,19 @@ ValidateModelConfig(
   // If ensemble scheduling is specified, validate it.
   // Otherwise, must validate platform and instance_group
   if (config.has_ensemble_scheduling()) {
-    TF_RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
+    RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
   } else {
     if (config.platform() == kEnsemblePlatform) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble scheduling must be set for ensemble ", config.name(),
-          " whose platform is ", kEnsemblePlatform);
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble scheduling must be set for ensemble " + config.name() +
+              " whose platform is " + kEnsemblePlatform);
     }
 
     if (config.instance_group().size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "must specify one or more 'instance group's for ", config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify one or more 'instance group's for " + config.name());
     }
 
     // Make sure KIND_GPU instance group specifies at least one GPU and
@@ -409,79 +431,90 @@ ValidateModelConfig(
     if (cuerr == cudaErrorNoDevice) {
       dcnt = 0;
     } else if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to get device count for validation of model ", config.name(),
-          ": ", cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to get device count for validation of model " +
+              config.name() + ": " + cudaGetErrorString(cuerr));
     }
 
     for (const auto& group : config.instance_group()) {
       if (group.kind() == ModelInstanceGroup::KIND_GPU) {
         if (group.gpus().size() == 0) {
-          return tensorflow::errors::InvalidArgument(
-              "instance group ", group.name(), " of model ", config.name(),
-              " has kind KIND_GPU but specifies no GPUs");
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "instance group " + group.name() + " of model " + config.name() +
+                  " has kind KIND_GPU but specifies no GPUs");
         }
 
         for (const int32_t gid : group.gpus()) {
           if ((gid < 0) || (gid >= dcnt)) {
-            return tensorflow::errors::InvalidArgument(
-                "instance group ", group.name(), " of model ", config.name(),
-                " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
-                (dcnt - 1));
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "instance group " + group.name() + " of model " +
+                    config.name() + " specifies invalid GPU id " +
+                    std::to_string(gid) + ", valid GPUs are 0 - " +
+                    std::to_string(dcnt - 1));
           }
         }
       } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
-          return tensorflow::errors::InvalidArgument(
-              "instance group ", group.name(), " of model ", config.name(),
-              " has kind KIND_CPU but specifies one or more GPUs");
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "instance group " + group.name() + " of model " + config.name() +
+                  " has kind KIND_CPU but specifies one or more GPUs");
         }
       } else {
-        return tensorflow::errors::Internal(
-            "instance group ", group.name(), " of model ", config.name(),
-            " has unexpected kind KIND_AUTO");
+        return Status(
+            RequestStatusCode::INTERNAL, "instance group " + group.name() +
+                                             " of model " + config.name() +
+                                             " has unexpected kind KIND_AUTO");
       }
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateEnsembleSchedulingConfig(const ModelConfig& config)
 {
   if (config.platform() != kEnsemblePlatform) {
-    return tensorflow::errors::InvalidArgument(
-        "ensemble scheduling can not be set for model ", config.name(),
-        " whose platform is not ", kEnsemblePlatform);
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "ensemble scheduling can not be set for model " + config.name() +
+            " whose platform is not " + kEnsemblePlatform);
   }
   if (config.instance_group().size() != 0) {
-    return tensorflow::errors::InvalidArgument(
-        "instance group should not be specified for ensemble ", config.name());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "instance group should not be specified for ensemble " + config.name());
   }
   if (config.has_optimization()) {
-    return tensorflow::errors::InvalidArgument(
-        "optimization should not be specified for ensemble ", config.name());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "optimization should not be specified for ensemble " + config.name());
   }
 
   // Make sure step is not empty and all fields are set
   if (config.ensemble_scheduling().step_size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify 'step' for ensemble ", config.name());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "must specify 'step' for ensemble " + config.name());
   }
 
   std::unordered_map<std::string, EnsembleTensor> tensors;
 
-  TF_RETURN_IF_ERROR(BuildEnsembleGraph(config, tensors));
+  RETURN_IF_ERROR(BuildEnsembleGraph(config, tensors));
 
   // check data flow
   std::deque<EnsembleTensor*> ready_queue;
   for (const auto& input : config.input()) {
     auto it = tensors.find(input.name());
     if (it == tensors.end()) {
-      return tensorflow::errors::InvalidArgument(
-          "must map ensemble input ", input.name(), " for ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG, "must map ensemble input " +
+                                              input.name() + " for ensemble " +
+                                              config.name());
     }
     it->second.ready = true;
     ready_queue.push_back(&(it->second));
@@ -510,14 +543,16 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
   for (const auto& output : config.output()) {
     auto it = tensors.find(output.name());
     if (it == tensors.end()) {
-      return tensorflow::errors::InvalidArgument(
-          "must map ensemble output ", output.name(), " for ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG, "must map ensemble output " +
+                                              output.name() + " for ensemble " +
+                                              config.name());
     }
     if (!it->second.ready) {
-      return tensorflow::errors::InvalidArgument(
-          "no data will be written to ensemble output ", output.name(),
-          " for ensemble ", config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "no data will be written to ensemble output " + output.name() +
+              " for ensemble " + config.name());
     } else {
       outputs.insert(it->first);
     }
@@ -529,21 +564,24 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
       continue;
     }
     if (!tensor.second.ready) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble tensor ", tensor.first,
-          " is redundant as no data will be written to it for ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble tensor " + tensor.first +
+              " is redundant as no data will be written to it for ensemble " +
+              config.name());
     } else if (tensor.second.next_nodes.size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble tensor ", tensor.first,
-          " is redundant as it will not be used in any models for ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble tensor " + tensor.first +
+              " is redundant as it will not be used in any models for "
+              "ensemble " +
+              config.name());
     }
   }
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 BuildEnsembleGraph(
     const ModelConfig& config,
     std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
@@ -551,18 +589,21 @@ BuildEnsembleGraph(
   keyed_ensemble_graph.clear();
   for (const auto& element : config.ensemble_scheduling().step()) {
     if (element.model_name().empty()) {
-      return tensorflow::errors::InvalidArgument(
-          "must specify 'model_name' in step of ensemble ", config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify 'model_name' in step of ensemble " + config.name());
     }
     if (element.input_map().size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "must specify one or more 'input_map' in step of ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify one or more 'input_map' in step of ensemble " +
+              config.name());
     }
     if (element.output_map().size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "must specify one or more 'output_map' in step of ensemble ",
-          config.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "must specify one or more 'output_map' in step of ensemble " +
+              config.name());
     }
 
     // Link ensemble tensors
@@ -571,10 +612,11 @@ BuildEnsembleGraph(
       auto it = keyed_ensemble_graph.find(output_map.second);
       if (it != keyed_ensemble_graph.end()) {
         if (it->second.isOutput) {
-          return tensorflow::errors::InvalidArgument(
-              "ensemble tensor ", it->first,
-              " can appear in an output map only once for ensemble ",
-              config.name());
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "ensemble tensor " + it->first +
+                  " can appear in an output map only once for ensemble " +
+                  config.name());
         } else {
           it->second.isOutput = true;
         }
@@ -590,10 +632,12 @@ BuildEnsembleGraph(
     std::set<std::string> model_inputs;
     for (const auto& input_map : element.input_map()) {
       if (model_inputs.find(input_map.second) != model_inputs.end()) {
-        return tensorflow::errors::InvalidArgument(
-            "input ", input_map.second, " in model ", element.model_name(),
-            " is mapped to multiple ensemble tensors in one step for ensemble ",
-            config.name());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "input " + input_map.second + " in model " + element.model_name() +
+                " is mapped to multiple ensemble tensors in one step for "
+                "ensemble " +
+                config.name());
       } else {
         model_inputs.emplace(input_map.second);
       }
@@ -610,48 +654,50 @@ BuildEnsembleGraph(
       }
     }
   }
-  return tensorflow::Status::OK();
+
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateModelInput(const ModelInput& io)
 {
   std::set<std::string> allowed;
   return ValidateModelInput(io, allowed);
 }
 
-tensorflow::Status
+Status
 ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
 {
   if (io.name().empty()) {
-    return tensorflow::errors::InvalidArgument(
-        "model input must specify 'name'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model input must specify 'name'");
   }
 
   if (io.data_type() == DataType::TYPE_INVALID) {
-    return tensorflow::errors::InvalidArgument(
-        "model input must specify 'data_type'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model input must specify 'data_type'");
   }
 
   if (io.dims_size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "model input must specify 'dims'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model input must specify 'dims'");
   }
 
   for (auto dim : io.dims()) {
     if ((dim < 1) && (dim != WILDCARD_DIM)) {
-      return tensorflow::errors::InvalidArgument(
-          "model input dimension must be integer >= 1, or ",
-          std::to_string(WILDCARD_DIM),
-          " to indicate a variable-size dimension");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model input dimension must be integer >= 1, or " +
+              std::to_string(WILDCARD_DIM) +
+              " to indicate a variable-size dimension");
     }
   }
 
   if (((io.format() == ModelInput::FORMAT_NHWC) ||
        (io.format() == ModelInput::FORMAT_NCHW)) &&
       (io.dims_size() != 3)) {
-    return tensorflow::errors::InvalidArgument(
-        "model input NHWC/NCHW require 3 dims");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
   }
 
   if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {
@@ -663,45 +709,48 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
       astr.append(a);
     }
 
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference input '", io.name(),
-        "', allowed inputs are: ", astr);
+    return Status(
+        RequestStatusCode::INVALID_ARG, "unexpected inference input '" +
+                                            io.name() +
+                                            "', allowed inputs are: " + astr);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateModelOutput(const ModelOutput& io)
 {
   std::set<std::string> allowed;
   return ValidateModelOutput(io, allowed);
 }
 
-tensorflow::Status
+Status
 ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
 {
   if (io.name().empty()) {
-    return tensorflow::errors::InvalidArgument(
-        "model output must specify 'name'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model output must specify 'name'");
   }
 
   if (io.data_type() == DataType::TYPE_INVALID) {
-    return tensorflow::errors::InvalidArgument(
+    return Status(
+        RequestStatusCode::INVALID_ARG,
         "model output must specify 'data_type'");
   }
 
   if (io.dims_size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "model output must specify 'dims'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "model output must specify 'dims'");
   }
 
   for (auto dim : io.dims()) {
     if ((dim < 1) && (dim != WILDCARD_DIM)) {
-      return tensorflow::errors::InvalidArgument(
-          "model input dimension must be integer >= 1, or ",
-          std::to_string(WILDCARD_DIM),
-          " to indicate a variable-size dimension");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model input dimension must be integer >= 1, or " +
+              std::to_string(WILDCARD_DIM) +
+              " to indicate a variable-size dimension");
     }
   }
 
@@ -714,12 +763,13 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
       astr.append(a);
     }
 
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference output '", io.name(),
-        "', allowed outputs are: ", astr);
+    return Status(
+        RequestStatusCode::INVALID_ARG, "unexpected inference output '" +
+                                            io.name() +
+                                            "', allowed outputs are: " + astr);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

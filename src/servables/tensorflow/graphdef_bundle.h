@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/status.h"
 #include "src/servables/tensorflow/base_bundle.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -34,10 +35,9 @@ class GraphDefBundle : public BaseBundle {
   GraphDefBundle() = default;
   GraphDefBundle(GraphDefBundle&&) = default;
 
-  tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+  Status Init(const std::string& path, const ModelConfig& config);
 
-  tensorflow::Status CreateSession(
+  Status CreateSession(
       const tensorflow::SessionOptions& options, const int gpu_device,
       const std::string& model_path, tensorflow::Session** session,
       IONameMap* input_name_map, IONameMap* output_name_map) override;

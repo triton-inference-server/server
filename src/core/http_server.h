@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -33,10 +33,11 @@ class InferenceServer;
 
 class HTTPServer {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       InferenceServer* server, uint16_t port, int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
-  virtual tensorflow::Status Start() = 0;
-  virtual tensorflow::Status Stop() = 0;
+  virtual Status Start() = 0;
+  virtual Status Stop() = 0;
 };
+
 }}  // namespace nvidia::inferenceserver

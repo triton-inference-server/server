@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -37,20 +37,21 @@
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 AutoFillPlan::Create(
     const std::string& model_name, const std::string& model_path,
     std::unique_ptr<AutoFillPlan>* autofill)
 {
   std::set<std::string> version_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name, "' due to multiple versions");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
   const auto version_path =
@@ -58,32 +59,34 @@ AutoFillPlan::Create(
 
   // There must be a single plan file within the version directory...
   std::set<std::string> plan_files;
-  TF_RETURN_IF_ERROR(GetFiles(version_path, &plan_files));
+  RETURN_IF_ERROR(GetFiles(version_path, &plan_files));
   if (plan_files.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name, "', unable to find plan file");
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "', unable to find plan file");
   }
 
   const std::string plan_file = *(plan_files.begin());
   const auto plan_path = tensorflow::io::JoinPath(version_path, plan_file);
 
   tensorflow::string plan_data_str;
-  TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
+  RETURN_IF_TF_ERROR(tensorflow::ReadFileToString(
       tensorflow::Env::Default(), plan_path, &plan_data_str));
   std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
 
   nvinfer1::IRuntime* runtime = nullptr;
   nvinfer1::ICudaEngine* engine = nullptr;
-  if (!LoadPlan(plan_data, &runtime, &engine).ok()) {
+  if (!LoadPlan(plan_data, &runtime, &engine).IsOk()) {
     if (engine != nullptr) {
       engine->destroy();
     }
     if (runtime != nullptr) {
       runtime->destroy();
     }
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to create TensorRT runtime and engine");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to create TensorRT runtime and engine");
   }
 
   const int32_t max_batch_size = engine->getMaxBatchSize();
@@ -117,10 +120,10 @@ AutoFillPlan::Create(
 
   autofill->reset(
       new AutoFillPlan(model_name, plan_file, max_batch_size, config));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillPlan::Fix(ModelConfig* config)
 {
   config->set_platform(kTensorRTPlanPlatform);
@@ -148,7 +151,7 @@ AutoFillPlan::Fix(ModelConfig* config)
     config->mutable_output()->CopyFrom(config_.output());
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

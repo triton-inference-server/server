@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/status.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
 
@@ -39,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param bundle Returns the SavedModelBundle
 /// \param sig If non-nullptr returns the signature of the model
 /// \return Error status.
-tensorflow::Status LoadSavedModel(
+Status LoadSavedModel(
     const std::string& model_name, const std::string& model_path,
     const tensorflow::SessionOptions& session_options,
     std::unique_ptr<tensorflow::SavedModelBundle>* bundle,

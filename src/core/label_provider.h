@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,7 +28,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/constants.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -42,11 +43,10 @@ class LabelProvider {
   const std::string& GetLabel(const std::string& name, size_t index) const;
 
   // Add a set of named labels initialized from a given 'filepath'.
-  tensorflow::Status AddLabels(
-      const std::string& name, const std::string& filepath);
+  Status AddLabels(const std::string& name, const std::string& filepath);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(LabelProvider);
+  DISALLOW_COPY_AND_ASSIGN(LabelProvider);
 
   std::unordered_map<std::string, std::vector<std::string>> label_map_;
 };
