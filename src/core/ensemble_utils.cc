@@ -278,7 +278,6 @@ ValidateEnsembleConfig(
           " is redundant as no data will be written to it under optimistic "
           "assumption");
     } else if (tensor.second.next_nodes.size() == 0) {
-      if (ensemble)
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
           " is redundant as it will not be used in any models under optimistic "

@@ -26,6 +26,7 @@
 
 #include "src/core/model_config_utils.h"
 
+#include <deque>
 #include <set>
 #include "absl/strings/numbers.h"
 #include "cuda/include/cuda_runtime_api.h"
@@ -384,48 +385,11 @@ ValidateModelConfig(
         nullptr));
   }
 
-  // If ensemble scheduling is specified make sure the other fields are
-  // specified correctly.
+  // If ensemble scheduling is specified, validate it.
+  // Otherwise, must validate platform and instance_group
   if (config.has_ensemble_scheduling()) {
-    if (config.platform() != kEnsemblePlatform) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble scheduling can not be set for model ", config.name(),
-          " whose platform is not ", kEnsemblePlatform);
-    }
-    if (config.instance_group().size() != 0) {
-      return tensorflow::errors::InvalidArgument(
-          "instance group should not be specified for ensemble ",
-          config.name());
-    }
-    if (config.has_optimization()) {
-      return tensorflow::errors::InvalidArgument(
-          "optimization should not be specified for ensemble ", config.name());
-    }
-
-    // Make sure step is not empty and all fields are set
-    if (config.ensemble_scheduling().step_size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "must specify 'step' for ensemble ", config.name());
-    }
-    for (const auto& element : config.ensemble_scheduling().step()) {
-      if (element.model_name().empty()) {
-        return tensorflow::errors::InvalidArgument(
-            "must specify 'model_name' in step of ensemble ", config.name());
-      }
-      if (!element.input_map().size() == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "must specify one or more 'input_map' in step of ensemble ",
-            config.name());
-      }
-      if (!element.output_map().size() == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "must specify one or more 'output_map' in step of ensemble ",
-            config.name());
-      }
-    }
-  }
-  // if not specifed, then must validate platform and instance_group
-  else {
+    TF_RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
+  } else {
     if (config.platform() == kEnsemblePlatform) {
       return tensorflow::errors::InvalidArgument(
           "ensemble scheduling must be set for ensemble ", config.name(),
@@ -480,6 +444,172 @@ ValidateModelConfig(
     }
   }
 
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+ValidateEnsembleSchedulingConfig(const ModelConfig& config)
+{
+  if (config.platform() != kEnsemblePlatform) {
+    return tensorflow::errors::InvalidArgument(
+        "ensemble scheduling can not be set for model ", config.name(),
+        " whose platform is not ", kEnsemblePlatform);
+  }
+  if (config.instance_group().size() != 0) {
+    return tensorflow::errors::InvalidArgument(
+        "instance group should not be specified for ensemble ", config.name());
+  }
+  if (config.has_optimization()) {
+    return tensorflow::errors::InvalidArgument(
+        "optimization should not be specified for ensemble ", config.name());
+  }
+
+  // Make sure step is not empty and all fields are set
+  if (config.ensemble_scheduling().step_size() == 0) {
+    return tensorflow::errors::InvalidArgument(
+        "must specify 'step' for ensemble ", config.name());
+  }
+
+  struct EnsembleTensor {
+    EnsembleTensor(bool isOutput) : ready(false), isOutput(isOutput) {}
+    bool ready;
+    bool isOutput;
+    std::vector<EnsembleTensor*> prev_nodes;
+    std::vector<EnsembleTensor*> next_nodes;
+  };
+
+  std::unordered_map<std::string, EnsembleTensor> tensors;
+
+  for (const auto& element : config.ensemble_scheduling().step()) {
+    if (element.model_name().empty()) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify 'model_name' in step of ensemble ", config.name());
+    }
+    if (element.input_map().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'input_map' in step of ensemble ",
+          config.name());
+    }
+    if (element.output_map().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'output_map' in step of ensemble ",
+          config.name());
+    }
+
+    // Link ensemble tensors
+    std::vector<EnsembleTensor*> tensor_as_output;
+    for (const auto& output_map : element.output_map()) {
+      auto it = tensors.find(output_map.second);
+      if (it != tensors.end()) {
+        if (it->second.isOutput) {
+          return tensorflow::errors::InvalidArgument(
+              "ensemble tensor ", it->first,
+              " can appear in an output map only once for ensemble ",
+              config.name());
+        } else {
+          it->second.isOutput = true;
+        }
+      } else {
+        it = tensors
+                 .emplace(
+                     std::make_pair(output_map.second, EnsembleTensor(true)))
+                 .first;
+      }
+      tensor_as_output.push_back(&(it->second));
+    }
+
+    std::set<std::string> model_inputs;
+    for (const auto& input_map : element.input_map()) {
+      if (model_inputs.find(input_map.second) != model_inputs.end()) {
+        return tensorflow::errors::InvalidArgument(
+            "input ", input_map.second, " in model ", element.model_name(),
+            " is mapped to multiple ensemble tensors in one step for ensemble ",
+            config.name());
+      } else {
+        model_inputs.emplace(input_map.second);
+      }
+      auto it = tensors.find(input_map.first);
+      if (it == tensors.end()) {
+        it =
+            tensors
+                .emplace(std::make_pair(input_map.first, EnsembleTensor(false)))
+                .first;
+      }
+      for (auto output : tensor_as_output) {
+        output->prev_nodes.push_back(&(it->second));
+        it->second.next_nodes.push_back(output);
+      }
+    }
+  }
+
+  // check data flow
+  std::deque<EnsembleTensor*> ready_queue;
+  for (const auto& input : config.input()) {
+    auto it = tensors.find(input.name());
+    if (it == tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+          "must map ensemble input ", input.name(), " for ensemble ",
+          config.name());
+    }
+    it->second.ready = true;
+    ready_queue.push_back(&(it->second));
+  }
+  while (!ready_queue.empty()) {
+    auto& ready_node = ready_queue.front();
+    for (auto& next_node : ready_node->next_nodes) {
+      if (next_node->ready) {
+        continue;
+      }
+      bool next_node_ready = true;
+      for (auto& prev_node : next_node->prev_nodes) {
+        if (!prev_node->ready) {
+          next_node_ready = false;
+          break;
+        }
+      }
+      next_node->ready = next_node_ready;
+      if (next_node_ready) {
+        ready_queue.push_back(next_node);
+      }
+    }
+    ready_queue.pop_front();
+  }
+  std::set<std::string> outputs;
+  for (const auto& output : config.output()) {
+    auto it = tensors.find(output.name());
+    if (it == tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+          "must map ensemble output ", output.name(), " for ensemble ",
+          config.name());
+    }
+    if (!it->second.ready) {
+      return tensorflow::errors::InvalidArgument(
+          "no data will be written to ensemble output ", output.name(),
+          " under optimistic assumption for ensemble ", config.name());
+    } else {
+      outputs.insert(it->first);
+    }
+  }
+  // Check redundant ensemble tensors
+  for (const auto& tensor : tensors) {
+    // skip ensemble outputs as they have been check and can have no next nodes
+    if (outputs.find(tensor.first) != outputs.end()) {
+      continue;
+    }
+    if (!tensor.second.ready) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble tensor ", tensor.first,
+          " is redundant as no data will be written to it under optimistic "
+          "assumption for ensemble ",
+          config.name());
+    } else if (tensor.second.next_nodes.size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble tensor ", tensor.first,
+          " is redundant as it will not be used in any models under optimistic "
+          "assumption for ensemble ",
+          config.name());
+    }
+  }
   return tensorflow::Status::OK();
 }
 

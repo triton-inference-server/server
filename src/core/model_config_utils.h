@@ -76,6 +76,14 @@ tensorflow::Status GetNormalizedModelConfig(
 tensorflow::Status ValidateModelConfig(
     const ModelConfig& config, const std::string& expected_platform);
 
+/// Validate that the ensemble scheduling are specified correctly.
+/// \param ensemble_config The model configuration that specifies
+/// ensemble_scheduling field.
+/// \return The error status. A non-OK status indicates the configuration
+/// is not valid.
+tensorflow::Status ValidateEnsembleSchedulingConfig(
+    const ModelConfig& ensemble_config);
+
 /// Validate that input is specified correctly in a model
 /// configuration.
 /// \param io The model input.
