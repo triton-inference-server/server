@@ -28,8 +28,6 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
-
 filegroup(
     name = "ensemble_testdata",
     srcs = glob(

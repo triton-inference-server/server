@@ -517,7 +517,7 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     if (!it->second.ready) {
       return tensorflow::errors::InvalidArgument(
           "no data will be written to ensemble output ", output.name(),
-          " under optimistic assumption for ensemble ", config.name());
+          " for ensemble ", config.name());
     } else {
       outputs.insert(it->first);
     }
@@ -531,14 +531,12 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     if (!tensor.second.ready) {
       return tensorflow::errors::InvalidArgument(
           "ensemble tensor ", tensor.first,
-          " is redundant as no data will be written to it under optimistic "
-          "assumption for ensemble ",
+          " is redundant as no data will be written to it for ensemble ",
           config.name());
     } else if (tensor.second.next_nodes.size() == 0) {
       return tensorflow::errors::InvalidArgument(
           "ensemble tensor ", tensor.first,
-          " is redundant as it will not be used in any models under optimistic "
-          "assumption for ensemble ",
+          " is redundant as it will not be used in any models for ensemble ",
           config.name());
     }
   }

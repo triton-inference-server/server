@@ -263,7 +263,7 @@ ValidateEnsembleConfig(
     if (!it->second.ready) {
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", no data will be written to ",
-          "ensemble output ", output.name(), " under optimistic assumption");
+          "ensemble output ", output.name());
     } else {
       ensemble_outputs.insert(it->first);
     }
@@ -275,13 +275,11 @@ ValidateEnsembleConfig(
     if (!tensor.second.ready) {
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
-          " is redundant as no data will be written to it under optimistic "
-          "assumption");
+          " is redundant as no data will be written to it");
     } else if (tensor.second.next_nodes.size() == 0) {
       return tensorflow::errors::InvalidArgument(
           "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
-          " is redundant as it will not be used in any models under optimistic "
-          "assumption");
+          " is redundant as it will not be used in any models");
     }
   }
   (ensembles.find(ensemble))->second = true;
