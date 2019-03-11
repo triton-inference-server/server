@@ -31,53 +31,48 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
-#include "tensorflow/c/c_api.h"
-#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
-EnsembleBundle::Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
+Status
+EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 {
-  TF_RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
-  TF_RETURN_IF_ERROR(SetModelConfig(path, config));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
+  RETURN_IF_ERROR(SetModelConfig(path, config));
 
   // [TODO] Replace it to ensemble scheduler after DLIS-290
-  TF_RETURN_IF_ERROR(SetConfiguredScheduler(
-      1,
-      [](uint32_t runner_idx) -> tensorflow::Status {
-        return tensorflow::Status::OK();
-      },
+  RETURN_IF_ERROR(SetConfiguredScheduler(
+      1, [](uint32_t runner_idx) -> Status { return Status::Success; },
       [this](
           uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(tensorflow::Status)> func) {
+          std::function<void(Status)> func) {
         Run(runner_idx, payloads, func);
       }));
 
   LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 EnsembleBundle::SetInferenceServer(void* inference_server)
 {
   // [TODO] Uncommon below after DLIS-290
   // EnsembleScheduler* scheduler =
   //    static_cast<EnsembleScheduler*>(scheduler_.get());
-  // TF_RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
+  // RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
   return InferenceBackend::SetInferenceServer(inference_server);
 }
 
 void
 EnsembleBundle::Run(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads)
+    std::function<void(Status)> OnCompleteQueuedPayloads)
 {
   LOG_ERROR << "Unexpectedly invoked EnsembleBundle::Run()";
 
-  OnCompleteQueuedPayloads(tensorflow::errors::Internal(
+  OnCompleteQueuedPayloads(Status(
+      RequestStatusCode::INTERNAL,
       "unexpected invocation of EnsembleBundle::Run()"));
 }
 

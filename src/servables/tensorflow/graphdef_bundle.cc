@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -39,48 +39,49 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-tensorflow::Status
+Status
 ReadBinaryProto(const std::string& filename, google::protobuf::MessageLite* msg)
 {
   tensorflow::string msg_str;
-  TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
+  RETURN_IF_TF_ERROR(tensorflow::ReadFileToString(
       tensorflow::Env::Default(), filename, &msg_str));
 
   google::protobuf::io::CodedInputStream coded_stream(
       reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
   coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
   if (!msg->ParseFromCodedStream(&coded_stream)) {
-    return tensorflow::errors::DataLoss(
-        "Can't parse ", filename, " as binary proto");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Can't parse " + filename + " as binary proto");
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }  // namespace
 
-tensorflow::Status
-GraphDefBundle::Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
+Status
+GraphDefBundle::Init(const std::string& path, const ModelConfig& config)
 {
-  TF_RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowGraphDefPlatform));
-  TF_RETURN_IF_ERROR(BaseBundle::Init(path, config));
-  return tensorflow::Status::OK();
+  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowGraphDefPlatform));
+  RETURN_IF_ERROR(BaseBundle::Init(path, config));
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GraphDefBundle::CreateSession(
     const tensorflow::SessionOptions& options, const int gpu_device,
     const std::string& model_path, tensorflow::Session** session,
     IONameMap* input_name_map, IONameMap* output_name_map)
 {
-  TF_RETURN_IF_ERROR(tensorflow::NewSession(options, session));
+  RETURN_IF_TF_ERROR(tensorflow::NewSession(options, session));
 
   tensorflow::GraphDef graph_def;
-  TF_RETURN_IF_ERROR(ReadBinaryProto(model_path, &graph_def));
+  RETURN_IF_ERROR(ReadBinaryProto(model_path, &graph_def));
   if (graph_def.node_size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "model ", Name(), " has an empty network");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "model " + Name() + " has an empty network");
   }
 
   // Set the default device to control the CPU/GPU that the graph runs
@@ -95,7 +96,7 @@ GraphDefBundle::CreateSession(
         "/gpu:" + std::to_string(gpu_device), &graph_def);
   }
 
-  TF_RETURN_IF_ERROR((*session)->Create(graph_def));
+  RETURN_IF_TF_ERROR((*session)->Create(graph_def));
 
   // Go through all graph nodes and collect the possible inputs and
   // outputs. We use this to verify the requested inputs and outputs
@@ -112,20 +113,22 @@ GraphDefBundle::CreateSession(
   }
 
   if (potential_inputs.size() < (size_t)Config().input().size()) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', configuration expects ",
-        Config().input().size(), " inputs, model provides at most ",
-        potential_inputs.size());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + Name() + "', configuration expects " +
+            std::to_string(Config().input().size()) +
+            " inputs, model provides at most " +
+            std::to_string(potential_inputs.size()));
   }
 
   for (const auto& io : Config().input()) {
-    TF_RETURN_IF_ERROR(ValidateModelInput(io, potential_inputs));
+    RETURN_IF_ERROR(ValidateModelInput(io, potential_inputs));
   }
   for (const auto& io : Config().output()) {
-    TF_RETURN_IF_ERROR(ValidateModelOutput(io, potential_outputs));
+    RETURN_IF_ERROR(ValidateModelOutput(io, potential_outputs));
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

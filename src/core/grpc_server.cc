@@ -118,22 +118,22 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     uint64_t id = request.meta_data().id();
 
     auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-    tensorflow::Status status = server->CreateBackendHandle(
+    Status status = server->CreateBackendHandle(
         request.model_name(), request.model_version(), backend);
-    if (status.ok()) {
+    if (status.IsOk()) {
       infer_stats->SetModelBackend((*backend)());
 
       std::shared_ptr<GRPCInferRequestProvider> request_provider;
       status = GRPCInferRequestProvider::Create(
           *((*backend)()), request, &request_provider);
-      if (status.ok()) {
+      if (status.IsOk()) {
         infer_stats->SetBatchSize(
             request_provider->RequestHeader().batch_size());
 
         std::shared_ptr<GRPCInferResponseProvider> response_provider;
         status = GRPCInferResponseProvider::Create(
             request.meta_data(), &response, &response_provider);
-        if (status.ok()) {
+        if (status.IsOk()) {
           server->HandleInfer(
               request_status, backend, request_provider, response_provider,
               infer_stats,
@@ -155,8 +155,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       }
     }
 
-    if (!status.ok()) {
-      LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
+    if (!status.IsOk()) {
+      LOG_VERBOSE(1) << "Infer failed: " << status.Message();
       infer_stats->SetFailed(true);
       RequestStatusFactory::Create(
           request_status, 0 /* request_id */, server->Id(), status);
@@ -225,7 +225,7 @@ class HealthContext final
 
 GRPCServer::GRPCServer(const std::string& addr) : nvrpc::Server(addr) {}
 
-tensorflow::Status
+Status
 GRPCServer::Create(
     InferenceServer* server, uint16_t port,
     std::unique_ptr<GRPCServer>* grpc_server)
@@ -279,21 +279,21 @@ GRPCServer::Create(
   executor->RegisterContexts(rpcHealth, g_Resources, 1);
   executor->RegisterContexts(rpcProfile, g_Resources, 1);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GRPCServer::Start()
 {
   AsyncRun();
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 GRPCServer::Stop()
 {
   Shutdown();
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

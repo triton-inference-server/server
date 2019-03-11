@@ -38,7 +38,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 SequenceBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
     StandardInitFunc OnInit, StandardRunFunc OnSchedule,
@@ -70,7 +70,7 @@ SequenceBatchScheduler::Create(
   std::shared_ptr<InferRequestProvider::InputOverrideMap> start;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> cont;
   std::shared_ptr<InferRequestProvider::InputOverrideMap> notready;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_ERROR(
       sched->CreateControlTensors(config, &start, &cont, &notready));
 
   // Create one SequenceBatch object for each requested runner. The
@@ -98,7 +98,7 @@ SequenceBatchScheduler::Create(
 
   scheduler->reset(raw);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 SequenceBatchScheduler::~SequenceBatchScheduler()
@@ -113,7 +113,7 @@ SequenceBatchScheduler::~SequenceBatchScheduler()
   reaper_thread_->join();
 }
 
-tensorflow::Status
+Status
 SequenceBatchScheduler::CreateControlTensors(
     const ModelConfig& config,
     std::shared_ptr<InferRequestProvider::InputOverrideMap>*
@@ -139,7 +139,7 @@ SequenceBatchScheduler::CreateControlTensors(
 
   // START
   {
-    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
@@ -175,7 +175,7 @@ SequenceBatchScheduler::CreateControlTensors(
 
   // READY
   {
-    TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+    RETURN_IF_ERROR(GetSequenceControlProperties(
         config.sequence_batching(), config.name(),
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         true /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
@@ -209,7 +209,7 @@ SequenceBatchScheduler::CreateControlTensors(
         ->insert(std::make_pair(tensor_name, false_override));
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 void
@@ -217,7 +217,7 @@ SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(tensorflow::Status)> OnComplete)
+    std::function<void(Status)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
   std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
@@ -230,9 +230,11 @@ SequenceBatchScheduler::Enqueue(
   // batcher does not yet support requests that are statically
   // batched.
   if (request_header.batch_size() != 1) {
-    OnComplete(tensorflow::errors::InvalidArgument(
-        "inference request to model '", request_provider->ModelName(),
-        "' must specify batch-size 1 due to requirements of sequence batcher"));
+    OnComplete(Status(
+        RequestStatusCode::INVALID_ARG,
+        "inference request to model '" + request_provider->ModelName() +
+            "' must specify batch-size 1 due to requirements of sequence "
+            "batcher"));
     return;
   }
 
@@ -241,9 +243,10 @@ SequenceBatchScheduler::Enqueue(
   // doesn't have a correlation ID.
   const CorrelationID correlation_id = request_header.correlation_id();
   if (correlation_id == 0) {
-    OnComplete(tensorflow::errors::InvalidArgument(
-        "inference request to model '", request_provider->ModelName(),
-        "' must specify a non-zero correlation ID"));
+    OnComplete(Status(
+        RequestStatusCode::INVALID_ARG,
+        "inference request to model '" + request_provider->ModelName() +
+            "' must specify a non-zero correlation ID"));
     return;
   }
 
@@ -266,10 +269,12 @@ SequenceBatchScheduler::Enqueue(
   // this request.
   if (!seq_start && (sb_itr == sequence_to_batchslot_map_.end()) &&
       (bl_itr == sequence_to_backlog_map_.end())) {
-    OnComplete(tensorflow::errors::InvalidArgument(
-        "inference request for sequence ", std::to_string(correlation_id),
-        " to model '", request_provider->ModelName(),
-        "' must specify the START flag on the first request of the sequence"));
+    OnComplete(Status(
+        RequestStatusCode::INVALID_ARG,
+        "inference request for sequence " + std::to_string(correlation_id) +
+            " to model '" + request_provider->ModelName() +
+            "' must specify the START flag on the first request of the "
+            "sequence"));
     return;
   }
 
@@ -590,7 +595,7 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(tensorflow::Status)> OnComplete)
+    std::function<void(Status)> OnComplete)
 {
   bool wake_runner = false;
 
@@ -640,10 +645,10 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
-  tensorflow::Status init_status = OnInit_(batcher_idx_);
-  if (!init_status.ok()) {
+  Status init_status = OnInit_(batcher_idx_);
+  if (!init_status.IsOk()) {
     LOG_ERROR << "Initialization failed for sequence-batch scheduler thread "
-              << batcher_idx_ << ": " << init_status.error_message();
+              << batcher_idx_ << ": " << init_status.Message();
     return;
   }
 
@@ -817,16 +822,16 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [payloads](tensorflow::Status status) {
+      auto OnCompleteQueuedPayloads = [payloads](Status status) {
         // Payloads that don't have a completion function don't have
         // anywhere to report their errors. Those errors could have
         // caused other payloads to have issues (due to mis-alignment
         // within the batch, etc.). So if any such payload has an
         // error we just fail all payloads.
-        if (status.ok()) {
+        if (status.IsOk()) {
           for (auto& payload : *payloads) {
             if (payload.complete_function_ == nullptr) {
-              if (!payload.status_.ok()) {
+              if (!payload.status_.IsOk()) {
                 status = payload.status_;
                 break;
               }
@@ -837,13 +842,12 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
         // Complete each payload by calling the competion function.
         bool found_success = false;
         for (auto& payload : *payloads) {
-          const tensorflow::Status& final_status =
-              status.ok() ? payload.status_ : status;
+          const Status& final_status = status.IsOk() ? payload.status_ : status;
 
-          // All the payloads executed together, so count 1 execution in
-          // the first successful payload. Other payloads stay at 0
+          // All the payloads executed together, so count 1 execution
+          // in the first successful payload. Other payloads stay at 0
           // executions.
-          if (!found_success && final_status.ok() &&
+          if (!found_success && final_status.IsOk() &&
               (payload.stats_ != nullptr)) {
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;

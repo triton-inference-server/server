@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -42,7 +42,7 @@ class DynamicBatchScheduler : public Scheduler {
  public:
   // Create a scheduler to support a given number of runners and a run
   // function to call when a request is scheduled.
-  static tensorflow::Status Create(
+  static Status Create(
       const ModelConfig& config, const uint32_t runner_cnt,
       StandardInitFunc OnInit, StandardRunFunc OnSchedule,
       std::unique_ptr<Scheduler>* scheduler);
@@ -54,7 +54,7 @@ class DynamicBatchScheduler : public Scheduler {
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(tensorflow::Status)> OnComplete) override;
+      std::function<void(Status)> OnComplete) override;
 
  private:
   DynamicBatchScheduler(

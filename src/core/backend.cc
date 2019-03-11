@@ -32,7 +32,6 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -150,47 +149,49 @@ InferenceBackend::MetricInferenceLoadRatio(int gpu_device) const
   return hist;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::GetInput(
     const std::string& name, const ModelInput** input) const
 {
   const auto itr = input_map_.find(name);
   if (itr == input_map_.end()) {
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference input '", name, "' for model '", Name(), "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unexpected inference input '" + name + "' for model '" + Name() + "'");
   }
 
   *input = &itr->second;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::GetOutput(
     const std::string& name, const ModelOutput** output) const
 {
   const auto itr = output_map_.find(name);
   if (itr == output_map_.end()) {
-    return tensorflow::errors::InvalidArgument(
-        "unexpected inference output '", name, "' for model '", Name(), "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG, "unexpected inference output '" + name +
+                                            "' for model '" + Name() + "'");
   }
 
   *output = &itr->second;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::SetInferenceServer(void* inference_server)
 {
   inference_server_ = inference_server;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::SetModelConfig(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
+    const std::string& path, const ModelConfig& config)
 {
   config_ = config;
-  TF_RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
+  RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
   for (const auto& tag : config_.metric_tags()) {
     tags_.insert(
         std::map<std::string, std::string>::value_type(tag.first, tag.second));
@@ -209,26 +210,26 @@ InferenceBackend::SetModelConfig(
     if (!io.label_filename().empty()) {
       const auto label_path =
           tensorflow::io::JoinPath(model_dir, io.label_filename());
-      TF_RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
+      RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 {
   if (scheduler_ != nullptr) {
-    return tensorflow::errors::Internal(
-        "Attempt to change scheduler not allowed");
+    return Status(
+        RequestStatusCode::INTERNAL, "Attempt to change scheduler not allowed");
   }
 
   scheduler_ = std::move(scheduler);
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 InferenceBackend::SetConfiguredScheduler(
     const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
     Scheduler::StandardRunFunc OnRun)
@@ -238,10 +239,10 @@ InferenceBackend::SetConfiguredScheduler(
   // If 'sequence_batching' is configured use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
-    TF_RETURN_IF_ERROR(SequenceBatchScheduler::Create(
+    RETURN_IF_ERROR(SequenceBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));
   } else {
-    TF_RETURN_IF_ERROR(DynamicBatchScheduler::Create(
+    RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));
   }
 
@@ -253,7 +254,7 @@ InferenceBackend::Run(
     std::shared_ptr<ModelInferStats> stats,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
-    std::function<void(tensorflow::Status)> OnCompleteHandleInfer)
+    std::function<void(Status)> OnCompleteHandleInfer)
 {
   scheduler_->Enqueue(
       stats, request_provider, response_provider, OnCompleteHandleInfer);

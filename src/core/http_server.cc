@@ -26,6 +26,7 @@
 
 #include "src/core/http_server.h"
 
+#include <google/protobuf/text_format.h>
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "evhtp/evhtp.h"
@@ -54,9 +55,8 @@ class HTTPServerImpl : public HTTPServer {
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
-  tensorflow::Status Start() override;
-
-  tensorflow::Status Stop() override;
+  Status Start() override;
+  Status Stop() override;
 
  private:
   // Class object associated to evhtp thread, requests received are bounded
@@ -86,10 +86,10 @@ class HTTPServerImpl : public HTTPServer {
   };
 
   void Handle(evhtp_request_t* req);
-  void Health(evhtp_request_t* req, const std::string& health_uri);
-  void Profile(evhtp_request_t* req, const std::string& profile_uri);
-  void Infer(evhtp_request_t* req, const std::string& infer_uri);
-  void Status(evhtp_request_t* req, const std::string& status_uri);
+  void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
+  void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
+  void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
+  void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
 
   void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -108,7 +108,7 @@ class HTTPServerImpl : public HTTPServer {
   std::thread worker_;
 };
 
-tensorflow::Status
+Status
 HTTPServerImpl::Start()
 {
   if (!worker_.joinable()) {
@@ -118,24 +118,23 @@ HTTPServerImpl::Start()
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
     worker_ = std::thread(event_base_loop, evbase_, 0);
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
-  return tensorflow::Status(
-      tensorflow::error::ALREADY_EXISTS, "HTTP server is already running.");
+  return Status(
+      RequestStatusCode::ALREADY_EXISTS, "HTTP server is already running.");
 }
 
-tensorflow::Status
+Status
 HTTPServerImpl::Stop()
 {
   if (worker_.joinable()) {
     event_base_loopexit(evbase_, NULL);
     worker_.join();
-    return tensorflow::Status::OK();
+    return Status::Success;
   }
 
-  return tensorflow::Status(
-      tensorflow::error::UNAVAILABLE, "HTTP server is not running.");
+  return Status(RequestStatusCode::UNAVAILABLE, "HTTP server is not running.");
 }
 
 void
@@ -155,22 +154,22 @@ HTTPServerImpl::Handle(evhtp_request_t* req)
           std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
     // health
     if (endpoint == "health") {
-      Health(req, rest);
+      HandleHealth(req, rest);
       return;
     }
     // profile
     else if (endpoint == "profile") {
-      Profile(req, rest);
+      HandleProfile(req, rest);
       return;
     }
     // infer
     else if (endpoint == "infer") {
-      Infer(req, rest);
+      HandleInfer(req, rest);
       return;
     }
     // status
     else if (endpoint == "status") {
-      Status(req, rest);
+      HandleStatus(req, rest);
       return;
     }
   }
@@ -181,7 +180,8 @@ HTTPServerImpl::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPServerImpl::Health(evhtp_request_t* req, const std::string& health_uri)
+HTTPServerImpl::HandleHealth(
+    evhtp_request_t* req, const std::string& health_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
@@ -212,7 +212,8 @@ HTTPServerImpl::Health(evhtp_request_t* req, const std::string& health_uri)
 }
 
 void
-HTTPServerImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
+HTTPServerImpl::HandleProfile(
+    evhtp_request_t* req, const std::string& profile_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
@@ -248,7 +249,7 @@ HTTPServerImpl::Profile(evhtp_request_t* req, const std::string& profile_uri)
 }
 
 void
-HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
+HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -283,28 +284,28 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
   RequestStatus request_status;
 
   InferRequestHeader request_header;
-  tensorflow::protobuf::TextFormat::ParseFromString(
+  google::protobuf::TextFormat::ParseFromString(
       infer_request_header_str, &request_header);
   uint64_t id = request_header.id();
 
   auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-  tensorflow::Status status =
+  Status status =
       server_->CreateBackendHandle(model_name, model_version, backend);
-  if (status.ok()) {
+  if (status.IsOk()) {
     infer_stats->SetModelBackend((*backend)());
 
     std::shared_ptr<HTTPInferRequestProvider> request_provider;
     status = HTTPInferRequestProvider::Create(
         req->buffer_in, *((*backend)()), model_name, model_version,
         infer_request_header_str, &request_provider);
-    if (status.ok()) {
+    if (status.IsOk()) {
       infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
       std::shared_ptr<HTTPInferResponseProvider> response_provider;
       status = HTTPInferResponseProvider::Create(
           req->buffer_out, *((*backend)()), request_provider->RequestHeader(),
           &response_provider);
-      if (status.ok()) {
+      if (status.IsOk()) {
         std::shared_ptr<InferRequest> request(new InferRequest(
             req, id, request_provider, response_provider, infer_stats, timer));
         server_->HandleInfer(
@@ -315,7 +316,7 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
     }
   }
 
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     InferResponseHeader response_header;
     response_header.set_id(id);
     evhtp_headers_add_header(
@@ -323,7 +324,7 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
         evhtp_header_new(
             kInferResponseHTTPHeader,
             response_header.ShortDebugString().c_str(), 1, 1));
-    LOG_VERBOSE(1) << "Infer failed: " << status.error_message();
+    LOG_VERBOSE(1) << "Infer failed: " << status.Message();
     infer_stats->SetFailed(true);
     RequestStatusFactory::Create(
         &request_status, 0 /* request_id */, server_->Id(), status);
@@ -345,7 +346,8 @@ HTTPServerImpl::Infer(evhtp_request_t* req, const std::string& infer_uri)
 }
 
 void
-HTTPServerImpl::Status(evhtp_request_t* req, const std::string& status_uri)
+HTTPServerImpl::HandleStatus(
+    evhtp_request_t* req, const std::string& status_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
@@ -502,12 +504,12 @@ HTTPServerImpl::InferRequest::FinalizeResponse()
              : EVHTP_RES_BADREQ;
 }
 
-tensorflow::Status
+Status
 HTTPServer::Create(
     InferenceServer* server, uint16_t port, int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPServerImpl(server, port, thread_cnt));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 }}  // namespace nvidia::inferenceserver

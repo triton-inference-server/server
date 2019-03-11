@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -51,8 +51,11 @@ CreateSavedModelBundle(
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
-      std::string(model_name), &model_config));
+  Status status = ModelRepositoryManager::GetModelConfig(
+      std::string(model_name), &model_config);
+  if (!status.IsOk()) {
+    return tensorflow::errors::Internal(status.Message());
+  }
 
   // Read all the savedmodel directories in 'path'. GetChildren()
   // returns all descendants instead for cloud storage like GCS, so
@@ -76,16 +79,17 @@ CreateSavedModelBundle(
   }
 
   bundle->reset(new SavedModelBundle);
-  tensorflow::Status status = (*bundle)->Init(path, model_config);
-  if (status.ok()) {
+  status = (*bundle)->Init(path, model_config);
+  if (status.IsOk()) {
     status = (*bundle)->CreateExecutionContexts(
         adapter_config.session_config(), savedmodel_paths);
   }
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     bundle->reset();
+    return tensorflow::errors::Internal(status.Message());
   }
 
-  return status;
+  return tensorflow::Status::OK();
 }
 
 }  // namespace

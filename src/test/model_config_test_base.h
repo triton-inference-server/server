@@ -28,6 +28,7 @@
 
 #include <gtest/gtest.h>
 #include "src/core/model_config.pb.h"
+#include "src/core/status.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 
@@ -36,7 +37,7 @@ namespace nvidia { namespace inferenceserver { namespace test {
 class ModelConfigTestBase : public ::testing::Test {
  public:
   using BundleInitFunc =
-      std::function<tensorflow::Status(const std::string&, const ModelConfig&)>;
+      std::function<Status(const std::string&, const ModelConfig&)>;
 
   bool ValidateInit(
       const std::string& path, bool autofill, BundleInitFunc init_func,

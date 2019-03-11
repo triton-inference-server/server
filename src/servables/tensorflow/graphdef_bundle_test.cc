@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 
 #include "src/servables/tensorflow/graphdef_bundle.h"
 #include "src/core/constants.h"
+#include "src/core/status.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
@@ -36,12 +37,11 @@ class GraphDefBundleTest : public ModelConfigTestBase {
 
 TEST_F(GraphDefBundleTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func =
-      [](const std::string& path,
-         const ModelConfig& config) -> tensorflow::Status {
+  BundleInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
     std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    tensorflow::Status status = bundle->Init(path, config);
-    if (status.ok()) {
+    Status status = bundle->Init(path, config);
+    if (status.IsOk()) {
       std::unordered_map<std::string, std::string> graphdef_paths;
 
       for (const auto& filename :

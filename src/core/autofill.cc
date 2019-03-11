@@ -42,24 +42,24 @@ namespace nvidia { namespace inferenceserver {
 //
 class AutoFillNull : public AutoFill {
  public:
-  static tensorflow::Status Create(std::unique_ptr<AutoFillNull>* autofill);
-  tensorflow::Status Fix(ModelConfig* config);
+  static Status Create(std::unique_ptr<AutoFillNull>* autofill);
+  Status Fix(ModelConfig* config);
 
  private:
   AutoFillNull() : AutoFill(std::string()) {}
 };
 
-tensorflow::Status
+Status
 AutoFillNull::Create(std::unique_ptr<AutoFillNull>* autofill)
 {
   autofill->reset(new AutoFillNull);
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillNull::Fix(ModelConfig* config)
 {
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 //
@@ -67,23 +67,23 @@ AutoFillNull::Fix(ModelConfig* config)
 //
 class AutoFillSimple : public AutoFill {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill);
-  tensorflow::Status Fix(ModelConfig* config);
+  Status Fix(ModelConfig* config);
 
  private:
   AutoFillSimple(const std::string& model_name) : AutoFill(model_name) {}
 };
 
-tensorflow::Status
+Status
 AutoFillSimple::Create(
     const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill)
 {
   autofill->reset(new AutoFillSimple(model_name));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillSimple::Fix(ModelConfig* config)
 {
   // Set name if not already set.
@@ -91,13 +91,13 @@ AutoFillSimple::Fix(ModelConfig* config)
     config->set_name(model_name_);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 //
 // AutoFill
 //
-tensorflow::Status
+Status
 AutoFill::Create(
     const std::string& model_name,
     const tfs::PlatformConfigMap& platform_config_map,
@@ -120,44 +120,41 @@ AutoFill::Create(
     if (it != platform_config_map.platform_configs().end()) {
       platform_config = it->second.source_adapter_config();
     }
-    tensorflow::Status status = AutoFillSavedModel::Create(
+    Status status = AutoFillSavedModel::Create(
         model_name, platform_config, model_path, &afsm);
-    if (status.ok()) {
+    if (status.IsOk()) {
       *autofill = std::move(afsm);
-      return tensorflow::Status::OK();
+      return Status::Success;
     }
   }
 
   if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillGraphDef> afgd;
-    tensorflow::Status status =
-        AutoFillGraphDef::Create(model_name, model_path, &afgd);
-    if (status.ok()) {
+    Status status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
+    if (status.IsOk()) {
       *autofill = std::move(afgd);
-      return tensorflow::Status::OK();
+      return Status::Success;
     }
   }
 
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillPlan> afp;
-    tensorflow::Status status =
-        AutoFillPlan::Create(model_name, model_path, &afp);
-    if (status.ok()) {
+    Status status = AutoFillPlan::Create(model_name, model_path, &afp);
+    if (status.IsOk()) {
       *autofill = std::move(afp);
-      return tensorflow::Status::OK();
+      return Status::Success;
     }
   }
 
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillNetDef> afnd;
-    tensorflow::Status status =
-        AutoFillNetDef::Create(model_name, model_path, &afnd);
-    if (status.ok()) {
+    Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
+    if (status.IsOk()) {
       *autofill = std::move(afnd);
-      return tensorflow::Status::OK();
+      return Status::Success;
     }
   }
 
@@ -165,24 +162,24 @@ AutoFill::Create(
   // or null if that fails.
   {
     std::unique_ptr<AutoFillSimple> afs;
-    tensorflow::Status status = AutoFillSimple::Create(model_name, &afs);
-    if (status.ok()) {
+    Status status = AutoFillSimple::Create(model_name, &afs);
+    if (status.IsOk()) {
       *autofill = std::move(afs);
     } else {
       std::unique_ptr<AutoFillNull> afn;
-      TF_RETURN_IF_ERROR(AutoFillNull::Create(&afn));
+      RETURN_IF_ERROR(AutoFillNull::Create(&afn));
       *autofill = std::move(afn);
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFill::GetSubdirs(const std::string& path, std::set<std::string>* subdirs)
 {
   std::vector<std::string> childs;
-  TF_RETURN_IF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
+  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
 
   // GetChildren() returns all descendants instead for cloud storage
   // like GCS. In such case we should filter out all non-direct
@@ -199,14 +196,14 @@ AutoFill::GetSubdirs(const std::string& path, std::set<std::string>* subdirs)
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFill::GetFiles(const std::string& path, std::set<std::string>* files)
 {
   std::vector<std::string> childs;
-  TF_RETURN_IF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
+  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
 
   // GetChildren() returns all descendants instead for cloud storage
   // like GCS. In such case we should filter out all non-direct
@@ -223,7 +220,7 @@ AutoFill::GetFiles(const std::string& path, std::set<std::string>* files)
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

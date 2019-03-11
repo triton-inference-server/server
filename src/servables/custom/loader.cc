@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-tensorflow::Status
+Status
 GetEntrypoint(void* handle, const std::string& name, void** fn)
 {
   dlerror();
@@ -41,21 +41,24 @@ GetEntrypoint(void* handle, const std::string& name, void** fn)
   const char* dlsym_error = dlerror();
   if (dlsym_error != nullptr) {
     std::string errstr(dlsym_error);  // need copy as dlclose overwrites
-    return tensorflow::errors::NotFound(
-        "unable to find '", name, "' entrypoint in custom library: ", errstr);
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "unable to find '" + name +
+            "' entrypoint in custom library: " + errstr);
   }
 
   if (*fn == nullptr) {
-    return tensorflow::errors::NotFound(
-        "unable to find '", name, "' entrypoint in custom library");
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "unable to find '" + name + "' entrypoint in custom library");
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }  // namespace
 
-tensorflow::Status
+Status
 LoadCustom(
     const std::string& path, void** dlhandle,
     CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
@@ -70,37 +73,38 @@ LoadCustom(
   // Load the custom library
   void* handle = dlopen(path.c_str(), RTLD_LAZY);
   if (handle == nullptr) {
-    return tensorflow::errors::NotFound(
-        "unable to load custom library: ", dlerror());
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "unable to load custom library: " + std::string(dlerror()));
   }
 
-  tensorflow::Status status;
+  Status status;
 
   // Get shared library entrypoints.
   void* init_fn;
   status = GetEntrypoint(handle, "CustomInitialize", &init_fn);
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     dlclose(handle);
     return status;
   }
 
   void* fini_fn;
   status = GetEntrypoint(handle, "CustomFinalize", &fini_fn);
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     dlclose(handle);
     return status;
   }
 
   void* errstr_fn;
   status = GetEntrypoint(handle, "CustomErrorString", &errstr_fn);
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     dlclose(handle);
     return status;
   }
 
   void* exec_fn;
   status = GetEntrypoint(handle, "CustomExecute", &exec_fn);
-  if (!status.ok()) {
+  if (!status.IsOk()) {
     dlclose(handle);
     return status;
   }
@@ -111,7 +115,7 @@ LoadCustom(
   *ErrorStringFn = (CustomErrorStringFn_t)errstr_fn;
   *ExecuteFn = (CustomExecuteFn_t)exec_fn;
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 void

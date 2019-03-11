@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,14 +25,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Start profiling on all GPU devices.
-tensorflow::Status ProfileStartAll();
+Status ProfileStartAll();
 
 // Stop profiling on all GPU devices.
-tensorflow::Status ProfileStopAll();
+Status ProfileStopAll();
 
 }}  // namespace nvidia::inferenceserver

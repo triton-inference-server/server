@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -36,13 +36,12 @@ class CustomBundleTest : public ModelConfigTestBase {
 
 TEST_F(CustomBundleTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func =
-      [](const std::string& path,
-         const ModelConfig& config) -> tensorflow::Status {
+  BundleInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
     std::unique_ptr<CustomBundle> bundle(new CustomBundle());
     std::vector<std::string> server_params;
-    tensorflow::Status status = bundle->Init(path, server_params, config);
-    if (status.ok()) {
+    Status status = bundle->Init(path, server_params, config);
+    if (status.IsOk()) {
       std::unordered_map<std::string, std::string> custom_paths;
 
       for (const auto& filename : std::vector<std::string>{kCustomFilename}) {

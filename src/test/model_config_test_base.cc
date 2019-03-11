@@ -48,16 +48,16 @@ ModelConfigTestBase::ValidateInit(
 
   ModelConfig config;
   tfs::PlatformConfigMap platform_map;
-  tensorflow::Status status =
+  Status status =
       GetNormalizedModelConfig(model_path, platform_map, autofill, &config);
-  if (!status.ok()) {
-    result->append(status.ToString());
+  if (!status.IsOk()) {
+    result->append(status.AsString());
     return false;
   }
 
   status = ValidateModelConfig(config, std::string());
-  if (!status.ok()) {
-    result->append(status.ToString());
+  if (!status.IsOk()) {
+    result->append(status.AsString());
     return false;
   }
 
@@ -65,8 +65,8 @@ ModelConfigTestBase::ValidateInit(
   const std::string version_path = tensorflow::io::JoinPath(model_path, "1");
 
   status = init_func(version_path, config);
-  if (!status.ok()) {
-    result->append(status.ToString());
+  if (!status.IsOk()) {
+    result->append(status.AsString());
     return false;
   }
 

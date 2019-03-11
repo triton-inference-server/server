@@ -33,10 +33,6 @@ load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 cc_proto_library(
     name = "ensemble_bundle_proto",
     srcs = ["ensemble_bundle.proto"],
-    deps = [
-        "@org_tensorflow//tensorflow/core:protos_all_cc",
-        "@protobuf_archive//:cc_wkt_protos",
-    ],
 )
 
 cc_library(
@@ -49,8 +45,7 @@ cc_library(
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
         "//src/core:server_status",
-        "@org_tensorflow//tensorflow/c:c_api",
-        "@org_tensorflow//tensorflow/core:lib",
+        "//src/core:status",
     ],
 )
 
@@ -66,12 +61,12 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
+        "//src/core:status",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
         "@tf_serving//tensorflow_serving/core:storage_path",
         "@tf_serving//tensorflow_serving/util:optional",
-        "@org_tensorflow//tensorflow/core:core_cpu",
         "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
@@ -100,6 +95,7 @@ cc_test(
         "//src/core:ensemble_utils",
         "//src/core:logging",
         "//src/core:model_config_utils",
+        "//src/core:status",
         "//src/test:model_config_test_base",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",

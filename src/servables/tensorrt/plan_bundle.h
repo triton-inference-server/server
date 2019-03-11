@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -39,14 +39,13 @@ class PlanBundle : public InferenceBackend {
   PlanBundle() = default;
   PlanBundle(PlanBundle&&) = default;
 
-  tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+  Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
-  tensorflow::Status CreateExecutionContexts(
+  Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::vector<char>>& models);
-  tensorflow::Status CreateExecutionContext(
+  Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::vector<char>>& models);
 
@@ -55,7 +54,7 @@ class PlanBundle : public InferenceBackend {
   // execute for one or more requests.
   void Run(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(PlanBundle);
@@ -79,14 +78,13 @@ class PlanBundle : public InferenceBackend {
 
     TF_DISALLOW_COPY_AND_ASSIGN(Context);
 
-    tensorflow::Status InitializeInputBinding(
+    Status InitializeInputBinding(
         const std::string& input_name, const DataType input_datatype,
         const DimsList& input_dims);
-    tensorflow::Status InitializeSequenceControlInputBindings(
-        const ModelConfig& config);
-    tensorflow::Status InitializeConfigInputBindings(
+    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
+    Status InitializeConfigInputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    tensorflow::Status InitializeConfigOutputBindings(
+    Status InitializeConfigOutputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Run model to execute for one or more requests. This function
@@ -95,7 +93,7 @@ class PlanBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(std::vector<Scheduler::Payload>* payloads);
+    Status Run(std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
     const std::string name_;

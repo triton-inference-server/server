@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,6 +47,7 @@ cc_library(
         "//src/core:logging",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
+        "//src/core:status",
         "@com_google_googletest//:gtest",
         "@org_tensorflow//tensorflow/core:testlib",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",

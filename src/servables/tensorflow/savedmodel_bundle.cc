@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,22 +34,19 @@
 #include "src/servables/tensorflow/loader.h"
 #include "src/servables/tensorflow/tf_utils.h"
 #include "tensorflow/c/c_api.h"
-#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
-SavedModelBundle::Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config)
+Status
+SavedModelBundle::Init(const std::string& path, const ModelConfig& config)
 {
-  TF_RETURN_IF_ERROR(
-      ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
-  TF_RETURN_IF_ERROR(BaseBundle::Init(path, config));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
+  RETURN_IF_ERROR(BaseBundle::Init(path, config));
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 SavedModelBundle::CreateSession(
     const tensorflow::SessionOptions& options, const int gpu_device,
     const std::string& model_path, tensorflow::Session** session,
@@ -77,7 +74,7 @@ SavedModelBundle::CreateSession(
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
   tensorflow::SignatureDef sig;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_ERROR(
       LoadSavedModel(Name(), model_path, session_options, &bundle, &sig));
 
   // Collect all the expected input and allowed output tensor names
@@ -98,9 +95,9 @@ SavedModelBundle::CreateSession(
   // inputs are present in the model and have the correct shape and
   // datatype.
   if (Config().has_sequence_batching()) {
-    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, sig));
-    TF_RETURN_IF_ERROR(ValidateSequenceControl(
+    RETURN_IF_ERROR(ValidateSequenceControl(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, sig));
     expected_input_cnt += 2;
   }
@@ -108,85 +105,94 @@ SavedModelBundle::CreateSession(
   // Verify that the model configuration input and outputs match what
   // is expected by the signature def.
   if (expected_inputs.size() != expected_input_cnt) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', configuration expects ",
-        Config().input().size(), " inputs, model provides ",
-        expected_inputs.size());
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + Name() + "', configuration expects " +
+            std::to_string(Config().input().size()) +
+            " inputs, model provides " +
+            std::to_string(expected_inputs.size()));
   }
 
   for (const auto& io : Config().input()) {
-    TF_RETURN_IF_ERROR(ValidateModelInput(io, expected_inputs));
+    RETURN_IF_ERROR(ValidateModelInput(io, expected_inputs));
 
     const auto& iitr = sig.inputs().find(io.name());
     if (iitr == sig.inputs().end()) {
-      return tensorflow::errors::Internal(
-          "unexpected inference input '", io.name(), "'");
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected inference input '" + io.name() + "'");
     }
 
     if (!CompareDimsSupported(
             iitr->second.tensor_shape(), io.dims(),
             Config().max_batch_size() > 0)) {
-      return tensorflow::errors::InvalidArgument(
-          "unable to load model '", Name(), "', input '", io.name(), "' dims ",
-          DimsDebugString(iitr->second.tensor_shape()),
-          " don't match configuration dims ", DimsDebugString(io.dims()));
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', input '" + io.name() +
+              "' dims " + DimsDebugString(iitr->second.tensor_shape()) +
+              " don't match configuration dims " + DimsDebugString(io.dims()));
     }
     if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
-      return tensorflow::errors::InvalidArgument(
-          "unable to load model '", Name(), "', input '", io.name(),
-          "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
-          " doesn't match configuration data-type ",
-          DataType_Name(io.data_type()));
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', input '" + io.name() +
+              "' data-type " + tensorflow::DataType_Name(iitr->second.dtype()) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
     }
   }
 
   for (const auto& io : Config().output()) {
-    TF_RETURN_IF_ERROR(ValidateModelOutput(io, allowed_outputs));
+    RETURN_IF_ERROR(ValidateModelOutput(io, allowed_outputs));
 
     const auto& oitr = sig.outputs().find(io.name());
     if (oitr == sig.outputs().end()) {
-      return tensorflow::errors::Internal(
-          "unexpected inference output '", io.name(), "'");
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected inference output '" + io.name() + "'");
     }
 
     if (!CompareDimsSupported(
             oitr->second.tensor_shape(), io.dims(),
             Config().max_batch_size() > 0)) {
-      return tensorflow::errors::InvalidArgument(
-          "unable to load model '", Name(), "', output '", io.name(), "' dims ",
-          DimsDebugString(oitr->second.tensor_shape()),
-          " don't match configuration dims ", DimsDebugString(io.dims()));
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', output '" + io.name() +
+              "' dims " + DimsDebugString(oitr->second.tensor_shape()) +
+              " don't match configuration dims " + DimsDebugString(io.dims()));
     }
     if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
-      return tensorflow::errors::InvalidArgument(
-          "unable to load model '", Name(), "', output '", io.name(),
-          "' data-type ", tensorflow::DataType_Name(oitr->second.dtype()),
-          " doesn't match configuration data-type ",
-          DataType_Name(io.data_type()));
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', output '" + io.name() +
+              "' data-type " + tensorflow::DataType_Name(oitr->second.dtype()) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
     }
   }
 
   *session = bundle->session.release();
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 SavedModelBundle::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     const tensorflow::SignatureDef& sig)
 {
   std::string tensor_name;
   DataType tensor_datatype;
-  TF_RETURN_IF_ERROR(GetSequenceControlProperties(
+  RETURN_IF_ERROR(GetSequenceControlProperties(
       Config().sequence_batching(), Name(), control_kind, true /* required */,
       &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
 
   const auto& iitr = sig.inputs().find(tensor_name);
   if (iitr == sig.inputs().end()) {
-    return tensorflow::errors::Internal(
-        "configuration specified sequence control '", tensor_name,
-        "', but model does not provide that input");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "configuration specified sequence control '" + tensor_name +
+            "', but model does not provide that input");
   }
 
   // Control tensors must have shape [1].
@@ -195,20 +201,25 @@ SavedModelBundle::ValidateSequenceControl(
 
   if (!CompareDimsExact(
           iitr->second.tensor_shape(), dims, Config().max_batch_size() > 0)) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', sequence control '", tensor_name,
-        "' dims ", DimsDebugString(iitr->second.tensor_shape()),
-        " don't match expected dims [1]");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + Name() + "', sequence control '" +
+            tensor_name + "' dims " +
+            DimsDebugString(iitr->second.tensor_shape()) +
+            " don't match expected dims [1]");
   }
 
   if (!CompareDataType(iitr->second.dtype(), tensor_datatype)) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to load model '", Name(), "', sequence control '", tensor_name,
-        "' data-type ", tensorflow::DataType_Name(iitr->second.dtype()),
-        " doesn't match required data-type ", DataType_Name(tensor_datatype));
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + Name() + "', sequence control '" +
+            tensor_name + "' data-type " +
+            tensorflow::DataType_Name(iitr->second.dtype()) +
+            " doesn't match required data-type " +
+            DataType_Name(tensor_datatype));
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

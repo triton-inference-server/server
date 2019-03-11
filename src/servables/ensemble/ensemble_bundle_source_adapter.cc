@@ -35,7 +35,6 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
-#include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -51,18 +50,22 @@ CreateEnsembleBundle(
   const auto model_name = tensorflow::io::Basename(model_path);
 
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(ModelRepositoryManager::GetModelConfig(
-      std::string(model_name), &model_config));
+  Status status = ModelRepositoryManager::GetModelConfig(
+      std::string(model_name), &model_config);
+  if (!status.IsOk()) {
+    return tensorflow::errors::Internal(status.Message());
+  }
 
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
   bundle->reset(new EnsembleBundle);
-  tensorflow::Status status = (*bundle)->Init(path, model_config);
-  if (!status.ok()) {
+  status = (*bundle)->Init(path, model_config);
+  if (!status.IsOk()) {
     bundle->reset();
+    return tensorflow::errors::Internal(status.Message());
   }
 
-  return status;
+  return tensorflow::Status::OK();
 }
 
 }  // namespace

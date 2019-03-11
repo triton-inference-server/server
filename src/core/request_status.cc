@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,33 +28,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-RequestStatusCode
-GetStatusCode(const tensorflow::Status& tf_status)
-{
-  if (tf_status.ok()) {
-    return RequestStatusCode::SUCCESS;
-  }
-
-  switch (tf_status.code()) {
-    case tensorflow::error::INVALID_ARGUMENT:
-      return RequestStatusCode::INVALID_ARG;
-    case tensorflow::error::NOT_FOUND:
-      return RequestStatusCode::NOT_FOUND;
-    case tensorflow::error::UNAVAILABLE:
-      return RequestStatusCode::UNAVAILABLE;
-    case tensorflow::error::INTERNAL:
-      return RequestStatusCode::INTERNAL;
-    default:
-      break;
-  }
-
-  return RequestStatusCode::UNKNOWN;
-}
-
-}  // namespace
-
 void
 RequestStatusFactory::Create(
     RequestStatus* status, uint64_t request_id, const std::string& server_id,
@@ -81,11 +54,10 @@ RequestStatusFactory::Create(
 void
 RequestStatusFactory::Create(
     RequestStatus* status, uint64_t request_id, const std::string& server_id,
-    const tensorflow::Status& tf_status)
+    const Status& isstatus)
 {
-  status->Clear();
-  status->set_code(GetStatusCode(tf_status));
-  status->set_msg(tf_status.error_message());
+  status->set_code(isstatus.Code());
+  status->set_msg(isstatus.Message());
   status->set_server_id(server_id);
   status->set_request_id(request_id);
 }
