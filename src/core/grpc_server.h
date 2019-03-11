@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/status.h"
 #include "src/nvrpc/Server.h"
-#include "tensorflow/core/lib/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -34,13 +34,14 @@ class InferenceServer;
 
 class GRPCServer : private nvrpc::Server {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       InferenceServer* server, uint16_t port,
       std::unique_ptr<GRPCServer>* grpc_server);
-  tensorflow::Status Start();
-  tensorflow::Status Stop();
+  Status Start();
+  Status Stop();
 
  private:
   GRPCServer(const std::string& addr);
 };
+
 }}  // namespace nvidia::inferenceserver

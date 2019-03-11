@@ -29,7 +29,7 @@
 #include <unordered_map>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -62,7 +62,7 @@ std::string DimsListToString(const DimsList& list);
 /// if error status is non-OK.
 /// \return The error status. A non-OK status indicates the TensorNode objects
 /// are not consistent.
-tensorflow::Status ValidateTensorConsistency(
+Status ValidateTensorConsistency(
     const TensorNode& lhs, const TensorNode& rhs, const std::string& message);
 
 /// Validate that the ensembles are specified correctly. Assuming that the
@@ -72,7 +72,7 @@ tensorflow::Status ValidateTensorConsistency(
 /// in the ensembles.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
-tensorflow::Status ValidateEnsembleConfig(
+Status ValidateEnsembleConfig(
     const std::unordered_map<std::string, ModelConfig>& config_map);
 
 /// Validate that the ensembles are specified correctly. Assuming that the
@@ -89,7 +89,7 @@ tensorflow::Status ValidateEnsembleConfig(
 /// 'ensemble' is in.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
-tensorflow::Status ValidateEnsembleConfig(
+Status ValidateEnsembleConfig(
     const std::string& ensemble,
     const std::unordered_map<std::string, ModelConfig>& config_map,
     const std::unordered_map<std::string, std::string>& invalid_model_names,

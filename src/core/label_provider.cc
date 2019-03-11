@@ -28,7 +28,6 @@
 
 #include <iostream>
 #include <iterator>
-#include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/io/inputbuffer.h"
 #include "tensorflow/core/platform/env.h"
 
@@ -51,17 +50,17 @@ LabelProvider::GetLabel(const std::string& name, size_t index) const
   return itr->second[index];
 }
 
-tensorflow::Status
+Status
 LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
 {
   std::unique_ptr<tensorflow::RandomAccessFile> label_file;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_TF_ERROR(
       tensorflow::Env::Default()->NewRandomAccessFile(filepath, &label_file));
 
   auto p = label_map_.insert(std::make_pair(name, std::vector<std::string>()));
   if (!p.second) {
-    return tensorflow::errors::Internal(
-        "multiple label files for '", name, "'");
+    return Status(
+        RequestStatusCode::INTERNAL, "multiple label files for '" + name + "'");
   }
 
   auto itr = p.first;
@@ -76,10 +75,10 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
   }
 
   if (!tensorflow::errors::IsOutOfRange(status)) {
-    return status;
+    return FROM_TF_STATUS(status);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

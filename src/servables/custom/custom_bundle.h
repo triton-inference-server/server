@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,8 +28,8 @@
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
+#include "src/core/status.h"
 #include "src/servables/custom/custom.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -38,27 +38,27 @@ class CustomBundle : public InferenceBackend {
   CustomBundle() = default;
   CustomBundle(CustomBundle&&) = default;
 
-  tensorflow::Status Init(
-      const tensorflow::StringPiece& path,
-      const std::vector<std::string>& server_params, const ModelConfig& config);
+  Status Init(
+      const std::string& path, const std::vector<std::string>& server_params,
+      const ModelConfig& config);
 
   // Create a context for execution for each instance for the custom
   // 'models'.
-  tensorflow::Status CreateExecutionContexts(
+  Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::string>& libraries);
-  tensorflow::Status CreateExecutionContext(
+  Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::unordered_map<std::string, std::string>& libraries);
 
  private:
   // Init model on the context associated with 'runner_idx'.
-  tensorflow::Status InitBackend(uint32_t runner_idx);
+  Status InitBackend(uint32_t runner_idx);
 
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void RunBackend(
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(tensorflow::Status)> OnCompleteQueuedPayloads);
+      std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(CustomBundle);
@@ -95,8 +95,7 @@ class CustomBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    tensorflow::Status Run(
-        CustomBundle* base, std::vector<Scheduler::Payload>* payloads);
+    Status Run(CustomBundle* base, std::vector<Scheduler::Payload>* payloads);
 
     struct GetInputOutputContext {
       GetInputOutputContext(

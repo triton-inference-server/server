@@ -29,9 +29,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.h"
-#include "tensorflow/core/lib/core/errors.h"
-
-struct evbuffer;
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -71,7 +69,7 @@ class InferRequestProvider {
   // 'force_contiguous' is true then the entire (remaining) input will
   // be returned as a single chunk. In some cases this will require
   // copying the data.
-  virtual tensorflow::Status GetNextInputContent(
+  virtual Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) = 0;
 
@@ -86,13 +84,12 @@ class InferRequestProvider {
   using InputOverrideMap =
       std::unordered_map<std::string, std::shared_ptr<InputOverride>>;
   const std::shared_ptr<InputOverrideMap>& GetInputOverride() const;
-  tensorflow::Status SetInputOverride(
-      const std::shared_ptr<InputOverrideMap>& override);
+  Status SetInputOverride(const std::shared_ptr<InputOverrideMap>& override);
 
  protected:
   // Validate request header and modify as necessary so that every
   // input has a shape and a batch-byte-size.
-  tensorflow::Status NormalizeRequestHeader(const InferenceBackend& is);
+  Status NormalizeRequestHeader(const InferenceBackend& is);
 
   // Get the override content for 'name'd input. Return a pointer to
   // the override content in 'content'.  Return the override content
@@ -132,7 +129,7 @@ class NULLInferRequestProvider : public InferRequestProvider {
     request_header_ = request_header;
   }
 
-  tensorflow::Status GetNextInputContent(
+  Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
@@ -153,11 +150,11 @@ class GRPCInferRequestProvider : public InferRequestProvider {
   // captured by reference to avoid copying all the raw input tensor
   // data... but this means that it's lifetime must persist longer
   // than this provider.
-  static tensorflow::Status Create(
+  static Status Create(
       const InferenceBackend& is, const InferRequest& request,
       std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
 
-  tensorflow::Status GetNextInputContent(
+  Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
@@ -177,13 +174,13 @@ class GRPCInferRequestProvider : public InferRequestProvider {
 class HTTPInferRequestProvider : public InferRequestProvider {
  public:
   // Initialize based on HTTP request
-  static tensorflow::Status Create(
+  static Status Create(
       evbuffer* input_buffer, const InferenceBackend& is,
       const std::string& model_name, const int64_t model_version,
       const std::string& request_header_str,
       std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
 
-  tensorflow::Status GetNextInputContent(
+  Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
       bool force_contiguous) override;
 
@@ -219,7 +216,7 @@ class InferResponseProvider {
 
   // Get a buffer to store results for a named output. The output must
   // be listed in the request header.
-  virtual tensorflow::Status GetOutputBuffer(
+  virtual Status GetOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) = 0;
 
@@ -227,14 +224,14 @@ class InferResponseProvider {
   bool RequiresOutput(const std::string& name);
 
   // Finialize response based on a servable.
-  tensorflow::Status FinalizeResponse(const InferenceBackend& is);
+  Status FinalizeResponse(const InferenceBackend& is);
 
  protected:
   struct Output;
 
   // Check that 'name' is a valid output. If output is to be buffered,
   // allocate space for it and point to that space with 'content'
-  tensorflow::Status CheckAndSetIfBufferedOutput(
+  Status CheckAndSetIfBufferedOutput(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape, Output** output);
 
@@ -266,13 +263,13 @@ class InferResponseProvider {
 class GRPCInferResponseProvider : public InferResponseProvider {
  public:
   // Initialize based on gRPC request
-  static tensorflow::Status Create(
+  static Status Create(
       const InferRequestHeader& request_header, InferResponse* response,
       std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
-  tensorflow::Status GetOutputBuffer(
+  Status GetOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 
@@ -291,14 +288,14 @@ class GRPCInferResponseProvider : public InferResponseProvider {
 //
 class HTTPInferResponseProvider : public InferResponseProvider {
  public:
-  static tensorflow::Status Create(
+  static Status Create(
       evbuffer* output_buffer, const InferenceBackend& is,
       const InferRequestHeader& request_header,
       std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
-  tensorflow::Status GetOutputBuffer(
+  Status GetOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 

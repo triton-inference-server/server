@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,13 +26,13 @@
 #pragma once
 
 #include "src/core/request_status.pb.h"
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
 class RequestStatusFactory {
  public:
-  // Create a Status object from a code and optional message.
+  // Create a RequestStatus object from a code and optional message.
   static void Create(
       RequestStatus* status, uint64_t request_id, const std::string& server_id,
       RequestStatusCode code, const std::string& msg);
@@ -40,10 +40,10 @@ class RequestStatusFactory {
       RequestStatus* status, uint64_t request_id, const std::string& server_id,
       RequestStatusCode code);
 
-  // Create a Status object from a TensorFlow status.
+  // Create a RequestStatus object a Status.
   static void Create(
       RequestStatus* status, uint64_t request_id, const std::string& server_id,
-      const tensorflow::Status& tf_status);
+      const Status& isstatus);
 };
 
 }}  // namespace nvidia::inferenceserver

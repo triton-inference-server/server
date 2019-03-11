@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 #include "src/servables/tensorflow/savedmodel_bundle.h"
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/macros.h"
 #include "tensorflow_serving/core/loader.h"
 #include "tensorflow_serving/core/simple_loader.h"
 #include "tensorflow_serving/core/storage_path.h"

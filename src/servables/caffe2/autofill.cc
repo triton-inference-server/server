@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,24 +28,24 @@
 
 #include "src/core/constants.h"
 #include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 AutoFillNetDef::Create(
     const std::string& model_name, const std::string& model_path,
     std::unique_ptr<AutoFillNetDef>* autofill)
 {
   std::set<std::string> version_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name, "' due to multiple versions");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
   const auto version_path =
@@ -54,11 +54,11 @@ AutoFillNetDef::Create(
   // There must be a single netdef model (which is spread across two
   // files) within the version directory...
   std::set<std::string> netdef_files;
-  TF_RETURN_IF_ERROR(GetFiles(version_path, &netdef_files));
+  RETURN_IF_ERROR(GetFiles(version_path, &netdef_files));
   if (netdef_files.size() != 2) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to find netdef files");
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "', unable to find netdef files");
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
@@ -81,17 +81,18 @@ AutoFillNetDef::Create(
          (netdef1_file == expected_init_filename)) ||
         ((netdef1_file == kCaffe2NetDefFilename) &&
          (netdef0_file == expected_init_filename)))) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to find netdef files named '", kCaffe2NetDefFilename,
-        "' and '", expected_init_filename, "'");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find netdef files named '" + kCaffe2NetDefFilename +
+            "' and '" + expected_init_filename + "'");
   }
 
   autofill->reset(new AutoFillNetDef(model_name));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillNetDef::Fix(ModelConfig* config)
 {
   config->set_platform(kCaffe2NetDefPlatform);
@@ -101,7 +102,7 @@ AutoFillNetDef::Fix(ModelConfig* config)
     config->set_name(model_name_);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,11 +28,10 @@
 
 #include "cuda/include/cuda_profiler_api.h"
 #include "cuda/include/cuda_runtime_api.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 ProfileStartAll()
 {
   int dcnt;
@@ -40,29 +39,34 @@ ProfileStartAll()
   if (cuerr == cudaErrorNoDevice) {
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for profiling: ",
-        cudaGetErrorString(cuerr));
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to get device count for profiling: " +
+            std::string(cudaGetErrorString(cuerr)));
   }
 
   for (int i = 0; i < dcnt; i++) {
     cuerr = cudaSetDevice(i);
     if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to set device for profiling: " +
+              std::string(cudaGetErrorString(cuerr)));
     }
 
     cuerr = cudaProfilerStart();
     if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to start profiling: ", cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to start profiling: " +
+              std::string(cudaGetErrorString(cuerr)));
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ProfileStopAll()
 {
   int dcnt;
@@ -70,26 +74,31 @@ ProfileStopAll()
   if (cuerr == cudaErrorNoDevice) {
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for profiling: ",
-        cudaGetErrorString(cuerr));
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to get device count for profiling: " +
+            std::string(cudaGetErrorString(cuerr)));
   }
 
   for (int i = 0; i < dcnt; i++) {
     cuerr = cudaSetDevice(i);
     if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to set device for profiling: ", cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to set device for profiling: " +
+              std::string(cudaGetErrorString(cuerr)));
     }
 
     cuerr = cudaProfilerStop();
     if (cuerr != cudaSuccess) {
-      return tensorflow::errors::Internal(
-          "failed to stop profiling: ", cudaGetErrorString(cuerr));
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to stop profiling: " +
+              std::string(cudaGetErrorString(cuerr)));
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

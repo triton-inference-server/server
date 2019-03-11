@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #pragma once
 
 #include "src/core/server_status.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -57,12 +57,11 @@ class Scheduler {
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
-        const std::function<void(tensorflow::Status)> complete_function)
+        const std::function<void(Status)> complete_function)
         : queue_timer_(std::move(queue_timer)), stats_(stats),
           request_provider_(request_provider),
           response_provider_(response_provider),
-          complete_function_(complete_function),
-          status_(tensorflow::Status::OK())
+          complete_function_(complete_function), status_(Status::Success)
     {
     }
 
@@ -70,8 +69,8 @@ class Scheduler {
     std::shared_ptr<ModelInferStats> stats_;
     std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<InferResponseProvider> response_provider_;
-    std::function<void(tensorflow::Status)> complete_function_;
-    tensorflow::Status status_;
+    std::function<void(Status)> complete_function_;
+    Status status_;
   };
 
   // The prototype for the initialization function that will be called
@@ -80,8 +79,7 @@ class Scheduler {
   // the runner that will later execute payloads for 'runner_idx'. A
   // non-OK error status indicates an initialization error that
   // prevents scheduler from using the runner.
-  using StandardInitFunc =
-      std::function<tensorflow::Status(uint32_t runner_idx)>;
+  using StandardInitFunc = std::function<Status(uint32_t runner_idx)>;
 
   // The prototype for the run function that will be called by the
   // "standard" schedulers created based on a model's
@@ -94,14 +92,14 @@ class Scheduler {
   // single request in 'payloads' it will be reported in that payload.
   using StandardRunFunc = std::function<void(
       uint32_t runner_idx, std::vector<Payload>* payloads,
-      std::function<void(tensorflow::Status)> OnRunComplete)>;
+      std::function<void(Status)> OnRunComplete)>;
 
   // Enqueue a request with the scheduler.
   virtual void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(tensorflow::Status)> OnComplete) = 0;
+      std::function<void(Status)> OnComplete) = 0;
 };
 
 }}  // namespace nvidia::inferenceserver

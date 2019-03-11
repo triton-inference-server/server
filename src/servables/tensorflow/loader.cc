@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 LoadSavedModel(
     const std::string& model_name, const std::string& model_path,
     const tensorflow::SessionOptions& session_options,
@@ -43,7 +43,7 @@ LoadSavedModel(
   saved_model_tags.insert(tensorflow::kSavedModelTagServe);
 
   tensorflow::RunOptions run_options;
-  TF_RETURN_IF_ERROR(tensorflow::LoadSavedModel(
+  RETURN_IF_TF_ERROR(tensorflow::LoadSavedModel(
       session_options, run_options, model_path, saved_model_tags,
       bundle->get()));
 
@@ -59,9 +59,10 @@ LoadSavedModel(
     }
   }
   if (!found_serve_tag) {
-    return tensorflow::errors::Internal(
-        "unable to load model '", model_name, "', expected '",
-        tensorflow::kSavedModelTagServe, "' tag");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to load model '" + model_name + "', expected '" +
+            tensorflow::kSavedModelTagServe + "' tag");
   }
 
   // Verify that a "serving_default" signature exists, that is what
@@ -70,16 +71,17 @@ LoadSavedModel(
   const auto& sig_itr = (*bundle)->meta_graph_def.signature_def().find(
       DEFAULT_SERVING_SIGNATURE_DEF_KEY);
   if (sig_itr == (*bundle)->meta_graph_def.signature_def().end()) {
-    return tensorflow::errors::InvalidArgument(
-        "unable to load model '", model_name, "', expected '",
-        DEFAULT_SERVING_SIGNATURE_DEF_KEY, "' signature");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', expected '" +
+            DEFAULT_SERVING_SIGNATURE_DEF_KEY + "' signature");
   }
 
   if (sig != nullptr) {
     *sig = sig_itr->second;
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

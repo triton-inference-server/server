@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/status.h"
 #include "src/servables/custom/custom.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -43,7 +43,7 @@ namespace nvidia { namespace inferenceserver {
 /// \param ExecuteFn Returns the execute function from the custom
 /// library.
 /// \return Error status.
-tensorflow::Status LoadCustom(
+Status LoadCustom(
     const std::string& path, void** dlhandle,
     CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
     CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn);

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
-#include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_statistics.h"
@@ -110,23 +109,24 @@ ModelRepositoryManager::ModelRepositoryManager(
 {
 }
 
-tensorflow::Status
+Status
 ModelRepositoryManager::Create(
     const std::string& repository_path,
     const tfs::PlatformConfigMap& platform_config_map, const bool autofill)
 {
   if (singleton != nullptr) {
-    return tensorflow::errors::AlreadyExists(
+    return Status(
+        RequestStatusCode::ALREADY_EXISTS,
         "ModelRepositoryManager singleton already created");
   }
 
   singleton = new ModelRepositoryManager(
       repository_path, platform_config_map, autofill);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ModelRepositoryManager::GetModelConfig(
     const std::string& name, ModelConfig* model_config)
 {
@@ -134,15 +134,16 @@ ModelRepositoryManager::GetModelConfig(
 
   const auto itr = singleton->infos_.find(name);
   if (itr == singleton->infos_.end()) {
-    return tensorflow::errors::NotFound(
-        "no configuration for model '", name, "'");
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "no configuration for model '" + name + "'");
   }
 
   *model_config = itr->second.model_config_;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ModelRepositoryManager::GetTFSModelConfig(
     const std::string& name, tfs::ModelConfig* tfs_model_config)
 {
@@ -150,15 +151,16 @@ ModelRepositoryManager::GetTFSModelConfig(
 
   const auto itr = singleton->infos_.find(name);
   if (itr == singleton->infos_.end()) {
-    return tensorflow::errors::NotFound(
-        "no TFS configuration for model '", name, "'");
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "no TFS configuration for model '" + name + "'");
   }
 
   *tfs_model_config = itr->second.tfs_model_config_;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ModelRepositoryManager::GetModelPlatform(
     const std::string& name, Platform* platform)
 {
@@ -172,14 +174,15 @@ ModelRepositoryManager::GetModelPlatform(
   }
 
   if (*platform == Platform::PLATFORM_UNKNOWN) {
-    return tensorflow::errors::NotFound(
-        "unknown platform for model '", name, "'");
+    return Status(
+        RequestStatusCode::NOT_FOUND,
+        "unknown platform for model '" + name + "'");
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ModelRepositoryManager::Poll(
     std::set<std::string>* added, std::set<std::string>* deleted,
     std::set<std::string>* modified, std::set<std::string>* unmodified)
@@ -200,7 +203,7 @@ ModelRepositoryManager::Poll(
   // Each subdirectory of repository path is a model directory from
   // which we read the model configuration.
   std::vector<std::string> children;
-  TF_RETURN_IF_ERROR(tensorflow::Env::Default()->GetChildren(
+  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(
       singleton->repository_path_, &children));
 
   // GetChildren() returns all descendants instead for cloud storage
@@ -238,8 +241,9 @@ ModelRepositoryManager::Poll(
         unmodified->insert(child);
         const auto& ret = new_infos.emplace(child, iitr->second);
         if (!ret.second) {
-          return tensorflow::errors::AlreadyExists(
-              "unexpected model info for model '", child, "'");
+          return Status(
+              RequestStatusCode::ALREADY_EXISTS,
+              "unexpected model info for model '" + child + "'");
         }
       }
     }
@@ -247,8 +251,9 @@ ModelRepositoryManager::Poll(
     if (need_load) {
       const auto& ret = new_infos.emplace(child, ModelInfo{});
       if (!ret.second) {
-        return tensorflow::errors::AlreadyExists(
-            "unexpected model info for model '", child, "'");
+        return Status(
+            RequestStatusCode::ALREADY_EXISTS,
+            "unexpected model info for model '" + child + "'");
       }
 
       ModelInfo& model_info = ret.first->second;
@@ -259,10 +264,10 @@ ModelRepositoryManager::Poll(
       // If enabled, try to automatically generate missing parts of
       // the model configuration (autofill) from the model
       // definition. In all cases normalize and validate the config.
-      TF_RETURN_IF_ERROR(GetNormalizedModelConfig(
+      RETURN_IF_ERROR(GetNormalizedModelConfig(
           full_path, singleton->platform_config_map_, singleton->autofill_,
           &model_config));
-      TF_RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
+      RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
 
       model_info.platform_ = GetPlatform(model_config.platform());
 
@@ -272,9 +277,11 @@ ModelRepositoryManager::Poll(
       // check to make sure we don't have two different models with the
       // same name.
       if (model_config.name() != child) {
-        return tensorflow::errors::InvalidArgument(
-            "unexpected directory name '", child, "' for model '",
-            model_config.name(), "', directory name must equal model name");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected directory name '" + child + "' for model '" +
+                model_config.name() +
+                "', directory name must equal model name");
       }
 
       tfs_config.set_name(model_config.name());
@@ -301,8 +308,9 @@ ModelRepositoryManager::Poll(
         tfs_config.mutable_model_version_policy()->mutable_specific()->CopyFrom(
             specific);
       } else {
-        return tensorflow::errors::Internal(
-            "expected version policy for model '", model_config.name());
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "expected version policy for model '" + model_config.name());
       }
     }
   }
@@ -324,7 +332,7 @@ ModelRepositoryManager::Poll(
     singleton->infos_.swap(new_infos);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

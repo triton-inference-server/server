@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,14 +32,13 @@
 #include "src/servables/tensorflow/loader.h"
 #include "src/servables/tensorflow/tf_utils.h"
 #include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
 //
 // AutoFillSavedModel
 //
-tensorflow::Status
+Status
 AutoFillSavedModel::Create(
     const std::string& model_name,
     const ::google::protobuf::Any& platform_config,
@@ -47,14 +46,15 @@ AutoFillSavedModel::Create(
     std::unique_ptr<AutoFillSavedModel>* autofill)
 {
   std::set<std::string> version_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name, "' due to multiple versions");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
   const auto version_path =
@@ -63,11 +63,12 @@ AutoFillSavedModel::Create(
   // There must be a single savedmodel directory within the version
   // directory...
   std::set<std::string> savedmodel_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
+  RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
   if (savedmodel_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to find savedmodel directory");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find savedmodel directory");
   }
 
   const std::string savedmodel_dir = *(savedmodel_dirs.begin());
@@ -80,14 +81,14 @@ AutoFillSavedModel::Create(
   tensorflow::SessionOptions session_options;
   session_options.config = saved_model_config.session_config();
   tensorflow::SignatureDef sig;
-  TF_RETURN_IF_ERROR(LoadSavedModel(
+  RETURN_IF_ERROR(LoadSavedModel(
       model_name, savedmodel_path, session_options, &bundle, &sig));
 
   autofill->reset(new AutoFillSavedModel(model_name, savedmodel_dir, sig));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillSavedModel::Fix(ModelConfig* config)
 {
   config->set_platform(kTensorFlowSavedModelPlatform);
@@ -112,10 +113,11 @@ AutoFillSavedModel::Fix(ModelConfig* config)
 
       const DataType dt = ConvertDataType(sin.second.dtype());
       if (dt == DataType::TYPE_INVALID) {
-        return tensorflow::errors::Internal(
-            "unable to autofill for '", model_name_,
-            "', unsupported data-type '",
-            tensorflow::DataType_Name(sin.second.dtype()), "'");
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to autofill for '" + model_name_ +
+                "', unsupported data-type '" +
+                tensorflow::DataType_Name(sin.second.dtype()) + "'");
       }
 
       config_input->set_data_type(dt);
@@ -143,10 +145,11 @@ AutoFillSavedModel::Fix(ModelConfig* config)
 
       const DataType dt = ConvertDataType(sout.second.dtype());
       if (dt == DataType::TYPE_INVALID) {
-        return tensorflow::errors::Internal(
-            "unable to autofill for '", model_name_,
-            "', unsupported data-type '",
-            tensorflow::DataType_Name(sout.second.dtype()), "'");
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to autofill for '" + model_name_ +
+                "', unsupported data-type '" +
+                tensorflow::DataType_Name(sout.second.dtype()) + "'");
       }
 
       config_output->set_data_type(dt);
@@ -172,26 +175,27 @@ AutoFillSavedModel::Fix(ModelConfig* config)
     config->set_max_batch_size(1);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 //
 // AutoFillGraphDef
 //
-tensorflow::Status
+Status
 AutoFillGraphDef::Create(
     const std::string& model_name, const std::string& model_path,
     std::unique_ptr<AutoFillGraphDef>* autofill)
 {
   std::set<std::string> version_dirs;
-  TF_RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
   if (version_dirs.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name, "' due to multiple versions");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
   const auto version_path =
@@ -200,11 +204,11 @@ AutoFillGraphDef::Create(
   // There must be a single graphdef file within the version
   // directory...
   std::set<std::string> graphdef_files;
-  TF_RETURN_IF_ERROR(GetFiles(version_path, &graphdef_files));
+  RETURN_IF_ERROR(GetFiles(version_path, &graphdef_files));
   if (graphdef_files.size() != 1) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to find graphdef file");
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "', unable to find graphdef file");
   }
 
   const std::string graphdef_file = *(graphdef_files.begin());
@@ -217,17 +221,18 @@ AutoFillGraphDef::Create(
   // placeholders are inputs... but we have no way to know what the
   // outputs are.
   if (graphdef_file != kTensorFlowGraphDefFilename) {
-    return tensorflow::errors::Internal(
-        "unable to autofill for '", model_name,
-        "', unable to find graphdef file named '", kTensorFlowGraphDefFilename,
-        "'");
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find graphdef file named '" +
+            kTensorFlowGraphDefFilename + "'");
   }
 
   autofill->reset(new AutoFillGraphDef(model_name));
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 AutoFillGraphDef::Fix(ModelConfig* config)
 {
   config->set_platform(kTensorFlowGraphDefPlatform);
@@ -236,7 +241,7 @@ AutoFillGraphDef::Fix(ModelConfig* config)
     config->set_name(model_name_);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

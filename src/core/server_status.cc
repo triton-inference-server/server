@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/provider.h"
-#include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow_serving/core/servable_state.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -92,11 +91,11 @@ ServerStatusManager::ServerStatusManager(const std::string& server_version)
   }
 }
 
-tensorflow::Status
+Status
 ServerStatusManager::InitForModel(const std::string& model_name)
 {
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_ERROR(
       ModelRepositoryManager::GetModelConfig(model_name, &model_config));
 
   std::lock_guard<std::mutex> lock(mu_);
@@ -111,32 +110,33 @@ ServerStatusManager::InitForModel(const std::string& model_name)
 
   ms[model_name].mutable_config()->CopyFrom(model_config);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ServerStatusManager::UpdateConfigForModel(const std::string& model_name)
 {
   ModelConfig model_config;
-  TF_RETURN_IF_ERROR(
+  RETURN_IF_ERROR(
       ModelRepositoryManager::GetModelConfig(model_name, &model_config));
 
   std::lock_guard<std::mutex> lock(mu_);
 
   auto& ms = *server_status_.mutable_model_status();
   if (ms.find(model_name) == ms.end()) {
-    return tensorflow::errors::InvalidArgument(
-        "try to update config for non-existing model '", model_name, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "try to update config for non-existing model '" + model_name + "'");
   } else {
     LOG_INFO << "Updating config for model '" << model_name << "'";
   }
 
   ms[model_name].mutable_config()->CopyFrom(model_config);
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ServerStatusManager::Get(
     ServerStatus* server_status, const std::string& server_id,
     ServerReadyState server_ready_state, uint64_t server_uptime_ns,
@@ -154,10 +154,10 @@ ServerStatusManager::Get(
     }
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ServerStatusManager::Get(
     ServerStatus* server_status, const std::string& server_id,
     ServerReadyState server_ready_state, uint64_t server_uptime_ns,
@@ -174,8 +174,9 @@ ServerStatusManager::Get(
 
   const auto& itr = server_status_.model_status().find(model_name);
   if (itr == server_status_.model_status().end()) {
-    return tensorflow::errors::InvalidArgument(
-        "no status available for unknown model '", model_name, "'");
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "no status available for unknown model '" + model_name + "'");
   }
 
   auto& ms = *server_status->mutable_model_status();
@@ -184,7 +185,7 @@ ServerStatusManager::Get(
     SetModelVersionReadyState(*monitor, ms[model_name]);
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 void

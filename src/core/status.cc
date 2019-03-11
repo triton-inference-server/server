@@ -23,36 +23,83 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/core/backend.h"
-#include "src/core/model_config.pb.h"
-#include "src/core/scheduler.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class EnsembleBundle : public InferenceBackend {
- public:
-  EnsembleBundle() = default;
-  EnsembleBundle(EnsembleBundle&&) = default;
+const Status Status::Success(RequestStatusCode::SUCCESS);
 
-  Status Init(const std::string& path, const ModelConfig& config);
+RequestStatusCode
+Status::FromTFError(const int tf_code)
+{
+  switch (tf_code) {
+    case 0:  // tensorflow::error::OK
+      return RequestStatusCode::SUCCESS;
 
-  Status SetInferenceServer(void* inference_server) override;
+    case 3:  // tensorflow::error::INVALID_ARGUMENT
+      return RequestStatusCode::INVALID_ARG;
 
- private:
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
+    case 5:  // tensorflow::error::NOT_FOUND
+      return RequestStatusCode::NOT_FOUND;
 
- private:
-  TF_DISALLOW_COPY_AND_ASSIGN(EnsembleBundle);
-  friend std::ostream& operator<<(std::ostream&, const EnsembleBundle&);
-};
+    case 6:  // tensorflow::error::ALREADY_EXISTS
+      return RequestStatusCode::NOT_FOUND;
 
-std::ostream& operator<<(std::ostream& out, const EnsembleBundle& pb);
+    case 14:  // tensorflow::error::UNAVAILABLE
+      return RequestStatusCode::UNAVAILABLE;
+
+    case 13:  // tensorflow::error::INTERNAL
+      return RequestStatusCode::INTERNAL;
+
+    default:
+      break;
+  }
+
+  return RequestStatusCode::UNKNOWN;
+}
+
+std::string
+Status::AsString() const
+{
+  std::string str;
+
+  switch (code_) {
+    case RequestStatusCode::INVALID:
+      str = "Invalid";
+      break;
+    case RequestStatusCode::SUCCESS:
+      str = "OK";
+      break;
+    case RequestStatusCode::UNKNOWN:
+      str = "Unknown";
+      break;
+    case RequestStatusCode::INTERNAL:
+      str = "Internal";
+      break;
+    case RequestStatusCode::NOT_FOUND:
+      str = "Not found";
+      break;
+    case RequestStatusCode::INVALID_ARG:
+      str = "Invalid argument";
+      break;
+    case RequestStatusCode::UNAVAILABLE:
+      str = "Unavailable";
+      break;
+    case RequestStatusCode::UNSUPPORTED:
+      str = "Unsupported";
+      break;
+    case RequestStatusCode::ALREADY_EXISTS:
+      str = "Already exists";
+      break;
+
+    default:
+      str = "Unknown status code (" + std::to_string(code_) + ")";
+      break;
+  }
+
+  str += ": " + msg_;
+  return str;
+}
 
 }}  // namespace nvidia::inferenceserver

@@ -26,7 +26,7 @@
 #pragma once
 
 #include "src/core/model_config.pb.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
 
 namespace tfs = tensorflow::serving;
@@ -46,15 +46,14 @@ struct EnsembleTensor {
 /// \param path The path to the model definition file.
 /// \param version Returns the version.
 /// \return The error status.
-tensorflow::Status GetModelVersionFromPath(
-    const tensorflow::StringPiece& path, int64_t* version);
+Status GetModelVersionFromPath(const std::string& path, int64_t* version);
 
 /// Get the tensor name, false value, and true value for a sequence
 /// batcher control kind. If 'required' is true then must find a
 /// tensor for the control. If 'required' is false, return
 /// 'tensor_name' as empty-string if the control is not mapped to any
 /// tensor.
-tensorflow::Status GetSequenceControlProperties(
+Status GetSequenceControlProperties(
     const ModelSequenceBatching& batcher, const std::string& model_name,
     const ModelSequenceBatching::Control::Kind control_kind,
     const bool required, std::string* tensor_name, DataType* tensor_datatype,
@@ -68,10 +67,9 @@ tensorflow::Status GetSequenceControlProperties(
 /// configuration from the model definition.
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
-tensorflow::Status GetNormalizedModelConfig(
-    const tensorflow::StringPiece& path,
-    const tfs::PlatformConfigMap& platform_config_map, const bool autofill,
-    ModelConfig* config);
+Status GetNormalizedModelConfig(
+    const std::string& path, const tfs::PlatformConfigMap& platform_config_map,
+    const bool autofill, ModelConfig* config);
 
 /// Validate that a model is specified correctly (excluding inputs and
 /// outputs which are validated via ValidateModelInput() and
@@ -81,7 +79,7 @@ tensorflow::Status GetNormalizedModelConfig(
 /// to make sure its platform matches this value.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
-tensorflow::Status ValidateModelConfig(
+Status ValidateModelConfig(
     const ModelConfig& config, const std::string& expected_platform);
 
 /// Validate that the ensemble scheduling are specified correctly.
@@ -89,8 +87,7 @@ tensorflow::Status ValidateModelConfig(
 /// ensemble_scheduling field.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
-tensorflow::Status ValidateEnsembleSchedulingConfig(
-    const ModelConfig& ensemble_config);
+Status ValidateEnsembleSchedulingConfig(const ModelConfig& ensemble_config);
 
 /// Build a graph that represents the data flow in the ensemble specifieed in
 /// given model config. the node (ensemble tensor) in the graph can be looked
@@ -100,7 +97,7 @@ tensorflow::Status ValidateEnsembleSchedulingConfig(
 /// \param keyed_ensemble_graph Returned the ensemble graph.
 /// \return The error status. A non-OK status indicates the build fails because
 /// the ensemble configuration is not valid.
-tensorflow::Status BuildEnsembleGraph(
+Status BuildEnsembleGraph(
     const ModelConfig& ensemble_config,
     std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph);
 
@@ -109,7 +106,7 @@ tensorflow::Status BuildEnsembleGraph(
 /// \param io The model input.
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-tensorflow::Status ValidateModelInput(const ModelInput& io);
+Status ValidateModelInput(const ModelInput& io);
 
 /// Validate that an input is specified correctly in a model
 /// configuration and matches one of the allowed input names.
@@ -117,7 +114,7 @@ tensorflow::Status ValidateModelInput(const ModelInput& io);
 /// \param allowed The set of allowed input names.
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-tensorflow::Status ValidateModelInput(
+Status ValidateModelInput(
     const ModelInput& io, const std::set<std::string>& allowed);
 
 /// Validate that an output is specified correctly in a model
@@ -125,7 +122,7 @@ tensorflow::Status ValidateModelInput(
 /// \param io The model output.
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-tensorflow::Status ValidateModelOutput(const ModelOutput& io);
+Status ValidateModelOutput(const ModelOutput& io);
 
 /// Validate that an output is specified correctly in a model
 /// configuration and matches one of the allowed output names.
@@ -133,7 +130,7 @@ tensorflow::Status ValidateModelOutput(const ModelOutput& io);
 /// \param allowed The set of allowed output names.
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-tensorflow::Status ValidateModelOutput(
+Status ValidateModelOutput(
     const ModelOutput& io, const std::set<std::string>& allowed);
 
 }}  // namespace nvidia::inferenceserver

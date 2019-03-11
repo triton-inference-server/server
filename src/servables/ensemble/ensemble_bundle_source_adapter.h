@@ -28,7 +28,6 @@
 #include "src/servables/ensemble/ensemble_bundle.h"
 #include "src/servables/ensemble/ensemble_bundle.pb.h"
 #include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/macros.h"
 #include "tensorflow_serving/core/loader.h"
 #include "tensorflow_serving/core/simple_loader.h"
 #include "tensorflow_serving/core/source_adapter.h"

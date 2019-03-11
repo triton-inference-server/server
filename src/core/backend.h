@@ -29,7 +29,7 @@
 #include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
-#include "tensorflow/core/lib/core/errors.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -45,7 +45,7 @@ class InferenceBackend {
   virtual ~InferenceBackend() {}
 
   // Set reference to the inference server that is serving the servable.
-  virtual tensorflow::Status SetInferenceServer(void* inference_server);
+  virtual Status SetInferenceServer(void* inference_server);
 
   // Get the name of model being served.
   const std::string& Name() const { return config_.name(); }
@@ -57,12 +57,10 @@ class InferenceBackend {
   const ModelConfig& Config() const { return config_; }
 
   // Get the model configuration for a named input.
-  tensorflow::Status GetInput(
-      const std::string& name, const ModelInput** input) const;
+  Status GetInput(const std::string& name, const ModelInput** input) const;
 
   // Get the model configuration for a named output.
-  tensorflow::Status GetOutput(
-      const std::string& name, const ModelOutput** output) const;
+  Status GetOutput(const std::string& name, const ModelOutput** output) const;
 
   // Get a label provider for the model.
   const LabelProvider& GetLabelProvider() const { return label_provider_; }
@@ -77,7 +75,7 @@ class InferenceBackend {
       std::shared_ptr<ModelInferStats> stats,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
-      std::function<void(tensorflow::Status)> OnCompleteHandleInfer);
+      std::function<void(Status)> OnCompleteHandleInfer);
 
   // Get a metric for the servable specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
@@ -92,16 +90,15 @@ class InferenceBackend {
 
  protected:
   // Set the configuration of the model being served.
-  tensorflow::Status SetModelConfig(
-      const tensorflow::StringPiece& path, const ModelConfig& config);
+  Status SetModelConfig(const std::string& path, const ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a servable.
-  tensorflow::Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
+  Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
 
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a servable.
-  tensorflow::Status SetConfiguredScheduler(
+  Status SetConfiguredScheduler(
       const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
       Scheduler::StandardRunFunc OnRun);
 

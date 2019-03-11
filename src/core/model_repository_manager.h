@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 #include <mutex>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
 
@@ -47,7 +47,7 @@ class ModelRepositoryManager {
   /// \param autofill If true attempt to autofill missing required
   /// information in each model configuration.
   /// \return The error status.
-  static tensorflow::Status Create(
+  static Status Create(
       const std::string& repository_path,
       const tfs::PlatformConfigMap& platform_config_map, const bool autofill);
 
@@ -61,7 +61,7 @@ class ModelRepositoryManager {
   /// \param unmodified The names of the models remaining in the
   /// repository that have not changed.
   /// \return The error status.
-  static tensorflow::Status Poll(
+  static Status Poll(
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
@@ -69,22 +69,21 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  static tensorflow::Status GetModelConfig(
+  static Status GetModelConfig(
       const std::string& name, ModelConfig* model_config);
 
   /// Get TFS-style configuration for a named model.
   /// \param name The model name.
   /// \param tfs_model_config Returns the TFS-style model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  static tensorflow::Status GetTFSModelConfig(
+  static Status GetTFSModelConfig(
       const std::string& name, tfs::ModelConfig* tfs_model_config);
 
   /// Get the platform for a named model.
   /// \param name The model name.
   /// \param platform Returns the Platform.
   /// \return OK if found, NOT_FOUND otherwise.
-  static tensorflow::Status GetModelPlatform(
-      const std::string& name, Platform* platform);
+  static Status GetModelPlatform(const std::string& name, Platform* platform);
 
  private:
   struct ModelInfo {

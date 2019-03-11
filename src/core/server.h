@@ -38,7 +38,7 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 #include "tensorflow_serving/model_servers/server_core.h"
 
 namespace tfs = tensorflow::serving;
@@ -126,7 +126,7 @@ class InferenceServer {
   class InferBackendHandle {
    public:
     InferBackendHandle() : is_(nullptr) {}
-    tensorflow::Status Init(
+    Status Init(
         const std::string& model_name, const int64_t model_version,
         tfs::ServerCore* core);
     InferenceBackend* operator()() { return is_; }
@@ -141,7 +141,7 @@ class InferenceServer {
     tfs::ServableHandle<EnsembleBundle> ensemble_bundle_;
   };
 
-  tensorflow::Status CreateBackendHandle(
+  Status CreateBackendHandle(
       const std::string& model_name, const int64_t model_version,
       const std::shared_ptr<InferBackendHandle>& handle);
 
@@ -151,7 +151,7 @@ class InferenceServer {
 
   std::unique_ptr<GRPCServer> StartGrpcServer();
   std::unique_ptr<HTTPServer> StartHttpServer();
-  tensorflow::Status ParseProtoTextFile(
+  Status ParseProtoTextFile(
       const std::string& file, google::protobuf::Message* message);
   tfs::PlatformConfigMap BuildPlatformConfigMap(
       float tf_gpu_memory_fraction, bool tf_allow_soft_placement);

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-tensorflow::Status
+Status
 LoadPlan(
     const std::vector<char>& model_data, nvinfer1::IRuntime** runtime,
     nvinfer1::ICudaEngine** engine)
@@ -46,16 +46,18 @@ LoadPlan(
 
   *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
   if (*runtime == nullptr) {
-    return tensorflow::errors::Internal("unable to create TensorRT runtime");
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create TensorRT runtime");
   }
 
   *engine = (*runtime)->deserializeCudaEngine(
       &model_data[0], model_data.size(), onnx_plugin_factory);
   if (*engine == nullptr) {
-    return tensorflow::errors::Internal("unable to create TensorRT engine");
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create TensorRT engine");
   }
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/server_status.pb.h"
-#include "tensorflow/core/lib/core/status.h"
+#include "src/core/status.h"
 #include "tensorflow_serving/core/servable_state_monitor.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -167,19 +167,19 @@ class ServerStatusManager {
   explicit ServerStatusManager(const std::string& server_version);
 
   // Initialize status for a model.
-  tensorflow::Status InitForModel(const std::string& model_name);
+  Status InitForModel(const std::string& model_name);
 
   // Update model config for an existing model.
-  tensorflow::Status UpdateConfigForModel(const std::string& model_name);
+  Status UpdateConfigForModel(const std::string& model_name);
 
   // Get the entire server status, including status for all models.
-  tensorflow::Status Get(
+  Status Get(
       ServerStatus* server_status, const std::string& server_id,
       ServerReadyState server_ready_state, uint64_t server_uptime_ns,
       const tensorflow::serving::ServableStateMonitor* monitor) const;
 
   // Get the server status and the status for a single model.
-  tensorflow::Status Get(
+  Status Get(
       ServerStatus* server_status, const std::string& server_id,
       ServerReadyState server_ready_state, uint64_t server_uptime_ns,
       const std::string& model_name,

@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -76,7 +76,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   }
 }
 
-tensorflow::Status
+Status
 DynamicBatchScheduler::Create(
     const ModelConfig& config, const uint32_t runner_cnt,
     StandardInitFunc OnInit, StandardRunFunc OnSchedule,
@@ -96,7 +96,7 @@ DynamicBatchScheduler::Create(
 
   scheduler->reset(sched.release());
 
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
 DynamicBatchScheduler::~DynamicBatchScheduler()
@@ -118,7 +118,7 @@ DynamicBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(tensorflow::Status)> OnComplete)
+    std::function<void(Status)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
   std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
@@ -157,10 +157,10 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
   // Initialize using the thread. If error then just exit this thread
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
-  tensorflow::Status init_status = OnInit_(runner_id);
-  if (!init_status.ok()) {
+  Status init_status = OnInit_(runner_id);
+  if (!init_status.IsOk()) {
     LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread "
-              << runner_id << ": " << init_status.error_message();
+              << runner_id << ": " << init_status.Message();
     return;
   }
 
@@ -240,16 +240,15 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [payloads](tensorflow::Status status) {
+      auto OnCompleteQueuedPayloads = [payloads](Status status) {
         bool found_success = false;
         for (auto& payload : *payloads) {
-          tensorflow::Status final_status =
-              status.ok() ? payload.status_ : status;
+          Status final_status = status.IsOk() ? payload.status_ : status;
 
           // All the payloads executed together, so count 1 execution in
           // the first successful payload. Other payloads stay at 0
           // executions.
-          if (!found_success && final_status.ok() &&
+          if (!found_success && final_status.IsOk() &&
               (payload.stats_ != nullptr)) {
             payload.stats_->SetModelExecutionCount(1);
             found_success = true;

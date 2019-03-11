@@ -44,19 +44,22 @@ DimsListToString(const DimsList& list)
   return res + "]";
 }
 
-tensorflow::Status
+Status
 ValidateTensorConsistency(
     const TensorNode& lhs, const TensorNode& rhs, const std::string& message)
 {
   if (lhs.type != rhs.type) {
-    return tensorflow::errors::InvalidArgument(
-        message, "inconsistent data type: ", lhs.type,
-        " is inferred from model ", lhs.model_name, " while ", rhs.type,
-        " is inferred from model ", rhs.model_name);
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        message + "inconsistent data type: " + std::to_string(lhs.type) +
+            " is inferred from model " + lhs.model_name + " while " +
+            std::to_string(rhs.type) + " is inferred from model " +
+            rhs.model_name);
   }
+
   bool consistent = (lhs.dims.size() == rhs.dims.size());
   if (consistent) {
-    for (size_t i = 0; i < lhs.dims.size(); i++) {
+    for (int i = 0; i < lhs.dims.size(); i++) {
       if (lhs.dims[i] != rhs.dims[i]) {
         consistent = false;
         break;
@@ -64,15 +67,18 @@ ValidateTensorConsistency(
     }
   }
   if (!consistent) {
-    return tensorflow::errors::InvalidArgument(
-        message, "inconsistent shape: ", DimsListToString(lhs.dims),
-        " is inferred from model ", lhs.model_name, " while ",
-        DimsListToString(rhs.dims), " is inferred from model ", rhs.model_name);
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        message + "inconsistent shape: " + DimsListToString(lhs.dims) +
+            " is inferred from model " + lhs.model_name + " while " +
+            DimsListToString(rhs.dims) + " is inferred from model " +
+            rhs.model_name);
   }
-  return tensorflow::Status::OK();
+
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateEnsembleConfig(
     const std::string& ensemble,
     const std::unordered_map<std::string, ModelConfig>& config_map,
@@ -96,37 +102,42 @@ ValidateEnsembleConfig(
   for (const auto& step : ensemble_config.ensemble_scheduling().step()) {
     const auto& model_name = step.model_name();
     if (invalid_model_names.find(model_name) != invalid_model_names.end()) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble ", ensemble, " contains invalid model ", model_name, " : ",
-          invalid_model_names.at(model_name));
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble " + ensemble + " contains invalid model " + model_name +
+              " : " + invalid_model_names.at(model_name));
     }
     auto it = config_map.find(model_name);
     if (it == config_map.end()) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble ", ensemble, " contains model ", model_name,
-          " which is not in the available models");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble " + ensemble + " contains model " + model_name +
+              " which is not in the available models");
     }
     const auto& model_config = it->second;
     if (model_config.max_batch_size() < ensemble_config.max_batch_size()) {
-      return tensorflow::errors::InvalidArgument(
-          "ensemble ", ensemble, " allows maximum batch size ",
-          ensemble_config.max_batch_size(), ", but it contains model ",
-          model_name, " which only allows  maximum batch size to be ",
-          model_config.max_batch_size());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "ensemble " + ensemble + " allows maximum batch size " +
+              std::to_string(ensemble_config.max_batch_size()) +
+              ", but it contains model " + model_name +
+              " which only allows  maximum batch size to be " +
+              std::to_string(model_config.max_batch_size()));
     }
 
     if (model_config.has_ensemble_scheduling()) {
       for (const auto& name : ensemble_dependency) {
         if (name == model_name) {
-          return tensorflow::errors::InvalidArgument(
-              "circular dependency between ensembles: ", name, " -> ... -> ",
-              ensemble, " -> ", name);
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "circular dependency between ensembles: " + name + " -> ... -> " +
+                  ensemble + " -> " + name);
         }
       }
 
       if ((ensembles.find(model_name))->second == false) {
         ensemble_dependency.push_back(ensemble);
-        TF_RETURN_IF_ERROR(ValidateEnsembleConfig(
+        RETURN_IF_ERROR(ValidateEnsembleConfig(
             model_name, config_map, invalid_model_names, ensembles,
             ensemble_dependency));
         ensemble_dependency.pop_back();
@@ -140,10 +151,11 @@ ValidateEnsembleConfig(
     }
     for (const auto& input_map : step.input_map()) {
       if (input_names.find(input_map.second) == input_names.end()) {
-        return tensorflow::errors::InvalidArgument(
-            "in ensemble ", ensemble, ", ensemble tensor ", input_map.first,
-            " is mapping to non-existing input ", input_map.second,
-            " in model ", step.model_name());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "in ensemble " + ensemble + ", ensemble tensor " + input_map.first +
+                " is mapping to non-existing input " + input_map.second +
+                " in model " + step.model_name());
       }
     }
     for (const auto& model_input : model_config.input()) {
@@ -154,7 +166,7 @@ ValidateEnsembleConfig(
               step.model_name(), model_input.data_type(), model_input.dims());
           auto it = ensemble_tensors.find(input_map.first);
           if (it != ensemble_tensors.end()) {
-            TF_RETURN_IF_ERROR(ValidateTensorConsistency(
+            RETURN_IF_ERROR(ValidateTensorConsistency(
                 it->second, model_tensor,
                 "in ensemble " + ensemble + ", ensemble tensor " +
                     input_map.first + ": "));
@@ -166,15 +178,17 @@ ValidateEnsembleConfig(
         }
       }
       if (mapped_cnt == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "in ensemble ", ensemble, ", input ", model_input.name(),
-            " in model ", model_config.name(),
-            " is not mapped to any ensemble tensors");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "in ensemble " + ensemble + ", input " + model_input.name() +
+                " in model " + model_config.name() +
+                " is not mapped to any ensemble tensors");
       } else if (mapped_cnt > 1) {
-        return tensorflow::errors::InvalidArgument(
-            "in ensemble ", ensemble, ", input ", model_input.name(),
-            " in model ", model_config.name(),
-            " is mapped to multiple ensemble tensors");
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "in ensemble " + ensemble + ", input " + model_input.name() +
+                " in model " + model_config.name() +
+                " is mapped to multiple ensemble tensors");
       }
     }
 
@@ -186,10 +200,11 @@ ValidateEnsembleConfig(
     }
     for (const auto& output_map : step.output_map()) {
       if (output_names.find(output_map.first) == output_names.end()) {
-        return tensorflow::errors::InvalidArgument(
-            "in ensemble ", ensemble, ", ensemble tensor ", output_map.second,
-            " is mapped from non-existing output ", output_map.first,
-            " in model ", step.model_name());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "in ensemble " + ensemble + ", ensemble tensor " +
+                output_map.second + " is mapped from non-existing output " +
+                output_map.first + " in model " + step.model_name());
       }
     }
     for (const auto& output_map : step.output_map()) {
@@ -200,7 +215,7 @@ ValidateEnsembleConfig(
               step.model_name(), model_output.data_type(), model_output.dims());
           auto it = ensemble_tensors.find(output_map.second);
           if (it != ensemble_tensors.end()) {
-            TF_RETURN_IF_ERROR(ValidateTensorConsistency(
+            RETURN_IF_ERROR(ValidateTensorConsistency(
                 it->second, model_tensor,
                 "in ensemble " + ensemble + ", ensemble tensor " +
                     output_map.second + ": "));
@@ -212,10 +227,11 @@ ValidateEnsembleConfig(
         }
       }
       if (mapped_cnt > 1) {
-        return tensorflow::errors::InvalidArgument(
-            "in ensemble " + ensemble + ", multiple outputs in model ",
-            model_config.name(), " are mapped to the same ensemble tensor ",
-            output_map.second);
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "in ensemble " + ensemble + ", multiple outputs in model " +
+                model_config.name() +
+                " are mapped to the same ensemble tensor " + output_map.second);
       }
     }
 
@@ -261,9 +277,10 @@ ValidateEnsembleConfig(
   for (const auto& output : ensemble_config.output()) {
     auto it = ensemble_tensors.find(output.name());
     if (!it->second.ready) {
-      return tensorflow::errors::InvalidArgument(
-          "in ensemble ", ensemble, ", no data will be written to ",
-          "ensemble output ", output.name());
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "in ensemble " + ensemble + ", no data will be written to " +
+              "ensemble output " + output.name());
     } else {
       ensemble_outputs.insert(it->first);
     }
@@ -273,20 +290,23 @@ ValidateEnsembleConfig(
       continue;
     }
     if (!tensor.second.ready) {
-      return tensorflow::errors::InvalidArgument(
-          "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
-          " is redundant as no data will be written to it");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "in ensemble " + ensemble + ", ensemble tensor " + tensor.first +
+              " is redundant as no data will be written to it");
     } else if (tensor.second.next_nodes.size() == 0) {
-      return tensorflow::errors::InvalidArgument(
-          "in ensemble ", ensemble, ", ensemble tensor ", tensor.first,
-          " is redundant as it will not be used in any models");
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "in ensemble " + ensemble + ", ensemble tensor " + tensor.first +
+              " is redundant as it will not be used in any models");
     }
   }
+
   (ensembles.find(ensemble))->second = true;
-  return tensorflow::Status::OK();
+  return Status::Success;
 }
 
-tensorflow::Status
+Status
 ValidateEnsembleConfig(
     const std::unordered_map<std::string, ModelConfig>& config_map)
 {
@@ -294,28 +314,29 @@ ValidateEnsembleConfig(
   std::unordered_map<std::string, bool> ensembles;
 
   for (const auto& pair : config_map) {
-    tensorflow::Status status;
+    Status status;
     for (const auto& input : pair.second.input()) {
       status = ValidateModelInput(input);
-      if (!status.ok()) {
+      if (!status.IsOk()) {
         break;
       }
     }
-    if (status.ok()) {
+    if (status.IsOk()) {
       for (const auto& output : pair.second.output()) {
         status = ValidateModelOutput(output);
-        if (!status.ok()) {
+        if (!status.IsOk()) {
           break;
         }
       }
     }
-    if (!status.ok()) {
+    if (!status.IsOk()) {
       // Return error if the inputs / outputs of one ensemble is not correct.
       if (pair.second.has_ensemble_scheduling()) {
-        return tensorflow::errors::InvalidArgument(
-            "ensemble", pair.first, ": ", status.error_message());
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "ensemble" + pair.first + ": " + status.Message());
       }
-      invalid_model_names.emplace(pair.first, status.error_message());
+      invalid_model_names.emplace(pair.first, status.Message());
     } else if (pair.second.has_ensemble_scheduling()) {
       ensembles.emplace(std::make_pair(pair.first, false));
     }
@@ -326,11 +347,12 @@ ValidateEnsembleConfig(
     if (pair.second) {
       continue;
     }
-    TF_RETURN_IF_ERROR(ValidateEnsembleConfig(
+    RETURN_IF_ERROR(ValidateEnsembleConfig(
         pair.first, config_map, invalid_model_names, ensembles,
         ensemble_dependency));
   }
-  return tensorflow::Status::OK();
+
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
