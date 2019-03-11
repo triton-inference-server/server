@@ -38,8 +38,7 @@ namespace nvidia { namespace inferenceserver {
 
 tensorflow::Status
 EnsembleBundle::Init(
-    const tensorflow::StringPiece& path, const ModelConfig& config,
-    uint64_t inference_server)
+    const tensorflow::StringPiece& path, const ModelConfig& config)
 {
   TF_RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   TF_RETURN_IF_ERROR(SetModelConfig(path, config));
@@ -56,11 +55,19 @@ EnsembleBundle::Init(
         Run(runner_idx, payloads, func);
       }));
 
-  inference_server_ = inference_server;
-
   LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
 
   return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+EnsembleBundle::SetInferenceServer(void* inference_server)
+{
+  // [TODO] Uncommon below after DLIS-290
+  // EnsembleScheduler* scheduler =
+  //    static_cast<EnsembleScheduler*>(scheduler_.get());
+  // TF_RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
+  return InferenceBackend::SetInferenceServer(inference_server);
 }
 
 void

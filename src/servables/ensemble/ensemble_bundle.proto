@@ -29,9 +29,4 @@ syntax = "proto3";
 package nvidia.inferenceserver;
 
 // Config proto for EnsembleBundleSourceAdapter.
-message EnsembleBundleSourceAdapterConfig
-{
-  // An variable to store pointer to inference server, which will be used
-  // in ensemble scheduler
-  uint64 inference_server = 1;
-}
+message EnsembleBundleSourceAdapterConfig {}

@@ -38,8 +38,9 @@ class EnsembleBundle : public InferenceBackend {
   EnsembleBundle(EnsembleBundle&&) = default;
 
   tensorflow::Status Init(
-      const tensorflow::StringPiece& path, const ModelConfig& config,
-      uint64_t inference_server);
+      const tensorflow::StringPiece& path, const ModelConfig& config);
+
+  tensorflow::Status SetInferenceServer(void* inference_server) override;
 
  private:
   // Run model on the context associated with 'runner_idx' to
@@ -51,10 +52,6 @@ class EnsembleBundle : public InferenceBackend {
  private:
   TF_DISALLOW_COPY_AND_ASSIGN(EnsembleBundle);
   friend std::ostream& operator<<(std::ostream&, const EnsembleBundle&);
-
-  // [TODO] remove this after DLIS-290 is done,
-  // it can be directly pass to scheduler on creation
-  uintptr_t inference_server_;
 };
 
 std::ostream& operator<<(std::ostream& out, const EnsembleBundle& pb);

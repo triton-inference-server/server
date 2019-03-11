@@ -44,6 +44,9 @@ class InferenceBackend {
   InferenceBackend() = default;
   virtual ~InferenceBackend() {}
 
+  // Set reference to the inference server that is serving the servable.
+  virtual tensorflow::Status SetInferenceServer(void* inference_server);
+
   // Get the name of model being served.
   const std::string& Name() const { return config_.name(); }
 
@@ -103,6 +106,9 @@ class InferenceBackend {
       Scheduler::StandardRunFunc OnRun);
 
  private:
+  // Pointer to the inference server that is serving the servable.
+  void* inference_server_;
+
   // Configuration of the model that this servable represents.
   ModelConfig config_;
 

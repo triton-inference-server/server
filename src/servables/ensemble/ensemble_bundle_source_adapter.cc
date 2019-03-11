@@ -57,8 +57,7 @@ CreateEnsembleBundle(
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
   bundle->reset(new EnsembleBundle);
-  tensorflow::Status status =
-      (*bundle)->Init(path, model_config, adapter_config.inference_server());
+  tensorflow::Status status = (*bundle)->Init(path, model_config);
   if (!status.ok()) {
     bundle->reset();
   }

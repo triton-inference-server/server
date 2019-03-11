@@ -56,14 +56,14 @@
 #include "src/servables/caffe2/netdef_bundle.pb.h"
 #include "src/servables/custom/custom_bundle.h"
 #include "src/servables/custom/custom_bundle.pb.h"
+#include "src/servables/ensemble/ensemble_bundle.h"
+#include "src/servables/ensemble/ensemble_bundle.pb.h"
 #include "src/servables/tensorflow/graphdef_bundle.h"
 #include "src/servables/tensorflow/graphdef_bundle.pb.h"
 #include "src/servables/tensorflow/savedmodel_bundle.h"
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
-#include "src/servables/ensemble/ensemble_bundle.h"
-#include "src/servables/ensemble/ensemble_bundle.pb.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/lib/strings/str_util.h"
@@ -806,6 +806,7 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
+  (*backend)()->SetInferenceServer(this);
   (*backend)()->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
@@ -953,7 +954,6 @@ InferenceServer::BuildPlatformConfigMap(
   //// Ensemble
   {
     EnsembleBundleSourceAdapterConfig ensemble_config;
-    ensemble_config.set_inference_server(reinterpret_cast<uint64_t>(this));
     ensemble_source_adapter_config.PackFrom(ensemble_config);
   }
 
