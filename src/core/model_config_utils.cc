@@ -24,8 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/utils.h"
+#include "src/core/model_config_utils.h"
 
+#include <deque>
+#include <set>
 #include "absl/strings/numbers.h"
 #include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
@@ -206,6 +208,8 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kCaffe2NetDefFilename);
     } else if (config->platform() == kCustomPlatform) {
       config->set_default_model_filename(kCustomFilename);
+    } else if (config->platform() == kEnsemblePlatform) {
+      // No actual model file is needed to be loaded for ensemble.
     } else {
       return tensorflow::errors::Internal(
           "unexpected platform type ", config->platform(), " for ",
@@ -246,62 +250,66 @@ GetNormalizedModelConfig(
     }
   }
 
-  // Make sure there is at least one instance_group.
-  if (config->instance_group().size() == 0) {
-    ModelInstanceGroup* group = config->add_instance_group();
-    group->set_name(config->name());
-  }
-
-  int device_cnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-  if (cuerr == cudaErrorNoDevice) {
-    device_cnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "unable to get number of CUDA devices for ", config->name(), ": ",
-        cudaGetErrorString(cuerr));
-  }
-
-  // Assign default name, kind and count to each instance group that
-  // doesn't give those values explicitly. For KIND_GPU, set GPUs to
-  // all available if not specified explicitly.
-  size_t cnt = 0;
-  for (auto& group : *config->mutable_instance_group()) {
-    // Name
-    if (group.name().empty()) {
-      group.set_name(config->name() + "_" + std::to_string(cnt));
+  // If model ensembling is specified, don't attempt to normalize instance_group
+  // as it is not allowed in ensemble scheduling
+  if (!config->has_ensemble_scheduling()) {
+    // Make sure there is at least one instance_group.
+    if (config->instance_group().size() == 0) {
+      ModelInstanceGroup* group = config->add_instance_group();
+      group->set_name(config->name());
     }
-    cnt++;
 
-    // For KIND_AUTO... if there are no GPUs or if any of the listed
-    // 'gpu's are not present, then use KIND_CPU.
-    if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-      if (device_cnt == 0) {
-        group.set_kind(ModelInstanceGroup::KIND_CPU);
-      } else {
-        for (const int32_t gid : group.gpus()) {
-          if ((gid < 0) || (gid >= device_cnt)) {
-            group.set_kind(ModelInstanceGroup::KIND_CPU);
-            break;
+    int device_cnt;
+    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
+    if (cuerr == cudaErrorNoDevice) {
+      device_cnt = 0;
+    } else if (cuerr != cudaSuccess) {
+      return tensorflow::errors::Internal(
+          "unable to get number of CUDA devices for ", config->name(), ": ",
+          cudaGetErrorString(cuerr));
+    }
+
+    // Assign default name, kind and count to each instance group that
+    // doesn't give those values explicitly. For KIND_GPU, set GPUs to
+    // all available if not specified explicitly.
+    size_t cnt = 0;
+    for (auto& group : *config->mutable_instance_group()) {
+      // Name
+      if (group.name().empty()) {
+        group.set_name(config->name() + "_" + std::to_string(cnt));
+      }
+      cnt++;
+
+      // For KIND_AUTO... if there are no GPUs or if any of the listed
+      // 'gpu's are not present, then use KIND_CPU.
+      if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
+        if (device_cnt == 0) {
+          group.set_kind(ModelInstanceGroup::KIND_CPU);
+        } else {
+          for (const int32_t gid : group.gpus()) {
+            if ((gid < 0) || (gid >= device_cnt)) {
+              group.set_kind(ModelInstanceGroup::KIND_CPU);
+              break;
+            }
           }
+        }
+
+        if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
+          group.set_kind(ModelInstanceGroup::KIND_GPU);
         }
       }
 
-      if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-        group.set_kind(ModelInstanceGroup::KIND_GPU);
+      // Count
+      if (group.count() < 1) {
+        group.set_count(1);
       }
-    }
 
-    // Count
-    if (group.count() < 1) {
-      group.set_count(1);
-    }
-
-    // GPUs
-    if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
-        (group.gpus().size() == 0)) {
-      for (int d = 0; d < device_cnt; d++) {
-        group.add_gpus(d);
+      // GPUs
+      if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
+          (group.gpus().size() == 0)) {
+        for (int d = 0; d < device_cnt; d++) {
+          group.add_gpus(d);
+        }
       }
     }
   }
@@ -331,11 +339,6 @@ ValidateModelConfig(
   if (!config.has_version_policy()) {
     return tensorflow::errors::InvalidArgument(
         "must specify 'version policy' for ", config.name());
-  }
-
-  if (config.instance_group().size() == 0) {
-    return tensorflow::errors::InvalidArgument(
-        "must specify one or more 'instance group's for ", config.name());
   }
 
   // If dynamic batching is specified make sure the preferred batch
@@ -382,48 +385,231 @@ ValidateModelConfig(
         nullptr));
   }
 
-  // Make sure KIND_GPU instance group specifies at least one GPU and
-  // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
-  // not specify any GPUs.
-  int dcnt;
-  cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
-    dcnt = 0;
-  } else if (cuerr != cudaSuccess) {
-    return tensorflow::errors::Internal(
-        "failed to get device count for validation of model ", config.name(),
-        ": ", cudaGetErrorString(cuerr));
-  }
+  // If ensemble scheduling is specified, validate it.
+  // Otherwise, must validate platform and instance_group
+  if (config.has_ensemble_scheduling()) {
+    TF_RETURN_IF_ERROR(ValidateEnsembleSchedulingConfig(config));
+  } else {
+    if (config.platform() == kEnsemblePlatform) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble scheduling must be set for ensemble ", config.name(),
+          " whose platform is ", kEnsemblePlatform);
+    }
 
-  for (const auto& group : config.instance_group()) {
-    if (group.kind() == ModelInstanceGroup::KIND_GPU) {
-      if (group.gpus().size() == 0) {
-        return tensorflow::errors::InvalidArgument(
-            "instance group ", group.name(), " of model ", config.name(),
-            " has kind KIND_GPU but specifies no GPUs");
-      }
+    if (config.instance_group().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'instance group's for ", config.name());
+    }
 
-      for (const int32_t gid : group.gpus()) {
-        if ((gid < 0) || (gid >= dcnt)) {
+    // Make sure KIND_GPU instance group specifies at least one GPU and
+    // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
+    // not specify any GPUs.
+    int dcnt;
+    cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
+    if (cuerr == cudaErrorNoDevice) {
+      dcnt = 0;
+    } else if (cuerr != cudaSuccess) {
+      return tensorflow::errors::Internal(
+          "failed to get device count for validation of model ", config.name(),
+          ": ", cudaGetErrorString(cuerr));
+    }
+
+    for (const auto& group : config.instance_group()) {
+      if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+        if (group.gpus().size() == 0) {
           return tensorflow::errors::InvalidArgument(
               "instance group ", group.name(), " of model ", config.name(),
-              " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
-              (dcnt - 1));
+              " has kind KIND_GPU but specifies no GPUs");
         }
-      }
-    } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
-      if (group.gpus().size() > 0) {
-        return tensorflow::errors::InvalidArgument(
+
+        for (const int32_t gid : group.gpus()) {
+          if ((gid < 0) || (gid >= dcnt)) {
+            return tensorflow::errors::InvalidArgument(
+                "instance group ", group.name(), " of model ", config.name(),
+                " specifies invalid GPU id ", gid, ", valid GPUs are 0 - ",
+                (dcnt - 1));
+          }
+        }
+      } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
+        if (group.gpus().size() > 0) {
+          return tensorflow::errors::InvalidArgument(
+              "instance group ", group.name(), " of model ", config.name(),
+              " has kind KIND_CPU but specifies one or more GPUs");
+        }
+      } else {
+        return tensorflow::errors::Internal(
             "instance group ", group.name(), " of model ", config.name(),
-            " has kind KIND_CPU but specifies one or more GPUs");
+            " has unexpected kind KIND_AUTO");
       }
-    } else {
-      return tensorflow::errors::Internal(
-          "instance group ", group.name(), " of model ", config.name(),
-          " has unexpected kind KIND_AUTO");
     }
   }
 
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+ValidateEnsembleSchedulingConfig(const ModelConfig& config)
+{
+  if (config.platform() != kEnsemblePlatform) {
+    return tensorflow::errors::InvalidArgument(
+        "ensemble scheduling can not be set for model ", config.name(),
+        " whose platform is not ", kEnsemblePlatform);
+  }
+  if (config.instance_group().size() != 0) {
+    return tensorflow::errors::InvalidArgument(
+        "instance group should not be specified for ensemble ", config.name());
+  }
+  if (config.has_optimization()) {
+    return tensorflow::errors::InvalidArgument(
+        "optimization should not be specified for ensemble ", config.name());
+  }
+
+  // Make sure step is not empty and all fields are set
+  if (config.ensemble_scheduling().step_size() == 0) {
+    return tensorflow::errors::InvalidArgument(
+        "must specify 'step' for ensemble ", config.name());
+  }
+
+  std::unordered_map<std::string, EnsembleTensor> tensors;
+
+  TF_RETURN_IF_ERROR(BuildEnsembleGraph(config, tensors));
+
+  // check data flow
+  std::deque<EnsembleTensor*> ready_queue;
+  for (const auto& input : config.input()) {
+    auto it = tensors.find(input.name());
+    if (it == tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+          "must map ensemble input ", input.name(), " for ensemble ",
+          config.name());
+    }
+    it->second.ready = true;
+    ready_queue.push_back(&(it->second));
+  }
+  while (!ready_queue.empty()) {
+    auto& ready_node = ready_queue.front();
+    for (auto& next_node : ready_node->next_nodes) {
+      if (next_node->ready) {
+        continue;
+      }
+      bool next_node_ready = true;
+      for (auto& prev_node : next_node->prev_nodes) {
+        if (!prev_node->ready) {
+          next_node_ready = false;
+          break;
+        }
+      }
+      next_node->ready = next_node_ready;
+      if (next_node_ready) {
+        ready_queue.push_back(next_node);
+      }
+    }
+    ready_queue.pop_front();
+  }
+  std::set<std::string> outputs;
+  for (const auto& output : config.output()) {
+    auto it = tensors.find(output.name());
+    if (it == tensors.end()) {
+      return tensorflow::errors::InvalidArgument(
+          "must map ensemble output ", output.name(), " for ensemble ",
+          config.name());
+    }
+    if (!it->second.ready) {
+      return tensorflow::errors::InvalidArgument(
+          "no data will be written to ensemble output ", output.name(),
+          " for ensemble ", config.name());
+    } else {
+      outputs.insert(it->first);
+    }
+  }
+  // Check redundant ensemble tensors
+  for (const auto& tensor : tensors) {
+    // skip ensemble outputs as they have been check and can have no next nodes
+    if (outputs.find(tensor.first) != outputs.end()) {
+      continue;
+    }
+    if (!tensor.second.ready) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble tensor ", tensor.first,
+          " is redundant as no data will be written to it for ensemble ",
+          config.name());
+    } else if (tensor.second.next_nodes.size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "ensemble tensor ", tensor.first,
+          " is redundant as it will not be used in any models for ensemble ",
+          config.name());
+    }
+  }
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
+BuildEnsembleGraph(
+    const ModelConfig& config,
+    std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
+{
+  keyed_ensemble_graph.clear();
+  for (const auto& element : config.ensemble_scheduling().step()) {
+    if (element.model_name().empty()) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify 'model_name' in step of ensemble ", config.name());
+    }
+    if (element.input_map().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'input_map' in step of ensemble ",
+          config.name());
+    }
+    if (element.output_map().size() == 0) {
+      return tensorflow::errors::InvalidArgument(
+          "must specify one or more 'output_map' in step of ensemble ",
+          config.name());
+    }
+
+    // Link ensemble tensors
+    std::vector<EnsembleTensor*> tensor_as_output;
+    for (const auto& output_map : element.output_map()) {
+      auto it = keyed_ensemble_graph.find(output_map.second);
+      if (it != keyed_ensemble_graph.end()) {
+        if (it->second.isOutput) {
+          return tensorflow::errors::InvalidArgument(
+              "ensemble tensor ", it->first,
+              " can appear in an output map only once for ensemble ",
+              config.name());
+        } else {
+          it->second.isOutput = true;
+        }
+      } else {
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(output_map.second, EnsembleTensor(true)))
+                 .first;
+      }
+      tensor_as_output.push_back(&(it->second));
+    }
+
+    std::set<std::string> model_inputs;
+    for (const auto& input_map : element.input_map()) {
+      if (model_inputs.find(input_map.second) != model_inputs.end()) {
+        return tensorflow::errors::InvalidArgument(
+            "input ", input_map.second, " in model ", element.model_name(),
+            " is mapped to multiple ensemble tensors in one step for ensemble ",
+            config.name());
+      } else {
+        model_inputs.emplace(input_map.second);
+      }
+      auto it = keyed_ensemble_graph.find(input_map.first);
+      if (it == keyed_ensemble_graph.end()) {
+        it =
+            keyed_ensemble_graph
+                .emplace(std::make_pair(input_map.first, EnsembleTensor(false)))
+                .first;
+      }
+      for (auto output : tensor_as_output) {
+        output->prev_nodes.push_back(&(it->second));
+        it->second.next_nodes.push_back(output);
+      }
+    }
+  }
   return tensorflow::Status::OK();
 }
 

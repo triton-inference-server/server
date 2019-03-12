@@ -30,8 +30,8 @@
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
+#include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
-#include "src/core/utils.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {

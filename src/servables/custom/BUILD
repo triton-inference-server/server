@@ -60,7 +60,7 @@ cc_library(
         "//src/core:model_config",
         "//src/core:provider",
         "//src/core:server_status",
-        "//src/core:utils",
+        "//src/core:model_config_utils",
     ],
 )
 
@@ -75,7 +75,7 @@ cc_library(
         "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:utils",
+        "//src/core:model_config_utils",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",

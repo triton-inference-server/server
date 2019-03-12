@@ -1,0 +1,18 @@
+name: "ensemble_scheduling_not_set"
+max_batch_size: 8
+platform: "ensemble"
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 1, 28, 28 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 10, 1, 1 ]
+  }
+]

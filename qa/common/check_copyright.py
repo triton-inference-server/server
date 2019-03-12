@@ -44,6 +44,7 @@ SKIP_PATHS = ('docs/examples/model_repository',
               'src/servables/caffe2/testdata',
               'src/servables/tensorflow/testdata',
               'src/servables/tensorrt/testdata',
+              'src/servables/ensemble/testdata',
               'src/test/testdata',
               'tools/patch',
               'VERSION')
