@@ -56,6 +56,8 @@
 #include "src/servables/caffe2/netdef_bundle.pb.h"
 #include "src/servables/custom/custom_bundle.h"
 #include "src/servables/custom/custom_bundle.pb.h"
+#include "src/servables/ensemble/ensemble_bundle.h"
+#include "src/servables/ensemble/ensemble_bundle.pb.h"
 #include "src/servables/tensorflow/graphdef_bundle.h"
 #include "src/servables/tensorflow/graphdef_bundle.pb.h"
 #include "src/servables/tensorflow/savedmodel_bundle.h"
@@ -804,6 +806,10 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
+  // Need to set 'this' in each backend even though it is redundant after
+  // the first time. Once we remove TFS dependency we can construct each backend
+  // in a way that makes it directly aware of the inference server
+  (*backend)()->SetInferenceServer(this);
   (*backend)()->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
@@ -881,6 +887,7 @@ InferenceServer::BuildPlatformConfigMap(
   ::google::protobuf::Any plan_source_adapter_config;
   ::google::protobuf::Any netdef_source_adapter_config;
   ::google::protobuf::Any custom_source_adapter_config;
+  ::google::protobuf::Any ensemble_source_adapter_config;
 
   //// Tensorflow GraphDef
   {
@@ -947,6 +954,12 @@ InferenceServer::BuildPlatformConfigMap(
     custom_source_adapter_config.PackFrom(custom_config);
   }
 
+  //// Ensemble
+  {
+    EnsembleBundleSourceAdapterConfig ensemble_config;
+    ensemble_source_adapter_config.PackFrom(ensemble_config);
+  }
+
   tfs::PlatformConfigMap platform_config_map;
 
   (*(*platform_config_map
@@ -961,6 +974,8 @@ InferenceServer::BuildPlatformConfigMap(
         .mutable_source_adapter_config()) = plan_source_adapter_config;
   (*(*platform_config_map.mutable_platform_configs())[kCustomPlatform]
         .mutable_source_adapter_config()) = custom_source_adapter_config;
+  (*(*platform_config_map.mutable_platform_configs())[kEnsemblePlatform]
+        .mutable_source_adapter_config()) = ensemble_source_adapter_config;
 
   return platform_config_map;
 }
@@ -1015,6 +1030,12 @@ InferenceServer::InferBackendHandle::Init(
         status = core->GetServableHandle(model_spec, &(custom_bundle_));
         if (status.ok()) {
           is_ = static_cast<InferenceBackend*>(custom_bundle_.get());
+        }
+        break;
+      case Platform::PLATFORM_ENSEMBLE:
+        status = core->GetServableHandle(model_spec, &(ensemble_bundle_));
+        if (status.ok()) {
+          is_ = static_cast<InferenceBackend*>(ensemble_bundle_.get());
         }
         break;
       default:

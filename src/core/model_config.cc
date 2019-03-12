@@ -180,6 +180,8 @@ GetPlatform(const std::string& platform_str)
     return Platform::PLATFORM_CAFFE2_NETDEF;
   } else if (platform_str == kCustomPlatform) {
     return Platform::PLATFORM_CUSTOM;
+  } else if (platform_str == kEnsemblePlatform) {
+    return Platform::PLATFORM_ENSEMBLE;
   }
 
   return Platform::PLATFORM_UNKNOWN;
