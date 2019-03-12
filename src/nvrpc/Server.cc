@@ -77,6 +77,7 @@ Server::AsyncRun()
 void
 Server::Shutdown()
 {
+  m_Server->Shutdown();
   for (int i = 0; i < m_Executors.size(); i++) {
     m_Executors[i]->Shutdown();
   }
