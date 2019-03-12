@@ -95,6 +95,8 @@ class HTTPServerImpl : public HTTPServer {
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
+  static void StopCallback(int sock, short events, void* arg);
+
   InferenceServer* server_;
   uint16_t port_;
   int thread_cnt_;
@@ -106,6 +108,8 @@ class HTTPServerImpl : public HTTPServer {
   evhtp_t* htp_;
   struct event_base* evbase_;
   std::thread worker_;
+  int fds_[2];
+  event* break_ev_;
 };
 
 Status
@@ -117,6 +121,10 @@ HTTPServerImpl::Start()
     evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
+    // Set listening event for breaking event loop
+    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
+    break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
+    event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
     return Status::Success;
   }
@@ -129,12 +137,26 @@ Status
 HTTPServerImpl::Stop()
 {
   if (worker_.joinable()) {
-    event_base_loopexit(evbase_, NULL);
+    // Notify event loop to break via fd write
+    send(fds_[1], &evbase_, sizeof(event_base*), 0);
     worker_.join();
+    event_free(break_ev_);
+    evutil_closesocket(fds_[0]);
+    evutil_closesocket(fds_[1]);
+    evhtp_unbind_socket(htp_);
+    evhtp_free(htp_);
+    event_base_free(evbase_);
     return Status::Success;
   }
 
   return Status(RequestStatusCode::UNAVAILABLE, "HTTP server is not running.");
+}
+
+void
+HTTPServerImpl::StopCallback(int sock, short events, void* arg)
+{
+  struct event_base* base = (struct event_base*)arg;
+  event_base_loopbreak(base);
 }
 
 void
