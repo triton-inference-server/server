@@ -1,0 +1,54 @@
+name: "no_model_name"
+max_batch_size: 8
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "model_a"
+      input_map {
+        key: "data"
+        value: "model_a_input"
+      }
+      output_map {
+        key: "model_a_output"
+        value: "temp_1"
+      }
+    },
+    {
+      input_map {
+        key: "temp_1"
+        value: "model_b_input"
+      }
+      output_map {
+        key: "model_b_output"
+        value: "temp_2"
+      }
+    },
+    {
+      model_name: "model_c"
+      input_map {
+        key: "temp_2"
+        value: "model_c_input"
+      }
+      output_map {
+        key: "model_c_output"
+        value: "prob"
+      }
+    }
+  ]
+}
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 1, 28, 28 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 10, 1, 1 ]
+  }
+]

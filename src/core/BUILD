@@ -152,7 +152,7 @@ cc_library(
         ":model_config_proto",
         ":scheduler",
         ":sequence_batch_scheduler",
-        ":utils",
+        ":model_config_utils",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -178,7 +178,7 @@ cc_library(
         ":provider_header",
         ":logging",
         ":model_config",
-        ":utils",
+        ":model_config_utils",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -244,7 +244,7 @@ cc_library(
         ":logging",
         ":model_config",
         ":model_config_proto",
-        ":utils",
+        ":model_config_utils",
         "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",
@@ -300,7 +300,7 @@ cc_library(
         ":model_config_proto",
         ":scheduler",
         ":server_status_header",
-        ":utils",
+        ":model_config_utils",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -325,7 +325,7 @@ cc_library(
         ":server_header",
         ":server_status_header",
         ":server_status_proto",
-        ":utils",
+        ":model_config_utils",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
@@ -430,9 +430,9 @@ cc_library(
 )
 
 cc_library(
-    name = "utils",
-    srcs = ["utils.cc"],
-    hdrs = ["utils.h"],
+    name = "model_config_utils",
+    srcs = ["model_config_utils.cc"],
+    hdrs = ["model_config_utils.h"],
     deps = [
         ":autofill",
         ":constants",
@@ -442,5 +442,17 @@ cc_library(
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",
+    ],
+)
+
+cc_library(
+    name = "ensemble_utils",
+    srcs = ["ensemble_utils.cc"],
+    hdrs = ["ensemble_utils.h"],
+    deps = [
+        ":logging",
+        ":model_config_proto",
+        ":model_config_utils",
+        "@org_tensorflow//tensorflow/core:lib",
     ],
 )

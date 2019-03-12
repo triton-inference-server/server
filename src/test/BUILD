@@ -46,7 +46,7 @@ cc_library(
         "//src/core:constants",
         "//src/core:logging",
         "//src/core:model_config_proto",
-        "//src/core:utils",
+        "//src/core:model_config_utils",
         "@com_google_googletest//:gtest",
         "@org_tensorflow//tensorflow/core:testlib",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",

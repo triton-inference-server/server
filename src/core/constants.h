@@ -43,6 +43,7 @@ constexpr char kTensorFlowSavedModelPlatform[] = "tensorflow_savedmodel";
 constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
 constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
 constexpr char kCustomPlatform[] = "custom";
+constexpr char kEnsemblePlatform[] = "ensemble";
 
 constexpr char kModelConfigPbTxt[] = "config.pbtxt";
 constexpr char kTensorRTPlanFilename[] = "model.plan";
