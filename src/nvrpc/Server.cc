@@ -31,7 +31,7 @@
 namespace nvrpc {
 
 Server::Server(std::string server_address)
-    : m_ServerAddress(server_address), m_Running(false)
+    : m_Running(false), m_ServerAddress(server_address)
 {
   m_Builder.AddListeningPort(
       m_ServerAddress, ::grpc::InsecureServerCredentials());
@@ -69,7 +69,7 @@ Server::AsyncRun()
 {
   m_Running = true;
   m_Server = m_Builder.BuildAndStart();
-  for (int i = 0; i < m_Executors.size(); i++) {
+  for (size_t i = 0; i < m_Executors.size(); i++) {
     m_Executors[i]->Run();
   }
 }
@@ -78,7 +78,7 @@ void
 Server::Shutdown()
 {
   m_Server->Shutdown();
-  for (int i = 0; i < m_Executors.size(); i++) {
+  for (size_t i = 0; i < m_Executors.size(); i++) {
     m_Executors[i]->Shutdown();
   }
 
