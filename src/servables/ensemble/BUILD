@@ -28,6 +28,55 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
+load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
+
+cc_proto_library(
+    name = "ensemble_bundle_proto",
+    srcs = ["ensemble_bundle.proto"],
+    deps = [
+        "@org_tensorflow//tensorflow/core:protos_all_cc",
+        "@protobuf_archive//:cc_wkt_protos",
+    ],
+)
+
+cc_library(
+    name = "ensemble_bundle",
+    srcs = ["ensemble_bundle.cc"],
+    hdrs = ["ensemble_bundle.h"],
+    deps = [
+        "//src/core:backend",
+        "//src/core:constants",
+        "//src/core:model_config_proto",
+        "//src/core:server_status",
+        "//src/core:utils",
+        "@org_tensorflow//tensorflow/c:c_api",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+)
+
+cc_library(
+    name = "ensemble_bundle_source_adapter",
+    srcs = ["ensemble_bundle_source_adapter.cc"],
+    hdrs = ["ensemble_bundle_source_adapter.h"],
+    deps = [
+        ":ensemble_bundle",
+        ":ensemble_bundle_proto",
+        "//src/core:constants",
+        "//src/core:logging",
+        "//src/core:model_config",
+        "//src/core:model_config_proto",
+        "//src/core:utils",
+        "@tf_serving//tensorflow_serving/core:loader",
+        "@tf_serving//tensorflow_serving/core:simple_loader",
+        "@tf_serving//tensorflow_serving/core:source_adapter",
+        "@tf_serving//tensorflow_serving/core:storage_path",
+        "@tf_serving//tensorflow_serving/util:optional",
+        "@org_tensorflow//tensorflow/core:core_cpu",
+        "@org_tensorflow//tensorflow/core:lib",
+    ],
+    alwayslink = 1,
+)
+
 filegroup(
     name = "ensemble_testdata",
     srcs = glob(

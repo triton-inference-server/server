@@ -179,6 +179,13 @@ InferenceBackend::GetOutput(
 }
 
 tensorflow::Status
+InferenceBackend::SetInferenceServer(void* inference_server)
+{
+  inference_server_ = inference_server;
+  return tensorflow::Status::OK();
+}
+
+tensorflow::Status
 InferenceBackend::SetModelConfig(
     const tensorflow::StringPiece& path, const ModelConfig& config)
 {

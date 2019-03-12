@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -331,6 +331,7 @@ cc_library(
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
         "//src/servables/tensorrt:plan_bundle_source_adapter",
         "//src/servables/custom:custom_bundle_source_adapter",
+        "//src/servables/ensemble:ensemble_bundle_source_adapter",
         "@com_github_libevent_libevent//:libevent",
         "@org_tensorflow//tensorflow/core:lib",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
