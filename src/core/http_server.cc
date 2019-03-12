@@ -108,6 +108,7 @@ class HTTPServerImpl : public HTTPServer {
   struct event_base* evbase_;
   std::thread worker_;
   int fds_[2];
+  event* break_ev_;
 };
 
 tensorflow::Status
@@ -121,8 +122,8 @@ HTTPServerImpl::Start()
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
     // Set listening event for breaking event loop
     evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
-    auto break_ev = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
-    event_add(break_ev, NULL);
+    break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
+    event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
     return tensorflow::Status::OK();
   }
@@ -138,8 +139,12 @@ HTTPServerImpl::Stop()
     // Notify event loop to break via fd write
     send(fds_[1], &evbase_, sizeof(event_base*), 0);
     worker_.join();
+    event_free(break_ev_);
     evutil_closesocket(fds_[0]);
     evutil_closesocket(fds_[1]);
+    evhtp_unbind_socket(htp_);
+    evhtp_free(htp_);
+    event_base_free(evbase_);
     return tensorflow::Status::OK();
   }
 
