@@ -37,7 +37,7 @@ Executor::Executor(int numThreads)
 }
 
 Executor::Executor(std::unique_ptr<ThreadPool> threadpool)
-    : IExecutor(), m_ThreadPool(std::move(threadpool))
+    : IExecutor(), m_Running(false), m_ThreadPool(std::move(threadpool))
 {
 }
 
@@ -48,12 +48,9 @@ Executor::ProgressEngine(int thread_id)
   void* tag;
   auto myCQ = m_ServerCompletionQueues[thread_id].get();
 
-  while (true) {
-    auto status = myCQ->Next(&tag, &ok);
-    if (!status)
-      return;  // Shutdown
+  while (myCQ->Next(&tag, &ok)) {
     auto ctx = IContext::Detag(tag);
-    if (!RunContext(ctx, ok)) {
+    if (!RunContext(ctx, ok) && m_Running) {
       ResetContext(ctx);
     }
   }

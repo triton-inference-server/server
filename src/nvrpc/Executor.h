@@ -64,6 +64,7 @@ class Executor : public IExecutor {
 
   void Run() final override
   {
+    m_Running = true;
     // Launch the threads polling on their CQs
     for (int i = 0; i < m_ThreadPool->Size(); i++) {
       m_ThreadPool->enqueue([this, i] { ProgressEngine(i); });
@@ -77,6 +78,7 @@ class Executor : public IExecutor {
 
   void Shutdown() final override
   {
+    m_Running = false;
     for (auto& cq : m_ServerCompletionQueues) {
       cq->Shutdown();
     }
@@ -85,6 +87,7 @@ class Executor : public IExecutor {
  private:
   void ProgressEngine(int thread_id);
 
+  volatile bool m_Running;
   std::vector<std::unique_ptr<IContext>> m_Contexts;
   std::vector<std::unique_ptr<::grpc::ServerCompletionQueue>>
       m_ServerCompletionQueues;
