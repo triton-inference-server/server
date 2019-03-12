@@ -806,6 +806,9 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
+  // Need to set 'this' in each backend even though it is redundant after
+  // the first time. Once we remove TFS dependency we can construct each backend
+  // in a way that makes it directly aware of the inference server
   (*backend)()->SetInferenceServer(this);
   (*backend)()->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
