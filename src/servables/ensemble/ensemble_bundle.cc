@@ -29,8 +29,8 @@
 #include <stdint.h>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
-#include "src/core/utils.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/lib/io/path.h"
 
