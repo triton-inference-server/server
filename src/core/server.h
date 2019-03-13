@@ -151,10 +151,6 @@ class InferenceServer {
 
   std::unique_ptr<GRPCServer> StartGrpcServer();
   std::unique_ptr<HTTPServer> StartHttpServer();
-  Status ParseProtoTextFile(
-      const std::string& file, google::protobuf::Message* message);
-  tfs::PlatformConfigMap BuildPlatformConfigMap(
-      float tf_gpu_memory_fraction, bool tf_allow_soft_placement);
 
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;

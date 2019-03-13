@@ -91,6 +91,118 @@ class ScopedAtomicIncrement {
   std::atomic<uint64_t>& counter_;
 };
 
+void
+BuildPlatformConfigMap(
+    const std::string& version, const std::string& model_store_path,
+    const bool strict_model_config, const float tf_gpu_memory_fraction,
+    const bool tf_allow_soft_placement, PlatformConfigMap* platform_configs,
+    tfs::PlatformConfigMap* tfs_platform_configs)
+{
+  ::google::protobuf::Any graphdef_source_adapter_config;
+  ::google::protobuf::Any saved_model_source_adapter_config;
+  ::google::protobuf::Any plan_source_adapter_config;
+  ::google::protobuf::Any netdef_source_adapter_config;
+  ::google::protobuf::Any custom_source_adapter_config;
+  ::google::protobuf::Any ensemble_source_adapter_config;
+
+  //// Tensorflow GraphDef
+  {
+    GraphDefBundleSourceAdapterConfig graphdef_config;
+
+    graphdef_config.set_autofill(!strict_model_config);
+
+    // Tensorflow session config
+    if (tf_gpu_memory_fraction == 0.0) {
+      graphdef_config.mutable_session_config()
+          ->mutable_gpu_options()
+          ->set_allow_growth(true);
+    } else {
+      graphdef_config.mutable_session_config()
+          ->mutable_gpu_options()
+          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
+    }
+
+    graphdef_config.mutable_session_config()->set_allow_soft_placement(
+        tf_allow_soft_placement);
+    graphdef_source_adapter_config.PackFrom(graphdef_config);
+  }
+
+  //// Tensorflow SavedModel
+  {
+    SavedModelBundleSourceAdapterConfig saved_model_config;
+
+    saved_model_config.set_autofill(!strict_model_config);
+
+    if (tf_gpu_memory_fraction == 0.0) {
+      saved_model_config.mutable_session_config()
+          ->mutable_gpu_options()
+          ->set_allow_growth(true);
+    } else {
+      saved_model_config.mutable_session_config()
+          ->mutable_gpu_options()
+          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
+    }
+
+    saved_model_config.mutable_session_config()->set_allow_soft_placement(
+        tf_allow_soft_placement);
+    saved_model_source_adapter_config.PackFrom(saved_model_config);
+  }
+
+  //// Caffe NetDef
+  {
+    NetDefBundleSourceAdapterConfig netdef_config;
+    netdef_config.set_autofill(!strict_model_config);
+    netdef_source_adapter_config.PackFrom(netdef_config);
+  }
+
+  //// TensorRT
+  {
+    PlanBundleSourceAdapterConfig plan_config;
+    plan_config.set_autofill(!strict_model_config);
+    plan_source_adapter_config.PackFrom(plan_config);
+  }
+
+  //// Custom
+  {
+    CustomBundleSourceAdapterConfig custom_config;
+    custom_config.set_inference_server_version(version);
+    custom_config.set_model_repository_path(model_store_path);
+    custom_source_adapter_config.PackFrom(custom_config);
+  }
+
+  //// Ensemble
+  {
+    EnsembleBundleSourceAdapterConfig ensemble_config;
+    ensemble_source_adapter_config.PackFrom(ensemble_config);
+  }
+
+  (*platform_configs)[kTensorFlowGraphDefPlatform] =
+      graphdef_source_adapter_config;
+  (*platform_configs)[kTensorFlowSavedModelPlatform] =
+      saved_model_source_adapter_config;
+  (*platform_configs)[kCaffe2NetDefPlatform] = netdef_source_adapter_config;
+  (*platform_configs)[kTensorRTPlanPlatform] = plan_source_adapter_config;
+  (*platform_configs)[kCustomPlatform] = custom_source_adapter_config;
+  (*platform_configs)[kEnsemblePlatform] = ensemble_source_adapter_config;
+
+  // Must also return the configs in format required by TFS for
+  // ServerCore.
+  (*(*tfs_platform_configs
+          ->mutable_platform_configs())[kTensorFlowGraphDefPlatform]
+        .mutable_source_adapter_config()) = graphdef_source_adapter_config;
+  (*(*tfs_platform_configs
+          ->mutable_platform_configs())[kTensorFlowSavedModelPlatform]
+        .mutable_source_adapter_config()) = saved_model_source_adapter_config;
+  (*(*tfs_platform_configs->mutable_platform_configs())[kCaffe2NetDefPlatform]
+        .mutable_source_adapter_config()) = netdef_source_adapter_config;
+  (*(*tfs_platform_configs->mutable_platform_configs())[kTensorRTPlanPlatform]
+        .mutable_source_adapter_config()) = plan_source_adapter_config;
+  (*(*tfs_platform_configs->mutable_platform_configs())[kCustomPlatform]
+        .mutable_source_adapter_config()) = custom_source_adapter_config;
+  (*(*tfs_platform_configs->mutable_platform_configs())[kEnsemblePlatform]
+        .mutable_source_adapter_config()) = ensemble_source_adapter_config;
+}
+
 }  // namespace
 
 //
@@ -141,7 +253,6 @@ InferenceServer::Init(int argc, char** argv)
 
   std::string server_id("inference:0");
   std::string model_store_path;
-  std::string platform_config_file;
 
   // On error, the init process will stop.
   // The difference is if the server will be terminated.
@@ -149,7 +260,7 @@ InferenceServer::Init(int argc, char** argv)
   bool strict_model_config = strict_model_config_;
   bool strict_readiness = strict_readiness_;
   bool allow_profiling = profiling_enabled_;
-  bool tf_allow_soft_placement = true;
+  bool tf_soft_placement_enabled = true;
   float tf_gpu_memory_fraction = 0.0;
   bool allow_poll_model_repository = poll_model_repository_enabled_;
   int32_t repository_poll_secs = repository_poll_secs_;
@@ -177,11 +288,6 @@ InferenceServer::Init(int argc, char** argv)
       tensorflow::Flag("id", &server_id, "Identifier for this server"),
       tensorflow::Flag(
           "model-store", &model_store_path, "Path to model store directory."),
-      tensorflow::Flag(
-          "platform-config-file", &platform_config_file,
-          "If non-empty, read an ASCII PlatformConfigMap protobuf "
-          "from the supplied file name, and use that platform "
-          "config instead of the default platform."),
       tensorflow::Flag(
           "exit-on-error", &exit_on_error,
           "Exit the inference server if an error occurs during "
@@ -242,7 +348,7 @@ InferenceServer::Init(int argc, char** argv)
           "inferences "
           "are still in flight."),
       tensorflow::Flag(
-          "tf-allow-soft-placement", &tf_allow_soft_placement,
+          "tf-allow-soft-placement", &tf_soft_placement_enabled,
           "Instruct TensorFlow to use CPU implementation of an operation when "
           "a "
           "GPU implementation is not available."),
@@ -348,27 +454,20 @@ InferenceServer::Init(int argc, char** argv)
   // startup.
   options.max_num_load_retries = 0;
   options.file_system_poll_wait_seconds =
-      (allow_poll_model_repository) ? repository_poll_secs_ : 0;
+      (poll_model_repository_enabled_) ? repository_poll_secs_ : 0;
 
-  // Platform configuration
-  if (platform_config_file.empty()) {
-    options.platform_config_map =
-        BuildPlatformConfigMap(tf_gpu_memory_fraction, tf_allow_soft_placement);
-  } else {
-    status =
-        ParseProtoTextFile(platform_config_file, &options.platform_config_map);
-    if (!status.IsOk()) {
-      LogInitError(status.Message());
-      return !exit_on_error;
-    }
-  }
+  PlatformConfigMap platform_configs;
+  BuildPlatformConfigMap(
+      version_, model_store_path_, strict_model_config_, tf_gpu_memory_fraction,
+      tf_soft_placement_enabled, &platform_configs,
+      &options.platform_config_map);
   LOG_VERBOSE(1) << options.platform_config_map.DebugString();
 
   // Create the global manager for the repository. Add all models'
   // into the server core 'options' so that they are eagerly loaded
   // below when ServerCore is created.
   status = ModelRepositoryManager::Create(
-      model_store_path_, options.platform_config_map, !strict_model_config_);
+      model_store_path_, platform_configs, !strict_model_config_);
   if (!status.IsOk()) {
     LogInitError(status.Message());
     return !exit_on_error;
@@ -850,127 +949,6 @@ InferenceServer::UptimeNs() const
 
   uint64_t now_ns = now.tv_sec * NANOS_PER_SECOND + now.tv_nsec;
   return now_ns - start_time_ns_;
-}
-
-Status
-InferenceServer::ParseProtoTextFile(
-    const std::string& file, google::protobuf::Message* message)
-{
-  std::unique_ptr<tensorflow::ReadOnlyMemoryRegion> file_data;
-  RETURN_IF_TF_ERROR(
-      tensorflow::Env::Default()->NewReadOnlyMemoryRegionFromFile(
-          file, &file_data));
-  std::string file_data_str(
-      reinterpret_cast<const char*>(file_data->data()), file_data->length());
-  if (google::protobuf::TextFormat::ParseFromString(file_data_str, message)) {
-    return Status::Success;
-  } else {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Invalid protobuf file: '" + file + "'");
-  }
-}
-
-tfs::PlatformConfigMap
-InferenceServer::BuildPlatformConfigMap(
-    float tf_gpu_memory_fraction, bool tf_allow_soft_placement)
-{
-  ::google::protobuf::Any graphdef_source_adapter_config;
-  ::google::protobuf::Any saved_model_source_adapter_config;
-  ::google::protobuf::Any plan_source_adapter_config;
-  ::google::protobuf::Any netdef_source_adapter_config;
-  ::google::protobuf::Any custom_source_adapter_config;
-  ::google::protobuf::Any ensemble_source_adapter_config;
-
-  //// Tensorflow GraphDef
-  {
-    GraphDefBundleSourceAdapterConfig graphdef_config;
-
-    graphdef_config.set_autofill(!strict_model_config_);
-
-    // Tensorflow session config
-    if (tf_gpu_memory_fraction == 0.0) {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
-    } else {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
-    }
-
-    graphdef_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    graphdef_source_adapter_config.PackFrom(graphdef_config);
-  }
-
-  //// Tensorflow SavedModel
-  {
-    SavedModelBundleSourceAdapterConfig saved_model_config;
-
-    saved_model_config.set_autofill(!strict_model_config_);
-
-    if (tf_gpu_memory_fraction == 0.0) {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
-    } else {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
-    }
-
-    saved_model_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    saved_model_source_adapter_config.PackFrom(saved_model_config);
-  }
-
-  //// Caffe NetDef
-  {
-    NetDefBundleSourceAdapterConfig netdef_config;
-    netdef_config.set_autofill(!strict_model_config_);
-    netdef_source_adapter_config.PackFrom(netdef_config);
-  }
-
-  //// TensorRT
-  {
-    PlanBundleSourceAdapterConfig plan_config;
-    plan_config.set_autofill(!strict_model_config_);
-    plan_source_adapter_config.PackFrom(plan_config);
-  }
-
-  //// Custom
-  {
-    CustomBundleSourceAdapterConfig custom_config;
-    custom_config.set_inference_server_version(version_);
-    custom_config.set_model_repository_path(model_store_path_);
-    custom_source_adapter_config.PackFrom(custom_config);
-  }
-
-  //// Ensemble
-  {
-    EnsembleBundleSourceAdapterConfig ensemble_config;
-    ensemble_source_adapter_config.PackFrom(ensemble_config);
-  }
-
-  tfs::PlatformConfigMap platform_config_map;
-
-  (*(*platform_config_map
-          .mutable_platform_configs())[kTensorFlowGraphDefPlatform]
-        .mutable_source_adapter_config()) = graphdef_source_adapter_config;
-  (*(*platform_config_map
-          .mutable_platform_configs())[kTensorFlowSavedModelPlatform]
-        .mutable_source_adapter_config()) = saved_model_source_adapter_config;
-  (*(*platform_config_map.mutable_platform_configs())[kCaffe2NetDefPlatform]
-        .mutable_source_adapter_config()) = netdef_source_adapter_config;
-  (*(*platform_config_map.mutable_platform_configs())[kTensorRTPlanPlatform]
-        .mutable_source_adapter_config()) = plan_source_adapter_config;
-  (*(*platform_config_map.mutable_platform_configs())[kCustomPlatform]
-        .mutable_source_adapter_config()) = custom_source_adapter_config;
-  (*(*platform_config_map.mutable_platform_configs())[kEnsemblePlatform]
-        .mutable_source_adapter_config()) = ensemble_source_adapter_config;
-
-  return platform_config_map;
 }
 
 //
