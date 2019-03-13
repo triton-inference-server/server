@@ -28,6 +28,7 @@
 
 #include <stdint.h>
 #include "src/core/constants.h"
+#include "src/core/ensemble_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
@@ -40,7 +41,6 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
   RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
-  // [TODO] Replace it to ensemble scheduler after DLIS-290
   RETURN_IF_ERROR(SetConfiguredScheduler(
       1, [](uint32_t runner_idx) -> Status { return Status::Success; },
       [this](
@@ -57,10 +57,9 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 Status
 EnsembleBundle::SetInferenceServer(void* inference_server)
 {
-  // [TODO] Uncommon below after DLIS-290
-  // EnsembleScheduler* scheduler =
-  //    static_cast<EnsembleScheduler*>(scheduler_.get());
-  // RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
+  EnsembleScheduler* scheduler =
+      static_cast<EnsembleScheduler*>(GetRawScheduler());
+  RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
   return InferenceBackend::SetInferenceServer(inference_server);
 }
 

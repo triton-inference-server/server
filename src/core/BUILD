@@ -139,18 +139,26 @@ cc_library(
 
 cc_library(
     name = "backend",
-    hdrs = ["backend.h"],
     srcs = ["backend.cc"],
     deps = [
+        ":backend_header",
         ":constants",
         ":dynamic_batch_scheduler",
-        ":label_provider",
+        ":ensemble_scheduler",
         ":logging",
         ":metric_model_reporter",
-        ":model_config_proto",
         ":model_config_utils",
-        ":scheduler",
         ":sequence_batch_scheduler",
+    ],
+)
+
+cc_library(
+    name = "backend_header",
+    hdrs = ["backend.h"],
+    deps = [
+        ":label_provider",
+        ":model_config_proto",
+        ":scheduler",
         ":status",
     ],
 )
@@ -330,11 +338,28 @@ cc_library(
 )
 
 cc_library(
+    name = "ensemble_scheduler",
+    srcs = ["ensemble_scheduler.cc"],
+    hdrs = ["ensemble_scheduler.h"],
+    deps = [
+        ":api_proto",
+        ":backend_header",
+        ":logging",
+        ":model_config_proto",
+        ":model_config_utils",
+        ":provider_header",
+        ":scheduler",
+        ":server_header",
+        ":server_status_header",
+    ],
+)
+
+cc_library(
     name = "server_header",
     hdrs = ["server.h"],
     deps = [
         ":api_proto",
-        ":provider",
+        ":provider_header",
         ":model_config_proto",
         ":request_status_proto",
         ":server_status_header",

@@ -94,6 +94,9 @@ class InferenceBackend {
       const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
       Scheduler::StandardRunFunc OnRun);
 
+  // Get the raw pointer to the scheduler of the servable.
+  Scheduler* GetRawScheduler() { return scheduler_.get(); }
+
  private:
   // Pointer to the inference server.
   void* inference_server_;
