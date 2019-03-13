@@ -37,7 +37,7 @@ RET=0
 rm -fr *.log
 
 # LifeCycleTest.test_parse_error_noexit_strict
-SERVER_ARGS="--model-store=$DATADIR/qa_model_repository --strict-readiness=true --exit-on-error=false --platform-config-file=/tmp/dhweiu"
+SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=true --exit-on-error=false"
 SERVER_LOG="./inference_server_0.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -60,7 +60,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # LifeCycleTest.test_parse_error_noexit
-SERVER_ARGS="--model-store=$DATADIR/qa_model_repository --strict-readiness=false --exit-on-error=false --platform-config-file=/tmp/dhweiu"
+SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
 SERVER_LOG="./inference_server_1.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then

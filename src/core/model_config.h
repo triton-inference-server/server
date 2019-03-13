@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <google/protobuf/any.pb.h>
 #include <stdint.h>
 #include "src/core/model_config.pb.h"
 
@@ -36,6 +37,11 @@ using CorrelationID = uint64_t;
 
 /// The type for a repeated dims field (used for shape)
 using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+
+/// The type from platform name to the backend configuration for that
+/// platform.
+using PlatformConfigMap =
+    std::unordered_map<std::string, ::google::protobuf::Any>;
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.

@@ -45,6 +45,7 @@ cc_library(
     deps = [
         "//src/core:constants",
         "//src/core:logging",
+        "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
         "//src/core:status",

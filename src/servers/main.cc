@@ -26,7 +26,10 @@
 
 #include <stdint.h>
 #include <unistd.h>
+#include <chrono>
+#include <condition_variable>
 #include <csignal>
+#include <mutex>
 #include <thread>
 
 #include "src/core/logging.h"

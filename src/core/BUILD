@@ -114,7 +114,6 @@ cc_library(
     deps = [
         ":model_config",
         ":status",
-        "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
 
@@ -245,7 +244,6 @@ cc_library(
         ":model_config_utils",
         ":status",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
-        "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
 
@@ -444,7 +442,6 @@ cc_library(
         ":model_config",
         ":model_config_proto",
         ":status",
-        "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
 
