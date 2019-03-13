@@ -32,6 +32,24 @@ TEST_LOG="./unit_test.log"
 # expected by bazel test.
 cp /opt/tensorrtserver/lib/* /usr/lib/.
 
+# Copy TensorRT plans into the unit test model repositories.
+for modelpath in \
+    testdata/autofill_sanity/too_many_inputs/1      \
+        testdata/autofill_sanity/no_name_platform/1 \
+        testdata/autofill_sanity/bad_input_type/1   \
+        testdata/autofill_sanity/bad_input_dims/1   \
+        testdata/autofill_sanity/unknown_input/1    \
+        testdata/autofill_sanity/empty_config/1     \
+        testdata/autofill_sanity/unknown_output/1   \
+        testdata/autofill_sanity/bad_output_dims/1  \
+        testdata/autofill_sanity/no_config/1        \
+        testdata/autofill_sanity/bad_output_type/1  \
+        testdata/autofill_sanity/too_few_inputs/1 ; do
+    mkdir -p /workspace/src/servables/tensorrt/$modelpath
+    cp /data/inferenceserver/qa_model_repository/plan_float32_float32_float32/1/model.plan \
+       /workspace/src/servables/tensorrt/$modelpath/.
+done
+
 rm -f $TEST_LOG
 RET=0
 
