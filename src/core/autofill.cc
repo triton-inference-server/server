@@ -99,8 +99,7 @@ AutoFillSimple::Fix(ModelConfig* config)
 //
 Status
 AutoFill::Create(
-    const std::string& model_name,
-    const tfs::PlatformConfigMap& platform_config_map,
+    const std::string& model_name, const PlatformConfigMap& platform_config_map,
     const std::string& model_path, const ModelConfig& config,
     std::unique_ptr<AutoFill>* autofill)
 {
@@ -115,10 +114,9 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFillSavedModel> afsm;
     ::google::protobuf::Any platform_config;
-    auto it = platform_config_map.platform_configs().find(
-        kTensorFlowSavedModelPlatform);
-    if (it != platform_config_map.platform_configs().end()) {
-      platform_config = it->second.source_adapter_config();
+    auto it = platform_config_map.find(kTensorFlowSavedModelPlatform);
+    if (it != platform_config_map.end()) {
+      platform_config = it->second;
     }
     Status status = AutoFillSavedModel::Create(
         model_name, platform_config, model_path, &afsm);

@@ -28,6 +28,7 @@
 #include "src/core/constants.h"
 #include "src/core/ensemble_utils.h"
 #include "src/core/logging.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/test/model_config_test_base.h"
 
@@ -63,7 +64,7 @@ EnsembleBundleTest::GetModelConfigsInRepository(
     }
 
     ModelConfig config;
-    tfs::PlatformConfigMap platform_map;
+    PlatformConfigMap platform_map;
     Status status =
         GetNormalizedModelConfig(model_path, platform_map, false, &config);
     if (!status.IsOk()) {

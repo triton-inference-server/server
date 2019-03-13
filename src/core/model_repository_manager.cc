@@ -103,7 +103,7 @@ ModelRepositoryManager* ModelRepositoryManager::singleton = nullptr;
 
 ModelRepositoryManager::ModelRepositoryManager(
     const std::string& repository_path,
-    const tfs::PlatformConfigMap& platform_config_map, const bool autofill)
+    const PlatformConfigMap& platform_config_map, const bool autofill)
     : repository_path_(repository_path),
       platform_config_map_(platform_config_map), autofill_(autofill)
 {
@@ -112,7 +112,7 @@ ModelRepositoryManager::ModelRepositoryManager(
 Status
 ModelRepositoryManager::Create(
     const std::string& repository_path,
-    const tfs::PlatformConfigMap& platform_config_map, const bool autofill)
+    const PlatformConfigMap& platform_config_map, const bool autofill)
 {
   if (singleton != nullptr) {
     return Status(

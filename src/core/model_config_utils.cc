@@ -33,7 +33,6 @@
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/model_config.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 
@@ -176,7 +175,7 @@ GetSequenceControlProperties(
 
 Status
 GetNormalizedModelConfig(
-    const std::string& path, const tfs::PlatformConfigMap& platform_config_map,
+    const std::string& path, const PlatformConfigMap& platform_config_map,
     const bool autofill, ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.

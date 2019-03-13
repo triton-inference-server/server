@@ -31,7 +31,6 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
-#include "tensorflow_serving/config/platform_config.pb.h"
 
 namespace tfs = tensorflow::serving;
 
@@ -44,12 +43,14 @@ class ModelRepositoryManager {
  public:
   /// Create a manager for a repository.
   /// \param repositpory_path The file-system path of the repository.
+  /// \param platform_config_map Map from platform name to the backend
+  /// configuration for that platform.
   /// \param autofill If true attempt to autofill missing required
   /// information in each model configuration.
   /// \return The error status.
   static Status Create(
       const std::string& repository_path,
-      const tfs::PlatformConfigMap& platform_config_map, const bool autofill);
+      const PlatformConfigMap& platform_config_map, const bool autofill);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -98,13 +99,13 @@ class ModelRepositoryManager {
 
   ModelRepositoryManager(
       const std::string& repository_path,
-      const tfs::PlatformConfigMap& platform_config_map, const bool autofill);
+      const PlatformConfigMap& platform_config_map, const bool autofill);
   ~ModelRepositoryManager() = default;
 
   static ModelRepositoryManager* singleton;
 
   const std::string repository_path_;
-  const tfs::PlatformConfigMap platform_config_map_;
+  const PlatformConfigMap platform_config_map_;
   const bool autofill_;
 
   std::mutex poll_mu_;
