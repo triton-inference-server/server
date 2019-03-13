@@ -27,10 +27,12 @@
 #include <chrono>
 #include <string>
 #include <thread>
-#include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/servables/custom/custom.h"
+
+#define LOG_ERROR std::cerr
+#define LOG_INFO std::cout
 
 // This custom backend takes three one-element input tensors, two
 // INT32 control values and one an INT32 value input; and produces a
