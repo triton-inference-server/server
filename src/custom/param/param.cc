@@ -25,10 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
-#include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/servables/custom/custom.h"
+
+#define LOG_ERROR std::cerr
+#define LOG_INFO std::cout
 
 // This custom backend returns system and configuration parameter
 // values every time it is executed.

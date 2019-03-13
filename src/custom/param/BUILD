@@ -32,7 +32,6 @@ cc_library(
     name = "param_base",
     srcs = ["param.cc"],
     deps = [
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/servables/custom:custom",
