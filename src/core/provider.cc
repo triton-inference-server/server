@@ -35,6 +35,43 @@
 
 namespace nvidia { namespace inferenceserver {
 
+SystemMemoryBlock::SystemMemoryBlock()
+    : byte_size_(0), referencing_block_(nullptr)
+{
+  ReserveBlock(byte_size_);
+}
+
+SystemMemoryBlock::SystemMemoryBlock(void* block, size_t block_size)
+    : byte_size_(block_size), referencing_block_(block)
+{
+}
+
+Status
+SystemMemoryBlock::ReserveBlock(size_t byte_size)
+{
+  if (byte_size_ != 0) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Can only reserve memory block if SystemMemoryBlock is empty");
+  }
+
+  byte_size_ = byte_size;
+  char* buffer = new char[byte_size];
+  buffer_.reset(buffer);
+  referencing_block_ = nullptr;
+  return Status::Success;
+}
+
+void*
+SystemMemoryBlock::GetBlock() const
+{
+  if (referencing_block_ != nullptr) {
+    return referencing_block_;
+  } else {
+    return buffer_.get();
+  }
+}
+
 Status
 InferRequestProvider::NormalizeRequestHeader(const InferenceBackend& is)
 {
@@ -785,6 +822,150 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   }
 
   return Status::Success;
+}
+
+Status
+SystemMemoryInferRequestProvider::Create(
+    const InferenceBackend& is, const std::string& model_name,
+    const int64_t model_version, const InferRequestHeader& request_header,
+    const std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
+        blocks,
+    std::shared_ptr<SystemMemoryInferRequestProvider>* infer_provider)
+{
+  auto provider =
+      new SystemMemoryInferRequestProvider(model_name, model_version);
+  infer_provider->reset(provider);
+
+  provider->request_header_ = request_header;
+
+  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
+
+  for (const auto& io : provider->request_header_.input()) {
+    auto it = blocks.find(io.name());
+    if (it == blocks.end()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "input '" + io.name() + "' is specified in request header but" +
+              " not found in memory block mapping for model '" +
+              provider->model_name_ + "'");
+    }
+    if (io.batch_byte_size() != it->second->ByteSize()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected size " + std::to_string(it->second->ByteSize()) +
+              " for input '" + io.name() + "', expecting " +
+              std::to_string(io.batch_byte_size()) + " for model '" +
+              provider->model_name_ + "'");
+    }
+    provider->input_map_[io.name()] = std::make_pair(it->second, false);
+  }
+
+  return Status::Success;
+}
+
+Status
+SystemMemoryInferRequestProvider::GetNextInputContent(
+    const std::string& name, const void** content, size_t* content_byte_size,
+    bool force_contiguous)
+{
+  if (*content_byte_size == 0) {
+    *content = nullptr;
+    return Status::Success;
+  }
+
+  if (!GetInputOverrideContent(name, content, content_byte_size)) {
+    const auto& pr = input_map_.find(name);
+    if (pr == input_map_.end()) {
+      return Status(
+          RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
+    }
+
+    auto& input_content = pr->second;
+
+    if (input_content.second) {
+      *content = nullptr;
+      *content_byte_size = 0;
+    } else {
+      *content = input_content.first->GetBlock();
+      *content_byte_size = input_content.first->ByteSize();
+    }
+
+    input_content.second = true;
+  }
+
+  return Status::Success;
+}
+
+Status
+SystemMemoryInferResponseProvider::Create(
+    const InferenceBackend& is, const InferRequestHeader& request_header,
+    std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>& blocks,
+    std::shared_ptr<SystemMemoryInferResponseProvider>* infer_provider)
+{
+  auto provider = new SystemMemoryInferResponseProvider(request_header);
+  infer_provider->reset(provider);
+
+  for (const auto& output : provider->output_map_) {
+    if (blocks.find(output.first) == blocks.end()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "output '" + output.first + "' is specified but" +
+              " not found in memory block mapping");
+    }
+    provider->output_block_[output.first] = blocks[output.first];
+  }
+
+  return Status::Success;
+}
+
+const InferResponseHeader&
+SystemMemoryInferResponseProvider::ResponseHeader() const
+{
+  return response_header_;
+}
+
+InferResponseHeader*
+SystemMemoryInferResponseProvider::MutableResponseHeader()
+{
+  return &response_header_;
+}
+
+Status
+SystemMemoryInferResponseProvider::GetOutputBuffer(
+    const std::string& name, void** content, size_t content_byte_size,
+    const std::vector<int64_t>& content_shape)
+{
+  *content = nullptr;
+
+  Output* output;
+  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
+      name, content, content_byte_size, content_shape, &output));
+
+  // Always write output tensor to the given output block no matter
+  // if output has cls field defined
+  if (content_byte_size > 0) {
+    if (output_block_[name]->ByteSize() == 0) {
+      RETURN_IF_ERROR(output_block_[name]->ReserveBlock(content_byte_size));
+    } else {
+      if (content_byte_size != output_block_[name]->ByteSize()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size " +
+                std::to_string(output_block_[name]->ByteSize()) +
+                " for output '" + name + "', expecting " + std::to_string(content_byte_size));
+      }
+    }
+
+    *content = output_block_[name]->GetBlock();
+  }
+
+  return Status::Success;
+}
+
+SystemMemoryInferResponseProvider::SystemMemoryInferResponseProvider(
+    const InferRequestHeader& request_header)
+    : InferResponseProvider(request_header)
+{
 }
 
 }}  // namespace nvidia::inferenceserver

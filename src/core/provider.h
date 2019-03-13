@@ -36,6 +36,42 @@ namespace nvidia { namespace inferenceserver {
 class InferenceBackend;
 
 //
+// Memory block used for accessing / storing data for providers
+// Note:
+//   - It is only responsible for deallocating memory obtained by ReserveBlock()
+//   - The functions are not thread-safe
+//
+class SystemMemoryBlock {
+ public:
+  // Create an SystemMemoryBlock object with block size 0
+  SystemMemoryBlock();
+
+  // Create an SystemMemoryBlock that points to 'block' provided
+  // 'block' is the memory block that has been allocated. For instance,
+  // content returned by InferRequestProvider.GetNextInputContent().
+  // 'block_size' is the size of the block
+  SystemMemoryBlock(void* block, size_t block_size);
+
+  // Reserve a block of memory with size 'byte_size'
+  // 'byte_size' is the size of the memory to be reserved
+  // Return error if the SystemMemoryBlock has reserved memory
+  // with non-zero size
+  Status ReserveBlock(size_t byte_size);
+
+  // Return a pointer to the memory location. It is caller's responsibility
+  // to make sure the access to the memory is exclusive on write.
+  void* GetBlock() const;
+
+  // Return the byte size of the memory
+  size_t ByteSize() const { return byte_size_; }
+
+ private:
+  size_t byte_size_;
+  std::unique_ptr<char[]> buffer_;
+  void* referencing_block_;
+};
+
+//
 // Provide inference request inputs and meta-data
 //
 class InferRequestProvider {
@@ -201,6 +237,36 @@ class HTTPInferRequestProvider : public InferRequestProvider {
 };
 
 //
+// Inference input provider for an internal inference request
+//
+class SystemMemoryInferRequestProvider : public InferRequestProvider {
+ public:
+  // Create a SystemMemoryInferRequestProvider object. The 'blocks' object is
+  // a mapping from input name to memory block that stores data for the input.
+  static Status Create(
+      const InferenceBackend& is, const std::string& model_name,
+      const int64_t model_version, const InferRequestHeader& request_header,
+      const std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
+          blocks,
+      std::shared_ptr<SystemMemoryInferRequestProvider>* infer_provider);
+
+  Status GetNextInputContent(
+      const std::string& name, const void** content, size_t* content_byte_size,
+      bool force_contiguous) override;
+
+ private:
+  SystemMemoryInferRequestProvider(
+      const std::string& model_name, const int64_t version)
+      : InferRequestProvider(model_name, version)
+  {
+  }
+
+  std::unordered_map<
+      std::string, std::pair<std::shared_ptr<SystemMemoryBlock>, bool>>
+      input_map_;
+};
+
+//
 // Provide support for reporting inference response outputs and
 // response meta-data
 //
@@ -305,6 +371,37 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
+};
+
+//
+// Inference response provider for an internal request
+//
+class SystemMemoryInferResponseProvider : public InferResponseProvider {
+ public:
+  // Create a SystemMemoryInferResponseProvider object. The 'blocks' object is
+  // a mapping from output name to memory block that will store the data for
+  // the output. The size and the content of the memory block may change during
+  // the use of the provider, so the memory block assigned to the provider
+  // shouldn't be assigned for other use until we are done with the provider
+  // to avoid race condition.
+  static Status Create(
+      const InferenceBackend& is, const InferRequestHeader& request_header,
+      std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
+          blocks,
+      std::shared_ptr<SystemMemoryInferResponseProvider>* infer_provider);
+
+  const InferResponseHeader& ResponseHeader() const override;
+  InferResponseHeader* MutableResponseHeader() override;
+  Status GetOutputBuffer(
+      const std::string& name, void** content, size_t content_byte_size,
+      const std::vector<int64_t>& content_shape) override;
+
+ private:
+  SystemMemoryInferResponseProvider(const InferRequestHeader& request_header);
+
+  InferResponseHeader response_header_;
+  std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>
+      output_block_;
 };
 
 }}  // namespace nvidia::inferenceserver
