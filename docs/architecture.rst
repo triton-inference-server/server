@@ -33,13 +33,15 @@ architecture. The :ref:`model repository <section-model-repository>`
 is a file-system based store of the models that the inference server
 will make available for inferencing. Inference requests arrive at the
 server via either :ref:`HTTP or GRPC <section-inference-server-api>`
-and are then routed to the appropriate per-model scheduler queue. The
-scheduler performs fair scheduling and dynamic batching for each
-model’s requests. The schedule passes each request to the framework
-backend corresponding to the model type. The framework backend
-performs inferencing using the inputs provided in the request to
-produce the requested outputs. The outputs are then formatted and a
-response is sent.
+and are then routed to the appropriate per-model scheduler. The
+inference server implements multiple scheduling and batching
+algorithms that can be configured on a model-by-model basis. Each
+model's configured scheduler optionally performs batching of inference
+requests and then passes the requests to the framework backend
+corresponding to the model type. The framework backend performs
+inferencing using the inputs provided in the request to produce the
+requested outputs. The outputs are then formatted and a response is
+sent.
 
 .. image:: images/arch.png
 

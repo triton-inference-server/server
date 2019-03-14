@@ -376,29 +376,7 @@ and then::
   1 - 1 = 0
   2 + 1 = 3
   2 - 1 = 1
-  3 + 1 = 4
-  3 - 1 = 2
-  4 + 1 = 5
-  4 - 1 = 3
-  5 + 1 = 6
-  5 - 1 = 4
-  6 + 1 = 7
-  6 - 1 = 5
-  7 + 1 = 8
-  7 - 1 = 6
-  8 + 1 = 9
-  8 - 1 = 7
-  9 + 1 = 10
-  9 - 1 = 8
-  10 + 1 = 11
-  10 - 1 = 9
-  11 + 1 = 12
-  11 - 1 = 10
-  12 + 1 = 13
-  12 - 1 = 11
-  13 + 1 = 14
-  13 - 1 = 12
-  14 + 1 = 15
+  ...
   14 - 1 = 13
   15 + 1 = 16
   15 - 1 = 14
@@ -425,24 +403,29 @@ String tensors are demonstrated in the C++ example application at
 and a Python version at `src/clients/python/simple\_string\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_string_client.py>`_.
 
-Stream Inference
-^^^^^^^^^^^^^^^^
+.. _section-client-api-stateful-models:
 
-Some applications may prefer to send requests in one connection rather than
-establishing connections for individual requests. For instance, in the case
-where multiple instances of TensorRT Inference Server are created with the
-purpose of load balancing, requests sent in different connections may be routed
-to different server instances. This scenario will not fit the need if the
-requests are correlated, where they are expected to be processed by the same
-model instance, like inferencing with sequence models. By using stream
-inference, the requests will be sent to the same server instance once the
-connection is established, and then they will be processed by the same model
-instance if proper :cpp:var:`correlation_id
-<nvidia::inferenceserver::InferRequestHeader::correlation_id>` is set.
+Client API for Stateful Models
+------------------------------
 
-Stream inference and use of correlation ID are demonstrated in the C++ example
-application at
+When performing inference using a :ref:`stateful model
+<section-stateful-models>`, a client must identify which inference
+requests belong to the same sequence and also when a sequence starts
+and ends.
+
+Each sequence is identified with a correlation ID that is provided
+when the inference context is created (in either the Python of C++
+APIs). It is up to the clients to create a unique correlation ID. For
+each sequence the first inference request should be marked as the
+start of the sequence and the last inference requests should be marked
+as the end of the sequence. Start and end are marked using the flags
+provided with the RunOptions in the C++ API and the run() and
+async_run() methods in the Python API.
+
+The use of correlation ID and start and end flags are demonstrated in
+the C++ example application at
 `src/clients/c++/simple\_sequence\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_sequence_client.cc>`_
-and a Python version at `src/clients/python/simple\_sequence\_client.py
+and a Python version at
+`src/clients/python/simple\_sequence\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_sequence_client.py>`_.
