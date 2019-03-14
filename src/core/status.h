@@ -69,26 +69,23 @@ class Status {
 };
 
 // If status is non-OK, return the Status.
-#define RETURN_IF_ERROR(S)                          \
-  do {                                              \
-    if ((S).Code() != RequestStatusCode::SUCCESS) { \
-      return (S);                                   \
-    }                                               \
+#define RETURN_IF_ERROR(S)                               \
+  do {                                                   \
+    const Status& status__ = (S);                        \
+    if (status__.Code() != RequestStatusCode::SUCCESS) { \
+      return status__;                                   \
+    }                                                    \
   } while (false)
 
 
-// Macro to convert from a TensorFlow Status -> Status. Implemented as
-// a macro to avoid including TF status and error headers and
-// everything they depend on.
-#define FROM_TF_STATUS(TFS) \
-  Status(Status::FromTFError((TFS).code()), (TFS).error_message())
-
 // If TensorFlow status is non-OK, return the equivalent Status.
-#define RETURN_IF_TF_ERROR(TFS)   \
-  do {                            \
-    if ((TFS).code() != 0) {      \
-      return FROM_TF_STATUS(TFS); \
-    }                             \
+#define RETURN_IF_TF_ERROR(TFS)                                            \
+  do {                                                                     \
+    const tensorflow::Status& status__ = (TFS);                            \
+    if (status__.code() != 0) {                                            \
+      return Status(                                                       \
+          Status::FromTFError(status__.code()), status__.error_message()); \
+    }                                                                      \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver
