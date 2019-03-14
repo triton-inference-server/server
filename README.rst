@@ -60,6 +60,20 @@ inference server provides the following features:
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
+* `Concurrent model execution support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html#instance-groups>`_. Multiple
+  models (or multiple instances of the same model) can run
+  simultaneously on the same GPU.
+
+* Batching support. For models that support batching, the server can
+  accept requests for a batch of inputs and respond with the
+  corresponding batch of outputs. The inference server also supports
+  multiple `scheduling and batching
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html#scheduling-and-batching>`_
+  algorithms that combine individual inference requests together to
+  improve inference throughput. These scheduling and batching
+  decisions are transparent to the client requesting inference.
+
 * `Custom backend support
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#custom-backends>`_. The inference server
   allows individual models to be implemented with custom backends
@@ -68,29 +82,15 @@ inference server provides the following features:
   the GPU support, concurrent execution, dynamic batching and other
   features provided by the server.
 
+* Multi-GPU support. The server can distribute inferencing across all
+  system GPUs.
+
 * The inference server `monitors the model repository
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#modifying-the-model-repository>`_
   for any change and dynamically reloads the model(s) when necessary,
   without requiring a server restart. Models and model versions can be
   added and removed, and model configurations can be modified while
   the server is running.
-
-* Multi-GPU support. The server can distribute inferencing across all
-  system GPUs.
-
-* `Concurrent model execution support
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#instance-groups>`_. Multiple
-  models (or multiple instances of the same model) can run
-  simultaneously on the same GPU.
-
-* Batching support. For models that support batching, the server can
-  accept requests for a batch of inputs and respond with the
-  corresponding batch of outputs. The inference server also supports
-  `dynamic batching
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_configuration.html?highlight=batching#dynamic-batching>`_
-  where individual inference requests are dynamically combined
-  together to improve inference throughput. Dynamic batching is
-  transparent to the client requesting inference.
 
 * `Model repositories
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_

@@ -153,8 +153,8 @@ portions of the model configuration if necessary, such as
 <nvidia::inferenceserver::ModelConfig::version_policy>`,
 :cpp:var:`optimization
 <nvidia::inferenceserver::ModelConfig::optimization>`,
-:cpp:var:`dynamic_batching
-<nvidia::inferenceserver::ModelConfig::dynamic_batching>`,
+:cpp:var:`scheduling and batching
+<nvidia::inferenceserver::ModelConfig::scheduling_choice>`,
 :cpp:var:`instance_group
 <nvidia::inferenceserver::ModelConfig::instance_group>`,
 :cpp:var:`default_model_filename
@@ -334,23 +334,48 @@ on the CPU. The following places two execution instances on the CPU::
     }
   ]
 
-.. _section-dynamic-batching:
+.. _section-scheduling-and-batching:
 
-Dynamic Batching
-----------------
+Scheduling And Batching
+-----------------------
 
 The TensorRT Inference Server supports batch inferencing by allowing
 individual inference requests to specify a batch of inputs. The
-inferencing for a batch of inputs is processed at the same time which
+inferencing for a batch of inputs is performed at the same time which
 is especially important for GPUs since it can greatly increase
 inferencing throughput. In many use-cases the individual inference
 requests are not batched, therefore, they do not benefit from the
 throughput benefits of batching.
 
+The inference server contains multiple scheduling and batching
+algorithms that support many different model types and use-cases. More
+information about model types and schedulers can be found in
+:ref:`section-models-and-schedulers`.
+
+.. _section-default-scheduler:
+
+Default Scheduler
+^^^^^^^^^^^^^^^^^
+
+The default scheduler is used for a model if none of the
+:cpp:var:`scheduling_choice
+<nvidia::inferenceserver::ModelConfig::scheduling_choice>`
+configurations are specified. This scheduler distributes inference
+requests to all :ref:`instances <section-instance-groups>` configured for
+the model.
+
+.. _section-dynamic-batcher:
+
+Dynamic Batcher
+^^^^^^^^^^^^^^^
+
 Dynamic batching is a feature of the inference server that allows
 non-batched inference requests to be combined by the server, so that a
 batch is created dynamically, resulting in the same increased
-throughput seen for batched inference requests.
+throughput seen for batched inference requests. The dynamic batcher
+should be used for :ref:`stateless <section-models-and-schedulers>`
+models. The dynamically created batches are distributed to all
+:ref:`instances <section-instance-groups>` configured for the model.
 
 Dynamic batching is enabled and configured independently for each
 model using the :cpp:var:`ModelDynamicBatching
@@ -369,14 +394,34 @@ batch sizes of 4 and 8, and a maximum delay time of 100 microseconds::
   }
 
 The size of generated batches can be examined in aggregate using Count
-metrics, see :ref:`section-metrics`. TRTIS verbose logging can be used
-to examine the size of individual batches.
+metrics, see :ref:`section-metrics`. Inference server verbose logging
+can be used to examine the size of individual batches.
 
-The GRPC endpoint is recommended when using dynamic batching. With the
-HTTP endpoint, the --http-thread-count must be set larger than the
-preferred batch size. Otherwise the inference server will be unable to
-batch sufficient requests and will always hit the maximum delay timeout
-with partial batches. The GRPC endpoint does not have this limitation.
+.. _section-sequence-batcher:
+
+Sequence Batcher
+^^^^^^^^^^^^^^^^
+
+Like the dynamic batcher, the sequence batcher combines non-batched
+inference requests, so that a batch is created dynamically. Unlike the
+dynamic batcher, the sequence batcher should be used for
+:ref:`stateful <section-models-and-schedulers>` models where a
+sequence of inference requests must be routed to the same model
+instance. The dynamically created batches are distributed to all
+:ref:`instances <section-instance-groups>` configured for the model.
+
+Sequence batching is enabled and configured independently for each
+model using the :cpp:var:`ModelSequenceBatching
+<nvidia::inferenceserver::ModelSequenceBatching>` settings in the
+model configuration. These settings control the sequence timeout as
+well as configuring how the inference server will send control signals
+to the model indicating sequence start and ready. See
+:ref:`section-models-and-schedulers` for more information and
+examples.
+
+The size of generated batches can be examined in aggregate using Count
+metrics, see :ref:`section-metrics`. Inference server verbose logging
+can be used to examine the size of individual batches.
 
 .. _section-optimization-policy:
 

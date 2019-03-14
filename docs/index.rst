@@ -53,6 +53,7 @@ NVIDIA TensorRT Inference Server
    install
    run
    client
+   models_and_schedulers
    model_repository
    model_configuration
    http_grpc_api
