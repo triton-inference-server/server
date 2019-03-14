@@ -75,7 +75,7 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
   }
 
   if (!tensorflow::errors::IsOutOfRange(status)) {
-    return FROM_TF_STATUS(status);
+    RETURN_IF_TF_ERROR(status);
   }
 
   return Status::Success;
