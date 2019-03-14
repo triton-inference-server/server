@@ -521,7 +521,7 @@ InferenceServer::Init(int argc, char** argv)
 }
 
 bool
-InferenceServer::Close()
+InferenceServer::Stop()
 {
   ready_state_ = ServerReadyState::SERVER_EXITING;
 
@@ -572,11 +572,19 @@ InferenceServer::Close()
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
+  if (grpc_server_) {
+    grpc_server_->Stop();
+  }
+
+  if (http_server_ != nullptr) {
+    http_server_->Stop();
+  }
+
   return false;
 }
 
 void
-InferenceServer::Wait()
+InferenceServer::PollModelRepository()
 {
   Status status;
 
@@ -682,14 +690,6 @@ InferenceServer::Wait()
     next:
       std::this_thread::sleep_for(std::chrono::seconds(repository_poll_secs_));
     }
-  }
-
-  if (grpc_server_) {
-    grpc_server_->Stop();
-  }
-
-  if (http_server_ != nullptr) {
-    http_server_->Stop();
   }
 }
 

@@ -66,12 +66,14 @@ class InferenceServer {
   // Return true on success, false otherwise.
   bool Init(int argc, char** argv);
 
-  // Close the server.
-  // Return true if all models are unloaded, false if exit timeout occurs.
-  bool Close();
+  // Stop the server.  Return true if all models are unloaded, false
+  // if exit timeout occurs.
+  bool Stop();
 
-  // Wait for server. Does not return until server is shutdown.
-  void Wait();
+  // Poll the model repository for changes, if enabled. Returns
+  // immediately if polling is not enabled. Otherwise returns when
+  // server stops.
+  void PollModelRepository();
 
   // Run health check indicated by 'mode'
   void HandleHealth(
