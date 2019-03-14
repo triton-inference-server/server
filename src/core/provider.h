@@ -34,6 +34,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
+class SystemMemoryInferResponseProvider;
 
 //
 // Memory block used for accessing / storing data for providers
@@ -43,32 +44,26 @@ class InferenceBackend;
 //
 class SystemMemoryBlock {
  public:
-  // Create an SystemMemoryBlock object with block size 0
-  SystemMemoryBlock();
+  // Create an SystemMemoryBlock object with 'byte_size'
+  SystemMemoryBlock(size_t byte_size);
 
-  // Create an SystemMemoryBlock that points to 'block' provided
-  // 'block' is the memory block that has been allocated. For instance,
+  // Create an SystemMemoryBlock that points to 'buffer' provided.
+  // 'buffer' is the memory that has been allocated. For instance,
   // content returned by InferRequestProvider.GetNextInputContent().
-  // 'block_size' is the size of the block
-  SystemMemoryBlock(void* block, size_t block_size);
+  // 'byte_size' is the size of the buffer
+  SystemMemoryBlock(const void* buffer, size_t byte_size);
 
-  // Reserve a block of memory with size 'byte_size'
-  // 'byte_size' is the size of the memory to be reserved
-  // Return error if the SystemMemoryBlock has reserved memory
-  // with non-zero size
-  Status ReserveBlock(size_t byte_size);
-
-  // Return a pointer to the memory location. It is caller's responsibility
-  // to make sure the access to the memory is exclusive on write.
-  void* GetBlock() const;
+  // Return a pointer to the memory location.
+  const void* Buffer() const;
 
   // Return the byte size of the memory
   size_t ByteSize() const { return byte_size_; }
 
  private:
+  friend class SystemMemoryInferResponseProvider;
   size_t byte_size_;
   std::unique_ptr<char[]> buffer_;
-  void* referencing_block_;
+  const void* referencing_buffer_;
 };
 
 //
@@ -241,13 +236,13 @@ class HTTPInferRequestProvider : public InferRequestProvider {
 //
 class SystemMemoryInferRequestProvider : public InferRequestProvider {
  public:
-  // Create a SystemMemoryInferRequestProvider object. The 'blocks' object is
-  // a mapping from input name to memory block that stores data for the input.
+  // Create a SystemMemoryInferRequestProvider object. The 'input_blocks' object
+  // is mapping from input name to memory block that stores data for the input.
   static Status Create(
       const InferenceBackend& is, const std::string& model_name,
       const int64_t model_version, const InferRequestHeader& request_header,
       const std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
-          blocks,
+          input_blocks,
       std::shared_ptr<SystemMemoryInferRequestProvider>* infer_provider);
 
   Status GetNextInputContent(
@@ -263,7 +258,7 @@ class SystemMemoryInferRequestProvider : public InferRequestProvider {
 
   std::unordered_map<
       std::string, std::pair<std::shared_ptr<SystemMemoryBlock>, bool>>
-      input_map_;
+      input_blocks_;
 };
 
 //
@@ -378,16 +373,9 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 //
 class SystemMemoryInferResponseProvider : public InferResponseProvider {
  public:
-  // Create a SystemMemoryInferResponseProvider object. The 'blocks' object is
-  // a mapping from output name to memory block that will store the data for
-  // the output. The size and the content of the memory block may change during
-  // the use of the provider, so the memory block assigned to the provider
-  // shouldn't be assigned for other use until we are done with the provider
-  // to avoid race condition.
+  // Create a SystemMemoryInferResponseProvider object.
   static Status Create(
       const InferenceBackend& is, const InferRequestHeader& request_header,
-      std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
-          blocks,
       std::shared_ptr<SystemMemoryInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -396,12 +384,17 @@ class SystemMemoryInferResponseProvider : public InferResponseProvider {
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 
+  // Retrieve the memory block that stores output 'name'.
+  Status GetOutputBlock(
+      const std::string& name,
+      std::shared_ptr<SystemMemoryBlock>* output_block);
+
  private:
   SystemMemoryInferResponseProvider(const InferRequestHeader& request_header);
 
   InferResponseHeader response_header_;
   std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>
-      output_block_;
+      output_blocks_;
 };
 
 }}  // namespace nvidia::inferenceserver
