@@ -200,6 +200,18 @@ response meta-data, and the raw output tensors.
 Stream Inference
 ----------------
 
+Some applications may request that multiple requests be sent using one
+persistent connection rather than potentially establishing multiple
+connections. For instance, in the case where multiple instances of
+TensorRT Inference Server are created with the purpose of load
+balancing, requests sent in different connections may be routed to
+different server instances. This scenario will not fit the need if the
+requests are correlated, where they are expected to be processed by
+the same model instance, like inferencing with :ref:`stateful models
+<section-stateful-models>`. By using stream inference, the requests
+will be sent to the same server instance once the connection is
+established.
+
 For GRPC the :cpp:var:`GRPCService
 <nvidia::inferenceserver::GRPCService>` uses the
 :cpp:var:`InferRequest <nvidia::inferenceserver::InferRequest>` and
