@@ -42,8 +42,14 @@ namespace {
 // *not* explicitly destructed. Thus we assume that 'server_' can
 // always be dereferenced.
 nvidia::inferenceserver::InferenceServer* server_ = nullptr;
-// Thread used to close and exit the server.
+
+// Exit thread, status, mutex and cv used to signal the main thread
+// that it should close the server and exit. Exit status is -1 when
+// server is not exiting, and 0/1 when server should exit.
 std::unique_ptr<std::thread> exit_thread_;
+int exit_status_ = -1;
+std::mutex exit_mu_;
+std::condition_variable exit_cv_;
 
 void
 SignalHandler(int signum)
@@ -56,8 +62,11 @@ SignalHandler(int signum)
     return;
 
   exit_thread_.reset(new std::thread([] {
-    bool close_status = server_->Close();
-    exit(close_status ? 0 : 1);
+    bool stop_status = server_->Stop();
+
+    std::unique_lock<std::mutex> lock(exit_mu_);
+    exit_status_ = (stop_status) ? 0 : 1;
+    exit_cv_.notify_all();
   }));
 
   exit_thread_->detach();
@@ -78,8 +87,14 @@ main(int argc, char** argv)
   signal(SIGINT, SignalHandler);
   signal(SIGTERM, SignalHandler);
 
-  // Server runs until terminated by a signal...
-  server_->Wait();
+  // Watch for changes in the model repository.
+  server_->PollModelRepository();
 
-  return 0;
+  // Wait until a signal terminates the server...
+  while (exit_status_ < 0) {
+    std::unique_lock<std::mutex> lock(exit_mu_);
+    exit_cv_.wait_for(lock, std::chrono::seconds(1));
+  }
+
+  return exit_status_;
 }
