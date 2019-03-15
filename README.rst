@@ -37,9 +37,9 @@ NVIDIA TensorRT Inference Server
 
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
-    latest release of the TensorRT Inference Server is 0.11.0 beta and
-    is available on branch** `r19.02
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.02>`_.
+    latest release of the TensorRT Inference Server is 1.0.0 and
+    is available on branch** `r19.03
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.03>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -108,11 +108,11 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 0.11.0 beta and
-corresponds to the 19.02 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 1.0.0 and
+corresponds to the 19.03 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r19.02
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.02>`_.
+this release is `r19.03
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.03>`_.
 
 Backwards Compatibility
 -----------------------
