@@ -116,16 +116,22 @@ After untaring you can find the client example binaries in bin/,
 libraries in lib/, and Python client examples and wheel file in
 python/.
 
-To run the Python and C++ examples you must install some dependencies::
+To use the C++ libraries and examples you must install some
+dependencies::
 
   $ apt-get update
-  $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev
+  $ apt-get install curl libcurl3-dev
 
-To run the Python examples you will need to additionally install the
-wheel file and some other dependencies::
+The Python examples require that you additionally install the wheel
+file and some other dependencies::
 
   $ apt-get install python3 python3-pip
   $ pip3 install --user --upgrade tensorrtserver-*.whl numpy pillow
+
+The C++ image_client example uses OpenCV for image manipulation so for
+that example you must install the following::
+
+  $ apt-get install libopencv-dev libopencv-core-dev
 
 .. build-client-end-marker-do-not-remove
 
