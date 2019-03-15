@@ -117,31 +117,38 @@ to be built on additional platforms.
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
 
-If your host sytem is Ubuntu-16.04, an alternative to running the
-examples within the tensorrtserver_client container is to instead
-download the client libraries and examples from the `GitHub release
-page <https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
-corresponding to the release you are interested in::
+An alternative to running the examples within the
+tensorrtserver_client container is to instead download the pre-built
+client libraries and examples from the `GitHub release page
+<https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
+corresponding to the release you are interested in. The client
+libraries and examples are found in the "Assets" section of the
+release page in a tar file named after the version of the release, for
+example, v1.0.0.clients.tar.gz.
 
-  $ mkdir tensorrtserver_client
-  $ cd tensorrtserver_client
-  $ wget https://github.com/NVIDIA/tensorrt-inference-server/archive/v1.0.0.clients.tar.gz
-  $ tar xzf v1.0.0.clients.tar.gz
+The pre-built libraries and examples can be used on a Ubuntu-16.04
+host or you can install them into the TensorRT Inference Server
+container to have both the clients and server in the same container::
 
-After untar you can find the client example binaries in bin/,
+  $ mkdir clients
+  $ cd clients
+  $ wget https://github.com/NVIDIA/tensorrt-inference-server/releases/download/<tarfile_path>
+  $ tar xzf <tarfile_name>
+
+After untaring you can find the client example binaries in bin/,
 libraries in lib/, and Python client examples and wheel file in
 python/.
 
-To run the C++ examples you must install some dependencies on your
-Ubuntu-16.04 host system::
+To run the Python and C++ examples you must install some dependencies::
 
+  $ apt-get update
   $ apt-get install curl libcurl3-dev libopencv-dev libopencv-core-dev
 
 To run the Python examples you will need to additionally install the
 wheel file and some other dependencies::
 
   $ apt-get install python3 python3-pip
-  $ pip3 install --user --upgrade tensorrtserver-*.whl numpy pillow
+  $ pip3 install --user --upgrade python/tensorrtserver-*.whl numpy pillow
 
 .. build-client-end-marker-do-not-remove
 
@@ -175,7 +182,7 @@ from the :ref:`example model repository
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
 directory::
 
-  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ image_client -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -183,7 +190,7 @@ directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python3 /workspace/src/clients/python/image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ python3 image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
@@ -195,7 +202,7 @@ server, but you can use GRPC protocol by providing the \-i flag. You
 must also use the \-u flag to point at the GRPC endpoint on the
 inference server::
 
-  $ /opt/tensorrtserver/bin/image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ image_client -i grpc -u localhost:8001 -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -203,7 +210,7 @@ inference server::
 By default the client prints the most probable classification for the
 image. Use the \-c flag to see more classifications::
 
-  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 qa/images/mug.jpg
+  $ image_client -m resnet50_netdef -s INCEPTION -c 3 qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
@@ -216,7 +223,7 @@ images that you specified. If the batch is bigger than the number of
 images then image\_client will just repeat the images to fill the
 batch::
 
-  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
+  $ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images/mug.jpg
   Request 0, batch size 2
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
@@ -230,7 +237,7 @@ batch::
 Provide a directory instead of a single image to perform inferencing
 on all images in the directory::
 
-  $ /opt/tensorrtserver/bin/image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
+  $ image_client -m resnet50_netdef -s INCEPTION -c 3 -b 2 qa/images
   Request 0, batch size 2
   Image '../qa/images/car.jpg':
       817 (SPORTS CAR) = 0.836187
@@ -301,7 +308,7 @@ that level of concurrency. Use the \-t flag to control concurrency and
 \-v to see verbose output. The following example uses four outstanding
 inference requests to the inference server::
 
-  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -t4 -v
+  $ perf_client -m resnet50_netdef -p3000 -t4 -v
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 3000 msec
@@ -330,7 +337,7 @@ measures latency and inferences/second starting with request
 concurrency one and increasing until request concurrency equals three
 or average request latency exceeds 50 milliseconds::
 
-  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
+  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3
   *** Measurement Settings ***
     Batch size: 1
     Measurement window: 3000 msec
@@ -375,7 +382,7 @@ or average request latency exceeds 50 milliseconds::
 Use the \-f option to generate a file containing CSV output of the
 results::
 
-  $ /opt/tensorrtserver/bin/perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
+  $ perf_client -m resnet50_netdef -p3000 -d -l50 -c 3 -f perf.csv
 
 You can then import the CSV file into a spreadsheet to help visualize
 the latency vs inferences/second tradeoff as well as see some
@@ -416,7 +423,7 @@ To run the the C++ version of the simple example, first build or
 download it as described in
 :ref:`section-getting-the-client-libraries-and-examples` and then::
 
-  $ /opt/tensorrtserver/bin/simple_client
+  $ simple_client
   0 + 1 = 1
   0 - 1 = -1
   1 + 1 = 2
@@ -433,7 +440,7 @@ download it as described in
 :ref:`section-getting-the-client-libraries-and-examples` and install
 the tensorrtserver whl, then::
 
-  $ python3 /workspace/src/clients/python/simple_client.py
+  $ python3 simple_client.py
 
 String Datatype
 ^^^^^^^^^^^^^^^
