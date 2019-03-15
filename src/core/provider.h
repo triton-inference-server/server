@@ -95,26 +95,11 @@ class AllocatedSystemMemory : public SystemMemory {
 //
 class InferRequestProvider {
  public:
-  // Initialize based on GRPC request. The 'request' object is
-  // captured by reference to avoid copying all the raw input tensor
-  // data... but this means that it's lifetime must persist longer
-  // than this provider.
+  // Initialize based on map from input name to data. The 'input_buffer' object
+  // is mapping from input name to data buffer for that input.
   static Status Create(
-      const InferenceBackend& is, const InferRequest& request,
-      std::shared_ptr<InferRequestProvider>* provider);
-
-  // Initialize based on HTTP request
-  static Status Create(
-      const InferenceBackend& is, const std::string& model_name,
-      const int64_t model_version, const std::string& request_header_str,
-      evbuffer* input_buffer, std::shared_ptr<InferRequestProvider>* provider);
-
-  // Initialize based on map fron input name to data directly. The
-  // 'input_buffer' object is mapping from input name to data buffer
-  // for that input.
-  static Status Create(
-      const InferenceBackend& is, const std::string& model_name,
-      const int64_t model_version, const InferRequestHeader& request_header,
+      const std::string& model_name, const int64_t model_version,
+      const InferRequestHeader& request_header,
       const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
           input_buffer,
       std::shared_ptr<InferRequestProvider>* provider);
@@ -169,10 +154,6 @@ class InferRequestProvider {
       : model_name_(model_name), version_(version)
   {
   }
-
-  // Validate request header and modify as necessary so that every
-  // input has a shape and a batch-byte-size.
-  Status NormalizeRequestHeader(const InferenceBackend& is);
 
   // Get the override content for 'name'd input. Return a pointer to
   // the override content in 'content'.  Return the override content
