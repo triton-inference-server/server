@@ -35,7 +35,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+class MetricModelReporter;
 class ServerStatusManager;
 
 // Updates a server stat with duration measured by a C++ scope.
@@ -105,9 +105,9 @@ class ModelInferStats {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& model_name)
       : status_manager_(status_manager), model_name_(model_name),
-        failed_(false), requested_model_version_(-1), model_backend_(nullptr),
-        batch_size_(0), gpu_device_(-1), execution_count_(0),
-        request_duration_ns_(0)
+        requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
+        failed_(false), execution_count_(0), request_duration_ns_(0),
+        queue_duration_ns_(0), compute_duration_ns_(0)
   {
   }
 
@@ -116,28 +116,37 @@ class ModelInferStats {
 
   // Mark inferencing request as failed / not-failed.
   void SetFailed(bool failed) { failed_ = failed; }
+
   // Set the model version explicitly requested for the inference, or
   // -1 if latest version was requested.
   void SetRequestedVersion(int64_t v) { requested_model_version_ = v; }
-  // Set model backend for the inference stats.
-  void SetModelBackend(const InferenceBackend* s) { model_backend_ = s; }
+
+  // Set the metric reporter for the model.
+  void SetMetricReporter(const std::shared_ptr<MetricModelReporter> m)
+  {
+    metric_reporter_ = m;
+  }
+
   // Set batch size for the inference stats.
   void SetBatchSize(size_t bs) { batch_size_ = bs; }
+
   // Set CUDA GPU device index where inference was performed.
   void SetGPUDevice(int idx) { gpu_device_ = idx; }
+
   // Set the number of model executions that were performed for this
   // inference request. Can be zero if this request was dynamically
   // batched with another request (in dynamic batch case only one of
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
+
   // Get a ScopedTimer that measures entire inference request-response
   // duration. The lifetime of 'timer' must not exceed the
   // lifetime of 'this' object.
   struct timespec StartRequestTimer(ScopedTimer* timer) const;
 
   // Get a ScopedTimer that measures wait time spent in backend Run(),
-  // including queuing, scheduling. The lifetime of
-  // 'timer' must not exceed the lifetime of 'this' object.
+  // including queuing, scheduling. The lifetime of 'timer' must not
+  // exceed the lifetime of 'this' object.
   struct timespec StartQueueTimer(ScopedTimer* timer) const;
 
   // Get a ScopedTimer that measures model compute duration including
@@ -147,14 +156,14 @@ class ModelInferStats {
 
  private:
   std::shared_ptr<ServerStatusManager> status_manager_;
+  std::shared_ptr<MetricModelReporter> metric_reporter_;
   const std::string model_name_;
-  bool failed_;
   int64_t requested_model_version_;
-  const InferenceBackend* model_backend_;
   size_t batch_size_;
   int gpu_device_;
-  uint32_t execution_count_;
+  bool failed_;
 
+  uint32_t execution_count_;
   mutable uint64_t request_duration_ns_;
   mutable uint64_t queue_duration_ns_;
   mutable uint64_t compute_duration_ns_;
