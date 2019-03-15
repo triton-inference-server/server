@@ -30,124 +30,11 @@
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
+#include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
 
 namespace nvidia { namespace inferenceserver {
-
-void
-InferenceBackend::GetMetricLabels(
-    std::map<std::string, std::string>* labels, const int gpu_device) const
-{
-  labels->insert(std::map<std::string, std::string>::value_type(
-      std::string(kMetricsLabelModelName), Name()));
-  labels->insert(std::map<std::string, std::string>::value_type(
-      std::string(kMetricsLabelModelVersion), std::to_string(Version())));
-  for (const auto& tag : Tags()) {
-    labels->insert(std::map<std::string, std::string>::value_type(
-        "_" + tag.first, tag.second));
-  }
-
-  // 'gpu_device' can be -1 to indicate that the GPU is not known. In
-  // that case use a metric that doesn't have the gpu_uuid label.
-  if (gpu_device >= 0) {
-    std::string uuid;
-    if (Metrics::UUIDForCudaDevice(gpu_device, &uuid)) {
-      labels->insert(std::map<std::string, std::string>::value_type(
-          std::string(kMetricsLabelGpuUuid), uuid));
-    }
-  }
-}
-
-prometheus::Counter&
-InferenceBackend::GetCounterMetric(
-    std::map<int, prometheus::Counter*>& metrics,
-    prometheus::Family<prometheus::Counter>& family, const int gpu_device) const
-{
-  const auto itr = metrics.find(gpu_device);
-  if (itr != metrics.end()) {
-    return *(itr->second);
-  }
-
-  std::map<std::string, std::string> labels;
-  GetMetricLabels(&labels, gpu_device);
-
-  prometheus::Counter& counter = family.Add(labels);
-  metrics.insert(
-      std::map<int, prometheus::Counter*>::value_type(gpu_device, &counter));
-  return counter;
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceSuccess(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_success_, Metrics::FamilyInferenceSuccess(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceFailure(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_failure_, Metrics::FamilyInferenceFailure(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceCount(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_count_, Metrics::FamilyInferenceCount(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceExecutionCount(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_exec_count_, Metrics::FamilyInferenceExecutionCount(),
-      gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceRequestDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_request_duration_us_,
-      Metrics::FamilyInferenceRequestDuration(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceComputeDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_compute_duration_us_,
-      Metrics::FamilyInferenceComputeDuration(), gpu_device);
-}
-
-prometheus::Counter&
-InferenceBackend::MetricInferenceQueueDuration(int gpu_device) const
-{
-  return GetCounterMetric(
-      metric_inf_queue_duration_us_, Metrics::FamilyInferenceQueueDuration(),
-      gpu_device);
-}
-
-prometheus::Histogram&
-InferenceBackend::MetricInferenceLoadRatio(int gpu_device) const
-{
-  const auto itr = metric_inf_load_ratio_.find(gpu_device);
-  if (itr != metric_inf_load_ratio_.end()) {
-    return *(itr->second);
-  }
-
-  std::map<std::string, std::string> labels;
-  GetMetricLabels(&labels, gpu_device);
-
-  prometheus::Histogram& hist = Metrics::FamilyInferenceLoadRatio().Add(
-      labels, std::vector<double>{1.05, 1.10, 1.25, 1.5, 2.0, 10.0, 50.0});
-  metric_inf_load_ratio_.insert(
-      std::map<int, prometheus::Histogram*>::value_type(gpu_device, &hist));
-  return hist;
-}
 
 Status
 InferenceBackend::GetInput(
@@ -192,10 +79,10 @@ InferenceBackend::SetModelConfig(
 {
   config_ = config;
   RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
-  for (const auto& tag : config_.metric_tags()) {
-    tags_.insert(
-        std::map<std::string, std::string>::value_type(tag.first, tag.second));
-  }
+
+  // Create the metric reporter for this backend.
+  metric_reporter_ = std::make_shared<MetricModelReporter>(
+      Name(), version_, config_.metric_tags());
 
   // Initialize the input map
   for (const auto& io : config.input()) {

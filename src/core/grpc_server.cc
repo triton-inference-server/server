@@ -32,6 +32,7 @@
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "grpc/grpc.h"
+#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/logging.h"
@@ -68,9 +69,9 @@ class AsyncResources : public nvrpc::Resources {
  private:
   InferenceServer* m_Server;
 
-  // We can and should get specific on thread affinity.  It might not be as
-  // important on the frontend, but the backend threadpool should be aligned
-  // with the respective devices.
+  // We can and should get specific on thread affinity.  It might not
+  // be as important on the frontend, but the backend threadpool
+  // should be aligned with the respective devices.
   ThreadPool m_MgmtThreadPool;
   ThreadPool m_InferThreadPool;
 };
@@ -110,7 +111,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
     RETURN_IF_ERROR(server->CreateBackendHandle(
         request.model_name(), request.model_version(), backend));
-    infer_stats->SetModelBackend((*backend)());
+    infer_stats->SetMetricReporter((*backend)()->MetricReporter());
 
     std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
     InferRequestHeader request_header = request.meta_data();

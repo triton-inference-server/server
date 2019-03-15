@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/core/label_provider.h"
-#include "src/core/metrics.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -35,6 +34,7 @@ namespace nvidia { namespace inferenceserver {
 
 class InferRequestProvider;
 class InferResponseProvider;
+class MetricModelReporter;
 
 //
 // Interface for backends that handle inference requests.
@@ -44,7 +44,7 @@ class InferenceBackend {
   InferenceBackend() = default;
   virtual ~InferenceBackend() {}
 
-  // Set reference to the inference server that is serving the servable.
+  // Set reference to the inference server.
   virtual Status SetInferenceServer(void* inference_server);
 
   // Get the name of model being served.
@@ -56,6 +56,12 @@ class InferenceBackend {
   // Get the configuration of model being served.
   const ModelConfig& Config() const { return config_; }
 
+  // Get the metric reportoer for the model being served.
+  const std::shared_ptr<MetricModelReporter>& MetricReporter() const
+  {
+    return metric_reporter_;
+  }
+
   // Get the model configuration for a named input.
   Status GetInput(const std::string& name, const ModelInput** input) const;
 
@@ -64,9 +70,6 @@ class InferenceBackend {
 
   // Get a label provider for the model.
   const LabelProvider& GetLabelProvider() const { return label_provider_; }
-
-  // Get the tags of model being served.
-  const std::map<std::string, std::string>& Tags() const { return tags_; }
 
   // Run inference using the provided request to produce outputs in the provide
   // response. The inference will run asynchronously and "OnCompleteHandleInfer"
@@ -77,45 +80,37 @@ class InferenceBackend {
       std::shared_ptr<InferResponseProvider> response_provider,
       std::function<void(Status)> OnCompleteHandleInfer);
 
-  // Get a metric for the servable specialized for the given GPU index
-  // (if -1 then return non-specialized version of the metric).
-  prometheus::Counter& MetricInferenceSuccess(int gpu_device) const;
-  prometheus::Counter& MetricInferenceFailure(int gpu_device) const;
-  prometheus::Counter& MetricInferenceCount(int gpu_device) const;
-  prometheus::Counter& MetricInferenceExecutionCount(int gpu_device) const;
-  prometheus::Counter& MetricInferenceRequestDuration(int gpu_device) const;
-  prometheus::Counter& MetricInferenceComputeDuration(int gpu_device) const;
-  prometheus::Counter& MetricInferenceQueueDuration(int gpu_device) const;
-  prometheus::Histogram& MetricInferenceLoadRatio(int gpu_device) const;
-
  protected:
   // Set the configuration of the model being served.
   Status SetModelConfig(const std::string& path, const ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
-  // model. The scheduler can only be set once for a servable.
+  // model. The scheduler can only be set once for a backend.
   Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
 
   // Set the scheduler based on the model configuration. The scheduler
-  // can only be set once for a servable.
+  // can only be set once for a backend.
   Status SetConfiguredScheduler(
       const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
       Scheduler::StandardRunFunc OnRun);
 
  private:
-  // Pointer to the inference server that is serving the servable.
+  // Pointer to the inference server.
   void* inference_server_;
 
-  // Configuration of the model that this servable represents.
+  // Configuration of the model that this backend represents.
   ModelConfig config_;
 
-  // Version of the model that this servable represents.
+  // Version of the model that this backend represents.
   int64_t version_;
+
+  // The metric reporter for the model that this backend represents.
+  std::shared_ptr<MetricModelReporter> metric_reporter_;
 
   // Label provider for this model.
   LabelProvider label_provider_;
 
-  // The scheduler to use for this servable.
+  // The scheduler to use for this backend.
   std::unique_ptr<Scheduler> scheduler_;
 
   // Map from input name to the model configuration for that input.
@@ -123,25 +118,6 @@ class InferenceBackend {
 
   // Map from output name to the model configuration for that output.
   std::unordered_map<std::string, ModelOutput> output_map_;
-
-  // Tags of the model that this servable represents.
-  std::map<std::string, std::string> tags_;
-
-  void GetMetricLabels(
-      std::map<std::string, std::string>* labels, const int gpu_device) const;
-  prometheus::Counter& GetCounterMetric(
-      std::map<int, prometheus::Counter*>& metrics,
-      prometheus::Family<prometheus::Counter>& family,
-      const int gpu_device) const;
-
-  mutable std::map<int, prometheus::Counter*> metric_inf_success_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_failure_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_count_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_exec_count_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_request_duration_us_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_compute_duration_us_;
-  mutable std::map<int, prometheus::Counter*> metric_inf_queue_duration_us_;
-  mutable std::map<int, prometheus::Histogram*> metric_inf_load_ratio_;
 };
 
 }}  // namespace nvidia::inferenceserver

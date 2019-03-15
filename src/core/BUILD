@@ -146,7 +146,7 @@ cc_library(
         ":dynamic_batch_scheduler",
         ":label_provider",
         ":logging",
-        ":metrics",
+        ":metric_model_reporter",
         ":model_config_proto",
         ":model_config_utils",
         ":scheduler",
@@ -225,6 +225,19 @@ cc_library(
         "@prometheus//core:core",
         "@prometheus//pull:pull",
         "@local_config_cuda//cuda:cuda_headers",
+    ],
+)
+
+cc_library(
+    name = "metric_model_reporter",
+    srcs = ["metric_model_reporter.cc"],
+    hdrs = ["metric_model_reporter.h"],
+    deps = [
+        ":constants",
+        ":metrics",
+        ":model_config",
+        ":status",
+        "@prometheus//core:core",
     ],
 )
 
@@ -369,6 +382,7 @@ cc_library(
     srcs = ["http_server.cc"],
     hdrs = ["http_server.h"],
     deps = [
+        ":backend",
         ":constants",
         ":logging",
         ":provider",
@@ -389,6 +403,7 @@ cc_library(
     srcs = ["grpc_server.cc"],
     hdrs = ["grpc_server.h"],
     deps = [
+        ":backend",
         ":constants",
         ":grpc_service_proto",
         ":logging",
@@ -419,11 +434,10 @@ cc_library(
     name = "server_status",
     srcs = ["server_status.cc"],
     deps = [
-        ":backend",
         ":constants",
         ":provider_header",
         ":logging",
-        ":metrics",
+        ":metric_model_reporter",
         ":server_status_header",
         "@tf_serving//tensorflow_serving/core:servable_state",
     ],

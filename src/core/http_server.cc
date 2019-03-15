@@ -32,6 +32,7 @@
 #include "evhtp/evhtp.h"
 #include "libevent/include/event2/buffer.h"
 #include "re2/re2.h"
+#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/provider_utils.h"
@@ -418,7 +419,7 @@ HTTPServerImpl::InferHelper(
   auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
   RETURN_IF_ERROR(
       server_->CreateBackendHandle(model_name, model_version, backend));
-  infer_stats->SetModelBackend((*backend)());
+  infer_stats->SetMetricReporter((*backend)()->MetricReporter());
 
   std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
   RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
