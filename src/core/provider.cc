@@ -35,26 +35,227 @@
 
 namespace nvidia { namespace inferenceserver {
 
-SystemMemoryBlock::SystemMemoryBlock(size_t byte_size)
-    : byte_size_(byte_size), referencing_buffer_(nullptr)
+SystemMemoryReference::SystemMemoryReference() : SystemMemory() {}
+
+const char*
+SystemMemoryReference::BufferAt(size_t idx, size_t* byte_size) const
 {
+  if (idx >= buffer_.size()) {
+    *byte_size = 0;
+    return nullptr;
+  }
+  *byte_size = buffer_[idx].second;
+  return buffer_[idx].first;
+}
+
+size_t
+SystemMemoryReference::AddBuffer(const char* buffer, size_t byte_size)
+{
+  buffer_.emplace_back(std::make_pair(buffer, byte_size));
+  return buffer_.size() - 1;
+}
+
+AllocatedSystemMemory::AllocatedSystemMemory(size_t byte_size) : SystemMemory()
+{
+  total_byte_size_ = byte_size;
   char* buffer = new char[byte_size];
   buffer_.reset(buffer);
 }
 
-SystemMemoryBlock::SystemMemoryBlock(const void* buffer, size_t byte_size)
-    : byte_size_(byte_size), referencing_buffer_(buffer)
+const char*
+AllocatedSystemMemory::BufferAt(size_t idx, size_t* byte_size) const
 {
+  if (idx != 0) {
+    *byte_size = 0;
+    return nullptr;
+  }
+  *byte_size = total_byte_size_;
+  return buffer_.get();
 }
 
-const void*
-SystemMemoryBlock::Buffer() const
+char*
+AllocatedSystemMemory::MutableBuffer()
 {
-  if (referencing_buffer_ != nullptr) {
-    return referencing_buffer_;
-  } else {
-    return buffer_.get();
+  return buffer_.get();
+}
+
+//
+// Create function for request received from GRPC
+//
+Status
+InferRequestProvider::Create(
+    const InferenceBackend& is, const InferRequest& request,
+    std::shared_ptr<InferRequestProvider>* provider)
+{
+  const int64_t version =
+      (request.model_version() >= 0) ? request.model_version() : -1;
+  provider->reset(new InferRequestProvider(request.model_name(), version));
+
+  (*provider)->request_header_ = request.meta_data();
+  RETURN_IF_ERROR((*provider)->NormalizeRequestHeader(is));
+
+  const InferRequestHeader& request_header = (*provider)->request_header_;
+
+  // Make sure that the request is providing the same number of raw
+  // input tensor data.
+  if (request_header.input_size() != request.raw_input_size()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "expected tensor data for " +
+            std::to_string(request_header.input_size()) + " inputs but got " +
+            std::to_string(request.raw_input_size()) +
+            " sets of data for model '" + (*provider)->model_name_ + "'");
   }
+
+  // Verify that the batch-byte-size of each input matches the size of
+  // the provided raw tensor data.
+  size_t idx = 0;
+  for (const auto& io : request_header.input()) {
+    auto memory_ref = std::make_shared<SystemMemoryReference>();
+    (*provider)->input_buffer_.emplace(std::make_pair(
+        io.name(),
+        std::make_pair(std::static_pointer_cast<SystemMemory>(memory_ref), 0)));
+
+    if (io.batch_byte_size() != request.raw_input(idx).size()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected size " + std::to_string(request.raw_input(idx).size()) +
+              " for input '" + io.name() + "', expecting " +
+              std::to_string(io.batch_byte_size()) + " for model '" +
+              (*provider)->model_name_ + "'");
+    }
+
+    const std::string& raw = request.raw_input(idx++);
+    memory_ref->AddBuffer(raw.c_str(), raw.size());
+  }
+
+  return Status::Success;
+}
+
+//
+// Create function for request received from HTTP
+//
+Status
+InferRequestProvider::Create(
+    const InferenceBackend& is, const std::string& model_name,
+    const int64_t model_version, const std::string& request_header_str,
+    evbuffer* input_buffer, std::shared_ptr<InferRequestProvider>* provider)
+{
+  provider->reset(new InferRequestProvider(model_name, model_version));
+
+  if (!google::protobuf::TextFormat::ParseFromString(
+          request_header_str, &((*provider)->request_header_))) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to parse request for model '" + model_name + "'");
+  }
+
+  RETURN_IF_ERROR((*provider)->NormalizeRequestHeader(is));
+
+  const InferRequestHeader& request_header = (*provider)->request_header_;
+  // Now need to create 'ref'. Each input has one entry in
+  // SystemMemory which gives a list of all the blocks of data for that
+  // input. These blocks are not necessarily contiguous so we keep
+  // track of each separately to avoid needing to copy everything into
+  // one buffer.
+  //
+  // Get the addr and size of each chunk of input data from the
+  // evbuffer.
+  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    struct evbuffer_iovec* v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected error getting input buffers ");
+    }
+
+    int v_idx = 0;
+
+    // Get the byte-size for each input and from that get the blocks
+    // holding the data for that input
+    for (const auto& io : request_header.input()) {
+      auto memory_ref = std::make_shared<SystemMemoryReference>();
+      (*provider)->input_buffer_.emplace(std::make_pair(
+          io.name(),
+          std::make_pair(
+              std::static_pointer_cast<SystemMemory>(memory_ref), 0)));
+
+      uint64_t byte_size = io.batch_byte_size();
+      while ((byte_size > 0) && (v_idx < n)) {
+        char* base = static_cast<char*>(v[v_idx].iov_base);
+        size_t base_size;
+        if (v[v_idx].iov_len > byte_size) {
+          base_size = byte_size;
+          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+          v[v_idx].iov_len -= byte_size;
+          byte_size = 0;
+        } else {
+          base_size = v[v_idx].iov_len;
+          byte_size -= v[v_idx].iov_len;
+          v_idx++;
+        }
+        memory_ref->AddBuffer(base, base_size);
+      }
+
+      if (byte_size != 0) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size for input '" + io.name() +
+                "', missing expecting " + std::to_string(byte_size) +
+                " bytes for model '" + model_name + "'");
+      }
+    }
+
+    if (v_idx != n) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected additional input data for model '" + model_name + "'");
+    }
+  }
+
+  return Status::Success;
+}
+
+//
+// Create function for request received from within the process
+//
+Status
+InferRequestProvider::Create(
+    const InferenceBackend& is, const std::string& model_name,
+    const int64_t model_version, const InferRequestHeader& request_header,
+    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
+        input_buffer,
+    std::shared_ptr<InferRequestProvider>* provider)
+{
+  provider->reset(new InferRequestProvider(model_name, model_version));
+
+  (*provider)->request_header_ = request_header;
+
+  RETURN_IF_ERROR((*provider)->NormalizeRequestHeader(is));
+
+  for (const auto& io : (*provider)->request_header_.input()) {
+    auto it = input_buffer.find(io.name());
+    if (it == input_buffer.end()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "input '" + io.name() + "' is specified in request header but" +
+              " not found in memory block mapping for model '" +
+              (*provider)->model_name_ + "'");
+    }
+    if (io.batch_byte_size() != it->second->TotalByteSize()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected size " + std::to_string(it->second->TotalByteSize()) +
+              " for input '" + io.name() + "', expecting " +
+              std::to_string(io.batch_byte_size()) + " for model '" +
+              (*provider)->model_name_ + "'");
+    }
+    (*provider)->input_buffer_[io.name()] = std::make_pair(it->second, 0);
+  }
+
+  return Status::Success;
 }
 
 Status
@@ -234,63 +435,8 @@ NULLInferRequestProvider::GetNextInputContent(
   return Status::Success;
 }
 
-//
-// GRPCInferRequestProvider
-//
-GRPCInferRequestProvider::GRPCInferRequestProvider(
-    const InferRequest& request, const int64_t version)
-    : InferRequestProvider(request.model_name(), version), request_(request)
-{
-  content_delivered_.resize(request_.raw_input_size(), false);
-}
-
 Status
-GRPCInferRequestProvider::Create(
-    const InferenceBackend& is, const InferRequest& request,
-    std::shared_ptr<GRPCInferRequestProvider>* infer_provider)
-{
-  const int64_t version =
-      (request.model_version() >= 0) ? request.model_version() : -1;
-  auto provider = new GRPCInferRequestProvider(request, version);
-  infer_provider->reset(provider);
-
-  provider->request_header_ = request.meta_data();
-  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
-
-  const InferRequestHeader& request_header = provider->request_header_;
-
-  // Make sure that the request is providing the same number of raw
-  // input tensor data.
-  if (request_header.input_size() != request.raw_input_size()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "expected tensor data for " +
-            std::to_string(request_header.input_size()) + " inputs but got " +
-            std::to_string(request.raw_input_size()) +
-            " sets of data for model '" + provider->model_name_ + "'");
-  }
-
-  // Verify that the batch-byte-size of each input matches the size of
-  // the provided raw tensor data.
-  size_t idx = 0;
-  for (const auto& io : request_header.input()) {
-    if (io.batch_byte_size() != request.raw_input(idx).size()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected size " + std::to_string(request.raw_input(idx).size()) +
-              " for input '" + io.name() + "', expecting " +
-              std::to_string(io.batch_byte_size()) + " for model '" +
-              provider->model_name_ + "'");
-    }
-
-    provider->input_map_[io.name()] = idx++;
-  }
-
-  return Status::Success;
-}
-
-Status
-GRPCInferRequestProvider::GetNextInputContent(
+InferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
     bool force_contiguous)
 {
@@ -300,169 +446,39 @@ GRPCInferRequestProvider::GetNextInputContent(
   }
 
   if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    const auto& pr = input_map_.find(name);
-    if (pr == input_map_.end()) {
+    const auto& pr = input_buffer_.find(name);
+    if (pr == input_buffer_.end()) {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
 
-    const size_t idx = pr->second;
+    auto& input_content = pr->second;
 
-    if (content_delivered_[idx]) {
-      *content = nullptr;
-      *content_byte_size = 0;
+    bool isLastChunk =
+        (input_content.first->BufferAt(
+             input_content.second + 1, content_byte_size) == nullptr);
+    if (!force_contiguous || isLastChunk) {
+      *content = input_content.first->BufferAt(
+          input_content.second, content_byte_size);
+      if (*content_byte_size != 0) {
+        input_content.second++;
+      }
     } else {
-      const std::string& raw = request_.raw_input(idx);
-      *content = raw.c_str();
-      *content_byte_size = raw.size();
-    }
-
-    content_delivered_[idx] = true;
-  }
-
-  return Status::Success;
-}
-
-//
-// HTTPInferRequestProvider
-//
-Status
-HTTPInferRequestProvider::Create(
-    evbuffer* input_buffer, const InferenceBackend& is,
-    const std::string& model_name, const int64_t model_version,
-    const std::string& request_header_str,
-    std::shared_ptr<HTTPInferRequestProvider>* infer_provider)
-{
-  auto provider = new HTTPInferRequestProvider(model_name, model_version);
-  infer_provider->reset(provider);
-
-  if (!google::protobuf::TextFormat::ParseFromString(
-          request_header_str, &(provider->request_header_))) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unable to parse request for model '" + model_name + "'");
-  }
-
-  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
-
-  const InferRequestHeader& request_header = provider->request_header_;
-
-  // Now need to create 'contents_'. Each input has one entry in
-  // 'contents_' which gives a list of all the blocks of data for that
-  // input. These blocks are not necessarily contiguous so we keep
-  // track of each separately to avoid needing to copy everything into
-  // one buffer.
-  //
-  // Get the addr and size of each chunk of input data from the
-  // evbuffer.
-  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
-  if (n > 0) {
-    struct evbuffer_iovec* v = static_cast<struct evbuffer_iovec*>(
-        alloca(sizeof(struct evbuffer_iovec) * n));
-    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unexpected error getting input buffers ");
-    }
-
-    int v_idx = 0;
-
-    // Get the byte-size for each input and from that get the blocks
-    // holding the data for that input
-    for (const auto& io : request_header.input()) {
-      provider->input_map_[io.name()] = provider->contents_.size();
-      provider->contents_idx_.push_back(0);
-      provider->contents_.emplace_back();
-
-      auto& blocks = provider->contents_.back();
-
-      uint64_t byte_size = io.batch_byte_size();
-      while ((byte_size > 0) && (v_idx < n)) {
-        blocks.emplace_back();
-        Block& block = blocks.back();
-
-        char* base = static_cast<char*>(v[v_idx].iov_base);
-        block.first = base;
-        if (v[v_idx].iov_len > byte_size) {
-          block.second = byte_size;
-          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-          v[v_idx].iov_len -= byte_size;
-          byte_size = 0;
-        } else {
-          block.second = v[v_idx].iov_len;
-          byte_size -= v[v_idx].iov_len;
-          v_idx++;
-        }
-      }
-
-      if (byte_size != 0) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected size for input '" + io.name() +
-                "', missing expecting " + std::to_string(byte_size) +
-                " bytes for model '" + model_name + "'");
-      }
-    }
-
-    if (v_idx != n) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected additional input data for model '" + model_name + "'");
-    }
-  }
-
-  return Status::Success;
-}
-
-Status
-HTTPInferRequestProvider::GetNextInputContent(
-    const std::string& name, const void** content, size_t* content_byte_size,
-    bool force_contiguous)
-{
-  if (*content_byte_size == 0) {
-    *content = nullptr;
-    return Status::Success;
-  }
-
-  if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    const auto& pr = input_map_.find(name);
-    if (pr == input_map_.end()) {
-      return Status(
-          RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
-    }
-
-    const size_t idx = pr->second;
-    const size_t block_cnt = contents_[idx].size();
-    const size_t block_idx = contents_idx_[idx];
-
-    if (block_idx >= block_cnt) {
-      *content = nullptr;
-      *content_byte_size = 0;
-    }
-    // Return next block of data...
-    else if (!force_contiguous || ((block_idx + 1) >= block_cnt)) {
-      const auto& block = contents_[idx][block_idx];
-      *content = block.first;
-      *content_byte_size = block.second;
-      contents_idx_[idx]++;
-    }
-    // If remaining data needs to be returned in one contiguous region
-    // and there is more than one block remaining, then need to copy the
-    // content into a single contiguous buffer.
-    else {
       size_t total_size = 0;
-      for (size_t i = block_idx; i < block_cnt; i++) {
-        const auto& block = contents_[idx][i];
-        total_size += block.second;
-      }
+      size_t start_idx = input_content.second;
+      do {
+        *content = input_content.first->BufferAt(
+            input_content.second++, content_byte_size);
+        total_size += *content_byte_size;
+      } while (*content != nullptr);
 
       contiguous_buffers_.emplace_back();
       std::vector<char>& buf = contiguous_buffers_.back();
       buf.reserve(total_size);
 
-      for (size_t i = block_idx; i < block_cnt; i++) {
-        const auto& block = contents_[idx][i];
-        buf.insert(buf.end(), block.first, block.first + block.second);
+      for (size_t i = start_idx; i < input_content.second; i++) {
+        const auto& block = input_content.first->BufferAt(i, content_byte_size);
+        buf.insert(buf.end(), block, block + *content_byte_size);
       }
 
       if (buf.size() != total_size) {
@@ -477,6 +493,19 @@ HTTPInferRequestProvider::GetNextInputContent(
   return Status::Success;
 }
 
+Status
+InferRequestProvider::GetSystemMemory(
+    const std::string& name, std::shared_ptr<SystemMemory>* input_buffer)
+{
+  auto it = input_buffer_.find(name);
+  if (it == input_buffer_.end()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "input '" + name + "' is not found in the provider");
+  }
+  *input_buffer = it->second.first;
+  return Status::Success;
+}
 
 Status
 GRPCInferResponseProvider::Create(
@@ -810,101 +839,29 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 }
 
 Status
-SystemMemoryInferRequestProvider::Create(
-    const InferenceBackend& is, const std::string& model_name,
-    const int64_t model_version, const InferRequestHeader& request_header,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemoryBlock>>&
-        input_blocks,
-    std::shared_ptr<SystemMemoryInferRequestProvider>* infer_provider)
-{
-  auto provider =
-      new SystemMemoryInferRequestProvider(model_name, model_version);
-  infer_provider->reset(provider);
-
-  provider->request_header_ = request_header;
-
-  RETURN_IF_ERROR(provider->NormalizeRequestHeader(is));
-
-  for (const auto& io : provider->request_header_.input()) {
-    auto it = input_blocks.find(io.name());
-    if (it == input_blocks.end()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "input '" + io.name() + "' is specified in request header but" +
-              " not found in memory block mapping for model '" +
-              provider->model_name_ + "'");
-    }
-    if (io.batch_byte_size() != it->second->ByteSize()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected size " + std::to_string(it->second->ByteSize()) +
-              " for input '" + io.name() + "', expecting " +
-              std::to_string(io.batch_byte_size()) + " for model '" +
-              provider->model_name_ + "'");
-    }
-    provider->input_blocks_[io.name()] = std::make_pair(it->second, false);
-  }
-
-  return Status::Success;
-}
-
-Status
-SystemMemoryInferRequestProvider::GetNextInputContent(
-    const std::string& name, const void** content, size_t* content_byte_size,
-    bool force_contiguous)
-{
-  if (*content_byte_size == 0) {
-    *content = nullptr;
-    return Status::Success;
-  }
-
-  if (!GetInputOverrideContent(name, content, content_byte_size)) {
-    const auto& pr = input_blocks_.find(name);
-    if (pr == input_blocks_.end()) {
-      return Status(
-          RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
-    }
-
-    auto& input_content = pr->second;
-
-    if (input_content.second) {
-      *content = nullptr;
-      *content_byte_size = 0;
-    } else {
-      *content = input_content.first->Buffer();
-      *content_byte_size = input_content.first->ByteSize();
-    }
-
-    input_content.second = true;
-  }
-
-  return Status::Success;
-}
-
-Status
-SystemMemoryInferResponseProvider::Create(
+InternalInferResponseProvider::Create(
     const InferenceBackend& is, const InferRequestHeader& request_header,
-    std::shared_ptr<SystemMemoryInferResponseProvider>* infer_provider)
+    std::shared_ptr<InternalInferResponseProvider>* infer_provider)
 {
-  auto provider = new SystemMemoryInferResponseProvider(request_header);
+  auto provider = new InternalInferResponseProvider(request_header);
   infer_provider->reset(provider);
   return Status::Success;
 }
 
 const InferResponseHeader&
-SystemMemoryInferResponseProvider::ResponseHeader() const
+InternalInferResponseProvider::ResponseHeader() const
 {
   return response_header_;
 }
 
 InferResponseHeader*
-SystemMemoryInferResponseProvider::MutableResponseHeader()
+InternalInferResponseProvider::MutableResponseHeader()
 {
   return &response_header_;
 }
 
 Status
-SystemMemoryInferResponseProvider::GetOutputBuffer(
+InternalInferResponseProvider::GetOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape)
 {
@@ -914,40 +871,45 @@ SystemMemoryInferResponseProvider::GetOutputBuffer(
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
 
-  // Always write output tensor to an output block no matter
+  // Always write output tensor to an output buffer no matter
   // if output has cls field defined
-  if (output_blocks_.find(name) != output_blocks_.end()) {
-    output_blocks_[name] =
-        std::make_shared<SystemMemoryBlock>(content_byte_size);
+  auto it = output_buffer_.find(name);
+  if (it == output_buffer_.end()) {
+    it = output_buffer_
+             .emplace(std::make_pair(
+                 name,
+                 std::make_shared<AllocatedSystemMemory>(content_byte_size)))
+             .first;
   }
 
-  if (content_byte_size != output_blocks_[name]->ByteSize()) {
+  if (content_byte_size != it->second->TotalByteSize()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "unexpected size " + std::to_string(output_blocks_[name]->ByteSize()) +
+        "unexpected size " + std::to_string(it->second->TotalByteSize()) +
             " for output '" + name + "', expecting " +
             std::to_string(content_byte_size));
   }
 
-  *content = output_blocks_[name]->buffer_.get();
+  *content = it->second->MutableBuffer();
 
   return Status::Success;
 }
 
 Status
-SystemMemoryInferResponseProvider::GetOutputBlock(
-    const std::string& name, std::shared_ptr<SystemMemoryBlock>* output_block)
+InternalInferResponseProvider::GetSystemMemory(
+    const std::string& name, std::shared_ptr<SystemMemory>* output_buffer)
 {
-  if (output_blocks_.find(name) == output_blocks_.end()) {
+  auto it = output_buffer_.find(name);
+  if (it == output_buffer_.end()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "output '" + name + "' is not found in response provider");
   }
-  *output_block = output_blocks_[name];
+  *output_buffer = std::static_pointer_cast<SystemMemory>(it->second);
   return Status::Success;
 }
 
-SystemMemoryInferResponseProvider::SystemMemoryInferResponseProvider(
+InternalInferResponseProvider::InternalInferResponseProvider(
     const InferRequestHeader& request_header)
     : InferResponseProvider(request_header)
 {

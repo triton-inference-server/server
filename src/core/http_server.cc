@@ -66,7 +66,7 @@ class HTTPServerImpl : public HTTPServer {
    public:
     InferRequest(
         evhtp_request_t* req, uint64_t id,
-        const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+        const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
         const std::shared_ptr<ModelInferStats>& infer_stats,
         const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
@@ -79,7 +79,7 @@ class HTTPServerImpl : public HTTPServer {
     evthr_t* thread_;
     uint64_t id_;
     RequestStatus request_status_;
-    std::shared_ptr<HTTPInferRequestProvider> request_provider_;
+    std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<HTTPInferResponseProvider> response_provider_;
     std::shared_ptr<ModelInferStats> infer_stats_;
     std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
@@ -316,10 +316,10 @@ HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   if (status.IsOk()) {
     infer_stats->SetModelBackend((*backend)());
 
-    std::shared_ptr<HTTPInferRequestProvider> request_provider;
-    status = HTTPInferRequestProvider::Create(
-        req->buffer_in, *((*backend)()), model_name, model_version,
-        infer_request_header_str, &request_provider);
+    std::shared_ptr<InferRequestProvider> request_provider;
+    status = InferRequestProvider::Create(
+        *((*backend)()), model_name, model_version, infer_request_header_str,
+        req->buffer_in, &request_provider);
     if (status.IsOk()) {
       infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
 
@@ -455,7 +455,7 @@ HTTPServerImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
 
 HTTPServerImpl::InferRequest::InferRequest(
     evhtp_request_t* req, uint64_t id,
-    const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
     const std::shared_ptr<ModelInferStats>& infer_stats,
     const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)

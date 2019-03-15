@@ -123,8 +123,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     if (status.IsOk()) {
       infer_stats->SetModelBackend((*backend)());
 
-      std::shared_ptr<GRPCInferRequestProvider> request_provider;
-      status = GRPCInferRequestProvider::Create(
+      std::shared_ptr<InferRequestProvider> request_provider;
+      status = InferRequestProvider::Create(
           *((*backend)()), request, &request_provider);
       if (status.IsOk()) {
         infer_stats->SetBatchSize(
