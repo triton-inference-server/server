@@ -51,6 +51,7 @@ SystemMemoryReference::BufferAt(size_t idx, size_t* byte_size) const
 size_t
 SystemMemoryReference::AddBuffer(const char* buffer, size_t byte_size)
 {
+  total_byte_size_ += byte_size;
   buffer_.emplace_back(std::make_pair(buffer, byte_size));
   return buffer_.size() - 1;
 }
