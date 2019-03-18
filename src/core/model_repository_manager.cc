@@ -49,9 +49,10 @@ GetModifiedTime(const std::string& path)
   // If 'path' is a file return its mtime.
   if (!tensorflow::Env::Default()->IsDirectory(path).ok()) {
     tensorflow::FileStatistics stat;
-    if (!tensorflow::Env::Default()->Stat(path, &stat).ok()) {
+    tensorflow::Status status = tensorflow::Env::Default()->Stat(path, &stat);
+    if (!status.ok()) {
       LOG_ERROR << "Failed to determine modification time for '" << path
-                << "', assuming 0";
+                << "': " << status;
       return 0;
     }
 
@@ -68,6 +69,7 @@ GetModifiedTime(const std::string& path)
   if (!tensorflow::Env::Default()->GetChildren(path, &children).ok()) {
     LOG_ERROR << "Failed to determine modification time for '" << path
               << "', assuming 0";
+    return 0;
   }
 
   std::set<std::string> real_children;
