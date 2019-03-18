@@ -40,7 +40,6 @@
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/metrics.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
@@ -245,13 +244,6 @@ InferenceServer::Init()
     LOG_ERROR << "--model-store must be specified";
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return false;
-  }
-
-  // Initialize metrics reporting port.
-  int metrics_port = 8002;  // FIXME
-  if (metrics_port >= 0) {
-    LOG_INFO << "Reporting prometheus metrics on port " << metrics_port;
-    Metrics::Initialize(metrics_port);
   }
 
   // Disable profiling at server start. Server API can be used to
