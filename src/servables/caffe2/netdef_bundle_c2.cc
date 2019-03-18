@@ -90,7 +90,8 @@ namespace {
 
 bool
 CompareOutputShape(
-    const std::vector<int64_t>& config_shape, const at::IntArrayRef& output_shape)
+    const std::vector<int64_t>& config_shape,
+    const at::IntArrayRef& output_shape)
 {
   if (config_shape.size() != output_shape.size()) {
     return false;
