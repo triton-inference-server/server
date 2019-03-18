@@ -35,6 +35,7 @@
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/logging.h"
+#include "src/core/provider_utils.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
 #include "src/nvrpc/Context.h"
@@ -101,9 +102,59 @@ class StatusContext final
 
 template <class LifeCycle>
 class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
+  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
+  Status InferHelper(
+      InferenceServer* server, std::shared_ptr<ModelInferStats>& infer_stats,
+      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
+      InferRequest& request, InferResponse& response)
+  {
+    auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
+    RETURN_IF_ERROR(server->CreateBackendHandle(
+        request.model_name(), request.model_version(), backend));
+    infer_stats->SetModelBackend((*backend)());
+
+    std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
+    InferRequestHeader request_header = request.meta_data();
+    RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
+    RETURN_IF_ERROR(
+        GRPCInferRequestToInputMap(request_header, request, input_map));
+
+    std::shared_ptr<InferRequestProvider> request_provider;
+    std::shared_ptr<GRPCInferResponseProvider> response_provider;
+    RETURN_IF_ERROR(InferRequestProvider::Create(
+        request.model_name(), request.model_version(), request_header,
+        input_map, &request_provider));
+    infer_stats->SetBatchSize(request_header.batch_size());
+
+    RETURN_IF_ERROR(GRPCInferResponseProvider::Create(
+        request.meta_data(), &response, &response_provider));
+
+    RequestStatus* request_status = response.mutable_request_status();
+    uint64_t id = request.meta_data().id();
+    uintptr_t execution_context = this->GetExecutionContext();
+    server->HandleInfer(
+        request_status, backend, request_provider, response_provider,
+        infer_stats,
+        [this, execution_context, id, request_status, &response, infer_stats,
+         timer]() mutable {
+          // If the response is an error then clear the meta-data
+          // and raw output as they may be partially or
+          // un-initialized.
+          if (request_status->code() != RequestStatusCode::SUCCESS) {
+            response.mutable_meta_data()->Clear();
+            response.mutable_raw_output()->Clear();
+          }
+
+          response.mutable_meta_data()->set_id(id);
+          this->CompleteExecution(execution_context);
+          timer.reset();
+        });
+
+    return Status::Success;
+  }
+
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
-    uintptr_t execution_context = this->GetExecutionContext();
     auto server = this->GetResources()->GetServer();
     auto infer_stats = std::make_shared<ModelInferStats>(
         server->StatusManager(), request.model_name());
@@ -111,63 +162,22 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     infer_stats->StartRequestTimer(timer.get());
     infer_stats->SetRequestedVersion(request.model_version());
 
-    RequestStatus* request_status = response.mutable_request_status();
-
-    // Get the request ID at top level so we can set the corresponding field
-    // in ResponseHeader even on inference failure
-    uint64_t id = request.meta_data().id();
-
-    auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-    Status status = server->CreateBackendHandle(
-        request.model_name(), request.model_version(), backend);
-    if (status.IsOk()) {
-      infer_stats->SetModelBackend((*backend)());
-
-      std::shared_ptr<GRPCInferRequestProvider> request_provider;
-      status = GRPCInferRequestProvider::Create(
-          *((*backend)()), request, &request_provider);
-      if (status.IsOk()) {
-        infer_stats->SetBatchSize(
-            request_provider->RequestHeader().batch_size());
-
-        std::shared_ptr<GRPCInferResponseProvider> response_provider;
-        status = GRPCInferResponseProvider::Create(
-            request.meta_data(), &response, &response_provider);
-        if (status.IsOk()) {
-          server->HandleInfer(
-              request_status, backend, request_provider, response_provider,
-              infer_stats,
-              [this, execution_context, id, request_status, &response,
-               infer_stats, timer]() mutable {
-                // If the response is an error then clear the meta-data
-                // and raw output as they may be partially or
-                // un-initialized.
-                if (request_status->code() != RequestStatusCode::SUCCESS) {
-                  response.mutable_meta_data()->Clear();
-                  response.mutable_raw_output()->Clear();
-                }
-
-                response.mutable_meta_data()->set_id(id);
-                this->CompleteExecution(execution_context);
-                timer.reset();
-              });
-        }
-      }
-    }
+    Status status = InferHelper(server, infer_stats, timer, request, response);
 
     if (!status.IsOk()) {
       LOG_VERBOSE(1) << "Infer failed: " << status.Message();
       infer_stats->SetFailed(true);
       RequestStatusFactory::Create(
-          request_status, 0 /* request_id */, server->Id(), status);
+          response.mutable_request_status(), 0 /* request_id */, server->Id(),
+          status);
 
       // If the response is an error then clear the meta-data and raw
       // output as they may be partially or un-initialized.
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
-      response.mutable_meta_data()->set_id(id);
-      this->CompleteExecution(execution_context);
+      response.mutable_meta_data()->set_id(request.meta_data().id());
+      this->CompleteExecution(this->GetExecutionContext());
     }
   }
 };

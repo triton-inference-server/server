@@ -34,6 +34,7 @@
 #include "re2/re2.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/provider_utils.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
 
@@ -66,7 +67,7 @@ class HTTPServerImpl : public HTTPServer {
    public:
     InferRequest(
         evhtp_request_t* req, uint64_t id,
-        const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+        const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
         const std::shared_ptr<ModelInferStats>& infer_stats,
         const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
@@ -79,7 +80,7 @@ class HTTPServerImpl : public HTTPServer {
     evthr_t* thread_;
     uint64_t id_;
     RequestStatus request_status_;
-    std::shared_ptr<HTTPInferRequestProvider> request_provider_;
+    std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<HTTPInferResponseProvider> response_provider_;
     std::shared_ptr<ModelInferStats> infer_stats_;
     std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
@@ -90,6 +91,13 @@ class HTTPServerImpl : public HTTPServer {
   void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
+
+  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
+  Status InferHelper(
+      std::shared_ptr<ModelInferStats>& infer_stats,
+      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
+      const std::string& model_name, int64_t model_version,
+      InferRequestHeader& request_header, evhtp_request_t* req);
 
   void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -303,44 +311,17 @@ HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   std::string infer_request_header_str(
       infer_request_header.data(), infer_request_header.size());
 
-  RequestStatus request_status;
-
   InferRequestHeader request_header;
   google::protobuf::TextFormat::ParseFromString(
       infer_request_header_str, &request_header);
-  uint64_t id = request_header.id();
 
-  auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-  Status status =
-      server_->CreateBackendHandle(model_name, model_version, backend);
-  if (status.IsOk()) {
-    infer_stats->SetModelBackend((*backend)());
-
-    std::shared_ptr<HTTPInferRequestProvider> request_provider;
-    status = HTTPInferRequestProvider::Create(
-        req->buffer_in, *((*backend)()), model_name, model_version,
-        infer_request_header_str, &request_provider);
-    if (status.IsOk()) {
-      infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
-
-      std::shared_ptr<HTTPInferResponseProvider> response_provider;
-      status = HTTPInferResponseProvider::Create(
-          req->buffer_out, *((*backend)()), request_provider->RequestHeader(),
-          &response_provider);
-      if (status.IsOk()) {
-        std::shared_ptr<InferRequest> request(new InferRequest(
-            req, id, request_provider, response_provider, infer_stats, timer));
-        server_->HandleInfer(
-            &(request->request_status_), backend, request->request_provider_,
-            request->response_provider_, infer_stats,
-            [this, request]() mutable { this->FinishInferResponse(request); });
-      }
-    }
-  }
+  Status status = InferHelper(
+      infer_stats, timer, model_name, model_version, request_header, req);
 
   if (!status.IsOk()) {
+    RequestStatus request_status;
     InferResponseHeader response_header;
-    response_header.set_id(id);
+    response_header.set_id(request_header.id());
     evhtp_headers_add_header(
         req->headers_out,
         evhtp_header_new(
@@ -427,6 +408,44 @@ HTTPServerImpl::HandleStatus(
                : EVHTP_RES_BADREQ);
 }
 
+Status
+HTTPServerImpl::InferHelper(
+    std::shared_ptr<ModelInferStats>& infer_stats,
+    std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
+    const std::string& model_name, int64_t model_version,
+    InferRequestHeader& request_header, evhtp_request_t* req)
+{
+  auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
+  RETURN_IF_ERROR(
+      server_->CreateBackendHandle(model_name, model_version, backend));
+  infer_stats->SetModelBackend((*backend)());
+
+  std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
+  RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
+  RETURN_IF_ERROR(EVBufferToInputMap(
+      model_name, request_header, req->buffer_in, input_map));
+
+  std::shared_ptr<InferRequestProvider> request_provider;
+  RETURN_IF_ERROR(InferRequestProvider::Create(
+      model_name, model_version, request_header, input_map, &request_provider));
+  infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
+
+  std::shared_ptr<HTTPInferResponseProvider> response_provider;
+  RETURN_IF_ERROR(HTTPInferResponseProvider::Create(
+      req->buffer_out, *((*backend)()), request_provider->RequestHeader(),
+      &response_provider));
+
+  std::shared_ptr<InferRequest> request(new InferRequest(
+      req, request_header.id(), request_provider, response_provider,
+      infer_stats, timer));
+  server_->HandleInfer(
+      &(request->request_status_), backend, request->request_provider_,
+      request->response_provider_, infer_stats,
+      [this, request]() mutable { this->FinishInferResponse(request); });
+
+  return Status::Success;
+}
+
 void
 HTTPServerImpl::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
@@ -455,7 +474,7 @@ HTTPServerImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
 
 HTTPServerImpl::InferRequest::InferRequest(
     evhtp_request_t* req, uint64_t id,
-    const std::shared_ptr<HTTPInferRequestProvider>& request_provider,
+    const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
     const std::shared_ptr<ModelInferStats>& infer_stats,
     const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)

@@ -36,15 +36,73 @@ namespace nvidia { namespace inferenceserver {
 class InferenceBackend;
 
 //
+// SystemMemory used to access data in providers
+//
+class SystemMemory {
+ public:
+  // Get the 'idx'-th data block in the buffer. Using index to avoid
+  // maintaining internal state such that one buffer can be shared
+  // across multiple providers.
+  // 'idx' zero base index. Valid indices are continuous.
+  // 'byte_size' returns the byte size of the chunk of bytes. Returns 0 if
+  // 'idx' is out of range.
+  // Return the pointer to the data block. Returns nullptr if 'idx' is
+  // out of range
+  virtual const char* BufferAt(size_t idx, size_t* byte_size) const = 0;
+
+  // Return the total byte size of the data buffer
+  size_t TotalByteSize() const { return total_byte_size_; }
+
+ protected:
+  SystemMemory() : total_byte_size_(0) {}
+  size_t total_byte_size_;
+};
+
+class SystemMemoryReference : public SystemMemory {
+ public:
+  // Create a read-only data buffer as a reference to other data buffer
+  SystemMemoryReference();
+
+  //\see SystemMemory::BufferAt()
+  const char* BufferAt(size_t idx, size_t* byte_size) const override;
+
+  // Add a 'buffer' with 'byte_size' as part of this data buffer
+  // Return the index of the buffer
+  size_t AddBuffer(const char* buffer, size_t byte_size);
+
+ private:
+  using Block = std::pair<const char*, size_t>;
+  std::vector<Block> buffer_;
+};
+
+class AllocatedSystemMemory : public SystemMemory {
+ public:
+  // Create a continuous data buffer with 'byte_size'.
+  AllocatedSystemMemory(size_t byte_size);
+
+  //\see SystemMemory::BufferAt()
+  const char* BufferAt(size_t idx, size_t* byte_size) const override;
+
+  // Return the mutable buffer
+  char* MutableBuffer();
+
+ private:
+  std::unique_ptr<char[]> buffer_;
+};
+
+//
 // Provide inference request inputs and meta-data
 //
 class InferRequestProvider {
  public:
-  explicit InferRequestProvider(
-      const std::string& model_name, const int64_t version)
-      : model_name_(model_name), version_(version)
-  {
-  }
+  // Initialize based on map from input name to data. The 'input_buffer' object
+  // is mapping from input name to data buffer for that input.
+  static Status Create(
+      const std::string& model_name, const int64_t model_version,
+      const InferRequestHeader& request_header,
+      const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
+          input_buffer,
+      std::shared_ptr<InferRequestProvider>* provider);
 
   // Return the requested model name.
   const std::string& ModelName() const { return model_name_; }
@@ -71,7 +129,11 @@ class InferRequestProvider {
   // copying the data.
   virtual Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
-      bool force_contiguous) = 0;
+      bool force_contiguous);
+
+  // Retrieve the data buffer of input 'name'.
+  Status GetSystemMemory(
+      const std::string& name, std::shared_ptr<SystemMemory>* input_buffer);
 
   // Set content for named inputs. If the input already has content,
   // this content will be in-place of existing content.
@@ -87,9 +149,11 @@ class InferRequestProvider {
   Status SetInputOverride(const std::shared_ptr<InputOverrideMap>& override);
 
  protected:
-  // Validate request header and modify as necessary so that every
-  // input has a shape and a batch-byte-size.
-  Status NormalizeRequestHeader(const InferenceBackend& is);
+  explicit InferRequestProvider(
+      const std::string& model_name, const int64_t version)
+      : model_name_(model_name), version_(version)
+  {
+  }
 
   // Get the override content for 'name'd input. Return a pointer to
   // the override content in 'content'.  Return the override content
@@ -113,6 +177,15 @@ class InferRequestProvider {
   // 'content' == nullptr to indicate that all the override content
   // has been consumed.
   std::set<std::string> overrides_consumed_;
+
+  // Placeholder for providing buffer as contiguous block.
+  std::vector<std::vector<char>> contiguous_buffers_;
+
+  // Map from input name to the content of the input. The content contains
+  // the buffer and index to the next data block for the named input.
+  std::unordered_map<
+      std::string, std::pair<std::shared_ptr<SystemMemory>, size_t>>
+      input_buffer_;
 };
 
 //
@@ -139,65 +212,6 @@ class NULLInferRequestProvider : public InferRequestProvider {
 
   // Mutex to guard buf_
   static std::mutex mu_;
-};
-
-//
-// Inference input provider for a GRPC inference request
-//
-class GRPCInferRequestProvider : public InferRequestProvider {
- public:
-  // Create a GRPCInferRequestProvider object. The 'request' object is
-  // captured by reference to avoid copying all the raw input tensor
-  // data... but this means that it's lifetime must persist longer
-  // than this provider.
-  static Status Create(
-      const InferenceBackend& is, const InferRequest& request,
-      std::shared_ptr<GRPCInferRequestProvider>* infer_provider);
-
-  Status GetNextInputContent(
-      const std::string& name, const void** content, size_t* content_byte_size,
-      bool force_contiguous) override;
-
- private:
-  GRPCInferRequestProvider(const InferRequest& request, const int64_t version);
-
-  const InferRequest& request_;
-  std::vector<bool> content_delivered_;
-
-  // Map from input name to the index in the request of that input.
-  std::unordered_map<std::string, size_t> input_map_;
-};
-
-//
-// Inference input provider for an HTTP inference request
-//
-class HTTPInferRequestProvider : public InferRequestProvider {
- public:
-  // Initialize based on HTTP request
-  static Status Create(
-      evbuffer* input_buffer, const InferenceBackend& is,
-      const std::string& model_name, const int64_t model_version,
-      const std::string& request_header_str,
-      std::shared_ptr<HTTPInferRequestProvider>* infer_provider);
-
-  Status GetNextInputContent(
-      const std::string& name, const void** content, size_t* content_byte_size,
-      bool force_contiguous) override;
-
- private:
-  HTTPInferRequestProvider(const std::string& model_name, const int64_t version)
-      : InferRequestProvider(model_name, version)
-  {
-  }
-
-  using Block = std::pair<const char*, size_t>;
-  std::vector<std::vector<Block>> contents_;
-  std::vector<size_t> contents_idx_;
-  std::vector<std::vector<char>> contiguous_buffers_;
-
-  // Map from input name to the index in contents_ that contains the
-  // data for the input.
-  std::unordered_map<std::string, size_t> input_map_;
 };
 
 //
@@ -305,6 +319,34 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
+};
+
+//
+// Inference response provider for an internal request
+//
+class InternalInferResponseProvider : public InferResponseProvider {
+ public:
+  // Create a InternalInferResponseProvider object.
+  static Status Create(
+      const InferenceBackend& is, const InferRequestHeader& request_header,
+      std::shared_ptr<InternalInferResponseProvider>* infer_provider);
+
+  const InferResponseHeader& ResponseHeader() const override;
+  InferResponseHeader* MutableResponseHeader() override;
+  Status GetOutputBuffer(
+      const std::string& name, void** content, size_t content_byte_size,
+      const std::vector<int64_t>& content_shape) override;
+
+  // Retrieve the data buffer of output 'name'.
+  Status GetSystemMemory(
+      const std::string& name, std::shared_ptr<SystemMemory>* output_buffer);
+
+ private:
+  InternalInferResponseProvider(const InferRequestHeader& request_header);
+
+  InferResponseHeader response_header_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
+      output_buffer_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -181,6 +181,22 @@ cc_library(
 )
 
 cc_library(
+    name = "provider_utils",
+    srcs = ["provider_utils.cc"],
+    hdrs = ["provider_utils.h"],
+    deps = [
+        ":api_proto",
+        ":backend",
+        ":provider_header",
+        ":model_config",
+        ":model_config_utils",
+        ":grpc_service_proto",
+        ":status",
+        "@com_github_libevent_libevent//:libevent",
+    ],
+)
+
+cc_library(
     name = "label_provider",
     srcs = ["label_provider.cc"],
     hdrs = ["label_provider.h"],
@@ -357,6 +373,7 @@ cc_library(
         ":constants",
         ":logging",
         ":provider",
+        ":provider_utils",
         ":request_status",
         ":request_status_proto",
         ":server_header",
@@ -377,6 +394,7 @@ cc_library(
         ":grpc_service_proto",
         ":logging",
         ":provider",
+        ":provider_utils",
         ":request_status",
         ":request_status_proto",
         ":server_header",
