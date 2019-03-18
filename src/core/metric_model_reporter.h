@@ -26,7 +26,6 @@
 #pragma once
 
 #include "prometheus/registry.h"
-#include "src/core/metrics.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 

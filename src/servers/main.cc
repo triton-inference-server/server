@@ -34,6 +34,7 @@
 #include "src/core/grpc_server.h"
 #include "src/core/http_server.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
 #include "tensorflow/core/util/command_line_flags.h"
@@ -157,6 +158,13 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
       LOG_ERROR << "Failed to start HTTP service";
       return false;
     }
+  }
+
+  // Enable metrics endpoint if requested...
+  if (metrics_port_ != -1) {
+    LOG_INFO << " localhost:" << std::to_string(metrics_port_)
+             << " for metric reporting";
+    nvidia::inferenceserver::Metrics::Initialize(metrics_port_);
   }
 
   return true;
@@ -342,7 +350,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Start the HTTP and/or GRPC endpoints.
+  // Start the HTTP, GRPC, and metrics endpoints.
   if (!StartEndpoints(server_)) {
     exit(1);
   }
