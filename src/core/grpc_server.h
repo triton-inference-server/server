@@ -26,6 +26,7 @@
 #pragma once
 
 #include "src/core/status.h"
+#include "src/nvrpc/Interfaces.h"
 #include "src/nvrpc/Server.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -42,14 +43,16 @@ class GRPCServer : private nvrpc::Server {
   Status Start();
   Status Stop();
 
+  ~GRPCServer();
+
  private:
   GRPCServer(const std::string& addr);
 
-  IRPC* rpcInfer_;
-  IRPC* rpcStreamInfer_;
-  IRPC* rpcStatus_;
-  IRPC* rpcProfile_;
-  IRPC* rpcHealth_;
+  nvrpc::IRPC* rpcInfer_;
+  nvrpc::IRPC* rpcStreamInfer_;
+  nvrpc::IRPC* rpcStatus_;
+  nvrpc::IRPC* rpcProfile_;
+  nvrpc::IRPC* rpcHealth_;
   bool running_;
 };
 
