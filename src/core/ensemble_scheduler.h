@@ -36,6 +36,25 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
 
+struct EnsembleInfo {
+  struct StepInfo {
+    StepInfo(const std::string& model_name) : model_name_(model_name) {}
+
+    std::string model_name_;
+    std::unordered_map<size_t, std::string> tensor_to_input_;
+    std::unordered_map<std::string, size_t> output_to_tensor_;
+  };
+
+  std::unordered_map<std::string, size_t> ensemble_input_to_tensor_;
+  std::unordered_map<std::string, size_t> ensemble_output_to_tensor_;
+
+  std::vector<StepInfo> steps_;
+
+  // Only include a step if the ensemble tensor is used as input in that step
+  // Representing ensemble tensor with index (name doesn't matter at this point)
+  std::vector<std::set<StepInfo*>> tensor_to_step_;
+};
+
 // Scheduler that implements ensemble scheduling.
 class EnsembleScheduler : public Scheduler {
  public:
@@ -59,12 +78,17 @@ class EnsembleScheduler : public Scheduler {
   }
 
  private:
-  EnsembleScheduler(const ModelConfig& config) : config_(config) {}
+  EnsembleScheduler(const ModelConfig& config);
 
   InferenceServer* is_;
 
-  ModelConfig config_;
-  std::unordered_map<std::string, EnsembleTensor> ensemble_graph_;
+  // Ensemble information that is built from model config
+  // Use smart point to avoid edge case that ensemble model is unloaded
+  // while some ensemble requests are still running (i.e. when there are
+  // multiple steps are being executed, one of them fail and invoke the
+  // completed function of the ensemble request. The backend will be treated
+  // as no-inflight request and be unloaded)
+  std::shared_ptr<EnsembleInfo> info_;
 };
 
 }}  // namespace nvidia::inferenceserver
