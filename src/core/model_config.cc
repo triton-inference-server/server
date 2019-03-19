@@ -241,4 +241,23 @@ CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1)
   return true;
 }
 
+std::string
+DimsListToString(const DimsList& dims)
+{
+  bool first = true;
+
+  std::string str("[");
+  for (const auto& dim : dims) {
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(dim);
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
+
+
 }}  // namespace nvidia::inferenceserver

@@ -70,23 +70,6 @@ CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
 }
 
 const std::string
-DimsDebugString(const DimsList& dims)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.size(); ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims[i]));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-const std::string
 DimsDebugString(const nvinfer1::Dims& dims)
 {
   bool first = true;

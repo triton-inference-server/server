@@ -38,8 +38,6 @@ DataType ConvertDatatype(nvinfer1::DataType trt_type);
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 
-const std::string DimsDebugString(const DimsList& dims);
-
 const std::string DimsDebugString(const nvinfer1::Dims& dims);
 
 }}  // namespace nvidia::inferenceserver
