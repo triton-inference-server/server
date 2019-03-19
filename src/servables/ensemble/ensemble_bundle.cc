@@ -58,9 +58,8 @@ Status
 EnsembleBundle::SetInferenceServer(void* inference_server)
 {
   EnsembleScheduler* scheduler =
-      static_cast<EnsembleScheduler*>(GetRawScheduler());
-  RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
-  return InferenceBackend::SetInferenceServer(inference_server);
+      static_cast<EnsembleScheduler*>(BackendScheduler());
+  return scheduler->SetInferenceServer(inference_server);
 }
 
 void

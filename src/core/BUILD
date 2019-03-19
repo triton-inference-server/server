@@ -194,7 +194,7 @@ cc_library(
     hdrs = ["provider_utils.h"],
     deps = [
         ":api_proto",
-        ":backend",
+        ":backend_header",
         ":provider_header",
         ":model_config",
         ":model_config_utils",
@@ -348,6 +348,7 @@ cc_library(
         ":model_config_proto",
         ":model_config_utils",
         ":provider_header",
+        ":provider_utils",
         ":scheduler",
         ":server_header",
         ":server_status_header",

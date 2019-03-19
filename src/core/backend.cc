@@ -70,7 +70,6 @@ InferenceBackend::GetOutput(
 Status
 InferenceBackend::SetInferenceServer(void* inference_server)
 {
-  inference_server_ = inference_server;
   return Status::Success;
 }
 
@@ -129,11 +128,11 @@ InferenceBackend::SetConfiguredScheduler(
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));
-  } else if (config_.has_dynamic_batching()) {
+  } else if (config_.has_ensemble_scheduling()) {
+    RETURN_IF_ERROR(EnsembleScheduler::Create(config_, &scheduler));
+  } else {
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));
-  } else {
-    RETURN_IF_ERROR(EnsembleScheduler::Create(config_, &scheduler));
   }
 
   return SetScheduler(std::move(scheduler));
