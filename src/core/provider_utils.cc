@@ -84,9 +84,11 @@ NormalizeRequestHeader(
     if (io.dims_size() > 0) {
       if (!CompareDimsWithWildcard(io.dims(), input_config->dims())) {
         return Status(
-            RequestStatusCode::INVALID_ARG, "unexpected shape for input '" +
-                                                io.name() + "' for model '" +
-                                                model_name + "'");
+            RequestStatusCode::INVALID_ARG,
+            "unexpected shape for input '" + io.name() + "' for model '" +
+                model_name + "'. Expected " +
+                DimsListToString(input_config->dims()) + ", got " +
+                DimsListToString(io.dims()));
       }
 
       bs = GetByteSize(input_config->data_type(), io.dims());

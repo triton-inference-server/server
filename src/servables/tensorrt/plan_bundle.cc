@@ -319,7 +319,7 @@ PlanBundle::Context::InitializeInputBinding(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "input '" + input_name + "' dims " + DimsDebugString(dims) +
-            " don't match configuration dims " + DimsDebugString(input_dims) +
+            " don't match configuration dims " + DimsListToString(input_dims) +
             " for " + name_);
   }
 
@@ -432,7 +432,7 @@ PlanBundle::Context::InitializeConfigOutputBindings(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "output '" + io.name() + "' dims " + DimsDebugString(dims) +
-              " don't match configuration dims " + DimsDebugString(io.dims()) +
+              " don't match configuration dims " + DimsListToString(io.dims()) +
               " for " + name_);
     }
 

@@ -60,9 +60,6 @@ bool CompareDimsSupported(
 /// configuration data-type.
 bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
 
-/// \return the string representation of a model configuration shape.
-const std::string DimsDebugString(const DimsList& dims);
-
 /// \return the string representation of a TensorFlow shape.
 const std::string DimsDebugString(const tensorflow::TensorShapeProto& dims);
 
