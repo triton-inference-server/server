@@ -109,7 +109,7 @@ input tensor where the first dimension must be size 4 but the second
 dimension can be any size, the model configuration for that input
 would include **dims: [ 4, -1 ]**. The inference server would then
 accept inference requests where that input tensor's second dimension
-was any value >= 1. The model configuration can be more restrictive
+was any value >= 0. The model configuration can be more restrictive
 than what is allowed by the underlying model. For example, even though
 the model allows the second dimension to be any size, the model
 configuration could be specific as **dims: [ 4, 4 ]**. In this case,

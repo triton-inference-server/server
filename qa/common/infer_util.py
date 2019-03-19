@@ -198,3 +198,81 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
     return results
+
+
+# Perform inference using a "nop" model that expects some form or
+# zero-sized input/output tensor.
+def infer_zero(tester, pf, batch_size, tensor_dtype, tensor_shapes,
+               model_version=None, use_http=True, use_grpc=True,
+               use_streaming=True):
+    tester.assertTrue(use_http or use_grpc or use_streaming)
+    configs = []
+    if use_http:
+        configs.append(("localhost:8000", ProtocolType.HTTP, False))
+    if use_grpc:
+        configs.append(("localhost:8001", ProtocolType.GRPC, False))
+    if use_streaming:
+        configs.append(("localhost:8001", ProtocolType.GRPC, True))
+
+    io_cnt = len(tensor_shapes)
+
+    # If shape is [] then the entire input tensor batch has shape [
+    # batch-size ], so each input tensor in the request batch has
+    # shape [ 1 ].
+    #if len(tensor_shape) == 0:
+    #    tensor_shape = [1,]
+
+    for config in configs:
+        model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+        input_dict = {}
+        output_dict = {}
+        expected_dict = {}
+
+        for io_num in range(io_cnt):
+            input_name = "INPUT{}".format(io_num)
+            output_name = "OUTPUT{}".format(io_num)
+
+            input_list = list()
+            expected_list = list()
+            for b in range(batch_size):
+                rtensor_dtype = _range_repr_dtype(tensor_dtype)
+                in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
+                                        high=np.iinfo(rtensor_dtype).max,
+                                        size=tensor_shapes[io_num], dtype=rtensor_dtype)
+                if tensor_dtype != np.object:
+                    in0 = in0.astype(tensor_dtype)
+                    expected0 = np.ndarray.copy(in0)
+                else:
+                    expected0 = np.array([bytes(str(x), encoding='utf-8')
+                                    for x in in0.flatten()], dtype=object).reshape(in0.shape)
+                    in0 = np.array([str(x) for x in in0.flatten()],
+                                   dtype=object).reshape(in0.shape)
+
+                input_list.append(in0)
+                expected_list.append(expected0)
+
+            input_dict[input_name] = input_list
+            output_dict[output_name] = InferContext.ResultFormat.RAW
+            expected_dict[output_name] = expected_list
+
+        ctx = InferContext(config[0], config[1], model_name, model_version,
+                           correlation_id=0, streaming=config[2],
+                           verbose=True)
+        results = ctx.run(input_dict, output_dict, batch_size)
+
+        tester.assertEqual(ctx.get_last_request_model_name(), model_name)
+        if model_version is not None:
+            tester.assertEqual(ctx.get_last_request_model_version(), model_version)
+
+        tester.assertEqual(len(results), io_cnt)
+        for (result_name, result_val) in iteritems(results):
+            tester.assertTrue(result_name in output_dict)
+            tester.assertTrue(result_name in expected_dict)
+            for b in range(batch_size):
+                expected = expected_dict[result_name][b]
+                tester.assertEqual(result_val[b].shape, expected.shape)
+                tester.assertTrue(np.array_equal(result_val[b], expected),
+                                  "{}, {}, slot {}, expected: {}, got {}".format(
+                                      model_name, result_name, b, expected, result_val[b]))
+
+    return results
