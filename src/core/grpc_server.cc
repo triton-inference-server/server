@@ -233,7 +233,10 @@ class HealthContext final
 };
 }  // namespace
 
-GRPCServer::GRPCServer(const std::string& addr) : nvrpc::Server(addr) {}
+GRPCServer::GRPCServer(const std::string& addr)
+    : nvrpc::Server(addr), running_(false)
+{
+}
 
 Status
 GRPCServer::Create(
@@ -257,37 +260,24 @@ GRPCServer::Create(
   auto inferenceService = (*grpc_server)->RegisterAsyncService<GRPCService>();
 
   LOG_INFO << "Register Infer RPC";
-  auto rpcInfer = inferenceService->RegisterRPC<InferContext>(
+  rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
       &GRPCService::AsyncService::RequestInfer);
 
   LOG_INFO << "Register StreamInfer RPC";
-  auto rpcStreamInfer = inferenceService->RegisterRPC<StreamInferContext>(
+  rpcStreamInfer_ = inferenceService->RegisterRPC<StreamInferContext>(
       &GRPCService::AsyncService::RequestStreamInfer);
 
   LOG_INFO << "Register Status RPC";
-  auto rpcStatus = inferenceService->RegisterRPC<StatusContext>(
+  rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
 
   LOG_INFO << "Register Profile RPC";
-  auto rpcProfile = inferenceService->RegisterRPC<ProfileContext>(
+  rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
       &GRPCService::AsyncService::RequestProfile);
 
   LOG_INFO << "Register Health RPC";
-  auto rpcHealth = inferenceService->RegisterRPC<HealthContext>(
+  rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
       &GRPCService::AsyncService::RequestHealth);
-
-  LOG_INFO << "Register Executor";
-  auto executor = (*grpc_server)->RegisterExecutor(new ::nvrpc::Executor(1));
-
-  // You can register RPC execution contexts from any registered RPC on any
-  // executor.
-  executor->RegisterContexts(
-      rpcInfer, g_Resources, 1000);  // Configurable DLIS-161
-  executor->RegisterContexts(
-      rpcStreamInfer, g_Resources, 100);  // Configurable DLIS-161
-  executor->RegisterContexts(rpcStatus, g_Resources, 1);
-  executor->RegisterContexts(rpcHealth, g_Resources, 1);
-  executor->RegisterContexts(rpcProfile, g_Resources, 1);
 
   return Status::Success;
 }
@@ -295,15 +285,38 @@ GRPCServer::Create(
 Status
 GRPCServer::Start()
 {
-  AsyncRun();
-  return Status::Success;
+  if (!running_) {
+    LOG_INFO << "Register Executor";
+    auto executor = (*grpc_server)->RegisterExecutor(new ::nvrpc::Executor(1));
+
+    // You can register RPC execution contexts from any registered RPC on any
+    // executor.
+    executor->RegisterContexts(
+        rpcInfer_, g_Resources, 1000);  // Configurable DLIS-161
+    executor->RegisterContexts(
+        rpcStreamInfer_, g_Resources, 100);  // Configurable DLIS-161
+    executor->RegisterContexts(rpcStatus_, g_Resources, 1);
+    executor->RegisterContexts(rpcHealth_, g_Resources, 1);
+    executor->RegisterContexts(rpcProfile_, g_Resources, 1);
+
+    AsyncRun();
+    running_ = true;
+    return Status::Success;
+  }
+
+  return Status(
+      RequestStatusCode::ALREADY_EXISTS, "GRPC server is already running.");
 }
 
 Status
 GRPCServer::Stop()
 {
-  Shutdown();
-  return Status::Success;
+  if (running_) {
+    Shutdown();
+    return Status::Success;
+  }
+
+  return Status(RequestStatusCode::UNAVAILABLE, "GRPC server is not running.");
 }
 
 }}  // namespace nvidia::inferenceserver
