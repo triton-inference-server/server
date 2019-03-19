@@ -238,6 +238,11 @@ GRPCServer::GRPCServer(const std::string& addr)
 {
 }
 
+GRPCServer::~GRPCServer()
+{
+  Stop();
+}
+
 Status
 GRPCServer::Create(
     InferenceServer* server, uint16_t port,
@@ -260,23 +265,24 @@ GRPCServer::Create(
   auto inferenceService = (*grpc_server)->RegisterAsyncService<GRPCService>();
 
   LOG_INFO << "Register Infer RPC";
-  rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
+  (*grpc_server)->rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
       &GRPCService::AsyncService::RequestInfer);
 
   LOG_INFO << "Register StreamInfer RPC";
-  rpcStreamInfer_ = inferenceService->RegisterRPC<StreamInferContext>(
-      &GRPCService::AsyncService::RequestStreamInfer);
+  (*grpc_server)->rpcStreamInfer_ =
+      inferenceService->RegisterRPC<StreamInferContext>(
+          &GRPCService::AsyncService::RequestStreamInfer);
 
   LOG_INFO << "Register Status RPC";
-  rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
+  (*grpc_server)->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
 
   LOG_INFO << "Register Profile RPC";
-  rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
+  (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
       &GRPCService::AsyncService::RequestProfile);
 
   LOG_INFO << "Register Health RPC";
-  rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
+  (*grpc_server)->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
       &GRPCService::AsyncService::RequestHealth);
 
   return Status::Success;
@@ -286,8 +292,9 @@ Status
 GRPCServer::Start()
 {
   if (!running_) {
+    running_ = true;
     LOG_INFO << "Register Executor";
-    auto executor = (*grpc_server)->RegisterExecutor(new ::nvrpc::Executor(1));
+    auto executor = RegisterExecutor(new ::nvrpc::Executor(1));
 
     // You can register RPC execution contexts from any registered RPC on any
     // executor.
@@ -300,7 +307,6 @@ GRPCServer::Start()
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
 
     AsyncRun();
-    running_ = true;
     return Status::Success;
   }
 
@@ -312,6 +318,7 @@ Status
 GRPCServer::Stop()
 {
   if (running_) {
+    running_ = false;
     Shutdown();
     return Status::Success;
   }

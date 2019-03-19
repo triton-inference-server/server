@@ -55,6 +55,8 @@ class HTTPServerImpl : public HTTPServer {
   {
   }
 
+  ~HTTPServerImpl() { Stop(); }
+
   static void Dispatch(evhtp_request_t* req, void* arg);
 
   Status Start() override;
