@@ -655,10 +655,11 @@ class InferContext:
                     # concatenated together in "C" order.
                     if input_value.dtype == np.object:
                         flattened = bytes()
-                        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                            s = str(obj).encode('utf-8')
-                            flattened += struct.pack("<I", len(s))
-                            flattened += s
+                        if input_value.size > 0:
+                            for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+                                s = str(obj).encode('utf-8')
+                                flattened += struct.pack("<I", len(s))
+                                flattened += s
                         input_value = np.asarray(flattened)
 
                     if not input_value.flags['C_CONTIGUOUS']:
