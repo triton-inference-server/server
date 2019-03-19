@@ -38,7 +38,7 @@
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
-## /tmp/qa_variable_model_repository,
+## /tmp/qa_variable_model_repository, /tmp/qa_zero_model_repository,
 ## /tmp/qa_sequence_model_repository, and
 ## /tmp/qa_variable_sequence_model_repository directories containing
 ## all the models needed for CI testing.
@@ -54,12 +54,16 @@ CUDA_DEVICE=0
 HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/qa_model_repository
 HOST_VARDESTDIR=/tmp/qa_variable_model_repository
+HOST_ZERODESTDIR=/tmp/qa_zero_model_repository
 HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
 
-rm -fr $HOST_DESTDIR $HOST_VARDESTDIR $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
+rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
+rm -fr $HOST_ZERODESTDIR
+rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
+mkdir -p $HOST_ZERODESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
 
@@ -67,6 +71,7 @@ rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
 cp ./gen_qa_models.py $HOST_SRCDIR/.
+cp ./gen_qa_zero_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
@@ -77,6 +82,7 @@ TRTSCRIPT=trt_gen.cmds
 SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
+ZERODESTDIR=/tmp/zeromodels
 SEQDESTDIR=/tmp/seqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
 
@@ -90,6 +96,8 @@ python3 $SRCDIR/gen_qa_models.py --netdef --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --netdef --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
+python3 $SRCDIR/gen_qa_zero_models.py --netdef --models_dir=$ZERODESTDIR
+chown -R $(id -u):$(id -g) $ZERODESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --variable --models_dir=$VARSEQDESTDIR
@@ -107,6 +115,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+       --mount type=bind,source=$HOST_ZERODESTDIR,target=$ZERODESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $PYTORCH_IMAGE
@@ -125,6 +134,8 @@ python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
+python3 $SRCDIR/gen_qa_zero_models.py --graphdef --savedmodel --models_dir=$ZERODESTDIR
+chown -R $(id -u):$(id -g) $ZERODESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
@@ -142,6 +153,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+       --mount type=bind,source=$HOST_ZERODESTDIR,target=$ZERODESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
