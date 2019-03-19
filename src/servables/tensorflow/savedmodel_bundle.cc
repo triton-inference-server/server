@@ -130,7 +130,7 @@ SavedModelBundle::CreateSession(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', input '" + io.name() +
               "' dims " + DimsDebugString(iitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsDebugString(io.dims()));
+              " don't match configuration dims " + DimsListToString(io.dims()));
     }
     if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
       return Status(
@@ -159,7 +159,7 @@ SavedModelBundle::CreateSession(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', output '" + io.name() +
               "' dims " + DimsDebugString(oitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsDebugString(io.dims()));
+              " don't match configuration dims " + DimsListToString(io.dims()));
     }
     if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
       return Status(

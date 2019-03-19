@@ -49,11 +49,6 @@ struct TensorNode {
   std::vector<TensorNode*> next_nodes;
 };
 
-/// Convert a DimsList to string for generating error message
-/// \param list DimsList that to be converted.
-/// \return string of the DimsList in pattern "[ value value ... value ]"
-std::string DimsListToString(const DimsList& list);
-
 /// Validate if the data type and the shap of two TensorNode object are
 /// consistent.
 /// \param lhs One of the TensorNode object to be validated.

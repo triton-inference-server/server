@@ -163,4 +163,10 @@ bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 /// \return True if the shapes are equal, false if not equal.
 bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
 
+/// Convert a DimsList to string representation.
+/// \param dims The DimsList to be converted.
+/// \return String representation of the DimsList in pattern
+/// "[d0,d1,...,dn]"
+std::string DimsListToString(const DimsList& dims);
+
 }}  // namespace nvidia::inferenceserver

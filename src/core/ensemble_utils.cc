@@ -34,16 +34,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-std::string
-DimsListToString(const DimsList& list)
-{
-  std::string res = "[ ";
-  for (const auto& dim : list) {
-    res = res + std::to_string(dim) + " ";
-  }
-  return res + "]";
-}
-
 Status
 ValidateTensorConsistency(
     const TensorNode& lhs, const TensorNode& rhs, const std::string& message)
