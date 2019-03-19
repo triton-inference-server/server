@@ -44,6 +44,13 @@ class GRPCServer : private nvrpc::Server {
 
  private:
   GRPCServer(const std::string& addr);
+
+  IRPC* rpcInfer_;
+  IRPC* rpcStreamInfer_;
+  IRPC* rpcStatus_;
+  IRPC* rpcProfile_;
+  IRPC* rpcHealth_;
+  bool running_;
 };
 
 }}  // namespace nvidia::inferenceserver
