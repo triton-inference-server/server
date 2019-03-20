@@ -54,35 +54,58 @@ CompareDimsExact(
   return true;
 }
 
-bool
+Status
 CompareDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
     const bool supports_batching)
 {
   // If the model configuration expects batching support in the model,
   // then the tensorflow shape first dimension must be -1.
-  if (supports_batching) {
-    if ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1)) {
-      return false;
-    }
+  if (supports_batching &&
+      ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1))) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name +
+            "', model configuration supports batching but first dimension of "
+            "tensor '" +
+            tensor_name +
+            "' expected by framework is not a variable-size batch "
+            "dimension: " +
+            DimsDebugString(model_shape));
   }
 
-  if (model_shape.dim().size() != (dims.size() + (supports_batching ? 1 : 0))) {
-    return false;
+  const int nonbatch_start_idx = (supports_batching ? 1 : 0);
+
+  // Tensor rank in configuration must match what framework expects.
+  if (model_shape.dim().size() != (dims.size() + nonbatch_start_idx)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', tensor '" + tensor_name +
+            "' shape expected by framework " +
+            DimsDebugString(model_shape, nonbatch_start_idx) +
+            " doesn't match model configuration shape " +
+            DimsListToString(dims));
   }
 
   for (int i = 0; i < dims.size(); ++i) {
-    int64_t model_dim = model_shape.dim(i + (supports_batching ? 1 : 0)).size();
+    int64_t model_dim = model_shape.dim(i + nonbatch_start_idx).size();
     if (model_dim == -1) {
       continue;
     }
 
     if (model_dim != dims[i]) {
-      return false;
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', tensor '" + tensor_name +
+              "' shape expected by framework " +
+              DimsDebugString(model_shape, nonbatch_start_idx) +
+              " doesn't match model configuration shape " +
+              DimsListToString(dims));
     }
   }
 
-  return true;
+  return Status::Success;
 }
 
 bool
@@ -97,12 +120,12 @@ CompareDataType(tensorflow::DataType model_dtype, DataType dtype)
 }
 
 const std::string
-DimsDebugString(const tensorflow::TensorShapeProto& dims)
+DimsDebugString(const tensorflow::TensorShapeProto& dims, const int start_idx)
 {
   bool first = true;
   std::string str;
   str.append("[");
-  for (int i = 0; i < dims.dim().size(); ++i) {
+  for (int i = start_idx; i < dims.dim().size(); ++i) {
     if (!first) {
       str.append(",");
     }

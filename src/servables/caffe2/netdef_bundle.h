@@ -110,9 +110,8 @@ class NetDefBundle : public InferenceBackend {
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
-        const std::string& name, const std::vector<int64_t>& shape,
-        const Caffe2Workspace::DataType dtype, const size_t dtype_byte_size,
-        const size_t total_batch_size,
+        const std::string& name, const Caffe2Workspace::DataType dtype,
+        const size_t dtype_byte_size, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance

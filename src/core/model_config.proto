@@ -147,6 +147,20 @@ message ModelInstanceGroup
 }
 
 //@@
+//@@.. cpp:var:: message ModelTensorReshape
+//@@
+//@@   Reshape specification for input and output tensors.
+//@@
+message ModelTensorReshape
+{
+  //@@  .. cpp:var:: int64 shape (repeated)
+  //@@
+  //@@     The shape to use for reshaping.
+  //@@
+  repeated int64 shape = 1;
+}
+
+//@@
 //@@.. cpp:var:: message ModelInput
 //@@
 //@@   An input required by the model.
@@ -206,9 +220,19 @@ message ModelInput
 
   //@@  .. cpp:var:: int64 dims (repeated)
   //@@
-  //@@     The dimensions/shape of the input tensor.
+  //@@     The dimensions/shape of the input tensor that must be provided
+  //@@     when invoking the inference API for this model.
   //@@
   repeated int64 dims = 4;
+
+  //@@  .. cpp:var:: ModelTensorReshape reshape
+  //@@
+  //@@     The shape expected for this input by the backend. The input will
+  //@@     be reshaped to this before being presented to the backend. The
+  //@@     reshape must have the same number of elements as the input shape
+  //@@     specified by 'dims'. Optional.
+  //@@
+  ModelTensorReshape reshape = 5;
 }
 
 //@@
@@ -235,6 +259,15 @@ message ModelOutput
   //@@     The dimensions/shape of the output tensor.
   //@@
   repeated int64 dims = 3;
+
+  //@@  .. cpp:var:: ModelTensorReshape reshape
+  //@@
+  //@@     The shape produced for this output by the backend. The output will
+  //@@     be reshaped from this to the shape specifed in 'dims' before being
+  //@@     returned in the inference response. The reshape must have the same
+  //@@     number of elements as the output shape specified by 'dims'. Optional.
+  //@@
+  ModelTensorReshape reshape = 5;
 
   //@@  .. cpp:var:: string label_filename
   //@@

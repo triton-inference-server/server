@@ -186,10 +186,27 @@ bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 /// \return True if the shapes are equal, false if not equal.
 bool CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1);
 
+/// Compare two model configuration shapes for equality. Wildcard
+/// dimensions (that is, dimensions with size WILDCARD_DIM) are
+/// allowed to match with any value. So, a dimension in one shape
+/// specified as WILDCARD_DIM will always match the same dimension in
+/// the other shape.
+/// \params dims0 The first shape.
+/// \params dims1 The second shape.
+/// \return True if the shapes are equal, false if not equal.
+bool CompareDimsWithWildcard(
+    const DimsList& dims0, const std::vector<int64_t>& dims1);
+
 /// Convert a DimsList to string representation.
 /// \param dims The DimsList to be converted.
 /// \return String representation of the DimsList in pattern
 /// "[d0,d1,...,dn]"
 std::string DimsListToString(const DimsList& dims);
+
+/// Convert a vector representing a shape to string representation.
+/// \param dims The vector of dimensions to be converted.
+/// \return String representation of the vector in pattern
+/// "[d0,d1,...,dn]"
+std::string DimsListToString(const std::vector<int64_t>& dims);
 
 }}  // namespace nvidia::inferenceserver
