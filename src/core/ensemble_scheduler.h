@@ -52,7 +52,7 @@ struct EnsembleInfo {
 
   // Only include a step if the ensemble tensor is used as input in that step
   // Representing ensemble tensor with index (name doesn't matter at this point)
-  std::vector<std::set<StepInfo*>> tensor_to_step_;
+  std::vector<std::set<size_t>> tensor_to_step_;
 };
 
 // Scheduler that implements ensemble scheduling.
