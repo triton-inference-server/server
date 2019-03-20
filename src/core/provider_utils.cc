@@ -73,14 +73,12 @@ NormalizeRequestHeader(
   }
 
   // Update each input to have shape and batch-byte-size.
-  uint64_t bs = 0;
   for (InferRequestHeader::Input& io : *request_header.mutable_input()) {
     const ModelInput* input_config;
     RETURN_IF_ERROR(is.GetInput(io.name(), &input_config));
 
     // If the inference request specifies a shape for an input, make
-    // sure it matches what the model expects and then calculate the
-    // expected input size from that shape.
+    // sure it matches what the model expects.
     if (io.dims_size() > 0) {
       if (!CompareDimsWithWildcard(io.dims(), input_config->dims())) {
         return Status(
@@ -91,12 +89,28 @@ NormalizeRequestHeader(
                 DimsListToString(io.dims()));
       }
 
-      bs = GetByteSize(input_config->data_type(), io.dims());
-    } else {
+      // If there is a reshape for this input then clear the dims so
+      // that we set them to the reshape below. There cannot be a
+      // reshape if the tensor has variable-size dimensions so it is
+      // ok to throw away the request shape since it must be equal to
+      // the configuration shape.
+      if (input_config->has_reshape()) {
+        io.clear_dims();
+      }
+    }
+
+    // If we don't have shape for the input at this point then the
+    // request didn't specify it, or it has a reshape that we must use
+    // instead.
+    if (io.dims_size() == 0) {
+      const DimsList& dims = (input_config->has_reshape())
+                                 ? input_config->reshape().shape()
+                                 : input_config->dims();
+
       // Inference request doesn't specify shape, make sure input
       // shape is fully specified in the model and calculate expected
       // size from the model configuration.
-      for (auto dim : input_config->dims()) {
+      for (auto dim : dims) {
         if (dim < 0) {
           return Status(
               RequestStatusCode::INVALID_ARG,
@@ -107,16 +121,35 @@ NormalizeRequestHeader(
 
         io.add_dims(dim);
       }
-
-      bs = GetByteSize(*input_config);
     }
 
-    // If the input's datatype is not fixed-sized (like TYPE_STRING)
-    // then need to use the full-batch size specified by the
-    // input. For fixed-size datatype if batch-byte-size is given
-    // check to make sure that the calculated batch size matches.
+    // For fixed-size datatype there tensor used to calculate byte-size is:
+    //
+    //   [ batch-size, tensor-shape ] : for batching model and
+    //   non-zero-rank tensor
+    //
+    //   [ tensor-shape ] : for non-batching model and non-zero-rank
+    //   tensor
+    //
+    //   [ batch-size ] : for batching model and zero-rank tensor
+    //
+    // Note that non-batching zero-rank tensor is not allowed since
+    // that will always be shape [], i.e. a tensor with no contents.
+    //
+    uint64_t bs = 0;
     if (IsFixedSizeDataType(input_config->data_type())) {
-      bs *= request_header.batch_size();
+      bs = GetByteSize(input_config->data_type(), io.dims());
+      if (model_config.max_batch_size() > 0) {
+        if (io.dims_size() == 0) {
+          bs = GetDataTypeByteSize(input_config->data_type()) *
+               request_header.batch_size();
+        } else {
+          bs *= request_header.batch_size();
+        }
+      }
+
+      // If batch-byte-size is given check to make sure that the
+      // calculated batch size matches
       if ((io.batch_byte_size() != 0) && (io.batch_byte_size() != bs)) {
         return Status(
             RequestStatusCode::INVALID_ARG,
@@ -126,6 +159,8 @@ NormalizeRequestHeader(
                 model_name + "'");
       }
     } else {
+      // The input's datatype is not fixed-sized (like TYPE_STRING),
+      // use the full-batch size specified by the request.
       bs = io.batch_byte_size();
     }
 
@@ -190,7 +225,7 @@ EVBufferToInputMap(
     if (byte_size != 0) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unexpected size for input '" + io.name() + "', missing expecting " +
+          "unexpected size for input '" + io.name() + "', expecting " +
               std::to_string(byte_size) + " bytes for model '" + model_name +
               "'");
     }

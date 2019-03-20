@@ -94,9 +94,9 @@ class Caffe2Workspace {
 
   // Get the value for an output tensor after inferencing.
   virtual Error GetOutputTensor(
-      const std::string& name, const std::vector<int64_t>& shape,
-      const Caffe2Workspace::DataType dtype, const char** content,
-      size_t* byte_size, std::vector<int64_t>* content_shape) = 0;
+      const std::string& name, const Caffe2Workspace::DataType dtype,
+      const char** content, size_t* byte_size,
+      std::vector<int64_t>* content_shape) = 0;
 
   // Run the model.
   virtual Error Run() = 0;

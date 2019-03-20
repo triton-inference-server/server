@@ -58,9 +58,9 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
       const std::string& name, const std::vector<int64_t>& shape,
       const DataType dtype, const char* content, size_t byte_size) override;
   Error GetOutputTensor(
-      const std::string& name, const std::vector<int64_t>& shape,
-      const Caffe2Workspace::DataType dtype, const char** content,
-      size_t* byte_size, std::vector<int64_t>* content_shape) override;
+      const std::string& name, const Caffe2Workspace::DataType dtype,
+      const char** content, size_t* byte_size,
+      std::vector<int64_t>* content_shape) override;
   Error Run() override;
 
  private:
@@ -87,24 +87,6 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
 };
 
 namespace {
-
-bool
-CompareOutputShape(
-    const std::vector<int64_t>& config_shape,
-    const at::IntArrayRef& output_shape)
-{
-  if (config_shape.size() != output_shape.size()) {
-    return false;
-  }
-
-  for (int i = 0; i < config_shape.size(); ++i) {
-    if ((config_shape[i] != -1) && (config_shape[i] != output_shape[i])) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 const std::string
 DimsDebugString(const at::IntArrayRef& dims)
@@ -486,9 +468,9 @@ Caffe2WorkspaceImpl::SetInputTensor(
 
 Caffe2Workspace::Error
 Caffe2WorkspaceImpl::GetOutputTensor(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const Caffe2Workspace::DataType dtype, const char** content,
-    size_t* byte_size, std::vector<int64_t>* content_shape)
+    const std::string& name, const Caffe2Workspace::DataType dtype,
+    const char** content, size_t* byte_size,
+    std::vector<int64_t>* content_shape)
 {
   // Find the output tensor in the model...
   caffe2::Blob* blob = nullptr;
@@ -527,13 +509,6 @@ Caffe2WorkspaceImpl::GetOutputTensor(
         "unexpected datatype " + std::string(output->meta().name()) +
         " for inference output '" + name + "', expecting " +
         std::string(pr.second.name()));
-  }
-
-  if (!CompareOutputShape(shape, output->sizes())) {
-    return Error(
-        "unexpected shape " + DimsDebugString(output->sizes()) +
-        " for inference output '" + name + "', expecting " +
-        DimsDebugString(shape));
   }
 
   content_shape->clear();

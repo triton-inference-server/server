@@ -1,1 +1,1 @@
-Invalid argument: unable to load model 'bad_input_dims', input 'INPUT0' dims [-1,16] don't match configuration dims [16,1]
+Invalid argument: unable to load model 'bad_input_dims', tensor 'INPUT0' shape expected by framework [16] doesn't match model configuration shape [16,1]
