@@ -69,6 +69,7 @@ cc_library(
     deps = [
         "//src/core:model_config",
         "//src/core:model_config_proto",
+        "//src/core:status",
         "@org_tensorflow//tensorflow/core:protos_all_cc",
     ],
 )

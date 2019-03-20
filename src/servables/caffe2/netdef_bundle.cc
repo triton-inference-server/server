@@ -430,15 +430,15 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
 
 Status
 NetDefBundle::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const Caffe2Workspace::DataType dtype, const size_t dtype_byte_size,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
+    const std::string& name, const Caffe2Workspace::DataType dtype,
+    const size_t dtype_byte_size, const size_t total_batch_size,
+    std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
   const char* content = nullptr;
   size_t byte_size = 0;
   Caffe2Workspace::Error err = workspace_->GetOutputTensor(
-      name, shape, dtype, &content, &byte_size, &content_shape);
+      name, dtype, &content, &byte_size, &content_shape);
   if (!err.IsOk()) {
     return Status(RequestStatusCode::INTERNAL, err.Message());
   }
@@ -614,25 +614,12 @@ NetDefBundle::Context::Run(
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
-    // Get the shape of the output from the model configuration.
-    std::vector<int64_t> shape;
-
-    // If model supports batching then prepend the batch dimension
-    // onto the output shape.
-    if (max_batch_size_ != NO_BATCHING) {
-      shape.push_back(total_batch_size);
-    }
-
-    for (auto dim : output_config->dims()) {
-      shape.push_back(dim);
-    }
-
     // Checked at initialization time to make sure that STRING is not
     // being used for an output, so can just assume fixed-sized here.
     const Caffe2Workspace::DataType dtype =
         ConvertDataType(output_config->data_type());
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        name, shape, dtype, GetDataTypeByteSize(output_config->data_type()),
+        name, dtype, GetDataTypeByteSize(output_config->data_type()),
         total_batch_size, payloads));
   }
 

@@ -123,15 +123,15 @@ SavedModelBundle::CreateSession(
           "unexpected inference input '" + io.name() + "'");
     }
 
-    if (!CompareDimsSupported(
-            iitr->second.tensor_shape(), io.dims(),
-            Config().max_batch_size() > 0)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', input '" + io.name() +
-              "' dims " + DimsDebugString(iitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsListToString(io.dims()));
-    }
+    // If a reshape is provided for the input then use that when
+    // validating that the TF model matches what is expected.
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+    RETURN_IF_ERROR(CompareDimsSupported(
+        Name(), io.name(), iitr->second.tensor_shape(), dims,
+        Config().max_batch_size() > 0));
+
     if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
@@ -152,15 +152,15 @@ SavedModelBundle::CreateSession(
           "unexpected inference output '" + io.name() + "'");
     }
 
-    if (!CompareDimsSupported(
-            oitr->second.tensor_shape(), io.dims(),
-            Config().max_batch_size() > 0)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', output '" + io.name() +
-              "' dims " + DimsDebugString(oitr->second.tensor_shape()) +
-              " don't match configuration dims " + DimsListToString(io.dims()));
-    }
+    // If a reshape is provided for the output then use that when
+    // validating that the TF model matches what is expected.
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+    RETURN_IF_ERROR(CompareDimsSupported(
+        Name(), io.name(), oitr->second.tensor_shape(), dims,
+        Config().max_batch_size() > 0));
+
     if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,

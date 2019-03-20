@@ -269,6 +269,24 @@ CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1)
   return true;
 }
 
+bool
+CompareDimsWithWildcard(
+    const DimsList& dims0, const std::vector<int64_t>& dims1)
+{
+  if (dims0.size() != (int64_t)dims1.size()) {
+    return false;
+  }
+
+  for (int i = 0; i < dims0.size(); ++i) {
+    if ((dims0[i] != WILDCARD_DIM) && (dims1[i] != WILDCARD_DIM) &&
+        (dims0[i] != dims1[i])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 std::string
 DimsListToString(const DimsList& dims)
 {
@@ -287,5 +305,22 @@ DimsListToString(const DimsList& dims)
   return str;
 }
 
+std::string
+DimsListToString(const std::vector<int64_t>& dims)
+{
+  bool first = true;
+
+  std::string str("[");
+  for (const auto& dim : dims) {
+    if (!first) {
+      str += ",";
+    }
+    str += std::to_string(dim);
+    first = false;
+  }
+
+  str += "]";
+  return str;
+}
 
 }}  // namespace nvidia::inferenceserver

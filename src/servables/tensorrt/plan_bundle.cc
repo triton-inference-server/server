@@ -282,7 +282,7 @@ PlanBundle::CreateExecutionContext(
 Status
 PlanBundle::Context::InitializeInputBinding(
     const std::string& input_name, const DataType input_datatype,
-    const DimsList& input_dims)
+    const DimsList& model_config_dims)
 {
   int index = engine_->getBindingIndex(input_name.c_str());
   if (index < 0) {
@@ -314,16 +314,16 @@ PlanBundle::Context::InitializeInputBinding(
             DataType_Name(dt) + " for " + name_);
   }
 
-  nvinfer1::Dims dims = engine_->getBindingDimensions(index);
-  if (!CompareDims(dims, input_dims)) {
+  nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
+  if (!CompareDims(engine_dims, model_config_dims)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "input '" + input_name + "' dims " + DimsDebugString(dims) +
-            " don't match configuration dims " + DimsListToString(input_dims) +
-            " for " + name_);
+        "input '" + input_name + "' dims " + DimsDebugString(engine_dims) +
+            " don't match configuration dims " +
+            DimsListToString(model_config_dims) + " for " + name_);
   }
 
-  const int64_t byte_size = GetByteSize(max_batch_size_, dt, input_dims);
+  const int64_t byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
   if (byte_size == -1) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -385,8 +385,11 @@ PlanBundle::Context::InitializeConfigInputBindings(
 {
   for (const auto& io : ios) {
     RETURN_IF_ERROR(ValidateModelInput(io));
+
+    const DimsList& model_config_dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
     RETURN_IF_ERROR(
-        InitializeInputBinding(io.name(), io.data_type(), io.dims()));
+        InitializeInputBinding(io.name(), io.data_type(), model_config_dims));
   }
 
   return Status::Success;
@@ -429,16 +432,20 @@ PlanBundle::Context::InitializeConfigOutputBindings(
               DataType_Name(dt) + " for " + name_);
     }
 
-    nvinfer1::Dims dims = engine_->getBindingDimensions(index);
-    if (!CompareDims(dims, io.dims())) {
+    const DimsList& model_config_dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+    nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
+    if (!CompareDims(engine_dims, model_config_dims)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "output '" + io.name() + "' dims " + DimsDebugString(dims) +
-              " don't match configuration dims " + DimsListToString(io.dims()) +
-              " for " + name_);
+          "output '" + io.name() + "' dims " + DimsDebugString(engine_dims) +
+              " don't match configuration dims " +
+              DimsListToString(model_config_dims) + " for " + name_);
     }
 
-    const int64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
+    const int64_t byte_size =
+        GetByteSize(max_batch_size_, dt, model_config_dims);
     if (byte_size == -1) {
       return Status(
           RequestStatusCode::INTERNAL, "unable to calculate size for output '" +

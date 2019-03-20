@@ -27,6 +27,7 @@
 
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/status.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.pb.h"
 
@@ -43,7 +44,7 @@ bool CompareDimsExact(
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
     const bool supports_batching);
 
-/// \return true if a TensorFlow shape can support a model
+/// \return Status::Success if a TensorFlow shape can support a model
 /// configuration shape. Dimensions with variable size in the
 /// TensorFlow shape can support any size in the corresponding model
 /// configuration shape dimension. Dimensions with variable size in
@@ -52,7 +53,8 @@ bool CompareDimsExact(
 /// \param supports_batching If True then the configuration expects
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
-bool CompareDimsSupported(
+Status CompareDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
     const bool supports_batching);
 
@@ -61,7 +63,8 @@ bool CompareDimsSupported(
 bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
 
 /// \return the string representation of a TensorFlow shape.
-const std::string DimsDebugString(const tensorflow::TensorShapeProto& dims);
+const std::string DimsDebugString(
+    const tensorflow::TensorShapeProto& dims, const int start_idx = 1);
 
 /// \return the TensorFlow data-type that corresponds to a model
 /// configuration data-type.

@@ -482,6 +482,36 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 
   int output_idx = 0;
   for (const auto& output : outputs_) {
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
+
+    // Verify that the actual output shape matches what is expected by
+    // the model configuration. If there is an output reshape, we've
+    // already verified that reshape and dims have same element count
+    // so don't need to do that here.
+    bool skip_batch = (is.Config().max_batch_size() != 0);
+    DimsList batch1_backend_shape;
+    size_t batch1_element_count = 1;
+    for (auto d : output.shape_) {
+      if (!skip_batch) {
+        batch1_backend_shape.Add(d);
+        batch1_element_count *= (size_t)d;
+      }
+      skip_batch = false;
+    }
+
+    const DimsList& expected_shape = (output_config->has_reshape())
+                                         ? output_config->reshape().shape()
+                                         : output_config->dims();
+    if (!CompareDimsWithWildcard(expected_shape, batch1_backend_shape)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "output '" + output.name_ + "' for model '" + is.Name() +
+              "' has shape " + DimsListToString(batch1_backend_shape) +
+              " but model configuration specifies shape " +
+              DimsListToString(expected_shape));
+    }
+
     auto poutput = response_header->add_output();
     poutput->set_name(output.name_);
 
@@ -490,20 +520,17 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       poutput->mutable_raw()->Clear();
       poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
 
-      // If the model produces batched output, don't include the batch
-      // dimension.
-      bool skip = (is.Config().max_batch_size() != 0);
-      for (auto d : output.shape_) {
-        if (!skip) {
-          poutput->mutable_raw()->add_dims(d);
-        }
-        skip = false;
+      // If there is a reshape them we know that output_config dims
+      // are non-variable so use them directly. If there is not a
+      // reshape then use output shape as that will have actual sized
+      // in place of any wildcard dimensions.
+      if (output_config->has_reshape()) {
+        poutput->mutable_raw()->mutable_dims()->CopyFrom(output_config->dims());
+      } else {
+        poutput->mutable_raw()->mutable_dims()->CopyFrom(batch1_backend_shape);
       }
     } else {
       // Class result...
-      const ModelOutput* output_config;
-      RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
-
       const auto& pr = output_map_.find(output.name_);
       if (pr == output_map_.end()) {
         return Status(
@@ -511,16 +538,6 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
             "can't find request meta-data for output '" + output.name_ + "'");
       }
       const InferRequestHeader::Output* request_output = pr->second;
-
-      // Determine the number of elements in a batch-1 output.
-      size_t batch1_element_count = 1;
-      bool skip = (is.Config().max_batch_size() != 0);
-      for (auto d : output.shape_) {
-        if (!skip) {
-          batch1_element_count *= (size_t)d;
-        }
-        skip = false;
-      }
 
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
