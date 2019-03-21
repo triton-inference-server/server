@@ -648,28 +648,37 @@ class InferContext:
                                 input, shape_value, c_uint64(shape_value.size))))
 
                 for input_value in input_values:
-                    # If the input is a tensor of string objects, then
-                    # must flatten those into a 1-dimensional array
-                    # containing the 4-byte string length followed by
-                    # the actual string characters.  All strings are
-                    # concatenated together in "C" order.
-                    if input_value.dtype == np.object:
-                        flattened = bytes()
-                        if input_value.size > 0:
+                    # If the input tensor is empty then avoid going
+                    # through the more complicated logic since
+                    # creating the buffer for string objects results
+                    # is a size-1 array instead of 0.
+                    if input_value.size == 0:
+                        _raise_if_error(
+                            c_void_p(
+                                _crequest_infer_ctx_input_set_raw(input, 0, 0)))
+                    else:
+                        # If the input is a tensor of string objects,
+                        # then must flatten those into a 1-dimensional
+                        # array containing the 4-byte string length
+                        # followed by the actual string characters.
+                        # All strings are concatenated together in "C"
+                        # order.
+                        if input_value.dtype == np.object:
+                            flattened = bytes()
                             for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
                                 s = str(obj).encode('utf-8')
                                 flattened += struct.pack("<I", len(s))
                                 flattened += s
-                        input_value = np.asarray(flattened)
+                            input_value = np.asarray(flattened)
 
-                    if not input_value.flags['C_CONTIGUOUS']:
-                        input_value = np.ascontiguousarray(input_value)
-                    contiguous_input_values.append(input_value)
-                    _raise_if_error(
-                        c_void_p(
-                            _crequest_infer_ctx_input_set_raw(
-                                input, input_value.ctypes.data_as(c_void_p),
-                                c_uint64(input_value.size * input_value.itemsize))))
+                        if not input_value.flags['C_CONTIGUOUS']:
+                            input_value = np.ascontiguousarray(input_value)
+                        contiguous_input_values.append(input_value)
+                        _raise_if_error(
+                            c_void_p(
+                                _crequest_infer_ctx_input_set_raw(
+                                    input, input_value.ctypes.data_as(c_void_p),
+                                    c_uint64(input_value.size * input_value.itemsize))))
             finally:
                 _crequest_infer_ctx_input_del(input)
 
@@ -701,6 +710,17 @@ class InferContext:
                 result_dtype = self._get_result_numpy_dtype(result)
                 results[output_name] = list()
                 if output_format == InferContext.ResultFormat.RAW:
+                    # Get the shape of each result tensor
+                    max_shape_dims = 16
+                    shape_array = np.zeros(max_shape_dims, dtype=np.int64)
+                    shape_len = c_uint64()
+                    _raise_if_error(
+                        c_void_p(
+                            _crequest_infer_ctx_result_shape(
+                                result, c_uint64(max_shape_dims),
+                                shape_array, byref(shape_len))))
+                    shape = np.resize(shape_array, shape_len.value).tolist()
+
                     for b in range(batch_size):
                         # Get the result value into a 1-dim np array
                         # of the appropriate type
@@ -710,39 +730,36 @@ class InferContext:
                             c_void_p(
                                 _crequest_infer_ctx_result_next_raw(
                                     result, b, byref(cval), byref(cval_len))))
-                        val_buf = cast(cval, POINTER(c_byte * cval_len.value))[0]
-
-                        # If the result is not a string datatype then
-                        # convert directly. Otherwise parse 'val_buf'
-                        # into an array of strings and from that into
-                        # a numpy array of string objects.
-                        if result_dtype != np.object:
-                            val = np.frombuffer(val_buf, dtype=result_dtype)
+                        if cval_len.value == 0:
+                            val = np.empty(shape, dtype=result_dtype)
+                            results[output_name].append(val)
                         else:
-                            # String results contain a 4-byte string
-                            # length followed by the actual string
-                            # characters.
-                            strs = list()
-                            offset = 0
-                            while offset < len(val_buf):
-                                l = struct.unpack_from("<I", val_buf, offset)[0]
-                                offset += 4
-                                sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
-                                offset += l
-                                strs.append(sb)
-                            val = np.array(strs, dtype=object)
+                            val_buf = cast(cval, POINTER(c_byte * cval_len.value))[0]
 
-                        # Reshape the result to the appropriate shape
-                        max_shape_dims = 16
-                        shape = np.zeros(max_shape_dims, dtype=np.int64)
-                        shape_len = c_uint64()
-                        _raise_if_error(
-                            c_void_p(
-                                _crequest_infer_ctx_result_shape(
-                                    result, c_uint64(max_shape_dims),
-                                    shape, byref(shape_len))))
-                        shaped = np.reshape(np.copy(val), np.resize(shape, shape_len.value).tolist())
-                        results[output_name].append(shaped)
+                            # If the result is not a string datatype
+                            # then convert directly. Otherwise parse
+                            # 'val_buf' into an array of strings and
+                            # from that into a numpy array of string
+                            # objects.
+                            if result_dtype != np.object:
+                                val = np.frombuffer(val_buf, dtype=result_dtype)
+                            else:
+                                # String results contain a 4-byte
+                                # string length followed by the actual
+                                # string characters.
+                                strs = list()
+                                offset = 0
+                                while offset < len(val_buf):
+                                    l = struct.unpack_from("<I", val_buf, offset)[0]
+                                    offset += 4
+                                    sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+                                    offset += l
+                                    strs.append(sb)
+                                val = np.array(strs, dtype=object)
+
+                            # Reshape the result to the appropriate shape
+                            shaped = np.reshape(np.copy(val), shape)
+                            results[output_name].append(shaped)
 
                 elif (isinstance(output_format, (list, tuple)) and
                       (output_format[0] == InferContext.ResultFormat.CLASS)):
@@ -958,7 +975,7 @@ class InferContext:
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
             self._ctx, byref(c_is_ready), request_id, wait))
 
-        
+
         self._last_request_id = _raise_if_error(err)
 
         if not c_is_ready.value:

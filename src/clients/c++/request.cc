@@ -314,9 +314,6 @@ InputImpl::InputImpl(const ModelInput& mio)
     needs_shape_ = true;
   } else {
     byte_size_ = GetByteSize(mio);
-    if (byte_size_ == 0) {
-      byte_size_ = -1;
-    }
   }
 }
 
@@ -334,11 +331,11 @@ InputImpl::SetShape(const std::vector<int64_t>& dims)
 {
   // Make sure the shape does not contain any invalid dimensions
   for (const auto dim : dims) {
-    if (dim < 1) {
+    if (dim < 0) {
       return Error(
           RequestStatusCode::INVALID_ARG,
           "attempt to set invalid shape dimension " + std::to_string(dim) +
-              ", shape dimensions must be >= 1 for input '" + Name());
+              ", shape dimensions must be >= 0 for input '" + Name());
     }
   }
 
@@ -346,9 +343,6 @@ InputImpl::SetShape(const std::vector<int64_t>& dims)
   shape_ = dims;
 
   byte_size_ = GetByteSize(DType(), dims);
-  if (byte_size_ == 0) {
-    byte_size_ = -1;
-  }
 
   return Error::Success;
 }
@@ -589,6 +583,7 @@ class ResultImpl : public InferContext::Result {
 
   void SetBatchnByteSize(const size_t s)
   {
+    has_fixed_batch1_byte_size_ = true;
     batch1_byte_size_ = s / batch_size_;
   }
 
@@ -628,6 +623,7 @@ class ResultImpl : public InferContext::Result {
   const InferContext::Result::ResultFormat result_format_;
   const size_t batch_size_;
 
+  bool has_fixed_batch1_byte_size_;
   size_t batch1_byte_size_;
   size_t batch1_element_count_;
   std::vector<int64_t> shape_;
@@ -650,9 +646,10 @@ ResultImpl::ResultImpl(
     : output_(output),
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
-      batch_size_(batch_size), batch1_byte_size_(0), batch1_element_count_(0),
-      bufs_(batch_size), bufs_idx_(0), bufs_pos_(batch_size),
-      bufs_byte_size_(batch_size), class_pos_(batch_size)
+      batch_size_(batch_size), has_fixed_batch1_byte_size_(false),
+      batch1_byte_size_(0), batch1_element_count_(0), bufs_(batch_size),
+      bufs_idx_(0), bufs_pos_(batch_size), bufs_byte_size_(batch_size),
+      class_pos_(batch_size)
 {
 }
 
@@ -826,6 +823,13 @@ ResultImpl::SetBatchRawResult(
 {
   size_t total_size = 0;
 
+  // If the batch1 size is 0, then we have an empty result tensor. We
+  // don't need to do anything in this case except advance bufs_idx_
+  // to show that all data has been read for the tensor.
+  if (batch1_byte_size == 0) {
+    bufs_idx_ = bufs_.size();
+  }
+
   while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
     const size_t csz = std::min(batch1_byte_size - bufs_pos_[bufs_idx_], size);
     if (csz > 0) {
@@ -853,14 +857,13 @@ ResultImpl::SetNextRawResult(
   // If output has a known batch1-byte-size (which is the same for
   // every item in the batch) then can directly assign the results to
   // the appropriate per-batch buffers.
-  if (batch1_byte_size_ > 0) {
+  if (has_fixed_batch1_byte_size_) {
     return SetBatchRawResult(batch1_byte_size_, buf, size, result_bytes);
   }
 
   // Output is a non-fixed-sized datatype. For now we assume that it
   // is TYPE_STRING and so we need to parse buf to get the size for
-  // each batch (since 'batch1_element_count_' entries which go into a
-  // batch).
+  // each batch.
   if (bufs_idx_ == bufs_.size()) {
     *result_bytes = 0;
     return Error::Success;

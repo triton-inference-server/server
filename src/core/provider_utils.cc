@@ -126,14 +126,6 @@ NormalizeRequestHeader(
                 model_name + "'");
       }
     } else {
-      if (io.batch_byte_size() == 0) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "batch-byte-size must be specified for input '" + io.name() +
-                "' with non-fixed-size datatype for model '" + model_name +
-                "'");
-      }
-
       bs = io.batch_byte_size();
     }
 
@@ -157,57 +149,59 @@ EVBufferToInputMap(
   //
   // Get the addr and size of each chunk of input data from the
   // evbuffer.
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
   if (n > 0) {
-    struct evbuffer_iovec* v = static_cast<struct evbuffer_iovec*>(
+    v = static_cast<struct evbuffer_iovec*>(
         alloca(sizeof(struct evbuffer_iovec) * n));
     if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unexpected error getting input buffers ");
     }
+  }
 
-    int v_idx = 0;
+  // Get the byte-size for each input and from that get the blocks
+  // holding the data for that input
+  for (const auto& io : request_header.input()) {
+    auto memory_ref = std::make_shared<SystemMemoryReference>();
+    input_map.emplace(std::make_pair(
+        io.name(), std::static_pointer_cast<SystemMemory>(memory_ref)));
 
-    // Get the byte-size for each input and from that get the blocks
-    // holding the data for that input
-    for (const auto& io : request_header.input()) {
-      auto memory_ref = std::make_shared<SystemMemoryReference>();
-      input_map.emplace(std::make_pair(
-          io.name(), std::static_pointer_cast<SystemMemory>(memory_ref)));
-
-      uint64_t byte_size = io.batch_byte_size();
-      while ((byte_size > 0) && (v_idx < n)) {
-        char* base = static_cast<char*>(v[v_idx].iov_base);
-        size_t base_size;
-        if (v[v_idx].iov_len > byte_size) {
-          base_size = byte_size;
-          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-          v[v_idx].iov_len -= byte_size;
-          byte_size = 0;
-        } else {
-          base_size = v[v_idx].iov_len;
-          byte_size -= v[v_idx].iov_len;
-          v_idx++;
-        }
-        memory_ref->AddBuffer(base, base_size);
+    uint64_t byte_size = io.batch_byte_size();
+    while ((byte_size > 0) && (v_idx < n)) {
+      char* base = static_cast<char*>(v[v_idx].iov_base);
+      size_t base_size;
+      if (v[v_idx].iov_len > byte_size) {
+        base_size = byte_size;
+        v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+        v[v_idx].iov_len -= byte_size;
+        byte_size = 0;
+      } else {
+        base_size = v[v_idx].iov_len;
+        byte_size -= v[v_idx].iov_len;
+        v_idx++;
       }
-
-      if (byte_size != 0) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected size for input '" + io.name() +
-                "', missing expecting " + std::to_string(byte_size) +
-                " bytes for model '" + model_name + "'");
-      }
+      memory_ref->AddBuffer(base, base_size);
     }
 
-    if (v_idx != n) {
+    if (byte_size != 0) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unexpected additional input data for model '" + model_name + "'");
+          "unexpected size for input '" + io.name() + "', missing expecting " +
+              std::to_string(byte_size) + " bytes for model '" + model_name +
+              "'");
     }
   }
+
+  if (v_idx != n) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unexpected additional input data for model '" + model_name + "'");
+  }
+
   return Status::Success;
 }
 
