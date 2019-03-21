@@ -80,7 +80,8 @@ class EnsembleContext {
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
-  StepList PrepareSteps(const std::shared_ptr<Step>& completed_step);
+  Status PrepareSteps(
+      const std::shared_ptr<Step>& completed_step, StepList& steps);
 
   // Prepare infer stats and call the inference server's function to process
   // the infer requests specified in 'steps'
@@ -88,17 +89,19 @@ class EnsembleContext {
       const std::shared_ptr<EnsembleContext>& context, const StepList& steps);
 
   // Helper function that updates ensemble state given 'completed_step' and
-  // returns the list of updated tensors
-  std::vector<size_t> UpdateEnsembleState(
-      const std::shared_ptr<Step>& completed_step);
+  // returns the list of updated tensors in 'updated_tensors'
+  Status UpdateEnsembleState(
+      const std::shared_ptr<Step>& completed_step,
+      std::vector<size_t>& updated_tensors);
 
-  // Helper function that returns a list of step that should be run under
+  // Helper function that returns a list of 'steps' that should be run under
   // current ensemble state. 'updated_tensors' is used so that we don't need to
   // iterate all the tensors to determine which step can be run.
-  StepList Next(const std::vector<size_t>& updated_tensors);
+  Status GetNextSteps(
+      const std::vector<size_t>& updated_tensors, StepList& steps);
 
   // Helper function that completes the response of the ensemble request
-  void FinishEnsemble();
+  Status FinishEnsemble();
 
   // Helper function that initialize the 'step' given the info at 'step_idx'.
   // The 'step' will have proper request / response provider for the model
@@ -199,56 +202,60 @@ EnsembleContext::Proceed(
     const std::shared_ptr<EnsembleContext>& context,
     const std::shared_ptr<Step>& completed_step)
 {
-  StepList ready_steps = context->PrepareSteps(completed_step);
-  ScheduleSteps(context, ready_steps);
+  StepList ready_steps;
+  Status status = context->PrepareSteps(completed_step, ready_steps);
+  if (status.IsOk()) {
+    ScheduleSteps(context, ready_steps);
+  }
 }
 
-EnsembleContext::StepList
-EnsembleContext::PrepareSteps(const std::shared_ptr<Step>& completed_step)
+Status
+EnsembleContext::PrepareSteps(
+    const std::shared_ptr<Step>& completed_step, StepList& ready_steps)
 {
-  StepList res;
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    StepList ready_steps;
+    StepList res;
     if (ensemble_status_.IsOk()) {
-      std::vector<size_t> updated_tensors = UpdateEnsembleState(completed_step);
+      std::vector<size_t> updated_tensors;
+      ensemble_status_ = UpdateEnsembleState(completed_step, updated_tensors);
       if (ensemble_status_.IsOk()) {
-        ready_steps = Next(updated_tensors);
+        ensemble_status_ = GetNextSteps(updated_tensors, res);
       }
     }
     // Error or no more progress (completed or deadlock)
     if ((!ensemble_status_.IsOk()) || (inflight_request_counter_ == 0)) {
-      FinishEnsemble();
+      ensemble_status_ = FinishEnsemble();
     } else {
-      res.swap(ready_steps);
+      ready_steps.swap(res);
     }
   }
-  return res;
+  return ensemble_status_;
 }
 
-std::vector<size_t>
+Status
 EnsembleContext::UpdateEnsembleState(
-    const std::shared_ptr<Step>& completed_step)
+    const std::shared_ptr<Step>& completed_step,
+    std::vector<size_t>& updated_tensors)
 {
-  std::vector<size_t> res;
-
+  updated_tensors.clear();
   if (completed_step == nullptr) {
     for (size_t i = 0; i < tensor_data_.size(); i++) {
       if (tensor_data_[i].second != nullptr) {
-        res.push_back(i);
+        updated_tensors.push_back(i);
       }
     }
   } else {
     inflight_request_counter_--;
     if (completed_step->request_status_.code() != RequestStatusCode::SUCCESS) {
-      ensemble_status_ = Status(
+      return Status(
           completed_step->request_status_.code(),
           completed_step->request_status_.msg());
     } else {
       auto step_idx = completed_step->step_idx_;
-      completed_step->response_provider_->FinalizeResponse(
-          *((*completed_step->backend_)()));
+      RETURN_IF_ERROR(completed_step->response_provider_->FinalizeResponse(
+          *((*completed_step->backend_)())));
       const auto& response_header =
           completed_step->response_provider_->ResponseHeader();
       for (const auto& output : response_header.output()) {
@@ -261,17 +268,17 @@ EnsembleContext::UpdateEnsembleState(
             tensor_data.first.set_batch_byte_size(
                 output.raw().batch_byte_size());
 
-            completed_step->response_provider_->GetSystemMemory(
-                it->first, &(tensor_data.second));
-            res.push_back(it->second);
+            RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
+                it->first, &(tensor_data.second)));
+            updated_tensors.push_back(it->second);
           } else {
-            ensemble_status_ = Status(
+            return Status(
                 RequestStatusCode::INTERNAL,
                 "internal response header specified output '" + output.name() +
                     "' that does not map to any ensemble tensors");
           }
         } else {
-          ensemble_status_ = Status(
+          return Status(
               RequestStatusCode::INTERNAL,
               "internal response header should return output '" +
                   output.name() +
@@ -280,13 +287,14 @@ EnsembleContext::UpdateEnsembleState(
       }
     }
   }
-  return res;
+  return Status::Success;
 }
 
-EnsembleContext::StepList
-EnsembleContext::Next(const std::vector<size_t>& updated_tensors)
+Status
+EnsembleContext::GetNextSteps(
+    const std::vector<size_t>& updated_tensors, StepList& steps)
 {
-  StepList res;
+  steps.clear();
 
   std::set<size_t> next_step_idx;
   // Get steps whose tensors used for input are set
@@ -307,16 +315,12 @@ EnsembleContext::Next(const std::vector<size_t>& updated_tensors)
   }
 
   for (const auto& idx : next_step_idx) {
-    res.emplace_back();
-    ensemble_status_ = InitStep(idx, &(res.back()));
-    if (!ensemble_status_.IsOk()) {
-      res.clear();
-      break;
-    }
+    steps.emplace_back();
+    RETURN_IF_ERROR(InitStep(idx, &(steps.back())));
   }
-  inflight_request_counter_ += res.size();
+  inflight_request_counter_ += steps.size();
 
-  return res;
+  return Status::Success;
 }
 
 Status
@@ -353,11 +357,11 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   return Status::Success;
 }
 
-void
+Status
 EnsembleContext::FinishEnsemble()
 {
   if (stats_ == nullptr) {
-    return;
+    return ensemble_status_;
   }
 
   stats_->SetModelExecutionCount(1);
@@ -371,6 +375,7 @@ EnsembleContext::FinishEnsemble()
   // because of failure in one of the internal requests)
   // And use it as a hint on whether FinishEnsemble() has been called
   stats_.reset();
+  return ensemble_status_;
 }
 
 Status
