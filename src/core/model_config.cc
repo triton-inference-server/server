@@ -76,14 +76,16 @@ GetDataTypeByteSize(const DataType dtype)
 int64_t
 GetElementCount(const DimsList& dims)
 {
+  bool first = true;
   int64_t cnt = 0;
   for (auto dim : dims) {
     if (dim == WILDCARD_DIM) {
       return -1;
     }
 
-    if (cnt == 0) {
+    if (first) {
       cnt = dim;
+      first = false;
     } else {
       cnt *= dim;
     }
@@ -95,14 +97,16 @@ GetElementCount(const DimsList& dims)
 int64_t
 GetElementCount(const std::vector<int64_t>& dims)
 {
+  bool first = true;
   int64_t cnt = 0;
   for (auto dim : dims) {
     if (dim == WILDCARD_DIM) {
       return -1;
     }
 
-    if (cnt == 0) {
+    if (first) {
       cnt = dim;
+      first = false;
     } else {
       cnt *= dim;
     }
@@ -123,45 +127,69 @@ GetElementCount(const ModelOutput& mio)
   return GetElementCount(mio.dims());
 }
 
-uint64_t
+int64_t
 GetByteSize(const DataType& dtype, const DimsList& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
-  if (dt_size <= 0) {
-    return 0;
+  if (dt_size == 0) {
+    return -1;
   }
 
   int64_t cnt = GetElementCount(dims);
   if (cnt == -1) {
-    return 0;
+    return -1;
   }
 
   return cnt * dt_size;
 }
 
-uint64_t
+int64_t
 GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims)
 {
   size_t dt_size = GetDataTypeByteSize(dtype);
-  if (dt_size <= 0) {
-    return 0;
+  if (dt_size == 0) {
+    return -1;
   }
 
   int64_t cnt = GetElementCount(dims);
   if (cnt == -1) {
-    return 0;
+    return -1;
   }
 
   return cnt * dt_size;
 }
 
-uint64_t
+int64_t
+GetByteSize(const int batch_size, const DataType& dtype, const DimsList& dims)
+{
+  int64_t bs = GetByteSize(dtype, dims);
+  if (bs == -1) {
+    return -1;
+  }
+
+  return std::max(1, batch_size) * bs;
+}
+
+int64_t
+GetByteSize(
+    const int batch_size, const DataType& dtype,
+    const std::vector<int64_t>& dims)
+{
+  int64_t bs = GetByteSize(dtype, dims);
+  if (bs == -1) {
+    return -1;
+  }
+
+  return std::max(1, batch_size) * bs;
+}
+
+int64_t
 GetByteSize(const ModelInput& mio)
 {
   return GetByteSize(mio.data_type(), mio.dims());
 }
 
-uint64_t
+int64_t
 GetByteSize(const ModelOutput& mio)
 {
   return GetByteSize(mio.data_type(), mio.dims());

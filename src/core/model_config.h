@@ -108,29 +108,52 @@ size_t GetDataTypeByteSize(const DataType dtype);
 /// shape.
 /// \param dtype The data-type.
 /// \param dims The shape.
-/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-uint64_t GetByteSize(const DataType& dtype, const DimsList& dims);
+int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on datatype and
 /// shape.
 /// \param dtype The data-type.
 /// \param dims The shape.
-/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-uint64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
+int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
+
+/// Get the size, in bytes, of a tensor based on batch-size, datatype
+/// and shape.
+/// \param batch_size The batch-size. May be 0 to indicate no
+/// batching.
+/// \param dtype The data-type.
+/// \param dims The shape.
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
+/// unable to determine the size.
+int64_t GetByteSize(
+    const int batch_size, const DataType& dtype, const DimsList& dims);
+
+/// Get the size, in bytes, of a tensor based on batch-size, datatype
+/// and shape.
+/// \param batch_size The batch-size. May be 0 to indicate no
+/// batching.
+/// \param dtype The data-type.
+/// \param dims The shape.
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
+/// unable to determine the size.
+int64_t GetByteSize(
+    const int batch_size, const DataType& dtype,
+    const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on ModelInput.
 /// \param mio The ModelInput protobuf.
-/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-uint64_t GetByteSize(const ModelInput& mio);
+int64_t GetByteSize(const ModelInput& mio);
 
 /// Get the size, in bytes, of a tensor based on ModelOutput.
 /// \param mio The ModelOutput protobuf.
-/// \return The size, in bytes, of the corresponding tensor, or 0 if
+/// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
-uint64_t GetByteSize(const ModelOutput& mio);
+int64_t GetByteSize(const ModelOutput& mio);
 
 /// Get the Platform value for a platform name.
 /// \param platform_name The platform name.

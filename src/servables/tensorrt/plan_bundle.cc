@@ -323,16 +323,18 @@ PlanBundle::Context::InitializeInputBinding(
             " for " + name_);
   }
 
-  const uint64_t byte_size = GetByteSize(max_batch_size_, dt, input_dims);
-  if (byte_size == 0) {
+  const int64_t byte_size = GetByteSize(max_batch_size_, dt, input_dims);
+  if (byte_size == -1) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to calculate size for input '" + input_name + " for " + name_);
   }
 
-  // Allocate CUDA memory
+  // Allocate CUDA memory. We rely on buffers_ being non-nullptr to
+  // indicate that the buffer has been correctly initalized so even
+  // for zero-sized tensors always allocate something.
   void* buffer;
-  cudaError_t err = cudaMalloc(&buffer, byte_size);
+  cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, byte_size));
   if (err != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to allocate memory for input '" +
@@ -436,16 +438,18 @@ PlanBundle::Context::InitializeConfigOutputBindings(
               " for " + name_);
     }
 
-    const uint64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
-    if (byte_size == 0) {
+    const int64_t byte_size = GetByteSize(max_batch_size_, dt, io.dims());
+    if (byte_size == -1) {
       return Status(
           RequestStatusCode::INTERNAL, "unable to calculate size for output '" +
                                            io.name() + " for " + name_);
     }
 
-    // Allocate CUDA memory
+    // Allocate CUDA memory. We rely on buffers_ being non-nullptr to
+    // indicate that the buffer has been correctly initalized so even
+    // for zero-sized tensors always allocate something.
     void* buffer;
-    cudaError_t err = cudaMalloc(&buffer, byte_size);
+    cudaError_t err = cudaMalloc(&buffer, std::max((int64_t)1, byte_size));
     if (err != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -578,16 +582,18 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
           break;
         }
 
-        cudaError_t err = cudaMemcpyAsync(
-            static_cast<char*>(buffers_[bindex]) + binding_copy_offset +
-                copied_byte_size,
-            content, content_byte_size, cudaMemcpyHostToDevice, stream_);
-        if (err != cudaSuccess) {
-          payload.status_ = Status(
-              RequestStatusCode::INTERNAL,
-              "failed to copy input values to GPU for input '" + name +
-                  "': " + std::string(cudaGetErrorString(err)));
-          break;
+        if (content_byte_size > 0) {
+          cudaError_t err = cudaMemcpyAsync(
+              static_cast<char*>(buffers_[bindex]) + binding_copy_offset +
+                  copied_byte_size,
+              content, content_byte_size, cudaMemcpyHostToDevice, stream_);
+          if (err != cudaSuccess) {
+            payload.status_ = Status(
+                RequestStatusCode::INTERNAL,
+                "failed to copy input values to GPU for input '" + name +
+                    "': " + std::string(cudaGetErrorString(err)));
+            break;
+          }
         }
 
         copied_byte_size += content_byte_size;
@@ -663,7 +669,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
                     std::to_string(binding_copy_offset + expected_byte_size) +
                     " for inference output '" + name + "', expecting maximum" +
                     std::to_string(byte_sizes_[bindex]));
-          } else {
+          } else if (expected_byte_size > 0) {
             cudaError_t err = cudaMemcpyAsync(
                 content,
                 static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
