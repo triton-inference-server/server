@@ -202,7 +202,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
 # Perform inference using a "nop" model that expects some form or
 # zero-sized input/output tensor.
-def infer_zero(tester, pf, batch_size, tensor_dtype, tensor_shapes,
+def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
                use_streaming=True):
     tester.assertTrue(use_http or use_grpc or use_streaming)
@@ -214,13 +214,8 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, tensor_shapes,
     if use_streaming:
         configs.append(("localhost:8001", ProtocolType.GRPC, True))
 
-    io_cnt = len(tensor_shapes)
-
-    # If shape is [] then the entire input tensor batch has shape [
-    # batch-size ], so each input tensor in the request batch has
-    # shape [ 1 ].
-    #if len(tensor_shape) == 0:
-    #    tensor_shape = [1,]
+    tester.assertEqual(len(input_shapes), len(output_shapes))
+    io_cnt = len(input_shapes)
 
     for config in configs:
         model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
@@ -238,15 +233,17 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, tensor_shapes,
                 rtensor_dtype = _range_repr_dtype(tensor_dtype)
                 in0 = np.random.randint(low=np.iinfo(rtensor_dtype).min,
                                         high=np.iinfo(rtensor_dtype).max,
-                                        size=tensor_shapes[io_num], dtype=rtensor_dtype)
+                                        size=input_shapes[io_num], dtype=rtensor_dtype)
                 if tensor_dtype != np.object:
                     in0 = in0.astype(tensor_dtype)
                     expected0 = np.ndarray.copy(in0)
                 else:
                     expected0 = np.array([bytes(str(x), encoding='utf-8')
-                                    for x in in0.flatten()], dtype=object).reshape(in0.shape)
+                                    for x in in0.flatten()], dtype=object)
                     in0 = np.array([str(x) for x in in0.flatten()],
                                    dtype=object).reshape(in0.shape)
+
+                expected0 = expected0.reshape(output_shapes[io_num])
 
                 input_list.append(in0)
                 expected_list.append(expected0)

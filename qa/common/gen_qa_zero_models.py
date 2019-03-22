@@ -127,9 +127,7 @@ def create_tf_modelfile(
 
     tf_dtype = np_to_tf_dtype(dtype)
 
-    # Create the model with a empty shape except for batch, [?]. The
-    # shape is completely determined by the batch dimension. The model
-    # just copies the input to the output.
+    # Create the model that copies inputs to corresponding outputs.
     tf.reset_default_graph()
     for io_num in range(io_cnt):
         input_name = "INPUT{}".format(io_num)
@@ -179,13 +177,7 @@ def create_tf_modelconfig(
     if not tu.validate_for_tf_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
-    # If max_batch is > 0 and shape is empty, then have the case where
-    # full batch input shape is a vector [ batch-size ], but each
-    # input of the batch still is a single element so set shape to [ 1
-    # ] for input.
     shape_str = tu.shape_to_dims_str(shape)
-    if (max_batch > 0) and (len(shape) == 0):
-        shape_str = tu.shape_to_dims_str([1,])
 
     # Use a different model name for the non-batching variant
     if create_savedmodel:
@@ -242,7 +234,7 @@ def create_netdef_modelfile(
     model_name = tu.get_zero_model_name(
         "netdef_nobatch" if max_batch == 0 else "netdef", io_cnt, dtype)
 
-    # The model just copies the input to the output.
+    # Create the model that copies inputs to corresponding outputs.
     model = c2model_helper.ModelHelper(name=model_name)
     for io_num in range(io_cnt):
         model.net.Copy("INPUT{}".format(io_num), "OUTPUT{}".format(io_num))
@@ -266,13 +258,7 @@ def create_netdef_modelconfig(
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
-    # If max_batch is > 0 and shape is empty, then have the case where
-    # full batch input shape is a vector [ batch-size ], but each
-    # input of the batch still is a single element so set shape to [ 1
-    # ] for input.
     shape_str = tu.shape_to_dims_str(shape)
-    if (max_batch > 0) and (len(shape) == 0):
-        shape_str = tu.shape_to_dims_str([1,])
 
     model_name = tu.get_zero_model_name(
         "netdef_nobatch" if max_batch == 0 else "netdef", io_cnt, dtype)
@@ -315,25 +301,25 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
     if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, io_cnt, 8, dtype, shape);
-        create_tf_modelfile(False, models_dir, model_version, io_cnt, 8, dtype, shape);
+        create_tf_modelconfig(False, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_tf_modelfile(False, models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_tf_modelconfig(False, models_dir, model_version, io_cnt, 0, dtype, shape);
-            create_tf_modelfile(False, models_dir, model_version, io_cnt, 0, dtype, shape);
+            create_tf_modelconfig(False, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_tf_modelfile(False, models_dir, model_version, io_cnt, 0, dtype, shape)
 
     if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape);
-        create_tf_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape);
+        create_tf_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_tf_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_tf_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape);
-            create_tf_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape);
+            create_tf_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_tf_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
     if FLAGS.netdef:
-        create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape);
-        create_netdef_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape);
+        create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_netdef_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape);
-            create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape);
+            create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
 
 if __name__ == '__main__':
@@ -357,13 +343,10 @@ if __name__ == '__main__':
 
     import test_util as tu
 
-    # Create a batching model with zero-sized tensors
-    #create_models(FLAGS.models_dir, np.float32, [], no_batch=False)
-
     # Create models with variable-sized input and output.
-    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1, no_batch=True)
-    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3, no_batch=True)
-    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1, no_batch=True)
-    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=3, no_batch=True)
-    create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1, no_batch=True)
-    create_models(FLAGS.models_dir, np_dtype_string, [-1,-1], io_cnt=3, no_batch=True)
+    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
+    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3)
+    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1)
+    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=3)
+    create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1)
+    create_models(FLAGS.models_dir, np_dtype_string, [-1,-1], io_cnt=3)

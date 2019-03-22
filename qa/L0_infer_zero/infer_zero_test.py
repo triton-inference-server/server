@@ -47,18 +47,18 @@ class InferZeroTest(unittest.TestCase):
         if tu.validate_for_tf_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'graphdef', bs, dtype, shapes)
-                iu.infer_zero(self, 'savedmodel', bs, dtype, shapes)
+                iu.infer_zero(self, 'graphdef', bs, dtype, shapes, shapes)
+                iu.infer_zero(self, 'savedmodel', bs, dtype, shapes, shapes)
             # model that does not support batching
-            iu.infer_zero(self, 'graphdef_nobatch', 1, dtype, shapes)
-            iu.infer_zero(self, 'savedmodel_nobatch', 1, dtype, shapes)
+            iu.infer_zero(self, 'graphdef_nobatch', 1, dtype, shapes, shapes)
+            iu.infer_zero(self, 'savedmodel_nobatch', 1, dtype, shapes, shapes)
 
         if tu.validate_for_c2_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
             # model that supports batching
             for bs in (1, 8):
-                iu.infer_zero(self, 'netdef', bs, dtype, shapes)
+                iu.infer_zero(self, 'netdef', bs, dtype, shapes, shapes)
             # model that does not support batching
-            iu.infer_zero(self, 'netdef_nobatch', 1, dtype, shapes)
+            iu.infer_zero(self, 'netdef_nobatch', 1, dtype, shapes, shapes)
 
     def test_ff1_sanity(self):
         self._full_zero(np.float32, ([1,],))
