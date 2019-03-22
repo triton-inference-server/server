@@ -281,7 +281,7 @@ instance_group [
 
 
 def create_netdef_modelfile(
-        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
+        models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -313,7 +313,7 @@ def create_netdef_modelfile(
 
 
 def create_netdef_modelconfig(
-        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
+        models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_c2_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -383,7 +383,7 @@ instance_group [
 
 
 def create_plan_modelfile(
-        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
+        models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -427,7 +427,7 @@ def create_plan_modelfile(
 
 
 def create_plan_modelconfig(
-        create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
+        models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -500,32 +500,32 @@ def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
     if FLAGS.graphdef:
-        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape);
-        create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape);
+        create_tf_modelconfig(False, models_dir, model_version, 8, dtype, shape)
+        create_tf_modelfile(False, models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_tf_modelconfig(False, models_dir, model_version, 0, dtype, shape);
-            create_tf_modelfile(False, models_dir, model_version, 0, dtype, shape);
+            create_tf_modelconfig(False, models_dir, model_version, 0, dtype, shape)
+            create_tf_modelfile(False, models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.savedmodel:
-        create_tf_modelconfig(True, models_dir, model_version, 8, dtype, shape);
-        create_tf_modelfile(True, models_dir, model_version, 8, dtype, shape);
+        create_tf_modelconfig(True, models_dir, model_version, 8, dtype, shape)
+        create_tf_modelfile(True, models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_tf_modelconfig(True, models_dir, model_version, 0, dtype, shape);
-            create_tf_modelfile(True, models_dir, model_version, 0, dtype, shape);
+            create_tf_modelconfig(True, models_dir, model_version, 0, dtype, shape)
+            create_tf_modelfile(True, models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.netdef:
-        create_netdef_modelconfig(True, models_dir, model_version, 8, dtype, shape);
-        create_netdef_modelfile(True, models_dir, model_version, 8, dtype, shape);
+        create_netdef_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_netdef_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_netdef_modelconfig(True, models_dir, model_version, 0, dtype, shape);
-            create_netdef_modelfile(True, models_dir, model_version, 0, dtype, shape);
+            create_netdef_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_netdef_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.tensorrt:
-        create_plan_modelconfig(True, models_dir, model_version, 8, dtype, shape + [1, 1]);
-        create_plan_modelfile(True, models_dir, model_version, 8, dtype, shape + [1, 1]);
+        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + [1, 1])
+        create_plan_modelfile(models_dir, model_version, 8, dtype, shape + [1, 1])
         if no_batch:
-            create_plan_modelconfig(True, models_dir, model_version, 0, dtype, shape + [1, 1]);
-            create_plan_modelfile(True, models_dir, model_version, 0, dtype, shape + [1, 1]);
+            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + [1, 1])
+            create_plan_modelfile(models_dir, model_version, 0, dtype, shape + [1, 1])
 
 
 if __name__ == '__main__':
