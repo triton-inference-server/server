@@ -1168,9 +1168,23 @@ InferContext::UpdateStat(const RequestTimers& timer)
                               timer.receive_start_.tv_nsec;
   uint64_t receive_end_ns =
       timer.receive_end_.tv_sec * NANOS_PER_SECOND + timer.receive_end_.tv_nsec;
-  if ((request_start_ns >= request_end_ns) || (send_start_ns > send_end_ns) ||
+  if ((request_start_ns > request_end_ns) || (send_start_ns > send_end_ns) ||
       (receive_start_ns > receive_end_ns)) {
-    return Error(RequestStatusCode::INVALID_ARG, "Timer not set correctly.");
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "Timer not set correctly." +
+            ((request_start_ns > request_end_ns)
+                 ? (" Request time from " + std::to_string(request_start_ns) +
+                    " to " + std::to_string(request_end_ns) + ".")
+                 : "") +
+            ((send_start_ns > send_end_ns)
+                 ? (" Send time from " + std::to_string(send_start_ns) +
+                    " to " + std::to_string(send_end_ns) + ".")
+                 : "") +
+            ((receive_start_ns > receive_end_ns)
+                 ? (" Receive time from " + std::to_string(receive_start_ns) +
+                    " to " + std::to_string(receive_end_ns) + ".")
+                 : ""));
   }
 
   uint64_t request_time_ns = request_end_ns - request_start_ns;
@@ -1547,6 +1561,9 @@ class HttpRequestImpl : public RequestImpl {
   // them for another request during the HTTP transfer.
   std::vector<std::shared_ptr<InferContext::Input>> inputs_;
 
+  // The total byte size across all the inputs
+  uint64_t total_input_byte_size_;
+
   // Current positions within input vectors when sending request.
   size_t input_pos_idx_;
 
@@ -1592,6 +1609,7 @@ HttpRequestImpl::InitializeRequest()
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
   }
 
+  total_input_byte_size_ = 0;
   input_pos_idx_ = 0;
   result_pos_idx_ = 0;
 
@@ -1875,6 +1893,12 @@ InferHttpContext::Run(ResultMap* results)
   sync_request->timer_.Reset();
   sync_request->timer_.Record(RequestTimers::Kind::REQUEST_START);
   sync_request->timer_.Record(RequestTimers::Kind::SEND_START);
+  if (sync_request->total_input_byte_size_ == 0) {
+    // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
+    // content length is 0. In that case, we can't measure SEND_END properly
+    // (send ends after sending request header).
+    sync_request->timer_.Record(RequestTimers::Kind::SEND_END);
+  }
   sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
   sync_request->timer_.Record(RequestTimers::Kind::RECEIVE_END);
   sync_request->timer_.Record(RequestTimers::Kind::REQUEST_END);
@@ -1932,6 +1956,9 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
     current_context->timer_.Reset();
     current_context->timer_.Record(RequestTimers::Kind::REQUEST_START);
     current_context->timer_.Record(RequestTimers::Kind::SEND_START);
+    if (current_context->total_input_byte_size_ == 0) {
+      current_context->timer_.Record(RequestTimers::Kind::SEND_END);
+    }
   }
 
   cv_.notify_all();
@@ -2098,11 +2125,10 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
   // per-batch-instance byte-size can be different for different input
   // instances in the batch... so set the batch-byte-size to the total
   // size of the batch (see api.proto).
-  uint64_t total_input_byte_size = 0;
   infer_request_.mutable_input()->Clear();
   infer_request_.set_id(request->Id());
   for (const auto& io : inputs_) {
-    total_input_byte_size += io->TotalByteSize();
+    http_request->total_input_byte_size_ += io->TotalByteSize();
 
     auto rinput = infer_request_.add_input();
     rinput->set_name(io->Name());
@@ -2117,7 +2143,8 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
 
   // Set the expected POST size. If you want to POST large amounts of
   // data, consider CURLOPT_POSTFIELDSIZE_LARGE
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, total_input_byte_size);
+  curl_easy_setopt(
+      curl, CURLOPT_POSTFIELDSIZE, http_request->total_input_byte_size_);
 
   // Headers to specify input and output tensors
   infer_request_str_.clear();
