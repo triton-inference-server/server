@@ -66,6 +66,15 @@ cc_library(
 )
 
 cc_library(
+    name = "simple_ensemble_client_main",
+    srcs = ["simple_ensemble_client.cc"],
+    deps = [
+        ":request",
+        "//src/core:model_config_proto",
+    ],
+)
+
+cc_library(
     name = "simple_sequence_client_main",
     srcs = ["simple_sequence_client.cc"],
     deps = [
@@ -128,6 +137,17 @@ cc_binary(
     name = "simple_string_client",
     deps = [
         ":simple_string_client_main",
+        ":request",
+    ],
+    linkopts = [
+        "-pthread", "-lcurl"
+    ],
+)
+
+cc_binary(
+    name = "simple_ensemble_client",
+    deps = [
+        ":simple_ensemble_client_main",
         ":request",
     ],
     linkopts = [
