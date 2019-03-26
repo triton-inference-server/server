@@ -54,6 +54,7 @@ RUN mkdir -p qa/common && \
     mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
     cp /opt/tensorrtserver/custom/libsequence.so \
        qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
+    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_reshape/. && \
     mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so \
        qa/custom_models/custom_int32_int32_int32/1/. && \

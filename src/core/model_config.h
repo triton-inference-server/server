@@ -121,7 +121,8 @@ int64_t GetByteSize(const DataType& dtype, const DimsList& dims);
 int64_t GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
-/// and shape.
+/// and shape. A tensor that has empty shape [] and non-zero
+/// batch-size is sized as a tensor with shape [ batch-size ].
 /// \param batch_size The batch-size. May be 0 to indicate no
 /// batching.
 /// \param dtype The data-type.
@@ -132,7 +133,8 @@ int64_t GetByteSize(
     const int batch_size, const DataType& dtype, const DimsList& dims);
 
 /// Get the size, in bytes, of a tensor based on batch-size, datatype
-/// and shape.
+/// and shape. A tensor that has empty shape [] and non-zero
+/// batch-size is sized as a tensor with shape [ batch-size ].
 /// \param batch_size The batch-size. May be 0 to indicate no
 /// batching.
 /// \param dtype The data-type.

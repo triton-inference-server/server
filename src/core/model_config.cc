@@ -162,6 +162,10 @@ GetByteSize(const DataType& dtype, const std::vector<int64_t>& dims)
 int64_t
 GetByteSize(const int batch_size, const DataType& dtype, const DimsList& dims)
 {
+  if (dims.size() == 0) {
+    return batch_size * GetDataTypeByteSize(dtype);
+  }
+
   int64_t bs = GetByteSize(dtype, dims);
   if (bs == -1) {
     return -1;
@@ -175,6 +179,10 @@ GetByteSize(
     const int batch_size, const DataType& dtype,
     const std::vector<int64_t>& dims)
 {
+  if (dims.size() == 0) {
+    return batch_size * GetDataTypeByteSize(dtype);
+  }
+
   int64_t bs = GetByteSize(dtype, dims);
   if (bs == -1) {
     return -1;

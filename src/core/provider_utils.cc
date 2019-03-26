@@ -123,15 +123,20 @@ NormalizeRequestHeader(
       }
     }
 
-    // For fixed-size datatype there tensor used to calculate byte-size is:
+    // For fixed-size datatype the tensor used to calculate byte-size
+    // is:
     //
     //   [ batch-size, tensor-shape ] : for batching model and
-    //   non-zero-rank tensor
+    //   non-zero-rank tensor. For example, batch-size 4 and dims [ 1,
+    //   2 ] the full tensor shape is [ 4, 1, 2 ].
     //
     //   [ tensor-shape ] : for non-batching model and non-zero-rank
-    //   tensor
+    //   tensor. For example, dims [ 1, 2 ] the full tensor shape is [
+    //   1, 2 ].
     //
-    //   [ batch-size ] : for batching model and zero-rank tensor
+    //   [ batch-size ] : for batching model and zero-rank tensor. For
+    //   example, batch-size 4 with dims [ 1 ] and reshape [ ], the
+    //   full tensor shape is [ 4 ].
     //
     // Note that non-batching zero-rank tensor is not allowed since
     // that will always be shape [], i.e. a tensor with no contents.
