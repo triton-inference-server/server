@@ -54,7 +54,6 @@ enum ErrorCodes {
   kOutputBuffer,
   kInput,
   kInputBuffer,
-  kInputContents,
   kInputSize,
   kOpenCV
 };
@@ -124,7 +123,7 @@ Context::Init()
   if (model_config_.input(0).dims_size() != 1) {
     return kInput;
   }
-  if (model_config_.input(0).dims(1) != 1) {
+  if (model_config_.input(0).dims(0) != 1) {
     return kInput;
   }
   if (model_config_.input(0).data_type() != DataType::TYPE_STRING) {
@@ -172,7 +171,6 @@ Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
-  // [TODO] replace below with preprocess procedure
   for (size_t idx = 0; idx < payload_cnt; idx++) {
     // If output wasn't requested just do nothing.
     if (payloads[idx].output_cnt == 0) {
@@ -180,9 +178,10 @@ Context::Execute(
     }
 
     // Reads input
+    uint32_t batch_size = (payloads[idx].batch_size == 0) ? 1 : payloads[idx].batch_size;
     std::vector<std::vector<char>> input;
     int err = GetInputTensor(
-        input_fn, payloads[idx].input_context, "INPUT0", payloads[idx].batch_size, input);
+        input_fn, payloads[idx].input_context, "INPUT", batch_size, input);
     if (err != kSuccess) {
       payloads[idx].error_code = err;
       continue;
@@ -246,7 +245,7 @@ Context::GetInputTensor(
     // Get all content out
     uint64_t content_byte_size = -1;
     if (!input_fn(input_context, name, &content, &content_byte_size)) {
-      return kInputContents;
+      return kInputBuffer;
     }
 
     // If 'content' returns nullptr we have all the input.
@@ -269,7 +268,7 @@ Context::GetInputTensor(
         content = static_cast<const char*>(content) + byte_to_append;
         content_byte_size -= byte_to_append;
         if (size_buffer.size() == 4) {
-          image_size = (uint32_t)size_buffer[0];
+          image_size = *(uint32_t*)(&size_buffer[0]);
           byte_read = 0;
           size_buffer.clear();
           input.emplace_back();
@@ -490,7 +489,6 @@ CustomFinalize(void* custom_context)
 const char*
 CustomErrorString(void* custom_context, int errcode)
 {
-  // [TODO] update the error string
   switch (errcode) {
     case kSuccess:
       return "success";
@@ -499,9 +497,17 @@ CustomErrorString(void* custom_context, int errcode)
     case kBatching:
       return "batching not supported";
     case kOutput:
-      return "expected single output, variable-size vector of string";
+      return "expected single output, with 3 dimensions";
     case kOutputBuffer:
       return "unable to get buffer for output tensor values";
+    case kInput:
+      return "expected single input, 1 STRING element";
+    case kInputBuffer:
+      return "unable to get buffer for input tensor values";
+    case kInputSize:
+      return "input obtained does not match batch size";
+    case kOpenCV:
+      return "unable to preprocess image";
     default:
       break;
   }

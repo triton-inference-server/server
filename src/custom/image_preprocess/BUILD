@@ -44,4 +44,8 @@ cc_binary(
         ":image_preprocess_base",
     ],
     linkshared = 1,
+    linkopts = [
+        "-lopencv_core",
+        "-lopencv_highgui",
+    ]
 )
