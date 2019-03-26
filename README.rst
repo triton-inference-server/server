@@ -30,11 +30,6 @@
 NVIDIA TensorRT Inference Server
 ================================
 
-    **VISIT US AT GTC 2019: The TensorRT Inference Server will be
-    featured in multiple presentations. You can also meet some of the
-    developers at a "Connect with the Experts" session on Wed. 3/20 at
-    12:00.** https://www.nvidia.com/gtc/
-
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
     latest release of the TensorRT Inference Server is 1.0.0 and
