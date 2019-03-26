@@ -385,7 +385,8 @@ CustomBundle::Context::Run(
 
       work_input_name_ptrs.push_back(input.name().c_str());
       work_input_dim_cnts.push_back(shape->size());
-      work_input_dims_ptrs.push_back(&(shape->at(0)));
+      work_input_dims_ptrs.push_back(
+          (shape->size() == 0) ? nullptr : &(shape->at(0)));
       if (custom_payload.input_names == nullptr) {
         custom_payload.input_names = &work_input_name_ptrs.back();
         custom_payload.input_shape_dim_cnts = &work_input_dim_cnts.back();
@@ -463,7 +464,11 @@ CustomBundle::Context::GetOutput(
   // If there is no response provider return content == nullptr with
   // OK status as an indication that the output should not be written.
   if (payload->response_provider_ != nullptr) {
-    std::vector<int64_t> shape(shape_dims, shape_dims + shape_dim_cnt);
+    std::vector<int64_t> shape;
+    if (shape_dim_cnt > 0) {
+      shape.assign(shape_dims, shape_dims + shape_dim_cnt);
+    }
+
     Status status = payload->response_provider_->GetOutputBuffer(
         name, content, content_byte_size, shape);
     return status.IsOk();
