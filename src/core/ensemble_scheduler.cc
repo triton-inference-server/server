@@ -309,8 +309,8 @@ EnsembleContext::GetNextSteps(
     const auto& step_idx = info_->tensor_to_step_[tensor_idx];
     for (const auto& idx : step_idx) {
       bool ready = true;
-      for (const auto& input_pair : info_->steps_[idx].tensor_to_input_) {
-        if (tensor_data_[input_pair.first].second == nullptr) {
+      for (const auto& input_pair : info_->steps_[idx].input_to_tensor_) {
+        if (tensor_data_[input_pair.second].second == nullptr) {
           ready = false;
           break;
         }
@@ -340,11 +340,11 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 
   request_header.set_correlation_id(correlation_id_);
   request_header.set_batch_size(batch_size_);
-  for (const auto& pair : info_->steps_[step_idx].tensor_to_input_) {
+  for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
     auto input = request_header.add_input();
-    *input = tensor_data_[pair.first].first;
-    input->set_name(pair.second);
-    input_map[pair.second] = tensor_data_[pair.first].second;
+    *input = tensor_data_[pair.second].first;
+    input->set_name(pair.first);
+    input_map[pair.first] = tensor_data_[pair.second].second;
   }
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
@@ -509,16 +509,16 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
     info_->steps_.emplace_back(element.model_name(), element.model_version());
     for (const auto& pair : element.input_map()) {
       size_t idx = info_->tensor_to_step_.size();
-      auto it = name_to_idx.find(pair.first);
+      auto it = name_to_idx.find(pair.second);
       if (it == name_to_idx.end()) {
-        name_to_idx[pair.first] = idx;
+        name_to_idx[pair.second] = idx;
         info_->tensor_to_step_.emplace_back();
       } else {
         idx = it->second;
       }
       info_->tensor_to_step_[idx].insert(step_idx);
-      info_->steps_[step_idx].tensor_to_input_.emplace(
-          std::make_pair(idx, pair.second));
+      info_->steps_[step_idx].input_to_tensor_.emplace(
+          std::make_pair(pair.first, idx));
     }
 
     for (const auto& pair : element.output_map()) {

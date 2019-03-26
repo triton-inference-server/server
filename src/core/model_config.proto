@@ -581,8 +581,8 @@ message ModelEnsembling
 
     //@@  .. cpp:var:: map<string,string> input_map
     //@@
-    //@@     Map from ensemble tensor name to name of an input tensor on this
-    //@@     step's model. The ensemble tensor must have the same data type and
+    //@@     Map from name of an input tensor on this step's model to ensemble
+    //@@     tensor name. The ensemble tensor must have the same data type and
     //@@     shape as the model input. Each model input must be assigned to
     //@@     one ensemble tensor, but the same ensemble tensor can be assigned
     //@@     to multiple model inputs.

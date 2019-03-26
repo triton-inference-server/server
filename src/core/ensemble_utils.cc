@@ -140,29 +140,29 @@ ValidateEnsembleConfig(
       input_names.insert(model_input.name());
     }
     for (const auto& input_map : step.input_map()) {
-      if (input_names.find(input_map.second) == input_names.end()) {
+      if (input_names.find(input_map.first) == input_names.end()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "in ensemble " + ensemble + ", ensemble tensor " + input_map.first +
-                " is mapping to non-existing input " + input_map.second +
+            "in ensemble " + ensemble + ", ensemble tensor " + input_map.second +
+                " is mapping to non-existing input " + input_map.first +
                 " in model " + step.model_name());
       }
     }
     for (const auto& model_input : model_config.input()) {
       size_t mapped_cnt = 0;
       for (const auto& input_map : step.input_map()) {
-        if (model_input.name() == input_map.second) {
+        if (model_input.name() == input_map.first) {
           TensorNode model_tensor(
               step.model_name(), model_input.data_type(), model_input.dims());
-          auto it = ensemble_tensors.find(input_map.first);
+          auto it = ensemble_tensors.find(input_map.second);
           if (it != ensemble_tensors.end()) {
             RETURN_IF_ERROR(ValidateTensorConsistency(
                 it->second, model_tensor,
                 "in ensemble " + ensemble + ", ensemble tensor " +
-                    input_map.first + ": "));
+                    input_map.second + ": "));
           } else {
             ensemble_tensors.emplace(
-                std::make_pair(input_map.first, model_tensor));
+                std::make_pair(input_map.second, model_tensor));
           }
           mapped_cnt++;
         }
@@ -229,7 +229,7 @@ ValidateEnsembleConfig(
     for (const auto& output_map : step.output_map()) {
       auto& node = ensemble_tensors.find(output_map.second)->second;
       for (const auto& input_map : step.input_map()) {
-        auto& prev_node = ensemble_tensors.find(input_map.first)->second;
+        auto& prev_node = ensemble_tensors.find(input_map.second)->second;
         node.prev_nodes.push_back(&prev_node);
         prev_node.next_nodes.push_back(&node);
       }

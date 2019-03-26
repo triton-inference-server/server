@@ -45,7 +45,7 @@ struct EnsembleInfo {
 
     std::string model_name_;
     int64_t model_version_;
-    std::unordered_map<size_t, std::string> tensor_to_input_;
+    std::unordered_map<std::string, size_t> input_to_tensor_;
     std::unordered_map<std::string, size_t> output_to_tensor_;
   };
 
