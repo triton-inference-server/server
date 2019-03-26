@@ -140,6 +140,9 @@ Context::Init()
     return kOutput;
   } else {
     for (const auto& dim : model_config_.output(0).dims()) {
+      if (dim < 1) {
+        return kOutput;
+      }
       output_shape_.push_back(dim);
     }
   }
@@ -497,7 +500,7 @@ CustomErrorString(void* custom_context, int errcode)
     case kBatching:
       return "batching not supported";
     case kOutput:
-      return "expected single output, with 3 dimensions";
+      return "expected single output with 3 dimensions, each dimension >= 1";
     case kOutputBuffer:
       return "unable to get buffer for output tensor values";
     case kInput:

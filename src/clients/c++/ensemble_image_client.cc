@@ -100,15 +100,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
-  std::cerr << "\t-p <proprocessed output filename prefix>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-      << std::endl;
-  std::cerr
-      << "For -p, if specified, the client will only send the raw images to the"
-      << " preprocess custom backend, and write the response to files as output"
-      << " in <prfix><batch index> format."
       << std::endl;
 
   exit(1);
@@ -122,7 +116,6 @@ main(int argc, char** argv)
   bool verbose = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
-  std::string prefix = "";
 
   // Parse commandline...
   int opt;
@@ -137,9 +130,6 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
-      case 'p':
-        prefix = optarg;
-        break;
       case '?':
         Usage(argv);
         break;
@@ -148,16 +138,10 @@ main(int argc, char** argv)
 
   nic::Error err;
 
-  // We use a simple model that takes 2 input tensors of 16 strings
-  // each and returns 2 output tensors of 16 strings each. The input
-  // strings must represent integers. One output tensor is the
-  // element-wise sum of the inputs and one output is the element-wise
-  // difference.
-  std::string model_name = "image_preprocess";
-  if (prefix.empty()) {
-    // [TODO] set model name to ensemble model once ensemble is implemented
-    Usage(argv, "error: attempt to use unimplemented ensemble feature");
-  }
+  // The ensemble model takes 1 input tensor with shape [ 1 ] and STRING
+  // data type and returns 1 output tensor as top 1 classification result of the
+  // input.
+  std::string model_name = "preprocess_resnet50_ensemble";
 
   // Create the inference context for the model.
   std::unique_ptr<nic::InferContext> ctx;
@@ -180,10 +164,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Create the data for the two input tensors. Initialize the first
-  // to unique integers and the second to all ones. The input tensors
-  // are the string representation of these values.
-  // Collect the names of the image(s).
+  // Obtain a list of the image names to be processed
   std::vector<std::string> image_filenames;
 
   struct stat name_stat;
@@ -227,12 +208,18 @@ main(int argc, char** argv)
     }
   }
 
-  // only send one request for simplicity
+  // this client only send one request for simplicity. So the maximum number
+  // of the images to be processed is limited by the maximum batch size
   uint64_t batch_size = ctx->MaxBatchSize();
+  if (images.size() > batch_size) {
+    std::cerr << "The number of images exceeds maximum batch size, only the"
+              << " first " << batch_size << " images, sorted by name"
+              << " alphabetically, will be processed" << std::endl;
+  }
   batch_size = (images.size() < batch_size) ? images.size() : batch_size;
 
-  // Set the context options to do batch-size 1 requests. Also request
-  // that all output tensors be returned.
+  // Set the context options to do 1 request. Also request
+  // the return type of the result.
   std::unique_ptr<nic::InferContext::Options> options;
   FAIL_IF_ERR(
       nic::InferContext::Options::Create(&options),
@@ -240,11 +227,7 @@ main(int argc, char** argv)
 
   options->SetBatchSize(batch_size);
   for (const auto& output : ctx->Outputs()) {
-    if (prefix.empty()) {
-      options->AddClassResult(output, 1);
-    } else {
-      options->AddRawResult(output);
-    }
+    options->AddClassResult(output, 1);
   }
 
   FAIL_IF_ERR(ctx->SetRunOptions(*options), "unable to set inference options");
@@ -264,30 +247,16 @@ main(int argc, char** argv)
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(ctx->Run(&results), "unable to run model");
 
-  // We expect there to be 2 results. Walk over all 16 result elements
-  // and print the sum and difference calculated by the model.
+  // We expect there to be 1 result. The result may be batched.
   if (results.size() != 1) {
     std::cerr << "error: expected 1 results, got " << results.size()
               << std::endl;
   }
 
-  // Read results
-  if (prefix.empty()) {
-    for (size_t i = 0; i < batch_size; i++) {
-      // Read the output values (they are strings).
-      Postprocess(results, image_filenames, batch_size);
-    }
-  } else {
-    for (size_t i = 0; i < batch_size; i++) {
-      const std::vector<uint8_t>* buf;
-      FAIL_IF_ERR(
-          results["OUTPUT"]->GetRaw(i /* batch idx */, &buf),
-          "unable to get OUTPUT result at idx " + std::to_string(i));
-      std::cout << "batch idx " << i << ": " << image_filenames[i] << std::endl;
-      std::ofstream output_file(prefix + std::to_string(i));
-      std::ostream_iterator<uint8_t> output_iterator(output_file);
-      std::copy((*buf).begin(), (*buf).end(), output_iterator);
-    }
+  // Print classification results
+  for (size_t i = 0; i < batch_size; i++) {
+    // Read the output values if we are performing classification.
+    Postprocess(results, image_filenames, batch_size);
   }
 
   return 0;

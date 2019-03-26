@@ -66,8 +66,8 @@ cc_library(
 )
 
 cc_library(
-    name = "simple_ensemble_client_main",
-    srcs = ["simple_ensemble_client.cc"],
+    name = "ensemble_image_client_main",
+    srcs = ["ensemble_image_client.cc"],
     deps = [
         ":request",
         "//src/core:model_config_proto",
@@ -145,9 +145,9 @@ cc_binary(
 )
 
 cc_binary(
-    name = "simple_ensemble_client",
+    name = "ensemble_image_client",
     deps = [
-        ":simple_ensemble_client_main",
+        ":ensemble_image_client_main",
         ":request",
     ],
     linkopts = [

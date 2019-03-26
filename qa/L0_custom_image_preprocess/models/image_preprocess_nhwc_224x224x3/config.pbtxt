@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "image_preprocess"
+name: "image_preprocess_nhwc_224x224x3"
 platform: "custom"
 default_model_filename: "libimagepreprocess.so"
 max_batch_size: 128

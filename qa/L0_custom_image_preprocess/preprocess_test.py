@@ -51,7 +51,7 @@ if __name__ == '__main__':
    FLAGS = parser.parse_args()
    protocol = ProtocolType.from_str(FLAGS.protocol)
 
-   model_name = "image_preprocess"
+   model_name = "image_preprocess_nhwc_224x224x3"
    model_version = -1
    batch_size = 1
 
