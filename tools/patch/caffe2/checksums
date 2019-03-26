@@ -1,3 +1,3 @@
 1d8430a3c725c5021823a5d8a726317c11da8c24  /opt/pytorch/pytorch/c10/util/Logging.cpp
-6e71f00595fd8f8ccbfa3e2cfa95be91ca7ff9f4  /opt/pytorch/pytorch/c10/util/logging_is_not_google_glog.h
-cece225c37e1bf277f7ccd7f4649fda36b6163a1  /opt/pytorch/pytorch/caffe2/core/context_gpu.cu
+984b3b8ce6e0db61fe4a1cf1c5f70b100e1a0576  /opt/pytorch/pytorch/c10/util/logging_is_not_google_glog.h
+f3de146b170ea382455834204991f3797d263345  /opt/pytorch/pytorch/caffe2/core/context_gpu.cu
