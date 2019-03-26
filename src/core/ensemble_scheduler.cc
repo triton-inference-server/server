@@ -63,7 +63,7 @@ struct Step {
 class EnsembleContext {
  public:
   EnsembleContext(
-      InferenceServer* is, const std::shared_ptr<EnsembleInfo>& info,
+      InferenceServer* is, EnsembleInfo* info,
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -77,6 +77,8 @@ class EnsembleContext {
 
  private:
   using StepList = std::vector<std::shared_ptr<Step>>;
+  using VersionMap = std::unordered_map<
+      int64_t, std::shared_ptr<InferenceServer::InferBackendHandle>>;
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
@@ -108,18 +110,19 @@ class EnsembleContext {
   Status InitStep(size_t step_idx, std::shared_ptr<Step>* step);
 
   // Helper function that set the output of the ensemble request if it is ready
-  // and valid
+  // and valid.
+  // Return error if some of the required outputs are not set (deadlock)
   Status CheckAndSetEnsembleOutput();
 
   InferenceServer* is_;
 
-  std::shared_ptr<EnsembleInfo> info_;
+  EnsembleInfo* info_;
 
   // Mutex to avoid concurrent call on 'PrepareSteps' where ensemble state
   // are being modified
   std::mutex mutex_;
 
-  size_t inflight_request_counter_;
+  size_t inflight_step_counter_;
 
   // Storing each tensor's shape, data type and the data
   std::vector<
@@ -127,9 +130,7 @@ class EnsembleContext {
       tensor_data_;
 
   // Handle to all backend that may be used in the ensemble
-  std::unordered_map<
-      std::string, std::shared_ptr<InferenceServer::InferBackendHandle>>
-      handles_;
+  std::unordered_map<std::string, VersionMap> handles_;
 
   // Request specific information that obtained from ensemble request and
   // should be applied to all internal requests
@@ -145,12 +146,12 @@ class EnsembleContext {
 };
 
 EnsembleContext::EnsembleContext(
-    InferenceServer* is, const std::shared_ptr<EnsembleInfo>& info,
+    InferenceServer* is, EnsembleInfo* info,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(Status)> OnComplete)
-    : is_(is), info_(info), inflight_request_counter_(0),
+    : is_(is), info_(info), inflight_step_counter_(0),
       tensor_data_(info_->tensor_to_step_.size()), stats_(stats),
       request_provider_(request_provider),
       response_provider_(response_provider), OnComplete_(OnComplete)
@@ -161,14 +162,19 @@ EnsembleContext::EnsembleContext(
   for (const auto& step_info : info_->steps_) {
     auto it = handles_.find(step_info.model_name_);
     if (it == handles_.end()) {
-      auto it =
-          handles_
-              .emplace(std::make_pair(
-                  step_info.model_name_,
-                  std::make_shared<InferenceServer::InferBackendHandle>()))
-              .first;
+      it = handles_.emplace(std::make_pair(step_info.model_name_, VersionMap()))
+               .first;
+    }
+    auto ver_it = it->second.find(step_info.model_version_);
+    if (ver_it == it->second.end()) {
+      ver_it = it->second
+                   .emplace(std::make_pair(
+                       step_info.model_version_,
+                       std::make_shared<InferenceServer::InferBackendHandle>()))
+                   .first;
+
       ensemble_status_ = is_->CreateBackendHandle(
-          step_info.model_name_, -1 /* model version */, it->second);
+          step_info.model_name_, step_info.model_version_, ver_it->second);
       if (!ensemble_status_.IsOk()) {
         break;
       }
@@ -216,22 +222,23 @@ EnsembleContext::PrepareSteps(
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    StepList res;
     if (ensemble_status_.IsOk()) {
+      StepList res;
       std::vector<size_t> updated_tensors;
       ensemble_status_ = UpdateEnsembleState(completed_step, updated_tensors);
       if (ensemble_status_.IsOk()) {
         ensemble_status_ = GetNextSteps(updated_tensors, res);
       }
+      // Error or no more progress (completed or deadlock)
+      // in either case, FinishEnsemble() won't be called again
+      if ((!ensemble_status_.IsOk()) || (inflight_step_counter_ == 0)) {
+        ensemble_status_ = FinishEnsemble();
+      } else {
+        ready_steps.swap(res);
+      }
     }
-    // Error or no more progress (completed or deadlock)
-    if ((!ensemble_status_.IsOk()) || (inflight_request_counter_ == 0)) {
-      ensemble_status_ = FinishEnsemble();
-    } else {
-      ready_steps.swap(res);
-    }
+    return ensemble_status_;
   }
-  return ensemble_status_;
 }
 
 Status
@@ -247,7 +254,7 @@ EnsembleContext::UpdateEnsembleState(
       }
     }
   } else {
-    inflight_request_counter_--;
+    inflight_step_counter_--;
     if (completed_step->request_status_.code() != RequestStatusCode::SUCCESS) {
       return Status(
           completed_step->request_status_.code(),
@@ -318,7 +325,7 @@ EnsembleContext::GetNextSteps(
     steps.emplace_back();
     RETURN_IF_ERROR(InitStep(idx, &(steps.back())));
   }
-  inflight_request_counter_ += steps.size();
+  inflight_step_counter_ += steps.size();
 
   return Status::Success;
 }
@@ -328,7 +335,8 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 {
   std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
   InferRequestHeader request_header;
-  auto& backend = handles_[info_->steps_[step_idx].model_name_];
+  auto& version_map = handles_[info_->steps_[step_idx].model_name_];
+  auto& backend = version_map[info_->steps_[step_idx].model_version_];
 
   request_header.set_correlation_id(correlation_id_);
   request_header.set_batch_size(batch_size_);
@@ -346,8 +354,9 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
   RETURN_IF_ERROR(InferRequestProvider::Create(
-      info_->steps_[step_idx].model_name_, -1 /* model version */,
-      request_header, input_map, &((*step)->request_provider_)));
+      info_->steps_[step_idx].model_name_,
+      info_->steps_[step_idx].model_version_, request_header, input_map,
+      &((*step)->request_provider_)));
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
   RETURN_IF_ERROR(InternalInferResponseProvider::Create(
@@ -360,10 +369,6 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 Status
 EnsembleContext::FinishEnsemble()
 {
-  if (stats_ == nullptr) {
-    return ensemble_status_;
-  }
-
   stats_->SetModelExecutionCount(1);
   if (ensemble_status_.IsOk()) {
     ensemble_status_ = CheckAndSetEnsembleOutput();
@@ -373,7 +378,6 @@ EnsembleContext::FinishEnsemble()
   // Reset stats_ to make sure the timers are stopped even though
   // there may be other internal requests (i.e. invoke FinishEnsemble()
   // because of failure in one of the internal requests)
-  // And use it as a hint on whether FinishEnsemble() has been called
   stats_.reset();
   return ensemble_status_;
 }
@@ -382,6 +386,9 @@ Status
 EnsembleContext::CheckAndSetEnsembleOutput()
 {
   for (const auto& output_pair : info_->ensemble_output_to_tensor_) {
+    if (!response_provider_->RequiresOutput(output_pair.first)) {
+      continue;
+    }
     // Check if output is ready
     const auto& tensor_data = tensor_data_[output_pair.second];
     if (tensor_data.second == nullptr) {
@@ -472,7 +479,8 @@ EnsembleScheduler::Enqueue(
     std::function<void(Status)> OnComplete)
 {
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
-      is_, info_, stats, request_provider, response_provider, OnComplete));
+      is_, info_.get(), stats, request_provider, response_provider,
+      OnComplete));
   EnsembleContext::Proceed(context);
 }
 
@@ -498,7 +506,7 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
 
   for (const auto& element : config.ensemble_scheduling().step()) {
     size_t step_idx = info_->steps_.size();
-    info_->steps_.emplace_back(element.model_name());
+    info_->steps_.emplace_back(element.model_name(), element.model_version());
     for (const auto& pair : element.input_map()) {
       size_t idx = info_->tensor_to_step_.size();
       auto it = name_to_idx.find(pair.first);
