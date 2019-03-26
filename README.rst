@@ -121,7 +121,7 @@ client libraries) from releases prior to 19.03 you should edit and
 rebuild those as necessary to match the version 1.0.0 APIs.
 
 These inferfaces will maintain backwards compatibility for all future
-1.x.y releases:
+1.x.y releases (see below for exceptions):
 
 * Model configuration as defined in `model_config.proto
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_.
@@ -133,6 +133,19 @@ These inferfaces will maintain backwards compatibility for all future
 
 * The custom backend interface as defined in `custom.h
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_.
+
+As new features are introduced they may temporarily have beta status
+where they are subject to change in non-backwards-compatible
+ways. When they exit beta they will conform to the
+backwards-compatibility guarantees described above. Currently the
+following features are in beta:
+
+* In the model configuration defined in `model_config.proto
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_
+  the sections related to model ensembling are currently in beta. In
+  particular, the ModelEnsembling message will potentially undergo
+  non-backwards-compatible changes.
+
 
 Documentation
 -------------
