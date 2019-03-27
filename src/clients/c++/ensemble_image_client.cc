@@ -150,8 +150,8 @@ main(int argc, char** argv)
   nic::Error err;
 
   // The ensemble model takes 1 input tensor with shape [ 1 ] and STRING
-  // data type and returns 1 output tensor as top 1 classification result of the
-  // input.
+  // data type and returns 1 output tensor as top k (see '-c' flag)
+  // classification result of the input.
   std::string model_name = "preprocess_resnet50_ensemble";
 
   // Create the inference context for the model.
