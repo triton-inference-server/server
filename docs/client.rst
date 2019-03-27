@@ -338,15 +338,15 @@ batch size of the ensemble, only the images within the maximum batch size
 will be sent::
 
   $ ensemble_image_client -c 3 qa/images
-  Image '../qa/images/car.jpg':
+  Image 'qa/images/car.jpg':
       817 (SPORTS CAR) = 0.836187
       511 (CONVERTIBLE) = 0.0708251
       751 (RACER) = 0.0597549
-  Image '../qa/images/mug.jpg':
+  Image 'qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
       968 (CUP) = 0.270953
       967 (ESPRESSO) = 0.00115996
-  Image '../qa/images/vulture.jpeg':
+  Image 'qa/images/vulture.jpeg':
       23 (VULTURE) = 0.992326
       8 (HEN) = 0.00231854
       84 (PEACOCK) = 0.00201471
