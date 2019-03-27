@@ -1,0 +1,17 @@
+name: "reshape_elementcount1"
+max_batch_size: 4
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    dims: [ 15 ]
+    reshape { shape: [ 2, 1, 5 ] }
+  }
+]
+output [
+  {
+    name: "output"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
