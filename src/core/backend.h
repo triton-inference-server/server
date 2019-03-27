@@ -94,10 +94,10 @@ class InferenceBackend {
       const uint32_t runner_cnt, Scheduler::StandardInitFunc OnInit,
       Scheduler::StandardRunFunc OnRun);
 
- private:
-  // Pointer to the inference server.
-  void* inference_server_;
+  // Get the raw pointer to the scheduler of this backend.
+  Scheduler* BackendScheduler() { return scheduler_.get(); }
 
+ private:
   // Configuration of the model that this backend represents.
   ModelConfig config_;
 

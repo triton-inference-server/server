@@ -69,7 +69,6 @@ InferenceBackend::GetOutput(
 Status
 InferenceBackend::SetInferenceServer(void* inference_server)
 {
-  inference_server_ = inference_server;
   return Status::Success;
 }
 

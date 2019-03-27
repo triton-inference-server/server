@@ -48,6 +48,10 @@ RUN mkdir -p qa/common && \
     mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so \
        qa/L0_simple_custom_example/models/simple/1/. && \
+    mkdir -p qa/L0_simple_ensemble/models/ensemble_add_sub_int32_int32_int32/1 && \
+    mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
+    cp /opt/tensorrtserver/custom/libaddsub.so \
+       qa/L0_simple_ensemble/models/simple/1/. && \
     mkdir -p qa/L0_custom_param/models/param/1 && \
     cp /opt/tensorrtserver/custom/libparam.so \
        qa/L0_custom_param/models/param/1/. && \
