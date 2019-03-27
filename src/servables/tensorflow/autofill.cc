@@ -102,8 +102,41 @@ AutoFillSavedModel::Fix(ModelConfig* config)
   }
 
   // Assume model doesn't support batching unless we see a batch
-  // dimension in the input or output.
-  bool supports_batch = false;
+  // dimension (-1) on signature of every model input and output.
+  bool sig_supports_batch = true;
+  if (config->input().size() == 0) {
+    for (const auto& sin : sig_.inputs()) {
+      const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
+      if ((shape.dim().size() == 0) || (shape.dim(0).size() != -1)) {
+        sig_supports_batch = false;
+      }
+    }
+  }
+  if (config->output().size() == 0) {
+    for (const auto& sout : sig_.outputs()) {
+      const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
+      if ((shape.dim().size() == 0) || (shape.dim(0).size() != -1)) {
+        sig_supports_batch = false;
+      }
+    }
+  }
+
+  // If max-batch-size is explicitly set to non-zero but the model
+  // signature doesn't support batching then can't autofill.
+  if (!sig_supports_batch && (config->max_batch_size() > 0)) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name_ +
+            "', configuration specified max-batch " +
+            std::to_string(config->max_batch_size()) +
+            " but model signature does not support batching");
+  }
+
+  // Set max-batch-size to 1 if the model signature supports it and it
+  // is not already set.
+  if (sig_supports_batch && (config->max_batch_size() == 0)) {
+    config->set_max_batch_size(1);
+  }
 
   // Inputs
   if (config->input().size() == 0) {
@@ -122,18 +155,20 @@ AutoFillSavedModel::Fix(ModelConfig* config)
 
       config_input->set_data_type(dt);
 
-      // The first model dimension can be -1 to serve as a placeholder
-      // for batch. This batch dim doesn't appear in the model
+      // The model signature supports batching then the first
+      // dimension is -1 and should not appear in the model
       // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
-      const bool has_batch_dim =
-          (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
-
-      for (int i = (has_batch_dim ? 1 : 0); i < shape.dim().size(); ++i) {
+      for (int i = (sig_supports_batch ? 1 : 0); i < shape.dim().size(); ++i) {
         config_input->mutable_dims()->Add(shape.dim(i).size());
       }
 
-      supports_batch |= has_batch_dim;
+      // If input dims are empty then must use a reshape for the
+      // input, since 'dims' is not allowed to be empty.
+      if (config_input->dims_size() == 0) {
+        config_input->mutable_dims()->Add(1);
+        config_input->mutable_reshape();
+      }
     }
   }
 
@@ -154,25 +189,21 @@ AutoFillSavedModel::Fix(ModelConfig* config)
 
       config_output->set_data_type(dt);
 
-      // The first model dimension can be -1 to serve as a placeholder
-      // for batch. The batch dim doesn't appear in the model
+      // The model signature supports batching then the first
+      // dimension is -1 and should not appear in the model
       // configuration 'dims' that we are creating.
       const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
-      const bool has_batch_dim =
-          (shape.dim().size() >= 1) && (shape.dim(0).size() == -1);
-
-      for (int i = (has_batch_dim ? 1 : 0); i < shape.dim().size(); ++i) {
+      for (int i = (sig_supports_batch ? 1 : 0); i < shape.dim().size(); ++i) {
         config_output->mutable_dims()->Add(shape.dim(i).size());
       }
 
-      supports_batch |= has_batch_dim;
+      // If output dims are empty then must use a reshape for the
+      // output, since 'dims' is not allowed to be empty.
+      if (config_output->dims_size() == 0) {
+        config_output->mutable_dims()->Add(1);
+        config_output->mutable_reshape();
+      }
     }
-  }
-
-  // Set max-batch-size to 1 if the model supports it and it is not
-  // already set.
-  if (supports_batch && (config->max_batch_size() == 0)) {
-    config->set_max_batch_size(1);
   }
 
   return Status::Success;
