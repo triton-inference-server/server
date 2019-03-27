@@ -642,10 +642,10 @@ BuildEnsembleGraph(
       }
       auto it = keyed_ensemble_graph.find(input_map.second);
       if (it == keyed_ensemble_graph.end()) {
-        it =
-            keyed_ensemble_graph
-                .emplace(std::make_pair(input_map.second, EnsembleTensor(false)))
-                .first;
+        it = keyed_ensemble_graph
+                 .emplace(
+                     std::make_pair(input_map.second, EnsembleTensor(false)))
+                 .first;
       }
       for (auto output : tensor_as_output) {
         output->prev_nodes.push_back(&(it->second));

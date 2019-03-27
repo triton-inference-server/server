@@ -63,8 +63,7 @@ enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
 // Context object. All state must be kept in this object.
 class Context {
  public:
-  Context(
-      const std::string& instance_name, const ModelConfig& config);
+  Context(const std::string& instance_name, const ModelConfig& config);
 
   // Initialize the context. Validate that the model configuration,
   // etc. is something that we can handle.
@@ -78,11 +77,10 @@ class Context {
  private:
   // Obtain the input tensor as contiguous chunk. If batched, decompose it.
   int GetInputTensor(
-    CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-    const uint32_t batch_size, std::vector<std::vector<char>>& input);
+      CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+      const uint32_t batch_size, std::vector<std::vector<char>>& input);
 
-  int Preprocess(
-    const cv::Mat& img, char* data, size_t* image_byte_size);
+  int Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size);
 
   bool ParseType(const DataType& dtype, int* type1, int* type3);
 
@@ -181,7 +179,8 @@ Context::Execute(
     }
 
     // Reads input
-    uint32_t batch_size = (payloads[idx].batch_size == 0) ? 1 : payloads[idx].batch_size;
+    uint32_t batch_size =
+        (payloads[idx].batch_size == 0) ? 1 : payloads[idx].batch_size;
     std::vector<std::vector<char>> input;
     int err = GetInputTensor(
         input_fn, payloads[idx].input_context, "INPUT", batch_size, input);
@@ -196,8 +195,10 @@ Context::Execute(
 
     void* obuffer;
     if (!output_fn(
-            payloads[idx].output_context, payloads[idx].required_output_names[0],
-            output_shape.size(), &output_shape[0], GetByteSize(output_type_, output_shape), &obuffer)) {
+            payloads[idx].output_context,
+            payloads[idx].required_output_names[0], output_shape.size(),
+            &output_shape[0], GetByteSize(output_type_, output_shape),
+            &obuffer)) {
       payloads[idx].error_code = kOutputBuffer;
       continue;
     }
@@ -214,7 +215,7 @@ Context::Execute(
         }
 
         size_t image_byte_size;
-        
+
         err = Preprocess(img, (char*)obuffer + byte_used, &image_byte_size);
         if (err != kSuccess) {
           payloads[idx].error_code = err;
@@ -262,11 +263,13 @@ Context::GetInputTensor(
       if (image_size == 0) {
         // Make sure we have enought bytes to read as 'image_size'
         uint64_t byte_to_append = 4 - size_buffer.size();
-        byte_to_append = (byte_to_append < content_byte_size) ? byte_to_append : content_byte_size;
+        byte_to_append = (byte_to_append < content_byte_size)
+                             ? byte_to_append
+                             : content_byte_size;
         size_buffer.insert(
-          size_buffer.end(), static_cast<const char*>(content),
-          static_cast<const char*>(content) + byte_to_append);
-        
+            size_buffer.end(), static_cast<const char*>(content),
+            static_cast<const char*>(content) + byte_to_append);
+
         // modify position to unread content
         content = static_cast<const char*>(content) + byte_to_append;
         content_byte_size -= byte_to_append;
@@ -281,7 +284,8 @@ Context::GetInputTensor(
       }
 
       uint32_t byte_to_read = image_size - byte_read;
-      byte_to_read = (byte_to_read < content_byte_size) ? byte_to_read : content_byte_size;
+      byte_to_read =
+          (byte_to_read < content_byte_size) ? byte_to_read : content_byte_size;
 
       input.back().insert(
           input.back().end(), static_cast<const char*>(content),
@@ -305,8 +309,7 @@ Context::GetInputTensor(
 }
 
 int
-Context::Preprocess(
-    const cv::Mat& img, char* data, size_t* image_byte_size)
+Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
 {
   // Image channels are in BGR order. Currently model configuration
   // data doesn't provide any information as to the expected channel
@@ -352,8 +355,7 @@ Context::Preprocess(
   }
 
   cv::Mat sample_type;
-  sample_resized.convertTo(
-      sample_type, (c == 3) ? img_type3 : img_type1);
+  sample_resized.convertTo(sample_type, (c == 3) ? img_type3 : img_type1);
 
   cv::Mat sample_final;
   if (scaling_ == ScaleType::INCEPTION) {
@@ -388,8 +390,7 @@ Context::Preprocess(
     } else {
       size_t row_byte_size = sample_final.cols * sample_final.elemSize();
       for (int r = 0; r < sample_final.rows; ++r) {
-        memcpy(
-            &(data[pos]), sample_final.ptr<uint8_t>(r), row_byte_size);
+        memcpy(&(data[pos]), sample_final.ptr<uint8_t>(r), row_byte_size);
         pos += row_byte_size;
       }
     }
@@ -466,8 +467,8 @@ CustomInitialize(const CustomInitializeData* data, void** custom_context)
 
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context = new Context(
-      std::string(data->instance_name), model_config);
+  Context* context =
+      new Context(std::string(data->instance_name), model_config);
   int err = context->Init();
   if (err != kSuccess) {
     return err;

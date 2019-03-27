@@ -40,7 +40,7 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
-  
+
   std::unique_ptr<Scheduler> scheduler;
   RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
   RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
