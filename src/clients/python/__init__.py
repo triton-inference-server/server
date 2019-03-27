@@ -663,10 +663,16 @@ class InferContext:
                         # followed by the actual string characters.
                         # All strings are concatenated together in "C"
                         # order.
-                        if input_value.dtype == np.object:
+                        if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
                             flattened = bytes()
                             for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                s = str(obj).encode('utf-8')
+                                # If directly passing bytes to STRING type,
+                                # don't convert it to str as Python will encode the
+                                # bytes which may distort the meaning
+                                if obj.dtype.type == np.bytes_:
+                                    s = bytes(obj)
+                                else:
+                                    s = str(obj).encode('utf-8')
                                 flattened += struct.pack("<I", len(s))
                                 flattened += s
                             input_value = np.asarray(flattened)
