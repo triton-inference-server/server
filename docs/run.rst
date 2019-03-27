@@ -45,8 +45,13 @@ model repository containing the models that the server will make
 available for inferencing.
 
 An example model repository containing a Caffe2 ResNet50, a TensorFlow
-Inception model, and a simple TensorFlow GraphDef model (used by the
-:ref:`simple_client example <section-client-api>`) are provided in the
+Inception model, a simple TensorFlow GraphDef model (used by the
+:ref:`simple_client example <section-client-api>`), a simple TensorFlow
+GraphDef model using String tensors (used by the
+:ref:`simple_string_client example <section-client-api>`), a custom image
+preprocess model and an ensemble (used by the
+:ref:`ensemble_image_client example <section-ensemble_image_classification_example>`)
+are provided in the
 `docs/examples/model_repository
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository>`_
 directory. Before using the example model repository you must fetch

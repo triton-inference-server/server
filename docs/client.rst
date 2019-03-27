@@ -270,6 +270,87 @@ behaves the same as the image\_client except that instead of using the
 inference server client library it uses the GRPC generated client
 library to communicate with the server.
 
+.. _section-ensemble_image_classification_example:
+
+Ensemble Image Classification Example Application
+----------------------------------------
+
+In comparison to the image classification example above, this example uses an
+ensemble of a custom image preprocessing model and a Caffe2 ResNet50 model, so
+that you can send the image binaries and receive classification results without
+preprocessing the images beforehand. The ensemble image classification example
+that uses the C++ client API is available at
+`src/clients/c++/ensemble\_image\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/ensemble_image_client.cc>`_.
+The Python version of the image classification client is available at
+`src/clients/python/ensemble\_image\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/ensemble_image_client.py>`_.
+
+To use ensemble\_image\_client (or ensemble\_image\_client.py) you must first
+have a running inference server that is serving the
+"preprocess_resnet50_ensemble" model and the models it depends on. The models
+are provided in example model repository see
+:ref:`section-example-model-repository` for instructions on how to create one.
+
+Follow the instructions in :ref:`section-running-the-inference-server`
+to launch the server using the model repository. Once the server is
+running you can use the ensemble\_image\_client application to send inference
+requests to the server. You can specify a single image or a directory
+holding images. Here we send a request for the ensemble from the
+:ref:`example model repository <section-example-model-repository>` for an image
+from the `qa/images
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
+directory::
+
+  $ ensemble_image_client qa/images/mug.jpg
+  Image 'qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+
+The Python version of the application accepts the same command-line
+arguments::
+
+  $ python3 ensemble_image_client.py qa/images/mug.jpg
+  Image 'qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.778078556061
+
+Similar to image\_client, by default ensemble\_image\_client
+instructs the client library to use HTTP protocol to talk to the
+server, but you can use GRPC protocol by providing the \-i flag. You
+must also use the \-u flag to point at the GRPC endpoint on the
+inference server::
+
+  $ ensemble_image_client -i grpc -u localhost:8001 qa/images/mug.jpg
+  Image 'qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+
+By default the client prints the most probable classification for the
+image. Use the \-c flag to see more classifications::
+
+  $ ensemble_image_client -c 3 qa/images/mug.jpg
+  Image 'qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+      968 (CUP) = 0.270953
+      967 (ESPRESSO) = 0.00115996
+
+Provide a directory instead of a single image to perform inferencing
+on all images in the directory. If the number of images exceeds the maximum
+batch size of the ensemble, only the images within the maximum batch size
+will be sent::
+
+  $ ensemble_image_client -c 3 qa/images
+  Image '../qa/images/car.jpg':
+      817 (SPORTS CAR) = 0.836187
+      511 (CONVERTIBLE) = 0.0708251
+      751 (RACER) = 0.0597549
+  Image '../qa/images/mug.jpg':
+      504 (COFFEE MUG) = 0.723991
+      968 (CUP) = 0.270953
+      967 (ESPRESSO) = 0.00115996
+  Image '../qa/images/vulture.jpeg':
+      23 (VULTURE) = 0.992326
+      8 (HEN) = 0.00231854
+      84 (PEACOCK) = 0.00201471
+
 Performance Example Application
 -------------------------------
 
