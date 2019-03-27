@@ -28,6 +28,7 @@
 
 #include <stdint.h>
 #include "src/core/constants.h"
+#include "src/core/ensemble_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
@@ -39,15 +40,10 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  // [TODO] Replace it to ensemble scheduler after DLIS-290
-  RETURN_IF_ERROR(SetConfiguredScheduler(
-      1, [](uint32_t runner_idx) -> Status { return Status::Success; },
-      [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
-      }));
+  
+  std::unique_ptr<Scheduler> scheduler;
+  RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
+  RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
 
   LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
 
@@ -57,11 +53,9 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 Status
 EnsembleBundle::SetInferenceServer(void* inference_server)
 {
-  // [TODO] Uncommon below after DLIS-290
-  // EnsembleScheduler* scheduler =
-  //    static_cast<EnsembleScheduler*>(scheduler_.get());
-  // RETURN_IF_ERROR(scheduler->SetInferenceServer(inference_server));
-  return InferenceBackend::SetInferenceServer(inference_server);
+  EnsembleScheduler* scheduler =
+      static_cast<EnsembleScheduler*>(BackendScheduler());
+  return scheduler->SetInferenceServer(inference_server);
 }
 
 void

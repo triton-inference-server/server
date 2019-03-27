@@ -630,21 +630,21 @@ BuildEnsembleGraph(
 
     std::set<std::string> model_inputs;
     for (const auto& input_map : element.input_map()) {
-      if (model_inputs.find(input_map.second) != model_inputs.end()) {
+      if (model_inputs.find(input_map.first) != model_inputs.end()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "input " + input_map.second + " in model " + element.model_name() +
+            "input " + input_map.first + " in model " + element.model_name() +
                 " is mapped to multiple ensemble tensors in one step for "
                 "ensemble " +
                 config.name());
       } else {
-        model_inputs.emplace(input_map.second);
+        model_inputs.emplace(input_map.first);
       }
-      auto it = keyed_ensemble_graph.find(input_map.first);
+      auto it = keyed_ensemble_graph.find(input_map.second);
       if (it == keyed_ensemble_graph.end()) {
         it =
             keyed_ensemble_graph
-                .emplace(std::make_pair(input_map.first, EnsembleTensor(false)))
+                .emplace(std::make_pair(input_map.second, EnsembleTensor(false)))
                 .first;
       }
       for (auto output : tensor_as_output) {

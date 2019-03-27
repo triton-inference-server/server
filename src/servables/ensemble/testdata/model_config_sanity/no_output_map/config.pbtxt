@@ -6,8 +6,8 @@ ensemble_scheduling {
     {
       model_name: "model_a"
       input_map {
-        key: "data"
-        value: "model_a_input"
+        key: "model_a_input"
+        value: "data"
       }
       output_map {
         key: "model_a_output"
@@ -17,15 +17,15 @@ ensemble_scheduling {
     {
       model_name: "model_b"
       input_map {
-        key: "temp_1"
-        value: "model_b_input"
+        key: "model_b_input"
+        value: "temp_1"
       }
     },
     {
       model_name: "model_c"
       input_map {
-        key: "temp_2"
-        value: "model_c_input"
+        key: "model_c_input"
+        value: "temp_2"
       }
       output_map {
         key: "model_c_output"

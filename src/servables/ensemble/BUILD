@@ -42,6 +42,7 @@ cc_library(
     deps = [
         "//src/core:backend",
         "//src/core:constants",
+        "//src/core:ensemble_scheduler",
         "//src/core:model_config_proto",
         "//src/core:model_config_utils",
         "//src/core:server_status",

@@ -566,21 +566,28 @@ message ModelEnsembling
   //@@
   message Step
   {
-    //@@    .. cpp:var:: string model_name
+    //@@  .. cpp:var:: string model_name
     //@@
-    //@@       The name of the model to execute for this step of the ensemble.
+    //@@     The name of the model to execute for this step of the ensemble.
     //@@
     string model_name = 1;
 
+    //@@  .. cpp:var:: int64 model_version
+    //@@
+    //@@     The version of the model to use for inference. If -1
+    //@@     the latest/most-recent version of the model is used.
+    //@@
+    int64 model_version = 2;
+
     //@@  .. cpp:var:: map<string,string> input_map
     //@@
-    //@@     Map from ensemble tensor name to name of an input tensor on this
-    //@@     step's model. The ensemble tensor must have the same data type and
+    //@@     Map from name of an input tensor on this step's model to ensemble
+    //@@     tensor name. The ensemble tensor must have the same data type and
     //@@     shape as the model input. Each model input must be assigned to
     //@@     one ensemble tensor, but the same ensemble tensor can be assigned
     //@@     to multiple model inputs.
     //@@
-    map<string, string> input_map = 2;
+    map<string, string> input_map = 3;
 
     //@@  .. cpp:var:: map<string,string> output_map
     //@@
@@ -590,7 +597,7 @@ message ModelEnsembling
     //@@     model outputs to ensemble tensors. One ensemble tensor name
     //@@     can appear in an output map only once.
     //@@
-    map<string, string> output_map = 3;
+    map<string, string> output_map = 4;
   }
 
   //@@  .. cpp:var:: Step step (repeated)

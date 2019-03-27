@@ -6,8 +6,8 @@ ensemble_scheduling {
     {
       model_name: "fp32_dim1_batch4"
       input_map {
-        key: "data"
-        value: "input"
+        key: "input"
+        value: "data"
       }
       output_map {
         key: "output"
@@ -17,8 +17,8 @@ ensemble_scheduling {
     {
       model_name: "fp32_dim1_batch2"
       input_map {
-        key: "temp_tensor"
-        value: "input"
+        key: "input"
+        value: "temp_tensor"
       }
       output_map {
         key: "output"

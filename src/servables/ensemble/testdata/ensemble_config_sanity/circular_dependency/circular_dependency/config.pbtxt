@@ -6,8 +6,8 @@ ensemble_scheduling {
     {
       model_name: "circular_dependency_2"
       input_map {
-        key: "data"
-        value: "input"
+        key: "input"
+        value: "data"
       }
       output_map {
         key: "output"
