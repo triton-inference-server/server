@@ -47,11 +47,14 @@ model repositories::
   $ cd qa/common
   $ ./gen_qa_model_repository
 
-This will generate two model repositories: in /tmp/qa_model_repository
-and /tmp/qa_variable_model_repository.  The TensorRT models will be
-created for the GPU on the system that CUDA considers device 0
-(zero). If you have multiple GPUs on your system see the documentation
-in the script for how to target a specific GPU.
+This will generate multiple model repositories:
+/tmp/qa_model_repository, /tmp/qa_reshape_repository,
+/tmp/qa_sequence_model_repository, /tmp/qa_variable_model_repository,
+/tmp/qa_variable_sequence_model_repository, and
+qa_zero_model_repository.  The TensorRT models will be created for the
+GPU on the system that CUDA considers device 0 (zero). If you have
+multiple GPUs on your system see the documentation in the script for
+how to target a specific GPU.
 
 Build QA Container
 ------------------
@@ -59,17 +62,18 @@ Build QA Container
 Next you need to build a QA version of the inference server
 container. This container will contain the inference server, the QA
 tests, and all the dependencies needed to run the QA tests. You must
-first build the tensorrtserver_build and tensorrtserver containers as
-described in :ref:`section-building-the-server` and then build the QA
-container::
+first build the tensorrtserver_client, tensorrtserver_build and
+tensorrtserver containers as described in
+:ref:`section-getting-the-client-libraries-and-examples` and
+:ref:`section-building-the-server` and then build the QA container::
 
   $ docker build -t tensorrtserver_qa -f Dockerfile.QA .
 
 Run QA Container
 ----------------
 
-Now run the QA container and mount the QA model repository into the
-container so the tests will be able to access it::
+Now run the QA container and mount the QA model repositories into the
+container so the tests will be able to access them::
 
   $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tensorrtserver_qa
 
