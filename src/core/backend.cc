@@ -29,7 +29,6 @@
 #include <chrono>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
-#include "src/core/ensemble_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
@@ -128,8 +127,6 @@ InferenceBackend::SetConfiguredScheduler(
   if (config_.has_sequence_batching()) {
     RETURN_IF_ERROR(SequenceBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));
-  } else if (config_.has_ensemble_scheduling()) {
-    RETURN_IF_ERROR(EnsembleScheduler::Create(config_, &scheduler));
   } else {
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         config_, runner_cnt, OnInit, OnRun, &scheduler));

@@ -144,7 +144,6 @@ cc_library(
         ":backend_header",
         ":constants",
         ":dynamic_batch_scheduler",
-        ":ensemble_scheduler",
         ":logging",
         ":metric_model_reporter",
         ":model_config_utils",

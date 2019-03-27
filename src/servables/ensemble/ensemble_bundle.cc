@@ -40,14 +40,10 @@ EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  RETURN_IF_ERROR(SetConfiguredScheduler(
-      1, [](uint32_t runner_idx) -> Status { return Status::Success; },
-      [this](
-          uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-          std::function<void(Status)> func) {
-        Run(runner_idx, payloads, func);
-      }));
+  
+  std::unique_ptr<Scheduler> scheduler;
+  RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
+  RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
 
   LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
 
