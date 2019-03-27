@@ -192,8 +192,7 @@ Context::Execute(
         }
       }
 
-      const int64_t batchn_byte_size =
-          GetByteSize(datatype, shape);
+      const int64_t batchn_byte_size = GetByteSize(datatype, shape);
       if (batchn_byte_size < 0) {
         payload.error_code = kOutputBuffer;
         break;

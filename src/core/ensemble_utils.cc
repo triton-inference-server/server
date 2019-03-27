@@ -143,9 +143,9 @@ ValidateEnsembleConfig(
       if (input_names.find(input_map.first) == input_names.end()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "in ensemble " + ensemble + ", ensemble tensor " + input_map.second +
-                " is mapping to non-existing input " + input_map.first +
-                " in model " + step.model_name());
+            "in ensemble " + ensemble + ", ensemble tensor " +
+                input_map.second + " is mapping to non-existing input " +
+                input_map.first + " in model " + step.model_name());
       }
     }
     for (const auto& model_input : model_config.input()) {

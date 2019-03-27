@@ -95,7 +95,8 @@ Usage(char** argv, const std::string& msg = std::string())
     std::cerr << "error: " << msg << std::endl;
   }
 
-  std::cerr << "Usage: " << argv[0] << " [options] <image filename / image folder>" << std::endl;
+  std::cerr << "Usage: " << argv[0]
+            << " [options] <image filename / image folder>" << std::endl;
   std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-c <topk>" << std::endl;
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
@@ -211,8 +212,9 @@ main(int argc, char** argv)
     auto& image_str = images.back();
     std::ifstream file(fn);
     file >> std::noskipws;
-    image_str.emplace_back((std::istreambuf_iterator<char>(file)),
-                  std::istreambuf_iterator<char>());
+    image_str.emplace_back(
+        (std::istreambuf_iterator<char>(file)),
+        std::istreambuf_iterator<char>());
     if (image_str.back().empty()) {
       std::cerr << "error: unable to read image file " << fn << std::endl;
       exit(1);
