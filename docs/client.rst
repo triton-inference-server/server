@@ -291,11 +291,11 @@ requests in-flight at all times. The next highest load level is
 created with three outstanding requests, etc.
 
 At each load level the perf\_client measures the throughput and
-latency over a time window, and then repeats until the measurements
-until it gets stable values. The perf\_client then increases the load
-level and measures again. This repeats until the perf\_client reaches
-one of the specified limits, either the maximum latency value is
-reached or the maximum concurrency value is reached.
+latency over a time window, and then repeats the measurements until it
+gets stable results. The perf\_client then increases the load level
+and measures again. This repeats until the perf\_client reaches one of
+the specified limits: either the maximum latency value is reached or
+the maximum concurrency value is reached.
 
 To use perf\_client you must first have a running inference server
 that is serving one or more models. The perf\_client application works
@@ -467,7 +467,7 @@ and a Python version at `src/clients/python/simple\_string\_client.py
 .. _section-client-api-stateful-models:
 
 Client API for Stateful Models
-------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When performing inference using a :ref:`stateful model
 <section-stateful-models>`, a client must identify which inference

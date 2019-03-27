@@ -86,6 +86,16 @@ type of the model. Section :ref:`section-datatypes` describes the
 allowed datatypes and how they map to the datatypes of each model
 type.
 
+Input shape specified by :cpp:var:`dims
+<nvidia::inferenceserver::ModelInput::dims>` indicates the shape of
+input expected by the inference API.  Output shape specified by
+:cpp:var:`dims <nvidia::inferenceserver::ModelOutput::dims>` indicates
+the shape of output returned by the inference API. Both input and
+output shape must have rank >= 1, that is, the empty shape **[ ]** is
+not allowed. The :ref:`reshape <section-reshape>` property must be
+used if the underlying framework model or custom backend requires an
+input or output with an empty shape.
+
 For models that support batched inputs the :cpp:var:`max_batch_size
 <nvidia::inferenceserver::ModelConfig::max_batch_size>` value must be
 >= 1. The TensorRT Inference Server assumes that the batching occurs
@@ -219,6 +229,55 @@ is the 32-bit floating-point datatype.
 
 For Numpy each value is in the numpy module. For example, numpy.float32
 is the 32-bit floating-point datatype.
+
+.. _section-reshape:
+
+Reshape
+-------
+
+The :cpp:var:`ModelTensorReshape
+<nvidia::inferenceserver::ModelTensorReshape>` property on a model
+configuration input or output is used to indicate that the input or
+output shape accepted by the inference API differs from the input or
+output shape expected or produced by the underlying framework model or
+custom backend.
+
+For an input, :cpp:var:`reshape
+<nvidia::inferenceserver::ModelInput::reshape>` can be used to reshape
+the input tensor to a different shape expected by the framework or
+backend. A common use-case is where a model that supports batching
+expects a batched input to have shape **[ batch-size ]**, which means
+that the batch dimension fully describes the shape. For the inference
+API the equivalent shape **[ batch-size, 1 ]** must be specified since
+each input in the batch must specify a non-empty shape. For this case
+the input should be specified as::
+
+  input [
+    {
+      name: "in"
+      dims: [ 1 ]
+      reshape: { shape: [ ] }
+    }
+    ...
+
+For an output, :cpp:var:`reshape
+<nvidia::inferenceserver::ModelOutput::reshape>` can be used to
+reshape the output tensor produced by the framework or backend to a
+different shape that is returned by the inference API. A common
+use-case is where a model that supports batching expects a batched
+output to have shape **[ batch-size ]**, which means that the batch
+dimension fully describes the shape. For the inference API the
+equivalent shape **[ batch-size, 1 ]** must be specified since each
+output in the batch must specify a non-empty shape. For this case the
+output should be specified as::
+
+  output [
+    {
+      name: "in"
+      dims: [ 1 ]
+      reshape: { shape: [ ] }
+    }
+    ...
 
 .. _section-version-policy:
 
