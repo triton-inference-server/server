@@ -59,6 +59,22 @@ ModelConfigTestBase::ValidateInit(
     return false;
   }
 
+  for (const auto& io : config.input()) {
+    status = ValidateModelInput(io);
+    if (!status.IsOk()) {
+      result->append(status.AsString());
+      return false;
+    }
+  }
+
+  for (const auto& io : config.output()) {
+    status = ValidateModelOutput(io);
+    if (!status.IsOk()) {
+      result->append(status.AsString());
+      return false;
+    }
+  }
+
   // ModelConfig unit tests assume model version "1"
   const std::string version_path = tensorflow::io::JoinPath(model_path, "1");
 

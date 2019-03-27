@@ -357,6 +357,27 @@ ValidateModelConfig(
         "must specify 'version policy' for " + config.name());
   }
 
+  // If the configuration is non-batching, then no input or output
+  // reshape can be empty as that would mean that input or output was
+  // always empty (no data).
+  if (config.max_batch_size() == 0) {
+    for (const auto& io : config.input()) {
+      if (io.has_reshape() && (io.reshape().shape_size() == 0)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "model input cannot have empty reshape for non-batching model");
+      }
+    }
+
+    for (const auto& io : config.output()) {
+      if (io.has_reshape() && (io.reshape().shape_size() == 0)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "model output cannot have empty reshape for non-batching model");
+      }
+    }
+  }
+
   // If dynamic batching is specified make sure the preferred batch
   // sizes are positive and don't exceed maximum batch size. Make sure
   // the max delay is non-negative.
@@ -683,12 +704,44 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
   }
 
   for (auto dim : io.dims()) {
+    // Dimension cannot be 0.
     if ((dim < 1) && (dim != WILDCARD_DIM)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "model input dimension must be integer >= 1, or " +
               std::to_string(WILDCARD_DIM) +
               " to indicate a variable-size dimension");
+    }
+
+    // Wildcards are not allowed in dims if there is a reshape.
+    if (io.has_reshape() && (dim == WILDCARD_DIM)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model input using reshape cannot have variable-size dimension " +
+              std::to_string(WILDCARD_DIM));
+    }
+  }
+
+  // Wildcards and zeros are not allowed in reshape. Make sure the
+  // element count input dims matches the reshape.
+  if (io.has_reshape()) {
+    for (auto dim : io.reshape().shape()) {
+      if (dim <= 0) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "model input reshape dimensions must be integer >= 1");
+      }
+    }
+
+    // Special case for empty reshape... expect dims to have element
+    // count of 1.
+    const int64_t reshape_size =
+        std::max((int64_t)1, GetElementCount(io.reshape().shape()));
+    const int64_t dims_size = GetElementCount(io.dims());
+    if (dims_size != reshape_size) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model input has different size for dims and reshape");
     }
   }
 
@@ -744,12 +797,44 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
   }
 
   for (auto dim : io.dims()) {
+    // Dimension cannot be 0.
     if ((dim < 1) && (dim != WILDCARD_DIM)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "model input dimension must be integer >= 1, or " +
+          "model output dimension must be integer >= 1, or " +
               std::to_string(WILDCARD_DIM) +
               " to indicate a variable-size dimension");
+    }
+
+    // Wildcards are not allowed in dims if there is a reshape.
+    if (io.has_reshape() && (dim == WILDCARD_DIM)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model output using reshape cannot have variable-size dimension " +
+              std::to_string(WILDCARD_DIM));
+    }
+  }
+
+  // Wildcards and zeros are not allowed in reshape. Make sure the
+  // element count output dims matches the reshape.
+  if (io.has_reshape()) {
+    for (auto dim : io.reshape().shape()) {
+      if (dim <= 0) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "model output reshape dimensions must be integer >= 1");
+      }
+    }
+
+    // Special case for empty reshape... expect dims to have element
+    // count of 1.
+    const int64_t reshape_size =
+        std::max((int64_t)1, GetElementCount(io.reshape().shape()));
+    const int64_t dims_size = GetElementCount(io.dims());
+    if (dims_size != reshape_size) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "model output has different size for dims and reshape");
     }
   }
 
