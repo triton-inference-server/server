@@ -129,6 +129,8 @@ class Error {
 ///
 class ServerHealthContext {
  public:
+  virtual ~ServerHealthContext() = 0;
+
   /// Contact the inference server and get readiness state.
   /// \param ready Returns the readiness state of the server.
   /// \return Error object indicating success or failure of the request.
@@ -138,12 +140,6 @@ class ServerHealthContext {
   /// \param ready Returns the liveness state of the server.
   /// \return Error object indicating success or failure of the request.
   virtual Error GetLive(bool* live) = 0;
-
- protected:
-  ServerHealthContext(bool);
-
-  // If true print verbose output
-  const bool verbose_;
 };
 
 //==============================================================================
@@ -173,16 +169,12 @@ class ServerHealthContext {
 ///
 class ServerStatusContext {
  public:
+  virtual ~ServerStatusContext() = 0;
+
   /// Contact the inference server and get status.
   /// \param status Returns the status.
   /// \return Error object indicating success or failure of the request.
   virtual Error GetServerStatus(ServerStatus* status) = 0;
-
- protected:
-  ServerStatusContext(bool);
-
-  // If true print verbose output
-  const bool verbose_;
 };
 
 //==============================================================================
@@ -192,9 +184,10 @@ class ServerStatusContext {
 /// model. Options that control how inference is performed can be
 /// changed in between inference runs.
 ///
-/// A InferContext object can use either HTTP protocol or GRPC protocol
-/// depending on the Create function (InferHttpContext::Create or
-/// InferGrpcContext::Create). For example:
+/// A InferContext object can use either HTTP protocol or GRPC
+/// protocol depending on the Create function
+/// (InferHttpContext::Create, InferGrpcContext::Create or
+/// InferGrpcStreamContext::Create). For example:
 ///
 /// \code
 ///   std::unique_ptr<InferContext> ctx;
@@ -245,8 +238,7 @@ class InferContext {
   /// An input to the model.
   class Input {
    public:
-    /// Destroy the input.
-    virtual ~Input(){};
+    virtual ~Input() = 0;
 
     /// \return The name of the input.
     virtual const std::string& Name() const = 0;
@@ -333,8 +325,7 @@ class InferContext {
   /// An output from the model.
   class Output {
    public:
-    /// Destroy the output.
-    virtual ~Output(){};
+    virtual ~Output() = 0;
 
     /// \return The name of the output.
     virtual const std::string& Name() const = 0;
@@ -352,8 +343,7 @@ class InferContext {
   /// An inference result corresponding to an output.
   class Result {
    public:
-    /// Destroy the result.
-    virtual ~Result(){};
+    virtual ~Result() = 0;
 
     /// Format in which result is returned.
     enum ResultFormat {
@@ -453,7 +443,7 @@ class InferContext {
   /// Run options to be applied to all subsequent Run() invocations.
   class Options {
    public:
-    virtual ~Options(){};
+    virtual ~Options() = 0;
 
     /// Create a new Options object with default values.
     /// \return Error object indicating success or failure.
@@ -510,8 +500,7 @@ class InferContext {
   /// request results if the request is sent by AsyncRun().
   class Request {
    public:
-    /// Destroy the request handle.
-    virtual ~Request() = default;
+    virtual ~Request() = 0;
 
     /// \return The unique identifier of the request.
     virtual uint64_t Id() const = 0;
@@ -548,109 +537,57 @@ class InferContext {
     }
   };
 
-  //==============
-  /// Timer to record the timestamp for different stages of request
-  /// handling.
-  class RequestTimers {
-   public:
-    /// The kind of the timer.
-    enum Kind {
-      /// The start of request handling.
-      REQUEST_START,
-      /// The end of request handling.
-      REQUEST_END,
-      /// The start of sending request bytes to the server (i.e. first byte).
-      SEND_START,
-      /// The end of sending request bytes to the server (i.e. last byte).
-      SEND_END,
-      /// The start of receiving response bytes from the server
-      /// (i.e. first byte).
-      RECEIVE_START,
-      /// The end of receiving response bytes from the server
-      /// (i.e. last byte).
-      RECEIVE_END
-    };
-
-    /// Construct a timer with zero-ed timestamps.
-    RequestTimers();
-
-    /// Reset all timestamp values to zero. Must be called before
-    /// re-using the timer.
-    /// \return Error object indicating success or failure.
-    Error Reset();
-
-    /// Record the current timestamp for a request stage.
-    /// \param kind The Kind of the timestamp.
-    /// \return Error object indicating success or failure.
-    Error Record(Kind kind);
-
-   private:
-    friend class InferContext;
-    friend class InferHttpContext;
-    friend class InferGrpcContext;
-    friend class InferGrpcStreamContext;
-    struct timespec request_start_;
-    struct timespec request_end_;
-    struct timespec send_start_;
-    struct timespec send_end_;
-    struct timespec receive_start_;
-    struct timespec receive_end_;
-  };
-
  public:
   using ResultMap = std::map<std::string, std::unique_ptr<Result>>;
 
-  /// Destroy the inference context.
-  virtual ~InferContext() = default;
+  virtual ~InferContext() = 0;
 
   /// \return The name of the model being used for this context.
-  const std::string& ModelName() const { return model_name_; }
+  virtual const std::string& ModelName() const = 0;
 
   /// \return The version of the model being used for this context. -1
   /// indicates that the latest (i.e. highest version number) version
   /// of that model is being used.
-  int64_t ModelVersion() const { return model_version_; }
+  virtual int64_t ModelVersion() const = 0;
 
   /// \return The maximum batch size supported by the context. A
   /// maximum batch size indicates that the context does not support
   /// batching and so only a single inference at a time can be
   /// performed.
-  uint64_t MaxBatchSize() const { return max_batch_size_; }
+  virtual uint64_t MaxBatchSize() const = 0;
 
   /// \return The correlation ID associated with the context.
-  CorrelationID CorrelationId() const { return correlation_id_; }
+  virtual CorrelationID CorrelationId() const = 0;
 
   /// \return The inputs of the model.
-  const std::vector<std::shared_ptr<Input>>& Inputs() const { return inputs_; }
+  virtual const std::vector<std::shared_ptr<Input>>& Inputs() const = 0;
 
   /// \return The outputs of the model.
-  const std::vector<std::shared_ptr<Output>>& Outputs() const
-  {
-    return outputs_;
-  }
+  virtual const std::vector<std::shared_ptr<Output>>& Outputs() const = 0;
 
   /// Get a named input.
   /// \param name The name of the input.
   /// \param input Returns the Input object for 'name'.
   /// \return Error object indicating success or failure.
-  Error GetInput(const std::string& name, std::shared_ptr<Input>* input) const;
+  virtual Error GetInput(
+      const std::string& name, std::shared_ptr<Input>* input) const = 0;
 
   /// Get a named output.
   /// \param name The name of the output.
   /// \param output Returns the Output object for 'name'.
   /// \return Error object indicating success or failure.
-  Error GetOutput(
-      const std::string& name, std::shared_ptr<Output>* output) const;
+  virtual Error GetOutput(
+      const std::string& name, std::shared_ptr<Output>* output) const = 0;
 
   /// Set the options to use for all subsequent Run() invocations.
   /// \param options The options.
   /// \return Error object indicating success or failure.
-  Error SetRunOptions(const Options& options);
+  virtual Error SetRunOptions(const Options& options) = 0;
 
   /// Get the current statistics of the InferContext.
   /// \param stat Returns the Stat object holding the statistics.
   /// \return Error object indicating success or failure.
-  Error GetStat(Stat* stat);
+  virtual Error GetStat(Stat* stat) const = 0;
 
   /// Send a synchronous request to the inference server to perform an
   /// inference to produce results for the outputs specified in the
@@ -690,82 +627,8 @@ class InferContext {
   /// \param wait If true, block until the request completes. Otherwise, return
   /// immediately.
   /// \return Error object indicating success or failure.
-  Error GetReadyAsyncRequest(
-      std::shared_ptr<Request>* async_request, bool* is_ready, bool wait);
-
- protected:
-  InferContext(const std::string&, int64_t, CorrelationID, bool);
-
-  // Function for worker thread to proceed the data transfer for all requests
-  virtual void AsyncTransfer() = 0;
-
-  // Helper function called before inference to prepare 'request'
-  virtual Error PreRunProcessing(std::shared_ptr<Request>& request) = 0;
-
-  // Helper function called by GetAsyncRunResults() to check if the request
-  // is ready. If the request is valid and wait == true,
-  // the function will block until request is ready.
-  Error IsRequestReady(
-      const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait);
-
-  // Update the context stat with the given timer
-  Error UpdateStat(const RequestTimers& timer);
-
-  using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<Request>>;
-
-  // map to record ongoing asynchronous requests with pointer to easy handle
-  // as key
-  AsyncReqMap ongoing_async_requests_;
-
-  // Model name
-  const std::string model_name_;
-
-  // Model version
-  const int64_t model_version_;
-
-  // The correlation ID to use with all inference requests using this
-  // context. A value of 0 (zero) indicates no correlation ID.
-  const CorrelationID correlation_id_;
-
-  // If true print verbose output
-  const bool verbose_;
-
-  // Maximum batch size supported by this context. A maximum batch
-  // size indicates that the context does not support batching and so
-  // only a single inference at a time can be performed.
-  uint64_t max_batch_size_;
-
-  // Requested batch size for inference request
-  uint64_t batch_size_;
-
-  // Use to assign unique identifier for each asynchronous request
-  uint64_t async_request_id_;
-
-  // The inputs and outputs
-  std::vector<std::shared_ptr<Input>> inputs_;
-  std::vector<std::shared_ptr<Output>> outputs_;
-
-  // Settings generated by current option
-  // InferRequestHeader protobuf describing the request
-  InferRequestHeader infer_request_;
-
-  // Standalone request context used for synchronous request
-  std::shared_ptr<Request> sync_request_;
-
-  // The statistic of the current context
-  Stat context_stat_;
-
-  // worker thread that will perform the asynchronous transfer
-  std::thread worker_;
-
-  // Avoid race condition between main thread and worker thread
-  std::mutex mutex_;
-
-  // Condition variable used for waiting on asynchronous request
-  std::condition_variable cv_;
-
-  // signal for worker thread to stop
-  bool exiting_;
+  virtual Error GetReadyAsyncRequest(
+      std::shared_ptr<Request>* async_request, bool* is_ready, bool wait) = 0;
 };
 
 //==============================================================================
@@ -793,27 +656,22 @@ class InferContext {
 ///
 class ProfileContext {
  public:
+  virtual ~ProfileContext() = 0;
+
   /// Start profiling on the inference server.
   /// \return Error object indicating success or failure.
-  Error StartProfile();
+  virtual Error StartProfile() = 0;
 
   /// Stop profiling on the inference server.
   // \return Error object indicating success or failure.
-  Error StopProfile();
-
- protected:
-  ProfileContext(bool);
-  virtual Error SendCommand(const std::string& cmd_str) = 0;
-
-  // If true print verbose output
-  const bool verbose_;
+  virtual Error StopProfile() = 0;
 };
 
 //==============================================================================
 /// ServerHealthHttpContext is the HTTP instantiation of
 /// ServerHealthContext.
 ///
-class ServerHealthHttpContext : public ServerHealthContext {
+class ServerHealthHttpContext {
  public:
   /// Create a context that returns health information.
   /// \param ctx Returns a new ServerHealthHttpContext object.
@@ -824,23 +682,13 @@ class ServerHealthHttpContext : public ServerHealthContext {
   static Error Create(
       std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
       bool verbose = false);
-
-  Error GetReady(bool* ready) override;
-  Error GetLive(bool* live) override;
-
- private:
-  ServerHealthHttpContext(const std::string&, bool);
-  Error GetHealth(const std::string& url, bool* health);
-
-  // URL for health endpoint on inference server.
-  const std::string url_;
 };
 
 //==============================================================================
 /// ServerStatusHttpContext is the HTTP instantiation of
 /// ServerStatusContext.
 ///
-class ServerStatusHttpContext : public ServerStatusContext {
+class ServerStatusHttpContext {
  public:
   /// Create a context that returns information about an inference
   /// server and all models on the server using HTTP protocol.
@@ -864,36 +712,13 @@ class ServerStatusHttpContext : public ServerStatusContext {
   static Error Create(
       std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
       const std::string& model_name, bool verbose = false);
-
-  /// Contact the inference server and get status.
-  /// \param status Returns the status.
-  /// \return Error object indicating success or failure.
-  Error GetServerStatus(ServerStatus* status) override;
-
- private:
-  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
-  static size_t ResponseHandler(void*, size_t, size_t, void*);
-
-  ServerStatusHttpContext(const std::string&, bool);
-  ServerStatusHttpContext(const std::string&, const std::string&, bool);
-
-  // URL for status endpoint on inference server.
-  const std::string url_;
-
-  // RequestStatus received in server response
-  RequestStatus request_status_;
-
-  // Serialized ServerStatus response from server.
-  std::string response_;
 };
 
 //==============================================================================
 /// InferHttpContext is the HTTP instantiation of InferContext.
 ///
-class InferHttpContext : public InferContext {
+class InferHttpContext {
  public:
-  ~InferHttpContext() override;
-
   /// Create context that performs inference for a non-sequence model
   /// using HTTP protocol.
   ///
@@ -930,44 +755,12 @@ class InferHttpContext : public InferContext {
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
-
-  Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
-  Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) override;
-
- private:
-  static size_t RequestProvider(void*, size_t, size_t, void*);
-  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
-  static size_t ResponseHandler(void*, size_t, size_t, void*);
-
-  InferHttpContext(
-      const std::string&, const std::string&, int64_t, CorrelationID, bool);
-
-  // @see InferContext.AsyncTransfer()
-  void AsyncTransfer() override;
-
-  // @see InferContext.PreRunProcessing()
-  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
-
-  // curl multi handle for processing asynchronous requests
-  CURLM* multi_handle_;
-
-  // URL to POST to
-  std::string url_;
-
-  // Serialized InferRequestHeader
-  std::string infer_request_str_;
-
-  // Keep an easy handle alive to reuse the connection
-  CURL* curl_;
 };
 
 //==============================================================================
 /// ProfileHttpContext is the HTTP instantiation of ProfileContext.
 ///
-class ProfileHttpContext : public ProfileContext {
+class ProfileHttpContext {
  public:
   /// Create context that controls profiling on a server using HTTP
   /// protocol.
@@ -979,25 +772,13 @@ class ProfileHttpContext : public ProfileContext {
   static Error Create(
       std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
       bool verbose = false);
-
- private:
-  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
-
-  ProfileHttpContext(const std::string&, bool);
-  Error SendCommand(const std::string& cmd_str) override;
-
-  // URL for status endpoint on inference server.
-  const std::string url_;
-
-  // RequestStatus received in server response
-  RequestStatus request_status_;
 };
 
 //==============================================================================
 /// ServerHealthGrpcContext is the GRPC instantiation of
 /// ServerHealthContext.
 ///
-class ServerHealthGrpcContext : public ServerHealthContext {
+class ServerHealthGrpcContext {
  public:
   /// Create a context that returns health information about server.
   /// \param ctx Returns a new ServerHealthGrpcContext object.
@@ -1008,23 +789,13 @@ class ServerHealthGrpcContext : public ServerHealthContext {
   static Error Create(
       std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
       bool verbose = false);
-
-  Error GetReady(bool* ready) override;
-  Error GetLive(bool* live) override;
-
- private:
-  ServerHealthGrpcContext(const std::string&, bool);
-  Error GetHealth(const std::string& mode, bool* health);
-
-  // GRPC end point.
-  std::unique_ptr<GRPCService::Stub> stub_;
 };
 
 //==============================================================================
 /// ServerStatusGrpcContext is the GRPC instantiation of
 /// ServerStatusContext.
 ///
-class ServerStatusGrpcContext : public ServerStatusContext {
+class ServerStatusGrpcContext {
  public:
   /// Create a context that returns information about an inference
   /// server and all models on the server using GRPC protocol.
@@ -1048,30 +819,13 @@ class ServerStatusGrpcContext : public ServerStatusContext {
   static Error Create(
       std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
       const std::string& model_name, bool verbose = false);
-
-  /// Contact the inference server and get status.
-  /// \param status Returns the status.
-  /// \return Error object indicating success or failure.
-  Error GetServerStatus(ServerStatus* status) override;
-
- private:
-  ServerStatusGrpcContext(const std::string&, bool);
-  ServerStatusGrpcContext(const std::string&, const std::string&, bool);
-
-  // Model name
-  const std::string model_name_;
-
-  // GRPC end point.
-  std::unique_ptr<GRPCService::Stub> stub_;
 };
 
 //==============================================================================
 /// InferGrpcContext is the GRPC instantiation of InferContext.
 ///
-class InferGrpcContext : public InferContext {
+class InferGrpcContext {
  public:
-  virtual ~InferGrpcContext() override;
-
   /// Create context that performs inference for a non-sequence model
   /// using the GRPC protocol.
   ///
@@ -1108,38 +862,6 @@ class InferGrpcContext : public InferContext {
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
-
-  virtual Error Run(ResultMap* results) override;
-  virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
-  Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) override;
-
- protected:
-  InferGrpcContext(
-      const std::string&, const std::string&, int64_t, CorrelationID, bool);
-
-  // Helper function to initialize the context
-  Error InitHelper(
-      const std::string& server_url, const std::string& model_name,
-      bool verbose);
-
-  // @see InferContext.AsyncTransfer()
-  virtual void AsyncTransfer() override;
-
-  // @see InferContext.PreRunProcessing()
-  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
-
-  // The producer-consumer queue used to communicate asynchronously with
-  // the GRPC runtime.
-  grpc::CompletionQueue async_request_completion_queue_;
-
-  // GRPC end point.
-  std::unique_ptr<GRPCService::Stub> stub_;
-
-  // request for GRPC call, one request object can be used for multiple calls
-  // since it can be overwritten as soon as the GRPC send finishes.
-  InferRequest request_;
 };
 
 //==============================================================================
@@ -1147,10 +869,8 @@ class InferGrpcContext : public InferContext {
 /// All synchronous and asynchronous requests sent from this context will be
 /// sent in the same stream.
 ///
-class InferGrpcStreamContext : public InferGrpcContext {
+class InferGrpcStreamContext {
  public:
-  ~InferGrpcStreamContext() override;
-
   /// Create streaming context that performs inference for a non-sequence model
   /// using the GRPC protocol.
   ///
@@ -1187,27 +907,12 @@ class InferGrpcStreamContext : public InferGrpcContext {
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
-
-  Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
-
- private:
-  InferGrpcStreamContext(
-      const std::string&, const std::string&, int64_t, CorrelationID, bool);
-
-  // @see InferContext.AsyncTransfer()
-  void AsyncTransfer() override;
-
-  // gRPC objects for using the streaming API
-  grpc::ClientContext context_;
-  std::shared_ptr<grpc::ClientReaderWriter<InferRequest, InferResponse>>
-      stream_;
 };
 
 //==============================================================================
 //// ProfileGrpcContext is the GRPC instantiation of ProfileContext.
 ////
-class ProfileGrpcContext : public ProfileContext {
+class ProfileGrpcContext {
  public:
   /// Create context that controls profiling on a server using GRPC
   /// protocol.
@@ -1219,13 +924,6 @@ class ProfileGrpcContext : public ProfileContext {
   static Error Create(
       std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
       bool verbose = false);
-
- private:
-  ProfileGrpcContext(const std::string&, bool);
-  Error SendCommand(const std::string& cmd_str) override;
-
-  // GRPC end point.
-  std::unique_ptr<GRPCService::Stub> stub_;
 };
 
 //==============================================================================

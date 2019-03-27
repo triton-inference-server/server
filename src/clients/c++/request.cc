@@ -36,7 +36,11 @@
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
-using ResponseHandlerUserP = std::pair<InferHttpContext*, HttpRequestImpl*>;
+class InferHttpContextImpl;
+class InferGrpcContextImpl;
+using ResponseHandlerUserP = std::pair<InferHttpContextImpl*, HttpRequestImpl*>;
+
+namespace {
 
 //==============================================================================
 
@@ -68,6 +72,98 @@ CurlGlobal::~CurlGlobal()
 }
 
 static CurlGlobal curl_global;
+
+//==============================================================================
+
+// Timer to record the timestamp for different stages of request
+// handling.
+class RequestTimers {
+ public:
+  /// The kind of the timer.
+  enum Kind {
+    /// The start of request handling.
+    REQUEST_START,
+    /// The end of request handling.
+    REQUEST_END,
+    /// The start of sending request bytes to the server (i.e. first byte).
+    SEND_START,
+    /// The end of sending request bytes to the server (i.e. last byte).
+    SEND_END,
+    /// The start of receiving response bytes from the server
+    /// (i.e. first byte).
+    RECEIVE_START,
+    /// The end of receiving response bytes from the server
+    /// (i.e. last byte).
+    RECEIVE_END
+  };
+
+  /// Construct a timer with zero-ed timestamps.
+  RequestTimers() { Reset(); }
+
+  /// Reset all timestamp values to zero. Must be called before
+  /// re-using the timer.
+  /// \return Error object indicating success or failure.
+  Error Reset();
+
+  /// Record the current timestamp for a request stage.
+  /// \param kind The Kind of the timestamp.
+  /// \return Error object indicating success or failure.
+  Error Record(Kind kind);
+
+  struct timespec request_start_;
+  struct timespec request_end_;
+  struct timespec send_start_;
+  struct timespec send_end_;
+  struct timespec receive_start_;
+  struct timespec receive_end_;
+};
+
+Error
+RequestTimers::Reset()
+{
+  request_start_.tv_sec = 0;
+  request_end_.tv_sec = 0;
+  send_start_.tv_sec = 0;
+  send_end_.tv_sec = 0;
+  receive_start_.tv_sec = 0;
+  receive_end_.tv_sec = 0;
+  request_start_.tv_nsec = 0;
+  request_end_.tv_nsec = 0;
+  send_start_.tv_nsec = 0;
+  send_end_.tv_nsec = 0;
+  receive_start_.tv_nsec = 0;
+  receive_end_.tv_nsec = 0;
+  return Error::Success;
+}
+
+Error
+RequestTimers::Record(Kind kind)
+{
+  switch (kind) {
+    case Kind::REQUEST_START:
+      clock_gettime(CLOCK_MONOTONIC, &request_start_);
+      break;
+    case Kind::REQUEST_END:
+      clock_gettime(CLOCK_MONOTONIC, &request_end_);
+      break;
+    case Kind::SEND_START:
+      clock_gettime(CLOCK_MONOTONIC, &send_start_);
+      break;
+    case Kind::SEND_END:
+      clock_gettime(CLOCK_MONOTONIC, &send_end_);
+      break;
+    case Kind::RECEIVE_START:
+      clock_gettime(CLOCK_MONOTONIC, &receive_start_);
+      break;
+    case Kind::RECEIVE_END:
+      clock_gettime(CLOCK_MONOTONIC, &receive_end_);
+      break;
+  }
+
+  return Error::Success;
+}
+
+}  // namespace
 
 //==============================================================================
 
@@ -147,13 +243,15 @@ operator<<(std::ostream& out, const Error& err)
   return out;
 }
 
-//==============================================================================
-
-ServerHealthContext::ServerHealthContext(bool verbose) : verbose_(verbose) {}
-
-//==============================================================================
-
-ServerStatusContext::ServerStatusContext(bool verbose) : verbose_(verbose) {}
+ProfileContext::~ProfileContext() {}
+ServerHealthContext::~ServerHealthContext() {}
+ServerStatusContext::~ServerStatusContext() {}
+InferContext::Input::~Input() {}
+InferContext::Output::~Output() {}
+InferContext::Result::~Result() {}
+InferContext::Options::~Options() {}
+InferContext::Request::~Request() {}
+InferContext::~InferContext() {}
 
 //==============================================================================
 
@@ -939,57 +1037,6 @@ ResultImpl::SetNextRawResult(
 
 //==============================================================================
 
-InferContext::RequestTimers::RequestTimers()
-{
-  Reset();
-}
-
-Error
-InferContext::RequestTimers::Reset()
-{
-  request_start_.tv_sec = 0;
-  request_end_.tv_sec = 0;
-  send_start_.tv_sec = 0;
-  send_end_.tv_sec = 0;
-  receive_start_.tv_sec = 0;
-  receive_end_.tv_sec = 0;
-  request_start_.tv_nsec = 0;
-  request_end_.tv_nsec = 0;
-  send_start_.tv_nsec = 0;
-  send_end_.tv_nsec = 0;
-  receive_start_.tv_nsec = 0;
-  receive_end_.tv_nsec = 0;
-  return Error::Success;
-}
-
-Error
-InferContext::RequestTimers::Record(Kind kind)
-{
-  switch (kind) {
-    case Kind::REQUEST_START:
-      clock_gettime(CLOCK_MONOTONIC, &request_start_);
-      break;
-    case Kind::REQUEST_END:
-      clock_gettime(CLOCK_MONOTONIC, &request_end_);
-      break;
-    case Kind::SEND_START:
-      clock_gettime(CLOCK_MONOTONIC, &send_start_);
-      break;
-    case Kind::SEND_END:
-      clock_gettime(CLOCK_MONOTONIC, &send_end_);
-      break;
-    case Kind::RECEIVE_START:
-      clock_gettime(CLOCK_MONOTONIC, &receive_start_);
-      break;
-    case Kind::RECEIVE_END:
-      clock_gettime(CLOCK_MONOTONIC, &receive_end_);
-      break;
-  }
-  return Error::Success;
-}
-
-//==============================================================================
-
 class RequestImpl : public InferContext::Request {
  public:
   virtual ~RequestImpl() = default;
@@ -997,7 +1044,7 @@ class RequestImpl : public InferContext::Request {
   uint64_t Id() const override { return id_; };
 
  protected:
-  friend class InferContext;
+  friend class InferContextImpl;
 
   RequestImpl(const uint64_t id);
 
@@ -1016,7 +1063,7 @@ class RequestImpl : public InferContext::Request {
   bool ready_;
 
   // The timer for infer request.
-  InferContext::RequestTimers timer_;
+  RequestTimers timer_;
 };
 
 RequestImpl::RequestImpl(const uint64_t id) : id_(id), ready_(false) {}
@@ -1052,7 +1099,118 @@ RequestImpl::PostRunProcessing(
 
 //==============================================================================
 
-InferContext::InferContext(
+class InferContextImpl : public InferContext {
+ public:
+  using ResultMap = std::map<std::string, std::unique_ptr<Result>>;
+
+  InferContextImpl(
+      const std::string& model_name, int64_t model_version,
+      CorrelationID correlation_id, bool verbose);
+  virtual ~InferContextImpl() {}
+
+  const std::string& ModelName() const override { return model_name_; }
+  int64_t ModelVersion() const override { return model_version_; }
+  uint64_t MaxBatchSize() const override { return max_batch_size_; }
+  CorrelationID CorrelationId() const override { return correlation_id_; }
+
+  const std::vector<std::shared_ptr<Input>>& Inputs() const override
+  {
+    return inputs_;
+  }
+  const std::vector<std::shared_ptr<Output>>& Outputs() const override
+  {
+    return outputs_;
+  }
+
+  Error GetInput(
+      const std::string& name, std::shared_ptr<Input>* input) const override;
+  Error GetOutput(
+      const std::string& name, std::shared_ptr<Output>* output) const override;
+
+  Error SetRunOptions(const Options& options) override;
+  Error GetStat(Stat* stat) const override;
+
+  Error GetReadyAsyncRequest(
+      std::shared_ptr<Request>* async_request, bool* is_ready,
+      bool wait) override;
+
+ protected:
+  friend class InferHttpContext;
+  friend class InferGrpcContext;
+
+  // Function for worker thread to proceed the data transfer for all requests
+  virtual void AsyncTransfer() = 0;
+
+  // Helper function called before inference to prepare 'request'
+  virtual Error PreRunProcessing(std::shared_ptr<Request>& request) = 0;
+
+  // Helper function called by GetAsyncRunResults() to check if the request
+  // is ready. If the request is valid and wait == true,
+  // the function will block until request is ready.
+  Error IsRequestReady(
+      const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait);
+
+  // Update the context stat with the given timer
+  Error UpdateStat(const RequestTimers& timer);
+
+  using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<Request>>;
+
+  // map to record ongoing asynchronous requests with pointer to easy handle
+  // as key
+  AsyncReqMap ongoing_async_requests_;
+
+  // Model name
+  const std::string model_name_;
+
+  // Model version
+  const int64_t model_version_;
+
+  // The correlation ID to use with all inference requests using this
+  // context. A value of 0 (zero) indicates no correlation ID.
+  const CorrelationID correlation_id_;
+
+  // If true print verbose output
+  const bool verbose_;
+
+  // Maximum batch size supported by this context. A maximum batch
+  // size indicates that the context does not support batching and so
+  // only a single inference at a time can be performed.
+  uint64_t max_batch_size_;
+
+  // Requested batch size for inference request
+  uint64_t batch_size_;
+
+  // Use to assign unique identifier for each asynchronous request
+  uint64_t async_request_id_;
+
+  // The inputs and outputs
+  std::vector<std::shared_ptr<Input>> inputs_;
+  std::vector<std::shared_ptr<Output>> outputs_;
+
+  // Settings generated by current option
+  // InferRequestHeader protobuf describing the request
+  InferRequestHeader infer_request_;
+
+  // Standalone request context used for synchronous request
+  std::shared_ptr<Request> sync_request_;
+
+  // The statistic of the current context
+  Stat context_stat_;
+
+  // worker thread that will perform the asynchronous transfer
+  std::thread worker_;
+
+  // Avoid race condition between main thread and worker thread
+  std::mutex mutex_;
+
+  // Condition variable used for waiting on asynchronous request
+  std::condition_variable cv_;
+
+  // signal for worker thread to stop
+  bool exiting_;
+};
+
+InferContextImpl::InferContextImpl(
     const std::string& model_name, int64_t model_version,
     CorrelationID correlation_id, bool verbose)
     : model_name_(model_name), model_version_(model_version),
@@ -1062,7 +1220,7 @@ InferContext::InferContext(
 }
 
 Error
-InferContext::GetInput(
+InferContextImpl::GetInput(
     const std::string& name, std::shared_ptr<Input>* input) const
 {
   for (const auto& io : inputs_) {
@@ -1078,7 +1236,7 @@ InferContext::GetInput(
 }
 
 Error
-InferContext::GetOutput(
+InferContextImpl::GetOutput(
     const std::string& name, std::shared_ptr<Output>* output) const
 {
   for (const auto& io : outputs_) {
@@ -1094,7 +1252,7 @@ InferContext::GetOutput(
 }
 
 Error
-InferContext::SetRunOptions(const InferContext::Options& boptions)
+InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 {
   const OptionsImpl& options = reinterpret_cast<const OptionsImpl&>(boptions);
 
@@ -1143,7 +1301,7 @@ InferContext::SetRunOptions(const InferContext::Options& boptions)
 }
 
 Error
-InferContext::GetStat(Stat* stat)
+InferContextImpl::GetStat(Stat* stat) const
 {
   stat->completed_request_count = context_stat_.completed_request_count;
   stat->cumulative_total_request_time_ns =
@@ -1154,7 +1312,7 @@ InferContext::GetStat(Stat* stat)
 }
 
 Error
-InferContext::UpdateStat(const RequestTimers& timer)
+InferContextImpl::UpdateStat(const RequestTimers& timer)
 {
   uint64_t request_start_ns = timer.request_start_.tv_sec * NANOS_PER_SECOND +
                               timer.request_start_.tv_nsec;
@@ -1199,7 +1357,7 @@ InferContext::UpdateStat(const RequestTimers& timer)
 }
 
 Error
-InferContext::GetReadyAsyncRequest(
+InferContextImpl::GetReadyAsyncRequest(
     std::shared_ptr<Request>* request, bool* is_ready, bool wait)
 {
   *is_ready = false;
@@ -1232,7 +1390,7 @@ InferContext::GetReadyAsyncRequest(
 }
 
 Error
-InferContext::IsRequestReady(
+InferContextImpl::IsRequestReady(
     const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait)
 {
   *is_ready = false;
@@ -1273,40 +1431,31 @@ InferContext::IsRequestReady(
 
 //==============================================================================
 
-ProfileContext::ProfileContext(bool verbose) : verbose_(verbose) {}
+class ServerHealthHttpContextImpl : public ServerHealthContext {
+ public:
+  ServerHealthHttpContextImpl(const std::string& url, bool verbose);
 
-Error
-ProfileContext::StartProfile()
-{
-  return SendCommand("start");
-}
+  Error GetReady(bool* ready) override;
+  Error GetLive(bool* live) override;
 
-Error
-ProfileContext::StopProfile()
-{
-  return SendCommand("stop");
-}
+ private:
+  Error GetHealth(const std::string& url, bool* health);
 
-//==============================================================================
+  // URL for health endpoint on inference server.
+  const std::string url_;
 
-Error
-ServerHealthHttpContext::Create(
-    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-    bool verbose)
-{
-  ctx->reset(static_cast<ServerHealthContext*>(
-      new ServerHealthHttpContext(server_url, verbose)));
-  return Error::Success;
-}
+  // Enable verbose output
+  const bool verbose_;
+};
 
-ServerHealthHttpContext::ServerHealthHttpContext(
-    const std::string& server_url, bool verbose)
-    : ServerHealthContext(verbose), url_(server_url + "/" + kHealthRESTEndpoint)
+ServerHealthHttpContextImpl::ServerHealthHttpContextImpl(
+    const std::string& url, bool verbose)
+    : url_(url + "/" + kHealthRESTEndpoint), verbose_(verbose)
 {
 }
 
 Error
-ServerHealthHttpContext::GetHealth(const std::string& url, bool* health)
+ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
 {
   if (!curl_global.Status().IsOk()) {
     return curl_global.Status();
@@ -1344,54 +1493,68 @@ ServerHealthHttpContext::GetHealth(const std::string& url, bool* health)
 }
 
 Error
-ServerHealthHttpContext::GetReady(bool* ready)
+ServerHealthHttpContextImpl::GetReady(bool* ready)
 {
   return GetHealth(url_ + "/ready", ready);
 }
 
 Error
-ServerHealthHttpContext::GetLive(bool* live)
+ServerHealthHttpContextImpl::GetLive(bool* live)
 {
   return GetHealth(url_ + "/live", live);
 }
 
-//==============================================================================
-
 Error
-ServerStatusHttpContext::Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+ServerHealthHttpContext::Create(
+    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
     bool verbose)
 {
-  ctx->reset(static_cast<ServerStatusContext*>(
-      new ServerStatusHttpContext(server_url, verbose)));
+  ctx->reset(static_cast<ServerHealthContext*>(
+      new ServerHealthHttpContextImpl(server_url, verbose)));
   return Error::Success;
 }
 
+//==============================================================================
+
+class ServerStatusHttpContextImpl : public ServerStatusContext {
+ public:
+  ServerStatusHttpContextImpl(const std::string& url, bool verbose);
+  ServerStatusHttpContextImpl(
+      const std::string& url, const std::string& model_name, bool verbose);
+  Error GetServerStatus(ServerStatus* status) override;
+
+ private:
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  static size_t ResponseHandler(void*, size_t, size_t, void*);
+
+  // URL for status endpoint on inference server.
+  const std::string url_;
+
+  // Enable verbose output
+  const bool verbose_;
+
+  // RequestStatus received in server response
+  RequestStatus request_status_;
+
+  // Serialized ServerStatus response from server.
+  std::string response_;
+};
+
+ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
+    const std::string& url, bool verbose)
+    : url_(url + "/" + kStatusRESTEndpoint), verbose_(verbose)
+{
+}
+
+ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
+    const std::string& url, const std::string& model_name, bool verbose)
+    : url_(url + "/" + kStatusRESTEndpoint + "/" + model_name),
+      verbose_(verbose)
+{
+}
+
 Error
-ServerStatusHttpContext::Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    const std::string& model_name, bool verbose)
-{
-  ctx->reset(static_cast<ServerStatusContext*>(
-      new ServerStatusHttpContext(server_url, model_name, verbose)));
-  return Error::Success;
-}
-
-ServerStatusHttpContext::ServerStatusHttpContext(
-    const std::string& server_url, bool verbose)
-    : ServerStatusContext(verbose), url_(server_url + "/" + kStatusRESTEndpoint)
-{
-}
-
-ServerStatusHttpContext::ServerStatusHttpContext(
-    const std::string& server_url, const std::string& model_name, bool verbose)
-    : ServerStatusContext(verbose),
-      url_(server_url + "/" + kStatusRESTEndpoint + "/" + model_name)
-{
-}
-
-Error
-ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
+ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
 {
   server_status->Clear();
   request_status_.Clear();
@@ -1464,11 +1627,11 @@ ServerStatusHttpContext::GetServerStatus(ServerStatus* server_status)
 }
 
 size_t
-ServerStatusHttpContext::ResponseHeaderHandler(
+ServerStatusHttpContextImpl::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  ServerStatusHttpContext* ctx =
-      reinterpret_cast<ServerStatusHttpContext*>(userp);
+  ServerStatusHttpContextImpl* ctx =
+      reinterpret_cast<ServerStatusHttpContextImpl*>(userp);
 
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
@@ -1493,15 +1656,35 @@ ServerStatusHttpContext::ResponseHeaderHandler(
 }
 
 size_t
-ServerStatusHttpContext::ResponseHandler(
+ServerStatusHttpContextImpl::ResponseHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  ServerStatusHttpContext* ctx =
-      reinterpret_cast<ServerStatusHttpContext*>(userp);
+  ServerStatusHttpContextImpl* ctx =
+      reinterpret_cast<ServerStatusHttpContextImpl*>(userp);
   uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
   size_t result_bytes = size * nmemb;
   std::copy(buf, buf + result_bytes, std::back_inserter(ctx->response_));
   return result_bytes;
+}
+
+Error
+ServerStatusHttpContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(
+      new ServerStatusHttpContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+Error
+ServerStatusHttpContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::string& model_name, bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(
+      new ServerStatusHttpContextImpl(server_url, model_name, verbose)));
+  return Error::Success;
 }
 
 //==============================================================================
@@ -1511,7 +1694,6 @@ class HttpRequestImpl : public RequestImpl {
   HttpRequestImpl(
       const uint64_t id,
       const std::vector<std::shared_ptr<InferContext::Input>> inputs);
-
   ~HttpRequestImpl();
 
   // Initialize the request for HTTP transfer. */
@@ -1523,8 +1705,8 @@ class HttpRequestImpl : public RequestImpl {
 
   // Create a result object for this request.
   Error CreateResult(
-      const InferHttpContext& ctx, const InferResponseHeader::Output& output,
-      const size_t batch_size);
+      const InferHttpContextImpl& ctx,
+      const InferResponseHeader::Output& output, const size_t batch_size);
 
   // Copy into the context 'size' bytes of result data from
   // 'buf'. Return the actual amount copied in 'result_bytes'.
@@ -1534,7 +1716,7 @@ class HttpRequestImpl : public RequestImpl {
   Error GetResults(InferContext::ResultMap* results);
 
  private:
-  friend class InferHttpContext;
+  friend class InferHttpContextImpl;
 
   // Pointer to easy handle that is processing the request
   CURL* easy_handle_;
@@ -1577,6 +1759,43 @@ class HttpRequestImpl : public RequestImpl {
   // response header.
   std::vector<std::unique_ptr<ResultImpl>> ordered_results_;
 };
+
+//==============================================================================
+
+class InferHttpContextImpl : public InferContextImpl {
+ public:
+  InferHttpContextImpl(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
+  virtual ~InferHttpContextImpl();
+
+  Error Run(ResultMap* results) override;
+  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error GetAsyncRunResults(
+      ResultMap* results, bool* is_ready,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
+
+ private:
+  static size_t RequestProvider(void*, size_t, size_t, void*);
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  static size_t ResponseHandler(void*, size_t, size_t, void*);
+
+  void AsyncTransfer() override;
+  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
+
+  // curl multi handle for processing asynchronous requests
+  CURLM* multi_handle_;
+
+  // URL to POST to
+  std::string url_;
+
+  // Serialized InferRequestHeader
+  std::string infer_request_str_;
+
+  // Keep an easy handle alive to reuse the connection
+  CURL* curl_;
+};
+
+//==============================================================================
 
 HttpRequestImpl::HttpRequestImpl(
     const uint64_t id,
@@ -1644,7 +1863,7 @@ HttpRequestImpl::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
 
   // Sent all input bytes
   if (input_pos_idx_ >= inputs_.size()) {
-    timer_.Record(InferContext::RequestTimers::Kind::SEND_END);
+    timer_.Record(RequestTimers::Kind::SEND_END);
   }
 
   return Error::Success;
@@ -1690,7 +1909,7 @@ HttpRequestImpl::SetNextRawResult(
 
 Error
 HttpRequestImpl::CreateResult(
-    const InferHttpContext& ctx, const InferResponseHeader::Output& output,
+    const InferHttpContextImpl& ctx, const InferResponseHeader::Output& output,
     const size_t batch_size)
 {
   std::shared_ptr<InferContext::Output> infer_output;
@@ -1776,71 +1995,10 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
 
 //==============================================================================
 
-Error
-InferHttpContext::Create(
-    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int64_t model_version, bool verbose)
-{
-  return Create(
-      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
-      verbose);
-}
-
-Error
-InferHttpContext::Create(
-    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
-    const std::string& server_url, const std::string& model_name,
-    int64_t model_version, bool verbose)
-{
-  InferHttpContext* ctx_ptr = new InferHttpContext(
-      server_url, model_name, model_version, correlation_id, verbose);
-  ctx->reset(static_cast<InferContext*>(ctx_ptr));
-
-  // Get status of the model and create the inputs and outputs.
-  std::unique_ptr<ServerStatusContext> sctx;
-  Error err =
-      ServerStatusHttpContext::Create(&sctx, server_url, model_name, verbose);
-  if (err.IsOk()) {
-    ServerStatus server_status;
-    err = sctx->GetServerStatus(&server_status);
-    if (err.IsOk()) {
-      const auto& itr = server_status.model_status().find(model_name);
-      if (itr == server_status.model_status().end()) {
-        err = Error(
-            RequestStatusCode::INTERNAL,
-            "unable to find status information for \"" + model_name + "\"");
-      } else {
-        const ModelConfig& model_info = itr->second.config();
-
-        ctx_ptr->max_batch_size_ =
-            static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
-
-        // Create inputs and outputs
-        for (const auto& io : model_info.input()) {
-          ctx_ptr->inputs_.emplace_back(std::make_shared<InputImpl>(io));
-        }
-        for (const auto& io : model_info.output()) {
-          ctx_ptr->outputs_.emplace_back(std::make_shared<OutputImpl>(io));
-        }
-      }
-    }
-  }
-
-  // Create request context for synchronous request.
-  ctx_ptr->sync_request_.reset(
-      static_cast<Request*>(new HttpRequestImpl(0, ctx_ptr->inputs_)));
-
-  if (!err.IsOk()) {
-    ctx->reset();
-  }
-
-  return err;
-}
-
-InferHttpContext::InferHttpContext(
+InferHttpContextImpl::InferHttpContextImpl(
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, CorrelationID correlation_id, bool verbose)
-    : InferContext(model_name, model_version, correlation_id, verbose),
+    : InferContextImpl(model_name, model_version, correlation_id, verbose),
       multi_handle_(curl_multi_init())
 {
   // Process url for HTTP request
@@ -1851,7 +2009,7 @@ InferHttpContext::InferHttpContext(
   }
 }
 
-InferHttpContext::~InferHttpContext()
+InferHttpContextImpl::~InferHttpContextImpl()
 {
   exiting_ = true;
   // thread not joinable if AsyncRun() is not called
@@ -1874,7 +2032,7 @@ InferHttpContext::~InferHttpContext()
 }
 
 Error
-InferHttpContext::Run(ResultMap* results)
+InferHttpContextImpl::Run(ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
       std::static_pointer_cast<HttpRequestImpl>(sync_request_);
@@ -1911,14 +2069,14 @@ InferHttpContext::Run(ResultMap* results)
 }
 
 Error
-InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
+InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
   if (!multi_handle_) {
     return Error(
         RequestStatusCode::INTERNAL,
         "failed to start HTTP asynchronous client");
   } else if (!worker_.joinable()) {
-    worker_ = std::thread(&InferHttpContext::AsyncTransfer, this);
+    worker_ = std::thread(&InferHttpContextImpl::AsyncTransfer, this);
   }
 
   // Make a copy of the current inputs
@@ -1966,7 +2124,7 @@ InferHttpContext::AsyncRun(std::shared_ptr<Request>* async_request)
 }
 
 Error
-InferHttpContext::GetAsyncRunResults(
+InferHttpContextImpl::GetAsyncRunResults(
     ResultMap* results, bool* is_ready,
     const std::shared_ptr<Request>& async_request, bool wait)
 {
@@ -1990,7 +2148,7 @@ InferHttpContext::GetAsyncRunResults(
 }
 
 size_t
-InferHttpContext::RequestProvider(
+InferHttpContextImpl::RequestProvider(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
@@ -2007,11 +2165,12 @@ InferHttpContext::RequestProvider(
 }
 
 size_t
-InferHttpContext::ResponseHeaderHandler(
+InferHttpContextImpl::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
   ResponseHandlerUserP* pr = reinterpret_cast<ResponseHandlerUserP*>(userp);
-  InferHttpContext* ctx = reinterpret_cast<InferHttpContext*>(pr->first);
+  InferHttpContextImpl* ctx =
+      reinterpret_cast<InferHttpContextImpl*>(pr->first);
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(pr->second);
 
   char* buf = reinterpret_cast<char*>(contents);
@@ -2062,7 +2221,7 @@ InferHttpContext::ResponseHeaderHandler(
 }
 
 size_t
-InferHttpContext::ResponseHandler(
+InferHttpContextImpl::ResponseHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
@@ -2083,7 +2242,7 @@ InferHttpContext::ResponseHandler(
 }
 
 Error
-InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
+InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
 {
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(request);
@@ -2163,7 +2322,7 @@ InferHttpContext::PreRunProcessing(std::shared_ptr<Request>& request)
 }
 
 void
-InferHttpContext::AsyncTransfer()
+InferHttpContextImpl::AsyncTransfer()
 {
   int place_holder = 0;
   CURLMsg* msg = nullptr;
@@ -2222,26 +2381,109 @@ InferHttpContext::AsyncTransfer()
   } while (!exiting_);
 }
 
+Error
+InferHttpContext::Create(
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::string& model_name, int64_t model_version, bool verbose)
+{
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
+      verbose);
+}
+
+Error
+InferHttpContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url, const std::string& model_name,
+    int64_t model_version, bool verbose)
+{
+  InferHttpContextImpl* ctx_ptr = new InferHttpContextImpl(
+      server_url, model_name, model_version, correlation_id, verbose);
+  ctx->reset(static_cast<InferContext*>(ctx_ptr));
+
+  // Get status of the model and create the inputs and outputs.
+  std::unique_ptr<ServerStatusContext> sctx;
+  Error err =
+      ServerStatusHttpContext::Create(&sctx, server_url, model_name, verbose);
+  if (err.IsOk()) {
+    ServerStatus server_status;
+    err = sctx->GetServerStatus(&server_status);
+    if (err.IsOk()) {
+      const auto& itr = server_status.model_status().find(model_name);
+      if (itr == server_status.model_status().end()) {
+        err = Error(
+            RequestStatusCode::INTERNAL,
+            "unable to find status information for \"" + model_name + "\"");
+      } else {
+        const ModelConfig& model_info = itr->second.config();
+
+        ctx_ptr->max_batch_size_ =
+            static_cast<uint64_t>(std::max(0, model_info.max_batch_size()));
+
+        // Create inputs and outputs
+        for (const auto& io : model_info.input()) {
+          ctx_ptr->inputs_.emplace_back(std::make_shared<InputImpl>(io));
+        }
+        for (const auto& io : model_info.output()) {
+          ctx_ptr->outputs_.emplace_back(std::make_shared<OutputImpl>(io));
+        }
+      }
+    }
+  }
+
+  // Create request context for synchronous request.
+  ctx_ptr->sync_request_.reset(static_cast<InferContext::Request*>(
+      new HttpRequestImpl(0, ctx_ptr->inputs_)));
+
+  if (!err.IsOk()) {
+    ctx->reset();
+  }
+
+  return err;
+}
+
 //==============================================================================
 
-Error
-ProfileHttpContext::Create(
-    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose)
+class ProfileHttpContextImpl : public ProfileContext {
+ public:
+  ProfileHttpContextImpl(const std::string& url, bool verbose);
+  Error StartProfile() override;
+  Error StopProfile() override;
+
+ private:
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  Error SendCommand(const std::string& cmd_str);
+
+  // URL for profile endpoint on inference server.
+  const std::string url_;
+
+  // RequestStatus received in server response
+  RequestStatus request_status_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ProfileHttpContextImpl::ProfileHttpContextImpl(
+    const std::string& url, bool verbose)
+    : url_(url + "/" + kProfileRESTEndpoint), verbose_(verbose)
 {
-  ctx->reset(static_cast<ProfileContext*>(
-      new ProfileHttpContext(server_url, verbose)));
-  return Error::Success;
 }
 
-ProfileHttpContext::ProfileHttpContext(
-    const std::string& server_url, bool verbose)
-    : ProfileContext(verbose), url_(server_url + "/" + kProfileRESTEndpoint)
+Error
+ProfileHttpContextImpl::StartProfile()
 {
+  return SendCommand("start");
 }
 
 Error
-ProfileHttpContext::SendCommand(const std::string& cmd_str)
+ProfileHttpContextImpl::StopProfile()
+{
+  return SendCommand("stop");
+}
+
+Error
+ProfileHttpContextImpl::SendCommand(const std::string& cmd_str)
 {
   request_status_.Clear();
 
@@ -2292,10 +2534,11 @@ ProfileHttpContext::SendCommand(const std::string& cmd_str)
 }
 
 size_t
-ProfileHttpContext::ResponseHeaderHandler(
+ProfileHttpContextImpl::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  ProfileHttpContext* ctx = reinterpret_cast<ProfileHttpContext*>(userp);
+  ProfileHttpContextImpl* ctx =
+      reinterpret_cast<ProfileHttpContextImpl*>(userp);
 
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
@@ -2319,27 +2562,43 @@ ProfileHttpContext::ResponseHeaderHandler(
   return byte_size;
 }
 
-//==============================================================================
-
 Error
-ServerHealthGrpcContext::Create(
-    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+ProfileHttpContext::Create(
+    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
     bool verbose)
 {
-  ctx->reset(static_cast<ServerHealthContext*>(
-      new ServerHealthGrpcContext(server_url, verbose)));
+  ctx->reset(static_cast<ProfileContext*>(
+      new ProfileHttpContextImpl(server_url, verbose)));
   return Error::Success;
 }
 
-ServerHealthGrpcContext::ServerHealthGrpcContext(
-    const std::string& server_url, bool verbose)
-    : ServerHealthContext(verbose),
-      stub_(GRPCService::NewStub(GetChannel(server_url)))
+//==============================================================================
+
+class ServerHealthGrpcContextImpl : public ServerHealthContext {
+ public:
+  ServerHealthGrpcContextImpl(const std::string& url, bool verbose);
+
+  Error GetReady(bool* ready) override;
+  Error GetLive(bool* live) override;
+
+ private:
+  Error GetHealth(const std::string& mode, bool* health);
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ServerHealthGrpcContextImpl::ServerHealthGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
 {
 }
 
 Error
-ServerHealthGrpcContext::GetHealth(const std::string& mode, bool* health)
+ServerHealthGrpcContextImpl::GetHealth(const std::string& mode, bool* health)
 {
   Error err;
 
@@ -2368,55 +2627,63 @@ ServerHealthGrpcContext::GetHealth(const std::string& mode, bool* health)
 }
 
 Error
-ServerHealthGrpcContext::GetReady(bool* ready)
+ServerHealthGrpcContextImpl::GetReady(bool* ready)
 {
   return GetHealth("ready", ready);
 }
 
 Error
-ServerHealthGrpcContext::GetLive(bool* live)
+ServerHealthGrpcContextImpl::GetLive(bool* live)
 {
   return GetHealth("live", live);
 }
 
-//==============================================================================
-
 Error
-ServerStatusGrpcContext::Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+ServerHealthGrpcContext::Create(
+    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
     bool verbose)
 {
-  ctx->reset(static_cast<ServerStatusContext*>(
-      new ServerStatusGrpcContext(server_url, verbose)));
+  ctx->reset(static_cast<ServerHealthContext*>(
+      new ServerHealthGrpcContextImpl(server_url, verbose)));
   return Error::Success;
 }
 
+//==============================================================================
+
+class ServerStatusGrpcContextImpl : public ServerStatusContext {
+ public:
+  ServerStatusGrpcContextImpl(const std::string& url, bool verbose);
+  ServerStatusGrpcContextImpl(
+      const std::string& url, const std::string& model_name, bool verbose);
+  Error GetServerStatus(ServerStatus* status) override;
+
+ private:
+  // Model name
+  const std::string model_name_;
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ServerStatusGrpcContextImpl::ServerStatusGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : model_name_(""), stub_(GRPCService::NewStub(GetChannel(url))),
+      verbose_(verbose)
+{
+}
+
+ServerStatusGrpcContextImpl::ServerStatusGrpcContextImpl(
+    const std::string& url, const std::string& model_name, bool verbose)
+    : model_name_(model_name), stub_(GRPCService::NewStub(GetChannel(url))),
+      verbose_(verbose)
+{
+}
+
 Error
-ServerStatusGrpcContext::Create(
-    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-    const std::string& model_name, bool verbose)
-{
-  ctx->reset(static_cast<ServerStatusContext*>(
-      new ServerStatusGrpcContext(server_url, model_name, verbose)));
-  return Error::Success;
-}
-
-ServerStatusGrpcContext::ServerStatusGrpcContext(
-    const std::string& server_url, bool verbose)
-    : ServerStatusContext(verbose), model_name_(""),
-      stub_(GRPCService::NewStub(GetChannel(server_url)))
-{
-}
-
-ServerStatusGrpcContext::ServerStatusGrpcContext(
-    const std::string& server_url, const std::string& model_name, bool verbose)
-    : ServerStatusContext(verbose), model_name_(model_name),
-      stub_(GRPCService::NewStub(GetChannel(server_url)))
-{
-}
-
-Error
-ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
+ServerStatusGrpcContextImpl::GetServerStatus(ServerStatus* server_status)
 {
   server_status->Clear();
 
@@ -2446,6 +2713,26 @@ ServerStatusGrpcContext::GetServerStatus(ServerStatus* server_status)
   return grpc_status;
 }
 
+Error
+ServerStatusGrpcContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(
+      new ServerStatusGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+Error
+ServerStatusGrpcContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::string& model_name, bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(
+      new ServerStatusGrpcContextImpl(server_url, model_name, verbose)));
+  return Error::Success;
+}
+
 //==============================================================================
 
 class GrpcRequestImpl : public RequestImpl {
@@ -2453,21 +2740,54 @@ class GrpcRequestImpl : public RequestImpl {
   GrpcRequestImpl(const uint64_t id);
 
   Error GetResults(
-      const InferGrpcContext& ctx, InferContext::ResultMap* results);
+      const InferGrpcContextImpl& ctx, InferContext::ResultMap* results);
 
  private:
   Error CreateResult(
-      const InferGrpcContext& ctx, const InferResponseHeader::Output& output,
-      const size_t batch_size, const size_t idx,
-      InferContext::ResultMap* results);
+      const InferGrpcContextImpl& ctx,
+      const InferResponseHeader::Output& output, const size_t batch_size,
+      const size_t idx, InferContext::ResultMap* results);
 
-  friend class InferGrpcContext;
-  friend class InferGrpcStreamContext;
+  friend class InferGrpcContextImpl;
+  friend class InferGrpcStreamContextImpl;
 
   // Variables for GRPC call
   grpc::ClientContext grpc_context_;
   grpc::Status grpc_status_;
   InferResponse grpc_response_;
+};
+
+class InferGrpcContextImpl : public InferContextImpl {
+ public:
+  InferGrpcContextImpl(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
+  virtual ~InferGrpcContextImpl();
+
+  virtual Error Run(ResultMap* results) override;
+  virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error GetAsyncRunResults(
+      ResultMap* results, bool* is_ready,
+      const std::shared_ptr<Request>& async_request, bool wait) override;
+
+  // Helper function to initialize the context
+  Error InitHelper(
+      const std::string& server_url, const std::string& model_name,
+      bool verbose);
+
+ protected:
+  virtual void AsyncTransfer() override;
+  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
+
+  // The producer-consumer queue used to communicate asynchronously with
+  // the GRPC runtime.
+  grpc::CompletionQueue async_request_completion_queue_;
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // request for GRPC call, one request object can be used for multiple calls
+  // since it can be overwritten as soon as the GRPC send finishes.
+  InferRequest request_;
 };
 
 GrpcRequestImpl::GrpcRequestImpl(const uint64_t id)
@@ -2478,7 +2798,7 @@ GrpcRequestImpl::GrpcRequestImpl(const uint64_t id)
 
 Error
 GrpcRequestImpl::CreateResult(
-    const InferGrpcContext& ctx, const InferResponseHeader::Output& output,
+    const InferGrpcContextImpl& ctx, const InferResponseHeader::Output& output,
     const size_t batch_size, const size_t idx, InferContext::ResultMap* results)
 {
   std::shared_ptr<InferContext::Output> infer_output;
@@ -2525,7 +2845,7 @@ GrpcRequestImpl::CreateResult(
 
 Error
 GrpcRequestImpl::GetResults(
-    const InferGrpcContext& ctx, InferContext::ResultMap* results)
+    const InferGrpcContextImpl& ctx, InferContext::ResultMap* results)
 {
   results->clear();
   InferResponseHeader infer_response;
@@ -2566,39 +2886,7 @@ GrpcRequestImpl::GetResults(
 //==============================================================================
 
 Error
-InferGrpcContext::Create(
-    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-    const std::string& model_name, int64_t model_version, bool verbose)
-{
-  return Create(
-      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
-      verbose);
-}
-
-Error
-InferGrpcContext::Create(
-    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
-    const std::string& server_url, const std::string& model_name,
-    int64_t model_version, bool verbose)
-{
-  InferGrpcContext* ctx_ptr = new InferGrpcContext(
-      server_url, model_name, model_version, correlation_id, verbose);
-  ctx->reset(static_cast<InferContext*>(ctx_ptr));
-
-  // Create request context for synchronous request.
-  ctx_ptr->sync_request_.reset(static_cast<Request*>(new GrpcRequestImpl(0)));
-
-  Error err = ctx_ptr->InitHelper(server_url, model_name, verbose);
-
-  if (!err.IsOk()) {
-    ctx->reset();
-  }
-
-  return err;
-}
-
-Error
-InferGrpcContext::InitHelper(
+InferGrpcContextImpl::InitHelper(
     const std::string& server_url, const std::string& model_name, bool verbose)
 {
   // Get status of the model and create the inputs and outputs.
@@ -2633,15 +2921,15 @@ InferGrpcContext::InitHelper(
   return err;
 }
 
-InferGrpcContext::InferGrpcContext(
+InferGrpcContextImpl::InferGrpcContextImpl(
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, CorrelationID correlation_id, bool verbose)
-    : InferContext(model_name, model_version, correlation_id, verbose),
+    : InferContextImpl(model_name, model_version, correlation_id, verbose),
       stub_(GRPCService::NewStub(GetChannel(server_url)))
 {
 }
 
-InferGrpcContext::~InferGrpcContext()
+InferGrpcContextImpl::~InferGrpcContextImpl()
 {
   exiting_ = true;
   // thread not joinable if AsyncRun() is not called
@@ -2662,7 +2950,7 @@ InferGrpcContext::~InferGrpcContext()
 }
 
 Error
-InferGrpcContext::Run(ResultMap* results)
+InferGrpcContextImpl::Run(ResultMap* results)
 {
   grpc::ClientContext context;
 
@@ -2693,10 +2981,10 @@ InferGrpcContext::Run(ResultMap* results)
 }
 
 Error
-InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
+InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
   if (!worker_.joinable()) {
-    worker_ = std::thread(&InferGrpcContext::AsyncTransfer, this);
+    worker_ = std::thread(&InferGrpcContextImpl::AsyncTransfer, this);
   }
 
   GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
@@ -2734,7 +3022,7 @@ InferGrpcContext::AsyncRun(std::shared_ptr<Request>* async_request)
 }
 
 Error
-InferGrpcContext::GetAsyncRunResults(
+InferGrpcContextImpl::GetAsyncRunResults(
     ResultMap* results, bool* is_ready,
     const std::shared_ptr<Request>& async_request, bool wait)
 {
@@ -2761,7 +3049,7 @@ InferGrpcContext::GetAsyncRunResults(
 }
 
 Error
-InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
+InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
 {
   // Create the input metadata for the request now that all input
   // sizes are known. For non-fixed-sized datatypes the
@@ -2809,7 +3097,7 @@ InferGrpcContext::PreRunProcessing(std::shared_ptr<Request>& request)
 }
 
 void
-InferGrpcContext::AsyncTransfer()
+InferGrpcContextImpl::AsyncTransfer()
 {
   do {
     // sleep if no work is available
@@ -2862,10 +3150,8 @@ InferGrpcContext::AsyncTransfer()
   } while (!exiting_);
 }
 
-//==============================================================================
-
 Error
-InferGrpcStreamContext::Create(
+InferGrpcContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
     const std::string& model_name, int64_t model_version, bool verbose)
 {
@@ -2875,14 +3161,18 @@ InferGrpcStreamContext::Create(
 }
 
 Error
-InferGrpcStreamContext::Create(
+InferGrpcContext::Create(
     std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, bool verbose)
 {
-  InferGrpcStreamContext* ctx_ptr = new InferGrpcStreamContext(
+  InferGrpcContextImpl* ctx_ptr = new InferGrpcContextImpl(
       server_url, model_name, model_version, correlation_id, verbose);
   ctx->reset(static_cast<InferContext*>(ctx_ptr));
+
+  // Create request context for synchronous request.
+  ctx_ptr->sync_request_.reset(
+      static_cast<InferContext::Request*>(new GrpcRequestImpl(0)));
 
   Error err = ctx_ptr->InitHelper(server_url, model_name, verbose);
 
@@ -2893,18 +3183,38 @@ InferGrpcStreamContext::Create(
   return err;
 }
 
-InferGrpcStreamContext::InferGrpcStreamContext(
+//==============================================================================
+
+class InferGrpcStreamContextImpl : public InferGrpcContextImpl {
+ public:
+  InferGrpcStreamContextImpl(
+      const std::string&, const std::string&, int64_t, CorrelationID, bool);
+  virtual ~InferGrpcStreamContextImpl();
+
+  Error Run(ResultMap* results) override;
+  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+
+ private:
+  void AsyncTransfer() override;
+
+  // gRPC objects for using the streaming API
+  grpc::ClientContext context_;
+  std::shared_ptr<grpc::ClientReaderWriter<InferRequest, InferResponse>>
+      stream_;
+};
+
+InferGrpcStreamContextImpl::InferGrpcStreamContextImpl(
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, CorrelationID correlation_id, bool verbose)
-    : InferGrpcContext(
+    : InferGrpcContextImpl(
           server_url, model_name, model_version, correlation_id, verbose)
 {
   stream_ = stub_->StreamInfer(&context_);
   // Initiate worker thread to read constantly
-  worker_ = std::thread(&InferGrpcStreamContext::AsyncTransfer, this);
+  worker_ = std::thread(&InferGrpcStreamContextImpl::AsyncTransfer, this);
 }
 
-InferGrpcStreamContext::~InferGrpcStreamContext()
+InferGrpcStreamContextImpl::~InferGrpcStreamContextImpl()
 {
   exiting_ = true;
   stream_->WritesDone();
@@ -2913,7 +3223,7 @@ InferGrpcStreamContext::~InferGrpcStreamContext()
 }
 
 Error
-InferGrpcStreamContext::Run(ResultMap* results)
+InferGrpcStreamContextImpl::Run(ResultMap* results)
 {
   // Actually calling AsyncRun() and GetAsyncRunResults()
   std::shared_ptr<Request> req;
@@ -2926,7 +3236,7 @@ InferGrpcStreamContext::Run(ResultMap* results)
 }
 
 Error
-InferGrpcStreamContext::AsyncRun(std::shared_ptr<Request>* async_request)
+InferGrpcStreamContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
   GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
   async_request->reset(static_cast<Request*>(current_context));
@@ -2957,7 +3267,7 @@ InferGrpcStreamContext::AsyncRun(std::shared_ptr<Request>* async_request)
 }
 
 void
-InferGrpcStreamContext::AsyncTransfer()
+InferGrpcStreamContextImpl::AsyncTransfer()
 {
   InferResponse response;
   // End loop if Read() returns false
@@ -2992,27 +3302,73 @@ InferGrpcStreamContext::AsyncTransfer()
   stream_->Finish();
 }
 
+Error
+InferGrpcStreamContext::Create(
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::string& model_name, int64_t model_version, bool verbose)
+{
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
+      verbose);
+}
+
+Error
+InferGrpcStreamContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url, const std::string& model_name,
+    int64_t model_version, bool verbose)
+{
+  InferGrpcStreamContextImpl* ctx_ptr = new InferGrpcStreamContextImpl(
+      server_url, model_name, model_version, correlation_id, verbose);
+  ctx->reset(static_cast<InferContext*>(ctx_ptr));
+
+  Error err = ctx_ptr->InitHelper(server_url, model_name, verbose);
+
+  if (!err.IsOk()) {
+    ctx->reset();
+  }
+
+  return err;
+}
+
 //==============================================================================
 
-Error
-ProfileGrpcContext::Create(
-    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose)
+class ProfileGrpcContextImpl : public ProfileContext {
+ public:
+  ProfileGrpcContextImpl(const std::string& url, bool verbose);
+  Error StartProfile() override;
+  Error StopProfile() override;
+
+ private:
+  Error SendCommand(const std::string& cmd_str);
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ProfileGrpcContextImpl::ProfileGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
 {
-  ctx->reset(static_cast<ProfileContext*>(
-      new ProfileGrpcContext(server_url, verbose)));
-  return Error::Success;
 }
 
-ProfileGrpcContext::ProfileGrpcContext(
-    const std::string& server_url, bool verbose)
-    : ProfileContext(verbose),
-      stub_(GRPCService::NewStub(GetChannel(server_url)))
+Error
+ProfileGrpcContextImpl::StartProfile()
 {
+  return SendCommand("start");
 }
 
 Error
-ProfileGrpcContext::SendCommand(const std::string& cmd_str)
+ProfileGrpcContextImpl::StopProfile()
+{
+  return SendCommand("stop");
+}
+
+Error
+ProfileGrpcContextImpl::SendCommand(const std::string& cmd_str)
 {
   ProfileRequest request;
   ProfileResponse response;
@@ -3029,6 +3385,16 @@ ProfileGrpcContext::SendCommand(const std::string& cmd_str)
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
+}
+
+Error
+ProfileGrpcContext::Create(
+    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ProfileContext*>(
+      new ProfileGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
 }
 
 }}}  // namespace nvidia::inferenceserver::client
