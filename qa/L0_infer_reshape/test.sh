@@ -28,14 +28,31 @@
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_reshape_test.py
 
-DATADIR=/data/inferenceserver/qa_reshape_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+SERVER_ARGS=--model-store=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
+rm -fr models && mkdir models
+cp -r /data/inferenceserver/qa_reshape_model_repository/* models/.
+for i in \
+        nobatch_zero_3_float32 \
+        nobatch_zero_4_float32 \
+        zero_1_float32 \
+        zero_2_float32 \
+        zero_3_float32 \
+        zero_4_float32 ; do
+    cp -r models/graphdef_${i} models/custom_${i}
+    rm -fr models/custom_${i}/1/*
+    cp libidentity.so models/custom_${i}/1/.
+    (cd models/custom_${i} && \
+                sed -i "s/^platform:.*/platform: \"custom\"/" config.pbtxt && \
+                sed -i "s/^name:.*/name: \"custom_${i}\"/" config.pbtxt && \
+                echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+                echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+done
 
 RET=0
 
