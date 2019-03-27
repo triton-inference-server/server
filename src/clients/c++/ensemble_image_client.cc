@@ -97,10 +97,13 @@ Usage(char** argv, const std::string& msg = std::string())
 
   std::cerr << "Usage: " << argv[0] << " [options] <image filename / image folder>" << std::endl;
   std::cerr << "\t-v" << std::endl;
+  std::cerr << "\t-c <topk>" << std::endl;
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << std::endl;
+  std::cerr << "For -c, the <topk> classes will be returned, default is 1."
+            << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
       << std::endl;
@@ -116,10 +119,11 @@ main(int argc, char** argv)
   bool verbose = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
+  size_t topk = 1;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:p:c:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -130,10 +134,17 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
+      case 'c':
+        topk = std::atoi(optarg);
+        break;
       case '?':
         Usage(argv);
         break;
     }
+  }
+
+  if (topk <= 0) {
+    Usage(argv, "topk must be > 0");
   }
 
   nic::Error err;
@@ -227,7 +238,7 @@ main(int argc, char** argv)
 
   options->SetBatchSize(batch_size);
   for (const auto& output : ctx->Outputs()) {
-    options->AddClassResult(output, 1);
+    options->AddClassResult(output, topk);
   }
 
   FAIL_IF_ERR(ctx->SetRunOptions(*options), "unable to set inference options");
