@@ -75,7 +75,7 @@ With respect to the inference server's schedulers, a *stateful* model
 (or stateful custom backend) does maintain state between inference
 requests. The model is expecting multiple inference requests that
 together form a sequence of inferences that must be routed to the same
-model instance so that the state being maintained by model is
+model instance so that the state being maintained by the model is
 correctly updated. Moreover, the model may require that the inference
 server provide *control* signals indicating, for example, sequence
 start.
