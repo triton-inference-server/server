@@ -66,6 +66,15 @@ class InferReshapeTest(unittest.TestCase):
             if no_batch:
                 iu.infer_zero(self, 'netdef_nobatch', 1, dtype, input_shapes, output_shapes)
 
+        if tu.validate_for_custom_model(dtype, dtype, dtype,
+                                    input_shapes[0], input_shapes[0], input_shapes[0]):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_zero(self, 'custom', bs, dtype, input_shapes, output_shapes)
+            # model that does not support batching
+            if no_batch:
+                iu.infer_zero(self, 'custom_nobatch', 1, dtype, input_shapes, output_shapes)
+
     def _trt_reshape(self, dtype, input_shapes, output_shapes=None, no_batch=True):
         # 'shapes' is list of shapes, one for each input.
         if output_shapes is None:
