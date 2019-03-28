@@ -267,10 +267,7 @@ main(int argc, char** argv)
   }
 
   // Print classification results
-  for (size_t i = 0; i < batch_size; i++) {
-    // Read the output values if we are performing classification.
-    Postprocess(results, image_filenames, batch_size);
-  }
+  Postprocess(results, image_filenames, batch_size);
 
   return 0;
 }
