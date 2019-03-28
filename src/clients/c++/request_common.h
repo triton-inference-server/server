@@ -321,7 +321,7 @@ class RequestImpl : public InferContext::Request {
   // Set non-RAW results from the inference response
   Error PostRunProcessing(
       const InferResponseHeader& infer_response,
-      InferContext::ResultMap* results);
+      InferContext::ResultMap* results) const;
 
  private:
   // Identifier seen by user
@@ -376,12 +376,6 @@ class InferContextImpl : public InferContext {
 
  protected:
   Error Init(std::unique_ptr<ServerStatusContext> sctx);
-
-  // Function for worker thread to proceed the data transfer for all requests
-  virtual void AsyncTransfer() = 0;
-
-  // Helper function called before inference to prepare 'request'
-  virtual Error PreRunProcessing(std::shared_ptr<Request>& request) = 0;
 
   // Helper function called by GetAsyncRunResults() to check if the request
   // is ready. If the request is valid and wait == true,

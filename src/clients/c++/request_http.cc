@@ -553,8 +553,8 @@ class InferHttpContextImpl : public InferContextImpl {
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
-  void AsyncTransfer() override;
-  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
+  void AsyncTransfer();
+  Error PreRunProcessing(std::shared_ptr<Request>& request);
 
   // curl multi handle for processing asynchronous requests
   CURLM* multi_handle_;

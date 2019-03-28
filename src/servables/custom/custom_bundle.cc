@@ -469,7 +469,7 @@ CustomBundle::Context::GetOutput(
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
 
-    Status status = payload->response_provider_->GetOutputBuffer(
+    Status status = payload->response_provider_->AllocateOutputBuffer(
         name, content, content_byte_size, shape);
     return status.IsOk();
   }

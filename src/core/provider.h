@@ -228,14 +228,20 @@ class InferResponseProvider {
   // Get a mutuable full response header for this inference request.
   virtual InferResponseHeader* MutableResponseHeader() = 0;
 
-  // Get a buffer to store results for a named output. The output must
-  // be listed in the request header.
-  virtual Status GetOutputBuffer(
+  // Return true if this provider requires a named output.
+  bool RequiresOutput(const std::string& name);
+
+  // Get a buffer to store results for a named output. Must be called
+  // exactly once for each output that is being returned for the
+  // request. The output must be listed in the request header.
+  virtual Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) = 0;
 
-  // Return true if this provider requires a named output.
-  bool RequiresOutput(const std::string& name);
+  // Get the address and byte-size of an output buffer. Error is
+  // returned if the buffer is not already allocated.
+  Status OutputBufferContents(
+      const std::string& name, void** content, size_t* content_byte_size) const;
 
   // Finialize response based on a servable.
   Status FinalizeResponse(const InferenceBackend& is);
@@ -261,14 +267,43 @@ class InferResponseProvider {
   struct Output {
     std::string name_;
     std::vector<int64_t> shape_;
+    void* ptr_;
     size_t byte_size_;
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;
   };
 
-  // Ordered list of outputs as they "added" by GetOutputBuffer().
+  // Ordered list of outputs as they "added" by AllocateOutputBuffer().
   std::vector<Output> outputs_;
+};
+
+//
+// Inference response provider for an internal request
+//
+class InternalInferResponseProvider : public InferResponseProvider {
+ public:
+  // Create a InternalInferResponseProvider object.
+  static Status Create(
+      const InferenceBackend& is, const InferRequestHeader& request_header,
+      std::shared_ptr<InternalInferResponseProvider>* infer_provider);
+
+  const InferResponseHeader& ResponseHeader() const override;
+  InferResponseHeader* MutableResponseHeader() override;
+  Status AllocateOutputBuffer(
+      const std::string& name, void** content, size_t content_byte_size,
+      const std::vector<int64_t>& content_shape) override;
+
+  // Retrieve the data buffer of output 'name'.
+  Status GetSystemMemory(
+      const std::string& name, std::shared_ptr<SystemMemory>* output_buffer);
+
+ private:
+  InternalInferResponseProvider(const InferRequestHeader& request_header);
+
+  InferResponseHeader response_header_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
+      output_buffer_;
 };
 
 //
@@ -283,7 +318,7 @@ class GRPCInferResponseProvider : public InferResponseProvider {
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
-  Status GetOutputBuffer(
+  Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 
@@ -309,7 +344,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
-  Status GetOutputBuffer(
+  Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 
@@ -322,31 +357,28 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 };
 
 //
-// Inference response provider for an internal request
+// Inference response provider that delegates output buffer allocation
+// via a callback.
 //
-class InternalInferResponseProvider : public InferResponseProvider {
+class DelegatingInferResponseProvider : public InferResponseProvider {
  public:
-  // Create a InternalInferResponseProvider object.
   static Status Create(
-      const InferenceBackend& is, const InferRequestHeader& request_header,
-      std::shared_ptr<InternalInferResponseProvider>* infer_provider);
+      const InferRequestHeader& request_header,
+      std::shared_ptr<DelegatingInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
-  Status GetOutputBuffer(
+  Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape) override;
 
-  // Retrieve the data buffer of output 'name'.
-  Status GetSystemMemory(
-      const std::string& name, std::shared_ptr<SystemMemory>* output_buffer);
-
  private:
-  InternalInferResponseProvider(const InferRequestHeader& request_header);
+  DelegatingInferResponseProvider(const InferRequestHeader& request_header)
+      : InferResponseProvider(request_header)
+  {
+  }
 
   InferResponseHeader response_header_;
-  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
-      output_buffer_;
 };
 
 }}  // namespace nvidia::inferenceserver

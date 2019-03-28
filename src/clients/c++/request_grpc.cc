@@ -328,8 +328,8 @@ class InferGrpcContextImpl : public InferContextImpl {
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  protected:
-  virtual void AsyncTransfer() override;
-  Error PreRunProcessing(std::shared_ptr<Request>& request) override;
+  virtual void AsyncTransfer();
+  Error PreRunProcessing(std::shared_ptr<Request>& request);
 
   // The producer-consumer queue used to communicate asynchronously with
   // the GRPC runtime.
