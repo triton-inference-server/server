@@ -661,7 +661,7 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
       if ((payload.response_provider_ != nullptr) &&
           payload.response_provider_->RequiresOutput(name)) {
         void* content = nullptr;
-        Status status = payload.response_provider_->GetOutputBuffer(
+        Status status = payload.response_provider_->AllocateOutputBuffer(
             name, &content, expected_byte_size, shape);
         if (status.IsOk()) {
           if ((binding_copy_offset + expected_byte_size) >

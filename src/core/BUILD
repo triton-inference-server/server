@@ -153,6 +153,18 @@ cc_library(
 )
 
 #
+# Inferface for in-process access to the server
+#
+cc_library(
+    name = "request_inprocess_header",
+    hdrs = ["request_inprocess.h"],
+    deps = [
+        ":constants",
+        "//src/clients/c++:request",
+    ],
+)
+
+#
 # Server headers
 #
 
@@ -186,6 +198,7 @@ cc_library(
     ],
     deps = [
         ":all_cc_protos",
+        ":request_inprocess_header",
         "//src/servables/caffe2:autofill_header",
         "//src/servables/tensorflow:autofill_header",
         "//src/servables/tensorrt:autofill_header",
@@ -218,6 +231,7 @@ cc_library(
         "profile.cc",
         "provider.cc",
         "provider_utils.cc",
+        "request_inprocess.cc",
         "request_status.cc",
         "sequence_batch_scheduler.cc",
         "server.cc",
@@ -230,6 +244,8 @@ cc_library(
         ":model_config",
         ":model_config_cuda",
         ":server_header",
+        "//src/clients/c++:request",
+        "//src/clients/c++:request_common",
         "//src/operations/tensorflow:all_custom_ops",
         "//src/servables/caffe2:autofill",
         "//src/servables/caffe2:netdef_bundle_source_adapter",

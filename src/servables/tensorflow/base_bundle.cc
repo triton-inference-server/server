@@ -427,7 +427,7 @@ ReadFixedSizedOutputTensor(
     if ((payload.response_provider_ != nullptr) &&
         payload.response_provider_->RequiresOutput(output_name)) {
       void* content = nullptr;
-      Status status = payload.response_provider_->GetOutputBuffer(
+      Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, expected_byte_size, shape);
       if (!status.IsOk()) {
         payload.status_ = status;
@@ -484,7 +484,7 @@ ReadStringOutputTensor(
       }
 
       void* content;
-      Status status = payload.response_provider_->GetOutputBuffer(
+      Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, serialized.size(), shape);
       if (status.IsOk()) {
         memcpy(
