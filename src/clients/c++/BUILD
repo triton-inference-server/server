@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,10 +29,56 @@ package(
 )
 
 cc_library(
+    name = "request_header",
+    hdrs = ["request.h"],
+    deps = [
+        "//src/core:api_proto",
+        "//src/core:constants",
+        "//src/core:model_config",
+        "//src/core:request_status_proto",
+        "//src/core:server_status_proto",
+    ],
+)
+
+cc_library(
+    name = "request_common",
+    hdrs = ["request_common.h"],
+    srcs = ["request_common.cc"],
+    deps = [
+        ":request_header",
+        "//src/core:constants",
+        "//src/core:model_config_proto",
+    ],
+)
+
+cc_library(
+    name = "request_grpc",
+    hdrs = ["request_grpc.h"],
+    srcs = ["request_grpc.cc"],
+    deps = [
+        ":request_header",
+        ":request_common",
+        "//src/core:grpc_service_proto",
+        "//src/core:model_config_proto",
+    ],
+)
+
+cc_library(
+    name = "request_http",
+    srcs = ["request_http.cc"],
+    hdrs = ["request_http.h"],
+    deps = [
+        ":request_header",
+        ":request_common",
+    ],
+)
+
+cc_library(
     name = "image_client_main",
     srcs = ["image_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:model_config_proto",
     ],
 )
@@ -41,7 +87,8 @@ cc_library(
     name = "perf_client_main",
     srcs = ["perf_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:constants",
         "//src/core:model_config_proto",
     ],
@@ -51,7 +98,8 @@ cc_library(
     name = "simple_client_main",
     srcs = ["simple_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:model_config_proto",
     ],
 )
@@ -60,7 +108,8 @@ cc_library(
     name = "simple_string_client_main",
     srcs = ["simple_string_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:model_config_proto",
     ],
 )
@@ -69,7 +118,8 @@ cc_library(
     name = "ensemble_image_client_main",
     srcs = ["ensemble_image_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:model_config_proto",
     ],
 )
@@ -78,23 +128,9 @@ cc_library(
     name = "simple_sequence_client_main",
     srcs = ["simple_sequence_client.cc"],
     deps = [
-        ":request",
+        ":request_grpc",
+        ":request_http",
         "//src/core:model_config_proto",
-    ],
-)
-
-cc_library(
-    name = "request",
-    srcs = ["request.cc"],
-    hdrs = ["request.h"],
-    deps = [
-        "//src/core:api_proto",
-        "//src/core:constants",
-        "//src/core:grpc_service_proto",
-        "//src/core:model_config_proto",
-        "//src/core:model_config",
-        "//src/core:request_status_proto",
-        "//src/core:server_status_proto",
     ],
 )
 
@@ -102,7 +138,6 @@ cc_binary(
     name = "image_client",
     deps = [
         ":image_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread",
@@ -115,7 +150,6 @@ cc_binary(
     name = "perf_client",
     deps = [
         ":perf_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread", "-lcurl"
@@ -126,7 +160,6 @@ cc_binary(
     name = "simple_client",
     deps = [
         ":simple_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread", "-lcurl"
@@ -137,7 +170,6 @@ cc_binary(
     name = "simple_string_client",
     deps = [
         ":simple_string_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread", "-lcurl"
@@ -148,7 +180,6 @@ cc_binary(
     name = "ensemble_image_client",
     deps = [
         ":ensemble_image_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread", "-lcurl"
@@ -159,7 +190,6 @@ cc_binary(
     name = "simple_sequence_client",
     deps = [
         ":simple_sequence_client_main",
-        ":request",
     ],
     linkopts = [
         "-pthread", "-lcurl"

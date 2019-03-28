@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/request.h"
-
 #include <getopt.h>
 #include <math.h>
 #include <stdlib.h>
@@ -41,6 +39,8 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include "src/clients/c++/request_grpc.h"
+#include "src/clients/c++/request_http.h"
 #include "src/core/constants.h"
 
 namespace ni = nvidia::inferenceserver;

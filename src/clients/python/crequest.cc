@@ -27,6 +27,8 @@
 #include "src/clients/python/crequest.h"
 
 #include <iostream>
+#include "src/clients/c++/request_grpc.h"
+#include "src/clients/c++/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
