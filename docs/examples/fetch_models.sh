@@ -43,7 +43,11 @@ mv /tmp/inception_v3_2016_08_28_frozen.pb model_repository/inception_graphdef/1/
 
 # Custom models
 mkdir -p model_repository/image_preprocess_nchw_3x224x224_inception/1
-mkdir -p model_repository/preprocess_resnet50_ensemble/1
 wget -O /tmp/custom_models.tar.gz `curl https://api.github.com/repos/NVIDIA/tensorrt-inference-server/releases/latest | grep -oP '(?<=browser_download_url\":\ \")https.*custom_models\.tar\.gz(?=\")'`
 (cd /tmp && tar xzf custom_models.tar.gz)
 mv /tmp/custom_models/libimagepreprocess.so model_repository/image_preprocess_nchw_3x224x224_inception/1/.
+
+# Ensemble models
+# (ensemble models are fully specified in their model configuration, but need to
+#  create empty version directories to be recognized as valid model directories)
+mkdir -p model_repository/preprocess_resnet50_ensemble/1
