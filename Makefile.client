@@ -53,6 +53,10 @@ IMAGE_OBJS  := $(addprefix $(BUILDDIR)/, $(IMAGE_SRCS:%.cc=%.o))
 IMAGE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread \
                  -lopencv_core -lopencv_imgproc -lopencv_highgui -ldl
 
+ENSEMBLE_SRCS   := $(CPPDIR)/ensemble_image_client.cc
+ENSEMBLE_OBJS   := $(addprefix $(BUILDDIR)/, $(ENSEMBLE_SRCS:%.cc=%.o))
+ENSEMBLE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+
 PERF_SRCS   := $(CPPDIR)/perf_client.cc
 PERF_OBJS   := $(addprefix $(BUILDDIR)/, $(PERF_SRCS:%.cc=%.o))
 PERF_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
@@ -106,7 +110,7 @@ INCS        += -I$(BUILDDIR)
 INCS        += -I$(LIBGRPCDIR)/include
 INCS        += -I$(PROTOBUF_INCLUDE_PATH)
 
-DEPS         = $(IMAGE_OBJS:.o=.d) $(PERF_OBJS:.o=.d) \
+DEPS         = $(IMAGE_OBJS:.o=.d) $(ENSEMBLE_OBJS:.o=.d) $(PERF_OBJS:.o=.d) \
                $(SIMPLE_OBJS:.o=.d) $(SIMPSEQ_OBJS:.o=.d) $(SIMPSTR_OBJS:.o=.d) \
                $(CMN_OBJS:.o=.d) $(LIBREQ_OBJS:.o=.d) \
                $(PROTO_OBJS:.o=.d) $(GRPC_OBJS:.o=.d)
@@ -116,9 +120,9 @@ DEPS         = $(IMAGE_OBJS:.o=.d) $(PERF_OBJS:.o=.d) \
 .SECONDARY: $(PROTO_HDRS) $(PROTO_SRCS) $(PROTO_PY) $(PROTO_CP)
 
 all: pip $(BUILDDIR)/librequest.so $(BUILDDIR)/librequest.a \
-     $(BUILDDIR)/image_client $(BUILDDIR)/perf_client \
-     $(BUILDDIR)/simple_client $(BUILDDIR)/simple_sequence_client \
-     $(BUILDDIR)/simple_string_client
+     $(BUILDDIR)/image_client $(BUILDDIR)/ensemble_image_client \
+	 $(BUILDDIR)/perf_client  $(BUILDDIR)/simple_client \
+	 $(BUILDDIR)/simple_sequence_client $(BUILDDIR)/simple_string_client
 
 # Need to fix protoc compiled imports (see
 # https://github.com/google/protobuf/issues/1491). The 'sed' command
@@ -163,6 +167,9 @@ $(BUILDDIR)/librequest.a: $(CMN_OBJS)
 
 $(BUILDDIR)/image_client: $(IMAGE_OBJS) $(PROTO_OBJS) $(GRPC_OBJS) $(CMN_OBJS)
 	$(CXX) -o $@ $^ $(IMAGE_LDFLAGS)
+
+$(BUILDDIR)/ensemble_image_client: $(ENSEMBLE_OBJS) $(PROTO_OBJS) $(GRPC_OBJS) $(CMN_OBJS)
+	$(CXX) -o $@ $^ $(ENSEMBLE_LDFLAGS)
 
 $(BUILDDIR)/perf_client: $(PERF_OBJS) $(PROTO_OBJS) $(GRPC_OBJS) $(CMN_OBJS)
 	$(CXX) -o $@ $^ $(PERF_LDFLAGS)
@@ -232,29 +239,31 @@ help:
 
 # Show variables
 show:
-	@echo 'VERSION      :' $(VERSION)
-	@echo 'BUILDDIR     :' $(BUILDDIR)
-	@echo 'SRCDIR       :' $(SRCDIR)
-	@echo 'CPPDIR       :' $(CPPDIR)
-	@echo 'PYTHONDIR    :' $(PYTHONDIR)
-	@echo 'CFLAGS       :' $(CFLAGS)
-	@echo 'INCS         :' $(INCS)
-	@echo 'IMAGE_SRCS   :' $(IMAGE_SRCS)
-	@echo 'IMAGE_OBJS   :' $(IMAGE_OBJS)
-	@echo 'PERF_SRCS    :' $(PERF_SRCS)
-	@echo 'PERF_OBJS    :' $(PERF_OBJS)
-	@echo 'SIMPLE_SRCS  :' $(SIMPLE_SRCS)
-	@echo 'SIMPLE_OBJS  :' $(SIMPLE_OBJS)
-	@echo 'SIMPSEQ_SRCS :' $(SIMPSEQ_SRCS)
-	@echo 'SIMPSEQ_OBJS :' $(SIMPSEQ_OBJS)
-	@echo 'SIMPSTR_SRCS :' $(SIMPSTR_SRCS)
-	@echo 'SIMPSTR_OBJS :' $(SIMPSTR_OBJS)
-	@echo 'CMN_SRCS     :' $(CMN_SRCS)
-	@echo 'CMN_OBJS     :' $(CMN_OBJS)
-	@echo 'LIBREQ_SRCS  :' $(LIBREQ_SRCS)
-	@echo 'LIBREQ_OBJS  :' $(LIBREQ_OBJS)
-	@echo 'PROTOS       :' $(PROTOS)
-	@echo 'PROTO_HDRS   :' $(PROTO_HDRS)
-	@echo 'PROTO_SRCS   :' $(PROTO_SRCS)
-	@echo 'PROTO_OBJS   :' $(PROTO_OBJS)
-	@echo 'DEPS         :' $(DEPS)
+	@echo 'VERSION       :' $(VERSION)
+	@echo 'BUILDDIR      :' $(BUILDDIR)
+	@echo 'SRCDIR        :' $(SRCDIR)
+	@echo 'CPPDIR        :' $(CPPDIR)
+	@echo 'PYTHONDIR     :' $(PYTHONDIR)
+	@echo 'CFLAGS        :' $(CFLAGS)
+	@echo 'INCS          :' $(INCS)
+	@echo 'IMAGE_SRCS    :' $(IMAGE_SRCS)
+	@echo 'IMAGE_OBJS    :' $(IMAGE_OBJS)
+	@echo 'ENSEMBLE_SRCS :' $(ENSEMBLE_SRCS)
+	@echo 'ENSEMBLE_OBJS :' $(ENSEMBLE_OBJS)
+	@echo 'PERF_SRCS     :' $(PERF_SRCS)
+	@echo 'PERF_OBJS     :' $(PERF_OBJS)
+	@echo 'SIMPLE_SRCS   :' $(SIMPLE_SRCS)
+	@echo 'SIMPLE_OBJS   :' $(SIMPLE_OBJS)
+	@echo 'SIMPSEQ_SRCS  :' $(SIMPSEQ_SRCS)
+	@echo 'SIMPSEQ_OBJS  :' $(SIMPSEQ_OBJS)
+	@echo 'SIMPSTR_SRCS  :' $(SIMPSTR_SRCS)
+	@echo 'SIMPSTR_OBJS  :' $(SIMPSTR_OBJS)
+	@echo 'CMN_SRCS      :' $(CMN_SRCS)
+	@echo 'CMN_OBJS      :' $(CMN_OBJS)
+	@echo 'LIBREQ_SRCS   :' $(LIBREQ_SRCS)
+	@echo 'LIBREQ_OBJS   :' $(LIBREQ_OBJS)
+	@echo 'PROTOS        :' $(PROTOS)
+	@echo 'PROTO_HDRS    :' $(PROTO_HDRS)
+	@echo 'PROTO_SRCS    :' $(PROTO_SRCS)
+	@echo 'PROTO_OBJS    :' $(PROTO_OBJS)
+	@echo 'DEPS          :' $(DEPS)
