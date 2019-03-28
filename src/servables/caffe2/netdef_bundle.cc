@@ -477,7 +477,7 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
     if ((payload.response_provider_ != nullptr) &&
         payload.response_provider_->RequiresOutput(name)) {
       void* buffer;
-      Status status = payload.response_provider_->GetOutputBuffer(
+      Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape);
       if (status.IsOk()) {
         memcpy(buffer, content + content_offset, expected_byte_size);

@@ -142,6 +142,14 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "simple_inprocess_main",
+    srcs = ["simple_inprocess.cc"],
+    deps = [
+        "//src/core:request_inprocess_header",
+    ],
+)
+
 cc_binary(
     name = "image_client",
     deps = [
@@ -201,5 +209,31 @@ cc_binary(
     ],
     linkopts = [
         "-pthread", "-lcurl"
+    ],
+)
+
+cc_binary(
+    name = "simple_inprocess",
+    deps = [
+        ":simple_inprocess_main",
+        "//src/core:libtrtserver_import",
+        "@extern_lib//:libcaffe2",                   # bazel is stupid...
+        "@extern_lib//:libcaffe2_detectron_ops_gpu", # putting these on libtrtserver doesn't work
+        "@extern_lib//:libcaffe2_gpu",
+        "@extern_lib//:libc10",
+        "@extern_lib//:libc10_cuda",
+        "@extern_lib//:libmkl_core",
+        "@extern_lib//:libmkl_gnu_thread",
+        "@extern_lib//:libmkl_avx2",
+        "@extern_lib//:libmkl_def",
+        "@extern_lib//:libmkl_intel_lp64",
+        "@extern_lib//:libmkl_rt",
+        "@extern_lib//:libmkl_vml_def",
+    ],
+    linkopts = [
+        "-pthread",
+        "-L/usr/local/cuda/lib64/stubs",
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime"
     ],
 )

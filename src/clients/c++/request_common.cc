@@ -643,7 +643,8 @@ ResultImpl::SetNextRawResult(
 
 Error
 RequestImpl::PostRunProcessing(
-    const InferResponseHeader& infer_response, InferContext::ResultMap* results)
+    const InferResponseHeader& infer_response,
+    InferContext::ResultMap* results) const
 {
   // At this point, the RAW requested results have their result values
   // set. Now need to initialize non-RAW results.
