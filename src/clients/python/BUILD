@@ -33,7 +33,8 @@ cc_library(
     srcs = ["crequest.cc"],
     hdrs = ["crequest.h"],
     deps = [
-        "//src/clients/c++:request",
+        "//src/clients/c++:request_grpc",
+        "//src/clients/c++:request_http",
     ],
 )
 
@@ -41,7 +42,6 @@ cc_binary(
     name = "libcrequest.so",
     deps = [
         ":crequest_base",
-        "//src/clients/c++:request",
         "//src/core:api_proto",
         "//src/core:grpc_service_proto",
         "//src/core:model_config_proto",
