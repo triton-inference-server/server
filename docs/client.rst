@@ -54,8 +54,6 @@ to perform image classification and to test performance:
   to experiment with different model configuration settings for your
   models.
 
-.. build-client-begin-marker-do-not-remove
-
 .. _section-getting-the-client-libraries-and-examples:
 
 Getting the Client Libraries and Examples
@@ -65,6 +63,8 @@ The provided Makefile.client and Dockerfile.client can be used to
 build the client libraries and examples. As an alternative to building
 it is also possible to download the pre-build client libraries and
 examples from GitHub.
+
+.. build-client-begin-marker-do-not-remove
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -114,6 +114,8 @@ can also be targeted for other OSes and platforms. We welcome any
 updates that expand the Makefiles functionality and allow the clients
 to be built on additional platforms.
 
+.. build-client-end-marker-do-not-remove
+
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -155,8 +157,6 @@ The C++ image_client example uses OpenCV for image manipulation so for
 that example you must install the following::
 
   $ apt-get install libopencv-dev libopencv-core-dev
-
-.. build-client-end-marker-do-not-remove
 
 .. _section-image_classification_example:
 
