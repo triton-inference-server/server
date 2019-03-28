@@ -273,7 +273,7 @@ library to communicate with the server.
 .. _section-ensemble_image_classification_example:
 
 Ensemble Image Classification Example Application
-----------------------------------------
+-------------------------------------------------
 
 In comparison to the image classification example above, this example uses an
 ensemble of a custom image preprocessing model and a Caffe2 ResNet50 model, so
