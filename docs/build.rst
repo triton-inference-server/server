@@ -81,6 +81,12 @@ before issuing the above build command::
 
   # rm -fr bazel-bin/src
 
+Buliding the Client Libraries and Examples
+------------------------------------------
+
+The provided Makefile.client and Dockerfile.client can be used to
+build the client libraries and examples.
+
 .. include:: client.rst
    :start-after: build-client-begin-marker-do-not-remove
    :end-before: build-client-end-marker-do-not-remove
