@@ -26,50 +26,32 @@
 #pragma once
 
 #include <string>
-#include "src/core/autofill.h"
-#include "src/core/model_config.pb.h"
-#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
-#include "tensorflow/cc/saved_model/loader.h"
-#include "tensorflow/cc/saved_model/tag_constants.h"
+#include "src/core/model_config.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+class AutoFill;
 
 //
 // AutoFillSavedModel
 //
-class AutoFillSavedModel : public AutoFill {
+class AutoFillSavedModel {
  public:
   static Status Create(
       const std::string& model_name,
       const ::google::protobuf::Any& platform_config,
-      const std::string& model_path,
-      std::unique_ptr<AutoFillSavedModel>* autofill);
-  Status Fix(ModelConfig* config) override;
-
- private:
-  AutoFillSavedModel(
-      const std::string& model_name, const std::string& savedmodel_dirname,
-      const tensorflow::SignatureDef& sig)
-      : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname), sig_(sig)
-  {
-  }
-
-  const std::string savedmodel_dirname_;
-  const tensorflow::SignatureDef sig_;
+      const std::string& model_path, std::unique_ptr<AutoFill>* autofill);
 };
 
 //
 // AutoFillGraphDef
 //
-class AutoFillGraphDef : public AutoFill {
+class AutoFillGraphDef {
  public:
   static Status Create(
       const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFillGraphDef>* autofill);
-  Status Fix(ModelConfig* config) override;
-
- private:
-  AutoFillGraphDef(const std::string& model_name) : AutoFill(model_name) {}
+      std::unique_ptr<AutoFill>* autofill);
 };
 
 }}  // namespace nvidia::inferenceserver

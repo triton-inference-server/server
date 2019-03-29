@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,35 +23,14 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/tensorrt/logging.h"
-
-#include "src/core/logging.h"
+#include <string>
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-TensorRTLogger tensorrt_logger;
-
-void
-TensorRTLogger::log(Severity severity, const char* msg)
-{
-  switch (severity) {
-    case Severity::kINTERNAL_ERROR:
-      LOG_ERROR << msg;
-      break;
-    case Severity::kERROR:
-      LOG_ERROR << msg;
-      break;
-    case Severity::kWARNING:
-      LOG_WARNING << msg;
-      break;
-    case Severity::kINFO:
-      LOG_INFO << msg;
-      break;
-    case Severity::kVERBOSE:
-      LOG_VERBOSE(1) << msg;
-      break;
-  }
-}
+Status GetSubdirs(const std::string& path, std::set<std::string>* subdirs);
+Status GetFiles(const std::string& path, std::set<std::string>* files);
 
 }}  // namespace nvidia::inferenceserver

@@ -33,6 +33,7 @@
 #include "src/core/metrics.h"
 #include "src/core/provider.h"
 #include "tensorflow_serving/core/servable_state.h"
+#include "tensorflow_serving/core/servable_state_monitor.h"
 
 namespace nvidia { namespace inferenceserver {
 

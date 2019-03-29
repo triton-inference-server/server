@@ -36,14 +36,20 @@ cc_proto_library(
 )
 
 cc_library(
+    name = "autofill_header",
+    hdrs = ["autofill.h"],
+    deps = [
+    ],
+)
+
+cc_library(
     name = "autofill",
     srcs = ["autofill.cc"],
-    hdrs = ["autofill.h"],
     deps = [
         ":loader",
         ":plan_utils",
-        "//src/core:autofill_header",
-        "//src/core:status",
+        "//src/core:model_config_proto",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -54,7 +60,7 @@ cc_library(
     hdrs = ["loader.h"],
     deps = [
         ":logging",
-        "//src/core:status",
+        "//src/core:server_header",
     ],
 )
 
@@ -63,7 +69,7 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
-        "//src/core:logging",
+        "//src/core:server_header",
     ],
 )
 
@@ -83,14 +89,10 @@ cc_library(
     deps = [
         ":loader",
         ":plan_utils",
-        "//src/core:backend",
         "//src/core:constants",
         "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:provider",
-        "//src/core:server_status",
-        "//src/core:status",
+        "//src/core:server_header",
     ],
 )
 
@@ -102,10 +104,9 @@ cc_library(
         ":plan_bundle",
         ":plan_bundle_proto",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
+        "//src/core:server_header",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -125,6 +126,9 @@ cc_test(
     name = "plan_bundle_test",
     srcs = ["plan_bundle_test.cc"],
     linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
@@ -134,10 +138,8 @@ cc_test(
         ":tensorrt_testdata"
     ],
     deps = [
-        ":plan_bundle",
-        "//src/core:constants",
-        "//src/core:status",
         "//src/test:model_config_test_base",
+        "//src/core:server",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
     ],

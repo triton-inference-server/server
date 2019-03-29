@@ -31,7 +31,10 @@
 #include "src/core/model_repository_manager.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
-#include "tensorflow_serving/core/servable_state_monitor.h"
+
+namespace tensorflow { namespace serving {
+class ServableStateMonitor;
+}}  // namespace tensorflow::serving
 
 namespace nvidia { namespace inferenceserver {
 

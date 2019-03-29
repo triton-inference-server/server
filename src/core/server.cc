@@ -68,6 +68,8 @@
 #include "tensorflow_serving/core/servable_handle.h"
 #include "tensorflow_serving/model_servers/server_core.h"
 
+namespace tfs = tensorflow::serving;
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -455,14 +457,6 @@ InferenceServer::PollModelRepository()
   return Status::Success;
 }
 
-Status
-InferenceServer::CreateBackendHandle(
-    const std::string& model_name, const int64_t model_version,
-    const std::shared_ptr<InferBackendHandle>& handle)
-{
-  return handle->Init(model_name, model_version, core_.get());
-}
-
 void
 InferenceServer::HandleHealth(
     RequestStatus* request_status, bool* health, const std::string& mode)
@@ -586,7 +580,8 @@ InferenceServer::HandleInfer(
                                 response_provider, request_status, request_id,
                                 infer_stats, inflight](Status status) mutable {
     if (status.IsOk()) {
-      status = response_provider->FinalizeResponse(*(*backend)());
+      status =
+          response_provider->FinalizeResponse(*backend->GetInferenceBackend());
       if (status.IsOk()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
@@ -604,8 +599,8 @@ InferenceServer::HandleInfer(
   // Need to set 'this' in each backend even though it is redundant after
   // the first time. Once we remove TFS dependency we can construct each backend
   // in a way that makes it directly aware of the inference server
-  (*backend)()->SetInferenceServer(this);
-  (*backend)()->Run(
+  backend->GetInferenceBackend()->SetInferenceServer(this);
+  backend->GetInferenceBackend()->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
@@ -657,8 +652,27 @@ InferenceServer::UptimeNs() const
 //
 // InferBackendHandle
 //
+class InferBackendHandleImpl : public InferenceServer::InferBackendHandle {
+ public:
+  InferBackendHandleImpl() : is_(nullptr) {}
+  Status Init(
+      const std::string& model_name, const int64_t model_version,
+      tfs::ServerCore* core);
+
+  InferenceBackend* GetInferenceBackend() override { return is_; }
+
+ private:
+  InferenceBackend* is_;
+  tfs::ServableHandle<GraphDefBundle> graphdef_bundle_;
+  tfs::ServableHandle<PlanBundle> plan_bundle_;
+  tfs::ServableHandle<NetDefBundle> netdef_bundle_;
+  tfs::ServableHandle<SavedModelBundle> saved_model_bundle_;
+  tfs::ServableHandle<CustomBundle> custom_bundle_;
+  tfs::ServableHandle<EnsembleBundle> ensemble_bundle_;
+};
+
 Status
-InferenceServer::InferBackendHandle::Init(
+InferBackendHandleImpl::Init(
     const std::string& model_name, const int64_t model_version,
     tfs::ServerCore* core)
 {
@@ -724,6 +738,20 @@ InferenceServer::InferBackendHandle::Init(
     status = Status(
         RequestStatusCode::UNAVAILABLE,
         "Inference request for unknown model '" + model_name + "'");
+  }
+
+  return status;
+}
+
+Status
+InferenceServer::InferBackendHandle::Create(
+    const InferenceServer* server, const std::string& model_name,
+    const int64_t model_version, std::shared_ptr<InferBackendHandle>* handle)
+{
+  InferBackendHandleImpl* bh = new InferBackendHandleImpl();
+  Status status = bh->Init(model_name, model_version, server->core_.get());
+  if (status.IsOk()) {
+    handle->reset(bh);
   }
 
   return status;

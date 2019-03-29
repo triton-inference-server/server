@@ -33,8 +33,16 @@
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_statistics.h"
+#include "tensorflow_serving/config/model_server_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
+
+struct ModelRepositoryManager::ModelInfo {
+  int64_t mtime_nsec_;
+  ModelConfig model_config_;
+  tfs::ModelConfig tfs_model_config_;
+  Platform platform_;
+};
 
 namespace {
 
@@ -141,7 +149,7 @@ ModelRepositoryManager::GetModelConfig(
         "no configuration for model '" + name + "'");
   }
 
-  *model_config = itr->second.model_config_;
+  *model_config = itr->second->model_config_;
   return Status::Success;
 }
 
@@ -158,7 +166,7 @@ ModelRepositoryManager::GetTFSModelConfig(
         "no TFS configuration for model '" + name + "'");
   }
 
-  *tfs_model_config = itr->second.tfs_model_config_;
+  *tfs_model_config = itr->second->tfs_model_config_;
   return Status::Success;
 }
 
@@ -172,7 +180,7 @@ ModelRepositoryManager::GetModelPlatform(
   if (itr == singleton->infos_.end()) {
     *platform = Platform::PLATFORM_UNKNOWN;
   } else {
-    *platform = itr->second.platform_;
+    *platform = itr->second->platform_;
   }
 
   if (*platform == Platform::PLATFORM_UNKNOWN) {
@@ -235,33 +243,37 @@ ModelRepositoryManager::Poll(
       mtime_ns = GetModifiedTime(std::string(full_path));
       need_load = true;
     } else {
-      mtime_ns = iitr->second.mtime_nsec_;
+      mtime_ns = iitr->second->mtime_nsec_;
       if (IsModified(std::string(full_path), &mtime_ns)) {
         modified->insert(child);
         need_load = true;
       } else {
         unmodified->insert(child);
-        const auto& ret = new_infos.emplace(child, iitr->second);
+        const auto& ret = new_infos.emplace(child, nullptr);
         if (!ret.second) {
           return Status(
               RequestStatusCode::ALREADY_EXISTS,
               "unexpected model info for model '" + child + "'");
         }
+
+        std::unique_ptr<ModelInfo>& model_info = ret.first->second;
+        model_info.reset(new ModelInfo(*iitr->second));
       }
     }
 
     if (need_load) {
-      const auto& ret = new_infos.emplace(child, ModelInfo{});
+      const auto& ret = new_infos.emplace(child, nullptr);
       if (!ret.second) {
         return Status(
             RequestStatusCode::ALREADY_EXISTS,
             "unexpected model info for model '" + child + "'");
       }
 
-      ModelInfo& model_info = ret.first->second;
-      ModelConfig& model_config = model_info.model_config_;
-      tfs::ModelConfig& tfs_config = model_info.tfs_model_config_;
-      model_info.mtime_nsec_ = mtime_ns;
+      std::unique_ptr<ModelInfo>& model_info = ret.first->second;
+      model_info.reset(new ModelInfo());
+      ModelConfig& model_config = model_info->model_config_;
+      tfs::ModelConfig& tfs_config = model_info->tfs_model_config_;
+      model_info->mtime_nsec_ = mtime_ns;
 
       // If enabled, try to automatically generate missing parts of
       // the model configuration (autofill) from the model
@@ -271,7 +283,7 @@ ModelRepositoryManager::Poll(
           &model_config));
       RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
 
-      model_info.platform_ = GetPlatform(model_config.platform());
+      model_info->platform_ = GetPlatform(model_config.platform());
 
       // Make sure the name of the model matches the name of the
       // directory. This is a somewhat arbitrary requirement but seems

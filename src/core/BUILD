@@ -31,6 +31,21 @@ package(
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library")
 load('@com_google_protobuf//:protobuf.bzl', 'py_proto_library')
 
+#
+# C++, Python and GRPC protobuf-derived libraries
+#
+
+cc_library(
+    name = "all_cc_protos",
+    deps = [
+        ":api_proto",
+        ":grpc_service_proto",
+        "model_config_proto",
+        "request_status_proto",
+        "server_status_proto",
+    ],
+)
+
 cc_proto_library(
     name = "api_proto",
     srcs = ["api.proto"],
@@ -108,144 +123,13 @@ py_proto_library(
     ],
 )
 
-cc_library(
-    name = "autofill_header",
-    hdrs = ["autofill.h"],
-    deps = [
-        ":model_config",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "autofill",
-    srcs = ["autofill.cc"],
-    deps = [
-        ":autofill_header",
-        ":constants",
-        ":logging",
-        ":model_config",
-        ":model_config_proto",
-        "//src/servables/caffe2:autofill",
-        "//src/servables/tensorflow:autofill",
-        "//src/servables/tensorrt:autofill",
-    ],
-)
+#
+# Simple dependencies required by clients, custom backends
+#
 
 cc_library(
     name = "constants",
     hdrs = ["constants.h"],
-)
-
-cc_library(
-    name = "backend",
-    srcs = ["backend.cc"],
-    deps = [
-        ":backend_header",
-        ":constants",
-        ":dynamic_batch_scheduler",
-        ":logging",
-        ":metric_model_reporter",
-        ":model_config_utils",
-        ":sequence_batch_scheduler",
-    ],
-)
-
-cc_library(
-    name = "backend_header",
-    hdrs = ["backend.h"],
-    deps = [
-        ":label_provider",
-        ":model_config_proto",
-        ":scheduler",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "provider_header",
-    hdrs = ["provider.h"],
-    deps = [
-        ":api_proto",
-        ":grpc_service_proto",
-        ":status",
-        "@com_github_libevent_libevent//:libevent",
-    ],
-)
-
-cc_library(
-    name = "provider",
-    srcs = ["provider.cc"],
-    deps = [
-        ":backend",
-        ":constants",
-        ":provider_header",
-        ":logging",
-        ":model_config",
-        ":model_config_utils",
-        "@com_github_libevent_libevent//:libevent",
-    ],
-)
-
-cc_library(
-    name = "provider_utils",
-    srcs = ["provider_utils.cc"],
-    hdrs = ["provider_utils.h"],
-    deps = [
-        ":api_proto",
-        ":backend_header",
-        ":provider_header",
-        ":model_config",
-        ":model_config_utils",
-        ":grpc_service_proto",
-        ":status",
-        "@com_github_libevent_libevent//:libevent",
-    ],
-)
-
-cc_library(
-    name = "label_provider",
-    srcs = ["label_provider.cc"],
-    hdrs = ["label_provider.h"],
-    deps = [
-        ":constants",
-        ":status",
-        "@org_tensorflow//tensorflow/core:lib",
-    ],
-)
-
-cc_library(
-    name = "logging",
-    srcs = ["logging.cc"],
-    hdrs = ["logging.h"],
-    deps = [
-    ],
-)
-
-cc_library(
-    name = "metrics",
-    srcs = ["metrics.cc"],
-    hdrs = ["metrics.h"],
-    deps = [
-        ":constants",
-        ":logging",
-        "@prometheus//core:core",
-        "@prometheus//pull:pull",
-        "@local_config_cuda//cuda:cuda_headers",
-    ],
-)
-
-cc_library(
-    name = "metric_model_reporter",
-    srcs = ["metric_model_reporter.cc"],
-    hdrs = ["metric_model_reporter.h"],
-    deps = [
-        ":constants",
-        ":metrics",
-        ":model_config",
-        ":status",
-        "@prometheus//core:core",
-    ],
 )
 
 cc_library(
@@ -268,249 +152,109 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "model_repository_manager",
-    srcs = ["model_repository_manager.cc"],
-    hdrs = ["model_repository_manager.h"],
-    deps = [
-        ":constants",
-        ":logging",
-        ":model_config",
-        ":model_config_proto",
-        ":model_config_utils",
-        ":status",
-        "@tf_serving//tensorflow_serving/config:model_server_config_proto",
-    ],
-)
-
-cc_library(
-    name = "profile",
-    srcs = ["profile.cc"],
-    hdrs = ["profile.h"],
-    deps = [
-        ":status",
-        "@local_config_cuda//cuda:cuda_headers",
-    ],
-)
-
-cc_library(
-    name = "scheduler",
-    hdrs = ["scheduler.h"],
-    deps = [
-        ":server_status_header",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "dynamic_batch_scheduler",
-    srcs = ["dynamic_batch_scheduler.cc"],
-    hdrs = ["dynamic_batch_scheduler.h"],
-    deps = [
-        ":api_proto",
-        ":constants",
-        ":provider_header",
-        ":logging",
-        ":model_config",
-        ":model_config_proto",
-        ":scheduler",
-        ":server_status_header",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "sequence_batch_scheduler",
-    srcs = ["sequence_batch_scheduler.cc"],
-    hdrs = ["sequence_batch_scheduler.h"],
-    deps = [
-        ":constants",
-        ":provider_header",
-        ":logging",
-        ":model_config",
-        ":model_config_proto",
-        ":model_config_utils",
-        ":scheduler",
-        ":server_status_header",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "ensemble_scheduler",
-    srcs = ["ensemble_scheduler.cc"],
-    hdrs = ["ensemble_scheduler.h"],
-    deps = [
-        ":api_proto",
-        ":backend_header",
-        ":logging",
-        ":model_config_proto",
-        ":model_config_utils",
-        ":provider_header",
-        ":provider_utils",
-        ":scheduler",
-        ":server_header",
-        ":server_status_header",
-    ],
-)
+#
+# Server headers
+#
 
 cc_library(
     name = "server_header",
-    hdrs = ["server.h"],
+    hdrs = [
+        "autofill.h",
+        "backend.h",
+        "constants.h",
+        "dynamic_batch_scheduler.h",
+        "ensemble_scheduler.h",
+        "ensemble_utils.h",
+        "filesystem.h",
+        "label_provider.h",
+        "logging.h",
+        "metric_model_reporter.h",
+        "metrics.h",
+        "model_config.h",
+        "model_config_cuda.h",
+        "model_config_utils.h",
+        "model_repository_manager.h",
+        "profile.h",
+        "provider.h",
+        "provider_utils.h",
+        "request_status.h",
+        "scheduler.h",
+        "sequence_batch_scheduler.h",
+        "server.h",
+        "server_status.h",
+        "status.h",
+    ],
     deps = [
-        ":api_proto",
-        ":provider_header",
-        ":model_config_proto",
-        ":request_status_proto",
-        ":server_status_header",
-        ":server_status_proto",
-        ":status",
-        "@tf_serving//tensorflow_serving/model_servers:server_core",
+        ":all_cc_protos",
+        "//src/servables/caffe2:autofill_header",
+        "//src/servables/tensorflow:autofill_header",
+        "//src/servables/tensorrt:autofill_header",
+        "@com_github_libevent_libevent//:libevent",
+        "@com_google_absl//absl/strings",
+        "@prometheus//core:core",
+        "@prometheus//pull:pull",
     ],
 )
 
+#
+# Server
+#
+
 cc_library(
     name = "server",
-    srcs = ["server.cc"],
+    srcs = [
+        "autofill.cc",
+        "backend.cc",
+        "dynamic_batch_scheduler.cc",
+        "ensemble_scheduler.cc",
+        "ensemble_utils.cc",
+        "filesystem.cc",
+        "label_provider.cc",
+        "logging.cc",
+        "metric_model_reporter.cc",
+        "metrics.cc",
+        "model_config_utils.cc",
+        "model_repository_manager.cc",
+        "profile.cc",
+        "provider.cc",
+        "provider_utils.cc",
+        "request_status.cc",
+        "sequence_batch_scheduler.cc",
+        "server.cc",
+        "server_status.cc",
+        "status.cc",
+    ],
     deps = [
-        ":api_proto",
+        ":all_cc_protos",
         ":constants",
-        ":logging",
         ":model_config",
-        ":model_config_proto",
-        ":model_config_utils",
-        ":model_repository_manager",
-        ":profile",
-        ":provider",
-        ":request_status",
-        ":request_status_proto",
+        ":model_config_cuda",
         ":server_header",
-        ":server_status_header",
-        ":server_status_proto",
-        ":status",
         "//src/operations/tensorflow:all_custom_ops",
+        "//src/servables/caffe2:autofill",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
+        "//src/servables/tensorflow:autofill",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
+        "//src/servables/tensorrt:autofill",
         "//src/servables/tensorrt:plan_bundle_source_adapter",
         "//src/servables/custom:custom_bundle_source_adapter",
         "//src/servables/ensemble:ensemble_bundle_source_adapter",
         "@com_github_libevent_libevent//:libevent",
+        "@com_google_absl//absl/strings",
+        "@local_config_cuda//cuda:cuda_headers",
+        "@org_tensorflow//tensorflow/contrib:contrib_kernels",
+        "@org_tensorflow//tensorflow/contrib:contrib_ops_op_lib",
+        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
+        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_kernel",
+        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_shape_function",
+        "@org_tensorflow//tensorflow/core:lib",
+        "@prometheus//core:core",
+        "@prometheus//pull:pull",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
         "@tf_serving//tensorflow_serving/core:availability_preserving_policy",
         "@tf_serving//tensorflow_serving/model_servers:server_core",
-    ],
-)
-
-cc_library(
-    name = "http_server",
-    srcs = ["http_server.cc"],
-    hdrs = ["http_server.h"],
-    deps = [
-        ":backend",
-        ":constants",
-        ":logging",
-        ":provider",
-        ":provider_utils",
-        ":request_status",
-        ":request_status_proto",
-        ":server_header",
-        ":status",
-        "@com_github_libevhtp//:libevhtp",
-        "@com_github_libevent_libevent//:libevent",
-        "@com_google_absl//absl/strings",
-        "@com_googlesource_code_re2//:re2",
-    ],
-)
-
-cc_library(
-    name = "grpc_server",
-    srcs = ["grpc_server.cc"],
-    hdrs = ["grpc_server.h"],
-    deps = [
-        ":backend",
-        ":constants",
-        ":grpc_service_proto",
-        ":logging",
-        ":provider",
-        ":provider_utils",
-        ":request_status",
-        ":request_status_proto",
-        ":server_header",
-        ":status",
-        "//src/nvrpc:nvrpc",
-        "@grpc//:grpc++_unsecure",
-    ],
-)
-
-cc_library(
-    name = "server_status_header",
-    hdrs = ["server_status.h"],
-    deps = [
-        ":model_config_proto",
-        ":model_repository_manager",
-        ":server_status_proto",
-        ":status",
-        "@tf_serving//tensorflow_serving/core:servable_state_monitor",
-    ],
-)
-
-cc_library(
-    name = "server_status",
-    srcs = ["server_status.cc"],
-    deps = [
-        ":constants",
-        ":provider_header",
-        ":logging",
-        ":metric_model_reporter",
-        ":server_status_header",
-        "@tf_serving//tensorflow_serving/core:servable_state",
-    ],
-)
-
-cc_library(
-    name = "status",
-    srcs = ["status.cc"],
-    hdrs = ["status.h"],
-    deps = [
-        ":request_status_proto",
-    ],
-)
-
-cc_library(
-    name = "request_status",
-    srcs = ["request_status.cc"],
-    hdrs = ["request_status.h"],
-    deps = [
-        ":request_status_proto",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "model_config_utils",
-    srcs = ["model_config_utils.cc"],
-    hdrs = ["model_config_utils.h"],
-    deps = [
-        ":autofill",
-        ":constants",
-        ":logging",
-        ":model_config",
-        ":model_config_proto",
-        ":status",
-    ],
-)
-
-cc_library(
-    name = "ensemble_utils",
-    srcs = ["ensemble_utils.cc"],
-    hdrs = ["ensemble_utils.h"],
-    deps = [
-        ":logging",
-        ":model_config_proto",
-        ":model_config_utils",
-        ":status",
     ],
 )
 
@@ -526,4 +270,35 @@ cc_binary(
         "-lnvonnxparser_runtime"
     ],
     linkshared = 1,
+)
+
+cc_import(
+    name = "libtrtserver_import",
+    shared_library = ":libtrtserver.so",
+    hdrs = [
+        "autofill.h",
+        "backend.h",
+        "constants.h",
+        "dynamic_batch_scheduler.h",
+        "ensemble_scheduler.h",
+        "ensemble_utils.h",
+        "filesystem.h",
+        "label_provider.h",
+        "logging.h",
+        "metric_model_reporter.h",
+        "metrics.h",
+        "model_config.h",
+        "model_config_cuda.h",
+        "model_config_utils.h",
+        "model_repository_manager.h",
+        "profile.h",
+        "provider.h",
+        "provider_utils.h",
+        "request_status.h",
+        "scheduler.h",
+        "sequence_batch_scheduler.h",
+        "server.h",
+        "server_status.h",
+        "status.h",
+    ],
 )

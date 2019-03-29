@@ -50,7 +50,7 @@ class GraphDefBundleSourceAdapter final
   ~GraphDefBundleSourceAdapter() override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(GraphDefBundleSourceAdapter);
+  DISALLOW_COPY_AND_ASSIGN(GraphDefBundleSourceAdapter);
   using SimpleSourceAdapter =
       tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, GraphDefBundle>;
 

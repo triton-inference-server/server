@@ -30,8 +30,10 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
-#include "tensorflow_serving/config/model_server_config.pb.h"
 
+namespace tensorflow { namespace serving {
+class ModelConfig;
+}}  // namespace tensorflow::serving
 namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
@@ -87,15 +89,11 @@ class ModelRepositoryManager {
   static Status GetModelPlatform(const std::string& name, Platform* platform);
 
  private:
-  struct ModelInfo {
-    int64_t mtime_nsec_;
-    ModelConfig model_config_;
-    tfs::ModelConfig tfs_model_config_;
-    Platform platform_;
-  };
+  struct ModelInfo;
 
   // Map from model name to information about the model.
-  using ModelInfoMap = std::unordered_map<std::string, ModelInfo>;
+  using ModelInfoMap =
+      std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
 
   ModelRepositoryManager(
       const std::string& repository_path,

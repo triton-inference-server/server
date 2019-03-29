@@ -85,8 +85,8 @@ REGISTER_KERNEL_BUILDER(
 #if GOOGLE_CUDA
 
 extern void LaunchTRTISExampleAddSubFloat(
-    const float* in0, const float* in1, float* sum, float* diff, int element_cnt,
-    const Eigen::GpuDevice& device);
+    const float* in0, const float* in1, float* sum, float* diff,
+    int element_cnt, const Eigen::GpuDevice& device);
 
 class TRTISExampleAddSubGpuOp : public OpKernel {
  public:
@@ -118,7 +118,8 @@ class TRTISExampleAddSubGpuOp : public OpKernel {
 
     const int element_cnt = input0_tensor.NumElements();
     LaunchTRTISExampleAddSubFloat(
-        input0_flat.data(), input1_flat.data(), const_cast<float*>(output0_flat.data()),
+        input0_flat.data(), input1_flat.data(),
+        const_cast<float*>(output0_flat.data()),
         const_cast<float*>(output1_flat.data()), element_cnt,
         context->eigen_device<Eigen::GpuDevice>());
   }

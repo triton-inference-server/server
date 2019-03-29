@@ -26,15 +26,36 @@
 
 #include "src/servables/caffe2/autofill.h"
 
+#include "src/core/autofill.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
+class AutoFillNetDefImpl : public AutoFill {
+ public:
+  AutoFillNetDefImpl(const std::string& model_name) : AutoFill(model_name) {}
+  Status Fix(ModelConfig* config) override;
+};
+
+Status
+AutoFillNetDefImpl::Fix(ModelConfig* config)
+{
+  config->set_platform(kCaffe2NetDefPlatform);
+
+  // Set name if not already set.
+  if (config->name().empty()) {
+    config->set_name(model_name_);
+  }
+
+  return Status::Success;
+}
+
 Status
 AutoFillNetDef::Create(
     const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillNetDef>* autofill)
+    std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
   RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -88,20 +109,7 @@ AutoFillNetDef::Create(
             "' and '" + expected_init_filename + "'");
   }
 
-  autofill->reset(new AutoFillNetDef(model_name));
-  return Status::Success;
-}
-
-Status
-AutoFillNetDef::Fix(ModelConfig* config)
-{
-  config->set_platform(kCaffe2NetDefPlatform);
-
-  // Set name if not already set.
-  if (config->name().empty()) {
-    config->set_name(model_name_);
-  }
-
+  autofill->reset(new AutoFillNetDefImpl(model_name));
   return Status::Success;
 }
 
