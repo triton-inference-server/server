@@ -97,7 +97,7 @@ RUN apt-get update && \
             libopencv-dev \
             libopencv-core-dev \
             libtool
-            
+
 # Use the PYVER version of python
 RUN rm -f /usr/bin/python && \
     rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
@@ -242,6 +242,12 @@ COPY --from=trtserver_build /opt/tensorflow/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib
+
+# Extra defensive wiring for CUDA Compat lib
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+ && ldconfig \
+ && rm -f ${_CUDA_COMPAT_PATH}/lib
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
 ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
