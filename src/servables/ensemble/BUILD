@@ -40,13 +40,8 @@ cc_library(
     srcs = ["ensemble_bundle.cc"],
     hdrs = ["ensemble_bundle.h"],
     deps = [
-        "//src/core:backend",
         "//src/core:constants",
-        "//src/core:ensemble_scheduler",
-        "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:server_status",
-        "//src/core:status",
+        "//src/core:server_header",
     ],
 )
 
@@ -58,11 +53,9 @@ cc_library(
         ":ensemble_bundle",
         ":ensemble_bundle_proto",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:status",
+        "//src/core:server_header",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -83,6 +76,9 @@ cc_test(
     name = "ensemble_bundle_test",
     srcs = ["ensemble_bundle_test.cc"],
     linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
@@ -92,13 +88,8 @@ cc_test(
         ":ensemble_testdata"
     ],
     deps = [
-        "//src/core:constants",
-        "//src/core:ensemble_utils",
-        "//src/core:logging",
-        "//src/core:model_config",
-        "//src/core:model_config_utils",
         "//src/test:model_config_test_base",
-        "//src/core:status",
+        "//src/core:server",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
     ],

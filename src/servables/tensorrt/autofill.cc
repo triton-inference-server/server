@@ -27,7 +27,9 @@
 #include "src/servables/tensorrt/autofill.h"
 
 #include <NvInfer.h>
+#include "src/core/autofill.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/servables/tensorrt/loader.h"
@@ -37,10 +39,59 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class AutoFillPlanImpl : public AutoFill {
+ public:
+  AutoFillPlanImpl(
+      const std::string& model_name, const std::string& plan_filename,
+      const int32_t max_batch_size, const ModelConfig& config)
+      : AutoFill(model_name), plan_filename_(plan_filename),
+        max_batch_size_(max_batch_size), config_(config)
+  {
+  }
+
+  Status Fix(ModelConfig* config) override;
+
+ private:
+  const std::string plan_filename_;
+  const int32_t max_batch_size_;
+  const ModelConfig config_;
+};
+
+Status
+AutoFillPlanImpl::Fix(ModelConfig* config)
+{
+  config->set_platform(kTensorRTPlanPlatform);
+
+  // Set name if not already set.
+  if (config->name().empty()) {
+    config->set_name(model_name_);
+  }
+
+  if (config->default_model_filename().empty()) {
+    config->set_default_model_filename(plan_filename_);
+  }
+
+  if (config->max_batch_size() == 0) {
+    config->set_max_batch_size(max_batch_size_);
+  }
+
+  // Inputs
+  if (config->input().size() == 0) {
+    config->mutable_input()->CopyFrom(config_.input());
+  }
+
+  // Outputs
+  if (config->output().size() == 0) {
+    config->mutable_output()->CopyFrom(config_.output());
+  }
+
+  return Status::Success;
+}
+
 Status
 AutoFillPlan::Create(
     const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillPlan>* autofill)
+    std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
   RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -119,38 +170,7 @@ AutoFillPlan::Create(
   runtime->destroy();
 
   autofill->reset(
-      new AutoFillPlan(model_name, plan_file, max_batch_size, config));
-  return Status::Success;
-}
-
-Status
-AutoFillPlan::Fix(ModelConfig* config)
-{
-  config->set_platform(kTensorRTPlanPlatform);
-
-  // Set name if not already set.
-  if (config->name().empty()) {
-    config->set_name(model_name_);
-  }
-
-  if (config->default_model_filename().empty()) {
-    config->set_default_model_filename(plan_filename_);
-  }
-
-  if (config->max_batch_size() == 0) {
-    config->set_max_batch_size(max_batch_size_);
-  }
-
-  // Inputs
-  if (config->input().size() == 0) {
-    config->mutable_input()->CopyFrom(config_.input());
-  }
-
-  // Outputs
-  if (config->output().size() == 0) {
-    config->mutable_output()->CopyFrom(config_.output());
-  }
-
+      new AutoFillPlanImpl(model_name, plan_file, max_batch_size, config));
   return Status::Success;
 }
 

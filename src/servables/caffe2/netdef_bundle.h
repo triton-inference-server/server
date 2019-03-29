@@ -60,7 +60,7 @@ class NetDefBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(NetDefBundle);
+  DISALLOW_COPY_AND_ASSIGN(NetDefBundle);
   friend std::ostream& operator<<(std::ostream&, const NetDefBundle&);
 
   // For each model instance there is a context.
@@ -78,7 +78,7 @@ class NetDefBundle : public InferenceBackend {
     Context(Context&& o);
     ~Context();
 
-    TF_DISALLOW_COPY_AND_ASSIGN(Context);
+    DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);

@@ -61,7 +61,7 @@ class CustomBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(CustomBundle);
+  DISALLOW_COPY_AND_ASSIGN(CustomBundle);
   friend std::ostream& operator<<(std::ostream&, const CustomBundle&);
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
   friend bool CustomGetOutput(
@@ -84,7 +84,7 @@ class CustomBundle : public InferenceBackend {
     Context(Context&& o) = delete;
     ~Context();
 
-    TF_DISALLOW_COPY_AND_ASSIGN(Context);
+    DISALLOW_COPY_AND_ASSIGN(Context);
 
     // Return the shared library reported error string for 'err'.
     std::string LibraryErrorString(const int err);

@@ -167,17 +167,14 @@ EnsembleContext::EnsembleContext(
     }
     auto ver_it = it->second.find(step_info.model_version_);
     if (ver_it == it->second.end()) {
-      ver_it = it->second
-                   .emplace(std::make_pair(
-                       step_info.model_version_,
-                       std::make_shared<InferenceServer::InferBackendHandle>()))
-                   .first;
-
-      ensemble_status_ = is_->CreateBackendHandle(
-          step_info.model_name_, step_info.model_version_, ver_it->second);
+      std::shared_ptr<InferenceServer::InferBackendHandle> backend = nullptr;
+      ensemble_status_ = InferenceServer::InferBackendHandle::Create(
+          is_, step_info.model_name_, step_info.model_version_, &backend);
       if (!ensemble_status_.IsOk()) {
         break;
       }
+
+      it->second.emplace(std::make_pair(step_info.model_version_, backend));
     }
   }
 
@@ -267,7 +264,7 @@ EnsembleContext::UpdateEnsembleState(
     } else {
       auto step_idx = completed_step->step_idx_;
       RETURN_IF_ERROR(completed_step->response_provider_->FinalizeResponse(
-          *((*completed_step->backend_)())));
+          *(completed_step->backend_->GetInferenceBackend())));
       const auto& response_header =
           completed_step->response_provider_->ResponseHeader();
       for (const auto& output : response_header.output()) {
@@ -354,7 +351,8 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
   }
-  RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
+  RETURN_IF_ERROR(
+      NormalizeRequestHeader(*backend->GetInferenceBackend(), request_header));
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
@@ -365,7 +363,8 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
   RETURN_IF_ERROR(InternalInferResponseProvider::Create(
-      *((*(*step)->backend_)()), (*step)->request_provider_->RequestHeader(),
+      *((*step)->backend_->GetInferenceBackend()),
+      (*step)->request_provider_->RequestHeader(),
       &((*step)->response_provider_)));
 
   return Status::Success;
@@ -452,7 +451,7 @@ EnsembleContext::ScheduleSteps(
     const std::shared_ptr<EnsembleContext>& context, const StepList& steps)
 {
   for (const auto& step : steps) {
-    InferenceBackend* backend = (*step->backend_)();
+    InferenceBackend* backend = step->backend_->GetInferenceBackend();
 
     auto infer_stats = std::make_shared<ModelInferStats>(
         context->is_->StatusManager(), backend->Name());

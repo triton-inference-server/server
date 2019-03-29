@@ -33,6 +33,7 @@
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/sequence_batch_scheduler.h"
+#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 

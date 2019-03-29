@@ -57,7 +57,7 @@ class PlanBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(PlanBundle);
+  DISALLOW_COPY_AND_ASSIGN(PlanBundle);
   friend std::ostream& operator<<(std::ostream&, const PlanBundle&);
 
   // For each model instance there is a context.
@@ -76,7 +76,7 @@ class PlanBundle : public InferenceBackend {
     Context(Context&& o);
     ~Context();
 
-    TF_DISALLOW_COPY_AND_ASSIGN(Context);
+    DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status InitializeInputBinding(
         const std::string& input_name, const DataType input_datatype,

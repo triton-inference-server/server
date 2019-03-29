@@ -51,7 +51,7 @@ class PlanBundleSourceAdapter final
   ~PlanBundleSourceAdapter() override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(PlanBundleSourceAdapter);
+  DISALLOW_COPY_AND_ASSIGN(PlanBundleSourceAdapter);
   using SimpleSourceAdapter =
       tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle>;
 

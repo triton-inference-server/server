@@ -71,7 +71,8 @@ with::
 
   # cd /workspace
   # bazel build -c opt src/servers/trtserver
-  # cp /workspace/bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/trtserver
+  # cp /workspace/bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/.
+  # cp /workspace/bazel-bin/src/core/libtrtserver.so /opt/tensorrtserver/lib/.
 
 Some source changes seem to cause bazel to get confused and not
 correctly rebuild all required sources. You can force bazel to rebuild

@@ -76,7 +76,7 @@ class BaseBundle : public InferenceBackend {
     Context(Context&& o);
     ~Context();
 
-    TF_DISALLOW_COPY_AND_ASSIGN(Context);
+    DISALLOW_COPY_AND_ASSIGN(Context);
 
     // Create TF tensor for an input.
     using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
@@ -126,7 +126,7 @@ class BaseBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(BaseBundle);
+  DISALLOW_COPY_AND_ASSIGN(BaseBundle);
   friend std::ostream& operator<<(std::ostream&, const BaseBundle&);
 
   // The contexts for this backend.

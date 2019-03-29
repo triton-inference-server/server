@@ -43,12 +43,7 @@ cc_library(
         ":test_testdata",
     ],
     deps = [
-        "//src/core:constants",
-        "//src/core:logging",
-        "//src/core:model_config",
-        "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:status",
+        "//src/core:server_header",
         "@com_google_googletest//:gtest",
         "@org_tensorflow//tensorflow/core:testlib",
         "@tf_serving//tensorflow_serving/config:platform_config_proto",

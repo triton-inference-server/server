@@ -49,15 +49,11 @@ cc_library(
     deps = [
         ":custom",
         ":loader",
-        "//src/core:backend",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
         "//src/core:model_config",
-        "//src/core:provider",
-        "//src/core:server_status",
-        "//src/core:status",
+        "//src/core:server_header",
+        "@local_config_cuda//cuda:cuda_headers"
     ],
 )
 
@@ -69,11 +65,9 @@ cc_library(
         ":custom_bundle",
         ":custom_bundle_proto",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:status",
+        "//src/core:server_header",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -89,8 +83,7 @@ cc_library(
     hdrs = ["loader.h"],
     deps = [
         ":custom",
-        "//src/core:logging",
-        "//src/core:status",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/core:lib",
     ],
 )
@@ -99,16 +92,17 @@ cc_test(
     name = "custom_bundle_test",
     srcs = ["custom_bundle_test.cc"],
     linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
         "-lnvonnxparser_runtime",
     ],
     deps = [
-        ":custom_bundle",
-        "//src/core:constants",
-        "//src/core:status",
         "//src/test:model_config_test_base",
+        "//src/core:server",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
     ],

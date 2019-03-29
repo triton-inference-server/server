@@ -26,21 +26,17 @@
 #pragma once
 
 #include <string>
-#include "src/core/autofill.h"
-#include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class AutoFillNetDef : public AutoFill {
+class AutoFill;
+
+class AutoFillNetDef {
  public:
   static Status Create(
       const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFillNetDef>* autofill);
-  Status Fix(ModelConfig* config) override;
-
- private:
-  AutoFillNetDef(const std::string& model_name) : AutoFill(model_name) {}
+      std::unique_ptr<AutoFill>* autofill);
 };
 
 }}  // namespace nvidia::inferenceserver

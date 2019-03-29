@@ -49,7 +49,7 @@ class EnsembleBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(EnsembleBundle);
+  DISALLOW_COPY_AND_ASSIGN(EnsembleBundle);
   friend std::ostream& operator<<(std::ostream&, const EnsembleBundle&);
 };
 
