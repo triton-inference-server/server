@@ -41,11 +41,19 @@ cc_library(
 )
 
 cc_library(
+    name = "request",
+    srcs = ["request.cc"],
+    deps = [
+        ":request_header",
+    ],
+)
+
+cc_library(
     name = "request_common",
     hdrs = ["request_common.h"],
     srcs = ["request_common.cc"],
     deps = [
-        ":request_header",
+        ":request",
         "//src/core:constants",
         "//src/core:model_config_proto",
     ],

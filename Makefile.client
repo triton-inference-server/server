@@ -77,7 +77,7 @@ LIBREQ_SRCS := $(PYTHONDIR)/crequest.cc
 LIBREQ_OBJS := $(addprefix $(BUILDDIR)/, $(LIBREQ_SRCS:%.cc=%.o))
 LIBREQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -ldl
 
-CMN_SRCS    := $(CPPDIR)/request_common.cc $(CPPDIR)/request_grpc.cc \
+CMN_SRCS    := $(CPPDIR)/request.cc $(CPPDIR)/request_common.cc $(CPPDIR)/request_grpc.cc \
                $(CPPDIR)/request_http.cc $(SRCDIR)/core/model_config.cc
 CMN_OBJS    := $(addprefix $(BUILDDIR)/, $(CMN_SRCS:%.cc=%.o))
 CMN_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -ldl
