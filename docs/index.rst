@@ -64,9 +64,10 @@ NVIDIA TensorRT Inference Server
    :caption: Developer Guide
 
    architecture
-   contribute
+   custom_operation
    build
    test
+   contribute
 
 .. toctree::
    :maxdepth: 2
