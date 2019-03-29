@@ -43,7 +43,7 @@ class GraphDefBundle : public BaseBundle {
       IONameMap* input_name_map, IONameMap* output_name_map) override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(GraphDefBundle);
+  DISALLOW_COPY_AND_ASSIGN(GraphDefBundle);
 };
 
 }}  // namespace nvidia::inferenceserver

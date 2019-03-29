@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/grpc_server.h"
+#include "src/servers/grpc_server.h"
 
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
@@ -108,14 +108,16 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
       InferRequest& request, InferResponse& response)
   {
-    auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-    RETURN_IF_ERROR(server->CreateBackendHandle(
-        request.model_name(), request.model_version(), backend));
-    infer_stats->SetMetricReporter((*backend)()->MetricReporter());
+    std::shared_ptr<InferenceServer::InferBackendHandle> backend = nullptr;
+    RETURN_IF_ERROR(InferenceServer::InferBackendHandle::Create(
+        server, request.model_name(), request.model_version(), &backend));
+    infer_stats->SetMetricReporter(
+        backend->GetInferenceBackend()->MetricReporter());
 
     std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
     InferRequestHeader request_header = request.meta_data();
-    RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
+    RETURN_IF_ERROR(NormalizeRequestHeader(
+        *backend->GetInferenceBackend(), request_header));
     RETURN_IF_ERROR(
         GRPCInferRequestToInputMap(request_header, request, input_map));
 

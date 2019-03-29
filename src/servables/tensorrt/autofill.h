@@ -26,31 +26,17 @@
 #pragma once
 
 #include <string>
-#include "src/core/autofill.h"
-#include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class AutoFillPlan : public AutoFill {
+class AutoFill;
+
+class AutoFillPlan {
  public:
   static Status Create(
       const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFillPlan>* autofill);
-  Status Fix(ModelConfig* config) override;
-
- private:
-  AutoFillPlan(
-      const std::string& model_name, const std::string& plan_filename,
-      const int32_t max_batch_size, const ModelConfig& config)
-      : AutoFill(model_name), plan_filename_(plan_filename),
-        max_batch_size_(max_batch_size), config_(config)
-  {
-  }
-
-  const std::string plan_filename_;
-  const int32_t max_batch_size_;
-  const ModelConfig config_;
+      std::unique_ptr<AutoFill>* autofill);
 };
 
 }}  // namespace nvidia::inferenceserver

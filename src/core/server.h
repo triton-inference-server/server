@@ -39,18 +39,12 @@
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
-#include "tensorflow_serving/model_servers/server_core.h"
 
-namespace tfs = tensorflow::serving;
+namespace tensorflow { namespace serving {
+class ServerCore;
+}}  // namespace tensorflow::serving
 
 namespace nvidia { namespace inferenceserver {
-
-class CustomBundle;
-class GraphDefBundle;
-class NetDefBundle;
-class PlanBundle;
-class SavedModelBundle;
-class EnsembleBundle;
 
 // Inference server information.
 class InferenceServer {
@@ -153,25 +147,13 @@ class InferenceServer {
   // A handle to a backend.
   class InferBackendHandle {
    public:
-    InferBackendHandle() : is_(nullptr) {}
-    Status Init(
-        const std::string& model_name, const int64_t model_version,
-        tfs::ServerCore* core);
-    InferenceBackend* operator()() { return is_; }
+    static Status Create(
+        const InferenceServer* server, const std::string& model_name,
+        const int64_t model_version,
+        std::shared_ptr<InferBackendHandle>* handle);
 
-   private:
-    InferenceBackend* is_;
-    tfs::ServableHandle<GraphDefBundle> graphdef_bundle_;
-    tfs::ServableHandle<PlanBundle> plan_bundle_;
-    tfs::ServableHandle<NetDefBundle> netdef_bundle_;
-    tfs::ServableHandle<SavedModelBundle> saved_model_bundle_;
-    tfs::ServableHandle<CustomBundle> custom_bundle_;
-    tfs::ServableHandle<EnsembleBundle> ensemble_bundle_;
+    virtual InferenceBackend* GetInferenceBackend() = 0;
   };
-
-  Status CreateBackendHandle(
-      const std::string& model_name, const int64_t model_version,
-      const std::shared_ptr<InferBackendHandle>& handle);
 
  private:
   // Return the uptime of the server in nanoseconds.
@@ -204,7 +186,7 @@ class InferenceServer {
   // for all in-flight requests to complete before exiting.
   std::atomic<uint64_t> inflight_request_counter_;
 
-  std::unique_ptr<tfs::ServerCore> core_;
+  std::unique_ptr<tensorflow::serving::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
 };
 

@@ -28,18 +28,49 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
+#
+# HTTP service endpoint
+#
+cc_library(
+    name = "http_server",
+    srcs = ["http_server.cc"],
+    hdrs = ["http_server.h"],
+    deps = [
+        "//src/core:all_cc_protos",
+        "//src/core:libtrtserver_import",
+        "@com_github_libevhtp//:libevhtp",
+        "@com_github_libevent_libevent//:libevent",
+        "@com_google_absl//absl/strings",
+        "@com_googlesource_code_re2//:re2",
+    ],
+)
+
+#
+# GRPC service endpoint
+#
+cc_library(
+    name = "grpc_server",
+    srcs = ["grpc_server.cc"],
+    hdrs = ["grpc_server.h"],
+    deps = [
+        "//src/core:all_cc_protos",
+        "//src/core:libtrtserver_import",
+        "//src/nvrpc:nvrpc",
+        "@com_github_libevent_libevent//:libevent", # FIXME, because provider_utils mixes HTTP/GRPC
+        "@grpc//:grpc++_unsecure",
+    ],
+)
+
+#
+# Inference server
+#
 cc_binary(
     name = "trtserver",
     srcs = ["main.cc"],
     deps = [
-        "//src/core:grpc_server",
-        "//src/core:http_server",
-        "//src/core:server",
-        "@org_tensorflow//tensorflow/contrib:contrib_kernels",
-        "@org_tensorflow//tensorflow/contrib:contrib_ops_op_lib",
-        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
-        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_engine_op_kernel",
-        "@org_tensorflow//tensorflow/contrib/tensorrt:trt_shape_function",
+        ":grpc_server",
+        ":http_server",
+        "//src/core:libtrtserver_import",
         "@extern_lib//:libcaffe2",
         "@extern_lib//:libcaffe2_detectron_ops_gpu",
         "@extern_lib//:libcaffe2_gpu",
@@ -52,6 +83,7 @@ cc_binary(
         "@extern_lib//:libmkl_intel_lp64",
         "@extern_lib//:libmkl_rt",
         "@extern_lib//:libmkl_vml_def",
+        "@prometheus//pull:pull",
     ],
     linkopts = [
         "-pthread",

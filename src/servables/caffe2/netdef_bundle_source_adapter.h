@@ -52,7 +52,7 @@ class NetDefBundleSourceAdapter final
   ~NetDefBundleSourceAdapter() override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(NetDefBundleSourceAdapter);
+  DISALLOW_COPY_AND_ASSIGN(NetDefBundleSourceAdapter);
   using SimpleSourceAdapter =
       tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle>;
 

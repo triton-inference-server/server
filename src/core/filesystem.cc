@@ -23,47 +23,60 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/servables/ensemble/ensemble_bundle.h"
-#include "src/servables/ensemble/ensemble_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/source_adapter.h"
-#include "tensorflow_serving/core/storage_path.h"
+#include "src/core/filesystem.h"
 
-namespace tfs = tensorflow::serving;
+#include "tensorflow/core/lib/io/path.h"
+#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Adapter that converts storage paths pointing to ensemble files into the
-// corresponding ensemble bundle.
-class EnsembleBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, EnsembleBundle> {
- public:
-  static tensorflow::Status Create(
-      const EnsembleBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+Status
+GetSubdirs(const std::string& path, std::set<std::string>* subdirs)
+{
+  std::vector<std::string> childs;
+  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
 
-  ~EnsembleBundleSourceAdapter() override;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(EnsembleBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, EnsembleBundle>;
-
-  EnsembleBundleSourceAdapter(
-      const EnsembleBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
-  {
+  // GetChildren() returns all descendants instead for cloud storage
+  // like GCS. In such case we should filter out all non-direct
+  // descendants.
+  std::set<std::string> real_childs;
+  for (const std::string& child : childs) {
+    real_childs.insert(child.substr(0, child.find_first_of('/')));
   }
 
-  const EnsembleBundleSourceAdapterConfig config_;
-};
+  for (const auto& child : real_childs) {
+    const auto vp = tensorflow::io::JoinPath(path, child);
+    if (tensorflow::Env::Default()->IsDirectory(vp).ok()) {
+      subdirs->insert(child);
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+GetFiles(const std::string& path, std::set<std::string>* files)
+{
+  std::vector<std::string> childs;
+  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
+
+  // GetChildren() returns all descendants instead for cloud storage
+  // like GCS. In such case we should filter out all non-direct
+  // descendants.
+  std::set<std::string> real_childs;
+  for (const std::string& child : childs) {
+    real_childs.insert(child.substr(0, child.find_first_of('/')));
+  }
+
+  for (const auto& child : real_childs) {
+    const auto vp = tensorflow::io::JoinPath(path, child);
+    if (!tensorflow::Env::Default()->IsDirectory(vp).ok()) {
+      files->insert(child);
+    }
+  }
+
+  return Status::Success;
+}
 
 }}  // namespace nvidia::inferenceserver

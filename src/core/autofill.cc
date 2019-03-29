@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ namespace nvidia { namespace inferenceserver {
 //
 class AutoFillNull : public AutoFill {
  public:
-  static Status Create(std::unique_ptr<AutoFillNull>* autofill);
+  static Status Create(std::unique_ptr<AutoFill>* autofill);
   Status Fix(ModelConfig* config);
 
  private:
@@ -50,7 +50,7 @@ class AutoFillNull : public AutoFill {
 };
 
 Status
-AutoFillNull::Create(std::unique_ptr<AutoFillNull>* autofill)
+AutoFillNull::Create(std::unique_ptr<AutoFill>* autofill)
 {
   autofill->reset(new AutoFillNull);
   return Status::Success;
@@ -68,7 +68,7 @@ AutoFillNull::Fix(ModelConfig* config)
 class AutoFillSimple : public AutoFill {
  public:
   static Status Create(
-      const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill);
+      const std::string& model_name, std::unique_ptr<AutoFill>* autofill);
   Status Fix(ModelConfig* config);
 
  private:
@@ -77,7 +77,7 @@ class AutoFillSimple : public AutoFill {
 
 Status
 AutoFillSimple::Create(
-    const std::string& model_name, std::unique_ptr<AutoFillSimple>* autofill)
+    const std::string& model_name, std::unique_ptr<AutoFill>* autofill)
 {
   autofill->reset(new AutoFillSimple(model_name));
   return Status::Success;
@@ -112,7 +112,7 @@ AutoFill::Create(
 
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
-    std::unique_ptr<AutoFillSavedModel> afsm;
+    std::unique_ptr<AutoFill> afsm;
     ::google::protobuf::Any platform_config;
     auto it = platform_config_map.find(kTensorFlowSavedModelPlatform);
     if (it != platform_config_map.end()) {
@@ -128,7 +128,7 @@ AutoFill::Create(
 
   if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
-    std::unique_ptr<AutoFillGraphDef> afgd;
+    std::unique_ptr<AutoFill> afgd;
     Status status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
     if (status.IsOk()) {
       *autofill = std::move(afgd);
@@ -138,7 +138,7 @@ AutoFill::Create(
 
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
-    std::unique_ptr<AutoFillPlan> afp;
+    std::unique_ptr<AutoFill> afp;
     Status status = AutoFillPlan::Create(model_name, model_path, &afp);
     if (status.IsOk()) {
       *autofill = std::move(afp);
@@ -148,7 +148,7 @@ AutoFill::Create(
 
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
-    std::unique_ptr<AutoFillNetDef> afnd;
+    std::unique_ptr<AutoFill> afnd;
     Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
     if (status.IsOk()) {
       *autofill = std::move(afnd);
@@ -159,62 +159,14 @@ AutoFill::Create(
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
   {
-    std::unique_ptr<AutoFillSimple> afs;
+    std::unique_ptr<AutoFill> afs;
     Status status = AutoFillSimple::Create(model_name, &afs);
     if (status.IsOk()) {
       *autofill = std::move(afs);
     } else {
-      std::unique_ptr<AutoFillNull> afn;
+      std::unique_ptr<AutoFill> afn;
       RETURN_IF_ERROR(AutoFillNull::Create(&afn));
       *autofill = std::move(afn);
-    }
-  }
-
-  return Status::Success;
-}
-
-Status
-AutoFill::GetSubdirs(const std::string& path, std::set<std::string>* subdirs)
-{
-  std::vector<std::string> childs;
-  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
-
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS. In such case we should filter out all non-direct
-  // descendants.
-  std::set<std::string> real_childs;
-  for (const std::string& child : childs) {
-    real_childs.insert(child.substr(0, child.find_first_of('/')));
-  }
-
-  for (const auto& child : real_childs) {
-    const auto vp = tensorflow::io::JoinPath(path, child);
-    if (tensorflow::Env::Default()->IsDirectory(vp).ok()) {
-      subdirs->insert(child);
-    }
-  }
-
-  return Status::Success;
-}
-
-Status
-AutoFill::GetFiles(const std::string& path, std::set<std::string>* files)
-{
-  std::vector<std::string> childs;
-  RETURN_IF_TF_ERROR(tensorflow::Env::Default()->GetChildren(path, &childs));
-
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS. In such case we should filter out all non-direct
-  // descendants.
-  std::set<std::string> real_childs;
-  for (const std::string& child : childs) {
-    real_childs.insert(child.substr(0, child.find_first_of('/')));
-  }
-
-  for (const auto& child : real_childs) {
-    const auto vp = tensorflow::io::JoinPath(path, child);
-    if (!tensorflow::Env::Default()->IsDirectory(vp).ok()) {
-      files->insert(child);
     }
   }
 

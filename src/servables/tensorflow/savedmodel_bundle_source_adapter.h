@@ -51,7 +51,7 @@ class SavedModelBundleSourceAdapter final
   ~SavedModelBundleSourceAdapter() override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(SavedModelBundleSourceAdapter);
+  DISALLOW_COPY_AND_ASSIGN(SavedModelBundleSourceAdapter);
   using SimpleSourceAdapter =
       tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, SavedModelBundle>;
 

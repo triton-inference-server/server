@@ -179,8 +179,9 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
           src/custom/... \
           src/test/... && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa) && \
-    mkdir -p /opt/tensorrtserver/bin && \
+    mkdir -p /opt/tensorrtserver/bin /opt/tensorrtserver/lib && \
     cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/. && \
+    cp bazel-bin/src/core/libtrtserver.so /opt/tensorrtserver/lib/. && \
     cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/. && \
     mkdir -p /opt/tensorrtserver/custom && \
     cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
@@ -194,6 +195,9 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
+
+ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
+ENV PATH /opt/tensorrtserver/bin:${PATH}
 ENV PYVER ${PYVER}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver

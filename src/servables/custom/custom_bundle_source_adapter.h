@@ -51,7 +51,7 @@ class CustomBundleSourceAdapter final
   ~CustomBundleSourceAdapter() override;
 
  private:
-  TF_DISALLOW_COPY_AND_ASSIGN(CustomBundleSourceAdapter);
+  DISALLOW_COPY_AND_ASSIGN(CustomBundleSourceAdapter);
   using SimpleSourceAdapter =
       tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle>;
 

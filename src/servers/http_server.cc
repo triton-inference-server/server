@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/http_server.h"
+#include "src/servers/http_server.h"
 
 #include <google/protobuf/text_format.h>
 #include "absl/strings/str_cat.h"
@@ -418,13 +418,15 @@ HTTPServerImpl::InferHelper(
     const std::string& model_name, int64_t model_version,
     InferRequestHeader& request_header, evhtp_request_t* req)
 {
-  auto backend = std::make_shared<InferenceServer::InferBackendHandle>();
-  RETURN_IF_ERROR(
-      server_->CreateBackendHandle(model_name, model_version, backend));
-  infer_stats->SetMetricReporter((*backend)()->MetricReporter());
+  std::shared_ptr<InferenceServer::InferBackendHandle> backend = nullptr;
+  RETURN_IF_ERROR(InferenceServer::InferBackendHandle::Create(
+      server_, model_name, model_version, &backend));
+  infer_stats->SetMetricReporter(
+      backend->GetInferenceBackend()->MetricReporter());
 
   std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
-  RETURN_IF_ERROR(NormalizeRequestHeader(*((*backend)()), request_header));
+  RETURN_IF_ERROR(
+      NormalizeRequestHeader(*backend->GetInferenceBackend(), request_header));
   RETURN_IF_ERROR(EVBufferToInputMap(
       model_name, request_header, req->buffer_in, input_map));
 
@@ -435,8 +437,8 @@ HTTPServerImpl::InferHelper(
 
   std::shared_ptr<HTTPInferResponseProvider> response_provider;
   RETURN_IF_ERROR(HTTPInferResponseProvider::Create(
-      req->buffer_out, *((*backend)()), request_provider->RequestHeader(),
-      &response_provider));
+      req->buffer_out, *backend->GetInferenceBackend(),
+      request_provider->RequestHeader(), &response_provider));
 
   std::shared_ptr<InferRequest> request(new InferRequest(
       req, request_header.id(), request_provider, response_provider,

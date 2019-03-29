@@ -26,70 +26,42 @@
 
 #include "src/servables/tensorflow/autofill.h"
 
+#include "src/core/autofill.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
+#include "src/core/model_config.pb.h"
 #include "src/servables/tensorflow/loader.h"
+#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorflow/tf_utils.h"
+#include "tensorflow/cc/saved_model/loader.h"
+#include "tensorflow/cc/saved_model/tag_constants.h"
 #include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
 //
-// AutoFillSavedModel
+// AutoFillSavedModelImpl
 //
-Status
-AutoFillSavedModel::Create(
-    const std::string& model_name,
-    const ::google::protobuf::Any& platform_config,
-    const std::string& model_path,
-    std::unique_ptr<AutoFillSavedModel>* autofill)
-{
-  std::set<std::string> version_dirs;
-  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
-
-  // There must be at least one version directory that we can inspect
-  // to attempt to determine the platform. For now we only handle the
-  // case where there is one version directory.
-  if (version_dirs.size() != 1) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name + "' due to multiple versions");
+class AutoFillSavedModelImpl : public AutoFill {
+ public:
+  AutoFillSavedModelImpl(
+      const std::string& model_name, const std::string& savedmodel_dirname,
+      const tensorflow::SignatureDef& sig)
+      : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname), sig_(sig)
+  {
   }
 
-  const auto version_path =
-      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+  Status Fix(ModelConfig* config) override;
 
-  // There must be a single savedmodel directory within the version
-  // directory...
-  std::set<std::string> savedmodel_dirs;
-  RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
-  if (savedmodel_dirs.size() != 1) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find savedmodel directory");
-  }
-
-  const std::string savedmodel_dir = *(savedmodel_dirs.begin());
-  const auto savedmodel_path =
-      tensorflow::io::JoinPath(version_path, savedmodel_dir);
-
-  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
-  SavedModelBundleSourceAdapterConfig saved_model_config;
-  platform_config.UnpackTo(&saved_model_config);
-  tensorflow::SessionOptions session_options;
-  session_options.config = saved_model_config.session_config();
-  tensorflow::SignatureDef sig;
-  RETURN_IF_ERROR(LoadSavedModel(
-      model_name, savedmodel_path, session_options, &bundle, &sig));
-
-  autofill->reset(new AutoFillSavedModel(model_name, savedmodel_dir, sig));
-  return Status::Success;
-}
+ private:
+  const std::string savedmodel_dirname_;
+  const tensorflow::SignatureDef sig_;
+};
 
 Status
-AutoFillSavedModel::Fix(ModelConfig* config)
+AutoFillSavedModelImpl::Fix(ModelConfig* config)
 {
   config->set_platform(kTensorFlowSavedModelPlatform);
 
@@ -209,13 +181,80 @@ AutoFillSavedModel::Fix(ModelConfig* config)
   return Status::Success;
 }
 
+Status
+AutoFillSavedModel::Create(
+    const std::string& model_name,
+    const ::google::protobuf::Any& platform_config,
+    const std::string& model_path, std::unique_ptr<AutoFill>* autofill)
+{
+  std::set<std::string> version_dirs;
+  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+
+  // There must be at least one version directory that we can inspect
+  // to attempt to determine the platform. For now we only handle the
+  // case where there is one version directory.
+  if (version_dirs.size() != 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "' due to multiple versions");
+  }
+
+  const auto version_path =
+      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+
+  // There must be a single savedmodel directory within the version
+  // directory...
+  std::set<std::string> savedmodel_dirs;
+  RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
+  if (savedmodel_dirs.size() != 1) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find savedmodel directory");
+  }
+
+  const std::string savedmodel_dir = *(savedmodel_dirs.begin());
+  const auto savedmodel_path =
+      tensorflow::io::JoinPath(version_path, savedmodel_dir);
+
+  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
+  SavedModelBundleSourceAdapterConfig saved_model_config;
+  platform_config.UnpackTo(&saved_model_config);
+  tensorflow::SessionOptions session_options;
+  session_options.config = saved_model_config.session_config();
+  tensorflow::SignatureDef sig;
+  RETURN_IF_ERROR(LoadSavedModel(
+      model_name, savedmodel_path, session_options, &bundle, &sig));
+
+  autofill->reset(new AutoFillSavedModelImpl(model_name, savedmodel_dir, sig));
+  return Status::Success;
+}
+
 //
-// AutoFillGraphDef
+// AutoFillGraphDefImpl
 //
+class AutoFillGraphDefImpl : public AutoFill {
+ public:
+  AutoFillGraphDefImpl(const std::string& model_name) : AutoFill(model_name) {}
+  Status Fix(ModelConfig* config) override;
+};
+
+Status
+AutoFillGraphDefImpl::Fix(ModelConfig* config)
+{
+  config->set_platform(kTensorFlowGraphDefPlatform);
+
+  if (config->name().empty()) {
+    config->set_name(model_name_);
+  }
+
+  return Status::Success;
+}
+
 Status
 AutoFillGraphDef::Create(
     const std::string& model_name, const std::string& model_path,
-    std::unique_ptr<AutoFillGraphDef>* autofill)
+    std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
   RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
@@ -259,19 +298,7 @@ AutoFillGraphDef::Create(
             kTensorFlowGraphDefFilename + "'");
   }
 
-  autofill->reset(new AutoFillGraphDef(model_name));
-  return Status::Success;
-}
-
-Status
-AutoFillGraphDef::Fix(ModelConfig* config)
-{
-  config->set_platform(kTensorFlowGraphDefPlatform);
-
-  if (config->name().empty()) {
-    config->set_name(model_name_);
-  }
-
+  autofill->reset(new AutoFillGraphDefImpl(model_name));
   return Status::Success;
 }
 

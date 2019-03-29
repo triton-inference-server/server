@@ -47,16 +47,24 @@ cc_proto_library(
 )
 
 cc_library(
+    name = "autofill_header",
+    hdrs = [
+        "autofill.h",
+    ],
+    deps = [
+        "//src/core:model_config",
+    ],
+)
+
+cc_library(
     name = "autofill",
     srcs = ["autofill.cc"],
-    hdrs = ["autofill.h"],
     deps = [
+        ":autofill_header",
         ":loader",
         ":savedmodel_bundle_proto",
         ":tf_utils",
-        "//src/core:autofill_header",
-        "//src/core:logging",
-        "//src/core:status",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -69,7 +77,7 @@ cc_library(
     deps = [
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:status",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/core:protos_all_cc",
     ],
 )
@@ -79,8 +87,7 @@ cc_library(
     srcs = ["loader.cc"],
     hdrs = ["loader.h"],
     deps = [
-        "//src/core:logging",
-        "//src/core:status",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
     ],
@@ -93,12 +100,8 @@ cc_library(
     deps = [
         ":tf_utils",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:provider",
-        "//src/core:server_status",
-        "//src/core:status",
+        "//src/core:server_header",
         "@org_tensorflow//tensorflow/c:c_api",
         "@org_tensorflow//tensorflow/core:lib",
     ],
@@ -112,7 +115,7 @@ cc_library(
         ":base_bundle",
         ":tf_utils",
         "//src/core:model_config",
-        "//src/core:status",
+        "//src/core:server_header",
     ],
 )
 
@@ -124,11 +127,9 @@ cc_library(
         ":graphdef_bundle",
         ":graphdef_bundle_proto",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
-        "//src/core:status",
+        "//src/core:server_header",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -148,7 +149,7 @@ cc_library(
         ":loader",
         ":tf_utils",
         "//src/core:model_config",
-        "//src/core:status",
+        "//src/core:server_header",
     ],
 )
 
@@ -160,10 +161,9 @@ cc_library(
         ":savedmodel_bundle",
         ":savedmodel_bundle_proto",
         "//src/core:constants",
-        "//src/core:logging",
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/core:model_config_utils",
+        "//src/core:server_header",
         "@tf_serving//tensorflow_serving/core:loader",
         "@tf_serving//tensorflow_serving/core:simple_loader",
         "@tf_serving//tensorflow_serving/core:source_adapter",
@@ -185,6 +185,9 @@ cc_test(
     name = "graphdef_bundle_test",
     srcs = ["graphdef_bundle_test.cc"],
     linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
@@ -194,10 +197,8 @@ cc_test(
          ":tf_testdata"
     ],
     deps = [
-        ":graphdef_bundle",
-        "//src/core:constants",
-        "//src/core:status",
         "//src/test:model_config_test_base",
+        "//src/core:server",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
     ],
@@ -208,6 +209,9 @@ cc_test(
     name = "savedmodel_bundle_test",
     srcs = ["savedmodel_bundle_test.cc"],
     linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
@@ -217,10 +221,8 @@ cc_test(
          ":tf_testdata"
     ],
     deps = [
-        ":savedmodel_bundle",
-        "//src/core:constants",
-        "//src/core:status",
         "//src/test:model_config_test_base",
+        "//src/core:server",
         "//src/test:testmain",
         "@local_config_cuda//cuda:cudart",
     ],

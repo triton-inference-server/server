@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -46,10 +46,6 @@ class AutoFill {
 
  protected:
   AutoFill(const std::string& model_name) : model_name_(model_name) {}
-
-  static Status GetSubdirs(
-      const std::string& path, std::set<std::string>* subdirs);
-  static Status GetFiles(const std::string& path, std::set<std::string>* files);
 
   const std::string model_name_;
 };

@@ -48,7 +48,7 @@ class SavedModelBundle : public BaseBundle {
       const ModelSequenceBatching::Control::Kind control_kind,
       const tensorflow::SignatureDef& sig);
 
-  TF_DISALLOW_COPY_AND_ASSIGN(SavedModelBundle);
+  DISALLOW_COPY_AND_ASSIGN(SavedModelBundle);
 };
 
 }}  // namespace nvidia::inferenceserver
