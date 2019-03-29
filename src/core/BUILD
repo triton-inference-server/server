@@ -388,6 +388,7 @@ cc_library(
         ":server_status_header",
         ":server_status_proto",
         ":status",
+        "//src/operations/tensorflow:all_custom_ops",
         "//src/servables/caffe2:netdef_bundle_source_adapter",
         "//src/servables/tensorflow:graphdef_bundle_source_adapter",
         "//src/servables/tensorflow:savedmodel_bundle_source_adapter",
