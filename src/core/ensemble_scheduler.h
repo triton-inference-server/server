@@ -49,6 +49,10 @@ struct EnsembleInfo {
     std::unordered_map<std::string, size_t> output_to_tensor_;
   };
 
+  std::string ensemble_name_;
+
+  bool allow_batching_;
+
   std::unordered_map<std::string, size_t> ensemble_input_to_tensor_;
   std::unordered_map<std::string, size_t> ensemble_output_to_tensor_;
 

@@ -373,6 +373,11 @@ EnsembleContext::FinishEnsemble()
   if (ensemble_status_.IsOk()) {
     ensemble_status_ = CheckAndSetEnsembleOutput();
   }
+  // Add ensemble name to make error message more trackable
+  if (!ensemble_status_.IsOk()) {
+    ensemble_status_ = Status(ensemble_status_.Code(), "in ensemble '" +
+        info_->ensemble_name_ + "', " + ensemble_status_.Message());
+  }
   OnComplete_(ensemble_status_);
 
   // Reset stats_ to make sure the timers are stopped even though
@@ -410,7 +415,9 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     // copy data to ensemble response provider
     size_t expected_byte_size = tensor_data.first.batch_byte_size();
     std::vector<int64_t> shape;
-    shape.push_back(batch_size_);
+    if (info_->allow_batching_){
+      shape.push_back(batch_size_);
+    }
     for (const auto& dim : tensor_data.first.dims()) {
       shape.push_back(dim);
     }
@@ -488,6 +495,9 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
 {
   // Set 'info_' based on 'config'
   info_.reset(new EnsembleInfo());
+
+  info_->ensemble_name_ = config.name();
+  info_->allow_batching_ = (config.max_batch_size() != 0);
 
   std::unordered_map<std::string, size_t> name_to_idx;
   // Reserve slot for ensemble inputs and outputs
