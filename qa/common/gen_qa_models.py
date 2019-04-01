@@ -29,6 +29,7 @@ from builtins import range
 import os
 import sys
 import numpy as np
+import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -740,6 +741,33 @@ def create_models(
             models_dir, 0, model_version,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
+    
+    if FLAGS.ensemble:
+        for pair in emu.platform_types_and_validation(FLAGS):
+            if not pair[1](input_dtype, output0_dtype, output1_dtype,
+                            input_shape, output0_shape, output1_shape):
+                continue
+
+            # max-batch 8
+            emu.create_ensemble_modelconfig(
+                pair[0], models_dir, 8, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_label_cnt, version_policy)
+            emu.create_ensemble_modelfile(
+                pair[0], models_dir, 8, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype)
+            # max-batch 0
+            emu.create_ensemble_modelconfig(
+                pair[0], models_dir, 0, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_label_cnt, version_policy)
+            emu.create_ensemble_modelfile(
+                pair[0], models_dir, 0, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype)
 
 def create_fixed_models(
         models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
@@ -769,6 +797,8 @@ if __name__ == '__main__':
                         help='Generate TensorRT PLAN models')
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
+    parser.add_argument('--ensemble', required=False, action='store_true',
+                        help='Generate GraphDef models used in ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -851,6 +881,20 @@ if __name__ == '__main__':
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
                 create_plan_modelfile(FLAGS.models_dir, 0, 3,
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+
+        if FLAGS.ensemble:
+            for pair in emu.platform_types_and_validation(FLAGS):
+                for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                    if not pair[1](vt, vt, vt, (16,), (16,), (16,)):
+                        continue
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 2,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 3,
+                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
