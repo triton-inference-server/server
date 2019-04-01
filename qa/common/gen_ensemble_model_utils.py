@@ -69,16 +69,17 @@ def platform_types_and_validation(flags):
         res.append(("plan", tu.validate_for_trt_model))
     return res
 
-class EnsembleSteps:
+class EnsembleSchedule:
+    """Helper class to generate ensemble schedule given an ensemble type"""
     def __init__(self, ensemble_type):
         if ensemble_type == "fan":
-            self._get_steps = EnsembleSteps.get_fan_ensemble_steps
+            self._get_steps = EnsembleSchedule._get_fan_ensemble_steps
         elif ensemble_type == "sequence":
-            self._get_steps = EnsembleSteps.get_sequence_ensemble_steps
+            self._get_steps = EnsembleSchedule._get_sequence_ensemble_steps
         else:
-            self._get_steps = EnsembleSteps.get_simple_ensemble_steps
+            self._get_steps = EnsembleSchedule._get_simple_ensemble_steps
 
-    def get_steps(self, base_model_name,
+    def get_schedule(self, base_model_name,
             input_dim_len, output0_dim_len, output1_dim_len,
             input_model_dtype, output0_model_dtype, output1_model_dtype):
         return self._get_steps(base_model_name,
@@ -86,7 +87,7 @@ class EnsembleSteps:
             input_model_dtype, output0_model_dtype, output1_model_dtype)
 
     @classmethod
-    def get_simple_ensemble_steps(cls, base_model_name,
+    def _get_simple_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
         steps = '''
@@ -118,7 +119,7 @@ ensemble_scheduling {{
         return steps
 
     @classmethod
-    def get_sequence_ensemble_steps(cls, base_model_name,
+    def _get_sequence_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
         steps = '''
@@ -170,7 +171,7 @@ ensemble_scheduling {{
         return steps
 
     @classmethod
-    def get_fan_ensemble_steps(cls, base_model_name,
+    def _get_fan_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
         steps = '''
@@ -304,7 +305,7 @@ def create_ensemble_modelconfig(
         base_model_name = tu.get_model_name("{}{}".format(base_model, "_nobatch" if max_batch == 0 else ""),
                                     input_dtype, output0_dtype, output1_dtype)
 
-        steps = EnsembleSteps(ensemble_type).get_steps(
+        ensemble_schedule = EnsembleSchedule(ensemble_type).get_schedule(
                         base_model_name, len(input_shape), len(output0_shape),
                         len(output1_shape), input_model_dtype,
                         output0_model_dtype, output1_model_dtype)
@@ -346,7 +347,7 @@ output [
             input_model_dtype, tu.shape_to_dims_str(input_shape),
             output0_model_dtype, tu.shape_to_dims_str(output0_shape),
             output1_model_dtype, tu.shape_to_dims_str(output1_shape),
-            steps)
+            ensemble_schedule)
 
         try:
             os.makedirs(config_dir)
@@ -411,8 +412,7 @@ if __name__ == '__main__':
                         help='Top-level model directory')
     FLAGS, unparsed = parser.parse_known_args()
 
-    import numpy as np
-    # Create non-addsub models used in ensemble
+    # Create utility models used in ensemble
     # nop (only creates model config, should add model file before use)
     model_dtypes = ["TYPE_BOOL", "TYPE_STRING"]
     for s in [8, 16, 32, 64]:

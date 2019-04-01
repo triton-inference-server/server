@@ -375,8 +375,9 @@ EnsembleContext::FinishEnsemble()
   }
   // Add ensemble name to make error message more trackable
   if (!ensemble_status_.IsOk()) {
-    ensemble_status_ = Status(ensemble_status_.Code(), "in ensemble '" +
-        info_->ensemble_name_ + "', " + ensemble_status_.Message());
+    ensemble_status_ = Status(
+        ensemble_status_.Code(), "in ensemble '" + info_->ensemble_name_ +
+                                     "', " + ensemble_status_.Message());
   }
   OnComplete_(ensemble_status_);
 
@@ -415,7 +416,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     // copy data to ensemble response provider
     size_t expected_byte_size = tensor_data.first.batch_byte_size();
     std::vector<int64_t> shape;
-    if (info_->allow_batching_){
+    if (info_->allow_batching_) {
       shape.push_back(batch_size_);
     }
     for (const auto& dim : tensor_data.first.dims()) {

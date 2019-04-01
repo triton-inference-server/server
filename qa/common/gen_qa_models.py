@@ -798,7 +798,8 @@ if __name__ == '__main__':
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
     parser.add_argument('--ensemble', required=False, action='store_true',
-                        help='Generate GraphDef models used in ensemble models')
+                        help='Also generate ensemble models against the models"
+                        + " generated in selected platforms')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
