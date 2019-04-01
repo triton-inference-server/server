@@ -31,7 +31,7 @@ INFER_TEST=infer_variable_test.py
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -45,9 +45,12 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/qa_variable_model_repository models && \
+        cp -r /data/inferenceserver/qa_ensemble_repository/* models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
+
+    create_nop_modelfile ../L0_infer_reshape/libidentity.so `pwd`/models
 
     for MC in `ls models/custom*_int32_int32_int32/config.pbtxt`; do
         sed -i "s/16/-1,-1/g" $MC
