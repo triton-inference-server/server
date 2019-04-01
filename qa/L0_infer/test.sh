@@ -31,7 +31,8 @@ INFER_TEST=infer_test.py
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+# Allow more time to exit. Ensemble brings in too many models
+SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -57,7 +58,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-store=$DATADIR --strict-readiness=false"
+        SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120 --strict-readiness=false"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
@@ -65,9 +66,12 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/qa_model_repository models && \
+        cp -r /data/inferenceserver/qa_ensemble_repository/* models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
+
+    create_nop_modelfile ../L0_infer_reshape/libidentity.so `pwd`/models
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do

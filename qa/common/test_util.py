@@ -130,6 +130,20 @@ def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
 
     return True
 
+def validate_for_ensemble_model(ensemble_type,
+                              input_dtype, output0_dtype, output1_dtype,
+                              input_shape, output0_shape, output1_shape):
+    """Return True if input and output dtypes are supported by the ensemble type."""
+
+    # Those ensemble types contains "identity" model which doesn't allow STRING
+    # data type
+    if ("sequence" in ensemble_type or "fan" in ensemble_type) and (input_dtype == np.object):
+        return False
+    if "fan" in ensemble_type and (output0_dtype == np.object or output1_dtype == np.object):
+        return False
+
+    return True
+
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(
         pf, np.dtype(input_dtype).name, np.dtype(output0_dtype).name,
