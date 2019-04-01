@@ -79,8 +79,8 @@ RUN cd pytorch && \
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=1.1.0dev
-ARG TRTIS_CONTAINER_VERSION=19.04dev
+ARG TRTIS_VERSION=1.2.0dev
+ARG TRTIS_CONTAINER_VERSION=19.05dev
 ARG PYVER=3.5
 
 # The TFServing release branch must match the TF release used by
@@ -204,8 +204,8 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.1.0dev
-ARG TRTIS_CONTAINER_VERSION=19.04dev
+ARG TRTIS_VERSION=1.2.0dev
+ARG TRTIS_CONTAINER_VERSION=19.05dev
 ARG PYVER=3.5
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
