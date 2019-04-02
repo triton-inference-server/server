@@ -492,11 +492,18 @@ ValidateModelConfig(
     }
   }
 
+  Status status;
   for (const auto& io : config.input()) {
-    RETURN_IF_ERROR(ValidateModelInput(io));
+    status = ValidateModelInput(io);
+    if (!status.IsOk()) {
+      return Status(status.Code(), status.Message() + " for " + config.name());
+    }
   }
   for (const auto& io : config.output()) {
-    RETURN_IF_ERROR(ValidateModelOutput(io));
+    status = ValidateModelOutput(io);
+    if (!status.IsOk()) {
+      return Status(status.Code(), status.Message() + " for " + config.name());
+    }
   }
 
   return Status::Success;
