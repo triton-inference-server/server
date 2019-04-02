@@ -741,12 +741,19 @@ def create_models(
             models_dir, 0, model_version,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
-    
+
     if FLAGS.ensemble:
-        for pair in emu.platform_types_and_validation(FLAGS):
+        for pair in emu.platform_types_and_validation():
             if not pair[1](input_dtype, output0_dtype, output1_dtype,
                             input_shape, output0_shape, output1_shape):
                 continue
+            if pair[0] == "plan":
+                if len(input_shape) == 1:
+                    input_shape = (input_shape[0], 1, 1)
+                if len(output0_shape) == 1:
+                    output0_shape = (output0_shape[0], 1, 1)
+                if len(output1_shape) == 1:
+                    output1_shape = (output1_shape[0], 1, 1)
 
             # max-batch 8
             emu.create_ensemble_modelconfig(
@@ -768,6 +775,7 @@ def create_models(
                 pair[0], models_dir, 0, model_version,
                 input_shape, output0_shape, output1_shape,
                 input_dtype, output0_dtype, output1_dtype)
+
 
 def create_fixed_models(
         models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
@@ -798,8 +806,9 @@ if __name__ == '__main__':
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
     parser.add_argument('--ensemble', required=False, action='store_true',
-                        help='Also generate ensemble models against the models'
-                        + ' generated in selected platforms')
+                        help='Generate ensemble models against the models'
+                        + ' in all platforms. Note that the models generated'
+                        + ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -884,18 +893,19 @@ if __name__ == '__main__':
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
 
         if FLAGS.ensemble:
-            for pair in emu.platform_types_and_validation(FLAGS):
+            for pair in emu.platform_types_and_validation():
+                shape = (16, 1, 1) if pair[0] == "plan" else (16,)
                 for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
-                    if not pair[1](vt, vt, vt, (16,), (16,), (16,)):
+                    if not pair[1](vt, vt, vt, shape, shape, shape):
                         continue
                     emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 2,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                                            shape, shape, shape, vt, vt, vt, swap=True)
                     emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 3,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                                            shape, shape, shape, vt, vt, vt, swap=True)
                     emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 2,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                                            shape, shape, shape, vt, vt, vt, swap=True)
                     emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 3,
-                                            (16,), (16,), (16,), vt, vt, vt, swap=True)
+                                            shape, shape, shape, vt, vt, vt, swap=True)
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:

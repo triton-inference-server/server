@@ -60,16 +60,12 @@ def np_to_model_dtype(np_dtype):
 def fixed_to_variable_size(shape):
     return [-1] * len(shape)
 
-def platform_types_and_validation(flags):
-    res = []
-    if flags.graphdef:
-        res.append(("graphdef", tu.validate_for_tf_model))
-    if flags.savedmodel:
-        res.append(("savedmodel", tu.validate_for_tf_model))
-    if flags.netdef:
-        res.append(("netdef", tu.validate_for_c2_model))
-    if flags.tensorrt:
-        res.append(("plan", tu.validate_for_trt_model))
+def platform_types_and_validation():
+    res = [
+        ("graphdef", tu.validate_for_tf_model),
+        ("savedmodel", tu.validate_for_tf_model),
+        ("netdef", tu.validate_for_c2_model),
+        ("plan", tu.validate_for_trt_model)]
     return res
 
 class EnsembleSchedule:
