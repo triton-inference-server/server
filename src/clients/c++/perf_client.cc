@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -234,13 +234,13 @@ class ConcurrencyManager {
       const bool streaming, const size_t max_threads,
       const std::string& model_name, const int64_t model_version,
       const std::string& url, const ProtocolType protocol,
-      const size_t sequence_length)
+      const size_t sequence_length, const bool zero_input)
   {
     nic::Error err = nic::Error::Success;
     manager->reset(new ConcurrencyManager(
         verbose, profile, batch_size, stable_offset, measurement_window_ms,
         max_measurement_count, streaming, max_threads, model_name,
-        model_version, url, protocol, sequence_length, err));
+        model_version, url, protocol, sequence_length, zero_input, err));
     return err;
   }
 
@@ -382,15 +382,15 @@ class ConcurrencyManager {
       const size_t max_threads, const std::string& model_name,
       const int64_t model_version, const std::string& url,
       const ProtocolType protocol, const size_t sequence_length,
-      nic::Error& err)
+      const bool zero_input, nic::Error& err)
       : verbose_(verbose), profile_(profile), batch_size_(batch_size),
         stable_offset_(stable_offset),
         measurement_window_ms_(measurement_window_ms),
         max_measurement_count_(max_measurement_count), streaming_(streaming),
         max_threads_(max_threads), model_name_(model_name),
         model_version_(model_version), url_(url), protocol_(protocol),
-        sequence_length_(sequence_length), on_sequence_model_(false),
-        current_correlation_id_(0)
+        sequence_length_(sequence_length), zero_input_(zero_input),
+        on_sequence_model_(false), current_correlation_id_(0)
   {
     request_timestamps_.reset(new TimestampVector());
 
@@ -533,9 +533,9 @@ class ConcurrencyManager {
       return err;
     }
 
-    // Create a randomly initialized buffer that is large enough to
-    // provide the largest needed input. We (re)use this buffer for all
-    // input values.
+    // Create a zero or randomly (as indicated by zero_input_)
+    // initialized buffer that is large enough to provide the largest
+    // needed input. We (re)use this buffer for all input values.
     size_t max_input_byte_size = 0;
     for (const auto& input : (*ctx)->Inputs()) {
       const int64_t bs = input->ByteSize();
@@ -555,7 +555,7 @@ class ConcurrencyManager {
     if (input_buffer.size() == 0) {
       std::vector<uint8_t> input_buf(max_input_byte_size);
       for (size_t i = 0; i < input_buf.size(); ++i) {
-        input_buf[i] = rand();
+        input_buf[i] = (zero_input_) ? 0 : rand();
       }
       input_buffer.swap(input_buf);
     }
@@ -992,6 +992,7 @@ class ConcurrencyManager {
   std::string url_;
   ProtocolType protocol_;
   size_t sequence_length_;
+  bool zero_input_;
 
   bool on_sequence_model_;
   ni::CorrelationID current_correlation_id_;
@@ -1138,6 +1139,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-t <number of concurrent requests>" << std::endl;
   std::cerr << "\t-d" << std::endl;
   std::cerr << "\t-a" << std::endl;
+  std::cerr << "\t-z" << std::endl;
   std::cerr << "\t--streaming" << std::endl;
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
   std::cerr << "\t-l <latency threshold (in msec)>" << std::endl;
@@ -1171,33 +1173,28 @@ Usage(char** argv, const std::string& msg = std::string())
       << " flag is set." << std::endl;
   std::cerr
       << "For -s, it indicates the deviation threshold for the measurements. "
-         "The"
-      << " measurement is considered as stable if the recent 3 measurements "
-         "are "
-      << "within +/- (deviation threshold)% of their average in terms of both "
-      << "infer per second and latency. Default is 10(%)" << std::endl;
-  std::cerr << "For -c, it indicates the maximum number of concurrent requests "
-               "allowed"
-            << " if -d flag is set. Once the number of concurrent requests "
-               "exceeds the"
-            << " maximum, the perf client will stop and exit regardless of the "
-               "latency"
-            << " threshold. Default is 0 to indicate that no limit is set on "
-               "the number"
-            << " of concurrent requests." << std::endl;
+         "The measurement is considered as stable if the recent 3 measurements "
+         "are within +/- (deviation threshold)% of their average in terms of "
+         "both infer per second and latency. Default is 10(%)"
+      << std::endl;
+  std::cerr
+      << "For -c, it indicates the maximum number of concurrent requests "
+         "allowed if -d flag is set. Once the number of concurrent requests "
+         "exceeds the maximum, the perf client will stop and exit regardless "
+         "of the latency threshold. Default is 0 to indicate that no limit is "
+         "set on the number of concurrent requests."
+      << std::endl;
   std::cerr
       << "For -p, it indicates the time interval used for each measurement."
       << " The perf client will sample a time interval specified by -p and"
       << " take measurement over the requests completed"
       << " within that time interval." << std::endl;
-  std::cerr
-      << "For -r, it indicates the maximum number of measurements for each"
-      << " profiling setting. The perf client will take multiple measurements "
-         "and"
-      << " report the measurement until it is stable. The perf client will "
-         "abort"
-      << " if the measurement is still unstable after the maximum number of"
-      << " measuremnts." << std::endl;
+  std::cerr << "For -r, it indicates the maximum number of measurements for "
+               "each profiling setting. The perf client will take multiple "
+               "measurements and report the measurement until it is stable. "
+               "The perf client will abort if the measurement is still "
+               "unstable after the maximum number of measuremnts."
+            << std::endl;
   std::cerr << "For -l, it has no effect unless -d flag is set." << std::endl;
   std::cerr << "The -n flag enables profiling for the duration of the run"
             << std::endl;
@@ -1205,6 +1202,9 @@ Usage(char** argv, const std::string& msg = std::string())
       << "If -x is not specified the most recent version (that is, the highest "
       << "numbered version) of the model will be used." << std::endl;
   std::cerr << "For -i, available protocols are gRPC and HTTP. Default is HTTP."
+            << std::endl;
+  std::cerr << "The -z flag causes input tensors to be initialized with zeros "
+               "instead of random data"
             << std::endl;
   std::cerr
       << "For --sequence-length, it indicates the base length of a sequence"
@@ -1225,6 +1225,7 @@ main(int argc, char** argv)
   bool profile = false;
   bool dynamic_concurrency_mode = false;
   bool streaming = false;
+  bool zero_input = false;
   size_t max_threads = 16;
   // average length of a sentence
   size_t sequence_length = 20;
@@ -1250,7 +1251,7 @@ main(int argc, char** argv)
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vndac:u:m:x:b:t:p:i:l:r:s:f:", long_options,
+              argc, argv, "vndazc:u:m:x:b:t:p:i:l:r:s:f:", long_options,
               NULL)) != -1) {
     switch (opt) {
       case 0:
@@ -1267,6 +1268,9 @@ main(int argc, char** argv)
         break;
       case 'n':
         profile = true;
+        break;
+      case 'z':
+        zero_input = true;
         break;
       case 'd':
         dynamic_concurrency_mode = true;
@@ -1353,7 +1357,7 @@ main(int argc, char** argv)
   err = ConcurrencyManager::Create(
       &manager, verbose, profile, batch_size, stable_offset,
       measurement_window_ms, max_measurement_count, streaming, max_threads,
-      model_name, model_version, url, protocol, sequence_length);
+      model_name, model_version, url, protocol, sequence_length, zero_input);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
