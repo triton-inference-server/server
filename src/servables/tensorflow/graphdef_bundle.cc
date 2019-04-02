@@ -122,10 +122,10 @@ GraphDefBundle::CreateSession(
   }
 
   for (const auto& io : Config().input()) {
-    RETURN_IF_ERROR(ValidateModelInput(io, potential_inputs));
+    RETURN_IF_ERROR(AllowModelInput(io, potential_inputs));
   }
   for (const auto& io : Config().output()) {
-    RETURN_IF_ERROR(ValidateModelOutput(io, potential_outputs));
+    RETURN_IF_ERROR(AllowModelOutput(io, potential_outputs));
   }
 
   return Status::Success;

@@ -384,8 +384,6 @@ PlanBundle::Context::InitializeConfigInputBindings(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(ValidateModelInput(io));
-
     const DimsList& model_config_dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
     RETURN_IF_ERROR(
@@ -400,8 +398,6 @@ PlanBundle::Context::InitializeConfigOutputBindings(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(ValidateModelOutput(io));
-
     int index = engine_->getBindingIndex(io.name().c_str());
     if (index < 0) {
       return Status(
