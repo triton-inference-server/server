@@ -492,6 +492,13 @@ ValidateModelConfig(
     }
   }
 
+  for (const auto& io : config.input()) {
+    RETURN_IF_ERROR(ValidateModelInput(io));
+  }
+  for (const auto& io : config.output()) {
+    RETURN_IF_ERROR(ValidateModelOutput(io));
+  }
+
   return Status::Success;
 }
 
