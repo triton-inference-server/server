@@ -45,7 +45,6 @@ for TARGET in cpu gpu; do
 
     rm -fr models && \
         cp -r /data/inferenceserver/qa_variable_model_repository models && \
-        cp -r /data/inferenceserver/qa_ensemble_repository/* models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.

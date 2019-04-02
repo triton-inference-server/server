@@ -57,6 +57,9 @@ def np_to_model_dtype(np_dtype):
         return "TYPE_STRING"
     return None
 
+def fixed_to_variable_size(shape):
+    return [-1] * len(shape)
+
 def platform_types_and_validation(flags):
     res = []
     if flags.graphdef:
@@ -90,6 +93,7 @@ class EnsembleSchedule:
     def _get_simple_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # ensemble input -> addsub -> ensemble output
         steps = '''
 ensemble_scheduling {{
   step [
@@ -122,6 +126,8 @@ ensemble_scheduling {{
     def _get_sequence_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # ensemble input -> nop -> addsub -> ensemble output
+        nop_input_shape = fixed_to_variable_size(input_shape)
         steps = '''
 ensemble_scheduling {{
   step [
@@ -167,13 +173,18 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(input_dtype, input_shape, base_model_name)
+'''.format(input_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name)
         return steps
 
     @classmethod
     def _get_fan_ensemble_steps(cls, base_model_name,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype):
+        # ensemble input -> nop -> addsub ->
+        # nop (fan out, one output send to one nop) -> ensemble output (fan in)
+        nop_input_shape = fixed_to_variable_size(input_shape)
+        nop_output0_shape = fixed_to_variable_size(output0_shape)
+        nop_output1_shape = fixed_to_variable_size(output1_shape)
         steps = '''
 ensemble_scheduling {{
   step [
@@ -251,9 +262,9 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(input_dtype, input_shape, base_model_name,
-              output0_dtype, output0_shape,
-              output1_dtype, output1_shape)
+'''.format(input_dtype, tu.shape_to_dims_str(nop_input_shape), base_model_name,
+              output0_dtype, tu.shape_to_dims_str(nop_output0_shape),
+              output1_dtype, tu.shape_to_dims_str(nop_output1_shape))
         return steps
 
 def create_ensemble_modelfile(
@@ -297,8 +308,9 @@ def create_ensemble_modelconfig(
     input_model_dtype = np_to_model_dtype(input_dtype)
     output0_model_dtype = np_to_model_dtype(output0_dtype)
     output1_model_dtype = np_to_model_dtype(output1_dtype)
-    # Use a different model name for the non-batching variant
+
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
+        # Use a different model name for the non-batching variant
         ensemble_model_name = "{}_{}{}".format(ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
         model_name = tu.get_model_name(ensemble_model_name,
                                     input_dtype, output0_dtype, output1_dtype)
@@ -306,8 +318,8 @@ def create_ensemble_modelconfig(
                                     input_dtype, output0_dtype, output1_dtype)
 
         ensemble_schedule = EnsembleSchedule(ensemble_type).get_schedule(
-                        base_model_name, len(input_shape), len(output0_shape),
-                        len(output1_shape), input_model_dtype,
+                        base_model_name, input_shape, output0_shape,
+                        output1_shape, input_model_dtype,
                         output0_model_dtype, output1_model_dtype)
 
         config_dir = models_dir + "/" + model_name
@@ -361,11 +373,12 @@ output [
             for l in range(output0_label_cnt):
                 lfile.write("label" + str(l) + "\n")
 
+
 def create_nop_modelconfig(models_dir, tensor_shape, tensor_dtype):
-    model_name = "nop_{}_{}".format(tensor_dtype, len(tensor_shape))
+    model_name = "nop_{}_{}".format(tensor_dtype, tu.shape_to_dims_str(tensor_shape))
     config_dir = models_dir + "/" + model_name
     config = '''
-name: "nop_{dtype}_{dim_len}"
+name: "{model_name}"
 platform: "custom"
 max_batch_size: {batch_size}
 default_model_filename: "libidentity.so"
@@ -394,7 +407,7 @@ output [
   }}
 ]
 instance_group [ {{ kind: KIND_CPU }} ]
-'''.format(dtype=tensor_dtype, dim_len=len(tensor_shape),
+'''.format(model_name=model_name, dtype=tensor_dtype,
             batch_size=1024, dim=tu.shape_to_dims_str(tensor_shape))
 
     try:
@@ -405,24 +418,3 @@ instance_group [ {{ kind: KIND_CPU }} ]
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir', type=str, required=True,
-                        help='Top-level model directory')
-    FLAGS, unparsed = parser.parse_known_args()
-
-    # Create utility models used in ensemble
-    # nop (only creates model config, should add model file before use)
-    model_dtypes = ["TYPE_BOOL", "TYPE_STRING"]
-    for s in [8, 16, 32, 64]:
-      for t in ["INT", "UINT", "FP"]:
-        if t == "FP" and s == 8:
-          continue
-        model_dtypes.append("TYPE_{}{}".format(t, s))
-
-    for model_dtype in model_dtypes:
-      # Use variable size to handle all shape. Note: piping variable size output
-      # to fixed size model is not safe but doable
-      for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
-        create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)

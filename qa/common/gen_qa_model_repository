@@ -59,19 +59,16 @@ HOST_ZERODESTDIR=/tmp/qa_zero_model_repository
 HOST_RESHAPEDESTDIR=/tmp/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
-HOST_ENSEMBLEDESTDIR=/tmp/qa_ensemble_repository
 
 rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_ZERODESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
-rm -fr $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_ZERODESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
-mkdir -p $HOST_ENSEMBLEDESTDIR
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
@@ -86,7 +83,6 @@ cp ./test_util.py $HOST_SRCDIR/.
 C2SCRIPT=c2_gen.cmds
 TFSCRIPT=tf_gen.cmds
 TRTSCRIPT=trt_gen.cmds
-ENSEMBLESCRIPT=ensemble_gen.cmds
 
 SRCDIR=/tmp/src
 DESTDIR=/tmp/models
@@ -95,7 +91,6 @@ ZERODESTDIR=/tmp/zeromodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
-ENSEMBLEDESTDIR=/tmp/ensemblebasemodels
 
 # PyTorch
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
@@ -212,35 +207,6 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        -u $(id -u):$(id -g) $TENSORRT_IMAGE
-if [ $? -ne 0 ]; then
-    echo -e "Failed"
-    exit 1
-fi
-
-# Ensemble related models
-cat >$HOST_SRCDIR/$ENSEMBLESCRIPT <<EOF
-#!/bin/bash
-set -e
-export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
-cd $SRCDIR
-python3 $SRCDIR/gen_ensemble_model_utils.py --models_dir=$ENSEMBLEDESTDIR
-chown -R $(id -u):$(id -g) $ENSEMBLEDESTDIR
-EOF
-
-chmod a+x $HOST_SRCDIR/$ENSEMBLESCRIPT
-if [ $? -ne 0 ]; then
-    echo -e "Failed: chmod"
-    exit 1
-fi
-
-# Doesn't have to use TensorFlow image, only creating model configs of util
-# models which use custom backends. The actual model files should be provided by
-# the test scripts
-docker pull $TENSORFLOW_IMAGE
-nvidia-docker run --rm --entrypoint $SRCDIR/$ENSEMBLESCRIPT \
-       --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
-       --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
-       -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1

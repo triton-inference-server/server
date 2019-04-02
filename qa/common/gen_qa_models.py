@@ -798,8 +798,8 @@ if __name__ == '__main__':
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
     parser.add_argument('--ensemble', required=False, action='store_true',
-                        help='Also generate ensemble models against the models"
-                        + " generated in selected platforms')
+                        help='Also generate ensemble models against the models'
+                        + ' generated in selected platforms')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -915,3 +915,19 @@ if __name__ == '__main__':
                       (8,-1), (8,4), (8,4), 32)
         create_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string,
                       (-1,8,-1), (2,8,2), (2,8,2), 32)
+
+    if FLAGS.ensemble:
+        # Create utility models used in ensemble
+        # nop (only creates model config, should add model file before use)
+        model_dtypes = ["TYPE_BOOL", "TYPE_STRING"]
+        for s in [8, 16, 32, 64]:
+            for t in ["INT", "UINT", "FP"]:
+                if t == "FP" and s == 8:
+                    continue
+                model_dtypes.append("TYPE_{}{}".format(t, s))
+
+        for model_dtype in model_dtypes:
+            # Use variable size to handle all shape. Note: piping variable size output
+            # to fixed size model is not safe but doable
+            for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
+                emu.create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)

@@ -222,6 +222,11 @@ EnsembleContext::PrepareSteps(
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    // Initialization error, ensemble status will be not ok since the beginning
+    if (completed_step == nullptr && !ensemble_status_.IsOk()) {
+      ensemble_status_ = FinishEnsemble();
+    }
+
     if (ensemble_status_.IsOk()) {
       StepList res;
       std::vector<size_t> updated_tensors;
