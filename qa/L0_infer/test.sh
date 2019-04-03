@@ -71,7 +71,7 @@ for TARGET in cpu gpu; do
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.
 
-    create_nop_modelfile ../L0_infer_reshape/libidentity.so `pwd`/models
+    create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do
