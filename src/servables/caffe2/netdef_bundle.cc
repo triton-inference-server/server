@@ -288,7 +288,8 @@ NetDefBundle::Context::ValidateInputs(
   for (const auto& io : ios) {
     // For now, skipping the check if potential names is empty
     if (!workspace_->PotentialInputNames().empty()) {
-      RETURN_IF_ERROR(CheckAllowedModelInput(io, workspace_->PotentialInputNames()));
+      RETURN_IF_ERROR(
+          CheckAllowedModelInput(io, workspace_->PotentialInputNames()));
     }
 
     if (ConvertDataType(io.data_type()) ==
@@ -311,7 +312,8 @@ NetDefBundle::Context::ValidateOutputs(
   for (const auto& io : ios) {
     // For now, skipping the check if potential names is empty
     if (!workspace_->PotentialOutputNames().empty()) {
-      RETURN_IF_ERROR(CheckAllowedModelOutput(io, workspace_->PotentialOutputNames()));
+      RETURN_IF_ERROR(
+          CheckAllowedModelOutput(io, workspace_->PotentialOutputNames()));
     }
 
     if (ConvertDataType(io.data_type()) ==

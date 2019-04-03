@@ -105,6 +105,7 @@ class Metrics {
   static std::shared_ptr<prometheus::Registry> GetRegistry();
   bool InitializeNvmlMetrics();
 
+  bool initialized_;
   std::unique_ptr<prometheus::Exposer> exposer_;
   std::shared_ptr<prometheus::Registry> registry_;
 

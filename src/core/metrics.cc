@@ -36,7 +36,7 @@
 namespace nvidia { namespace inferenceserver {
 
 Metrics::Metrics()
-    : registry_(std::make_shared<prometheus::Registry>()),
+    : initialized_(false), registry_(std::make_shared<prometheus::Registry>()),
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -115,18 +115,21 @@ void
 Metrics::Initialize(uint32_t port)
 {
   auto singleton = GetSingleton();
-  if (singleton->exposer_) {
+  if (singleton->initialized_) {
     LOG_WARNING << "Metrics already initialized.";
     return;
   }
 
-  if (std::getenv("TENSORRT_SERVER_CPU_ONLY") == nullptr)
+  if (std::getenv("TENSORRT_SERVER_CPU_ONLY") == nullptr) {
     singleton->InitializeNvmlMetrics();
+  }
 
   std::ostringstream stream;
   stream << "0.0.0.0:" << port;
   singleton->exposer_.reset(new prometheus::Exposer(stream.str()));
   singleton->exposer_->RegisterCollectable(singleton->registry_);
+
+  singleton->initialized_ = true;
 }
 
 bool
@@ -308,6 +311,14 @@ Metrics::InitializeNvmlMetrics()
 bool
 Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
 {
+  // If metrics were not initialized then just silently fail since
+  // with NVML we can't get the CUDA device (and not worth doing
+  // anyway since metrics aren't being reported).
+  auto singleton = GetSingleton();
+  if (!singleton->initialized_) {
+    return false;
+  }
+
   char pcibusid_str[64];
   cudaError_t cuerr = cudaDeviceGetPCIBusId(
       pcibusid_str, sizeof(pcibusid_str) - 1, cuda_device);
