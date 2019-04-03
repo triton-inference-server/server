@@ -41,51 +41,55 @@ class InferVariableTest(unittest.TestCase):
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     input_shape, output0_shape, output1_shape,
                     output0_raw=True, output1_raw=True, swap=False):
+        def _infer_exact_helper(tester, pf, tensor_shape, batch_size,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_raw=True, output1_raw=True,
+                model_version=None, swap=False,
+                outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
+                skip_request_id_check=False, use_streaming=True,
+                correlation_id=0):
+            for bs in (1, batch_size):
+                # model that does not support batching
+                if bs == 1:
+                    iu.infer_exact(tester, pf + "_nobatch", tensor_shape, bs,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+                # model that supports batching
+                iu.infer_exact(tester, pf, tensor_shape, bs,
+                               input_dtype, output0_dtype, output1_dtype,
+                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+
+        all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
+        ensemble_prefix = [""]
+        for prefix in all_ensemble_prefix:
+            if tu.validate_for_ensemble_model(prefix,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, input_shape, input_shape):
+                ensemble_prefix.append(prefix)
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
-            # model that supports batching
-            for bs in (1, 8):
-                iu.infer_exact(self, 'graphdef', input_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
-                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-                iu.infer_exact(self, 'savedmodel', input_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
-                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-            # model that does not support batching
-            iu.infer_exact(self, 'graphdef_nobatch', input_shape, 1,
-                           input_dtype, output0_dtype, output1_dtype,
-                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-            iu.infer_exact(self, 'savedmodel_nobatch', input_shape, 1,
-                           input_dtype, output0_dtype, output1_dtype,
-                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            for prefix in ensemble_prefix:
+                for pf in ["graphdef", "savedmodel"]:
+                    _infer_exact_helper(self, prefix + pf, input_shape, 8,
+                                    input_dtype, output0_dtype, output1_dtype,
+                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
-            # model that supports batching
-            for bs in (1, 8):
-                iu.infer_exact(self, 'netdef', input_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
-                               output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-            # model that does not support batching
-            iu.infer_exact(self, 'netdef_nobatch', input_shape, 1,
-                           input_dtype, output0_dtype, output1_dtype,
-                           output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            for prefix in ensemble_prefix:
+                _infer_exact_helper(self, prefix + 'netdef', input_shape, 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         # the custom model is src/custom/addsub... it does not swap
         # the inputs so always set to False
         if tu.validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
                                         input_shape, output0_shape, output1_shape):
-            # model that supports batching
-            for bs in (1, 8):
-                iu.infer_exact(self, 'custom', input_shape, bs,
-                               input_dtype, output0_dtype, output1_dtype,
-                               output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
-            # model that does not support batching
-            iu.infer_exact(self, 'custom_nobatch', input_shape, 1,
-                           input_dtype, output0_dtype, output1_dtype,
-                           output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
-
+            # No basic ensemble models are created against custom models
+            _infer_exact_helper(self, 'custom', input_shape, 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
     def test_raw_fff(self):
         self._full_exact(np.float32, np.float32, np.float32, (16,), (16,), (16,))

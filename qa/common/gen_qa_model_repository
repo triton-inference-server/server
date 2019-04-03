@@ -59,16 +59,25 @@ HOST_ZERODESTDIR=/tmp/qa_zero_model_repository
 HOST_RESHAPEDESTDIR=/tmp/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
+HOST_ENSEMBLEDESTDIR=/tmp/qa_ensemble_model_repository
 
 rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_ZERODESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
+rm -fr $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_ZERODESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
+# Since the models required by ensemble models may not be available
+# at this point, storing ensemble models separately so that other qa directories
+# are proper model stores
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_zero_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_reshape_model_repository
 
 rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
@@ -77,6 +86,7 @@ cp ./gen_qa_models.py $HOST_SRCDIR/.
 cp ./gen_qa_zero_models.py $HOST_SRCDIR/.
 cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
 C2SCRIPT=c2_gen.cmds
@@ -90,6 +100,7 @@ ZERODESTDIR=/tmp/zeromodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
+ENSEMBLEDESTDIR=/tmp/ensemblemodels
 
 # PyTorch
 cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
@@ -150,6 +161,9 @@ python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --variable --models_dir=$VARSEQDESTDIR
 chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
+python3 $SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_model_repository
+chown -R $(id -u):$(id -g) $ENSEMBLEDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -167,6 +181,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
+       --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
        -u $(id -u):$(id -g) $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
