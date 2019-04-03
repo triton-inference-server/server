@@ -304,21 +304,7 @@ ValidateEnsembleConfig(
   std::unordered_map<std::string, bool> ensembles;
 
   for (const auto& pair : config_map) {
-    Status status;
-    for (const auto& input : pair.second.input()) {
-      status = ValidateModelInput(input);
-      if (!status.IsOk()) {
-        break;
-      }
-    }
-    if (status.IsOk()) {
-      for (const auto& output : pair.second.output()) {
-        status = ValidateModelOutput(output);
-        if (!status.IsOk()) {
-          break;
-        }
-      }
-    }
+    Status status = ValidateModelConfig(pair.second, std::string());
     if (!status.IsOk()) {
       // Return error if the inputs / outputs of one ensemble is not correct.
       if (pair.second.has_ensemble_scheduling()) {

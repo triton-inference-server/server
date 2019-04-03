@@ -114,7 +114,7 @@ SavedModelBundle::CreateSession(
   }
 
   for (const auto& io : Config().input()) {
-    RETURN_IF_ERROR(ValidateModelInput(io, expected_inputs));
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, expected_inputs));
 
     const auto& iitr = sig.inputs().find(io.name());
     if (iitr == sig.inputs().end()) {
@@ -143,7 +143,7 @@ SavedModelBundle::CreateSession(
   }
 
   for (const auto& io : Config().output()) {
-    RETURN_IF_ERROR(ValidateModelOutput(io, allowed_outputs));
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
 
     const auto& oitr = sig.outputs().find(io.name());
     if (oitr == sig.outputs().end()) {

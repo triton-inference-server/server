@@ -71,9 +71,7 @@ Status GetNormalizedModelConfig(
     const std::string& path, const PlatformConfigMap& platform_config_map,
     const bool autofill, ModelConfig* config);
 
-/// Validate that a model is specified correctly (excluding inputs and
-/// outputs which are validated via ValidateModelInput() and
-/// ValidateModelOutput()).
+/// Validate that a model is specified correctly.
 /// \param config The model configuration to validate.
 /// \param expected_platform If non-empty the model will be checked
 /// to make sure its platform matches this value.
@@ -104,33 +102,33 @@ Status BuildEnsembleGraph(
 /// Validate that input is specified correctly in a model
 /// configuration.
 /// \param io The model input.
+/// \param max_batch_size The max batch size specified in model configuration.
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-Status ValidateModelInput(const ModelInput& io);
+Status ValidateModelInput(const ModelInput& io, int32_t max_batch_size);
 
-/// Validate that an input is specified correctly in a model
-/// configuration and matches one of the allowed input names.
+/// Validate that an input matches one of the allowed input names.
 /// \param io The model input.
 /// \param allowed The set of allowed input names.
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-Status ValidateModelInput(
+Status CheckAllowedModelInput(
     const ModelInput& io, const std::set<std::string>& allowed);
 
 /// Validate that an output is specified correctly in a model
 /// configuration.
 /// \param io The model output.
+/// \param max_batch_size The max batch size specified in model configuration.
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-Status ValidateModelOutput(const ModelOutput& io);
+Status ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size);
 
-/// Validate that an output is specified correctly in a model
-/// configuration and matches one of the allowed output names.
+/// Validate that an output matches one of the allowed output names.
 /// \param io The model output.
 /// \param allowed The set of allowed output names.
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-Status ValidateModelOutput(
+Status CheckAllowedModelOutput(
     const ModelOutput& io, const std::set<std::string>& allowed);
 
 }}  // namespace nvidia::inferenceserver

@@ -357,24 +357,17 @@ ValidateModelConfig(
         "must specify 'version policy' for " + config.name());
   }
 
-  // If the configuration is non-batching, then no input or output
-  // reshape can be empty as that would mean that input or output was
-  // always empty (no data).
-  if (config.max_batch_size() == 0) {
-    for (const auto& io : config.input()) {
-      if (io.has_reshape() && (io.reshape().shape_size() == 0)) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "model input cannot have empty reshape for non-batching model");
-      }
+  Status status;
+  for (const auto& io : config.input()) {
+    status = ValidateModelInput(io, config.max_batch_size());
+    if (!status.IsOk()) {
+      return Status(status.Code(), status.Message() + " for " + config.name());
     }
-
-    for (const auto& io : config.output()) {
-      if (io.has_reshape() && (io.reshape().shape_size() == 0)) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "model output cannot have empty reshape for non-batching model");
-      }
+  }
+  for (const auto& io : config.output()) {
+    status = ValidateModelOutput(io, config.max_batch_size());
+    if (!status.IsOk()) {
+      return Status(status.Code(), status.Message() + " for " + config.name());
     }
   }
 
@@ -679,14 +672,7 @@ BuildEnsembleGraph(
 }
 
 Status
-ValidateModelInput(const ModelInput& io)
-{
-  std::set<std::string> allowed;
-  return ValidateModelInput(io, allowed);
-}
-
-Status
-ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
+ValidateModelInput(const ModelInput& io, int32_t max_batch_size)
 {
   if (io.name().empty()) {
     return Status(
@@ -701,6 +687,16 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
   if (io.dims_size() == 0) {
     return Status(
         RequestStatusCode::INVALID_ARG, "model input must specify 'dims'");
+  }
+
+  // If the configuration is non-batching, then no input or output
+  // reshape can be empty as that would mean that input or output was
+  // always empty (no data).
+  if (io.has_reshape() && (io.reshape().shape_size() == 0) &&
+      (max_batch_size == 0)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "model input cannot have empty reshape for non-batching model");
   }
 
   for (auto dim : io.dims()) {
@@ -752,7 +748,13 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
         RequestStatusCode::INVALID_ARG, "model input NHWC/NCHW require 3 dims");
   }
 
-  if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {
+  return Status::Success;
+}
+
+Status
+CheckAllowedModelInput(const ModelInput& io, const std::set<std::string>& allowed)
+{
+  if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
     for (const auto& a : allowed) {
       if (!astr.empty()) {
@@ -766,19 +768,11 @@ ValidateModelInput(const ModelInput& io, const std::set<std::string>& allowed)
                                             io.name() +
                                             "', allowed inputs are: " + astr);
   }
-
   return Status::Success;
 }
 
 Status
-ValidateModelOutput(const ModelOutput& io)
-{
-  std::set<std::string> allowed;
-  return ValidateModelOutput(io, allowed);
-}
-
-Status
-ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
+ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size)
 {
   if (io.name().empty()) {
     return Status(
@@ -794,6 +788,16 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
   if (io.dims_size() == 0) {
     return Status(
         RequestStatusCode::INVALID_ARG, "model output must specify 'dims'");
+  }
+
+  // If the configuration is non-batching, then no input or output
+  // reshape can be empty as that would mean that input or output was
+  // always empty (no data).
+  if (io.has_reshape() && (io.reshape().shape_size() == 0) &&
+      (max_batch_size == 0)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "model output cannot have empty reshape for non-batching model");
   }
 
   for (auto dim : io.dims()) {
@@ -838,7 +842,13 @@ ValidateModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
     }
   }
 
-  if (!allowed.empty() && (allowed.find(io.name()) == allowed.end())) {
+  return Status::Success;
+}
+
+Status
+CheckAllowedModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
+{
+  if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
     for (const auto& a : allowed) {
       if (!astr.empty()) {
