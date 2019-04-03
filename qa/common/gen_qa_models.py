@@ -29,6 +29,7 @@ from builtins import range
 import os
 import sys
 import numpy as np
+import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -741,6 +742,41 @@ def create_models(
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
 
+    if FLAGS.ensemble:
+        for pair in emu.platform_types_and_validation():
+            if not pair[1](input_dtype, output0_dtype, output1_dtype,
+                            input_shape, output0_shape, output1_shape):
+                continue
+            if pair[0] == "plan":
+                if len(input_shape) == 1:
+                    input_shape = (input_shape[0], 1, 1)
+                if len(output0_shape) == 1:
+                    output0_shape = (output0_shape[0], 1, 1)
+                if len(output1_shape) == 1:
+                    output1_shape = (output1_shape[0], 1, 1)
+
+            # max-batch 8
+            emu.create_ensemble_modelconfig(
+                pair[0], models_dir, 8, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_label_cnt, version_policy)
+            emu.create_ensemble_modelfile(
+                pair[0], models_dir, 8, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype)
+            # max-batch 0
+            emu.create_ensemble_modelconfig(
+                pair[0], models_dir, 0, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_label_cnt, version_policy)
+            emu.create_ensemble_modelfile(
+                pair[0], models_dir, 0, model_version,
+                input_shape, output0_shape, output1_shape,
+                input_dtype, output0_dtype, output1_dtype)
+
+
 def create_fixed_models(
         models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
     input_size = 16
@@ -769,6 +805,10 @@ if __name__ == '__main__':
                         help='Generate TensorRT PLAN models')
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
+    parser.add_argument('--ensemble', required=False, action='store_true',
+                        help='Generate ensemble models against the models'
+                        + ' in all platforms. Note that the models generated'
+                        + ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -852,6 +892,21 @@ if __name__ == '__main__':
                 create_plan_modelfile(FLAGS.models_dir, 0, 3,
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
 
+        if FLAGS.ensemble:
+            for pair in emu.platform_types_and_validation():
+                shape = (16, 1, 1) if pair[0] == "plan" else (16,)
+                for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                    if not pair[1](vt, vt, vt, shape, shape, shape):
+                        continue
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 2,
+                                            shape, shape, shape, vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 8, 3,
+                                            shape, shape, shape, vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 2,
+                                            shape, shape, shape, vt, vt, vt, swap=True)
+                    emu.create_ensemble_modelfile(pair[0], FLAGS.models_dir, 0, 3,
+                                            shape, shape, shape, vt, vt, vt, swap=True)
+
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
         create_models(FLAGS.models_dir, np.float32, np.float32, np.float32, (-1,), (16,), (16,), 16)
@@ -870,3 +925,19 @@ if __name__ == '__main__':
                       (8,-1), (8,4), (8,4), 32)
         create_models(FLAGS.models_dir, np_dtype_string, np.int32, np_dtype_string,
                       (-1,8,-1), (2,8,2), (2,8,2), 32)
+
+    if FLAGS.ensemble:
+        # Create utility models used in ensemble
+        # nop (only creates model config, should add model file before use)
+        model_dtypes = ["TYPE_BOOL", "TYPE_STRING"]
+        for s in [8, 16, 32, 64]:
+            for t in ["INT", "UINT", "FP"]:
+                if t == "FP" and s == 8:
+                    continue
+                model_dtypes.append("TYPE_{}{}".format(t, s))
+
+        for model_dtype in model_dtypes:
+            # Use variable size to handle all shape. Note: piping variable size output
+            # to fixed size model is not safe but doable
+            for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
+                emu.create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)
