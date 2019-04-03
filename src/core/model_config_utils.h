@@ -112,7 +112,7 @@ Status ValidateModelInput(const ModelInput& io, int32_t max_batch_size);
 /// \param allowed The set of allowed input names.
 /// \return The error status. A non-OK status indicates the input
 /// is not valid.
-Status AllowModelInput(
+Status CheckAllowedModelInput(
     const ModelInput& io, const std::set<std::string>& allowed);
 
 /// Validate that an output is specified correctly in a model
@@ -128,7 +128,7 @@ Status ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size);
 /// \param allowed The set of allowed output names.
 /// \return The error status. A non-OK status indicates the output
 /// is not valid.
-Status AllowModelOutput(
+Status CheckAllowedModelOutput(
     const ModelOutput& io, const std::set<std::string>& allowed);
 
 }}  // namespace nvidia::inferenceserver

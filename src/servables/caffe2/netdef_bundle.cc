@@ -286,7 +286,7 @@ NetDefBundle::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(AllowModelInput(io, workspace_->PotentialInputNames()));
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, workspace_->PotentialInputNames()));
 
     if (ConvertDataType(io.data_type()) ==
         Caffe2Workspace::DataType::TYPE_INVALID) {
@@ -306,7 +306,7 @@ NetDefBundle::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(AllowModelOutput(io, workspace_->PotentialOutputNames()));
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, workspace_->PotentialOutputNames()));
 
     if (ConvertDataType(io.data_type()) ==
         Caffe2Workspace::DataType::TYPE_INVALID) {
