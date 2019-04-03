@@ -752,7 +752,8 @@ ValidateModelInput(const ModelInput& io, int32_t max_batch_size)
 }
 
 Status
-CheckAllowedModelInput(const ModelInput& io, const std::set<std::string>& allowed)
+CheckAllowedModelInput(
+    const ModelInput& io, const std::set<std::string>& allowed)
 {
   if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
@@ -846,7 +847,8 @@ ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size)
 }
 
 Status
-CheckAllowedModelOutput(const ModelOutput& io, const std::set<std::string>& allowed)
+CheckAllowedModelOutput(
+    const ModelOutput& io, const std::set<std::string>& allowed)
 {
   if (allowed.find(io.name()) == allowed.end()) {
     std::string astr;
