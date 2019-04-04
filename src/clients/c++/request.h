@@ -30,10 +30,17 @@
 #include <string>
 #include <vector>
 #include "src/core/api.pb.h"
-#include "src/core/constants.h"
-#include "src/core/model_config.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server_status.pb.h"
+
+namespace nvidia { namespace inferenceserver {
+
+// From model_config.h, repeat here to avoid introducing dependence on
+// that header.
+using CorrelationID = uint64_t;
+using DimsList = ::google::protobuf::RepeatedField<::google::protobuf::int64>;
+
+}}  // namespace nvidia::inferenceserver
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

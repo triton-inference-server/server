@@ -34,6 +34,7 @@
 #include <vector>
 #include "src/clients/c++/request.h"
 #include "src/core/constants.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {

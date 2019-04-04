@@ -50,37 +50,37 @@ LIBPROTOBUF := $(LIBGRPCDIR)/grpc/libs/opt/protobuf/libprotobuf.a
 
 IMAGE_SRCS  := $(CPPDIR)/image_client.cc
 IMAGE_OBJS  := $(addprefix $(BUILDDIR)/, $(IMAGE_SRCS:%.cc=%.o))
-IMAGE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread \
+IMAGE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread \
                  -lopencv_core -lopencv_imgproc -lopencv_highgui -ldl
 
 ENSEMBLE_SRCS   := $(CPPDIR)/ensemble_image_client.cc
 ENSEMBLE_OBJS   := $(addprefix $(BUILDDIR)/, $(ENSEMBLE_SRCS:%.cc=%.o))
-ENSEMBLE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+ENSEMBLE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread -ldl
 
 PERF_SRCS   := $(CPPDIR)/perf_client.cc
 PERF_OBJS   := $(addprefix $(BUILDDIR)/, $(PERF_SRCS:%.cc=%.o))
-PERF_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+PERF_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread -ldl
 
 SIMPLE_SRCS   := $(CPPDIR)/simple_client.cc
 SIMPLE_OBJS   := $(addprefix $(BUILDDIR)/, $(SIMPLE_SRCS:%.cc=%.o))
-SIMPLE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+SIMPLE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread -ldl
 
 SIMPSEQ_SRCS   := $(CPPDIR)/simple_sequence_client.cc
 SIMPSEQ_OBJS   := $(addprefix $(BUILDDIR)/, $(SIMPSEQ_SRCS:%.cc=%.o))
-SIMPSEQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+SIMPSEQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread -ldl
 
 SIMPSTR_SRCS   := $(CPPDIR)/simple_string_client.cc
 SIMPSTR_OBJS   := $(addprefix $(BUILDDIR)/, $(SIMPSTR_SRCS:%.cc=%.o))
-SIMPSTR_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -lpthread -ldl
+SIMPSTR_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread -ldl
 
 LIBREQ_SRCS := $(PYTHONDIR)/crequest.cc
 LIBREQ_OBJS := $(addprefix $(BUILDDIR)/, $(LIBREQ_SRCS:%.cc=%.o))
-LIBREQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -lcurl -lz -ldl
+LIBREQ_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -ldl
 
 CMN_SRCS    := $(CPPDIR)/request.cc $(CPPDIR)/request_common.cc $(CPPDIR)/request_grpc.cc \
                $(CPPDIR)/request_http.cc $(SRCDIR)/core/model_config.cc
 CMN_OBJS    := $(addprefix $(BUILDDIR)/, $(CMN_SRCS:%.cc=%.o))
-CMN_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -L/opt/local/lib -ldl
+CMN_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -ldl
 
 PY_SRCS     := $(PYTHONDIR)/__init__.py
 PY_SETUP    := $(PYTHONDIR)/setup.py

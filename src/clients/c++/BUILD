@@ -33,8 +33,6 @@ cc_library(
     hdrs = ["request.h"],
     deps = [
         "//src/core:api_proto",
-        "//src/core:constants",
-        "//src/core:model_config",
         "//src/core:request_status_proto",
         "//src/core:server_status_proto",
     ],
@@ -55,6 +53,7 @@ cc_library(
     deps = [
         ":request",
         "//src/core:constants",
+        "//src/core:model_config",
         "//src/core:model_config_proto",
     ],
 )

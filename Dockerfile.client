@@ -62,7 +62,7 @@ WORKDIR /workspace
 COPY Makefile.client .
 COPY VERSION .
 COPY src src
-RUN make -j4 -f Makefile.client all
+RUN make -j8 -f Makefile.client all
 
 # Collect the client artifacts into a tar
 RUN mkdir -p /tmp/client/bin && \
@@ -76,6 +76,10 @@ RUN mkdir -p /tmp/client/bin && \
     cp build/librequest.so /tmp/client/lib/. && \
     cp build/librequest.a /tmp/client/lib/. && \
     mkdir -p /tmp/client/include && \
+    cp build/src/core/api.pb.h /tmp/client/include/. && \
+    cp build/src/core/model_config.pb.h /tmp/client/include/. && \
+    cp build/src/core/request_status.pb.h /tmp/client/include/. && \
+    cp build/src/core/server_status.pb.h /tmp/client/include/. && \
     cp src/clients/c++/request.h /tmp/client/include/. && \
     cp src/clients/c++/request_http.h /tmp/client/include/. && \
     cp src/clients/c++/request_grpc.h /tmp/client/include/. && \
