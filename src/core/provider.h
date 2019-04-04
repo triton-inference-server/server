@@ -44,8 +44,7 @@ class SystemMemory {
   // maintaining internal state such that one buffer can be shared
   // across multiple providers.
   // 'idx' zero base index. Valid indices are continuous.
-  // 'byte_size' returns the byte size of the chunk of bytes. Returns 0 if
-  // 'idx' is out of range.
+  // 'byte_size' returns the byte size of the chunk of bytes.
   // Return the pointer to the data block. Returns nullptr if 'idx' is
   // out of range
   virtual const char* BufferAt(size_t idx, size_t* byte_size) const = 0;
