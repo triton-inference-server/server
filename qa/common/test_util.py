@@ -137,9 +137,15 @@ def validate_for_ensemble_model(ensemble_type,
 
     # Those ensemble types contains "identity" model which doesn't allow STRING
     # data type
-    if ("sequence" in ensemble_type or "fan" in ensemble_type) and (input_dtype == np.object):
-        return False
-    if "fan" in ensemble_type and (output0_dtype == np.object or output1_dtype == np.object):
+    # Test types that use identity for both input and output
+    test_type_involved = ["reshape", "zero", "fan"]
+    if input_dtype == np.object or output0_dtype == np.object or output1_dtype == np.object:
+        for type_str in test_type_involved:
+            if type_str in ensemble_type:
+                return False
+                
+    # Otherwise, check input / output separately
+    if input_dtype == np.object and "sequence" in ensemble_type:
         return False
 
     return True

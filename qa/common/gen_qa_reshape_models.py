@@ -29,6 +29,7 @@ from builtins import range
 import os
 import sys
 import numpy as np
+import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -464,6 +465,35 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_ensemble_modelfile(
+        models_dir, model_version, max_batch,
+        dtype, input_shapes, output_shapes):
+
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_ensemble_model("reshape", dtype, dtype, dtype,
+                                    input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    emu.create_identity_ensemble_modelfile(
+        "reshape", models_dir, model_version, max_batch,
+        dtype, input_shapes, output_shapes)
+
+
+def create_ensemble_modelconfig(
+        models_dir, model_version, max_batch, dtype,
+        input_shapes, input_model_shapes, output_shapes, output_model_shapes):
+
+    assert len(input_shapes) == len(input_model_shapes)
+    assert len(output_shapes) == len(output_model_shapes)
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_ensemble_model("reshape", dtype, dtype, dtype,
+                                    input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    emu.create_identity_ensemble_modelconfig(
+        "reshape", models_dir, model_version, max_batch, dtype,
+        input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+    
 
 def create_models(models_dir, dtype, input_shapes, input_model_shapes,
                   output_shapes=None, output_model_shapes=None, no_batch=True):
@@ -506,6 +536,28 @@ def create_models(models_dir, dtype, input_shapes, input_model_shapes,
             create_netdef_modelfile(models_dir, model_version, 0, dtype,
                                     input_model_shapes, output_model_shapes)
 
+    # Shouldn't create ensembles that reshape to zero-sized tensors. Reshaping
+    # from / to zero dimension is not allow as ensemble inputs / outputs
+    # are passed from / to other model AS IF direct inference from client.
+    # But create it anyway, expecting that the ensemble models can be served but
+    # they will always return error message.
+    if FLAGS.ensemble:
+        # Create fixed size nop for ensemble models
+        for shape in input_model_shapes:
+            emu.create_nop_modelconfig(models_dir, shape, np.float32)
+            emu.create_nop_tunnel_modelconfig(models_dir, shape, np.float32)
+            emu.create_nop_modelconfig(models_dir, [-1], np.float32)
+        create_ensemble_modelconfig(models_dir, model_version, 8, dtype,
+                                  input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+        create_ensemble_modelfile(models_dir, model_version, 8, dtype,
+                                input_model_shapes, output_model_shapes)
+        if no_batch:
+            create_ensemble_modelconfig(models_dir, model_version, 0, dtype,
+                                      input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+            create_ensemble_modelfile(models_dir, model_version, 0, dtype,
+                                    input_model_shapes, output_model_shapes)
+
+
 def create_trt_models(models_dir, dtype, input_shapes, input_model_shapes,
                       output_shapes=None, output_model_shapes=None, no_batch=True):
     model_version = 1
@@ -538,6 +590,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--ensemble', required=False, action='store_true',
+                        help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
