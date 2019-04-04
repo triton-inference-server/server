@@ -108,6 +108,7 @@ main(int argc, char** argv)
           &health_ctx, server_ctx, verbose),
       "unable to create health context");
 
+  size_t health_iters = 0;
   while (true) {
     bool live, ready;
     FAIL_IF_ERR(health_ctx->GetLive(&live), "unable to get server liveness");
@@ -116,6 +117,11 @@ main(int argc, char** argv)
               << std::endl;
     if (live && ready) {
       break;
+    }
+
+    if (++health_iters >= 10) {
+      std::cerr << "failed to find healthy inference server" << std::endl;
+      exit(1);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));

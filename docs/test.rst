@@ -32,9 +32,9 @@ Currently there is no CI testing enabled for the open-source version
 of the TensorRT Inference Server. We will enable CI testing in a
 future update.
 
-There is a set of tests in the qa/ directory that can be run manually
-to provide some testing. Before running these tests you must first
-generate a couple of test model repositories containing the models
+However, there is a set of tests in the qa/ directory that can be run
+manually to provide extensive testing. Before running these tests you
+must first generate a few model repositories containing the models
 needed by the tests.
 
 Generate QA Model Repositories
@@ -47,12 +47,9 @@ model repositories::
   $ cd qa/common
   $ ./gen_qa_model_repository
 
-This will generate multiple model repositories:
-/tmp/qa_model_repository, /tmp/qa_reshape_repository,
-/tmp/qa_sequence_model_repository, /tmp/qa_variable_model_repository,
-/tmp/qa_variable_sequence_model_repository, and
-qa_zero_model_repository.  The TensorRT models will be created for the
-GPU on the system that CUDA considers device 0 (zero). If you have
+This will server multiple model repositories in /tmp/qa_* (for example
+/tmp/qa_model_repository).  The TensorRT models will be created for
+the GPU on the system that CUDA considers device 0 (zero). If you have
 multiple GPUs on your system see the documentation in the script for
 how to target a specific GPU.
 
@@ -62,8 +59,8 @@ Build QA Container
 Next you need to build a QA version of the inference server
 container. This container will contain the inference server, the QA
 tests, and all the dependencies needed to run the QA tests. You must
-first build the tensorrtserver_client, tensorrtserver_build and
-tensorrtserver containers as described in
+first build the tensorrtserver_client, tensorrtserver_inprocess,
+tensorrtserver_build and tensorrtserver containers as described in
 :ref:`section-getting-the-client-libraries-and-examples` and
 :ref:`section-building-the-server` and then build the QA container::
 

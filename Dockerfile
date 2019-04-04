@@ -179,10 +179,16 @@ RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
           src/custom/... \
           src/test/... && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa) && \
-    mkdir -p /opt/tensorrtserver/bin /opt/tensorrtserver/lib && \
+    mkdir -p /opt/tensorrtserver/include && \
+    cp bazel-out/k8-opt/genfiles/src/core/api.pb.h /opt/tensorrtserver/include/. && \
+    cp bazel-out/k8-opt/genfiles/src/core/model_config.pb.h /opt/tensorrtserver/include/. && \
+    cp bazel-out/k8-opt/genfiles/src/core/request_status.pb.h /opt/tensorrtserver/include/. && \
+    cp bazel-out/k8-opt/genfiles/src/core/server_status.pb.h /opt/tensorrtserver/include/. && \
+    mkdir -p /opt/tensorrtserver/bin && \
     cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/core/libtrtserver.so /opt/tensorrtserver/lib/. && \
     cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/. && \
+    mkdir -p /opt/tensorrtserver/lib && \
+    cp bazel-bin/src/core/libtrtserver.so /opt/tensorrtserver/lib/. && \
     mkdir -p /opt/tensorrtserver/custom && \
     cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
     cp bazel-bin/src/custom/identity/libidentity.so /opt/tensorrtserver/custom/. && \
@@ -246,6 +252,7 @@ COPY --from=trtserver_build /opt/tensorflow/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib
+COPY --from=trtserver_build /opt/tensorrtserver/include include
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
