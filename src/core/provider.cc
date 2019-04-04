@@ -184,10 +184,7 @@ InferRequestProvider::GetNextInputContent(
              input_content.second + 1, content_byte_size) == nullptr);
     if (!force_contiguous || isLastChunk) {
       *content = input_content.first->BufferAt(
-          input_content.second, content_byte_size);
-      if (*content_byte_size != 0) {
-        input_content.second++;
-      }
+          input_content.second++, content_byte_size);
     } else {
       size_t total_size = 0;
       size_t start_idx = input_content.second;
