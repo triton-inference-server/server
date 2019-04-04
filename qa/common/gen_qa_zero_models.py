@@ -29,6 +29,7 @@ from builtins import range
 import os
 import sys
 import numpy as np
+import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -297,6 +298,28 @@ output [
         cfile.write(config)
 
 
+def create_ensemble_modelfile(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype,
+                                    shape, shape, shape):
+        return
+
+    emu.create_identity_ensemble_modelfile(
+        "zero", models_dir, model_version, max_batch,
+        dtype, [shape] * io_cnt, [shape] * io_cnt)
+
+
+def create_ensemble_modelconfig(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype,
+                                    shape, shape, shape):
+        return
+
+    emu.create_identity_ensemble_modelconfig(
+        "zero", models_dir, model_version, max_batch, dtype,
+        [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt)
+
+
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
@@ -321,6 +344,14 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
             create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
+    if FLAGS.ensemble:
+        emu.create_nop_modelconfig(models_dir, shape, dtype)
+        create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_ensemble_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        if no_batch:
+            create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_ensemble_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -332,6 +363,8 @@ if __name__ == '__main__':
                         help='Generate SavedModel models')
     parser.add_argument('--netdef', required=False, action='store_true',
                         help='Generate NetDef models')
+    parser.add_argument('--ensemble', required=False, action='store_true',
+                        help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
