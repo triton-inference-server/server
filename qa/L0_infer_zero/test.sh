@@ -28,14 +28,17 @@
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_zero_test.py
 
-DATADIR=/data/inferenceserver/qa_zero_model_repository
-
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+SERVER_ARGS=--model-store=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
+rm -fr models && mkdir models
+cp -r /data/inferenceserver/qa_zero_model_repository/* models/. && \
+    cp -r /data/inferenceserver/qa_ensemble_model_repository/qa_zero_model_repository/* models/.
+
+create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
 RET=0
 
