@@ -75,6 +75,20 @@ class InferReshapeTest(unittest.TestCase):
             if no_batch:
                 iu.infer_zero(self, 'custom_nobatch', 1, dtype, input_shapes, output_shapes)
 
+        for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
+            if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
+                                        input_shapes[0], input_shapes[0], input_shapes[0]):
+                if len(input_shapes) <=2:
+                    # Skip cases that reshape to zero-sized tensors
+                    # (know from qa/common/gen_qa_reshape_model.py)
+                    return
+                # model that supports batching
+                for bs in (1, 8):
+                    iu.infer_zero(self, name, bs, dtype, input_shapes, output_shapes)
+                # model that does not support batching
+                if no_batch:
+                    iu.infer_zero(self, name + '_nobatch', 1, dtype, input_shapes, output_shapes)
+
     def _trt_reshape(self, dtype, input_shapes, output_shapes=None, no_batch=True):
         # 'shapes' is list of shapes, one for each input.
         if output_shapes is None:
@@ -102,6 +116,20 @@ class InferReshapeTest(unittest.TestCase):
                            output_shapes=([16],[1,2],[3,2,2],[1]))
         self._trt_reshape(np.float32, input_shapes=([4,4],[2],[2,2,3],[1]),
                           output_shapes=([2,2,4],[1,2,1],[3,2,2],[1,1,1]))
+
+    def test_ensemble_zero_dimension_reshape(self):
+        for shapes in [([1],), ([1],[8])]:
+            for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
+                # model that supports batching
+                for bs in (1, 8):
+                    try:
+                        iu.infer_zero(self, name, bs, np.float32, shapes, shapes)
+                        self.assertTrue(False, "Unexpected success in infer")
+                    except InferenceServerException as ex:
+                        self.assertEqual("inference:0", ex.server_id())
+                        self.assertTrue(
+                            "but model configuration specifies shape []" in ex.message())
+
 
 if __name__ == '__main__':
     unittest.main()
