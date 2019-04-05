@@ -216,7 +216,7 @@ class ResultImpl : public InferContext::Result {
  public:
   ResultImpl(
       const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size);
-  ~ResultImpl() = default;
+  virtual ~ResultImpl() = default;
 
   const std::string& ModelName() const override { return model_name_; }
   int64_t ModelVersion() const override { return model_version_; }
