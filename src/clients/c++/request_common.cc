@@ -349,9 +349,9 @@ ResultImpl::ResultImpl(
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
       batch_size_(batch_size), has_fixed_batch1_byte_size_(false),
-      batch1_byte_size_(0), batch1_element_count_(0), bufs_(batch_size),
-      bufs_idx_(0), bufs_pos_(batch_size), bufs_byte_size_(batch_size),
-      class_pos_(batch_size)
+      batch1_byte_size_(0), batch1_element_count_(0), inplace_(false),
+      inplace_ptrs_(batch_size), buffers_(batch_size), bufs_idx_(0),
+      bufs_pos_(batch_size), bufs_byte_size_(batch_size), class_pos_(batch_size)
 {
 }
 
@@ -388,7 +388,45 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
             std::to_string(batch_size_));
   }
 
-  *buf = &bufs_[batch_idx];
+  // If result is in-place then need to make a copy of the result
+  // bytes so that it can be returned as a vector.
+  if (inplace_ && buffers_[batch_idx].empty()) {
+    buffers_[batch_idx].assign(
+        inplace_ptrs_[batch_idx],
+        inplace_ptrs_[batch_idx] + bufs_byte_size_[batch_idx]);
+  }
+
+  *buf = &buffers_[batch_idx];
+  return Error::Success;
+}
+
+Error
+ResultImpl::GetRaw(
+    size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
+{
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
+  }
+
+  if (batch_idx >= batch_size_) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "unexpected batch entry " + std::to_string(batch_idx) +
+            " requested for output '" + output_->Name() + "', batch size is " +
+            std::to_string(batch_size_));
+  }
+
+  *byte_size = bufs_byte_size_[batch_idx];
+
+  if (inplace_) {
+    *buf = inplace_ptrs_[batch_idx];
+  } else {
+    *buf = &(buffers_[batch_idx][0]);
+  }
+
   return Error::Success;
 }
 
@@ -418,7 +456,12 @@ ResultImpl::GetRawAtCursor(
             "'");
   }
 
-  *buf = &bufs_[batch_idx][bufs_pos_[batch_idx]];
+  if (inplace_) {
+    *buf = inplace_ptrs_[batch_idx] + bufs_pos_[batch_idx];
+  } else {
+    *buf = &buffers_[batch_idx][bufs_pos_[batch_idx]];
+  }
+
   bufs_pos_[batch_idx] += adv_byte_size;
   return Error::Success;
 }
@@ -529,13 +572,22 @@ ResultImpl::SetBatchRawResult(
   // don't need to do anything in this case except advance bufs_idx_
   // to show that all data has been read for the tensor.
   if (batch1_byte_size == 0) {
-    bufs_idx_ = bufs_.size();
+    bufs_idx_ = buffers_.size();
   }
 
-  while ((bufs_idx_ < bufs_.size()) && (size > 0)) {
+  while ((bufs_idx_ < buffers_.size()) && (size > 0)) {
     const size_t csz = std::min(batch1_byte_size - bufs_pos_[bufs_idx_], size);
     if (csz > 0) {
-      std::copy(buf, buf + csz, std::back_inserter(bufs_[bufs_idx_]));
+      // If result is being used in-place just save a pointer to its
+      // base. For in-place, 'buf' must be a single contiguous buffer
+      // delivering the entire batch, but we don't need to check that
+      // here since it is checked in SetNextRawResult.
+      if (inplace_) {
+        inplace_ptrs_[bufs_idx_] = buf;
+      } else {
+        std::copy(buf, buf + csz, std::back_inserter(buffers_[bufs_idx_]));
+      }
+
       bufs_pos_[bufs_idx_] += csz;
       bufs_byte_size_[bufs_idx_] += csz;
       buf += csz;
@@ -554,8 +606,21 @@ ResultImpl::SetBatchRawResult(
 
 Error
 ResultImpl::SetNextRawResult(
-    const uint8_t* buf, size_t size, size_t* result_bytes)
+    const uint8_t* buf, size_t size, const bool inplace, size_t* result_bytes)
 {
+  // 'inplace_' is initially false, so we use it to detect if called
+  // more than once. With 'inplace' == true should only be called a
+  // single time since that call should deliver a single contiguous
+  // buffer that holds all results.
+  if (inplace && inplace_) {
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "in-place results for '" + output_->Name() +
+            "' must be delivered in a single continguous buffer");
+  }
+
+  inplace_ = inplace;
+
   // If output has a known batch1-byte-size (which is the same for
   // every item in the batch) then can directly assign the results to
   // the appropriate per-batch buffers.
@@ -566,7 +631,7 @@ ResultImpl::SetNextRawResult(
   // Output is a non-fixed-sized datatype. For now we assume that it
   // is TYPE_STRING and so we need to parse buf to get the size for
   // each batch.
-  if (bufs_idx_ == bufs_.size()) {
+  if (bufs_idx_ == buffers_.size()) {
     *result_bytes = 0;
     return Error::Success;
   }
@@ -625,7 +690,7 @@ ResultImpl::SetNextRawResult(
       buf += sz;
     }
 
-    if (bufs_idx_ != bufs_.size()) {
+    if (bufs_idx_ != buffers_.size()) {
       return Error(
           RequestStatusCode::INTERNAL,
           "output '" + output_->Name() +
