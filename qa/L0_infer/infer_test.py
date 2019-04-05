@@ -327,6 +327,24 @@ class InferTest(unittest.TestCase):
                            np.float32, np.float32, np.float32,
                            model_version=3, swap=True)
 
+    def test_ensemble_mix_platform(self):
+        # Skip on CPU only machine as TensorRT model is used in this ensemble
+        if CPU_ONLY:
+            return
+        for bs in (1, 8):
+            iu.infer_exact(self, "mix_platform", (16,), bs,
+                np.float32, np.float32, np.float32)
+
+    def test_ensemble_mix_type(self):
+        for bs in (1, 8):
+            iu.infer_exact(self, "mix_type", (16,), bs,
+                np.int32, np.float32, np.float32)
+
+    def test_ensemble_mix_ensemble(self):
+        for bs in (1, 8):
+            iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                np.int32, np.float32, np.float32)
+
 
 if __name__ == '__main__':
     unittest.main()

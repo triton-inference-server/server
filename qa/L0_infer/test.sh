@@ -73,6 +73,11 @@ for TARGET in cpu gpu; do
 
     create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
+    for EM in `ls ../ensemble_models`; do
+        mkdir -p ../ensemble_models/$EM/1
+    done
+    cp -r ../ensemble_models/* models/.
+
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in graphdef savedmodel netdef custom; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
