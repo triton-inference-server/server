@@ -290,6 +290,28 @@ ProfileGrpcContext::Create(
 }
 
 //==============================================================================
+class GrpcResultImpl : public ResultImpl {
+ public:
+  GrpcResultImpl(
+      const std::shared_ptr<InferResponse>& response,
+      const std::shared_ptr<InferContext::Output>& output);
+  ~GrpcResultImpl() = default;
+
+ private:
+  // Result tensor data is used in-place from the GRPC response
+  // object so we must hold a reference to it.
+  std::shared_ptr<InferResponse> response_;
+};
+
+GrpcResultImpl::GrpcResultImpl(
+    const std::shared_ptr<InferResponse>& response,
+    const std::shared_ptr<InferContext::Output>& output)
+    : ResultImpl(output, response->meta_data().batch_size()),
+      response_(response)
+{
+}
+
+//==============================================================================
 
 class GrpcRequestImpl : public RequestImpl {
  public:
@@ -299,10 +321,10 @@ class GrpcRequestImpl : public RequestImpl {
       const InferGrpcContextImpl& ctx, InferContext::ResultMap* results);
 
  private:
-  Error CreateResult(
-      const InferGrpcContextImpl& ctx,
-      const InferResponseHeader::Output& output, const size_t batch_size,
-      const size_t idx, InferContext::ResultMap* results);
+  Error InitResult(
+      const std::shared_ptr<InferContext::Output>& infer_output,
+      const InferResponseHeader::Output& output, const size_t idx,
+      GrpcResultImpl* result);
 
   friend class InferGrpcContextImpl;
   friend class InferGrpcStreamContextImpl;
@@ -310,7 +332,7 @@ class GrpcRequestImpl : public RequestImpl {
   // Variables for GRPC call
   grpc::ClientContext grpc_context_;
   grpc::Status grpc_status_;
-  InferResponse grpc_response_;
+  std::shared_ptr<InferResponse> grpc_response_;
 };
 
 class InferGrpcContextImpl : public InferContextImpl {
@@ -346,42 +368,37 @@ class InferGrpcContextImpl : public InferContextImpl {
 //==============================================================================
 
 GrpcRequestImpl::GrpcRequestImpl(const uint64_t id)
-    : RequestImpl(id), grpc_status_()
+    : RequestImpl(id), grpc_status_(),
+      grpc_response_(std::make_shared<InferResponse>())
 {
   SetRunIndex(id);
 }
 
 Error
-GrpcRequestImpl::CreateResult(
-    const InferGrpcContextImpl& ctx, const InferResponseHeader::Output& output,
-    const size_t batch_size, const size_t idx, InferContext::ResultMap* results)
+GrpcRequestImpl::InitResult(
+    const std::shared_ptr<InferContext::Output>& infer_output,
+    const InferResponseHeader::Output& output, const size_t idx,
+    GrpcResultImpl* result)
 {
-  std::shared_ptr<InferContext::Output> infer_output;
-  Error err = ctx.GetOutput(output.name(), &infer_output);
-  if (!err.IsOk()) {
-    return err;
-  }
-
-  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
   result->SetBatch1Shape(output.raw().dims());
   if (IsFixedSizeDataType(infer_output->DType())) {
     result->SetBatchnByteSize(output.raw().batch_byte_size());
   }
 
   if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
-    if (grpc_response_.raw_output_size() <= (int)idx) {
+    if (grpc_response_->raw_output_size() <= (int)idx) {
       return Error(
           RequestStatusCode::INVALID,
           "Expected RAW output for result '" + output.name() + "'");
     }
 
-    const std::string& raw_output = grpc_response_.raw_output(idx);
+    const std::string& raw_output = grpc_response_->raw_output(idx);
     const uint8_t* buf = reinterpret_cast<const uint8_t*>(&raw_output[0]);
     size_t size = raw_output.size();
     size_t result_bytes = 0;
 
     Error err =
-        result->SetNextRawResult(buf, size, false /* inplace */, &result_bytes);
+        result->SetNextRawResult(buf, size, true /* inplace */, &result_bytes);
     if (!err.IsOk()) {
       return err;
     }
@@ -394,8 +411,6 @@ GrpcRequestImpl::CreateResult(
     }
   }
 
-  results->insert(std::make_pair(output.name(), std::move(result)));
-
   return Error::Success;
 }
 
@@ -404,39 +419,53 @@ GrpcRequestImpl::GetResults(
     const InferGrpcContextImpl& ctx, InferContext::ResultMap* results)
 {
   results->clear();
-  InferResponseHeader infer_response;
 
-  Error err(RequestStatusCode::SUCCESS);
-  if (grpc_status_.ok()) {
-    infer_response.Swap(grpc_response_.mutable_meta_data());
-    err = Error(grpc_response_.request_status());
-    if (err.IsOk()) {
-      size_t idx = 0;
-      for (const auto& output : infer_response.output()) {
-        Error set_err = CreateResult(
-            ctx, output, infer_response.batch_size(), idx, results);
-        if (!set_err.IsOk()) {
-          return set_err;
-        }
-
-        ++idx;
-      }
-    }
-  } else {
-    // Something wrong with the GRPC connection
-    err = Error(
+  // Something wrong with the GRPC connection
+  if (!grpc_status_.ok()) {
+    return Error(
         RequestStatusCode::INTERNAL,
         "GRPC client failed: " + std::to_string(grpc_status_.error_code()) +
             ": " + grpc_status_.error_message());
   }
 
-  if (err.IsOk()) {
-    PostRunProcessing(infer_response, results);
-  } else {
-    results->clear();
+  // Request failed...
+  if (grpc_response_->request_status().code() != RequestStatusCode::SUCCESS) {
+    return Error(grpc_response_->request_status());
   }
 
-  return err;
+  const InferResponseHeader& response_header = grpc_response_->meta_data();
+
+  // Create a Result for each output. Each result holds
+  // grpc_response_ (shared_ptr) so it can use its specific result
+  // in-place instead of copying it out.
+  size_t idx = 0;
+  for (const auto& output : response_header.output()) {
+    std::shared_ptr<InferContext::Output> infer_output;
+    Error err = ctx.GetOutput(output.name(), &infer_output);
+    if (!err.IsOk()) {
+      results->clear();
+      return err;
+    }
+
+    std::unique_ptr<GrpcResultImpl> result(
+        new GrpcResultImpl(grpc_response_, infer_output));
+    err = InitResult(infer_output, output, idx, result.get());
+    if (!err.IsOk()) {
+      results->clear();
+      return err;
+    }
+
+    results->insert(std::make_pair(output.name(), std::move(result)));
+    ++idx;
+  }
+
+  Error err = PostRunProcessing(response_header, results);
+  if (!err.IsOk()) {
+    results->clear();
+    return err;
+  }
+
+  return Error(grpc_response_->request_status());
 }
 
 //==============================================================================
@@ -502,8 +531,9 @@ InferGrpcContextImpl::Run(ResultMap* results)
   sync_request->Timer().Record(RequestTimers::Kind::SEND_END);
 
   sync_request->Timer().Record(RequestTimers::Kind::REQUEST_START);
+  sync_request->grpc_response_->Clear();
   sync_request->grpc_status_ =
-      stub_->Infer(&context, request_, &sync_request->grpc_response_);
+      stub_->Infer(&context, request_, sync_request->grpc_response_.get());
   sync_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
 
   sync_request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
@@ -552,7 +582,7 @@ InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
   rpc->StartCall();
 
   rpc->Finish(
-      &current_context->grpc_response_, &current_context->grpc_status_,
+      current_context->grpc_response_.get(), &current_context->grpc_status_,
       (void*)run_index);
 
   cv_.notify_all();
@@ -825,7 +855,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
 
       std::shared_ptr<GrpcRequestImpl> grpc_request =
           std::static_pointer_cast<GrpcRequestImpl>(itr->second);
-      grpc_request->grpc_response_.Swap(&response);
+      grpc_request->grpc_response_->Swap(&response);
       grpc_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
       grpc_request->SetIsReady(true);
     }
