@@ -478,7 +478,7 @@ InferInProcessContextImpl::CreateResult(
     size_t result_bytes = 0;
     err = result->SetNextRawResult(
         reinterpret_cast<const uint8_t*>(content), content_byte_size,
-        &result_bytes);
+        false /* inplace */, &result_bytes);
     if (!err.IsOk()) {
       return err;
     }

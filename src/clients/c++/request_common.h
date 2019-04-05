@@ -229,6 +229,8 @@ class ResultImpl : public InferContext::Result {
   Error GetRawShape(std::vector<int64_t>* shape) const override;
   Error GetRaw(
       size_t batch_idx, const std::vector<uint8_t>** buf) const override;
+  Error GetRaw(
+      size_t batch_idx, const uint8_t** buf, size_t* byte_size) const override;
   Error GetRawAtCursor(
       size_t batch_idx, const uint8_t** buf, size_t adv_byte_size) override;
   Error GetClassCount(size_t batch_idx, size_t* cnt) const override;
@@ -273,7 +275,9 @@ class ResultImpl : public InferContext::Result {
   // For RAW format result, copy into the output up to 'size' bytes of
   // output data from 'buf'. Return the actual amount copied in
   // 'result_bytes'.
-  Error SetNextRawResult(const uint8_t* buf, size_t size, size_t* result_bytes);
+  Error SetNextRawResult(
+      const uint8_t* buf, size_t size, const bool inplace,
+      size_t* result_bytes);
 
  private:
   Error SetBatchRawResult(
@@ -289,7 +293,16 @@ class ResultImpl : public InferContext::Result {
   size_t batch1_element_count_;
   std::vector<int64_t> shape_;
 
-  std::vector<std::vector<uint8_t>> bufs_;
+  // If using in-place buffer for the results then 'inplace_ptrs_'
+  // point to the buffer for each batch (so batch-size n will have n
+  // pointers). If not using in-place buffer then a copy of the
+  // results is placed into 'buffers_'. For in-place 'buffers_' is
+  // used if a copy of results must be created for GetRaw(size_t,
+  // const std::vector<uint8_t>**) API.
+  bool inplace_;
+  std::vector<const uint8_t*> inplace_ptrs_;
+  mutable std::vector<std::vector<uint8_t>> buffers_;
+
   size_t bufs_idx_;
   std::vector<size_t> bufs_pos_;
   std::vector<size_t> bufs_byte_size_;

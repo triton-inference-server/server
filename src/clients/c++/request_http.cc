@@ -655,7 +655,7 @@ HttpRequestImpl::SetNextRawResult(
 
     // Only try to read raw result for RAW
     if (io->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
-      Error err = io->SetNextRawResult(buf, size, &ob);
+      Error err = io->SetNextRawResult(buf, size, false /* inplace */, &ob);
       if (!err.IsOk()) {
         return err;
       }

@@ -372,11 +372,23 @@ class InferContext {
 
     /// Get a reference to entire raw result data for a specific batch
     /// entry. Returns error if this result is not RAW format.
+    /// WARNING: This call may require creation of a copy of the
+    /// result data. To avoid this potential copy overhead use
+    /// GetRaw(size_t, const uint8_t**, size_t*).
     /// \param batch_idx Returns the results for this entry of the batch.
     /// \param buf Returns the vector of result bytes.
     /// \return Error object indicating success or failure.
     virtual Error GetRaw(
         size_t batch_idx, const std::vector<uint8_t>** buf) const = 0;
+
+    /// Get a reference to entire raw result data for a specific batch
+    /// entry. Returns error if this result is not RAW format.
+    /// \param batch_idx Returns the results for this entry of the batch.
+    /// \param buf Returns pointer to the buffer holding result bytes.
+    /// \param byte_size Returns the size of the result buffer, in bytes.
+    /// \return Error object indicating success or failure.
+    virtual Error GetRaw(
+        size_t batch_idx, const uint8_t** buf, size_t* byte_size) const = 0;
 
     /// Get a reference to raw result data for a specific batch entry
     /// at the current "cursor" and advance the cursor by the specified

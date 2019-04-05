@@ -380,7 +380,8 @@ GrpcRequestImpl::CreateResult(
     size_t size = raw_output.size();
     size_t result_bytes = 0;
 
-    Error err = result->SetNextRawResult(buf, size, &result_bytes);
+    Error err =
+        result->SetNextRawResult(buf, size, false /* inplace */, &result_bytes);
     if (!err.IsOk()) {
       return err;
     }
