@@ -560,11 +560,12 @@ InferContextResultNextRaw(
         "no raw result available for empty result");
   }
 
-  const std::vector<uint8_t>* buf;
-  nic::Error err = ctx->result->GetRaw(batch_idx, &buf);
+  const uint8_t* content;
+  size_t content_byte_size;
+  nic::Error err = ctx->result->GetRaw(batch_idx, &content, &content_byte_size);
   if (err.IsOk()) {
-    *val = reinterpret_cast<const char*>(&((*buf)[0]));
-    *val_len = buf->size();
+    *val = reinterpret_cast<const char*>(content);
+    *val_len = content_byte_size;
   }
 
   return new nic::Error(err);
