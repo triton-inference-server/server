@@ -1,1 +1,1 @@
-Not found: output 'OUTPUT_UNKNOWN' not found for unknown_output_0_gpu0
+Invalid argument: unexpected inference output 'OUTPUT_UNKNOWN', allowed outputs are: OUTPUT0, OUTPUT1
