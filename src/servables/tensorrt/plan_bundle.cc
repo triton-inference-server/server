@@ -232,10 +232,30 @@ PlanBundle::CreateExecutionContext(
             std::to_string(context.engine_->getMaxBatchSize()));
   }
 
+  const int num_expected_bindings = context.engine_->getNbBindings();
+
+  // Collect all the expected input and allowed output tensor names
+  // and validate that the model configuration specifies only those.
+  std::set<std::string> allowed_inputs, allowed_outputs;
+  for (int i = 0; i < num_expected_bindings; ++i) {
+    if (context.engine_->bindingIsInput(i)) {
+      allowed_inputs.emplace(context.engine_->getBindingName(i));
+    } else {
+      allowed_outputs.emplace(context.engine_->getBindingName(i));
+    }
+  }
+
+  for (const auto& io : Config().input()) {
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, allowed_inputs));
+  }
+
+  for (const auto& io : Config().output()) {
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
+  }
+
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
-  const int num_expected_bindings = context.engine_->getNbBindings();
   context.byte_sizes_ = new uint64_t[num_expected_bindings];
   context.buffers_ = new void*[num_expected_bindings]();  // init to nullptr
 

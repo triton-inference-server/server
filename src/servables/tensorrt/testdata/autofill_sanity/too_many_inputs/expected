@@ -1,1 +1,1 @@
-Not found: input 'INPUT_EXTRA' not found for too_many_inputs_0_gpu0
+Invalid argument: unexpected inference input 'INPUT_EXTRA', allowed inputs are: INPUT0, INPUT1
