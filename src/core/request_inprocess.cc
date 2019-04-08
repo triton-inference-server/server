@@ -244,6 +244,27 @@ ServerStatusInProcessContext::Create(
 }
 
 //==============================================================================
+class InProcessResultImpl : public ResultImpl {
+ public:
+  InProcessResultImpl(
+      const std::shared_ptr<DelegatingInferResponseProvider>& response_provider,
+      const std::shared_ptr<InferContext::Output>& output);
+
+ private:
+  // Result tensor data is used in-place from the response provider
+  // object so we must hold a reference to it.
+  std::shared_ptr<DelegatingInferResponseProvider> response_provider_;
+};
+
+InProcessResultImpl::InProcessResultImpl(
+    const std::shared_ptr<DelegatingInferResponseProvider>& response_provider,
+    const std::shared_ptr<InferContext::Output>& output)
+    : ResultImpl(output, response_provider->ResponseHeader().batch_size()),
+      response_provider_(response_provider)
+{
+}
+
+//==============================================================================
 
 class InferInProcessRequestImpl : public RequestImpl {
  public:
@@ -255,6 +276,13 @@ class InferInProcessRequestImpl : public RequestImpl {
   Error CreateResponseProvider(
       const InferRequestHeader& request_header,
       std::shared_ptr<DelegatingInferResponseProvider>* response_provider);
+
+  const std::shared_ptr<DelegatingInferResponseProvider>& GetResponseProvider()
+      const
+  {
+    return response_provider_;
+  }
+
   const InferResponseHeader& GetResponseHeader() const
   {
     return response_provider_->ResponseHeader();
@@ -329,10 +357,11 @@ class InferInProcessContextImpl : public InferContextImpl {
   Error GetResults(
       const InferInProcessRequestImpl& request,
       InferContext::ResultMap* results) const;
-  Error CreateResult(
+  Error InitResult(
       const InferInProcessRequestImpl& request,
-      const InferResponseHeader::Output& output, const size_t batch_size,
-      InferContext::ResultMap* results) const;
+      const std::shared_ptr<InferContext::Output>& infer_output,
+      const InferResponseHeader::Output& output,
+      InProcessResultImpl* result) const;
 
   InferenceServer* const server_;
 };
@@ -434,7 +463,11 @@ InferInProcessContextImpl::AsyncInfer(
       &request_provider));
 
   std::shared_ptr<DelegatingInferResponseProvider> response_provider;
-  request->CreateResponseProvider(infer_request_, &response_provider);
+  Error err =
+      request->CreateResponseProvider(infer_request_, &response_provider);
+  if (!err.IsOk()) {
+    return err;
+  }
 
   server_->HandleInfer(
       request->MutableRequestStatus(), backend, request_provider,
@@ -449,18 +482,12 @@ InferInProcessContextImpl::AsyncInfer(
 }
 
 Error
-InferInProcessContextImpl::CreateResult(
+InferInProcessContextImpl::InitResult(
     const InferInProcessRequestImpl& request,
-    const InferResponseHeader::Output& output, const size_t batch_size,
-    InferContext::ResultMap* results) const
+    const std::shared_ptr<InferContext::Output>& infer_output,
+    const InferResponseHeader::Output& output,
+    InProcessResultImpl* result) const
 {
-  std::shared_ptr<InferContext::Output> infer_output;
-  Error err = GetOutput(output.name(), &infer_output);
-  if (!err.IsOk()) {
-    return err;
-  }
-
-  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
   result->SetBatch1Shape(output.raw().dims());
   if (IsFixedSizeDataType(infer_output->DType())) {
     result->SetBatchnByteSize(output.raw().batch_byte_size());
@@ -469,7 +496,7 @@ InferInProcessContextImpl::CreateResult(
   if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
     void* content;
     size_t content_byte_size;
-    err = request.GetOutputBufferContents(
+    Error err = request.GetOutputBufferContents(
         output.name(), &content, &content_byte_size);
     if (!err.IsOk()) {
       return err;
@@ -478,7 +505,7 @@ InferInProcessContextImpl::CreateResult(
     size_t result_bytes = 0;
     err = result->SetNextRawResult(
         reinterpret_cast<const uint8_t*>(content), content_byte_size,
-        false /* inplace */, &result_bytes);
+        true /* inplace */, &result_bytes);
     if (!err.IsOk()) {
       return err;
     }
@@ -491,8 +518,6 @@ InferInProcessContextImpl::CreateResult(
     }
   }
 
-  results->insert(std::make_pair(output.name(), std::move(result)));
-
   return Error::Success;
 }
 
@@ -503,19 +528,31 @@ InferInProcessContextImpl::GetResults(
 {
   results->clear();
 
-  Error err = Error::Success;
-  const InferResponseHeader& infer_response = request.GetResponseHeader();
-
-  for (const auto& output : infer_response.output()) {
-    err = CreateResult(request, output, infer_response.batch_size(), results);
+  // Create a Result for each output. Each result holds a reference to
+  // the response provider_ (shared_ptr) so it can use its specific
+  // result in-place instead of copying it out.
+  const InferResponseHeader& response_header = request.GetResponseHeader();
+  for (const auto& output : response_header.output()) {
+    std::shared_ptr<InferContext::Output> infer_output;
+    Error err = GetOutput(output.name(), &infer_output);
     if (!err.IsOk()) {
-      break;
+      results->clear();
+      return err;
     }
+
+    std::unique_ptr<InProcessResultImpl> result(
+        new InProcessResultImpl(request.GetResponseProvider(), infer_output));
+    err = InitResult(request, infer_output, output, result.get());
+    if (!err.IsOk()) {
+      results->clear();
+      return err;
+    }
+
+    results->insert(std::make_pair(output.name(), std::move(result)));
   }
 
-  if (err.IsOk()) {
-    err = request.PostRunProcessing(infer_response, results);
-  } else {
+  Error err = request.PostRunProcessing(response_header, results);
+  if (!err.IsOk()) {
     results->clear();
   }
 
@@ -569,10 +606,6 @@ InferInProcessContextImpl::Run(ResultMap* results)
       lcv.wait_for(lk, wait_timeout);
     }
   }
-
-  LOG_ERROR << "Complete";
-  LOG_ERROR << request.GetRequestStatus().DebugString();
-  LOG_ERROR << request.GetResponseHeader().DebugString();
 
   err = Error(request.GetRequestStatus());
   if (err.IsOk()) {

@@ -318,13 +318,13 @@ class GrpcRequestImpl : public RequestImpl {
   GrpcRequestImpl(const uint64_t id);
 
   Error GetResults(
-      const InferGrpcContextImpl& ctx, InferContext::ResultMap* results);
+      const InferGrpcContextImpl& ctx, InferContext::ResultMap* results) const;
 
  private:
   Error InitResult(
       const std::shared_ptr<InferContext::Output>& infer_output,
       const InferResponseHeader::Output& output, const size_t idx,
-      GrpcResultImpl* result);
+      GrpcResultImpl* result) const;
 
   friend class InferGrpcContextImpl;
   friend class InferGrpcStreamContextImpl;
@@ -378,7 +378,7 @@ Error
 GrpcRequestImpl::InitResult(
     const std::shared_ptr<InferContext::Output>& infer_output,
     const InferResponseHeader::Output& output, const size_t idx,
-    GrpcResultImpl* result)
+    GrpcResultImpl* result) const
 {
   result->SetBatch1Shape(output.raw().dims());
   if (IsFixedSizeDataType(infer_output->DType())) {
@@ -416,7 +416,7 @@ GrpcRequestImpl::InitResult(
 
 Error
 GrpcRequestImpl::GetResults(
-    const InferGrpcContextImpl& ctx, InferContext::ResultMap* results)
+    const InferGrpcContextImpl& ctx, InferContext::ResultMap* results) const
 {
   results->clear();
 
