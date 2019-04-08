@@ -266,6 +266,7 @@ class InferResponseProvider {
   struct Output {
     std::string name_;
     std::vector<int64_t> shape_;
+    size_t cls_count_;
     void* ptr_;
     size_t byte_size_;
 

@@ -270,12 +270,11 @@ void
 AddClassResults(
     InferResponseHeader::Output* poutput, char* poutput_buffer,
     const size_t batch1_element_count, const size_t batch_size,
-    const InferRequestHeader::Output& output,
-    const LabelProvider& label_provider)
+    const size_t cls_count, const LabelProvider& label_provider)
 {
   T* probs = reinterpret_cast<T*>(poutput_buffer);
   const size_t entry_cnt = batch1_element_count;
-  const size_t class_cnt = std::min((size_t)output.cls().count(), entry_cnt);
+  const size_t class_cnt = std::min(cls_count, entry_cnt);
   std::vector<size_t> idx(entry_cnt);
 
   for (size_t i = 0; i < batch_size; ++i) {
@@ -288,7 +287,7 @@ AddClassResults(
     for (size_t k = 0; k < class_cnt; ++k) {
       auto cls = bcls->add_cls();
       cls->set_idx(idx[k]);
-      cls->set_label(label_provider.GetLabel(output.name(), idx[k]));
+      cls->set_label(label_provider.GetLabel(poutput->name(), idx[k]));
 
       cls->set_value(static_cast<float>(probs[idx[k]]));
     }
@@ -324,7 +323,7 @@ InferResponseProvider::OutputBufferContents(
     const std::string& name, void** content, size_t* content_byte_size) const
 {
   for (const auto& output : outputs_) {
-    if (name == output.name_) {
+    if ((name == output.name_) && (output.cls_count_ == 0)) {
       *content = output.ptr_;
       *content_byte_size = output.byte_size_;
       return Status::Success;
@@ -351,10 +350,12 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   Output* loutput = &(outputs_.back());
   loutput->name_ = name;
   loutput->shape_ = content_shape;
+  loutput->cls_count_ = 0;
   loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
 
   if (pr->second->has_cls()) {
+    loutput->cls_count_ = pr->second->cls().count();
     char* buffer = new char[content_byte_size];
     *content = static_cast<void*>(buffer);
     loutput->ptr_ = static_cast<void*>(buffer);
@@ -415,7 +416,7 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
     auto poutput = response_header->add_output();
     poutput->set_name(output.name_);
 
-    if (output.buffer_ == nullptr) {
+    if (output.cls_count_ == 0) {
       // Raw result...
       poutput->mutable_raw()->Clear();
       poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
@@ -431,66 +432,58 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       }
     } else {
       // Class result...
-      const auto& pr = output_map_.find(output.name_);
-      if (pr == output_map_.end()) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "can't find request meta-data for output '" + output.name_ + "'");
-      }
-      const InferRequestHeader::Output* request_output = pr->second;
-
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              *request_output, label_provider);
+              output.cls_count_, label_provider);
           break;
 
         default:
@@ -762,8 +755,10 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
       name, content, content_byte_size, content_shape, &output));
 
   if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
-    *content = malloc(content_byte_size);
-    output->ptr_ = *content;
+    char* buffer = new char[content_byte_size];
+    *content = static_cast<void*>(buffer);
+    output->ptr_ = static_cast<void*>(buffer);
+    output->buffer_.reset(buffer);
   }
 
   return Status::Success;
