@@ -555,17 +555,22 @@ InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
     worker_ = std::thread(&InferGrpcContextImpl::AsyncTransfer, this);
   }
 
-  GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
-  async_request->reset(static_cast<Request*>(current_context));
+  GrpcRequestImpl* current_context;
+  uintptr_t run_index;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Also need to protect the id
+    current_context = new GrpcRequestImpl(async_request_id_++);
+    async_request->reset(static_cast<Request*>(current_context));
 
-  uintptr_t run_index = current_context->Id();
-  auto insert_result = ongoing_async_requests_.emplace(
-      std::make_pair(run_index, *async_request));
-
-  if (!insert_result.second) {
-    return Error(
-        RequestStatusCode::INTERNAL,
-        "Failed to insert new asynchronous request context.");
+    run_index = current_context->Id();
+    auto insert_result = ongoing_async_requests_.emplace(
+        std::make_pair(run_index, *async_request));
+    if (!insert_result.second) {
+      return Error(
+          RequestStatusCode::INTERNAL,
+          "Failed to insert new asynchronous request context.");
+    }
   }
 
   current_context->Timer().Reset();
@@ -801,17 +806,20 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
 Error
 InferGrpcStreamContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
-  GrpcRequestImpl* current_context = new GrpcRequestImpl(async_request_id_++);
-  async_request->reset(static_cast<Request*>(current_context));
+  GrpcRequestImpl* current_context;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    current_context = new GrpcRequestImpl(async_request_id_++);
+    async_request->reset(static_cast<Request*>(current_context));
 
-  uintptr_t run_index = current_context->Id();
-  auto insert_result = ongoing_async_requests_.emplace(
-      std::make_pair(run_index, *async_request));
-
-  if (!insert_result.second) {
-    return Error(
-        RequestStatusCode::INTERNAL,
-        "Failed to insert new asynchronous request context.");
+    uintptr_t run_index = current_context->Id();
+    auto insert_result = ongoing_async_requests_.emplace(
+        std::make_pair(run_index, *async_request));
+    if (!insert_result.second) {
+      return Error(
+          RequestStatusCode::INTERNAL,
+          "Failed to insert new asynchronous request context.");
+    }
   }
 
   current_context->Timer().Reset();
