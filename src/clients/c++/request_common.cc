@@ -920,13 +920,13 @@ InferContextImpl::GetReadyAsyncRequest(
     std::shared_ptr<Request>* request, bool* is_ready, bool wait)
 {
   *is_ready = false;
+  std::unique_lock<std::mutex> lock(mutex_);
   if (ongoing_async_requests_.size() == 0) {
     return Error(
         RequestStatusCode::UNAVAILABLE,
         "No asynchronous requests have been sent");
   }
 
-  std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [is_ready, request, this, wait] {
     for (auto& ongoing_async_request : this->ongoing_async_requests_) {
       if (std::static_pointer_cast<RequestImpl>(ongoing_async_request.second)
@@ -944,7 +944,6 @@ InferContextImpl::GetReadyAsyncRequest(
     }
   });
 
-  lock.unlock();
   return Error::Success;
 }
 
@@ -953,6 +952,7 @@ InferContextImpl::IsRequestReady(
     const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait)
 {
   *is_ready = false;
+  std::unique_lock<std::mutex> lock(mutex_);
   if (ongoing_async_requests_.size() == 0) {
     return Error(
         RequestStatusCode::INVALID_ARG,
@@ -969,7 +969,6 @@ InferContextImpl::IsRequestReady(
         "No matched asynchronous request found.");
   }
 
-  std::unique_lock<std::mutex> lock(mutex_);
   cv_.wait(lock, [is_ready, &request, wait] {
     if (!request->IsReady()) {
       if (wait) {
@@ -981,10 +980,6 @@ InferContextImpl::IsRequestReady(
     return true;
   });
 
-  if (*is_ready) {
-    ongoing_async_requests_.erase(itr->first);
-  }
-  lock.unlock();
   return Error::Success;
 }
 

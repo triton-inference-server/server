@@ -323,6 +323,7 @@ class RequestImpl : public InferContext::Request {
   virtual ~RequestImpl() = default;
 
   uint64_t Id() const override { return id_; };
+  void SetId(uint64_t id) { id_ = id; }
 
   uintptr_t RunIndex() const { return run_index_; }
   void SetRunIndex(uintptr_t idx) { run_index_ = idx; }
