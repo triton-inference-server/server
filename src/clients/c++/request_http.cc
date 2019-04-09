@@ -879,7 +879,7 @@ InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
   }
 
   HttpRequestImpl* current_context =
-      new HttpRequestImpl(async_request_id_++, inputs);
+      new HttpRequestImpl(0 /* temp id */, inputs);
   async_request->reset(static_cast<Request*>(current_context));
 
   if (!current_context->easy_handle_) {
@@ -891,6 +891,8 @@ InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
+
+    current_context->SetId(async_request_id_++);
 
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
         reinterpret_cast<uintptr_t>(current_context->easy_handle_),
@@ -929,6 +931,7 @@ InferHttpContextImpl::GetAsyncRunResults(
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    ongoing_async_requests_.erase(http_request->RunIndex());
     curl_multi_remove_handle(multi_handle_, http_request->easy_handle_);
   }
 
