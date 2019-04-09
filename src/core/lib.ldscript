@@ -1,0 +1,4 @@
+{
+  global: *;
+  local: jpeg*; jinit*;
+};
