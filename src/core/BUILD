@@ -278,14 +278,14 @@ cc_binary(
     name = "libtrtserver.so",
     deps = [
         ":server",
-        ":lib.ldscript"
+        ":libtrtserver.ldscript"
     ],
     linkopts = [
         "-pthread",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
         "-lnvonnxparser_runtime",
-        "-Wl,--version-script", "$(location :lib.ldscript)"
+        "-Wl,--version-script", "$(location :libtrtserver.ldscript)"
     ],
     linkshared = 1,
 )
