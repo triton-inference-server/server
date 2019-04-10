@@ -268,7 +268,7 @@ InProcessResultImpl::InProcessResultImpl(
 
 class InferInProcessRequestImpl : public RequestImpl {
  public:
-  InferInProcessRequestImpl();
+  InferInProcessRequestImpl(const uint64_t id) : RequestImpl(id) {}
 
   const RequestStatus& GetRequestStatus() const { return request_status_; }
   RequestStatus* MutableRequestStatus() { return &request_status_; }
@@ -291,17 +291,16 @@ class InferInProcessRequestImpl : public RequestImpl {
   Error GetOutputBufferContents(
       const std::string& name, void** content, size_t* content_byte_size) const;
 
+  Error Release();
+  Error Wait();
+
  private:
-  static uint64_t next_id_;
   RequestStatus request_status_;
   std::shared_ptr<DelegatingInferResponseProvider> response_provider_;
+
+  std::mutex mu_;
+  std::condition_variable cv_;
 };
-
-uint64_t InferInProcessRequestImpl::next_id_ = 1;
-
-InferInProcessRequestImpl::InferInProcessRequestImpl() : RequestImpl(next_id_++)
-{
-}
 
 Error
 InferInProcessRequestImpl::CreateResponseProvider(
@@ -330,6 +329,23 @@ InferInProcessRequestImpl::GetOutputBufferContents(
   return Error::Success;
 }
 
+Error
+InferInProcessRequestImpl::Release()
+{
+  SetIsReady(true);
+  cv_.notify_all();
+  return Error::Success;
+}
+
+Error
+InferInProcessRequestImpl::Wait()
+{
+  std::unique_lock<std::mutex> lk(mu_);
+  cv_.wait(lk, [this] { return IsReady(); });
+
+  return Error::Success;
+}
+
 //==============================================================================
 
 class InferInProcessContextImpl : public InferContextImpl {
@@ -343,13 +359,16 @@ class InferInProcessContextImpl : public InferContextImpl {
 
   virtual Error Run(ResultMap* results) override;
   virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error GetReadyAsyncRequest(
+      std::shared_ptr<Request>* async_request, bool* is_ready,
+      bool wait) override;
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
   Error AsyncInfer(
-      InferInProcessRequestImpl* request,
+      std::shared_ptr<InferInProcessRequestImpl> request,
       std::function<void()> OnCompleteInfer);
   Status InferRequestToInputMap(
       std::unordered_map<std::string, std::shared_ptr<SystemMemory>>* input_map)
@@ -364,13 +383,14 @@ class InferInProcessContextImpl : public InferContextImpl {
       InProcessResultImpl* result) const;
 
   InferenceServer* const server_;
+  uint64_t next_id_;
 };
 
 InferInProcessContextImpl::InferInProcessContextImpl(
     InferenceServer* server, CorrelationID correlation_id,
     const std::string& model_name, int64_t model_version, bool verbose)
     : InferContextImpl(model_name, model_version, correlation_id, verbose),
-      server_(server)
+      server_(server), next_id_(1)
 {
 }
 
@@ -414,7 +434,7 @@ InferInProcessContextImpl::InferRequestToInputMap(
 
 Error
 InferInProcessContextImpl::AsyncInfer(
-    InferInProcessRequestImpl* request, std::function<void()> OnCompleteInfer)
+    std::shared_ptr<InferInProcessRequestImpl> request, std::function<void()> OnCompleteInfer)
 {
   auto infer_stats =
       std::make_shared<ModelInferStats>(server_->StatusManager(), model_name_);
@@ -562,9 +582,12 @@ InferInProcessContextImpl::GetResults(
 Error
 InferInProcessContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
-  return Error(
-      RequestStatusCode::UNSUPPORTED,
-      "AsyncRun not supported for in-process API");
+  std::shared_ptr<InferInProcessRequestImpl> inprocess_request(
+      std::make_shared<InferInProcessRequestImpl>(next_id_++));
+  *async_request = inprocess_request;
+  return AsyncInfer(inprocess_request, [inprocess_request]() {
+    inprocess_request->Release();
+  });
 }
 
 Error
@@ -572,44 +595,53 @@ InferInProcessContextImpl::GetAsyncRunResults(
     ResultMap* results, bool* is_ready,
     const std::shared_ptr<Request>& async_request, bool wait)
 {
+  std::shared_ptr<InferInProcessRequestImpl> inprocess_request =
+      std::static_pointer_cast<InferInProcessRequestImpl>(async_request);
+
+  *is_ready = inprocess_request->IsReady();
+
+  if (!(*is_ready) && wait) {
+    inprocess_request->Wait();
+    *is_ready = inprocess_request->IsReady();
+  }
+
+  if (*is_ready) {
+    return GetResults(*inprocess_request, results);
+  }
+
+  return Error::Success;
+}
+
+Error
+InferInProcessContextImpl::GetReadyAsyncRequest(
+    std::shared_ptr<Request>* async_request, bool* is_ready, bool wait)
+{
   return Error(
       RequestStatusCode::UNSUPPORTED,
-      "GetAsyncRunResults not supported for in-process API");
+      "GetReadyAsyncRequest not supported for in-process API");
 }
 
 Error
 InferInProcessContextImpl::Run(ResultMap* results)
 {
-  std::mutex lmu;
-  std::condition_variable lcv;
-  bool infer_completed = false;
-
-  InferInProcessRequestImpl request;
-  Error err = AsyncInfer(&request, [&lmu, &lcv, &infer_completed]() {
-    {
-      std::lock_guard<std::mutex> lk(lmu);
-      infer_completed = true;
-    }
-    lcv.notify_one();
-  });
-
+  std::shared_ptr<Request> request;
+  Error err = AsyncRun(&request);
   if (!err.IsOk()) {
     return err;
   }
 
-  // Want synchronous behavior so must wait for AsyncInfer completer
-  // to indicate completion.
-  {
-    std::chrono::seconds wait_timeout(1);
-    std::unique_lock<std::mutex> lk(lmu);
-    while (!infer_completed) {
-      lcv.wait_for(lk, wait_timeout);
-    }
+  bool is_ready;
+  err = GetAsyncRunResults(results, &is_ready, request, true /* wait */);
+  if (!err.IsOk()) {
+    return err;
   }
 
-  err = Error(request.GetRequestStatus());
+  std::shared_ptr<InferInProcessRequestImpl> inprocess_request =
+      std::static_pointer_cast<InferInProcessRequestImpl>(request);
+
+  err = Error(inprocess_request->GetRequestStatus());
   if (err.IsOk()) {
-    err = GetResults(request, results);
+    err = GetResults(*inprocess_request, results);
   }
 
   return err;

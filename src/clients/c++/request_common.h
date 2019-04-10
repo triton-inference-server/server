@@ -385,7 +385,7 @@ class InferContextImpl : public InferContext {
   Error SetRunOptions(const Options& options) override;
   Error GetStat(Stat* stat) const override;
 
-  Error GetReadyAsyncRequest(
+  virtual Error GetReadyAsyncRequest(
       std::shared_ptr<Request>* async_request, bool* is_ready,
       bool wait) override;
 
