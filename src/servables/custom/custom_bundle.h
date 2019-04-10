@@ -81,9 +81,9 @@ class CustomBundle : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o) = delete;
     ~Context();
 
+    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     // Return the shared library reported error string for 'err'.
