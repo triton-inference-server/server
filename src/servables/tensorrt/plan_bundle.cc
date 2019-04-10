@@ -48,20 +48,6 @@ PlanBundle::Context::Context(
 {
 }
 
-PlanBundle::Context::Context(Context&& o)
-    : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_), runtime_(o.runtime_),
-      engine_(o.engine_), context_(o.context_), byte_sizes_(o.byte_sizes_),
-      buffers_(o.buffers_), stream_(o.stream_)
-{
-  o.runtime_ = nullptr;
-  o.engine_ = nullptr;
-  o.context_ = nullptr;
-  o.byte_sizes_ = nullptr;
-  o.buffers_ = nullptr;
-  o.stream_ = nullptr;
-}
-
 PlanBundle::Context::~Context()
 {
   LOG_VERBOSE(1) << "~PlanBundle::Context ";
@@ -209,8 +195,8 @@ PlanBundle::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
 
-  contexts_.emplace_back(instance_name, gpu_device, mbs);
-  Context& context = contexts_.back();
+  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  const std::unique_ptr<Context>& context = contexts_.back();
 
   // Set the device before generating engine and context.
   cuerr = cudaSetDevice(gpu_device);
@@ -221,27 +207,27 @@ PlanBundle::CreateExecutionContext(
   }
 
   RETURN_IF_ERROR(
-      LoadPlan(mn_itr->second, &context.runtime_, &context.engine_));
+      LoadPlan(mn_itr->second, &context->runtime_, &context->engine_));
 
-  if (context.max_batch_size_ > context.engine_->getMaxBatchSize()) {
+  if (context->max_batch_size_ > context->engine_->getMaxBatchSize()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unexpected configuration maximum batch size " +
             std::to_string(Config().max_batch_size()) + " for '" + Name() +
             "', model maximum is " +
-            std::to_string(context.engine_->getMaxBatchSize()));
+            std::to_string(context->engine_->getMaxBatchSize()));
   }
 
-  const int num_expected_bindings = context.engine_->getNbBindings();
+  const int num_expected_bindings = context->engine_->getNbBindings();
 
   // Collect all the expected input and allowed output tensor names
   // and validate that the model configuration specifies only those.
   std::set<std::string> allowed_inputs, allowed_outputs;
   for (int i = 0; i < num_expected_bindings; ++i) {
-    if (context.engine_->bindingIsInput(i)) {
-      allowed_inputs.emplace(context.engine_->getBindingName(i));
+    if (context->engine_->bindingIsInput(i)) {
+      allowed_inputs.emplace(context->engine_->getBindingName(i));
     } else {
-      allowed_outputs.emplace(context.engine_->getBindingName(i));
+      allowed_outputs.emplace(context->engine_->getBindingName(i));
     }
   }
 
@@ -256,28 +242,28 @@ PlanBundle::CreateExecutionContext(
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
-  context.byte_sizes_ = new uint64_t[num_expected_bindings];
-  context.buffers_ = new void*[num_expected_bindings]();  // init to nullptr
+  context->byte_sizes_ = new uint64_t[num_expected_bindings];
+  context->buffers_ = new void*[num_expected_bindings]();  // init to nullptr
 
-  RETURN_IF_ERROR(context.InitializeConfigInputBindings(Config().input()));
-  RETURN_IF_ERROR(context.InitializeSequenceControlInputBindings(Config()));
-  RETURN_IF_ERROR(context.InitializeConfigOutputBindings(Config().output()));
+  RETURN_IF_ERROR(context->InitializeConfigInputBindings(Config().input()));
+  RETURN_IF_ERROR(context->InitializeSequenceControlInputBindings(Config()));
+  RETURN_IF_ERROR(context->InitializeConfigOutputBindings(Config().output()));
 
   // Make sure every index is initialized.
   for (int i = 0; i < num_expected_bindings; ++i) {
-    if (context.buffers_[i] == nullptr) {
+    if (context->buffers_[i] == nullptr) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "expected configuration for " +
               std::string(
-                  (context.engine_->bindingIsInput(i) ? "input" : "output")) +
-              " '" + context.engine_->getBindingName(i) + "' for " + Name());
+                  (context->engine_->bindingIsInput(i) ? "input" : "output")) +
+              " '" + context->engine_->getBindingName(i) + "' for " + Name());
     }
   }
 
   // Now the TRT execution context
-  context.context_ = context.engine_->createExecutionContext();
-  if (context.context_ == nullptr) {
+  context->context_ = context->engine_->createExecutionContext();
+  if (context->context_ == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create TensorRT context");
   }
@@ -286,7 +272,7 @@ PlanBundle::CreateExecutionContext(
   const int cuda_stream_priority =
       GetCudaStreamPriority(Config().optimization().priority());
   cuerr = cudaStreamCreateWithPriority(
-      &context.stream_, cudaStreamDefault, cuda_stream_priority);
+      &context->stream_, cudaStreamDefault, cuda_stream_priority);
   if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to create stream for " + Name() +
@@ -511,11 +497,11 @@ PlanBundle::Run(
     if (payload.stats_ != nullptr) {
       compute_timers.emplace_back();
       payload.stats_->StartComputeTimer(&compute_timers.back());
-      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(payloads));
 }
 
 Status
@@ -726,20 +712,20 @@ operator<<(std::ostream& out, const PlanBundle& pb)
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
-    out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == PlanBundle::Context::NO_GPU_DEVICE)
+    out << "  name=" << context->name_ << ", gpu="
+        << ((context->gpu_device_ == PlanBundle::Context::NO_GPU_DEVICE)
                 ? "<none>"
-                : std::to_string(context.gpu_device_))
+                : std::to_string(context->gpu_device_))
         << ", max_batch_size="
-        << ((context.max_batch_size_ == PlanBundle::Context::NO_BATCHING)
+        << ((context->max_batch_size_ == PlanBundle::Context::NO_BATCHING)
                 ? "<none>"
-                : std::to_string(context.max_batch_size_))
+                : std::to_string(context->max_batch_size_))
         << std::endl
         << "  bindings:" << std::endl;
 
-    for (int i = 0; i < context.engine_->getNbBindings(); ++i) {
-      out << "    " << i << ": byte_size=" << context.byte_sizes_[i]
-          << ", buffer=" << context.buffers_[i] << " ]" << std::endl;
+    for (int i = 0; i < context->engine_->getNbBindings(); ++i) {
+      out << "    " << i << ": byte_size=" << context->byte_sizes_[i]
+          << ", buffer=" << context->buffers_[i] << " ]" << std::endl;
     }
   }
 
