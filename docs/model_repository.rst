@@ -334,3 +334,18 @@ An example of a custom backend can be found in the `addsub backend
 can see the custom backend being used as part of CI testing in
 `L0_infer
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/L0_infer>`_.
+
+.. _section-ensemble-backends:
+
+Ensemble Backends
+---------------
+
+A model using an ensemble backend is represented in the model repository
+in the same way as models using a deep-learning framework backend.
+However, each model version subdirectory should be empty because ensemble models
+are conceptual.
+
+An example of a ensemble backend in model repository can be found in the
+`docs/examples/model_repository/preprocess_resnet50_ensemble
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository/preprocess_resnet50_ensemble>`_
+directory.
