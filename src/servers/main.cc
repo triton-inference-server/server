@@ -32,6 +32,7 @@
 #include <csignal>
 #include <mutex>
 
+#include "prometheus/exposer.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/server.h"
@@ -64,6 +65,9 @@ bool exit_on_failed_init_ = true;
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> http_service_;
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
+// The metrics service
+std::unique_ptr<prometheus::Exposer> exposer_;
+
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
 // protocol is disabled.
@@ -74,6 +78,9 @@ int grpc_port_ = 8001;
 // on command-line args. Set to -1 to indicate the protocol is
 // disabled.
 int metrics_port_ = 8002;
+
+// Should GPU metrics be reported.
+bool allow_gpu_metrics_ = false;
 
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
@@ -94,6 +101,7 @@ enum OptionId {
   OPTION_ALLOW_GRPC,
   OPTION_ALLOW_HTTP,
   OPTION_ALLOW_METRICS,
+  OPTION_ALLOW_GPU_METRICS,
   OPTION_GRPC_PORT,
   OPTION_HTTP_PORT,
   OPTION_METRICS_PORT,
@@ -152,6 +160,9 @@ std::vector<Option> options_{
      "Allow the server to listen for HTTP requests."},
     {OPTION_ALLOW_METRICS, "allow-metrics",
      "Allow the server to provide prometheus metrics."},
+    {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
+     "Allow the server to provide GPU metrics. Ignored unless --allow-metrics "
+     "is true."},
     {OPTION_GRPC_PORT, "grpc-port",
      "The port for the server to listen on for GRPC requests."},
     {OPTION_HTTP_PORT, "http-port",
@@ -268,7 +279,15 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   if (metrics_port_ != -1) {
     LOG_INFO << " localhost:" << std::to_string(metrics_port_)
              << " for metric reporting";
-    nvidia::inferenceserver::Metrics::Initialize(metrics_port_);
+    if (allow_gpu_metrics_) {
+      nvidia::inferenceserver::Metrics::EnableGPUMetrics();
+    }
+
+    std::ostringstream stream;
+    stream << "0.0.0.0:" << metrics_port_;
+    exposer_.reset(new prometheus::Exposer(stream.str()));
+    exposer_->RegisterCollectable(
+        nvidia::inferenceserver::Metrics::GetRegistry());
   }
 
   return true;
@@ -330,6 +349,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   bool allow_http = true;
   bool allow_grpc = true;
   bool allow_metrics = true;
+  bool allow_gpu_metrics = true;
   int32_t http_port = http_port_;
   int32_t grpc_port = grpc_port_;
   int32_t metrics_port = metrics_port_;
@@ -398,6 +418,9 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
       case OPTION_ALLOW_METRICS:
         allow_metrics = ParseBoolOption(optarg);
         break;
+      case OPTION_ALLOW_GPU_METRICS:
+        allow_gpu_metrics = ParseBoolOption(optarg);
+        break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
         break;
@@ -462,6 +485,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   http_port_ = allow_http ? http_port : -1;
   grpc_port_ = allow_grpc ? grpc_port : -1;
   metrics_port_ = allow_metrics ? metrics_port : -1;
+  allow_gpu_metrics_ = allow_metrics ? allow_gpu_metrics : false;
   http_thread_cnt_ = http_thread_cnt;
 
   server->SetId(server_id);

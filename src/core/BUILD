@@ -205,7 +205,6 @@ cc_library(
         "@com_github_libevent_libevent//:libevent",
         "@com_google_absl//absl/strings",
         "@prometheus//core:core",
-        "@prometheus//pull:pull",
     ],
 )
 
@@ -266,7 +265,6 @@ cc_library(
         "@org_tensorflow//tensorflow/contrib/tensorrt:trt_shape_function",
         "@org_tensorflow//tensorflow/core:lib",
         "@prometheus//core:core",
-        "@prometheus//pull:pull",
         "@tf_serving//tensorflow_serving/config:model_server_config_proto",
         "@tf_serving//tensorflow_serving/core:servable_state_monitor",
         "@tf_serving//tensorflow_serving/core:availability_preserving_policy",
