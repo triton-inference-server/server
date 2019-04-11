@@ -27,6 +27,7 @@
 
 #include <NvInfer.h>
 #include <mutex>
+#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
@@ -86,6 +87,7 @@ class PlanBundle : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     Status InitializeConfigOutputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+    void BuildCudaGraph(const int batch_size);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -119,6 +121,11 @@ class PlanBundle : public InferenceBackend {
 
     // The stream where operations are executed.
     cudaStream_t stream_;
+
+    // The CUDA graphs captured for the model for different
+    // batch-sizes.
+    std::unordered_map<int, cudaGraph_t> cuda_graphs_;
+    std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;

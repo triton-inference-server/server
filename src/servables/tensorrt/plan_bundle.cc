@@ -28,7 +28,6 @@
 
 #include <NvInfer.h>
 #include <stdint.h>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
@@ -70,6 +69,24 @@ PlanBundle::Context::~Context()
     delete[] buffers_;
     buffers_ = nullptr;
   }
+
+  for (const auto& pr : cuda_graph_execs_) {
+    cudaError_t err = cudaGraphExecDestroy(pr.second);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda graph exec: "
+                << cudaGetErrorString(err);
+    }
+  }
+  cuda_graph_execs_.clear();
+
+  for (const auto& pr : cuda_graphs_) {
+    cudaError_t err = cudaGraphDestroy(pr.second);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda graph exec: "
+                << cudaGetErrorString(err);
+    }
+  }
+  cuda_graphs_.clear();
 
   if (stream_ != nullptr) {
     cudaError_t err = cudaStreamDestroy(stream_);
@@ -277,6 +294,16 @@ PlanBundle::CreateExecutionContext(
     return Status(
         RequestStatusCode::INTERNAL, "unable to create stream for " + Name() +
                                          ": " + cudaGetErrorString(cuerr));
+  }
+
+  // Build CUDA graphs for a default set of graph sizes. Graphs are
+  // most likely to help for small batch sizes so by default build for
+  // batch sizes 1, 2, 3, 4, 6, 8, 12, 16.
+  context->BuildCudaGraph(1);
+  for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
+    if (bs <= Config().max_batch_size()) {
+      context->BuildCudaGraph(bs);
+    }
   }
 
   LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
@@ -504,6 +531,39 @@ PlanBundle::Run(
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(payloads));
 }
 
+void
+PlanBundle::Context::BuildCudaGraph(const int batch_size)
+{
+  cudaError_t cuerr;
+
+  cudaGraph_t graph;
+  cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeRelaxed);
+  if (cuerr != cudaSuccess) {
+    LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
+              << cudaGetErrorString(cuerr);
+  } else {
+    if (!context_->enqueue(batch_size, buffers_, stream_, nullptr)) {
+      LOG_ERROR << "unable to record CUDA graph for " << name_;
+    } else {
+      cuerr = cudaStreamEndCapture(stream_, &graph);
+      if (cuerr != cudaSuccess) {
+        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
+                  << cudaGetErrorString(cuerr);
+      } else {
+        cudaGraphExec_t graph_exec;
+        cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
+        if (cuerr != cudaSuccess) {
+          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
+                    << cudaGetErrorString(cuerr);
+        } else {
+          cuda_graphs_.insert(std::make_pair(batch_size, graph));
+          cuda_graph_execs_.insert(std::make_pair(batch_size, graph_exec));
+        }
+      }
+    }
+  }
+}
+
 Status
 PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 {
@@ -620,12 +680,25 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
   }
 
-  // Async execute the inference.
-  if (!context_->enqueue(total_batch_size, buffers_, stream_, nullptr)) {
-    cudaStreamSynchronize(stream_);
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to enqueue for inference " + name_);
+  // Async execute the inference using a CUDA graph if available for
+  // the batch-size, otherwise execution normally.
+  auto itr = cuda_graph_execs_.find(total_batch_size);
+  if (itr != cuda_graph_execs_.end()) {
+    cudaError_t err = cudaGraphLaunch(itr->second, stream_);
+    if (err != cudaSuccess) {
+      cudaStreamSynchronize(stream_);
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unable to execute graph for inference " + name_ + ": " +
+              cudaGetErrorString(err));
+    }
+  } else {
+    if (!context_->enqueue(total_batch_size, buffers_, stream_, nullptr)) {
+      cudaStreamSynchronize(stream_);
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unable to enqueue for inference " + name_);
+    }
   }
 
   // For each requested output verify that the output can accept the
