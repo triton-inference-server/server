@@ -36,7 +36,8 @@
 namespace nvidia { namespace inferenceserver {
 
 Metrics::Metrics()
-    : initialized_(false), registry_(std::make_shared<prometheus::Registry>()),
+    : gpu_metrics_enabled_(false),
+      registry_(std::make_shared<prometheus::Registry>()),
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -112,11 +113,11 @@ Metrics::~Metrics()
 }
 
 void
-Metrics::Initialize(uint32_t port)
+Metrics::EnableGPUMetrics()
 {
   auto singleton = GetSingleton();
-  if (singleton->initialized_) {
-    LOG_WARNING << "Metrics already initialized.";
+  if (singleton->gpu_metrics_enabled_) {
+    LOG_WARNING << "GPU Metrics already enabled";
     return;
   }
 
@@ -124,12 +125,7 @@ Metrics::Initialize(uint32_t port)
     singleton->InitializeNvmlMetrics();
   }
 
-  std::ostringstream stream;
-  stream << "0.0.0.0:" << port;
-  singleton->exposer_.reset(new prometheus::Exposer(stream.str()));
-  singleton->exposer_->RegisterCollectable(singleton->registry_);
-
-  singleton->initialized_ = true;
+  singleton->gpu_metrics_enabled_ = true;
 }
 
 bool
@@ -315,7 +311,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   // with NVML we can't get the CUDA device (and not worth doing
   // anyway since metrics aren't being reported).
   auto singleton = GetSingleton();
-  if (!singleton->initialized_) {
+  if (!singleton->gpu_metrics_enabled_) {
     return false;
   }
 
