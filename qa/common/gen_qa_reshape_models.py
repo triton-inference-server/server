@@ -622,3 +622,8 @@ if __name__ == '__main__':
                       ([4,4], [2], [2,2,3], [1]), ([2,2,4], [1,2,1], [3,2,2], [1,1,1]),
                       output_shapes=([2,2,4], [1,2,1], [3,2,2], [1,1,1]),
                       output_model_shapes=([2,2,4], [1,2,1], [3,2,2], [1,1,1]))
+
+    # TRT plan that reshapes neither input nor output. Needed for
+    # L0_perflab_nomodel.
+    create_trt_models(FLAGS.models_dir, np.float32,
+                      ([1,1,1],), ([1,1,1],))
