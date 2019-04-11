@@ -38,8 +38,8 @@ wide variety of models. The inference server also supports multiple
 <section-scheduling-and-batching>` that further expand the class of
 models that the inference server can handle.
 
-This section describes *stateless* and *stateful* models and how the
-inference server provides schedulers to support both model types.
+This section describes *stateless*, *stateful* and *ensemble* models and how the
+inference server provides schedulers to support those model types.
 
 .. _section-stateless-models:
 
@@ -252,3 +252,144 @@ the following happens:
   requests.
 
 .. image:: images/sequence_example2.png
+
+.. _section-ensemble-models:
+
+Ensemble Models
+---------------
+
+An ensemble model represents a *pipepline* of one or more models and the
+connection of input and output tensors between those models. Ensemble models are
+intended to be used to encapsulate a procedure that involves
+multiple models, such as "data preprocessing -> inference -> data postprocessing".
+Using ensemble models for this purpose can avoid the overhead of transferring
+intermediate tensors and minimize the number of requests that must be sent to
+the inference server.
+
+The :ref:`ensemble scheduler <section-ensemble-scheduler>` must be used for
+ensemble models, regardless of the scheduler used by the models within the
+ensemble. With respect to the ensemble scheduler, an *ensemble* model is not
+an actual model. Instead, it specifies the dataflow between models within the
+ensemble as :cpp:var:`Step
+<nvidia::inferenceserver::ModelEnsembling::Step>`. The
+scheduler collects the output tensors in each step, provides them as input
+tensors for other steps according to the specification. In spite of that, the
+ensemble model is still viewed as a single model from an external view.
+
+Note that the ensemble models will inherit the characteristics of the models
+involved, so the meta-data in the request header must comply with the models
+within the ensemble. For instance, if one of the models is stateful model, then
+the inference request for the ensemble model should contain the information
+mentioned in the previous :ref:`section <section-stateful-models>`, which will
+be provided to the stateful model by the scheduler.
+
+As a running example, consider an ensemble model for image classification and
+segmentation that has the following model configuration::
+
+  name: "ensemble_model"
+  platform: "ensemble"
+  max_batch_size: 1
+  input [
+    {
+      name: "IMAGE"
+      data_type: TYPE_STRING
+      dims: [ 1 ]
+    }
+  ]
+  output [
+    {
+      name: "CLASSIFICATION"
+      data_type: TYPE_FP32
+      dims: [ 1000 ]
+    },
+    {
+      name: "SEGMENTATION"
+      data_type: TYPE_FP32
+      dims: [ 3, 224, 224 ]
+    }
+  ]
+  ensemble_scheduling {
+    step [
+      {
+        model_name: "image_preprocess_model"
+        model_version: -1
+        input_map {
+          key: "RAW_IMAGE"
+          value: "IMAGE"
+        }
+        output_map {
+          key: "PREPROCESSED_OUTPUT"
+          value: "preprocessed_image"
+        }
+      },
+      {
+        model_name: "classification_model"
+        model_version: -1
+        input_map {
+          key: "FORMATTED_IMAGE"
+          value: "preprocessed_image"
+        }
+        output_map {
+          key: "CLASSIFICATION_OUTPUT"
+          value: "CLASSIFICATION"
+        }
+      },
+      {
+        model_name: "segmentation_model"
+        model_version: -1
+        input_map {
+          key: "FORMATTED_IMAGE"
+          value: "preprocessed_image"
+        }
+        output_map {
+          key: "SEGMENTATION_OUTPUT"
+          value: "SEGMENTATION"
+        }
+      }
+    ]
+  }
+
+The ensemble_scheduling section indicates that the ensemble scheduler will be
+used and that the ensemble model consists of three different models. Each element
+in step section specifies the model to be used and how the inputs and outputs of
+the model are mapped to tensor names recognized by the scheduler. For
+example, the first element in step specifies that the latest version of
+image_preprocess_model should be used, the content of its input "RAW_IMAGE"
+is provided by "IMAGE" tensor, and the content of its output "PREPROCESSED_OUTPUT"
+will be mapped to "preprocessed_image" tensor for later use. The tensor names 
+recognized by the scheduler are the ensemble inputs, the ensemble outputs and
+all values in the input_map and the output_map.
+
+Assuming that only the ensemble model, the preprocess model, the classification
+model and the segmentation model are being served, the client applications will
+see them as four different models which can process requests independently.
+However, the ensemble scheduler will view the ensemble model as the following.
+
+.. image:: images/ensemble_example0.png
+
+When an inference request for the ensemble model is received, the ensemble
+scheduler will:
+
+1. Recognize that the "IMAGE" tensor in the request is mapped to input
+   "RAW_IMAGE" in the preprocess model.
+
+2. Check models within the ensemble and send an internal request to the
+   preprocess model becuase all the input tensors required are ready.
+
+3. Recognize the completion of the internal request, collect the output
+   tensor and map the content to "preprocessed_image" which is an unique name
+   known within the ensemble.
+
+4. Map the newly collected tensor to inputs of the models within the ensemble.
+   In this case, the inputs of "classification_model" and "segmentation_model"
+   will be mapped and marked as ready.
+
+5. Check models that require the newly collected tensor and send internal
+   requests to models whose inputs are ready, the classification
+   model and the segmentation model in this case. Note that the responses will
+   be in arbitrary order depending on the load and computation time of
+   individual models.
+
+6. Repeat step 3-5 until no more internal requests should be sent, and then
+   response to the inference request with the tensors mapped to the ensemble
+   output names.
