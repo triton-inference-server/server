@@ -434,7 +434,8 @@ InferInProcessContextImpl::InferRequestToInputMap(
 
 Error
 InferInProcessContextImpl::AsyncInfer(
-    std::shared_ptr<InferInProcessRequestImpl> request, std::function<void()> OnCompleteInfer)
+    std::shared_ptr<InferInProcessRequestImpl> request,
+    std::function<void()> OnCompleteInfer)
 {
   auto infer_stats =
       std::make_shared<ModelInferStats>(server_->StatusManager(), model_name_);
