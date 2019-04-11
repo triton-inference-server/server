@@ -81,8 +81,9 @@ corresponding to the directory name.
 For more information about how the model versions are handled by the
 server see :ref:`section-model-versions`.  Within each version
 subdirectory there are one or more model definition files that specify
-the actual model. The model definition can be either a
-:ref:`framework-specific model file
+the actual model, except for
+:ref:`ensemble models <section-ensemble-models>`. The model
+definition can be either a :ref:`framework-specific model file
 <section-framework-model-definition>` or a shared library implementing
 a :ref:`custom backend <section-custom-backends>`.
 
@@ -342,10 +343,10 @@ Ensemble Backends
 
 A model using an ensemble backend is represented in the model repository
 in the same way as models using a deep-learning framework backend.
-However, each model version subdirectory should be empty because ensemble models
-are conceptual.
+Currently, the ensemble backend does not require any version specific data,
+so each model version subdirectory must exist but should be empty.
 
-An example of a ensemble backend in model repository can be found in the
+An example of an ensemble backend in a model repository can be found in the
 `docs/examples/model_repository/preprocess_resnet50_ensemble
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository/preprocess_resnet50_ensemble>`_
 directory.
