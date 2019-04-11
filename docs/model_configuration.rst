@@ -482,6 +482,21 @@ The size of generated batches can be examined in aggregate using Count
 metrics, see :ref:`section-metrics`. Inference server verbose logging
 can be used to examine the size of individual batches.
 
+.. _section-ensemble-scheduler:
+
+Ensemble Scheduler
+^^^^^^^^^^^^^^^^^^
+
+The ensemble scheduler must be used for :ref:`ensemble models
+<section-ensemble-models>` and cannot be used for any other type of model.
+
+The ensemble scheduler is enabled and configured independently for each
+model using the :cpp:var:`ModelEnsembleScheduling
+<nvidia::inferenceserver::ModelEnsembleScheduling>` settings in the
+model configuration. The settings describe the models that are included in the
+ensemble and the flow of tensor values between the models. See
+:ref:`section-ensemble-models` for more information and examples.
+
 .. _section-optimization-policy:
 
 Optimization Policy
