@@ -51,6 +51,10 @@ for m in \
         $DATADIR/qa_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_sequence_object \
         $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32 \
         ../custom_models/custom_sequence_int32 ; do
     cp -r $m models1/. && \
         (cd models1/$(basename $m) && \
@@ -73,7 +77,11 @@ for m in \
         $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_object \
-        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32 ; do
+        $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32 \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 ; do
     cp -r $m models0/. && \
         (cd models0/$(basename $m) && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
@@ -86,7 +94,10 @@ rm -fr modelsv && mkdir modelsv
 for m in \
         $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object \
-        $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 ; do
+        $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 \
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 ; do
     cp -r $m modelsv/. && \
         (cd modelsv/$(basename $m) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
@@ -104,6 +115,9 @@ for model_trial in v 0 1 2 4 ; do
         [[ "$model_trial" != "0" ]] && export MODEL_INSTANCES=$model_trial
 
     MODEL_DIR=models${model_trial}
+
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_DIR/.
+    create_nop_modelfile `pwd`/libidentity.so `pwd`/$MODEL_DIR
 
     # Need to launch the server for each test so that the model status is
     # reset (which is used to make sure the correctly batch size was used
