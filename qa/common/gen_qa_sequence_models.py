@@ -29,6 +29,7 @@ from builtins import range
 import os
 import sys
 import numpy as np
+import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -527,6 +528,24 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + [1, 1])
             create_plan_modelfile(models_dir, model_version, 0, dtype, shape + [1, 1])
 
+    if FLAGS.ensemble:
+        for pair in emu.platform_types_and_validation():
+            if pair[0] == "plan":
+                shape = shape + [1, 1]
+            if not pair[1](dtype, dtype, dtype,
+                            shape, shape, shape):
+                continue
+
+            emu.create_sequence_ensemble_modelconfig(
+                pair[0], models_dir, 8, model_version, shape, dtype)
+            emu.create_sequence_ensemble_modelfile(
+                pair[0], models_dir, 8, model_version, shape, dtype)
+            if no_batch:
+                emu.create_sequence_ensemble_modelconfig(
+                    pair[0], models_dir, 0, model_version, shape, dtype)
+                emu.create_sequence_ensemble_modelfile(
+                    pair[0], models_dir, 0, model_version, shape, dtype)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -542,6 +561,10 @@ if __name__ == '__main__':
                         help='Generate TensorRT PLAN models')
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
+    parser.add_argument('--ensemble', required=False, action='store_true',
+                        help='Generate ensemble models against the models'
+                        + ' in all platforms. Note that the models generated'
+                        + ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -566,3 +589,10 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np.int32, [-1,], False)
         create_models(FLAGS.models_dir, np.float32, [-1,], False)
         create_models(FLAGS.models_dir, np_dtype_string, [-1,], False)
+
+    if FLAGS.ensemble:
+        # Create nop models used in ensemble
+        for model_dtype in ["TYPE_INT32", "TYPE_FP32"]:
+            # 3D shape for TensorRT Plan
+            for model_shape in [(-1,), (-1, -1, -1)]:
+                emu.create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)
