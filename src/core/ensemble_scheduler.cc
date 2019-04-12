@@ -134,6 +134,7 @@ class EnsembleContext {
 
   // Request specific information that obtained from ensemble request and
   // should be applied to all internal requests
+  uint32_t flags_;
   uint64_t correlation_id_;
   uint32_t batch_size_;
 
@@ -183,6 +184,7 @@ EnsembleContext::EnsembleContext(
 
     batch_size_ = request_header.batch_size();
     correlation_id_ = request_header.correlation_id();
+    flags_ = request_header.flags();
 
     for (const auto& input : request_header.input()) {
       auto it = info_->ensemble_input_to_tensor_.find(input.name());
@@ -342,6 +344,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 
   request_header.set_correlation_id(correlation_id_);
   request_header.set_batch_size(batch_size_);
+  request_header.set_flags(flags_);
   for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
     auto input = request_header.add_input();
     *input = tensor_data_[pair.second].first;
