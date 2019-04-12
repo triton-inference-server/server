@@ -283,10 +283,9 @@ class SequenceBatcherTest(unittest.TestCase):
         self.assertTrue(model_name in ss.model_status,
                         "expected status for model " + model_name)
         # Skip the sequence batching check on ensemble model
-        if ss.model_status[model_name].config.platform == "ensemble":
-            return
-        bconfig = ss.model_status[model_name].config.sequence_batching
-        self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
+        if ss.model_status[model_name].config.platform != "ensemble":
+            bconfig = ss.model_status[model_name].config.sequence_batching
+            self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
 
     def check_status(self, model_name, static_bs, exec_cnt, infer_cnt):
         ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
@@ -307,14 +306,13 @@ class SequenceBatcherTest(unittest.TestCase):
 
         # Skip checking on ensemble because its execution count isn't modified like
         # sequence batcher.
-        if ss.model_status[model_name].config.platform == "ensemble":
-            return
-        self.assertEqual(vs[1].model_execution_count, exec_cnt,
-                        "expected model-execution-count " + str(exec_cnt) + ", got " +
-                        str(vs[1].model_execution_count))
-        self.assertEqual(vs[1].model_inference_count, infer_cnt,
-                        "expected model-inference-count " + str(infer_cnt) + ", got " +
-                        str(vs[1].model_inference_count))
+        if ss.model_status[model_name].config.platform != "ensemble":
+            self.assertEqual(vs[1].model_execution_count, exec_cnt,
+                            "expected model-execution-count " + str(exec_cnt) + ", got " +
+                            str(vs[1].model_execution_count))
+            self.assertEqual(vs[1].model_inference_count, infer_cnt,
+                            "expected model-inference-count " + str(infer_cnt) + ", got " +
+                            str(vs[1].model_inference_count))
 
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
