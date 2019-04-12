@@ -68,6 +68,7 @@ RUN mkdir -p qa/common && \
     cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_variable/. && \
     cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_reshape/. && \
     cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_zero/. && \
+    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_sequence_batcher/. && \
     cp /opt/tensorrtserver/custom/libidentity.so qa/L0_perflab_nomodel/. && \
     mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so \

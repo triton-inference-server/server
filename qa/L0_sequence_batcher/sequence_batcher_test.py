@@ -50,6 +50,16 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     _trials = ("savedmodel", "graphdef", "netdef")
 else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan")
+# Add ensemble to the _trials
+ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
+res = []
+for trial in _trials:
+    res.append(trial)
+    if "custom" in trial:
+        continue
+    for ensemble_prefix in ENSEMBLE_PREFIXES:
+        res.append(ensemble_prefix + trial)
+_trials = tuple(res)
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -272,8 +282,10 @@ class SequenceBatcherTest(unittest.TestCase):
         self.assertEqual(len(ss.model_status), 1)
         self.assertTrue(model_name in ss.model_status,
                         "expected status for model " + model_name)
-        bconfig = ss.model_status[model_name].config.sequence_batching
-        self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
+        # Skip the sequence batching check on ensemble model
+        if ss.model_status[model_name].config.platform != "ensemble":
+            bconfig = ss.model_status[model_name].config.sequence_batching
+            self.assertEqual(bconfig.max_sequence_idle_microseconds, _max_sequence_idle_ms * 1000) # 5 secs
 
     def check_status(self, model_name, static_bs, exec_cnt, infer_cnt):
         ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name, True)
@@ -291,12 +303,16 @@ class SequenceBatcherTest(unittest.TestCase):
         for b in static_bs:
             self.assertTrue(b in infer,
                             "expected batch-size " + str(b) + ", got " + str(vs[1]))
-        self.assertEqual(vs[1].model_execution_count, exec_cnt,
-                        "expected model-execution-count " + str(exec_cnt) + ", got " +
-                        str(vs[1].model_execution_count))
-        self.assertEqual(vs[1].model_inference_count, infer_cnt,
-                        "expected model-inference-count " + str(infer_cnt) + ", got " +
-                        str(vs[1].model_inference_count))
+
+        # Skip checking on ensemble because its execution count isn't modified like
+        # sequence batcher.
+        if ss.model_status[model_name].config.platform != "ensemble":
+            self.assertEqual(vs[1].model_execution_count, exec_cnt,
+                            "expected model-execution-count " + str(exec_cnt) + ", got " +
+                            str(vs[1].model_execution_count))
+            self.assertEqual(vs[1].model_inference_count, infer_cnt,
+                            "expected model-inference-count " + str(infer_cnt) + ", got " +
+                            str(vs[1].model_inference_count))
 
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
@@ -414,6 +430,16 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
+                    for prefix in ENSEMBLE_PREFIXES:
+                        if model_name.startswith(prefix):
+                            base_model_name = model_name[(len(prefix)):]
+                            self.assertTrue(
+                                ex.message().startswith(
+                                    str("in ensemble '{}', " + 
+                                        "inference request to model '{}' must specify " +
+                                        "batch-size 1 due to requirements of sequence " +
+                                        "batcher").format(model_name, base_model_name)))        
+                            return
                     self.assertTrue(
                         ex.message().startswith(
                             str("inference request to model '{}' must specify " +
@@ -446,6 +472,15 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
+                    for prefix in ENSEMBLE_PREFIXES:
+                        if model_name.startswith(prefix):
+                            base_model_name = model_name[(len(prefix)):]
+                            self.assertTrue(
+                                ex.message().startswith(
+                                    str("in ensemble '{}', " + 
+                                        "inference request to model '{}' must specify a " +
+                                        "non-zero correlation ID").format(model_name, base_model_name)))
+                            return
                     self.assertTrue(
                         ex.message().startswith(
                             str("inference request to model '{}' must specify a " +
@@ -479,6 +514,16 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
+                    for prefix in ENSEMBLE_PREFIXES:
+                        if model_name.startswith(prefix):
+                            base_model_name = model_name[(len(prefix)):]
+                            self.assertTrue(
+                                ex.message().startswith(
+                                    str("in ensemble '{}', " + 
+                                        "inference request for sequence 37469245 to " +
+                                        "model '{}' must specify the START flag on the first " +
+                                        "request of the sequence").format(model_name, base_model_name)))
+                            return
                     self.assertTrue(
                         ex.message().startswith(
                             str("inference request for sequence 37469245 to " +
@@ -516,6 +561,16 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
+                    for prefix in ENSEMBLE_PREFIXES:
+                        if model_name.startswith(prefix):
+                            base_model_name = model_name[(len(prefix)):]
+                            self.assertTrue(
+                                ex.message().startswith(
+                                    str("in ensemble '{}', " + 
+                                        "inference request for sequence 3 to model '{}' must " +
+                                        "specify the START flag on the first request of " +
+                                        "the sequence").format(model_name, base_model_name)))
+                            return
                     self.assertTrue(
                         ex.message().startswith(
                             str("inference request for sequence 3 to model '{}' must " +
@@ -1356,6 +1411,16 @@ class SequenceBatcherTest(unittest.TestCase):
                 self.assertTrue(False, "expected error")
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
+                for prefix in ENSEMBLE_PREFIXES:
+                    if model_name.startswith(prefix):
+                        base_model_name = model_name[(len(prefix)):]
+                        self.assertTrue(
+                            ex.message().startswith(
+                                str("in ensemble '{}', " + 
+                                    "inference request for sequence 1001 to " +
+                                    "model '{}' must specify the START flag on the first " +
+                                    "request of the sequence").format(model_name, base_model_name)))
+                        return
                 self.assertTrue(
                     ex.message().startswith(
                         str("inference request for sequence 1001 to " +
