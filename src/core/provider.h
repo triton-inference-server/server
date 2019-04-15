@@ -220,8 +220,10 @@ class NULLInferRequestProvider : public InferRequestProvider {
 //
 class InferResponseProvider {
  public:
-  using LookupMap = std::unordered_map<
-      std::string, std::pair<std::string, std::shared_ptr<LabelProvider>>>;
+  using SecondaryLabelProvider =
+      std::pair<std::string, std::shared_ptr<LabelProvider>>;
+  using SecondaryLabelProviderMap =
+      std::unordered_map<std::string, SecondaryLabelProvider>;
 
   explicit InferResponseProvider(
       const InferRequestHeader& request_header,
@@ -254,8 +256,14 @@ class InferResponseProvider {
     return label_provider_;
   }
 
-  // Get mutable lookup map.
-  LookupMap& MutableLookupMap() { return lookup_map_; }
+  // Get secondary label provider. Return true if the secondary provider for
+  // the 'name' is found. False otherwise,
+  bool GetSecondaryLabelProvider(
+      const std::string& name, SecondaryLabelProvider* provider);
+
+  // Set secondary label provider.
+  void SetSecondaryLabelProvider(
+      const std::string& name, const SecondaryLabelProvider& provider);
 
   // Finalize response based on a servable.
   Status FinalizeResponse(const InferenceBackend& is);
@@ -298,7 +306,7 @@ class InferResponseProvider {
   // Map from output name to external label provider and name for that provider.
   // This map should only be non-empty if the response provider is for models
   // that doesn't provide labels directly, i.e. ensemble models.
-  LookupMap lookup_map_;
+  SecondaryLabelProviderMap secondary_label_provider_map_;
 };
 
 //

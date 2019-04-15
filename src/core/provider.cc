@@ -272,7 +272,7 @@ AddClassResults(
     const size_t batch1_element_count, const size_t batch_size,
     const size_t cls_count,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const InferResponseProvider::LookupMap& lookup_map)
+    const InferResponseProvider::SecondaryLabelProviderMap& lookup_map)
 {
   T* probs = reinterpret_cast<T*>(poutput_buffer);
   const size_t entry_cnt = batch1_element_count;
@@ -378,6 +378,25 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   return Status::Success;
 }
 
+bool
+InferResponseProvider::GetSecondaryLabelProvider(
+    const std::string& name, SecondaryLabelProvider* provider)
+{
+  auto it = secondary_label_provider_map_.find(name);
+  if (it != secondary_label_provider_map_.end()) {
+    provider = &it->second;
+    return true;
+  }
+  return false;
+}
+
+void
+InferResponseProvider::SetSecondaryLabelProvider(
+    const std::string& name, const SecondaryLabelProvider& provider)
+{
+  secondary_label_provider_map_[name] = provider;
+}
+
 Status
 InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 {
@@ -445,54 +464,64 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider_, lookup_map_);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         default:

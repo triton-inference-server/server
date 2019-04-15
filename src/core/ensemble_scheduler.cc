@@ -299,21 +299,20 @@ EnsembleContext::UpdateEnsembleState(
 
             auto tensor_it = no_label_tensors_.find(it->second);
             if (tensor_it != no_label_tensors_.end()) {
-              InferResponseProvider::LookupMap& ensemble_lookup_map =
-                  response_provider_->MutableLookupMap();
               // Check the inner model's lookup map first in case it is also an
               // ensemble model. In that case, the label of the inner model may
               // come from another model.
-              const InferResponseProvider::LookupMap& model_lookup_map =
-                  completed_step->response_provider_->MutableLookupMap();
-              auto map_it = model_lookup_map.find(it->first);
-              if (map_it != model_lookup_map.end()) {
-                ensemble_lookup_map[tensor_it->second] = map_it->second;
+              InferResponseProvider::SecondaryLabelProvider provider;
+              if (completed_step->response_provider_->GetSecondaryLabelProvider(
+                      it->first, &provider)) {
+                response_provider_->SetSecondaryLabelProvider(
+                    tensor_it->second, provider);
               } else {
                 const std::shared_ptr<LabelProvider>& label_provider =
                     completed_step->response_provider_->GetLabelProvider();
-                ensemble_lookup_map[tensor_it->second] =
-                    std::make_pair(it->first, label_provider);
+                response_provider_->SetSecondaryLabelProvider(
+                    tensor_it->second,
+                    std::make_pair(it->first, label_provider));
               }
               no_label_tensors_.erase(tensor_it);
             }
