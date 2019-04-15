@@ -34,6 +34,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
+class LabelProvider;
 
 //
 // SystemMemory used to access data in providers
@@ -219,7 +220,14 @@ class NULLInferRequestProvider : public InferRequestProvider {
 //
 class InferResponseProvider {
  public:
-  explicit InferResponseProvider(const InferRequestHeader& request_header);
+  using SecondaryLabelProvider =
+      std::pair<std::string, std::shared_ptr<LabelProvider>>;
+  using SecondaryLabelProviderMap =
+      std::unordered_map<std::string, SecondaryLabelProvider>;
+
+  explicit InferResponseProvider(
+      const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider);
 
   // Get the full response header for this inference request.
   virtual const InferResponseHeader& ResponseHeader() const = 0;
@@ -242,7 +250,22 @@ class InferResponseProvider {
   Status OutputBufferContents(
       const std::string& name, void** content, size_t* content_byte_size) const;
 
-  // Finialize response based on a servable.
+  // Get label provider.
+  const std::shared_ptr<LabelProvider>& GetLabelProvider() const
+  {
+    return label_provider_;
+  }
+
+  // Get secondary label provider. Return true if the secondary provider for
+  // the 'name' is found. False otherwise,
+  bool GetSecondaryLabelProvider(
+      const std::string& name, SecondaryLabelProvider* provider);
+
+  // Set secondary label provider.
+  void SetSecondaryLabelProvider(
+      const std::string& name, const SecondaryLabelProvider& provider);
+
+  // Finalize response based on a servable.
   Status FinalizeResponse(const InferenceBackend& is);
 
  protected:
@@ -276,6 +299,14 @@ class InferResponseProvider {
 
   // Ordered list of outputs as they "added" by AllocateOutputBuffer().
   std::vector<Output> outputs_;
+
+  // label provider used to generate classification results.
+  std::shared_ptr<LabelProvider> label_provider_;
+
+  // Map from output name to external label provider and name for that provider.
+  // This map should only be non-empty if the response provider is for models
+  // that doesn't provide labels directly, i.e. ensemble models.
+  SecondaryLabelProviderMap secondary_label_provider_map_;
 };
 
 //
@@ -286,6 +317,7 @@ class InternalInferResponseProvider : public InferResponseProvider {
   // Create a InternalInferResponseProvider object.
   static Status Create(
       const InferenceBackend& is, const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider,
       std::shared_ptr<InternalInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -299,7 +331,9 @@ class InternalInferResponseProvider : public InferResponseProvider {
       const std::string& name, std::shared_ptr<SystemMemory>* output_buffer);
 
  private:
-  InternalInferResponseProvider(const InferRequestHeader& request_header);
+  InternalInferResponseProvider(
+      const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider);
 
   InferResponseHeader response_header_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
@@ -314,6 +348,7 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   // Initialize based on gRPC request
   static Status Create(
       const InferRequestHeader& request_header, InferResponse* response,
+      const std::shared_ptr<LabelProvider>& label_provider,
       std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -324,8 +359,10 @@ class GRPCInferResponseProvider : public InferResponseProvider {
 
  private:
   GRPCInferResponseProvider(
-      const InferRequestHeader& request_header, InferResponse* response)
-      : InferResponseProvider(request_header), response_(response)
+      const InferRequestHeader& request_header, InferResponse* response,
+      const std::shared_ptr<LabelProvider>& label_provider)
+      : InferResponseProvider(request_header, label_provider),
+        response_(response)
   {
   }
 
@@ -340,6 +377,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   static Status Create(
       evbuffer* output_buffer, const InferenceBackend& is,
       const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider,
       std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -350,7 +388,8 @@ class HTTPInferResponseProvider : public InferResponseProvider {
 
  private:
   HTTPInferResponseProvider(
-      evbuffer* output_buffer, const InferRequestHeader& request_header);
+      evbuffer* output_buffer, const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider);
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
@@ -364,6 +403,7 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
  public:
   static Status Create(
       const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider,
       std::shared_ptr<DelegatingInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -373,8 +413,10 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
       const std::vector<int64_t>& content_shape) override;
 
  private:
-  DelegatingInferResponseProvider(const InferRequestHeader& request_header)
-      : InferResponseProvider(request_header)
+  DelegatingInferResponseProvider(
+      const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider)
+      : InferResponseProvider(request_header, label_provider)
   {
   }
 

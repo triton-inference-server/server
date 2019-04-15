@@ -90,6 +90,7 @@ InferenceBackend::SetModelConfig(
   }
 
   // Initialize the output map and label provider for each output
+  label_provider_ = std::make_shared<LabelProvider>();
   const auto model_dir = tensorflow::io::Dirname(path);
   for (const auto& io : config.output()) {
     output_map_.insert(std::make_pair(io.name(), io));
@@ -97,7 +98,7 @@ InferenceBackend::SetModelConfig(
     if (!io.label_filename().empty()) {
       const auto label_path =
           tensorflow::io::JoinPath(model_dir, io.label_filename());
-      RETURN_IF_ERROR(label_provider_.AddLabels(io.name(), label_path));
+      RETURN_IF_ERROR(label_provider_->AddLabels(io.name(), label_path));
     }
   }
 

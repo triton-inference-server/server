@@ -69,7 +69,10 @@ class InferenceBackend {
   Status GetOutput(const std::string& name, const ModelOutput** output) const;
 
   // Get a label provider for the model.
-  const LabelProvider& GetLabelProvider() const { return label_provider_; }
+  const std::shared_ptr<LabelProvider>& GetLabelProvider() const
+  {
+    return label_provider_;
+  }
 
   // Run inference using the provided request to produce outputs in the provide
   // response. The inference will run asynchronously and "OnCompleteHandleInfer"
@@ -108,7 +111,7 @@ class InferenceBackend {
   std::shared_ptr<MetricModelReporter> metric_reporter_;
 
   // Label provider for this model.
-  LabelProvider label_provider_;
+  std::shared_ptr<LabelProvider> label_provider_;
 
   // The scheduler to use for this backend.
   std::unique_ptr<Scheduler> scheduler_;

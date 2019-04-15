@@ -644,6 +644,11 @@ def create_ensemble_modelconfig(
     output1_model_dtype = np_to_model_dtype(output1_dtype)
 
     for ensemble_type in BASIC_ENSEMBLE_TYPES:
+        # Only in "fan" that ensemble output is not directly from addsub. In
+        # other case, ensemble should still generate proper labell without
+        # label file
+        labels = None if ensemble_type != "fan" else "output0_labels.txt"
+
         # Use a different model name for the non-batching variant
         ensemble_model_name = "{}_{}{}".format(ensemble_type, base_model, "_nobatch" if max_batch == 0 else "")
         model_name = tu.get_model_name(ensemble_model_name,
@@ -660,7 +665,7 @@ def create_ensemble_modelconfig(
         config = create_general_modelconfig(model_name, "ensemble", max_batch,
             repeat(input_dtype, 2), repeat(input_shape, 2), repeat(None, 2),
             [output0_dtype, output1_dtype], [output0_shape, output1_shape], repeat(None, 2),
-            ["output0_labels.txt", None],
+            [labels, None],
             version_policy=version_policy)
         config += ensemble_schedule
 
@@ -672,9 +677,10 @@ def create_ensemble_modelconfig(
         with open(config_dir + "/config.pbtxt", "w") as cfile:
             cfile.write(config)
 
-        with open(config_dir + "/output0_labels.txt", "w") as lfile:
-            for l in range(output0_label_cnt):
-                lfile.write("label" + str(l) + "\n")
+        if labels is not None:
+            with open(config_dir + "/output0_labels.txt", "w") as lfile:
+                for l in range(output0_label_cnt):
+                    lfile.write("label" + str(l) + "\n")
 
 
 def create_identity_ensemble_modelfile(
