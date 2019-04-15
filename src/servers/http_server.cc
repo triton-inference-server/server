@@ -438,7 +438,8 @@ HTTPServerImpl::InferHelper(
   std::shared_ptr<HTTPInferResponseProvider> response_provider;
   RETURN_IF_ERROR(HTTPInferResponseProvider::Create(
       req->buffer_out, *backend->GetInferenceBackend(),
-      request_provider->RequestHeader(), &response_provider));
+      request_provider->RequestHeader(),
+      backend->GetInferenceBackend()->GetLabelProvider(), &response_provider));
 
   std::shared_ptr<InferRequest> request(new InferRequest(
       req, request_header.id(), request_provider, response_provider,

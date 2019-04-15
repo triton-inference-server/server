@@ -144,6 +144,9 @@ class EnsembleContext {
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InferResponseProvider> response_provider_;
   std::function<void(Status)> OnComplete_;
+
+  // Output tensors whose labels are not provided by the ensemble servable
+  std::unordered_map<size_t, std::string> no_label_tensors_;
 };
 
 EnsembleContext::EnsembleContext(
@@ -197,6 +200,17 @@ EnsembleContext::EnsembleContext(
             RequestStatusCode::INVALID_ARG,
             "unexpected input '" + input.name() +
                 "' in request header that does not map to any ensemble inputs");
+      }
+    }
+  }
+
+  if (ensemble_status_.IsOk()) {
+    const std::shared_ptr<LabelProvider>& label_provider =
+        response_provider_->GetLabelProvider();
+    for (const auto& pair : info_->ensemble_output_to_tensor_) {
+      const auto& label = label_provider->GetLabel(pair.first, 0);
+      if (label == "") {
+        no_label_tensors_[pair.second] = pair.first;
       }
     }
   }
@@ -282,6 +296,26 @@ EnsembleContext::UpdateEnsembleState(
             RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
                 it->first, &(tensor_data.second)));
             updated_tensors.push_back(it->second);
+
+            auto tensor_it = no_label_tensors_.find(it->second);
+            if (tensor_it != no_label_tensors_.end()) {
+              // Check the inner model's lookup map first in case it is also an
+              // ensemble model. In that case, the label of the inner model may
+              // come from another model.
+              InferResponseProvider::SecondaryLabelProvider provider;
+              if (completed_step->response_provider_->GetSecondaryLabelProvider(
+                      it->first, &provider)) {
+                response_provider_->SetSecondaryLabelProvider(
+                    tensor_it->second, provider);
+              } else {
+                const std::shared_ptr<LabelProvider>& label_provider =
+                    completed_step->response_provider_->GetLabelProvider();
+                response_provider_->SetSecondaryLabelProvider(
+                    tensor_it->second,
+                    std::make_pair(it->first, label_provider));
+              }
+              no_label_tensors_.erase(tensor_it);
+            }
           } else {
             return Status(
                 RequestStatusCode::INTERNAL,
@@ -368,6 +402,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   RETURN_IF_ERROR(InternalInferResponseProvider::Create(
       *((*step)->backend_->GetInferenceBackend()),
       (*step)->request_provider_->RequestHeader(),
+      (*step)->backend_->GetInferenceBackend()->GetLabelProvider(),
       &((*step)->response_provider_)));
 
   return Status::Success;

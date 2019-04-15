@@ -270,7 +270,9 @@ void
 AddClassResults(
     InferResponseHeader::Output* poutput, char* poutput_buffer,
     const size_t batch1_element_count, const size_t batch_size,
-    const size_t cls_count, const LabelProvider& label_provider)
+    const size_t cls_count,
+    const std::shared_ptr<LabelProvider>& label_provider,
+    const InferResponseProvider::SecondaryLabelProviderMap& lookup_map)
 {
   T* probs = reinterpret_cast<T*>(poutput_buffer);
   const size_t entry_cnt = batch1_element_count;
@@ -287,7 +289,15 @@ AddClassResults(
     for (size_t k = 0; k < class_cnt; ++k) {
       auto cls = bcls->add_cls();
       cls->set_idx(idx[k]);
-      cls->set_label(label_provider.GetLabel(poutput->name(), idx[k]));
+      const auto& label = label_provider->GetLabel(poutput->name(), idx[k]);
+      cls->set_label(label);
+
+      if (label == "" && !lookup_map.empty()) {
+        auto it = lookup_map.find(poutput->name());
+        if (it != lookup_map.end()) {
+          cls->set_label(it->second.second->GetLabel(it->second.first, idx[k]));
+        }
+      }
 
       cls->set_value(static_cast<float>(probs[idx[k]]));
     }
@@ -302,8 +312,9 @@ AddClassResults(
 // InferResponseProvider
 //
 InferResponseProvider::InferResponseProvider(
-    const InferRequestHeader& request_header)
-    : request_header_(request_header)
+    const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider)
+    : request_header_(request_header), label_provider_(label_provider)
 {
   // Create a map from output name to the InferRequestHeader::Output
   // object for that output.
@@ -367,13 +378,30 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   return Status::Success;
 }
 
+bool
+InferResponseProvider::GetSecondaryLabelProvider(
+    const std::string& name, SecondaryLabelProvider* provider)
+{
+  auto it = secondary_label_provider_map_.find(name);
+  if (it != secondary_label_provider_map_.end()) {
+    provider = &it->second;
+    return true;
+  }
+  return false;
+}
+
+void
+InferResponseProvider::SetSecondaryLabelProvider(
+    const std::string& name, const SecondaryLabelProvider& provider)
+{
+  secondary_label_provider_map_[name] = provider;
+}
+
 Status
 InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 {
   InferResponseHeader* response_header = MutableResponseHeader();
   response_header->Clear();
-
-  const LabelProvider& label_provider = is.GetLabelProvider();
 
   response_header->set_model_name(is.Name());
   response_header->set_model_version(is.Version());
@@ -436,54 +464,64 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT16:
           AddClassResults<uint16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT32:
           AddClassResults<uint32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_UINT64:
           AddClassResults<uint64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_INT8:
           AddClassResults<int8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT16:
           AddClassResults<int16_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT32:
           AddClassResults<int32_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_INT64:
           AddClassResults<int64_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         case DataType::TYPE_FP32:
           AddClassResults<float>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
         case DataType::TYPE_FP64:
           AddClassResults<double>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
-              output.cls_count_, label_provider);
+              output.cls_count_, label_provider_,
+              secondary_label_provider_map_);
           break;
 
         default:
@@ -507,9 +545,11 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 Status
 InternalInferResponseProvider::Create(
     const InferenceBackend& is, const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider,
     std::shared_ptr<InternalInferResponseProvider>* infer_provider)
 {
-  auto provider = new InternalInferResponseProvider(request_header);
+  auto provider =
+      new InternalInferResponseProvider(request_header, label_provider);
   infer_provider->reset(provider);
   return Status::Success;
 }
@@ -577,8 +617,9 @@ InternalInferResponseProvider::GetSystemMemory(
 }
 
 InternalInferResponseProvider::InternalInferResponseProvider(
-    const InferRequestHeader& request_header)
-    : InferResponseProvider(request_header)
+    const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider)
+    : InferResponseProvider(request_header, label_provider)
 {
 }
 
@@ -588,10 +629,11 @@ InternalInferResponseProvider::InternalInferResponseProvider(
 Status
 GRPCInferResponseProvider::Create(
     const InferRequestHeader& request_header, InferResponse* response,
+    const std::shared_ptr<LabelProvider>& label_provider,
     std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
 {
   GRPCInferResponseProvider* provider =
-      new GRPCInferResponseProvider(request_header, response);
+      new GRPCInferResponseProvider(request_header, response, label_provider);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -635,8 +677,10 @@ GRPCInferResponseProvider::AllocateOutputBuffer(
 // HTTPInferResponseProvider
 //
 HTTPInferResponseProvider::HTTPInferResponseProvider(
-    evbuffer* output_buffer, const InferRequestHeader& request_header)
-    : InferResponseProvider(request_header), output_buffer_(output_buffer)
+    evbuffer* output_buffer, const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider)
+    : InferResponseProvider(request_header, label_provider),
+      output_buffer_(output_buffer)
 {
 }
 
@@ -644,10 +688,11 @@ Status
 HTTPInferResponseProvider::Create(
     evbuffer* output_buffer, const InferenceBackend& is,
     const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider,
     std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
 {
-  HTTPInferResponseProvider* provider =
-      new HTTPInferResponseProvider(output_buffer, request_header);
+  HTTPInferResponseProvider* provider = new HTTPInferResponseProvider(
+      output_buffer, request_header, label_provider);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -722,10 +767,11 @@ HTTPInferResponseProvider::AllocateOutputBuffer(
 Status
 DelegatingInferResponseProvider::Create(
     const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider,
     std::shared_ptr<DelegatingInferResponseProvider>* infer_provider)
 {
   DelegatingInferResponseProvider* provider =
-      new DelegatingInferResponseProvider(request_header);
+      new DelegatingInferResponseProvider(request_header, label_provider);
   infer_provider->reset(provider);
 
   return Status::Success;

@@ -275,6 +275,7 @@ class InferInProcessRequestImpl : public RequestImpl {
 
   Error CreateResponseProvider(
       const InferRequestHeader& request_header,
+      const std::shared_ptr<LabelProvider>& label_provider,
       std::shared_ptr<DelegatingInferResponseProvider>* response_provider);
 
   const std::shared_ptr<DelegatingInferResponseProvider>& GetResponseProvider()
@@ -305,6 +306,7 @@ class InferInProcessRequestImpl : public RequestImpl {
 Error
 InferInProcessRequestImpl::CreateResponseProvider(
     const InferRequestHeader& request_header,
+    const std::shared_ptr<LabelProvider>& label_provider,
     std::shared_ptr<DelegatingInferResponseProvider>* response_provider)
 {
   if (response_provider_ != nullptr) {
@@ -314,7 +316,7 @@ InferInProcessRequestImpl::CreateResponseProvider(
   }
 
   RETURN_IF_STATUS_ERROR(DelegatingInferResponseProvider::Create(
-      request_header, &response_provider_));
+      request_header, label_provider, &response_provider_));
 
   *response_provider = response_provider_;
   return Error::Success;
@@ -484,8 +486,9 @@ InferInProcessContextImpl::AsyncInfer(
       &request_provider));
 
   std::shared_ptr<DelegatingInferResponseProvider> response_provider;
-  Error err =
-      request->CreateResponseProvider(infer_request_, &response_provider);
+  Error err = request->CreateResponseProvider(
+      infer_request_, backend->GetInferenceBackend()->GetLabelProvider(),
+      &response_provider);
   if (!err.IsOk()) {
     return err;
   }

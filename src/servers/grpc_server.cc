@@ -129,7 +129,9 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     infer_stats->SetBatchSize(request_header.batch_size());
 
     RETURN_IF_ERROR(GRPCInferResponseProvider::Create(
-        request.meta_data(), &response, &response_provider));
+        request.meta_data(), &response,
+        backend->GetInferenceBackend()->GetLabelProvider(),
+        &response_provider));
 
     RequestStatus* request_status = response.mutable_request_status();
     uint64_t id = request.meta_data().id();
