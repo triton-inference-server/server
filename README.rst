@@ -99,7 +99,7 @@ inference server provides the following features:
 
 * `Metrics
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_
-  indicating GPU utiliization, server throughput, and server latency.
+  indicating GPU utilization, server throughput, and server latency.
 
 .. overview-end-marker-do-not-remove
 
@@ -159,6 +159,10 @@ You can also view the documentation for the `master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
 and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
+
+READMEs for deployment examples can be found in subdirectories of
+deploy/, for example, `deploy/single_server/README.rst
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/deploy/single_server/README.rst>`_.
 
 The `Release Notes
 <https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_
