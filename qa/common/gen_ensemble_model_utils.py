@@ -666,7 +666,7 @@ def create_ensemble_modelconfig(
             repeat(input_dtype, 2), repeat(input_shape, 2), repeat(None, 2),
             [output0_dtype, output1_dtype], [output0_shape, output1_shape], repeat(None, 2),
             [labels, None],
-            version_policy=version_policy)
+            version_policy=version_policy, force_tensor_number_suffix=True)
         config += ensemble_schedule
 
         try:
@@ -720,7 +720,7 @@ def create_identity_ensemble_modelconfig(
         config = create_general_modelconfig(model_name, "ensemble", max_batch,
             repeat(dtype, io_cnt), input_shapes, input_model_shapes,
             repeat(dtype, io_cnt), output_shapes, output_model_shapes,
-            repeat(None, io_cnt))
+            repeat(None, io_cnt), force_tensor_number_suffix=True)
         config += ensemble_schedule
 
         try:
@@ -856,7 +856,7 @@ def create_general_modelconfig(model_name, platform, max_batch,
         label_filenames,
         version_policy=None,
         default_model_filename=None,
-        instance_group_str=""):
+        instance_group_str="", force_tensor_number_suffix=False):
     assert len(input_dtypes) == len(input_shapes)
     assert len(input_model_shapes) == len(input_shapes)
     assert len(output_dtypes) == len(output_shapes)
@@ -890,7 +890,9 @@ version_policy : {}
         version_policy_str, default_model_filename_str,instance_group_str)
 
     for idx in range(len(input_dtypes)):
-        idx_str = "" if len(input_dtypes) == 1 else str(idx)
+        idx_str = ""
+        if len(input_dtypes) != 1 or force_tensor_number_suffix:
+            idx_str = str(idx)
         config += '''
 input [
   {{
@@ -904,7 +906,9 @@ input [
         reshape_str(input_shapes[idx], input_model_shapes[idx]))
 
     for idx in range(len(output_dtypes)):
-        idx_str = "" if len(input_dtypes) == 1 else str(idx)
+        idx_str = ""
+        if len(input_dtypes) != 1 or force_tensor_number_suffix:
+            idx_str = str(idx)
         config += '''
 output [
   {{
