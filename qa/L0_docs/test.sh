@@ -31,7 +31,7 @@ rm -f $TEST_LOG
 RET=0
 
 apt-get update && \
-    apt-get install -y --no-install-recommends doxygen && \
+    apt-get install -y --no-install-recommends zip doxygen && \
     pip install --upgrade sphinx==1.8.5 sphinx-rtd-theme nbsphinx exhale
 
 set +e
