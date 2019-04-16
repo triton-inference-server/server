@@ -225,7 +225,10 @@ directly or convert it to a GraphDef by using a script like
 or save it as a SavedModel using a `SavedModelBuilder
 <https://www.tensorflow.org/serving/serving_basic>`_ or
 `tf.saved_model.simple_save
-<https://www.tensorflow.org/api_docs/python/tf/saved_model/simple_save>`_.
+<https://www.tensorflow.org/api_docs/python/tf/saved_model/simple_save>`_. If
+you use the Estimator API you can also use
+`Estimator.export_savedmodel
+<https://www.tensorflow.org/api_docs/python/tf/estimator/Estimator#export_savedmodel>`_.
 
 A TensorFlow GraphDef is a single file that by default must be named
 model.graphdef. A minimal model repository for a single TensorFlow
