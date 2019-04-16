@@ -35,7 +35,8 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'log', 'serverlog',
              'preprocessed', 'jmx', 'gz',
              'caffemodel')
-SKIP_PATHS = ('docs/examples/model_repository',
+SKIP_PATHS = ('deploy/single_server/.helmignore',
+              'docs/examples/model_repository',
               'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
               'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
               'qa/custom_models/custom_int32_int32_int32/output0_labels.txt',
@@ -108,13 +109,13 @@ def visit(path):
             for fline in f:
                 line = fline
 
-                # Skip any '#!' or '..' (from rst) lines at the start
-                # of the file
+                # Skip any '#!', '..', '<!--', or '{{/*' lines at the
+                # start of the file
                 if first_line:
                     first_line = False
-                    if fline.startswith("#!") or fline.startswith("..") or fline.startswith("<!--"):
+                    if (fline.startswith("#!") or fline.startswith("..") or
+                        fline.startswith("<!--")  or fline.startswith("{{/*")):
                         continue
-
                 # Skip empty lines...
                 if len(fline.strip()) != 0:
                     break
