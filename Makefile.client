@@ -51,7 +51,7 @@ LIBPROTOBUF := $(LIBGRPCDIR)/grpc/libs/opt/protobuf/libprotobuf.a
 IMAGE_SRCS  := $(CPPDIR)/image_client.cc
 IMAGE_OBJS  := $(addprefix $(BUILDDIR)/, $(IMAGE_SRCS:%.cc=%.o))
 IMAGE_LDFLAGS := $(LIBGRPC) $(LIBPROTOBUF) -lcurl -lz -lpthread \
-                 -lopencv_core -lopencv_imgproc -lopencv_highgui -ldl
+                 `pkg-config --libs opencv` -ldl
 
 ENSEMBLE_SRCS   := $(CPPDIR)/ensemble_image_client.cc
 ENSEMBLE_OBJS   := $(addprefix $(BUILDDIR)/, $(ENSEMBLE_SRCS:%.cc=%.o))
@@ -146,7 +146,8 @@ grpc: $(LIBGRPCDIR)/libgrpc_indicator
 
 $(LIBGRPCDIR)/libgrpc_indicator:
 	mkdir -p $(LIBGRPCDIR)
-	git clone -b $(shell curl -L https://grpc.io/release) \
+	# Work around for not being able to build v1.20.0 (latest)
+	git clone -b v1.19.0 \
     https://github.com/grpc/grpc $(LIBGRPCDIR)/grpc
 	cd $(LIBGRPCDIR)/grpc && \
     git submodule update --checkout --init && \
