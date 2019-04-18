@@ -297,6 +297,59 @@ GRPCServer::Create(
 }
 
 Status
+GRPCServer::CreateUniqueEndpointPorts(
+    InferenceServer* server, std::string endpoint_name, uint16_t port,
+    std::unique_ptr<GRPCServer>* grpc_server)
+{
+  // DLIS-162 - provide global defaults and cli overridable options
+  g_Resources = std::make_shared<AsyncResources>(
+      server,  // InferenceServer*,
+      1,       // infer threads
+      1        // mgmt threads
+  );
+
+  LOG_INFO << "Building nvrpc server";
+  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  grpc_server->reset(new GRPCServer(addr));
+
+  (*grpc_server)->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
+
+  LOG_INFO << "Register TensorRT GRPCService";
+  auto inferenceService = (*grpc_server)->RegisterAsyncService<GRPCService>();
+
+  if (endpoint_name == "infer"){
+    LOG_INFO << "Register Infer RPC";
+    (*grpc_server)->rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
+        &GRPCService::AsyncService::RequestInfer);
+
+    LOG_INFO << "Register StreamInfer RPC";
+    (*grpc_server)->rpcStreamInfer_ =
+        inferenceService->RegisterRPC<StreamInferContext>(
+            &GRPCService::AsyncService::RequestStreamInfer);
+  }
+
+  if (endpoint_name == "status"){
+    LOG_INFO << "Register Status RPC";
+    (*grpc_server)->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
+        &GRPCService::AsyncService::RequestStatus);
+  }
+
+  if (endpoint_name == "profile"){
+    LOG_INFO << "Register Profile RPC";
+    (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
+        &GRPCService::AsyncService::RequestProfile);
+  }
+
+  if (endpoint_name == "health"){
+    LOG_INFO << "Register Health RPC";
+    (*grpc_server)->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
+        &GRPCService::AsyncService::RequestHealth);
+  }
+
+  return Status::Success;
+}
+
+Status
 GRPCServer::Start()
 {
   if (!running_) {

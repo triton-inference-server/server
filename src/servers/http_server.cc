@@ -47,7 +47,7 @@ namespace nvidia { namespace inferenceserver {
 class HTTPServerImpl : public HTTPServer {
  public:
   explicit HTTPServerImpl(
-      InferenceServer* server, uint16_t port, int thread_cnt)
+      InferenceServer* server, std::string endpoint_name, uint16_t port, int thread_cnt)
       : server_(server), port_(port), thread_cnt_(thread_cnt),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
@@ -57,7 +57,7 @@ class HTTPServerImpl : public HTTPServer {
 
   ~HTTPServerImpl() { Stop(); }
 
-  static void Dispatch(evhtp_request_t* req, void* arg);
+  static void Dispatch(evhtp_request_t* req, std::string endpoint_name, void* arg);
 
   Status Start() override;
   Status Stop() override;
@@ -171,13 +171,13 @@ HTTPServerImpl::StopCallback(int sock, short events, void* arg)
 }
 
 void
-HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
+HTTPServerImpl::Dispatch(evhtp_request_t* req, std::string endpoint_name, void* arg)
 {
-  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
+  (static_cast<HTTPServerImpl*>(arg))->Handle(req, endpoint_name);
 }
 
 void
-HTTPServerImpl::Handle(evhtp_request_t* req)
+HTTPServerImpl::Handle(evhtp_request_t* req, std::string endpoint_name)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -186,22 +186,22 @@ HTTPServerImpl::Handle(evhtp_request_t* req)
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
     // health
-    if (endpoint == "health") {
+    if (endpoint == "health" && (endpoint == endpoint_name || endpoint_name == "common")) {
       HandleHealth(req, rest);
       return;
     }
     // profile
-    else if (endpoint == "profile") {
+    else if (endpoint == "profile" && (endpoint == endpoint_name || endpoint_name == "common")) {
       HandleProfile(req, rest);
       return;
     }
     // infer
-    else if (endpoint == "infer") {
+    else if (endpoint == "infer" && (endpoint == endpoint_name || endpoint_name == "common")) {
       HandleInfer(req, rest);
       return;
     }
     // status
-    else if (endpoint == "status") {
+    else if (endpoint == "status" && (endpoint == endpoint_name || endpoint_name == "common")) {
       HandleStatus(req, rest);
       return;
     }
@@ -556,7 +556,17 @@ HTTPServer::Create(
     InferenceServer* server, uint16_t port, int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
-  http_server->reset(new HTTPServerImpl(server, port, thread_cnt));
+  http_server->reset(new HTTPServerImpl(server, "common", port, thread_cnt));
   return Status::Success;
 }
+
+Status
+HTTPServer::CreateUniqueEndpointPorts(
+    InferenceServer* server, std::string endpoint_name, uint16_t endpoint_port, int thread_cnt,
+    std::unique_ptr<HTTPServer>* http_server)
+{
+  http_server->reset(new HTTPServerImpl(server, endpoint_name, port, thread_cnt));
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver
