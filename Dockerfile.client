@@ -24,24 +24,41 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-FROM ubuntu:16.04
+# Default setting is building on ubuntu:16.04
+ARG UBUNTU_VERSION=16.04
 
-# Build for Python 3.5
-ARG PYVER=3.5
-
+FROM ubuntu:16.04 as base-16.04
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libcurl3-dev
+
+FROM ubuntu:18.04 as base-18.04
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libcurl4-openssl-dev \
+            python3-distutils
+
+FROM base-${UBUNTU_VERSION}
+# Build for Python 3.5 
+ARG PYVER=3.5
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             software-properties-common \
             autoconf \
             automake \
             build-essential \
             curl \
             git \
-            libcurl3-dev \
             libopencv-dev \
             libopencv-core-dev \
             libtool \
-            pkg-config \
+            pkg-config
+
+# Patch to be able to install Python versions
+# that are not provided from official repository of Ubuntu
+RUN add-apt-repository -y ppa:deadsnakes/ppa
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             python$PYVER \
             python$PYVER-dev
 
