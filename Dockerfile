@@ -254,7 +254,7 @@ COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib
 COPY --from=trtserver_build /opt/tensorrtserver/include include
 
-RUN chmod ugo-w+x /opt/tensorrtserver/lib/*.so
+RUN chmod ugo-w+rx /opt/tensorrtserver/lib/*.so
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
