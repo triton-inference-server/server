@@ -78,7 +78,9 @@ using TimestampVector =
 //     all responses.
 // - Latency (usec):
 //     The average elapsed time between when a request is sent and
-//     when the response for the request is received.
+//     when the response for the request is received. If 'percentile' flag is
+//     specified, the selected percentile value will be reported instead of
+//     average value.
 //
 // There are two settings (see -d option) for the data collection:
 // - Fixed concurrent request mode:
@@ -157,9 +159,8 @@ typedef struct PerformanceStatusStruct {
   // Only record sequences that finish within the measurement window
   uint64_t client_sequence_count;
   uint64_t client_duration_ns;
-  uint64_t client_min_latency_ns;
-  uint64_t client_max_latency_ns;
   uint64_t client_avg_latency_ns;
+  uint64_t client_percentile_latency_ns;
   // Using usec to avoid square of large number (large in nsec)
   uint64_t std_us;
   uint64_t client_avg_request_time_ns;
@@ -824,6 +825,7 @@ class InferenceProfiler {
   static nic::Error Create(
       const bool verbose, const bool profile, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
+      const int64_t percentile,
       std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<ConcurrencyManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
@@ -849,6 +851,7 @@ class InferenceProfiler {
   InferenceProfiler(
       const bool verbose, const bool profile, const double stable_offset,
       const int32_t measurement_window_ms, const size_t max_measurement_count,
+      const bool report_percentile, const size_t percentile,
       const bool on_sequence_model, const std::string& model_name,
       const int64_t model_version,
       std::unique_ptr<nic::ProfileContext> profile_ctx,
@@ -900,7 +903,7 @@ class InferenceProfiler {
   std::vector<uint64_t> ValidLatencyMeasurement(
       const TimestampVector& timestamps,
       const std::pair<uint64_t, uint64_t>& valid_range,
-      bool sort, size_t& valid_sequence_count);
+      size_t& valid_sequence_count);
 
   /// \param latencies The vector of request latencies collected.
   /// \param summary Returns the summary that the latency related fields are
@@ -939,6 +942,8 @@ class InferenceProfiler {
   double stable_offset_;
   uint64_t measurement_window_ms_;
   size_t max_measurement_count_;
+  bool report_percentile_;
+  size_t percentile_;
 
   bool on_sequence_model_;
   std::string model_name_;
@@ -953,6 +958,7 @@ nic::Error
 InferenceProfiler::Create(
     const bool verbose, const bool profile, const double stable_offset,
     const uint64_t measurement_window_ms, const size_t max_measurement_count,
+    const int64_t percentile,
     std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<ConcurrencyManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
@@ -964,7 +970,8 @@ InferenceProfiler::Create(
 
   profiler->reset(new InferenceProfiler(
       verbose, profile, stable_offset, measurement_window_ms,
-      max_measurement_count, factory->IsSequenceModel(), factory->ModelName(),
+      max_measurement_count, (percentile != -1), percentile,
+      factory->IsSequenceModel(), factory->ModelName(),
       factory->ModelVersion(), std::move(profile_ctx), std::move(status_ctx),
       std::move(manager)));
   return nic::Error::Success;
@@ -973,6 +980,7 @@ InferenceProfiler::Create(
 InferenceProfiler::InferenceProfiler(
     const bool verbose, const bool profile, const double stable_offset,
     const int32_t measurement_window_ms, const size_t max_measurement_count,
+    const bool report_percentile, const size_t percentile,
     const bool on_sequence_model, const std::string& model_name,
     const int64_t model_version,
     std::unique_ptr<nic::ProfileContext> profile_ctx,
@@ -981,6 +989,7 @@ InferenceProfiler::InferenceProfiler(
     : verbose_(verbose), profile_(profile), stable_offset_(stable_offset),
       measurement_window_ms_(measurement_window_ms),
       max_measurement_count_(max_measurement_count),
+      report_percentile_(report_percentile), percentile_(percentile),
       on_sequence_model_(on_sequence_model), model_name_(model_name),
       model_version_(model_version), profile_ctx_(std::move(profile_ctx)),
       status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
@@ -1009,17 +1018,27 @@ InferenceProfiler::Profile(
     RETURN_IF_ERROR(Measure(status_summary));
 
     infer_per_sec.push_back(status_summary.client_infer_per_sec);
-    latencies.push_back(status_summary.client_avg_latency_ns);
+    if (report_percentile_) {
+      latencies.push_back(status_summary.client_percentile_latency_ns);
+    } else {
+      latencies.push_back(status_summary.client_avg_latency_ns);
+    }
     avg_ips += (double)infer_per_sec.back() / recent_k;
     avg_latency += latencies.back() / recent_k;
 
     if (verbose_) {
       std::cout << "  Pass [" << infer_per_sec.size()
-                << "] throughput: " << infer_per_sec.back() << " infer/sec. "
-                << "Avg latency: "
-                << (status_summary.client_avg_latency_ns / 1000)
-                << " usec (std " << status_summary.std_us << " usec)"
-                << std::endl;
+                << "] throughput: " << infer_per_sec.back() << " infer/sec. ";
+      if (report_percentile_) {
+        std::cout << percentile_ << "-th percentile latency: "
+                  << (status_summary.client_percentile_latency_ns / 1000)
+                  << " usec" << std::endl;
+      } else {
+        std::cout << "Avg latency: "
+                  << (status_summary.client_avg_latency_ns / 1000)
+                  << " usec (std " << status_summary.std_us << " usec)"
+                  << std::endl;
+      }
     }
 
     if (infer_per_sec.size() >= recent_k) {
@@ -1127,12 +1146,11 @@ InferenceProfiler::Summarize(
     const nic::InferContext::Stat& end_stat,
     PerfStatus& summary)
 {
-  bool sort = false;
   size_t valid_sequence_count = 0;
 
   // Get measurement from requests that fall within the time interval
   std::pair<uint64_t, uint64_t> valid_range = MeasurementTimestamp(timestamps);
-  std::vector<uint64_t> latencies = ValidLatencyMeasurement(timestamps, valid_range, sort, valid_sequence_count);
+  std::vector<uint64_t> latencies = ValidLatencyMeasurement(timestamps, valid_range, valid_sequence_count);
 
   RETURN_IF_ERROR(SummarizeLatency(latencies, summary));
   RETURN_IF_ERROR(SummarizeClientStat(start_stat, end_stat, valid_range.second - valid_range.first, latencies.size(), valid_sequence_count, summary));
@@ -1182,7 +1200,7 @@ std::vector<uint64_t>
 InferenceProfiler::ValidLatencyMeasurement(
     const TimestampVector& timestamps,
     const std::pair<uint64_t, uint64_t>& valid_range,
-    bool sort, size_t& valid_sequence_count)
+    size_t& valid_sequence_count)
 {
   std::vector<uint64_t> valid_latencies;
   valid_sequence_count = 0;
@@ -1205,7 +1223,7 @@ InferenceProfiler::ValidLatencyMeasurement(
     }
   }
 
-  if (sort) {
+  if (report_percentile_) {
     std::sort(valid_latencies.begin(), valid_latencies.end());
   }
 
@@ -1223,26 +1241,21 @@ InferenceProfiler::SummarizeLatency(
         " Please use a larger time window.");
   }
 
-  uint64_t min_latency_ns = 0;
-  uint64_t max_latency_ns = 0;
   uint64_t tol_latency_ns = 0;
   uint64_t tol_square_latency_us = 0;
 
   for (const auto& latency : latencies) {
-    if ((latency < min_latency_ns) || (min_latency_ns == 0)) {
-      min_latency_ns = latency;
-    }
-    if ((latency > max_latency_ns) || (max_latency_ns == 0)) {
-      max_latency_ns = latency;
-    }
     tol_latency_ns += latency;
     tol_square_latency_us +=
         (latency * latency) / (1000 * 1000);
   }
 
-  summary.client_min_latency_ns = min_latency_ns;
-  summary.client_max_latency_ns = max_latency_ns;
   summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
+
+  if (report_percentile_) {
+    size_t index = (percentile_ / 100.0) * latencies.size();
+    summary.client_percentile_latency_ns = latencies[index];
+  }
 
   // calculate standard deviation
   uint64_t expected_square_latency_us =
@@ -1375,6 +1388,7 @@ ParseProtocol(const std::string& str)
 nic::Error
 Report(
     const PerfStatus& summary, const size_t concurrent_request_count,
+    const int64_t percentile,
     const ProtocolType protocol, const bool verbose)
 {
   const uint64_t cnt = summary.server_request_count;
@@ -1393,6 +1407,7 @@ Report(
                                 : 0;
 
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
+  const uint64_t percentile_latency_us = summary.client_percentile_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
   const uint64_t avg_request_time_us =
@@ -1447,10 +1462,16 @@ Report(
               << summary.client_sequence_per_sec << " seq/sec)" << std::endl;
   }
   std::cout << "    Throughput: " << summary.client_infer_per_sec
-            << " infer/sec" << std::endl
-            << "    Avg latency: " << avg_latency_us << " usec"
-            << " (standard deviation " << std_us << " usec)" << std::endl
-            << client_library_detail << std::endl
+            << " infer/sec" << std::endl;
+  if (percentile != -1) {
+    std::cout << "    " << percentile << "-th percentile latency: "
+              << percentile_latency_us
+              << " usec" << std::endl;
+  } else {
+    std::cout << "    Avg latency: " << avg_latency_us << " usec"
+              << " (standard deviation " << std_us << " usec)" << std::endl;
+  }
+  std::cout << client_library_detail << std::endl
             << "  Server: " << std::endl
             << "    Request count: " << cnt << std::endl
             << "    Avg request latency: " << cumm_avg_us << " usec"
@@ -1493,6 +1514,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
+  std::cerr << "\t--percentile <percentile>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "The -d flag enables dynamic concurrent request count where the number"
@@ -1549,6 +1571,12 @@ Usage(char** argv, const std::string& msg = std::string())
       << " of x requests to be sent as the elements in the sequence. The length"
       << " of the actual sequence will be within +/- 20% of the base length."
       << std::endl;
+  std::cerr
+      << "For --percentile, it indicates that the specified percentile in terms"
+      << " of latency will be reported and used to detemine if the measurement"
+      << " is stable instead of average latency."
+      << " Default is -1 to indicate no percentile will be used or reported."
+      << std::endl;
 
   exit(1);
 }
@@ -1566,6 +1594,7 @@ main(int argc, char** argv)
   size_t max_threads = 16;
   // average length of a sentence
   size_t sequence_length = 20;
+  int32_t percentile = -1;
   uint64_t latency_threshold_ms = 0;
   int32_t batch_size = 1;
   int32_t concurrent_request_count = 1;
@@ -1583,6 +1612,7 @@ main(int argc, char** argv)
   static struct option long_options[] = {{"streaming", 0, 0, 0},
                                          {"max-threads", 1, 0, 1},
                                          {"sequence-length", 1, 0, 2},
+                                         {"percentile", 1, 0, 3},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -1599,6 +1629,9 @@ main(int argc, char** argv)
         break;
       case 2:
         sequence_length = std::atoi(optarg);
+        break;
+      case 3:
+        percentile = std::atoi(optarg);
         break;
       case 'v':
         verbose = true;
@@ -1674,7 +1707,7 @@ main(int argc, char** argv)
     Usage(argv, "latency threshold must be >= 0 for dynamic concurrency mode");
   }
   if (streaming && protocol != ProtocolType::GRPC) {
-    Usage(argv, "Streaming is only allowed with gRPC protocol");
+    Usage(argv, "streaming is only allowed with gRPC protocol");
   }
   if (max_threads == 0) {
     Usage(argv, "maximum number of threads must be > 0");
@@ -1684,6 +1717,9 @@ main(int argc, char** argv)
     std::cerr << "WARNING: using an invalid sequence length. Perf client will"
               << " use default value if it is measuring on sequence model."
               << std::endl;
+  }
+  if (percentile != -1 && (percentile > 99 || percentile < 1)) {
+    Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
   }
 
   // trap SIGINT to allow threads to exit gracefully
@@ -1734,14 +1770,14 @@ main(int argc, char** argv)
   if (!dynamic_concurrency_mode) {
     err = profiler->Profile(concurrent_request_count, status_summary);
     if (err.IsOk()) {
-      err = Report(status_summary, concurrent_request_count, protocol, verbose);
+      err = Report(status_summary, concurrent_request_count, percentile, protocol, verbose);
     }
   } else {
     for (size_t count = concurrent_request_count;
          (count <= max_concurrency) || (max_concurrency == 0); count++) {
       err = profiler->Profile(count, status_summary);
       if (err.IsOk()) {
-        err = Report(status_summary, count, protocol, verbose);
+        err = Report(status_summary, count, percentile, protocol, verbose);
         summary.push_back(status_summary);
         uint64_t avg_latency_ms =
             status_summary.client_avg_latency_ns / (1000 * 1000);
