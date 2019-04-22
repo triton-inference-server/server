@@ -46,6 +46,11 @@ try:
         def finalize_options(self):
             _bdist_wheel.finalize_options(self)
             self.root_is_pure = False
+        def get_tag(self):
+            pyver, abi, plat = _bdist_wheel.get_tag(self)
+            # Client Python code is compatible with both Python 2 and 3
+            pyver, abi = 'py2.py3', 'none'
+            return pyver, abi, plat
 except ImportError:
     bdist_wheel = None
 
