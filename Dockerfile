@@ -41,7 +41,7 @@ FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 # to:
 #   - copy over netdef_bundle_c2 interface so it can build with other
 #     C2 sources
-#   - need to patch to delegate logging to the inference server.
+#   - need to patch as explained below
 
 # Copy netdef_bundle_c2 into Caffe2 core so it builds into the
 # libcaffe2 library. We want netdef_bundle_c2 to build against the
@@ -49,16 +49,9 @@ FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 COPY src/servables/caffe2/netdef_bundle_c2.* \
      /opt/pytorch/pytorch/caffe2/core/
 
-# Modify the C2 logging library to delegate logging to the trtserver
-# logger. Use a checksum to detect if the C2 logging file has
-# changed... if it has need to verify our patch is still valid and
-# update the patch/checksum as necessary.
+# Avoid failure when peer access already enabled for CUDA device
 COPY tools/patch/caffe2 /tmp/patch/caffe2
 RUN sha1sum -c /tmp/patch/caffe2/checksums && \
-    patch -i /tmp/patch/caffe2/c10/util/Logging.cpp \
-          /opt/pytorch/pytorch/c10/util/Logging.cpp && \
-    patch -i /tmp/patch/caffe2/c10/util/logging_is_not_google_glog.h \
-          /opt/pytorch/pytorch/c10/util/logging_is_not_google_glog.h && \
     patch -i /tmp/patch/caffe2/core/context_gpu.cu \
           /opt/pytorch/pytorch/caffe2/core/context_gpu.cu
 
@@ -138,15 +131,10 @@ COPY . .
 # Pull the TFS release that matches the version of TF being used.
 RUN git clone --single-branch -b ${TFS_BRANCH} https://github.com/tensorflow/serving.git
 
-# Modify the TF logging library to delegate logging to the trtserver
-# logger. Use a checksum to detect if the TF logging file has
-# changed... if it has need to verify our patch is still valid and
-# update the patch/checksum as necessary.
+# Modify the TF model loader to allow us to set the default GPU
 RUN sha1sum -c tools/patch/tensorflow/checksums && \
     patch -i tools/patch/tensorflow/cc/saved_model/loader.cc \
-          /opt/tensorflow/tensorflow/cc/saved_model/loader.cc && \
-    patch -i tools/patch/tensorflow/core/platform/default/logging.cc \
-          /opt/tensorflow/tensorflow/core/platform/default/logging.cc
+          /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
 
 # TFS modifications. Use a checksum to detect if the TFS file has
 # changed... if it has need to verify our patch is still valid and

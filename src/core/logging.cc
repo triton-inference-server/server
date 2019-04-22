@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -78,27 +78,6 @@ LogMessage::LogMessage(const char* file, int line, uint32_t level)
 LogMessage::~LogMessage()
 {
   gLogger_.Log(stream_.str());
-}
-
-uint32_t
-DelegatedVerboseLogLevel()
-{
-  return gLogger_.VerboseLevel();
-}
-
-void
-DelegatedLogMessage(
-    int dlevel, const char* file, int line, const std::string& msg)
-{
-  if ((dlevel < 0) || (dlevel > LOG_DELEGATED_INFO_LEVEL)) {
-    dlevel = LOG_DELEGATED_ERROR_LEVEL;
-  }
-
-  auto level = static_cast<nvidia::inferenceserver::LogMessage::Level>(dlevel);
-  if (nvidia::inferenceserver::gLogger_.IsEnabled(level)) {
-    nvidia::inferenceserver::LogMessage lmsg(file, line, level);
-    lmsg.stream() << msg;
-  }
 }
 
 }}  // namespace nvidia::inferenceserver
