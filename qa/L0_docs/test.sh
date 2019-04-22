@@ -32,7 +32,7 @@ RET=0
 
 apt-get update && \
     apt-get install -y --no-install-recommends zip doxygen && \
-    pip install --upgrade sphinx==1.8.5 sphinx-rtd-theme nbsphinx exhale
+    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
 set +e
 
