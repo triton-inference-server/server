@@ -24,35 +24,44 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-FROM ubuntu:16.04
+# Default setting is building on ubuntu:16.04
+ARG UBUNTU_VERSION=16.04
 
-# Build for Python 3.5
-ARG PYVER=3.5
+FROM ubuntu:${UBUNTU_VERSION}
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+# install platform specific packages
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl3-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl4-openssl-dev; \
+    else \
+        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        exit 1; \
+    fi
+
+RUN apt-get install -y --no-install-recommends \
             software-properties-common \
             autoconf \
             automake \
             build-essential \
             curl \
             git \
-            libcurl3-dev \
             libopencv-dev \
             libopencv-core-dev \
             libtool \
             pkg-config \
-            python$PYVER \
-            python$PYVER-dev
-
-# Make /usr/bin/python point to the $PYVER version of python
-RUN rm -f /usr/bin/python && \
-    rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python`echo $PYVER | cut -c1-1`
+            python \
+            python-dev
 
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python$PYVER get-pip.py && \
+    python get-pip.py && \
     rm get-pip.py
 
 RUN pip install --upgrade setuptools grpcio-tools
