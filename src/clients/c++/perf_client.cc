@@ -170,6 +170,9 @@ typedef struct PerformanceStatusStruct {
   int client_infer_per_sec;
   int client_sequence_per_sec;
   bool on_sequence_model;
+
+  // placeholder for the latency value that is used for conditional checking
+  uint64_t reporting_latency_ns;
 } PerfStatus;
 
 
@@ -326,7 +329,7 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
 /// to number of concurrent infer requests and to collect per-request statistic.
 ///
 /// Detail:
-/// Concurrency Manager will maintain the number of concurrent requests by 
+/// Concurrency Manager will maintain the number of concurrent requests by
 /// spawning worker threads that keep sending randomly generated requests to the
 /// server. The worker threads will record the start time and end
 /// time of each request into a shared vector.
@@ -676,8 +679,7 @@ ConcurrencyManager::AsyncInfer(
 
     // Create async requests such that the number of ongoing requests
     // matches the concurrency level (here is 'num_reqs')
-    size_t seq_length =
-        on_sequence_model_ ? GetRandomLength(0.2) : 1;
+    size_t seq_length = on_sequence_model_ ? GetRandomLength(0.2) : 1;
     for (size_t idx = 0; idx < num_reqs; idx++) {
       if (!ctxs_working[idx]) {
         // Create requests
@@ -777,8 +779,8 @@ ConcurrencyManager::AsyncInfer(
 size_t
 ConcurrencyManager::GetRandomLength(double offset_ratio)
 {
-  int random_offset =
-      ((2.0 * rand() / double(RAND_MAX)) - 1.0) * offset_ratio * sequence_length_;
+  int random_offset = ((2.0 * rand() / double(RAND_MAX)) - 1.0) * offset_ratio *
+                      sequence_length_;
   if (int(sequence_length_) + random_offset <= 0) {
     return 1;
   }
@@ -796,7 +798,8 @@ ConcurrencyManager::GetRandomLength(double offset_ratio)
 /// 'status_summary' based on the most recent measurement.
 ///
 /// The measurement procedure:
-/// 1. The profiler gets start status from the server and records the start time.
+/// 1. The profiler gets start status from the server and records the start
+/// time.
 /// 2. After given time interval, the profiler gets end status from the server
 ///    and records the end time.
 /// 3. The profiler obtains the timestamps recorded by concurrency manager,
@@ -809,9 +812,10 @@ class InferenceProfiler {
   /// \param verbose Whether to print verbose logging.
   /// \param profile Whether to send profile requests to server.
   /// \param stable_offset The range that the measurement is considered as
-  /// stable. i.e. within (1 +/- stable_offset) * average value of last
-  /// 3 measurements. The default criterias are "infer per second" and
-  /// "average latency".
+  /// stable. i.e. within (1 +/- stable_offset) * average value of the last
+  /// 3 measurements. The criterias are "infer per second" and "average
+  /// latency", or "infer per second" and "percentile latency" if valid
+  /// percentile is set (see 'percentile' below).
   /// \param measurement_window_ms The duration of each measurement in msec.
   /// \param max_measurement_count The maximum number of attempts to obtain
   /// stable measurement.
@@ -825,8 +829,7 @@ class InferenceProfiler {
   static nic::Error Create(
       const bool verbose, const bool profile, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
-      const int64_t percentile,
-      std::shared_ptr<ContextFactory>& factory,
+      const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<ConcurrencyManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
 
@@ -859,7 +862,7 @@ class InferenceProfiler {
       std::unique_ptr<ConcurrencyManager> manager);
 
   nic::Error StartProfile() { return profile_ctx_->StartProfile(); }
-  
+
   nic::Error StopProfile() { return profile_ctx_->StopProfile(); }
 
   /// Helper function to perform measurement.
@@ -882,11 +885,10 @@ class InferenceProfiler {
   /// \param summary Returns the summary of the measurement.
   /// \return Error object indicating success or failure.
   nic::Error Summarize(
-      const TimestampVector& timestamps,
-      const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
+      const TimestampVector& timestamps, const ni::ModelStatus& start_status,
+      const ni::ModelStatus& end_status,
       const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat,
-      PerfStatus& summary);
+      const nic::InferContext::Stat& end_stat, PerfStatus& summary);
 
   /// \param timestamps The timestamps collected for the measurement.
   /// \return the start and end timestamp of the measurement window.
@@ -922,10 +924,8 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   nic::Error SummarizeClientStat(
       const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat,
-      const uint64_t duration_ns,
-      const size_t valid_request_count,
-      const size_t valid_sequence_count,
+      const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
+      const size_t valid_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
   /// \param start_status The model status at the start of the measurement.
@@ -958,8 +958,7 @@ nic::Error
 InferenceProfiler::Create(
     const bool verbose, const bool profile, const double stable_offset,
     const uint64_t measurement_window_ms, const size_t max_measurement_count,
-    const int64_t percentile,
-    std::shared_ptr<ContextFactory>& factory,
+    const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<ConcurrencyManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
 {
@@ -971,9 +970,8 @@ InferenceProfiler::Create(
   profiler->reset(new InferenceProfiler(
       verbose, profile, stable_offset, measurement_window_ms,
       max_measurement_count, (percentile != -1), percentile,
-      factory->IsSequenceModel(), factory->ModelName(),
-      factory->ModelVersion(), std::move(profile_ctx), std::move(status_ctx),
-      std::move(manager)));
+      factory->IsSequenceModel(), factory->ModelName(), factory->ModelVersion(),
+      std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
   return nic::Error::Success;
 }
 
@@ -1018,11 +1016,7 @@ InferenceProfiler::Profile(
     RETURN_IF_ERROR(Measure(status_summary));
 
     infer_per_sec.push_back(status_summary.client_infer_per_sec);
-    if (report_percentile_) {
-      latencies.push_back(status_summary.client_percentile_latency_ns);
-    } else {
-      latencies.push_back(status_summary.client_avg_latency_ns);
-    }
+    latencies.push_back(status_summary.reporting_latency_ns);
     avg_ips += (double)infer_per_sec.back() / recent_k;
     avg_latency += latencies.back() / recent_k;
 
@@ -1140,20 +1134,22 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
 
 nic::Error
 InferenceProfiler::Summarize(
-    const TimestampVector& timestamps,
-    const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
+    const TimestampVector& timestamps, const ni::ModelStatus& start_status,
+    const ni::ModelStatus& end_status,
     const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat,
-    PerfStatus& summary)
+    const nic::InferContext::Stat& end_stat, PerfStatus& summary)
 {
   size_t valid_sequence_count = 0;
 
   // Get measurement from requests that fall within the time interval
   std::pair<uint64_t, uint64_t> valid_range = MeasurementTimestamp(timestamps);
-  std::vector<uint64_t> latencies = ValidLatencyMeasurement(timestamps, valid_range, valid_sequence_count);
+  std::vector<uint64_t> latencies =
+      ValidLatencyMeasurement(timestamps, valid_range, valid_sequence_count);
 
   RETURN_IF_ERROR(SummarizeLatency(latencies, summary));
-  RETURN_IF_ERROR(SummarizeClientStat(start_stat, end_stat, valid_range.second - valid_range.first, latencies.size(), valid_sequence_count, summary));
+  RETURN_IF_ERROR(SummarizeClientStat(
+      start_stat, end_stat, valid_range.second - valid_range.first,
+      latencies.size(), valid_sequence_count, summary));
   RETURN_IF_ERROR(SummarizeServerStat(start_status, end_status, summary));
 
   return nic::Error::Success;
@@ -1232,7 +1228,7 @@ InferenceProfiler::ValidLatencyMeasurement(
 
 nic::Error
 InferenceProfiler::SummarizeLatency(
-      const std::vector<uint64_t>& latencies, PerfStatus& summary)
+    const std::vector<uint64_t>& latencies, PerfStatus& summary)
 {
   if (latencies.size() == 0) {
     return nic::Error(
@@ -1246,15 +1242,18 @@ InferenceProfiler::SummarizeLatency(
 
   for (const auto& latency : latencies) {
     tol_latency_ns += latency;
-    tol_square_latency_us +=
-        (latency * latency) / (1000 * 1000);
+    tol_square_latency_us += (latency * latency) / (1000 * 1000);
   }
 
   summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
 
   if (report_percentile_) {
-    size_t index = (percentile_ / 100.0) * latencies.size();
+    // Round to nearest integer index by + 0.5
+    size_t index = (percentile_ / 100.0) * (latencies.size() - 1) + 0.5;
     summary.client_percentile_latency_ns = latencies[index];
+    summary.reporting_latency_ns = summary.client_percentile_latency_ns;
+  } else {
+    summary.reporting_latency_ns = summary.client_avg_latency_ns;
   }
 
   // calculate standard deviation
@@ -1274,8 +1273,7 @@ InferenceProfiler::SummarizeLatency(
 nic::Error
 InferenceProfiler::SummarizeClientStat(
     const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat,
-    const uint64_t duration_ns,
+    const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
     const size_t valid_request_count, const size_t valid_sequence_count,
     PerfStatus& summary)
 {
@@ -1388,8 +1386,7 @@ ParseProtocol(const std::string& str)
 nic::Error
 Report(
     const PerfStatus& summary, const size_t concurrent_request_count,
-    const int64_t percentile,
-    const ProtocolType protocol, const bool verbose)
+    const int64_t percentile, const ProtocolType protocol, const bool verbose)
 {
   const uint64_t cnt = summary.server_request_count;
 
@@ -1407,7 +1404,8 @@ Report(
                                 : 0;
 
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
-  const uint64_t percentile_latency_us = summary.client_percentile_latency_ns / 1000;
+  const uint64_t percentile_latency_us =
+      summary.client_percentile_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
   const uint64_t avg_request_time_us =
@@ -1464,9 +1462,9 @@ Report(
   std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl;
   if (percentile != -1) {
-    std::cout << "    " << percentile << "-th percentile latency: "
-              << percentile_latency_us
-              << " usec" << std::endl;
+    std::cout << "    " << percentile
+              << "-th percentile latency: " << percentile_latency_us << " usec"
+              << std::endl;
   } else {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
@@ -1743,8 +1741,8 @@ main(int argc, char** argv)
   }
   err = InferenceProfiler::Create(
       verbose, profile, stable_offset, measurement_window_ms,
-      max_measurement_count, percentile,
-      factory, std::move(manager), &profiler);
+      max_measurement_count, percentile, factory, std::move(manager),
+      &profiler);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
@@ -1763,6 +1761,12 @@ main(int argc, char** argv)
                 << " concurrent requests" << std::endl;
     }
   }
+  if (percentile == -1) {
+    std::cout << "  Reporting average latency" << std::endl;
+  } else {
+    std::cout << "  Reporting " << percentile << "-th percentile latency"
+              << std::endl;
+  }
   std::cout << std::endl;
 
   PerfStatus status_summary;
@@ -1770,7 +1774,9 @@ main(int argc, char** argv)
   if (!dynamic_concurrency_mode) {
     err = profiler->Profile(concurrent_request_count, status_summary);
     if (err.IsOk()) {
-      err = Report(status_summary, concurrent_request_count, percentile, protocol, verbose);
+      err = Report(
+          status_summary, concurrent_request_count, percentile, protocol,
+          verbose);
     }
   } else {
     for (size_t count = concurrent_request_count;
@@ -1779,9 +1785,9 @@ main(int argc, char** argv)
       if (err.IsOk()) {
         err = Report(status_summary, count, percentile, protocol, verbose);
         summary.push_back(status_summary);
-        uint64_t avg_latency_ms =
-            status_summary.client_avg_latency_ns / (1000 * 1000);
-        if ((avg_latency_ms >= latency_threshold_ms) || !err.IsOk()) {
+        uint64_t reporting_latency_ms =
+            status_summary.reporting_latency_ns / (1000 * 1000);
+        if ((reporting_latency_ms >= latency_threshold_ms) || !err.IsOk()) {
           std::cerr << err << std::endl;
           break;
         }
@@ -1795,24 +1801,27 @@ main(int argc, char** argv)
     return 1;
   }
   if (summary.size()) {
-    std::ofstream ofs(filename, std::ofstream::out);
     // Can print more depending on verbose, but it seems too much information
-    std::cout << "Inferences/Second vs. Client Average Batch Latency"
-              << std::endl;
-    if (!filename.empty()) {
-      ofs << "Concurrency,Inferences/Second,Client Send,"
-          << "Network+Server Send/Recv,Server Queue,"
-          << "Server Compute,Client Recv" << std::endl;
+    std::cout << "Inferences/Second vs. Client ";
+    if (percentile == -1) {
+      std::cout << "Average Batch Latency" << std::endl;
+    } else {
+      std::cout << percentile << "-th Percentile Batch Latency" << std::endl;
     }
 
     for (PerfStatus& status : summary) {
       std::cout << "Concurrency: " << status.concurrency << ", "
                 << status.client_infer_per_sec << " infer/sec, latency "
-                << (status.client_avg_latency_ns / 1000) << " usec"
-                << std::endl;
+                << (status.reporting_latency_ns / 1000) << " usec" << std::endl;
     }
 
     if (!filename.empty()) {
+      std::ofstream ofs(filename, std::ofstream::out);
+
+      ofs << "Concurrency,Inferences/Second,Client Send,"
+          << "Network+Server Send/Recv,Server Queue,"
+          << "Server Compute,Client Recv" << std::endl;
+
       // Sort summary results in order of increasing infer/sec.
       std::sort(
           summary.begin(), summary.end(),
@@ -1835,8 +1844,8 @@ main(int argc, char** argv)
             << "," << (avg_compute_ns / 1000) << ","
             << (status.client_avg_receive_time_ns / 1000) << std::endl;
       }
+      ofs.close();
     }
-    ofs.close();
   }
   return 0;
 }
