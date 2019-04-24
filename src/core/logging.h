@@ -1,4 +1,4 @@
-// Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -125,15 +125,5 @@ extern Logger gLogger_;
       .stream()
 
 #define LOG_FLUSH nvidia::inferenceserver::gLogger_.Flush()
-
-// Callbacks used for frameworks to log via this logging
-// interface. These declarations must be kept in sync with the usage
-// in tools/patch files.
-#define LOG_DELEGATED_ERROR_LEVEL 0
-#define LOG_DELEGATED_WARNING_LEVEL 1
-#define LOG_DELEGATED_INFO_LEVEL 2
-extern "C" uint32_t DelegatedVerboseLogLevel();
-extern "C" void DelegatedLogMessage(
-    int level, const char* file, int line, const std::string& msg);
 
 }}  // namespace nvidia::inferenceserver
