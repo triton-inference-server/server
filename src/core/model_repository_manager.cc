@@ -594,15 +594,15 @@ ModelRepositoryManager::GetBackendHandle(
   Platform platform;
   Status status = GetModelPlatform(model_name, &platform);
   if (status.IsOk()) {
-    handle->reset(
-        new BackendHandleImpl(platform, model_spec, singleton->core_.get()));
-
+    handle->reset(new BackendHandleImpl(platform, model_spec, core_.get()));
     if ((*handle)->GetInferenceBackend() == nullptr) {
       handle->reset();
-      status = Status(
-          RequestStatusCode::UNAVAILABLE,
-          "Inference request for unknown model '" + model_name + "'");
     }
+  }
+  if (*handle == nullptr) {
+    status = Status(
+        RequestStatusCode::UNAVAILABLE,
+        "Inference request for unknown model '" + model_name + "'");
   }
 
   return status;
