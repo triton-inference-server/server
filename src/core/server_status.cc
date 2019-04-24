@@ -32,8 +32,6 @@
 #include "src/core/metric_model_reporter.h"
 #include "src/core/metrics.h"
 #include "src/core/provider.h"
-#include "tensorflow_serving/core/servable_state.h"
-#include "tensorflow_serving/core/servable_state_monitor.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -41,44 +39,26 @@ namespace {
 
 void
 SetModelVersionReadyState(
-    const tensorflow::serving::ServableStateMonitor& monitor, ModelStatus& ms)
+    ModelStatus& ms, ModelRepositoryManager* model_repository_manager)
 {
   const std::string& model_name = ms.config().name();
 
   // Set all model versions for which we have status to
   // unavailable... and then override that with actual status for the
   // versions that are currently being served.
-  for (auto& itr : *ms.mutable_version_status()) {
+  auto& mvs = *ms.mutable_version_status();
+  for (auto& itr : mvs) {
     itr.second.set_ready_state(ModelReadyState::MODEL_UNAVAILABLE);
   }
 
-  const tensorflow::serving::ServableStateMonitor::VersionMap
-      versions_and_states = monitor.GetVersionStates(model_name);
+  // [TODO] Once ModelRepositoryManager (MRM) is improved, instead of polling
+  // version states from MRM, MRM will notify ServerStatusManager if there are
+  // version state changes. In this way, there is no cross referencing between
+  // these two classes.
+  const auto versions_and_states =
+      model_repository_manager->GetVersionStates(model_name);
   for (const auto& version_and_state : versions_and_states) {
-    const int64_t version = version_and_state.first;
-    const tensorflow::serving::ServableState& servable_state =
-        version_and_state.second.state;
-
-    ModelReadyState ready_state = ModelReadyState::MODEL_UNKNOWN;
-    switch (servable_state.manager_state) {
-      case tensorflow::serving::ServableState::ManagerState::kLoading:
-        ready_state = ModelReadyState::MODEL_LOADING;
-        break;
-      case tensorflow::serving::ServableState::ManagerState::kUnloading:
-        ready_state = ModelReadyState::MODEL_UNLOADING;
-        break;
-      case tensorflow::serving::ServableState::ManagerState::kAvailable:
-        ready_state = ModelReadyState::MODEL_READY;
-        break;
-      default:
-        ready_state = ModelReadyState::MODEL_UNAVAILABLE;
-        break;
-    }
-
-    if (ready_state != ModelReadyState::MODEL_UNKNOWN) {
-      auto& mvs = *ms.mutable_version_status();
-      mvs[version].set_ready_state(ready_state);
-    }
+    mvs[version_and_state.first].set_ready_state(version_and_state.second);
   }
 }
 
@@ -93,12 +73,9 @@ ServerStatusManager::ServerStatusManager(const std::string& server_version)
 }
 
 Status
-ServerStatusManager::InitForModel(const std::string& model_name)
+ServerStatusManager::InitForModel(
+    const std::string& model_name, const ModelConfig& model_config)
 {
-  ModelConfig model_config;
-  RETURN_IF_ERROR(
-      ModelRepositoryManager::GetModelConfig(model_name, &model_config));
-
   std::lock_guard<std::mutex> lock(mu_);
 
   auto& ms = *server_status_.mutable_model_status();
@@ -115,12 +92,9 @@ ServerStatusManager::InitForModel(const std::string& model_name)
 }
 
 Status
-ServerStatusManager::UpdateConfigForModel(const std::string& model_name)
+ServerStatusManager::UpdateConfigForModel(
+    const std::string& model_name, const ModelConfig& model_config)
 {
-  ModelConfig model_config;
-  RETURN_IF_ERROR(
-      ModelRepositoryManager::GetModelConfig(model_name, &model_config));
-
   std::lock_guard<std::mutex> lock(mu_);
 
   auto& ms = *server_status_.mutable_model_status();
@@ -141,7 +115,7 @@ Status
 ServerStatusManager::Get(
     ServerStatus* server_status, const std::string& server_id,
     ServerReadyState server_ready_state, uint64_t server_uptime_ns,
-    const tensorflow::serving::ServableStateMonitor* monitor) const
+    ModelRepositoryManager* model_repository_manager) const
 {
   std::lock_guard<std::mutex> lock(mu_);
   server_status->CopyFrom(server_status_);
@@ -149,10 +123,8 @@ ServerStatusManager::Get(
   server_status->set_ready_state(server_ready_state);
   server_status->set_uptime_ns(server_uptime_ns);
 
-  if (monitor != nullptr) {
-    for (auto& msitr : *server_status->mutable_model_status()) {
-      SetModelVersionReadyState(*monitor, msitr.second);
-    }
+  for (auto& msitr : *server_status->mutable_model_status()) {
+    SetModelVersionReadyState(msitr.second, model_repository_manager);
   }
 
   return Status::Success;
@@ -163,7 +135,7 @@ ServerStatusManager::Get(
     ServerStatus* server_status, const std::string& server_id,
     ServerReadyState server_ready_state, uint64_t server_uptime_ns,
     const std::string& model_name,
-    const tensorflow::serving::ServableStateMonitor* monitor) const
+    ModelRepositoryManager* model_repository_manager) const
 {
   std::lock_guard<std::mutex> lock(mu_);
 
@@ -182,9 +154,7 @@ ServerStatusManager::Get(
 
   auto& ms = *server_status->mutable_model_status();
   ms[model_name].CopyFrom(itr->second);
-  if (monitor != nullptr) {
-    SetModelVersionReadyState(*monitor, ms[model_name]);
-  }
+  SetModelVersionReadyState(ms[model_name], model_repository_manager);
 
   return Status::Success;
 }

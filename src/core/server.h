@@ -40,10 +40,6 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
-namespace tensorflow { namespace serving {
-class ServerCore;
-}}  // namespace tensorflow::serving
-
 namespace nvidia { namespace inferenceserver {
 
 // Inference server information.
@@ -144,6 +140,12 @@ class InferenceServer {
     return status_manager_;
   }
 
+  // Return the model repository manager for this server.
+  ModelRepositoryManager* ModelManager() const
+  {
+    return model_repository_manager_.get();
+  }
+
   // A handle to a backend.
   class InferBackendHandle {
    public:
@@ -186,8 +188,8 @@ class InferenceServer {
   // for all in-flight requests to complete before exiting.
   std::atomic<uint64_t> inflight_request_counter_;
 
-  std::unique_ptr<tensorflow::serving::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
+  std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
 };
 
 }}  // namespace nvidia::inferenceserver
