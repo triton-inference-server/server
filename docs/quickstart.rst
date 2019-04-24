@@ -109,7 +109,7 @@ GitHub repo and checkout the release version of the branch that you
 want to build (or the master branch if you want to build the
 under-development version)::
 
-  $ git checkout r19.03
+  $ git checkout r19.04
 
 Then use docker to build::
 
@@ -190,7 +190,7 @@ and checkout the release version of the branch that you want to build
 version). The branch you use for the client build should match the
 version of the inference server you are using::
 
-  $ git checkout r19.03
+  $ git checkout r19.04
 
 Then use docker to build the C++ client library, C++ and Python
 examples, and a Python wheel file for the Python client library::
