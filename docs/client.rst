@@ -75,7 +75,7 @@ want to build (or the master branch if you want to build the
 under-development version). The branch you use for the client build
 should match the version of the inference server you are using::
 
-  $ git checkout r19.03
+  $ git checkout r19.04
 
 Then, issue the following command to build the C++ client library, C++
 and Python examples, and a Python wheel file for the Python client
@@ -126,7 +126,7 @@ client libraries and examples from the `GitHub release page
 corresponding to the release you are interested in. The client
 libraries and examples are found in the "Assets" section of the
 release page in a tar file named after the version of the release, for
-example, v1.0.0.clients.tar.gz.
+example, v1.1.0.clients.tar.gz.
 
 The pre-built libraries and examples can be used on a Ubuntu-16.04
 host or you can install them into the TensorRT Inference Server

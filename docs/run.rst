@@ -79,7 +79,7 @@ you pulled from NGC or built locally::
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
 
 Where *<tensorrtserver image name>* will be something like
-**nvcr.io/nvidia/tensorrtserver:19.03-py3** if you :ref:`pulled the
+**nvcr.io/nvidia/tensorrtserver:19.04-py3** if you :ref:`pulled the
 container from the NGC registry
 <section-installing-prebuilt-containers>`, or **tensorrtserver** if
 you :ref:`built it from source <section-building-the-server>`.
