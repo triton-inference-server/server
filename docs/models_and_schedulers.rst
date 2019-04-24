@@ -258,7 +258,7 @@ the following happens:
 Ensemble Models
 ---------------
 
-An ensemble model represents a *pipepline* of one or more models and the
+An ensemble model represents a *pipeline* of one or more models and the
 connection of input and output tensors between those models. Ensemble models are
 intended to be used to encapsulate a procedure that involves
 multiple models, such as "data preprocessing -> inference -> data postprocessing".
@@ -275,6 +275,8 @@ ensemble as :cpp:var:`Step
 scheduler collects the output tensors in each step, provides them as input
 tensors for other steps according to the specification. In spite of that, the
 ensemble model is still viewed as a single model from an external view.
+:ref:`section-ensemble_image_classification_example` is an example that performs
+image classification using an ensemble model.
 
 Note that the ensemble models will inherit the characteristics of the models
 involved, so the meta-data in the request header must comply with the models
