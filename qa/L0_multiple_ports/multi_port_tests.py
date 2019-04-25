@@ -43,13 +43,13 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
                         help='Protocol ("http"/"grpc") used to ' +
                         'communicate with inference service. Default is "http".')
-    parser.add_argument(-'hsp', "http_status_port", type=int,
+    parser.add_argument(-'sp', "status_port", type=int,
      help="The port for the server to listen on for HTTP Status requests.")
-    parser.add_argument(-'hhp', "http_health_port", type=int,
+    parser.add_argument(-'hp', "health_port", type=int,
      help="The port for the server to listen on for HTTP Health requests.")
-    parser.add_argument(-'hpp', "http_profile_port", type=int,
+    parser.add_argument(-'pp', "profile_port", type=int,
      help="The port for the server to listen on for HTTP Profile requests.")
-    parser.add_argument(-'hip', "http_infer_port", type=int,
+    parser.add_argument(-'ip', "infer_port", type=int,
      help="The port for the server to listen on for HTTP Infer requests.")
 
     FLAGS = parser.parse_args()

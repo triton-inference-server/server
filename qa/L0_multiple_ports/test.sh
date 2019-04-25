@@ -25,28 +25,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# MULTI_PORT_CLIENT=../clients/multi_port_client
-MULTI_PORT_CLIENT_PY=../clients/multi_port_client.py
+MULTI_PORT_TESTS_PY=multi_port_tests.py
 
 CLIENT_LOG="./client.log"
 
 DATADIR=`pwd`/models
-HSP_ARR=(8008 8009 8010 8011)
-HHP_ARR=(8008 8010 8010 8009)
-HPP_ARR=(8008 8011 8011 8010)
-HIP_ARR=(8008 8011 8008 8008)
+SP_ARR=(8008 8009 8010 8011)
+HP_ARR=(8008 8010 8010 8009)
+PP_ARR=(8008 8011 8011 8010)
+IP_ARR=(8008 8011 8008 8008)
 SERVER=/opt/tensorrtserver/bin/trtserver
 for (( n=0; n<4; n++ ))
 do
 :
-# do whatever on $i
-  SERVER_ARGS_ADD_HTTP="--http-status-port ${HSP_ARR[n]} --http-health-port ${HHP_ARR[n]} --http-profile-port ${HPP_ARR[n]}\
-    --http-infer-port ${HIP_ARR[n]} --http-port -1"
-  SERVER_ARGS_ADD_GRPC="--grpc-status-port $((${HSP_ARR[n]}+10)) --grpc-health-port $((${HHP_ARR[n]}+10)) \
-    --grpc-profile-port $((${HPP_ARR[n]}+10)) --grpc-infer-port $((${HIP_ARR[n]}+10)) --grpc-port -1"
+  SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} --http-profile-port ${PP_ARR[n]}\
+    --http-infer-port ${IP_ARR[n]} --http-port -1"
+  SERVER_ARGS_ADD_GRPC="--grpc-status-port $((${SP_ARR[n]}+10)) --grpc-health-port $((${HP_ARR[n]}+10)) \
+    --grpc-profile-port $((${PP_ARR[n]}+10)) --grpc-infer-port $((${IP_ARR[n]}+10)) --grpc-port -1"
   SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC $SERVER_ARGS_ADD_HTTP"
   SERVER_LOG="./inference_server.log"
-  SERVER_TIMEOUT=20
   source ../common/util.sh
 
   rm -f $CLIENT_LOG $SERVER_LOG
@@ -60,17 +57,12 @@ do
 
   RET=0
 
-  # $MULTI_PORT_CLIENT -v >>$CLIENT_LOG 2>&1 -hsp $ ${HSP_ARR[n]} -hhp ${HHP_ARR[n]} -hpp ${HPP_ARR[n]} -hip ${HIP_ARR[n]}
-  # if [ $? -ne 0 ]; then
-  #     RET=1
-  # fi
-
-  python $MULTI_PORT_CLIENT_PY -v >>$CLIENT_LOG 2>&1 -hsp $ ${HSP_ARR[n]} -hhp ${HHP_ARR[n]} -hpp ${HPP_ARR[n]} -hip ${HIP_ARR[n]}
+  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
   if [ $? -ne 0 ]; then
       RET=1
   fi
 
-  python $MULTI_PORT_CLIENT_PY -v >>$CLIENT_LOG 2>&1 -hsp $ ${HSP_ARR[n]} -hhp ${HHP_ARR[n]} -hpp ${HPP_ARR[n]} -hip ${HIP_ARR[n]} -i grpc
+  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]+10} -hp ${HP_ARR[n]+10} -pp ${PP_ARR[n]+10} -ip ${IP_ARR[n]+10} -i grpc
   if [ $? -ne 0 ]; then
       RET=1
   fi
