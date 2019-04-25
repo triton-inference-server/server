@@ -97,7 +97,6 @@ RUN mkdir -p /tmp/client/bin && \
     cp src/clients/python/ensemble_image_client.py /tmp/client/python/. && \
     cp src/clients/python/grpc_image_client.py /tmp/client/python/. && \
     cp src/clients/python/simple_client.py /tmp/client/python/. && \
-    cp src/clients/python/multi_port_client.py /tmp/client/python/. && \
     cp src/clients/python/simple_string_client.py /tmp/client/python/. && \
     cp src/clients/python/simple_sequence_client.py /tmp/client/python/. && \
     cp build/dist/dist/*.whl /tmp/client/python/. && \
