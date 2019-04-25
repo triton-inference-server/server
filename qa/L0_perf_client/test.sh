@@ -46,6 +46,21 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+# Sanity check on measurements are not all zero
+set +e
+$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
 # Test perf client behavior on different model with different batch size
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Valid batch size
