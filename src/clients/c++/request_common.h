@@ -331,7 +331,7 @@ class RequestImpl : public InferContext::Request {
   bool IsReady() const { return ready_; }
   void SetIsReady(bool r) { ready_ = r; }
 
-  RequestTimers Timer() const { return timer_; }
+  RequestTimers& Timer() { return timer_; }
 
   // Set non-RAW results from the inference response
   Error PostRunProcessing(
