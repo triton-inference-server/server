@@ -41,19 +41,12 @@ FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 # to:
 #   - copy over netdef_backend_c2 interface so it can build with other
 #     C2 sources
-#   - need to patch as explained below
 
 # Copy netdef_backend_c2 into Caffe2 core so it builds into the
 # libcaffe2 library. We want netdef_backend_c2 to build against the
 # Caffe2 protobuf since it interfaces with that code.
 COPY src/backends/caffe2/netdef_backend_c2.* \
      /opt/pytorch/pytorch/caffe2/core/
-
-# Avoid failure when peer access already enabled for CUDA device
-COPY tools/patch/caffe2 /tmp/patch/caffe2
-RUN sha1sum -c /tmp/patch/caffe2/checksums && \
-    patch -i /tmp/patch/caffe2/core/context_gpu.cu \
-          /opt/pytorch/pytorch/caffe2/core/context_gpu.cu
 
 # Build same as in pytorch container... except for the NO_DISTRIBUTED
 # line where we turn off features not needed for trtserver
