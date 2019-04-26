@@ -189,10 +189,9 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
     # requirements
     img = Image.open(FLAGS.image_filename)
     image_data = preprocess(img, format, dtype, c, h, w, 'NONE')
+    input_bytes = image_data.tobytes()
 
     request.meta_data.input.add(name=input_name)
-
-    input_bytes = image_data.tobytes()
 
     del request.raw_input[:]
     request.raw_input.extend([input_bytes])
@@ -201,7 +200,6 @@ def requestGenerator(input_name, output_name, c, h, w, format, dtype, FLAGS):
 def TestGRPC(FLAGS):
     channel = grpc.insecure_channel(FLAGS.url)
     grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
-
     # Prepare request for Status gRPC
     request = grpc_service_pb2.StatusRequest(model_name=FLAGS.model_name)
     # Call and receive response from Status gRPC
@@ -220,13 +218,25 @@ def TestGRPC(FLAGS):
 def TestHTTP(FLAGS):
     url_ = 'http://'+FLAGS.url+'/api/infer/'+FLAGS.model_name
 
-    with open('preprocessed', 'rb') as mf:
-      data = mf.read()
+    channel = grpc.insecure_channel('localhost:8001')
+    grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
+    # Prepare request for Status gRPC
+    request = grpc_service_pb2.StatusRequest(model_name=FLAGS.model_name)
+    # Call and receive response from Status gRPC
+    response = grpc_stub.Status(request)
+    # Make sure the model matches our requirements, and get some
+    # properties of the model that we need for preprocessing
+    batch_size = 1
+    input_name, output_name, c, h, w, format, dtype = parse_model(
+        response, FLAGS.model_name, batch_size, FLAGS.verbose)
 
-    payload = data
+    img = Image.open(FLAGS.image_filename)
+    image_data = preprocess(img, format, dtype, c, h, w, 'NONE')
+    input_bytes = image_data.tobytes()
+
     headers = {'NV-InferRequest': 'batch_size: 1 input { name: "input" } output { name: "DUMMY" cls { count: 3 } }'}
 
-    r = requests.post(url_, data=data, headers=headers)
+    r = requests.post(url_, data=input_bytes, headers=headers)
 
     return r.status_code!=200
 
@@ -242,7 +252,7 @@ if __name__ == '__main__':
                         help='Number of class results to report. Default is 1.')
     parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('image_filename', type=str, nargs='?', default=None,
+    parser.add_argument('image_filename', type=str, nargs='?', default='../images/car.jpg',
                         help='Input image.')
     parser.add_argument('-i', '--protocol', type=str, required=False, default='grpc',
                         help='Protocol (HTTP/gRPC) used to ' +
