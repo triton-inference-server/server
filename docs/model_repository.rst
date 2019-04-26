@@ -41,7 +41,7 @@ prefixed with gs://, for example,
 -\\-model-store=gs://bucket/path/to/model/repository.
 
 :ref:`section-example-model-repository` describes how to create an
-example repository with a couple if image classification models.
+example repository with a couple of image classification models.
 
 An example of a typical model repository layout is shown below::
 
