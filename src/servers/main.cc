@@ -83,10 +83,10 @@ int metrics_port_ = 8002;
 bool allow_gpu_metrics_ = false;
 
 // The number of threads to initialize for handling GRPC infer requests.
-int grpc_infer_cnt_ = 1000;
+int grpc_infer_thread_cnt_ = 1000;
 
 // The number of threads to initialize for handling GRPC stream infer requests.
-int grpc_stream_infer_cnt_ = 100;
+int grpc_stream_infer_thread_cnt_ = 1000;
 
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
@@ -111,8 +111,8 @@ enum OptionId {
   OPTION_GRPC_PORT,
   OPTION_HTTP_PORT,
   OPTION_METRICS_PORT,
-  OPTION_GRPC_INFER_COUNT,
-  OPTION_GRPC_STREAM_INFER_COUNT,
+  OPTION_GRPC_INFER_THREAD_COUNT,
+  OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
   OPTION_HTTP_THREAD_COUNT,
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
@@ -177,10 +177,10 @@ std::vector<Option> options_{
      "The port for the server to listen on for HTTP requests."},
     {OPTION_METRICS_PORT, "metrics-port",
      "The port reporting prometheus metrics."},
-    {OPTION_GRPC_INFER_COUNT, "grpc-infer-count",
-     "Number of threads handling GRPC infer requests."},
-    {OPTION_GRPC_STREAM_INFER_COUNT, "grpc-stream-infer-count",
-     "Number of threads handling GRPC stream infer requests."},
+    {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
+     "Number of threads handling GRPC inference requests."},
+    {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
+     "Number of threads handling GRPC stream inference requests."},
     {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
      "Number of threads handling HTTP requests."},
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
@@ -230,8 +230,8 @@ StartGrpcService(nvidia::inferenceserver::InferenceServer* server)
   std::unique_ptr<nvidia::inferenceserver::GRPCServer> service;
   nvidia::inferenceserver::Status status =
       nvidia::inferenceserver::GRPCServer::Create(
-          server, grpc_port_, grpc_infer_cnt_, grpc_stream_infer_cnt_,
-          &service);
+          server, grpc_port_, grpc_infer_thread_cnt_,
+          grpc_stream_infer_thread_cnt_, &service);
   if (status.IsOk()) {
     status = service->Start();
   }
@@ -367,8 +367,8 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   int32_t http_port = http_port_;
   int32_t grpc_port = grpc_port_;
   int32_t metrics_port = metrics_port_;
-  int32_t grpc_infer_cnt = grpc_infer_cnt_;
-  int32_t grpc_stream_infer_cnt = grpc_stream_infer_cnt_;
+  int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
+  int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t http_thread_cnt = http_thread_cnt_;
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
@@ -447,11 +447,11 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
         metrics_port = ParseIntOption(optarg);
         break;
 
-      case OPTION_GRPC_INFER_COUNT:
-        grpc_infer_cnt = ParseIntOption(optarg);
+      case OPTION_GRPC_INFER_THREAD_COUNT:
+        grpc_infer_thread_cnt = ParseIntOption(optarg);
         break;
-      case OPTION_GRPC_STREAM_INFER_COUNT:
-        grpc_stream_infer_cnt = ParseIntOption(optarg);
+      case OPTION_GRPC_STREAM_INFER_THREAD_COUNT:
+        grpc_stream_infer_thread_cnt = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
@@ -508,8 +508,8 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   grpc_port_ = allow_grpc ? grpc_port : -1;
   metrics_port_ = allow_metrics ? metrics_port : -1;
   allow_gpu_metrics_ = allow_metrics ? allow_gpu_metrics : false;
-  grpc_infer_cnt_ = grpc_infer_cnt;
-  grpc_stream_infer_cnt_ = grpc_stream_infer_cnt;
+  grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
+  grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   http_thread_cnt_ = http_thread_cnt;
 
   server->SetId(server_id);
