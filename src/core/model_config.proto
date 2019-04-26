@@ -406,6 +406,22 @@ message ModelOptimizationPolicy
     PRIORITY_MIN = 2;
   }
 
+  //@@
+  //@@  .. cpp:var:: message Cuda
+  //@@
+  //@@     CUDA-specific optimization settings.
+  //@@
+  message Cuda
+  {
+    //@@    .. cpp:var:: bool graphs
+    //@@
+    //@@       Use CUDA graphs API to capture model operations and execute
+    //@@       them more efficiently. Currently only recognized by TensorRT
+    //@@       backend.
+    //@@
+    bool graphs = 1;
+  }
+
   //@@  .. cpp:var:: Graph graph
   //@@
   //@@     The graph optimization setting for the model. Optional.
@@ -417,6 +433,12 @@ message ModelOptimizationPolicy
   //@@     The priority setting for the model. Optional.
   //@@
   ModelPriority priority = 2;
+
+  //@@  .. cpp:var:: Cuda cuda
+  //@@
+  //@@     CUDA-specific optimization settings. Optional.
+  //@@
+  Cuda cuda = 3;
 }
 
 //@@
