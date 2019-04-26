@@ -43,13 +43,13 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
                         help='Protocol ("http"/"grpc") used to ' +
                         'communicate with inference service. Default is "http".')
-    parser.add_argument(-'sp', "status_port", type=int,
+    parser.add_argument('-sp', "--status_port", type=int,
      help="The port for the server to listen on for HTTP Status requests.")
-    parser.add_argument(-'hp', "health_port", type=int,
+    parser.add_argument('-hp', "--health_port", type=int,
      help="The port for the server to listen on for HTTP Health requests.")
-    parser.add_argument(-'pp', "profile_port", type=int,
+    parser.add_argument('-pp', "--profile_port", type=int,
      help="The port for the server to listen on for HTTP Profile requests.")
-    parser.add_argument(-'ip', "infer_port", type=int,
+    parser.add_argument('-ip', "--infer_port", type=int,
      help="The port for the server to listen on for HTTP Infer requests.")
 
     FLAGS = parser.parse_args()
@@ -66,52 +66,59 @@ if __name__ == '__main__':
     # Create the inference context for the model.
     if FLAGS.protocol == "http":
         # infer
-        ctx = InferContext(FLAGS.url+str(FLAGS.http_infer_port), protocol, model_name, model_version, FLAGS.verbose)
+        if FLAGS.infer_port !=-1:
+            ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
         # health
-        hctx = ServerHealthContext(FLAGS.url+str(FLAGS.http_health_port), protocol, True)
-        assert hctx.is_ready() == False
-        assert hctx.is_live() == False
+        if FLAGS.health_port !=-1:
+            hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
+            assert hctx.is_ready() == False
+            assert hctx.is_live() == False
         # status
-        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.http_status_port), protocol, model_name, True)
-        ss = sctx.get_server_status()
-        assert server_status.SERVER_READY == ss.ready_state
+        if FLAGS.status_port !=-1:
+            sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
+            ss = sctx.get_server_status()
+            assert server_status.SERVER_READY == ss.ready_state
     elif FLAGS.protocol == "grpc":
         # infer
-        ctx = InferContext(FLAGS.url+str(FLAGS.http_infer_port+10), protocol, model_name, model_version, FLAGS.verbose)
+        if FLAGS.infer_port !=-1:
+            ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
         # health
-        hctx = ServerHealthContext(FLAGS.url+str(FLAGS.http_health_port), protocol, True)
-        assert hctx.is_ready() == False
-        assert hctx.is_live() == False
+        if FLAGS.health_port !=-1:
+            hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
+            assert hctx.is_ready() == False
+            assert hctx.is_live() == False
         # status
-        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.http_status_port+10), protocol, model_name, True)
-        ss = sctx.get_server_status()
-        assert server_status.SERVER_READY == ss.ready_state
+        if FLAGS.status_port !=-1:
+            sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
+            ss = sctx.get_server_status()
+            assert server_status.SERVER_READY == ss.ready_state
 
-    # Create the data for the two input tensors. Initialize the first
-    # to unique integers and the second to all ones.
-    input0_data = np.arange(start=0, stop=16, dtype=np.int32)
-    input1_data = np.ones(shape=16, dtype=np.int32)
+    if FLAGS.infer_port !=-1:
+        # Create the data for the two input tensors. Initialize the first
+        # to unique integers and the second to all ones.
+        input0_data = np.arange(start=0, stop=16, dtype=np.int32)
+        input1_data = np.ones(shape=16, dtype=np.int32)
 
-    # Send inference request to the inference server. Get results for
-    # both output tensors.
-    result = ctx.run({ 'INPUT0' : (input0_data,),
-                       'INPUT1' : (input1_data,) },
-                     { 'OUTPUT0' : InferContext.ResultFormat.RAW,
-                       'OUTPUT1' : InferContext.ResultFormat.RAW },
-                     batch_size)
+        # Send inference request to the inference server. Get results for
+        # both output tensors.
+        result = ctx.run({ 'INPUT0' : (input0_data,),
+                           'INPUT1' : (input1_data,) },
+                         { 'OUTPUT0' : InferContext.ResultFormat.RAW,
+                           'OUTPUT1' : InferContext.ResultFormat.RAW },
+                         batch_size)
 
-    # We expect there to be 2 results (each with batch-size 1). Walk
-    # over all 16 result elements and print the sum and difference
-    # calculated by the model.
-    output0_data = result['OUTPUT0'][0]
-    output1_data = result['OUTPUT1'][0]
+        # We expect there to be 2 results (each with batch-size 1). Walk
+        # over all 16 result elements and print the sum and difference
+        # calculated by the model.
+        output0_data = result['OUTPUT0'][0]
+        output1_data = result['OUTPUT1'][0]
 
-    for i in range(16):
-        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
-        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
-        if (input0_data[i] + input1_data[i]) != output0_data[i]:
-            print("error: incorrect sum");
-            sys.exit(1);
-        if (input0_data[i] - input1_data[i]) != output1_data[i]:
-            print("error: incorrect difference");
-            sys.exit(1);
+        for i in range(16):
+            print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
+            print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
+            if (input0_data[i] + input1_data[i]) != output0_data[i]:
+                print("error: incorrect sum");
+                sys.exit(1);
+            if (input0_data[i] - input1_data[i]) != output1_data[i]:
+                print("error: incorrect difference");
+                sys.exit(1);
