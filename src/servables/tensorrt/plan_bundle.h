@@ -26,7 +26,6 @@
 #pragma once
 
 #include <NvInfer.h>
-#include <mutex>
 #include "cuda/include/cuda_runtime_api.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
@@ -87,7 +86,7 @@ class PlanBundle : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
     Status InitializeConfigOutputBindings(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
-    void BuildCudaGraph(const int batch_size);
+    bool BuildCudaGraph(const int batch_size);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that

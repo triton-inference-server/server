@@ -28,6 +28,7 @@
 
 #include <NvInfer.h>
 #include <stdint.h>
+#include <mutex>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
@@ -296,13 +297,20 @@ PlanBundle::CreateExecutionContext(
                                          ": " + cudaGetErrorString(cuerr));
   }
 
-  // Build CUDA graphs for a default set of graph sizes. Graphs are
-  // most likely to help for small batch sizes so by default build for
-  // batch sizes 1, 2, 3, 4, 6, 8, 12, 16.
-  context->BuildCudaGraph(1);
-  for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
-    if (bs <= Config().max_batch_size()) {
-      context->BuildCudaGraph(bs);
+  // If enabled, build CUDA graphs for a default set of graph
+  // sizes. Graphs are most likely to help for small batch sizes so by
+  // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16. If any
+  // build fails don't attempt for any larger batch sizes.
+  const bool use_cuda_graphs = Config().optimization().cuda().graphs();
+  if (use_cuda_graphs) {
+    if (context->BuildCudaGraph(1)) {
+      for (int bs : std::vector<int>{2, 3, 4, 6, 8, 12, 16}) {
+        if (bs <= Config().max_batch_size()) {
+          if (!context->BuildCudaGraph(bs)) {
+            break;
+          }
+        }
+      }
     }
   }
 
@@ -531,37 +539,46 @@ PlanBundle::Run(
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(payloads));
 }
 
-void
+bool
 PlanBundle::Context::BuildCudaGraph(const int batch_size)
 {
+  bool captured = true;
   cudaError_t cuerr;
 
   cudaGraph_t graph;
-  cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeRelaxed);
+  cuerr = cudaStreamBeginCapture(stream_, cudaStreamCaptureModeGlobal);
   if (cuerr != cudaSuccess) {
     LOG_ERROR << "unable to start CUDA graph for " << name_ << ": "
               << cudaGetErrorString(cuerr);
+    captured = false;
   } else {
     if (!context_->enqueue(batch_size, buffers_, stream_, nullptr)) {
-      LOG_ERROR << "unable to record CUDA graph for " << name_;
-    } else {
-      cuerr = cudaStreamEndCapture(stream_, &graph);
+      LOG_WARNING << "unable to record CUDA graph for " << name_;
+      captured = false;
+    }
+
+    cuerr = cudaStreamEndCapture(stream_, &graph);
+    if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
+                << cudaGetErrorString(cuerr);
+      captured = false;
+    }
+
+    if (captured) {
+      cudaGraphExec_t graph_exec;
+      cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
       if (cuerr != cudaSuccess) {
-        LOG_ERROR << "unable to finish CUDA graph for " << name_ << ": "
+        LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
                   << cudaGetErrorString(cuerr);
+        captured = false;
       } else {
-        cudaGraphExec_t graph_exec;
-        cuerr = cudaGraphInstantiate(&graph_exec, graph, NULL, NULL, 0);
-        if (cuerr != cudaSuccess) {
-          LOG_ERROR << "unable to instantiate CUDA graph for " << name_ << ": "
-                    << cudaGetErrorString(cuerr);
-        } else {
-          cuda_graphs_.insert(std::make_pair(batch_size, graph));
-          cuda_graph_execs_.insert(std::make_pair(batch_size, graph_exec));
-        }
+        cuda_graphs_.insert(std::make_pair(batch_size, graph));
+        cuda_graph_execs_.insert(std::make_pair(batch_size, graph_exec));
       }
     }
   }
+
+  return captured;
 }
 
 Status
