@@ -38,21 +38,25 @@ class ServerStatus;
 class GRPCServer : private nvrpc::Server {
  public:
   static Status Create(
-      InferenceServer* server, uint16_t port,
-      std::unique_ptr<GRPCServer>* grpc_server);
+      InferenceServer* server, uint16_t port, int infer_thread_cnt,
+      int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server);
   Status Start();
   Status Stop();
 
   ~GRPCServer();
 
  private:
-  GRPCServer(const std::string& addr);
+  GRPCServer(
+      const std::string& addr, const int infer_thread_cnt,
+      const int stream_infer_thread_cnt);
 
   nvrpc::IRPC* rpcInfer_;
   nvrpc::IRPC* rpcStreamInfer_;
   nvrpc::IRPC* rpcStatus_;
   nvrpc::IRPC* rpcProfile_;
   nvrpc::IRPC* rpcHealth_;
+  int infer_thread_cnt_;
+  int stream_infer_thread_cnt_;
   bool running_;
 };
 

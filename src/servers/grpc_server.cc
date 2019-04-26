@@ -237,8 +237,11 @@ class HealthContext final
 };
 }  // namespace
 
-GRPCServer::GRPCServer(const std::string& addr)
-    : nvrpc::Server(addr), running_(false)
+GRPCServer::GRPCServer(
+    const std::string& addr, const int infer_thread_cnt,
+    const int stream_infer_thread_cnt)
+    : nvrpc::Server(addr), infer_thread_cnt_(infer_thread_cnt),
+      stream_infer_thread_cnt_(stream_infer_thread_cnt), running_(false)
 {
 }
 
@@ -249,8 +252,8 @@ GRPCServer::~GRPCServer()
 
 Status
 GRPCServer::Create(
-    InferenceServer* server, uint16_t port,
-    std::unique_ptr<GRPCServer>* grpc_server)
+    InferenceServer* server, uint16_t port, int infer_thread_cnt,
+    int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
 {
   // DLIS-162 - provide global defaults and cli overridable options
   g_Resources = std::make_shared<AsyncResources>(
@@ -261,7 +264,8 @@ GRPCServer::Create(
 
   LOG_INFO << "Building nvrpc server";
   const std::string addr = "0.0.0.0:" + std::to_string(port);
-  grpc_server->reset(new GRPCServer(addr));
+  grpc_server->reset(
+      new GRPCServer(addr, infer_thread_cnt, stream_infer_thread_cnt));
 
   (*grpc_server)->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
 
@@ -302,10 +306,9 @@ GRPCServer::Start()
 
     // You can register RPC execution contexts from any registered RPC on any
     // executor.
+    executor->RegisterContexts(rpcInfer_, g_Resources, infer_thread_cnt_);
     executor->RegisterContexts(
-        rpcInfer_, g_Resources, 1000);  // Configurable DLIS-161
-    executor->RegisterContexts(
-        rpcStreamInfer_, g_Resources, 100);  // Configurable DLIS-161
+        rpcStreamInfer_, g_Resources, stream_infer_thread_cnt_);
     executor->RegisterContexts(rpcStatus_, g_Resources, 1);
     executor->RegisterContexts(rpcHealth_, g_Resources, 1);
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
