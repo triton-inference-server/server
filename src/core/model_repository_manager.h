@@ -29,30 +29,125 @@
 #include <mutex>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
 namespace tensorflow { namespace serving {
 class ModelConfig;
+class ServerCore;
 }}  // namespace tensorflow::serving
 namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceBackend;
+class ServerStatusManager;
+
 /// A singleton to manage the model repository active in the server. A
 /// singleton is used because the servables have no connection to the
 /// server itself but they need to have access to the configuration.
+/// [TODO] The singleton and related functions will be removed once
+/// ModelRepositoryManager is improved as it will manage the servables directly.
 class ModelRepositoryManager {
  public:
+  using VersionStateMap = std::map<int64_t, ModelReadyState>;
+  using ModelMap = std::map<std::string, VersionStateMap>;
+
+  enum ActionType { LOAD, UNLOAD };
+
+  /// [TODO] BackendHandle and InferenceServer::InferenceBackendHandle are used
+  /// to keep TFS servables alive. They should be able to be simplified once
+  /// ModelRepositoryManager is improved.
+  class BackendHandle {
+   public:
+    virtual ~BackendHandle() = default;
+    virtual InferenceBackend* GetInferenceBackend() = 0;
+  };
+
+  ~ModelRepositoryManager();
+
   /// Create a manager for a repository.
+  /// \param server_version The version of the inference server.
+  /// \param status_manager The status manager that the model repository manager
+  /// will update model configuration and state to.
   /// \param repositpory_path The file-system path of the repository.
-  /// \param platform_config_map Map from platform name to the backend
-  /// configuration for that platform.
-  /// \param autofill If true attempt to autofill missing required
+  /// \param strict_model_config If false attempt to autofill missing required
   /// information in each model configuration.
+  /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
+  /// for TensorFlow models.
+  /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
+  /// implementation of an operation when a GPU implementation is not available
+  /// \param repository_poll_secs Interval in seconds between each poll of
+  /// the model repository to check for changes.
+  /// \param polling_enabled If true, then PollAndUpdate() is allowed and
+  /// LoadUnloadModel() is not allowed. If false, LoadUnloadModel() is allowed
+  /// and PollAndUpdate() is not allowed.
   /// \return The error status.
   static Status Create(
+      const std::string& server_version,
+      const std::shared_ptr<ServerStatusManager>& status_manager,
+      const std::string& repository_path, const bool strict_model_config,
+      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
+      const uint32_t repository_poll_secs, const bool polling_enabled,
+      std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
+
+  /// Poll the model repository to determine the new set of models and
+  /// compare with the current set. And serve the new set of models based
+  /// on their version policy.
+  Status PollAndUpdate();
+
+  /// Load or unload a specified model.
+  /// \parm model_name The name of the model to be loaded or unloaded
+  /// \parm type The type action to be performed. If the action is LOAD and
+  /// the model has been loaded, the model will be re-loaded.
+  /// \param OnCompleteUpdate The callback function to be invoked once the
+  /// action is completed.
+  /// \return error status. Return "NOT_FOUND" if it tries to load
+  /// a non-existing model or if it tries to unload a model that hasn't been
+  /// loaded.
+  Status LoadUnloadModel(
+      const std::string& model_name, ActionType type,
+      std::function<void(Status)> OnCompleteUpdate);
+
+  /// Unload all models. This function should be called before shutting down
+  /// the model repository manager.
+  Status UnloadAllModels();
+
+  /// \return the states of all versions of all live model backends.
+  const ModelMap GetLiveBackendStates();
+
+  /// \param model_name The model to get version states from.
+  /// \return the states of all versions of the specified model backends.
+  const VersionStateMap GetVersionStates(const std::string& model_name);
+
+  /// Obtain the specified backend handle.
+  /// \param model_name The model name of the backend handle.
+  /// \param model_version The model version of the backend handle.
+  /// \param handle Return the backend handle object.
+  /// \return error status.
+  Status GetBackendHandle(
+      const std::string& model_name, const int64_t model_version,
+      std::unique_ptr<BackendHandle>* handle);
+
+  /// Get the configuration for a named model.
+  /// \param name The model name.
+  /// \param model_config Returns the model configuration.
+  /// \return OK if found, NOT_FOUND otherwise.
+  static Status GetModelConfig(
+      const std::string& name, ModelConfig* model_config);
+
+ private:
+  struct ModelInfo;
+
+  // Map from model name to information about the model.
+  using ModelInfoMap =
+      std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
+
+  ModelRepositoryManager(
+      const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
-      const PlatformConfigMap& platform_config_map, const bool autofill);
+      const PlatformConfigMap& platform_config_map, const bool autofill,
+      const bool polling_enabled);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -64,7 +159,7 @@ class ModelRepositoryManager {
   /// \param unmodified The names of the models remaining in the
   /// repository that have not changed.
   /// \return The error status.
-  static Status Poll(
+  Status Poll(
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
@@ -72,43 +167,35 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  static Status GetModelConfig(
+  Status GetModelConfigFromInstance(
       const std::string& name, ModelConfig* model_config);
 
   /// Get TFS-style configuration for a named model.
   /// \param name The model name.
   /// \param tfs_model_config Returns the TFS-style model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  static Status GetTFSModelConfig(
+  Status GetTFSModelConfig(
       const std::string& name, tfs::ModelConfig* tfs_model_config);
 
   /// Get the platform for a named model.
   /// \param name The model name.
   /// \param platform Returns the Platform.
   /// \return OK if found, NOT_FOUND otherwise.
-  static Status GetModelPlatform(const std::string& name, Platform* platform);
-
- private:
-  struct ModelInfo;
-
-  // Map from model name to information about the model.
-  using ModelInfoMap =
-      std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
-
-  ModelRepositoryManager(
-      const std::string& repository_path,
-      const PlatformConfigMap& platform_config_map, const bool autofill);
-  ~ModelRepositoryManager() = default;
+  Status GetModelPlatform(const std::string& name, Platform* platform);
 
   static ModelRepositoryManager* singleton;
 
   const std::string repository_path_;
   const PlatformConfigMap platform_config_map_;
   const bool autofill_;
+  const bool polling_enabled_;
 
   std::mutex poll_mu_;
   std::mutex infos_mu_;
   ModelInfoMap infos_;
+
+  std::unique_ptr<tensorflow::serving::ServerCore> core_;
+  std::shared_ptr<ServerStatusManager> status_manager_;
 };
 
 }}  // namespace nvidia::inferenceserver
