@@ -27,6 +27,7 @@
 #include "src/servers/http_server.h"
 
 #include <google/protobuf/text_format.h>
+#include <algorithm>
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "evhtp/evhtp.h"
@@ -41,14 +42,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-//
 // Handle HTTP requests
-//
 class HTTPServerImpl : public HTTPServer {
  public:
   explicit HTTPServerImpl(
-      InferenceServer* server, uint16_t port, int thread_cnt)
-      : server_(server), port_(port), thread_cnt_(thread_cnt),
+      InferenceServer* server, const std::vector<std::string>& endpoints,
+      int32_t port, int thread_cnt)
+      : server_(server), endpoint_names_(endpoints), port_(port),
+        thread_cnt_(thread_cnt),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
@@ -109,7 +110,8 @@ class HTTPServerImpl : public HTTPServer {
   static void StopCallback(int sock, short events, void* arg);
 
   InferenceServer* server_;
-  uint16_t port_;
+  std::vector<std::string> endpoint_names_;
+  int32_t port_;
   int thread_cnt_;
   re2::RE2 api_regex_;
   re2::RE2 health_regex_;
@@ -185,24 +187,32 @@ HTTPServerImpl::Handle(evhtp_request_t* req)
   std::string endpoint, rest;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
+    // status
+    if (endpoint == "status" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "status") !=
+         endpoint_names_.end())) {
+      HandleStatus(req, rest);
+      return;
+    }
     // health
-    if (endpoint == "health") {
+    if (endpoint == "health" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "health") !=
+         endpoint_names_.end())) {
       HandleHealth(req, rest);
       return;
     }
     // profile
-    else if (endpoint == "profile") {
+    if (endpoint == "profile" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "profile") !=
+         endpoint_names_.end())) {
       HandleProfile(req, rest);
       return;
     }
     // infer
-    else if (endpoint == "infer") {
+    if (endpoint == "infer" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "infer") !=
+         endpoint_names_.end())) {
       HandleInfer(req, rest);
-      return;
-    }
-    // status
-    else if (endpoint == "status") {
-      HandleStatus(req, rest);
       return;
     }
   }
@@ -553,10 +563,24 @@ HTTPServerImpl::InferRequest::FinalizeResponse()
 
 Status
 HTTPServer::Create(
-    InferenceServer* server, uint16_t port, int thread_cnt,
-    std::unique_ptr<HTTPServer>* http_server)
+    InferenceServer* server,
+    const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
+    std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
-  http_server->reset(new HTTPServerImpl(server, port, thread_cnt));
+  if (port_map.empty()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "HTTP is enabled but none of the service endpoints have a valid port "
+        "assignment");
+  }
+  http_servers->clear();
+  for (auto const& ep_map : port_map) {
+    std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
+    LOG_INFO << "Starting HTTPService at " << addr;
+    http_servers->emplace_back(
+        new HTTPServerImpl(server, ep_map.second, ep_map.first, thread_cnt));
+  }
+
   return Status::Success;
 }
 }}  // namespace nvidia::inferenceserver
