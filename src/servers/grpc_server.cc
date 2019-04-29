@@ -26,6 +26,7 @@
 
 #include "src/servers/grpc_server.h"
 
+#include <map>
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
 #include "grpc++/server_builder.h"
@@ -252,46 +253,66 @@ GRPCServer::~GRPCServer()
 
 Status
 GRPCServer::Create(
-    InferenceServer* server, uint16_t port, int infer_thread_cnt,
-    int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
+    InferenceServer* server,
+    const std::map<int32_t, std::vector<std::string>>& port_map,
+    int infer_thread_cnt, int stream_infer_thread_cnt,
+    std::vector<std::unique_ptr<GRPCServer>>* grpc_servers)
 {
-  // DLIS-162 - provide global defaults and cli overridable options
+  if (port_map.empty()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "GRPC is enabled but none of the service endpoints have a valid port "
+        "assignment");
+  }
   g_Resources = std::make_shared<AsyncResources>(
-      server,  // InferenceServer*,
-      1,       // infer threads
-      1        // mgmt threads
-  );
+      server, 1 /* infer threads */, 1 /* mgmt threads */);
+  grpc_servers->clear();
 
-  LOG_INFO << "Building nvrpc server";
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
-  grpc_server->reset(
-      new GRPCServer(addr, infer_thread_cnt, stream_infer_thread_cnt));
+  for (auto const& ep_map : port_map) {
+    std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
+    LOG_INFO << "Starting a GRPCService at " << addr;
 
-  (*grpc_server)->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
+    grpc_servers->emplace_back(
+        new GRPCServer(addr, infer_thread_cnt, stream_infer_thread_cnt));
+    auto& grpc_server = grpc_servers->back();
 
-  LOG_INFO << "Register TensorRT GRPCService";
-  auto inferenceService = (*grpc_server)->RegisterAsyncService<GRPCService>();
+    grpc_server->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
 
-  LOG_INFO << "Register Infer RPC";
-  (*grpc_server)->rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
-      &GRPCService::AsyncService::RequestInfer);
+    LOG_INFO << "Register TensorRT GRPCService";
+    auto inferenceService = grpc_server->RegisterAsyncService<GRPCService>();
 
-  LOG_INFO << "Register StreamInfer RPC";
-  (*grpc_server)->rpcStreamInfer_ =
-      inferenceService->RegisterRPC<StreamInferContext>(
-          &GRPCService::AsyncService::RequestStreamInfer);
+    for (auto ep_name : ep_map.second) {
+      if (ep_name == "infer") {
+        LOG_INFO << "Register Infer RPC";
+        grpc_server->rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
+            &GRPCService::AsyncService::RequestInfer);
 
-  LOG_INFO << "Register Status RPC";
-  (*grpc_server)->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
-      &GRPCService::AsyncService::RequestStatus);
+        LOG_INFO << "Register StreamInfer RPC";
+        grpc_server->rpcStreamInfer_ =
+            inferenceService->RegisterRPC<StreamInferContext>(
+                &GRPCService::AsyncService::RequestStreamInfer);
+      }
 
-  LOG_INFO << "Register Profile RPC";
-  (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
-      &GRPCService::AsyncService::RequestProfile);
+      if (ep_name == "status") {
+        LOG_INFO << "Register Status RPC";
+        grpc_server->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
+            &GRPCService::AsyncService::RequestStatus);
+      }
 
-  LOG_INFO << "Register Health RPC";
-  (*grpc_server)->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
-      &GRPCService::AsyncService::RequestHealth);
+      if (ep_name == "profile") {
+        LOG_INFO << "Register Profile RPC";
+        grpc_server->rpcProfile_ =
+            inferenceService->RegisterRPC<ProfileContext>(
+                &GRPCService::AsyncService::RequestProfile);
+      }
+
+      if (ep_name == "health") {
+        LOG_INFO << "Register Health RPC";
+        grpc_server->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
+            &GRPCService::AsyncService::RequestHealth);
+      }
+    }
+  }
 
   return Status::Success;
 }
