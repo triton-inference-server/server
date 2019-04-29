@@ -605,7 +605,7 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Change the model configuration to have the default version
-        # policy (so that only version 3) if available.
+        # policy (so that only version 3) is available.
         for base_name, model_name in zip(models_base, models):
             shutil.copyfile("config.pbtxt." + base_name, "models/" + model_name + "/config.pbtxt")
 

@@ -29,6 +29,7 @@
 
 #include "src/core/backend.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
@@ -44,9 +45,6 @@
 #include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/platform/file_statistics.h"
 #include "tensorflow_serving/config/model_server_config.pb.h"
 #include "tensorflow_serving/config/platform_config.pb.h"
 #include "tensorflow_serving/core/availability_preserving_policy.h"
@@ -203,42 +201,40 @@ GetModifiedTime(const std::string& path)
   // modification time is 0. This means that in error cases 'path'
   // will show as not modified. This is the safe fall-back to avoid
   // assuming a model is constantly being modified.
+  bool path_is_dir;
+  Status status = IsDirectory(path, &path_is_dir);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to determine modification time for '" << path
+              << "': " << status.AsString();
+    return 0;
+  }
 
   // If 'path' is a file return its mtime.
-  if (!tensorflow::Env::Default()->IsDirectory(path).ok()) {
-    tensorflow::FileStatistics stat;
-    tensorflow::Status status = tensorflow::Env::Default()->Stat(path, &stat);
-    if (!status.ok()) {
+  if (!path_is_dir) {
+    int64_t mtime;
+    status = FileModificationTime(path, &mtime);
+    if (!status.IsOk()) {
       LOG_ERROR << "Failed to determine modification time for '" << path
-                << "': " << status;
+                << "': " << status.AsString();
       return 0;
     }
 
-    return stat.mtime_nsec;
+    return mtime;
   }
 
   // 'path' is a directory. Return the most recent mtime of the
   // contents of the directory.
-  //
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS.  In such case we should filter out all non-direct
-  // descendants.
-  std::vector<std::string> children;
-  if (!tensorflow::Env::Default()->GetChildren(path, &children).ok()) {
+  std::set<std::string> contents;
+  status = GetDirectoryContents(path, &contents);
+  if (!status.IsOk()) {
     LOG_ERROR << "Failed to determine modification time for '" << path
-              << "', assuming 0";
+              << "': " << status.AsString();
     return 0;
   }
 
-  std::set<std::string> real_children;
-  for (size_t i = 0; i < children.size(); ++i) {
-    const std::string& child = children[i];
-    real_children.insert(child.substr(0, child.find_first_of('/')));
-  }
-
   int64_t mtime = 0;
-  for (const auto& child : real_children) {
-    const auto full_path = tensorflow::io::JoinPath(path, child);
+  for (const auto& child : contents) {
+    const auto full_path = JoinPath({path, child});
     mtime = std::max(mtime, GetModifiedTime(full_path));
   }
 
@@ -628,24 +624,11 @@ ModelRepositoryManager::Poll(
 
   // Each subdirectory of repository path is a model directory from
   // which we read the model configuration.
-  std::vector<std::string> children;
-  RETURN_IF_TF_ERROR(
-      tensorflow::Env::Default()->GetChildren(repository_path_, &children));
+  std::set<std::string> subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(repository_path_, &subdirs));
 
-  // GetChildren() returns all descendants instead for cloud storage
-  // like GCS.  In such case we should filter out all non-direct
-  // descendants.
-  std::set<std::string> real_children;
-  for (size_t i = 0; i < children.size(); ++i) {
-    const std::string& child = children[i];
-    real_children.insert(child.substr(0, child.find_first_of('/')));
-  }
-
-  for (const auto& child : real_children) {
-    const auto full_path = tensorflow::io::JoinPath(repository_path_, child);
-    if (!tensorflow::Env::Default()->IsDirectory(full_path).ok()) {
-      continue;
-    }
+  for (const auto& child : subdirs) {
+    const auto full_path = JoinPath({repository_path_, child});
 
     // If 'child' is a new model or an existing model that has been
     // modified since the last time it was polled, then need to

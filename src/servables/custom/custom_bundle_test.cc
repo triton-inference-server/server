@@ -26,6 +26,7 @@
 
 #include "src/servables/custom/custom_bundle.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
@@ -45,7 +46,7 @@ TEST_F(CustomBundleTest, ModelConfigSanity)
       std::unordered_map<std::string, std::string> custom_paths;
 
       for (const auto& filename : std::vector<std::string>{kCustomFilename}) {
-        const auto custom_path = tensorflow::io::JoinPath(path, filename);
+        const auto custom_path = JoinPath({path, filename});
         custom_paths.emplace(
             std::piecewise_construct, std::make_tuple(filename),
             std::make_tuple(custom_path));

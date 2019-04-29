@@ -29,6 +29,7 @@
 #include <chrono>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
 #include "src/core/model_config_utils.h"
@@ -91,13 +92,12 @@ InferenceBackend::SetModelConfig(
 
   // Initialize the output map and label provider for each output
   label_provider_ = std::make_shared<LabelProvider>();
-  const auto model_dir = tensorflow::io::Dirname(path);
+  const auto model_dir = DirName(path);
   for (const auto& io : config.output()) {
     output_map_.insert(std::make_pair(io.name(), io));
 
     if (!io.label_filename().empty()) {
-      const auto label_path =
-          tensorflow::io::JoinPath(model_dir, io.label_filename());
+      const auto label_path = JoinPath({model_dir, io.label_filename()});
       RETURN_IF_ERROR(label_provider_->AddLabels(io.name(), label_path));
     }
   }

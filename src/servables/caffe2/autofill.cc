@@ -58,7 +58,7 @@ AutoFillNetDef::Create(
     std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
-  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
@@ -69,13 +69,12 @@ AutoFillNetDef::Create(
         "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
-  const auto version_path =
-      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
   // There must be a single netdef model (which is spread across two
   // files) within the version directory...
   std::set<std::string> netdef_files;
-  RETURN_IF_ERROR(GetFiles(version_path, &netdef_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &netdef_files));
   if (netdef_files.size() != 2) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
@@ -83,12 +82,10 @@ AutoFillNetDef::Create(
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
-  const auto netdef0_path =
-      tensorflow::io::JoinPath(version_path, netdef0_file);
+  const auto netdef0_path = JoinPath({version_path, netdef0_file});
 
   const std::string netdef1_file = *(std::next(netdef_files.begin()));
-  const auto netdef1_path =
-      tensorflow::io::JoinPath(version_path, netdef1_file);
+  const auto netdef1_path = JoinPath({version_path, netdef1_file});
 
   const std::string expected_init_filename =
       std::string(kCaffe2NetDefInitFilenamePrefix) +

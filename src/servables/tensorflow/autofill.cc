@@ -188,7 +188,7 @@ AutoFillSavedModel::Create(
     const std::string& model_path, std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
-  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
@@ -199,13 +199,12 @@ AutoFillSavedModel::Create(
         "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
-  const auto version_path =
-      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
   // There must be a single savedmodel directory within the version
   // directory...
   std::set<std::string> savedmodel_dirs;
-  RETURN_IF_ERROR(GetSubdirs(version_path, &savedmodel_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(version_path, &savedmodel_dirs));
   if (savedmodel_dirs.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -214,8 +213,7 @@ AutoFillSavedModel::Create(
   }
 
   const std::string savedmodel_dir = *(savedmodel_dirs.begin());
-  const auto savedmodel_path =
-      tensorflow::io::JoinPath(version_path, savedmodel_dir);
+  const auto savedmodel_path = JoinPath({version_path, savedmodel_dir});
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
   SavedModelBundleSourceAdapterConfig saved_model_config;
@@ -257,7 +255,7 @@ AutoFillGraphDef::Create(
     std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
-  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
@@ -268,13 +266,12 @@ AutoFillGraphDef::Create(
         "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
-  const auto version_path =
-      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
   // There must be a single graphdef file within the version
   // directory...
   std::set<std::string> graphdef_files;
-  RETURN_IF_ERROR(GetFiles(version_path, &graphdef_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &graphdef_files));
   if (graphdef_files.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
@@ -282,8 +279,7 @@ AutoFillGraphDef::Create(
   }
 
   const std::string graphdef_file = *(graphdef_files.begin());
-  const auto graphdef_path =
-      tensorflow::io::JoinPath(version_path, graphdef_file);
+  const auto graphdef_path = JoinPath({version_path, graphdef_file});
 
   // If find a file named with the default graphdef name then assume
   // it is a graphdef. We could be smarter here and try to parse to

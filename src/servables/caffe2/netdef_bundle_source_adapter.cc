@@ -31,11 +31,11 @@
 #include <vector>
 
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -46,8 +46,8 @@ CreateNetDefBundle(
     const NetDefBundleSourceAdapterConfig& adapter_config,
     const std::string& path, std::unique_ptr<NetDefBundle>* bundle)
 {
-  const auto model_path = tensorflow::io::Dirname(path);
-  const auto model_name = tensorflow::io::Basename(model_path);
+  const auto model_path = DirName(path);
+  const auto model_name = BaseName(model_path);
 
   ModelConfig model_config;
   Status status = ModelRepositoryManager::GetModelConfig(
@@ -56,23 +56,23 @@ CreateNetDefBundle(
     return tensorflow::errors::Internal(status.Message());
   }
 
-  // Read all the netdef files in 'path'. GetChildren() returns all
-  // descendants instead for cloud storage like GCS, so filter out all
-  // non-direct descendants.
-  std::vector<std::string> possible_children;
-  TF_RETURN_IF_ERROR(
-      tensorflow::Env::Default()->GetChildren(path, &possible_children));
-  std::set<std::string> children;
-  for (const auto& child : possible_children) {
-    children.insert(child.substr(0, child.find_first_of('/')));
+  // Read all the netdef files in 'path'.
+  std::set<std::string> netdef_files;
+  status = GetDirectoryFiles(path, &netdef_files);
+  if (!status.IsOk()) {
+    return tensorflow::errors::Internal(status.Message());
   }
 
   std::unordered_map<std::string, std::vector<char>> models;
-  for (const auto& filename : children) {
-    const auto netdef_path = tensorflow::io::JoinPath(path, filename);
-    tensorflow::string model_data_str;
-    TF_RETURN_IF_ERROR(tensorflow::ReadFileToString(
-        tensorflow::Env::Default(), netdef_path, &model_data_str));
+  for (const auto& filename : netdef_files) {
+    const auto netdef_path = JoinPath({path, filename});
+    std::string model_data_str;
+
+    status = ReadTextFile(netdef_path, &model_data_str);
+    if (!status.IsOk()) {
+      return tensorflow::errors::Internal(status.Message());
+    }
+
     std::vector<char> model_data(model_data_str.begin(), model_data_str.end());
     models.emplace(filename, std::move(model_data));
   }

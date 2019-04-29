@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
@@ -46,8 +47,8 @@ CreateEnsembleBundle(
     const EnsembleBundleSourceAdapterConfig& adapter_config,
     const std::string& path, std::unique_ptr<EnsembleBundle>* bundle)
 {
-  const auto model_path = tensorflow::io::Dirname(path);
-  const auto model_name = tensorflow::io::Basename(model_path);
+  const auto model_path = DirName(path);
+  const auto model_name = BaseName(model_path);
 
   ModelConfig model_config;
   Status status = ModelRepositoryManager::GetModelConfig(
