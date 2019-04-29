@@ -34,8 +34,6 @@
 #include "src/core/model_config.h"
 #include "src/servables/tensorrt/loader.h"
 #include "src/servables/tensorrt/plan_utils.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -94,7 +92,7 @@ AutoFillPlan::Create(
     std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;
-  RETURN_IF_ERROR(GetSubdirs(model_path, &version_dirs));
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
@@ -105,12 +103,11 @@ AutoFillPlan::Create(
         "unable to autofill for '" + model_name + "' due to multiple versions");
   }
 
-  const auto version_path =
-      tensorflow::io::JoinPath(model_path, *(version_dirs.begin()));
+  const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
   // There must be a single plan file within the version directory...
   std::set<std::string> plan_files;
-  RETURN_IF_ERROR(GetFiles(version_path, &plan_files));
+  RETURN_IF_ERROR(GetDirectoryFiles(version_path, &plan_files));
   if (plan_files.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
@@ -118,11 +115,10 @@ AutoFillPlan::Create(
   }
 
   const std::string plan_file = *(plan_files.begin());
-  const auto plan_path = tensorflow::io::JoinPath(version_path, plan_file);
+  const auto plan_path = JoinPath({version_path, plan_file});
 
-  tensorflow::string plan_data_str;
-  RETURN_IF_TF_ERROR(tensorflow::ReadFileToString(
-      tensorflow::Env::Default(), plan_path, &plan_data_str));
+  std::string plan_data_str;
+  RETURN_IF_ERROR(ReadTextFile(plan_path, &plan_data_str));
   std::vector<char> plan_data(plan_data_str.begin(), plan_data_str.end());
 
   nvinfer1::IRuntime* runtime = nullptr;

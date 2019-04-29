@@ -28,8 +28,8 @@
 
 #include <iostream>
 #include <iterator>
-#include "tensorflow/core/lib/io/inputbuffer.h"
-#include "tensorflow/core/platform/env.h"
+#include <sstream>
+#include "src/core/filesystem.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -53,9 +53,8 @@ LabelProvider::GetLabel(const std::string& name, size_t index) const
 Status
 LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
 {
-  std::unique_ptr<tensorflow::RandomAccessFile> label_file;
-  RETURN_IF_TF_ERROR(
-      tensorflow::Env::Default()->NewRandomAccessFile(filepath, &label_file));
+  std::string label_file_contents;
+  RETURN_IF_ERROR(ReadTextFile(filepath, &label_file_contents));
 
   auto p = label_map_.insert(std::make_pair(name, std::vector<std::string>()));
   if (!p.second) {
@@ -65,17 +64,10 @@ LabelProvider::AddLabels(const std::string& name, const std::string& filepath)
 
   auto itr = p.first;
 
-  constexpr int kInputBufferSize = 1 * 1024 * 1024;
-  tensorflow::io::InputBuffer input_buffer(label_file.get(), kInputBufferSize);
-  tensorflow::string line;
-  tensorflow::Status status = input_buffer.ReadLine(&line);
-  while (status.ok()) {
+  std::istringstream label_file_stream(label_file_contents);
+  std::string line;
+  while (std::getline(label_file_stream, line)) {
     itr->second.push_back(line);
-    status = input_buffer.ReadLine(&line);
-  }
-
-  if (!tensorflow::errors::IsOutOfRange(status)) {
-    RETURN_IF_TF_ERROR(status);
   }
 
   return Status::Success;

@@ -28,6 +28,7 @@
 
 #include <set>
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/servables/tensorflow/tf_utils.h"
@@ -36,29 +37,6 @@
 #include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-Status
-ReadBinaryProto(const std::string& filename, google::protobuf::MessageLite* msg)
-{
-  tensorflow::string msg_str;
-  RETURN_IF_TF_ERROR(tensorflow::ReadFileToString(
-      tensorflow::Env::Default(), filename, &msg_str));
-
-  google::protobuf::io::CodedInputStream coded_stream(
-      reinterpret_cast<const uint8_t*>(msg_str.c_str()), msg_str.size());
-  coded_stream.SetTotalBytesLimit(INT_MAX, INT_MAX);
-  if (!msg->ParseFromCodedStream(&coded_stream)) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Can't parse " + filename + " as binary proto");
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
 
 Status
 GraphDefBundle::Init(const std::string& path, const ModelConfig& config)

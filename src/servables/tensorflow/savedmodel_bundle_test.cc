@@ -26,6 +26,7 @@
 
 #include "src/servables/tensorflow/savedmodel_bundle.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/status.h"
 #include "src/test/model_config_test_base.h"
 
@@ -46,7 +47,7 @@ TEST_F(SavedModelBundleTest, ModelConfigSanity)
 
       for (const auto& filename : std::vector<std::string>{
                kTensorFlowSavedModelFilename, "vnetsavedmodel"}) {
-        const auto savedmodel_path = tensorflow::io::JoinPath(path, filename);
+        const auto savedmodel_path = JoinPath({path, filename});
         savedmodel_paths.emplace(
             std::piecewise_construct, std::make_tuple(filename),
             std::make_tuple(savedmodel_path));

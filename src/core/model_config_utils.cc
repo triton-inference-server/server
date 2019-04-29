@@ -32,16 +32,15 @@
 #include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
 Status
 GetModelVersionFromPath(const std::string& path, int64_t* version)
 {
-  auto version_dir = tensorflow::io::Basename(path);
+  auto version_dir = BaseName(path);
 
   // Determine the version from the last segment of 'path'
   if (!absl::SimpleAtoi(version_dir, version)) {
@@ -179,17 +178,18 @@ GetNormalizedModelConfig(
     const bool autofill, ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
-  const auto config_path = tensorflow::io::JoinPath(path, kModelConfigPbTxt);
-  if (autofill && !tensorflow::Env::Default()->FileExists(config_path).ok()) {
+  const auto config_path = JoinPath({path, kModelConfigPbTxt});
+  bool model_config_exists;
+  RETURN_IF_ERROR(FileExists(config_path, &model_config_exists));
+  if (autofill && !model_config_exists) {
     config->Clear();
   } else {
-    RETURN_IF_TF_ERROR(
-        ReadTextProto(tensorflow::Env::Default(), config_path, config));
+    RETURN_IF_ERROR(ReadTextProto(config_path, config));
   }
 
   // Autofill if requested...
   if (autofill) {
-    const std::string model_name(tensorflow::io::Basename(path));
+    const std::string model_name(BaseName(path));
     std::unique_ptr<AutoFill> af;
     RETURN_IF_ERROR(AutoFill::Create(
         model_name, platform_config_map, std::string(path), *config, &af));

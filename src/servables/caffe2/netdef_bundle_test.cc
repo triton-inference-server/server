@@ -26,6 +26,7 @@
 
 #include "src/servables/caffe2/netdef_bundle.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
@@ -47,10 +48,9 @@ TEST_F(NetDefBundleTest, ModelConfigSanity)
                kCaffe2NetDefFilename,
                std::string(kCaffe2NetDefInitFilenamePrefix) +
                    std::string(kCaffe2NetDefFilename)}) {
-        const auto netdef_path = tensorflow::io::JoinPath(path, filename);
-        tensorflow::string blob_str;
-        tensorflow::ReadFileToString(
-            tensorflow::Env::Default(), netdef_path, &blob_str);
+        const auto netdef_path = JoinPath({path, filename});
+        std::string blob_str;
+        ReadTextFile(netdef_path, &blob_str);
         std::vector<char> blob(blob_str.begin(), blob_str.end());
         netdef_blobs.emplace(filename, std::move(blob));
       }
