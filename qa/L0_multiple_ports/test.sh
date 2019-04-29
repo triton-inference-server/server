@@ -29,7 +29,7 @@ MULTI_PORT_TESTS_PY=multi_port_tests.py
 
 CLIENT_LOG="./client.log"
 
-DATADIR=`pwd`/models
+DATADIR=/data/inferenceserver/tf_model_store
 SP_ARR=(8008 8009 8010 8011 -1 8004 8004 8004 8004 -1 -1)
 HP_ARR=(8008 8010 8010 8009 8005 -1 8005 8005 -1 8004 -1)
 PP_ARR=(8008 8011 8011 8010 8005 8005 -1 8006 -1 -1 -1)
@@ -59,10 +59,12 @@ do
 
   RET=0
 
+  set +e
   python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]} -i grpc
   if [ $? -ne 0 ]; then
       RET=1
   fi
+  set -e
 
   kill $SERVER_PID
   wait $SERVER_PID
@@ -76,10 +78,15 @@ do
       exit 1
   fi
 
+  set +e
   python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
   if [ $? -ne 0 ]; then
       RET=1
   fi
+  set -e
+
+  kill $SERVER_PID
+  wait $SERVER_PID
 
   if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test $n PASSED\n***"

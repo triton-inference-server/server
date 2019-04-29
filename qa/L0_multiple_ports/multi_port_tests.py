@@ -71,8 +71,8 @@ if __name__ == '__main__':
         # health
         if FLAGS.health_port !=-1:
             hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
-            assert hctx.is_ready() == False
-            assert hctx.is_live() == False
+            assert hctx.is_ready() == True
+            assert hctx.is_live() == True
         # status
         if FLAGS.status_port !=-1:
             sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
@@ -85,8 +85,8 @@ if __name__ == '__main__':
         # health
         if FLAGS.health_port !=-1:
             hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
-            assert hctx.is_ready() == False
-            assert hctx.is_live() == False
+            assert hctx.is_ready() == True
+            assert hctx.is_live() == True
         # status
         if FLAGS.status_port !=-1:
             sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
