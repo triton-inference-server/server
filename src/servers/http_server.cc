@@ -47,8 +47,10 @@ namespace nvidia { namespace inferenceserver {
 class HTTPServerImpl : public HTTPServer {
  public:
   explicit HTTPServerImpl(
-      InferenceServer* server, std::string endpoint_name, uint16_t port, int thread_cnt)
-      : server_(server), port_(port), thread_cnt_(thread_cnt),
+      InferenceServer* server, std::string endpoint_name, uint16_t port,
+      int thread_cnt)
+      : server_(server), endpoint_name_(endpoint_name), port_(port),
+        thread_cnt_(thread_cnt),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
@@ -57,7 +59,7 @@ class HTTPServerImpl : public HTTPServer {
 
   ~HTTPServerImpl() { Stop(); }
 
-  static void Dispatch(evhtp_request_t* req, std::string endpoint_name, void* arg);
+  static void Dispatch(evhtp_request_t* req, void* arg);
 
   Status Start() override;
   Status Stop() override;
@@ -109,6 +111,7 @@ class HTTPServerImpl : public HTTPServer {
   static void StopCallback(int sock, short events, void* arg);
 
   InferenceServer* server_;
+  std::string endpoint_name_;
   uint16_t port_;
   int thread_cnt_;
   re2::RE2 api_regex_;
@@ -171,13 +174,13 @@ HTTPServerImpl::StopCallback(int sock, short events, void* arg)
 }
 
 void
-HTTPServerImpl::Dispatch(evhtp_request_t* req, std::string endpoint_name, void* arg)
+HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 {
-  (static_cast<HTTPServerImpl*>(arg))->Handle(req, endpoint_name);
+  (static_cast<HTTPServerImpl*>(arg))->Handle(req);
 }
 
 void
-HTTPServerImpl::Handle(evhtp_request_t* req, std::string endpoint_name)
+HTTPServerImpl::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -186,22 +189,29 @@ HTTPServerImpl::Handle(evhtp_request_t* req, std::string endpoint_name)
   if (RE2::FullMatch(
           std::string(req->uri->path->full), api_regex_, &endpoint, &rest)) {
     // health
-    if (endpoint == "health" && (endpoint == endpoint_name || endpoint_name == "common")) {
+    if (endpoint == "health" &&
+        (endpoint == endpoint_name_ || endpoint_name_ == "common")) {
       HandleHealth(req, rest);
       return;
     }
     // profile
-    else if (endpoint == "profile" && (endpoint == endpoint_name || endpoint_name == "common")) {
+    else if (
+        endpoint == "profile" &&
+        (endpoint == endpoint_name_ || endpoint_name_ == "common")) {
       HandleProfile(req, rest);
       return;
     }
     // infer
-    else if (endpoint == "infer" && (endpoint == endpoint_name || endpoint_name == "common")) {
+    else if (
+        endpoint == "infer" &&
+        (endpoint == endpoint_name_ || endpoint_name_ == "common")) {
       HandleInfer(req, rest);
       return;
     }
     // status
-    else if (endpoint == "status" && (endpoint == endpoint_name || endpoint_name == "common")) {
+    else if (
+        endpoint == "status" &&
+        (endpoint == endpoint_name_ || endpoint_name_ == "common")) {
       HandleStatus(req, rest);
       return;
     }
@@ -562,10 +572,11 @@ HTTPServer::Create(
 
 Status
 HTTPServer::CreateUniqueEndpointPorts(
-    InferenceServer* server, std::string endpoint_name, uint16_t endpoint_port, int thread_cnt,
-    std::unique_ptr<HTTPServer>* http_server)
+    InferenceServer* server, std::string endpoint_name, uint16_t endpoint_port,
+    int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
 {
-  http_server->reset(new HTTPServerImpl(server, endpoint_name, port, thread_cnt));
+  http_server->reset(
+      new HTTPServerImpl(server, endpoint_name, endpoint_port, thread_cnt));
   return Status::Success;
 }
 

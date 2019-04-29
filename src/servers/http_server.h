@@ -36,6 +36,11 @@ class HTTPServer {
   static Status Create(
       InferenceServer* server, uint16_t port, int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
+
+ public:
+  static Status CreateUniqueEndpointPorts(
+      InferenceServer* server, std::string endpoint_name, uint16_t port,
+      int thread_cnt, std::unique_ptr<HTTPServer>* http_server);
   virtual Status Start() = 0;
   virtual Status Stop() = 0;
 };
