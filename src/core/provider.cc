@@ -26,7 +26,6 @@
 
 #include "src/core/provider.h"
 
-#include <google/protobuf/text_format.h>
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"

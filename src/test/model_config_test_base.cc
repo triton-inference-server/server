@@ -30,10 +30,10 @@
 #include <fstream>
 #include <memory>
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
@@ -60,7 +60,7 @@ ModelConfigTestBase::ValidateInit(
   }
 
   // ModelConfig unit tests assume model version "1"
-  const std::string version_path = tensorflow::io::JoinPath(model_path, "1");
+  const std::string version_path = JoinPath({model_path, "1"});
 
   status = init_func(version_path, config);
   if (!status.IsOk()) {
@@ -93,30 +93,28 @@ ModelConfigTestBase::ValidateOne(
     const std::string& platform, BundleInitFunc init_func)
 {
   const std::string model_base_path =
-      tensorflow::io::JoinPath(getenv("TEST_SRCDIR"), test_repository_rpath);
+      JoinPath({getenv("TEST_SRCDIR"), test_repository_rpath});
 
-  std::vector<std::string> models;
-  TF_CHECK_OK(
-      tensorflow::Env::Default()->GetChildren(model_base_path, &models));
+  std::set<std::string> models;
+  CHECK_IF_ERROR(GetDirectorySubdirs(model_base_path, &models));
 
   for (const auto& model_name : models) {
-    const auto model_path =
-        tensorflow::io::JoinPath(model_base_path, model_name);
+    const auto model_path = JoinPath({model_base_path, model_name});
 
     // If a platform is specified and there is a configuration file
     // then must change the configuration to use that platform. We
     // modify the config file in place... not ideal but for how our CI
     // testing is done it is not a problem.
     if (!platform.empty()) {
-      const auto config_path =
-          tensorflow::io::JoinPath(model_path, kModelConfigPbTxt);
-      if (tensorflow::Env::Default()->FileExists(config_path).ok()) {
+      const auto config_path = JoinPath({model_path, kModelConfigPbTxt});
+
+      bool config_exists;
+      CHECK_IF_ERROR(FileExists(config_path, &config_exists));
+      if (config_exists) {
         ModelConfig config;
-        TF_CHECK_OK(
-            ReadTextProto(tensorflow::Env::Default(), config_path, &config));
+        CHECK_IF_ERROR(ReadTextProto(config_path, &config));
         config.set_platform(platform);
-        TF_CHECK_OK(
-            WriteTextProto(tensorflow::Env::Default(), config_path, config));
+        CHECK_IF_ERROR(WriteTextProto(config_path, config));
       }
     }
 
@@ -140,13 +138,11 @@ ModelConfigTestBase::CompareActualWithExpected(
     std::string* fail_expected)
 {
   // The actual output must match *one of* the "expected*" files.
-  std::vector<std::string> children;
-  if (tensorflow::Env::Default()->GetChildren(expected_path, &children).ok()) {
+  std::set<std::string> children;
+  if (GetDirectoryFiles(expected_path, &children).IsOk()) {
     for (const auto& child : children) {
-      std::string real_child = child.substr(0, child.find_first_of('/'));
-      if (real_child.find("expected") == 0) {
-        const auto expected_file_path =
-            tensorflow::io::JoinPath(expected_path, real_child);
+      if (child.find("expected") == 0) {
+        const auto expected_file_path = JoinPath({expected_path, child});
         LOG_INFO << "Comparing with " << expected_file_path;
 
         std::ifstream expected_file(expected_file_path);

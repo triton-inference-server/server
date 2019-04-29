@@ -26,6 +26,7 @@
 
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/status.h"
 #include "src/test/model_config_test_base.h"
 
@@ -46,10 +47,9 @@ TEST_F(PlanBundleTest, ModelConfigSanity)
 
       for (const auto& filename :
            std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = tensorflow::io::JoinPath(path, filename);
+        const auto plan_path = JoinPath({path, filename});
         tensorflow::string blob_str;
-        tensorflow::ReadFileToString(
-            tensorflow::Env::Default(), plan_path, &blob_str);
+        ReadTextFile(plan_path, &blob_str);
         std::vector<char> blob(blob_str.begin(), blob_str.end());
         plan_blobs.emplace(filename, std::move(blob));
       }
