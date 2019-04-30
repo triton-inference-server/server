@@ -31,6 +31,7 @@ import numpy as np
 import os
 from builtins import range
 from tensorrtserver.api import *
+import tensorrtserver.api.server_status_pb2 as server_status
 
 FLAGS = None
 
@@ -40,19 +41,26 @@ if __name__ == '__main__':
                         help='Enable verbose output')
     parser.add_argument('-u', '--url', type=str, required=False, default='localhost:',
                         help='Inference server URL. Default is localhost:.')
-    parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
+    parser.add_argument('-i', '--protocol', type=str, required=False, default="http",
                         help='Protocol ("http"/"grpc") used to ' +
                         'communicate with inference service. Default is "http".')
-    parser.add_argument('-sp', "--status_port", type=int,
-     help="The port for the server to listen on for HTTP Status requests.")
-    parser.add_argument('-hp', "--health_port", type=int,
-     help="The port for the server to listen on for HTTP Health requests.")
-    parser.add_argument('-pp', "--profile_port", type=int,
-     help="The port for the server to listen on for HTTP Profile requests.")
-    parser.add_argument('-ip', "--infer_port", type=int,
-     help="The port for the server to listen on for HTTP Infer requests.")
+    parser.add_argument('-p', '--port', type=int, required=False, default=-1,
+                        help="The port for the server to listen on for all HTTP requests.")
+    parser.add_argument('-sp', "--status_port", type=int, required=False, default=-1,
+                        help="The port for the server to listen on for HTTP Status requests.")
+    parser.add_argument('-hp', "--health_port", type=int, required=False, default=-1,
+                        help="The port for the server to listen on for HTTP Health requests.")
+    parser.add_argument('-pp', "--profile_port", type=int, required=False, default=-1,
+                        help="The port for the server to listen on for HTTP Profile requests.")
+    parser.add_argument('-ip', "--infer_port", type=int, required=False, default=-1,
+                        help="The port for the server to listen on for HTTP Infer requests.")
 
     FLAGS = parser.parse_args()
+    FLAGS.status_port = FLAGS.port if FLAGS.status_port==-1 else FLAGS.status_port
+    FLAGS.health_port = FLAGS.port if FLAGS.health_port==-1 else FLAGS.health_port
+    FLAGS.profile_port = FLAGS.port if FLAGS.profile_port==-1 else FLAGS.profile_port
+    FLAGS.infer_port = FLAGS.port if FLAGS.infer_port==-1 else FLAGS.infer_port
+
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
     # We use a simple model that takes 2 input tensors of 16 integers
@@ -64,34 +72,19 @@ if __name__ == '__main__':
     batch_size = 1
 
     # Create the inference context for the model.
-    if FLAGS.protocol == "http":
-        # infer
-        if FLAGS.infer_port !=-1:
-            ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
-        # health
-        if FLAGS.health_port !=-1:
-            hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
-            assert hctx.is_ready() == True
-            assert hctx.is_live() == True
-        # status
-        if FLAGS.status_port !=-1:
-            sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
-            ss = sctx.get_server_status()
-            assert server_status.SERVER_READY == ss.ready_state
-    elif FLAGS.protocol == "grpc":
-        # infer
-        if FLAGS.infer_port !=-1:
-            ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
-        # health
-        if FLAGS.health_port !=-1:
-            hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
-            assert hctx.is_ready() == True
-            assert hctx.is_live() == True
-        # status
-        if FLAGS.status_port !=-1:
-            sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
-            ss = sctx.get_server_status()
-            assert server_status.SERVER_READY == ss.ready_state
+    # infer
+    if FLAGS.infer_port !=-1:
+        ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
+    # health
+    if FLAGS.health_port !=-1:
+        hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
+        assert hctx.is_ready() == True
+        assert hctx.is_live() == True
+    # status
+    if FLAGS.status_port !=-1:
+        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
+        ss = sctx.get_server_status()
+        assert server_status.SERVER_READY == ss.ready_state
 
     if FLAGS.infer_port !=-1:
         # Create the data for the two input tensors. Initialize the first
@@ -114,8 +107,6 @@ if __name__ == '__main__':
         output1_data = result['OUTPUT1'][0]
 
         for i in range(16):
-            print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
-            print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
             if (input0_data[i] + input1_data[i]) != output0_data[i]:
                 print("error: incorrect sum");
                 sys.exit(1);
