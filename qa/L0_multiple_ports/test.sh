@@ -29,21 +29,22 @@ MULTI_PORT_TESTS_PY=multi_port_tests.py
 
 CLIENT_LOG="./client.log"
 
-DATADIR=/data/inferenceserver/tf_model_store
-SP_ARR=(8008 8009 8010 8011 -1 8004 8004 8004 8004 -1 -1)
-HP_ARR=(8008 8010 8010 8009 8005 -1 8005 8005 -1 8004 -1)
-PP_ARR=(8008 8011 8011 8010 8005 8005 -1 8006 -1 -1 -1)
-IP_ARR=(8008 8011 8008 8008 8006 8006 8006 -1 -1 -1 8004)
+DATADIR=`pwd`/models
+SP_ARR=(8008 8009 8010 8011 -1 8004 8004 8004 8004 -1 -1 -1)
+HP_ARR=(8008 8010 8010 8009 8005 -1 8005 8005 -1 8004 -1 -1)
+PP_ARR=(8008 8011 8011 8010 8005 8005 -1 8006 -1 -1 8004 -1)
+IP_ARR=(8008 8011 8008 8008 8006 8006 8006 -1 -1 -1 -1 8004)
 SERVER=/opt/tensorrtserver/bin/trtserver
 len=${#SP_ARR[@]}
 
+# HTTP + GRPC w/o Interleaved
 for (( n=0; n<$len; n++ ))
 do
 :
   SERVER_ARGS_ADD_GRPC="--grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
-    --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-http 0"
-  SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} --http-profile-port ${PP_ARR[n]}\
-    --http-infer-port ${IP_ARR[n]} --allow-grpc 0"
+    --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
+  SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
+    --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
   SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
   SERVER_LOG="./inference_server.log"
   source ../common/util.sh
@@ -79,7 +80,40 @@ do
   fi
 
   set +e
-  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
+  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]} -i http
+  if [ $? -ne 0 ]; then
+      RET=1
+  fi
+  set -e
+
+  kill $SERVER_PID
+  wait $SERVER_PID
+done
+
+# HTTP + GRPC w/ Interleaved
+P=8005
+for (( n=0; n<$len; n++ ))
+do
+:
+  SERVER_ARGS_ADD_GRPC="--grpc-port $P --grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
+    --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
+  SERVER_ARGS_ADD_HTTP="--http-port $P --http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
+    --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
+  SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
+  SERVER_LOG="./inference_server.log"
+  source ../common/util.sh
+
+  rm -f $CLIENT_LOG $SERVER_LOG
+
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
+
+  set +e
+  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]} -i grpc
   if [ $? -ne 0 ]; then
       RET=1
   fi
@@ -88,12 +122,31 @@ do
   kill $SERVER_PID
   wait $SERVER_PID
 
-  if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test $n PASSED\n***"
-  else
-      cat $CLIENT_LOG
-      echo -e "\n***\n*** Test $n FAILED\n***"
+  SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
   fi
+
+  set +e
+  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
+  if [ $? -ne 0 ]; then
+      RET=1
+  fi
+  set -e
+
+  kill $SERVER_PID
+  wait $SERVER_PID
 done
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test PASSED\n***"
+else
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
 
 exit $RET
