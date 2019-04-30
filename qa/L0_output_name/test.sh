@@ -47,7 +47,7 @@ fi
 
 RET=0
 
-# test HTTP+gRPC for output name validation
+# test gRPC for output name validation
 set +e
 python $OP_NAME_TEST_PY OutputNameValidationTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then

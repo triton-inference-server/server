@@ -53,16 +53,6 @@ class OutputNameValidationTest(unittest.TestCase):
         response_ = grpc_stub.Infer(request_)
         return response_.request_status.code==5
 
-    def TestHTTP(self):
-        url_ = 'http://'+self.url+'/api/infer/'+self.model_name
-
-        input0_data = np.arange(start=0, stop=16, dtype=np.int32).tobytes()
-        headers = {'NV-InferRequest': 'batch_size: 1 input { name: "INPUT0" dims: 16} \
-                    output { name: "DUMMY"}} cls { count: 3 } }'}
-        # Send request
-        r = requests.post(url_, data=input0_data, headers=headers)
-        return r.status_code!=200
-
     def requestGenerator(self, output_name, FLAGS):
         # Prepare request for Infer gRPC
         # The meta data part can be reused across requests
@@ -87,11 +77,6 @@ class OutputNameValidationTest(unittest.TestCase):
         self.model_name = 'savedmodel_zero_1_float32'
         self.url = "localhost:8001"
         self.assertTrue(self.TestGRPC())
-
-    def test_http(self):
-        self.model_name = "savedmodel_zero_1_float32"
-        self.url = "localhost:8000"
-        self.assertTrue(self.TestHTTP())
 
 if __name__ == '__main__':
     unittest.main()
