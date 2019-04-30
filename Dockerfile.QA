@@ -53,9 +53,9 @@ RUN mkdir -p qa/common && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so \
        qa/L0_simple_ensemble/models/simple/1/. && \
-    mkdir -p qa/L0_muliple_ports/models/simple/1 && \
+    mkdir -p qa/L0_multiple_ports/models/simple/1 && \
     cp /opt/tensorrtserver/custom/libaddsub.so \
-      qa/L0_muliple_ports/models/simple/1/. && \
+      qa/L0_multiple_ports/models/simple/1/. && \
     mkdir qa/L0_simple_inprocess/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/. && \
     mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \

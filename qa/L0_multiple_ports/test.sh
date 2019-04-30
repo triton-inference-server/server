@@ -38,9 +38,7 @@ SERVER=/opt/tensorrtserver/bin/trtserver
 len=${#SP_ARR[@]}
 
 # HTTP + GRPC w/o Interleaved
-for (( n=0; n<$len; n++ ))
-do
-:
+for (( n=0; n<$len; n++ )) ; do
   SERVER_ARGS_ADD_GRPC="--grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
     --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
   SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
@@ -92,9 +90,7 @@ done
 
 # HTTP + GRPC w/ Interleaved
 P=8005
-for (( n=0; n<$len; n++ ))
-do
-:
+for (( n=0; n<$len; n++ )) ; do
   SERVER_ARGS_ADD_GRPC="--grpc-port $P --grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
     --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
   SERVER_ARGS_ADD_HTTP="--http-port $P --http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
