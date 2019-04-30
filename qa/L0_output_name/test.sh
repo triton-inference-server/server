@@ -28,7 +28,9 @@
 OP_NAME_TEST_PY=output_name_test.py
 
 CLIENT_LOG="./client.log"
-DATADIR=/data/inferenceserver/tf_model_store
+
+DATADIR=/data/inferenceserver/qa_zero_model_repository
+
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=$DATADIR
 SERVER_LOG="./inference_server.log"
@@ -45,24 +47,22 @@ fi
 
 RET=0
 
-python $OP_NAME_TEST_PY -v >>$CLIENT_LOG 2>&1 -i grpc -m resnet_v1_50_cpu_savedmodel -u localhost:8001
+# test HTTP+gRPC for output name validation
+set +e
+python $OP_NAME_TEST_PY OutputNameValidationTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
-
-python $OP_NAME_TEST_PY -v >>$CLIENT_LOG 2>&1 -i http -m resnet_v1_50_cpu_savedmodel -u localhost:8000
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test $n PASSED\n***"
+    echo -e "\n***\n*** Test PASSED\n***"
 else
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Test $n FAILED\n***"
+    echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
