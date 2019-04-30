@@ -47,23 +47,14 @@ class OutputNameValidationTest(unittest.TestCase):
     def TestGRPC(self):
         channel = grpc.insecure_channel(self.url)
         grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
-        # Prepare request for Status gRPC
-        request = grpc_service_pb2.StatusRequest(model_name=self.model_name)
-        response = grpc_stub.Status(request)
 
         request_ = self.requestGenerator("DUMMY", FLAGS)
         # Send request
         response_ = grpc_stub.Infer(request_)
-        return str(response_).find("code: SUCCESS")==-1
+        return response_.request_status.code==5
 
     def TestHTTP(self):
         url_ = 'http://'+self.url+'/api/infer/'+self.model_name
-
-        channel = grpc.insecure_channel('localhost:8001')
-        grpc_stub = grpc_service_pb2_grpc.GRPCServiceStub(channel)
-        # Prepare request for Status gRPC
-        request = grpc_service_pb2.StatusRequest(model_name=self.model_name)
-        response = grpc_stub.Status(request)
 
         input0_data = np.arange(start=0, stop=16, dtype=np.int32).tobytes()
         headers = {'NV-InferRequest': 'batch_size: 1 input { name: "INPUT0" dims: 16} \
@@ -82,7 +73,6 @@ class OutputNameValidationTest(unittest.TestCase):
         request.meta_data.batch_size = 1
         output_message = api_pb2.InferRequestHeader.Output()
         output_message.name = output_name
-        output_message.cls.count = 1
         request.meta_data.output.extend([output_message])
 
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
