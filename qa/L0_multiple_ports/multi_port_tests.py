@@ -71,22 +71,9 @@ if __name__ == '__main__':
     model_version = -1
     batch_size = 1
 
-    # Create the inference context for the model.
     # infer
     if FLAGS.infer_port !=-1:
         ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
-    # health
-    if FLAGS.health_port !=-1:
-        hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
-        assert hctx.is_ready() == True
-        assert hctx.is_live() == True
-    # status
-    if FLAGS.status_port !=-1:
-        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
-        ss = sctx.get_server_status()
-        assert server_status.SERVER_READY == ss.ready_state
-
-    if FLAGS.infer_port !=-1:
         # Create the data for the two input tensors. Initialize the first
         # to unique integers and the second to all ones.
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
@@ -113,3 +100,13 @@ if __name__ == '__main__':
             if (input0_data[i] - input1_data[i]) != output1_data[i]:
                 print("error: incorrect difference");
                 sys.exit(1);
+    # health
+    if FLAGS.health_port !=-1:
+        hctx = ServerHealthContext(FLAGS.url+str(FLAGS.health_port), protocol, True)
+        assert hctx.is_ready() == True
+        assert hctx.is_live() == True
+    # status
+    if FLAGS.status_port !=-1:
+        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
+        ss = sctx.get_server_status()
+        assert server_status.SERVER_READY == ss.ready_state
