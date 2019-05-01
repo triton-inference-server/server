@@ -30,7 +30,7 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-import "src/core/model_config.proto";
+import "model_config.proto";
 
 //@@
 //@@.. cpp:var:: message StatDuration

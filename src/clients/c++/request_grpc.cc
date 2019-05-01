@@ -26,6 +26,7 @@
 
 #include "src/clients/c++/request_grpc.h"
 
+#include <iostream>
 #include <grpcpp/grpcpp.h>
 #include "src/clients/c++/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
