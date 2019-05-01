@@ -30,9 +30,9 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-import "src/core/api.proto";
-import "src/core/request_status.proto";
-import "src/core/server_status.proto";
+import "api.proto";
+import "request_status.proto";
+import "server_status.proto";
 
 //@@
 //@@.. cpp:var:: service GRPCService
