@@ -38,8 +38,6 @@ from tensorrtserver.api import grpc_service_pb2
 from tensorrtserver.api import grpc_service_pb2_grpc
 import tensorrtserver.api.model_config_pb2 as model_config
 
-import json
-import requests
 import unittest
 FLAGS = None
 
