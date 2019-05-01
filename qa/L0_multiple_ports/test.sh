@@ -139,11 +139,91 @@ for (( i=0; i<2; i++ )) ; do
   done
 done
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test PASSED\n***"
-else
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test FAILED\n***"
+# CUSTOM CASES
+# set http ports to -1 after setting them to 8007
+SERVER_ARGS_ADD_HTTP="--http-status-port 8007 --http-health-port 8007 \
+  --http-profile-port 8007 --http-infer-port 8007 --http-port -1 --allow-http 1"
+SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
 fi
+set +e
+python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p -1 -sp 8007 -hp 8007 -pp 8007 -ip 8007
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+# allow overrules - grpc still works
+SERVER_ARGS_ADD_HTTP="--http-status-port 8007 --http-health-port 8007 \
+  --http-profile-port 8007 --http-infer-port 8007 --http-port -1 --allow-http 0"
+SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p -1 -sp 8007 -hp 8007 -pp 8007 -ip 8007
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+# overlap with grpc default
+SERVER_ARGS_ADD_HTTP="--http-status-port 8001 --http-health-port 8007 \
+  --http-profile-port 8007 --http-infer-port 8007"
+SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Should not have started $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp 8001 -hp 8007 -pp 8007 -ip 8007
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
+# overlap with metrics default
+SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
+  --http-profile-port 8007 --http-infer-port 8007"
+SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Should not have started $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+# disable metrics - no overlap with metrics default
+SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
+  --http-profile-port 8007 --http-infer-port 8007 --allow_metrics 0"
+SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+run_server_nowait
+sleep 10
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -sp 8002 -hp 8007 -pp 8007 -ip 8007
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
 
 exit $RET
