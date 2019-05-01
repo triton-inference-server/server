@@ -88,49 +88,51 @@ for (( n=0; n<$len; n++ )) ; do
 done
 
 # HTTP + GRPC w/ Interleaved
-P=8005
-for (( n=0; n<$len; n++ )) ; do
-  SERVER_ARGS_ADD_GRPC="--grpc-port $P --grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
-    --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
-  SERVER_ARGS_ADD_HTTP="--http-port $P --http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
-    --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
-  SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
+P=(8005 -1)
+for (( i=0; i<2; i++ )) ; do
+  for (( n=0; n<$len; n++ )) ; do
+    SERVER_ARGS_ADD_GRPC="--grpc-port ${P[i]} --grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
+      --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
+    SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
 
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      cat $SERVER_LOG
-      exit 1
-  fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-  set +e
-  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]} -i grpc
-  if [ $? -ne 0 ]; then
-      RET=1
-  fi
-  set -e
+    set +e
+    python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]} -i grpc
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+    set -e
 
-  kill $SERVER_PID
-  wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-  SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+    SERVER_ARGS_ADD_HTTP="--http-port ${P[i]} --http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
+      --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
+    SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
-  run_server
-  if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
-      cat $SERVER_LOG
-      exit 1
-  fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-  set +e
-  python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
-  if [ $? -ne 0 ]; then
-      RET=1
-  fi
-  set -e
+    set +e
+    python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p 8005 -sp ${SP_ARR[n]} -hp ${HP_ARR[n]} -pp ${PP_ARR[n]} -ip ${IP_ARR[n]}
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+    set -e
 
-  kill $SERVER_PID
-  wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
+  done
 done
 
 if [ $RET -eq 0 ]; then
