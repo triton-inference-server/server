@@ -56,10 +56,11 @@ if __name__ == '__main__':
                         help="The port for the server to listen on for HTTP Infer requests.")
 
     FLAGS = parser.parse_args()
-    FLAGS.status_port = FLAGS.port if FLAGS.status_port==-1 else FLAGS.status_port
-    FLAGS.health_port = FLAGS.port if FLAGS.health_port==-1 else FLAGS.health_port
-    FLAGS.profile_port = FLAGS.port if FLAGS.profile_port==-1 else FLAGS.profile_port
-    FLAGS.infer_port = FLAGS.port if FLAGS.infer_port==-1 else FLAGS.infer_port
+    if FLAGS.port!=-1:
+        FLAGS.status_port = FLAGS.port if FLAGS.status_port==-1 else FLAGS.status_port
+        FLAGS.health_port = FLAGS.port if FLAGS.health_port==-1 else FLAGS.health_port
+        FLAGS.profile_port = FLAGS.port if FLAGS.profile_port==-1 else FLAGS.profile_port
+        FLAGS.infer_port = FLAGS.port if FLAGS.infer_port==-1 else FLAGS.infer_port
 
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
