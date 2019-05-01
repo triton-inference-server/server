@@ -46,11 +46,10 @@ RET=0
 for (( n=0; n<$len; n++ )) ; do
   SERVER_ARGS_ADD_GRPC="--grpc-status-port ${SP_ARR[n]} --grpc-health-port ${HP_ARR[n]} \
     --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
-  SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
-    --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
   SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
 
-  run_server
+  run_server_nowait
+  sleep 10
   if [ "$SERVER_PID" == "0" ]; then
       echo -e "\n***\n*** Failed to start $SERVER\n***"
       cat $SERVER_LOG
@@ -67,9 +66,12 @@ for (( n=0; n<$len; n++ )) ; do
   kill $SERVER_PID
   wait $SERVER_PID
 
+  SERVER_ARGS_ADD_HTTP="--http-status-port ${SP_ARR[n]} --http-health-port ${HP_ARR[n]} \
+    --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
   SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
-  run_server
+  run_server_nowait
+  sleep 10
   if [ "$SERVER_PID" == "0" ]; then
       echo -e "\n***\n*** Failed to start $SERVER\n***"
       cat $SERVER_LOG
@@ -95,7 +97,8 @@ for (( i=0; i<2; i++ )) ; do
       --grpc-profile-port ${PP_ARR[n]} --grpc-infer-port ${IP_ARR[n]} --allow-grpc 1"
     SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_GRPC"
 
-    run_server
+    run_server_nowait
+    sleep 10
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
@@ -116,7 +119,8 @@ for (( i=0; i<2; i++ )) ; do
       --http-profile-port ${PP_ARR[n]} --http-infer-port ${IP_ARR[n]} --allow-http 1"
     SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
-    run_server
+    run_server_nowait
+    sleep 10
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG

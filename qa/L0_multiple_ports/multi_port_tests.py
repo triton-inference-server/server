@@ -69,7 +69,7 @@ if __name__ == '__main__':
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
     model_name = "simple"
-    model_version = -1
+    model_version = 1
     batch_size = 1
 
     # infer
