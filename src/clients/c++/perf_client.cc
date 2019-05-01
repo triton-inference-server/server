@@ -217,10 +217,10 @@ class ContextFactory {
   const std::string& ModelName() const { return model_name_; }
 
   /// \return The model version.
-  const int64_t ModelVersion() const { return model_version_; }
+  int64_t ModelVersion() const { return model_version_; }
 
   /// \return Whether the model is sequence model.
-  const bool IsSequenceModel() const { return is_sequence_model_; }
+  bool IsSequenceModel() const { return is_sequence_model_; }
 
  private:
   ContextFactory(
@@ -377,7 +377,7 @@ class ConcurrencyManager {
   nic::Error GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat);
 
   /// \return the batch size used for the inference requests
-  const size_t BatchSize() const { return batch_size_; }
+  size_t BatchSize() const { return batch_size_; }
 
  private:
   ConcurrencyManager(
@@ -1700,9 +1700,6 @@ main(int argc, char** argv)
   }
   if (concurrent_request_count <= 0) {
     Usage(argv, "concurrent request count must be > 0");
-  }
-  if (dynamic_concurrency_mode && latency_threshold_ms < 0) {
-    Usage(argv, "latency threshold must be >= 0 for dynamic concurrency mode");
   }
   if (streaming && protocol != ProtocolType::GRPC) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
