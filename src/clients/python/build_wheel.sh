@@ -1,4 +1,5 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,50 +25,53 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-from setuptools import find_packages
-from setuptools import setup, dist
+set -e
 
-if 'VERSION' not in os.environ:
-    raise Exception('envvar VERSION must be specified')
+function main() {
+  if [[ $# -lt 1 ]] ; then
+    echo "usage: $0 <destination dir>"
+    exit 1
+  fi
 
-VERSION = os.environ['VERSION']
+  if [[ ! -f "VERSION" ]]; then
+    echo "Could not find VERSION"
+    exit 1
+  fi
 
-REQUIRED = [
-    'future',
-    'numpy',
-    'protobuf>=3.5.0',
-    'grpcio'
-]
+  VERSION=`cat VERSION`
+  DEST="$1"
+  WHLDIR="$DEST/wheel"
 
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-    class bdist_wheel(_bdist_wheel):
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
-            self.root_is_pure = False
-        def get_tag(self):
-            pyver, abi, plat = _bdist_wheel.get_tag(self)
-            # Client Python code is compatible with both Python 2 and 3
-            pyver, abi = 'py2.py3', 'none'
-            return pyver, abi, plat
-except ImportError:
-    bdist_wheel = None
+  echo $(date) : "=== Using builddir: ${WHLDIR}"
+  mkdir -p ${WHLDIR}/tensorrtserver/api
 
-setup(
-    name='tensorrtserver',
-    version=VERSION,
-    author='NVIDIA Inc.',
-    author_email='davidg@nvidia.com',
-    description='Python client library for TensorRT Inference Server',
-    license='BSD',
-    url='http://nvidia.com',
-    keywords='tensorrt inference server service client',
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    package_data={
-        '': [ 'libcrequest.so', 'librequest.so', ],
-    },
-    zip_safe=False,
-    cmdclass={'bdist_wheel': bdist_wheel},
-)
+  echo "Adding package files"
+  cp ../../core/*_pb2.py \
+    "${WHLDIR}/tensorrtserver/api/."
+
+  cp ../../core/*_grpc.py \
+    "${WHLDIR}/tensorrtserver/api/."
+
+  cp libcrequest.so \
+    "${WHLDIR}/tensorrtserver/api/."
+  cp ../c++/librequest.so \
+    "${WHLDIR}/tensorrtserver/api/."
+
+  cp __init__.py \
+    "${WHLDIR}/tensorrtserver/api/."
+
+  cp setup.py "${WHLDIR}"
+	touch ${WHLDIR}/tensorrtserver/__init__.py
+
+  pushd "${WHLDIR}"
+  echo $(date) : "=== Building wheel"
+  VERSION=$VERSION python setup.py bdist_wheel
+  mkdir -p "${DEST}"
+  cp dist/* "${DEST}"
+  popd
+  echo $(date) : "=== Output wheel file is in: ${DEST}"
+
+	touch ${DEST}/stamp.whl
+}
+
+main "$@"

@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,50 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-from setuptools import find_packages
-from setuptools import setup, dist
+cmake_minimum_required (VERSION 3.5)
+project (trtis-clients)
 
-if 'VERSION' not in os.environ:
-    raise Exception('envvar VERSION must be specified')
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-VERSION = os.environ['VERSION']
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter")  # FIXME -Werror
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-REQUIRED = [
-    'future',
-    'numpy',
-    'protobuf>=3.5.0',
-    'grpcio'
-]
+# For more recent cmakes this should not be necessary
+set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local")
 
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
-    class bdist_wheel(_bdist_wheel):
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
-            self.root_is_pure = False
-        def get_tag(self):
-            pyver, abi, plat = _bdist_wheel.get_tag(self)
-            # Client Python code is compatible with both Python 2 and 3
-            pyver, abi = 'py2.py3', 'none'
-            return pyver, abi, plat
-except ImportError:
-    bdist_wheel = None
+include_directories("${PROJECT_SOURCE_DIR}/../..")
+include_directories("${PROJECT_BINARY_DIR}")
 
-setup(
-    name='tensorrtserver',
-    version=VERSION,
-    author='NVIDIA Inc.',
-    author_email='davidg@nvidia.com',
-    description='Python client library for TensorRT Inference Server',
-    license='BSD',
-    url='http://nvidia.com',
-    keywords='tensorrt inference server service client',
-    packages=find_packages(),
-    install_requires=REQUIRED,
-    package_data={
-        '': [ 'libcrequest.so', 'librequest.so', ],
-    },
-    zip_safe=False,
-    cmdclass={'bdist_wheel': bdist_wheel},
-)
+add_subdirectory(../../src/core src/core)
+add_subdirectory(../../src/clients/c++ src/clients/c++)
+add_subdirectory(../../src/clients/python src/clients/python)
