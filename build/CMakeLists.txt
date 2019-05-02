@@ -129,12 +129,12 @@ ExternalProject_Add(trtis-clients
   PREFIX trtis-clients
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-clients"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-clients"
-  INSTALL_COMMAND ""
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/trtis-clients/install
   DEPENDS protobuf grpc
 )

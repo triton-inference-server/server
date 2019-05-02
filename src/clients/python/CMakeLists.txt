@@ -55,3 +55,19 @@ add_custom_target(
   DEPENDS
     "${wheel_stamp_file}"
 )
+
+install(
+  FILES
+    image_client.py
+    ensemble_image_client.py
+    grpc_image_client.py
+    simple_client.py
+    simple_string_client.py
+    simple_sequence_client.py
+  DESTINATION python
+)
+
+install(
+  CODE "file(GLOB _Wheel \"${CMAKE_CURRENT_BINARY_DIR}/tensorrtserver*.whl\")"
+  CODE "file(INSTALL \${_Wheel} DESTINATION \"${CMAKE_INSTALL_PREFIX}/python\")"
+)
