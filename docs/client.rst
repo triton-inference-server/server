@@ -59,21 +59,22 @@ to perform image classification and to test performance:
 Getting the Client Libraries and Examples
 ------------------------------------------
 
-The provided Makefile.client and Dockerfile.client can be used to
-build the client libraries and examples. As an alternative to building
-it is also possible to download the pre-build client libraries and
-examples from GitHub.
+The provided Dockerfile.client and CMake support can be used to build
+the client libraries and examples. As an alternative to building it is
+also possible to download the pre-build client libraries and examples
+from GitHub.
 
 .. build-client-begin-marker-do-not-remove
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
 
-To build the libaries and examples, first change directory to the root
-of the repo and checkout the release version of the branch that you
-want to build (or the master branch if you want to build the
-under-development version). The branch you use for the client build
-should match the version of the inference server you are using::
+To build the libaries and examples using Docker, first change
+directory to the root of the repo and checkout the release version of
+the branch that you want to build (or the master branch if you want to
+build the under-development version). The branch you use for the
+client build should match the version of the inference server you are
+using::
 
   $ git checkout r19.04
 
@@ -83,13 +84,14 @@ library::
 
   $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
-You can optionally add *-\\-build-arg "UBUNTU_VERSION=<ver>"* to set the Ubuntu
-version that you want the client library built for. Supported
-values for *<ver>* are 16.04 and 18.04, with 16.04 being the default.
+You can optionally add *-\\-build-arg "UBUNTU_VERSION=<ver>"* to set
+the Ubuntu version that you want the client library built
+for. Supported values for *<ver>* are 16.04 and 18.04, with 16.04
+being the default.
 
 After the build completes the tensorrtserver_client docker image will
 contain the built client libraries and examples, and will also be
-configured with all the dependencies required to run those example
+configured with all the dependencies required to run those examples
 within the container. The easiest way to try the examples described in
 the following sections is to run the client image with -\\-net=host so
 that the client examples can access the inference server running in
@@ -98,21 +100,42 @@ more information about running the inference server)::
 
   $ docker run -it --rm --net=host tensorrtserver_client
 
-In the tensorrtserver_client image you can find the C++ library and
-example executables in /workspace/build, and the Python examples in
-/workspace/src/clients/python. A tar file containing all the library
-and example binaries and Python scripts is at
-/workspace/v<version>.clients.tar.gz.
+In the tensorrtserver_client image you can find the example
+executables in /workspace/build/trtis-clients/install/bin, and the
+Python examples in /workspace/build/trtis-clients/install/python. A
+tar file containing all the library and example binaries and Python
+scripts is at /workspace/v<version>.clients.tar.gz.
 
 Build Using Makefile
 ^^^^^^^^^^^^^^^^^^^^
 
-The actual client build is performed by Makefile.client. The build
+The actual client build is performed using CMake. The build
 dependencies and requirements are shown in Dockerfile.client. To build
-without Docker you must first install those dependencies. The Makefile
-can also be targeted for other OSes and platforms. We welcome any
-updates that expand the Makefiles functionality and allow the clients
+without Docker you must first install those dependencies. The CMake
+build can also be targeted for other OSes and platforms. We welcome
+any updates that expand the build functionality and allow the clients
 to be built on additional platforms.
+
+To build the libaries and examples using CMake, first change
+directory to the root of the repo and checkout the release version of
+the branch that you want to build (or the master branch if you want to
+build the under-development version). The branch you use for the
+client build should match the version of the inference server you are
+using::
+
+  $ git checkout r19.04
+
+Then change to the build/ directory and run the following to configure
+and build::
+
+  $ cd build
+  $ cmake -DCMAKE_BUILD_TYPE=Release
+  $ make -j8 trtis-clients
+
+The first build attempt may fail with a "protobuf_generate_cpp"
+error. If that happens simply run the make command again and the build
+should succeed. When the build completes the libraries and examples
+can be found in trtis-clients/install.
 
 .. build-client-end-marker-do-not-remove
 

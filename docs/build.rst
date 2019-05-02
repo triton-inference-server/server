@@ -100,8 +100,8 @@ container, you can find the corresponding model files in
 Building the Client Libraries and Examples
 ------------------------------------------
 
-The provided Makefile.client and Dockerfile.client can be used to
-build the client libraries and examples.
+The provided Dockerfile.client and CMake support can be used to build
+the client libraries and examples.
 
 .. include:: client.rst
    :start-after: build-client-begin-marker-do-not-remove
