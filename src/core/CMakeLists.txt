@@ -50,6 +50,15 @@ add_library(
 
 add_custom_target(proto-py-library DEPENDS ${PROTO_PY})
 
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/api.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/model_config.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/request_status.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/server_status.pb.h
+  DESTINATION include
+)
+
 #
 # GRPC
 #

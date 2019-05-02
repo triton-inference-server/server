@@ -48,12 +48,24 @@ add_library(
 )
 target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
 target_link_libraries(request gRPC::grpc++ gRPC::grpc -lcurl)
+install(
+  TARGETS request
+  LIBRARY DESTINATION lib
+)
+install(
+  FILES request.h request_grpc.h request_http.h
+  DESTINATION include
+)
 
 #
 # ensemble_image_client
 #
 add_executable(ensemble_image_client ensemble_image_client.cc)
 target_link_libraries(ensemble_image_client request)
+install(
+  TARGETS ensemble_image_client
+  RUNTIME DESTINATION bin
+)
 
 #
 # image_client
@@ -62,27 +74,47 @@ find_package(OpenCV REQUIRED)
 add_executable(image_client image_client.cc)
 target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(image_client request ${OpenCV_LIBS})
+install(
+  TARGETS image_client
+  RUNTIME DESTINATION bin
+)
 
 #
 # perf_client
 #
 add_executable(perf_client perf_client.cc)
 target_link_libraries(perf_client request)
+install(
+  TARGETS perf_client
+  RUNTIME DESTINATION bin
+)
 
 #
 # simple_client
 #
 add_executable(simple_client simple_client.cc)
 target_link_libraries(simple_client request)
+install(
+  TARGETS simple_client
+  RUNTIME DESTINATION bin
+)
 
 #
 # simple_sequence_client
 #
 add_executable(simple_sequence_client simple_sequence_client.cc)
 target_link_libraries(simple_sequence_client request)
+install(
+  TARGETS simple_sequence_client
+  RUNTIME DESTINATION bin
+)
 
 #
 # simple_string_client
 #
 add_executable(simple_string_client simple_string_client.cc)
 target_link_libraries(simple_string_client request)
+install(
+  TARGETS simple_string_client
+  RUNTIME DESTINATION bin
+)
