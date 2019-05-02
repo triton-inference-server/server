@@ -78,13 +78,16 @@ enum ProtocolType { HTTP = 0, GRPC = 1 };
 nic::Error
 ParseProtocol(ProtocolType* protocol, const int protocol_int)
 {
+  *protocol = ProtocolType::HTTP;
   if (protocol_int == 0) {
-    *protocol = ProtocolType::HTTP;
     return nic::Error::Success;
-  } else if (protocol_int == 1) {
+  }
+
+  if (protocol_int == 1) {
     *protocol = ProtocolType::GRPC;
     return nic::Error::Success;
   }
+
   return nic::Error(
       ni::RequestStatusCode::INVALID_ARG,
       "unexpected protocol integer, expecting 0 for HTTP or 1 for gRPC");
