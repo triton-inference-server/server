@@ -45,9 +45,9 @@ for modelpath in \
         testdata/autofill_sanity/no_config/1        \
         testdata/autofill_sanity/bad_output_type/1  \
         testdata/autofill_sanity/too_few_inputs/1 ; do
-    mkdir -p /workspace/src/servables/tensorrt/$modelpath
+    mkdir -p /workspace/src/backends/tensorrt/$modelpath
     cp /data/inferenceserver/qa_model_repository/plan_float32_float32_float32/1/model.plan \
-       /workspace/src/servables/tensorrt/$modelpath/.
+       /workspace/src/backends/tensorrt/$modelpath/.
 done
 
 rm -f $TEST_LOG

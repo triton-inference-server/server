@@ -108,7 +108,7 @@ class ModelRepositoryManager {
   /// \return the states of all versions of all live model backends.
   const ModelStateMap GetLiveBackendStates();
 
-  /// ModelRepositoryManager is improved as it will manage the servables
+  /// ModelRepositoryManager is improved as it will manage the backends
   /// directly. \param model_name The model to get version states from. \return
   /// the states of all versions of the specified model backends.
   ///

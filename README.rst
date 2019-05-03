@@ -131,7 +131,7 @@ These inferfaces will maintain backwards compatibility for all future
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_.
 
 * The custom backend interface as defined in `custom.h
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servables/custom/custom.h>`_.
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_.
 
 As new features are introduced they may temporarily have beta status
 where they are subject to change in non-backwards-compatible

@@ -39,7 +39,7 @@ namespace nvidia { namespace inferenceserver { namespace test {
 
 bool
 ModelConfigTestBase::ValidateInit(
-    const std::string& model_path, bool autofill, BundleInitFunc init_func,
+    const std::string& model_path, bool autofill, BackendInitFunc init_func,
     std::string* result)
 {
   result->clear();
@@ -74,7 +74,7 @@ ModelConfigTestBase::ValidateInit(
 
 void
 ModelConfigTestBase::ValidateAll(
-    const std::string& platform, BundleInitFunc init_func)
+    const std::string& platform, BackendInitFunc init_func)
 {
   // Sanity tests without autofill and forcing the platform.
   ValidateOne(
@@ -90,7 +90,7 @@ ModelConfigTestBase::ValidateAll(
 void
 ModelConfigTestBase::ValidateOne(
     const std::string& test_repository_rpath, bool autofill,
-    const std::string& platform, BundleInitFunc init_func)
+    const std::string& platform, BackendInitFunc init_func)
 {
   const std::string model_base_path =
       JoinPath({getenv("TEST_SRCDIR"), test_repository_rpath});
