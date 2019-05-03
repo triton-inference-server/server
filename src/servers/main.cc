@@ -61,11 +61,10 @@ std::condition_variable exit_cv_;
 // exit if even one model fails to load).
 bool exit_on_failed_init_ = true;
 
-// The HTTP and GRPC services
-std::vector<std::unique_ptr<nvidia::inferenceserver::GRPCServer>>
-    grpc_endpoint_services_;
+// The HTTP and GRPC service/s
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_endpoint_services_;
+std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
 // The metrics service
 std::unique_ptr<prometheus::Exposer> exposer_;
@@ -76,18 +75,8 @@ std::unique_ptr<prometheus::Exposer> exposer_;
 int32_t http_port_ = 8000;
 int32_t grpc_port_ = 8001;
 
-// Unique ports for health, status, profile and infer requests on HTTP and GRPC
-// servers
-int32_t http_status_port_ = -1;
+// Unique port for health requests on HTTP server
 int32_t http_health_port_ = -1;
-int32_t http_profile_port_ = -1;
-int32_t http_infer_port_ = -1;
-int32_t grpc_status_port_ = -1;
-int32_t grpc_health_port_ = -1;
-int32_t grpc_profile_port_ = -1;
-int32_t grpc_infer_port_ = -1;
-
-std::vector<int32_t> grpc_ports_;
 std::vector<int32_t> http_ports_;
 
 // The metric port. Initialized to default values and modifyied based
@@ -133,14 +122,7 @@ enum OptionId {
   OPTION_ALLOW_GPU_METRICS,
   OPTION_GRPC_PORT,
   OPTION_HTTP_PORT,
-  OPTION_GRPC_STATUS_PORT,
-  OPTION_GRPC_HEALTH_PORT,
-  OPTION_GRPC_PROFILE_PORT,
-  OPTION_GRPC_INFER_PORT,
-  OPTION_HTTP_STATUS_PORT,
   OPTION_HTTP_HEALTH_PORT,
-  OPTION_HTTP_PROFILE_PORT,
-  OPTION_HTTP_INFER_PORT,
   OPTION_METRICS_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
@@ -206,22 +188,8 @@ std::vector<Option> options_{
      "The port for the server to listen on for GRPC requests."},
     {OPTION_HTTP_PORT, "http-port",
      "The port for the server to listen on for HTTP requests."},
-    {OPTION_GRPC_STATUS_PORT, "grpc-status-port",
-     "The port for the server to listen on for GRPC Status requests."},
-    {OPTION_GRPC_HEALTH_PORT, "grpc-health-port",
-     "The port for the server to listen on for GRPC Health requests."},
-    {OPTION_GRPC_PROFILE_PORT, "grpc-profile-port",
-     "The port for the server to listen on for GRPC Profile requests."},
-    {OPTION_GRPC_INFER_PORT, "grpc-infer-port",
-     "The port for the server to listen on for GRPC Infer requests."},
-    {OPTION_HTTP_STATUS_PORT, "http-status-port",
-     "The port for the server to listen on for HTTP Status requests."},
     {OPTION_HTTP_HEALTH_PORT, "http-health-port",
      "The port for the server to listen on for HTTP Health requests."},
-    {OPTION_HTTP_PROFILE_PORT, "http-profile-port",
-     "The port for the server to listen on for HTTP Profile requests."},
-    {OPTION_HTTP_INFER_PORT, "http-infer-port",
-     "The port for the server to listen on for HTTP Infer requests."},
     {OPTION_METRICS_PORT, "metrics-port",
      "The port reporting prometheus metrics."},
     {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
@@ -275,26 +243,16 @@ bool
 CheckPortCollision()
 {
   // Check if HTTP and GRPC have shared ports
-  std::sort(grpc_ports_.begin(), grpc_ports_.end());
-  std::sort(http_ports_.begin(), http_ports_.end());
-  std::vector<int32_t> overlapping_ports;
-  std::set_intersection(
-      grpc_ports_.begin(), grpc_ports_.end(), http_ports_.begin(),
-      http_ports_.end(), back_inserter(overlapping_ports));
-  if (!overlapping_ports.empty()) {
-    for (auto& overlapping_port : overlapping_ports) {
-      if (overlapping_port != -1) {
-        LOG_ERROR << "The server cannot listen to HTTP requests "
-                  << "and gRPC requests at the same port";
-        return true;
-      }
-    }
+  if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
+       http_ports_.end()) &&
+    (grpc_port_ != -1)) {
+      LOG_ERROR << "The server cannot listen to HTTP requests "
+                << "and gRPC requests at the same port";
+      return true;
   }
 
   // Check if Metric and GRPC have shared ports
-  if ((std::find(grpc_ports_.begin(), grpc_ports_.end(), metrics_port_) !=
-       grpc_ports_.end()) &&
-      (metrics_port_ != -1)) {
+  if ((grpc_port_== metrics_port_) && (metrics_port_ != -1)) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "gRPC requests";
     return true;
@@ -311,33 +269,23 @@ CheckPortCollision()
   return false;
 }
 
-nvidia::inferenceserver::Status
-StartMultipleGrpcService(
-    nvidia::inferenceserver::InferenceServer* server,
-    const std::map<int32_t, std::vector<std::string>>& port_map)
+std::unique_ptr<nvidia::inferenceserver::GRPCServer>
+StartGrpcService(nvidia::inferenceserver::InferenceServer* server)
 {
+  std::unique_ptr<nvidia::inferenceserver::GRPCServer> service;
   nvidia::inferenceserver::Status status =
       nvidia::inferenceserver::GRPCServer::Create(
-          server, port_map, grpc_infer_thread_cnt_,
-          grpc_stream_infer_thread_cnt_, &grpc_endpoint_services_);
-
+          server, grpc_port_, grpc_infer_thread_cnt_,
+          grpc_stream_infer_thread_cnt_, &service);
   if (status.IsOk()) {
-    for (auto& grpc_eps : grpc_endpoint_services_) {
-      if (grpc_eps != nullptr) {
-        status = grpc_eps->Start();
-      }
-    }
+    status = service->Start();
   }
 
   if (!status.IsOk()) {
-    for (auto& grpc_eps : grpc_endpoint_services_) {
-      if (grpc_eps != nullptr) {
-        grpc_eps.reset();
-      }
-    }
+    service.reset();
   }
 
-  return status;
+  return std::move(service);
 }
 
 nvidia::inferenceserver::Status
@@ -375,18 +323,9 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
 
   // Enable gRPC endpoints if requested...
-  if (allow_grpc) {
-    std::map<int32_t, std::vector<std::string>> port_map;
-
-    // Group by port numbers
-    for (i = 0; i < grpc_ports_.size(); i++) {
-      if (grpc_ports_[i] != -1) {
-        port_map[grpc_ports_[i]].push_back(endpoint_names[i]);
-      }
-    }
-
-    create_status = StartMultipleGrpcService(server, port_map);
-    if (!create_status.IsOk()) {
+  if (allow_grpc && grpc_port_!=-1) {
+    grpc_service_ = StartGrpcService(server);
+    if (grpc_service_ == nullptr) {
       LOG_ERROR << "Failed to start gRPC service";
       return false;
     }
@@ -490,14 +429,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
   int32_t http_thread_cnt = http_thread_cnt_;
 
-  int32_t http_status_port = http_port_;
   int32_t http_health_port = http_port_;
-  int32_t http_profile_port = http_port_;
-  int32_t http_infer_port = http_port_;
-  int32_t grpc_status_port = grpc_port_;
-  int32_t grpc_health_port = grpc_port_;
-  int32_t grpc_profile_port = grpc_port_;
-  int32_t grpc_infer_port = grpc_port_;
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
 
@@ -567,41 +499,13 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
-        grpc_status_port = grpc_port;
-        grpc_health_port = grpc_port;
-        grpc_profile_port = grpc_port;
-        grpc_infer_port = grpc_port;
-        break;
-      case OPTION_GRPC_STATUS_PORT:
-        grpc_status_port = ParseIntOption(optarg);
-        break;
-      case OPTION_GRPC_HEALTH_PORT:
-        grpc_health_port = ParseIntOption(optarg);
-        break;
-      case OPTION_GRPC_PROFILE_PORT:
-        grpc_profile_port = ParseIntOption(optarg);
-        break;
-      case OPTION_GRPC_INFER_PORT:
-        grpc_infer_port = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_PORT:
         http_port = ParseIntOption(optarg);
-        http_status_port = http_port;
         http_health_port = http_port;
-        http_profile_port = http_port;
-        http_infer_port = http_port;
-        break;
-      case OPTION_HTTP_STATUS_PORT:
-        http_status_port = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_HEALTH_PORT:
         http_health_port = ParseIntOption(optarg);
-        break;
-      case OPTION_HTTP_PROFILE_PORT:
-        http_profile_port = ParseIntOption(optarg);
-        break;
-      case OPTION_HTTP_INFER_PORT:
-        http_infer_port = ParseIntOption(optarg);
         break;
 
       case OPTION_METRICS_PORT:
@@ -651,29 +555,18 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   if (!allow_http && !allow_grpc) {
     LOG_ERROR << "At least one of the following options must be true: "
               << "--allow-http, --allow-grpc";
+
     return false;
   }
 
   exit_on_failed_init_ = exit_on_error;
-  if (allow_http) {
-    http_status_port_ = http_status_port;
-    http_health_port_ = http_health_port;
-    http_profile_port_ = http_profile_port;
-    http_infer_port_ = http_infer_port;
-  }
 
-  if (allow_grpc) {
-    grpc_status_port_ = grpc_status_port;
-    grpc_health_port_ = grpc_health_port;
-    grpc_profile_port_ = grpc_profile_port;
-    grpc_infer_port_ = grpc_infer_port;
-  }
+  http_port_ = http_port;
+  grpc_port_ = grpc_port;
+  http_health_port_ = http_health_port;
 
   metrics_port_ = allow_metrics ? metrics_port : -1;
-  grpc_ports_ = {grpc_status_port_, grpc_health_port_, grpc_profile_port_,
-                 grpc_infer_port_};
-  http_ports_ = {http_status_port_, http_health_port_, http_profile_port_,
-                 http_infer_port_};
+  http_ports_ = {http_port_, http_health_port_, http_port_, http_port_};
 
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision())
@@ -749,10 +642,8 @@ main(int argc, char** argv)
 
   bool stop_status = server_->Stop();
 
-  for (auto& grpc_eps : grpc_endpoint_services_) {
-    if (grpc_eps != nullptr) {
-      grpc_eps->Stop();
-    }
+  if (grpc_service_) {
+    grpc_service_->Stop();
   }
   for (auto& http_eps : http_endpoint_services_) {
     if (http_eps != nullptr) {
