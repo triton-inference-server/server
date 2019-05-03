@@ -71,8 +71,10 @@ for (( i=0; i<2; i++ )) ; do
       --allow-http 1"
     SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
+    set +e
     run_server_nowait
     sleep 5
+    set -e
     if ! [[ "${P[i]}" == "-1" && "${HP_ARR[n]}" == "-1" ]] ; then
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -97,21 +99,21 @@ done
 # set http port to -1 after setting health to 8007
 SERVER_ARGS_ADD_HTTP="--http-health-port 8007 --http-port -1 --allow-http 1"
 SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+set +e
 run_server_nowait
-sleep 5
+sleep 10
+echo $SERVER_PID
+cat $SERVER_LOG
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Should not have started $SERVER\n***"
+    echo $SERVER_PID
     cat $SERVER_LOG
+    RET=1
+    kill $SERVER_PID
+    wait $SERVER_PID
     exit 1
 fi
-set +e
-python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p -1 -hp 8007 -i http
-if [ $? -ne 0 ]; then
-    RET=1
-fi
 set -e
-kill $SERVER_PID
-wait $SERVER_PID
 # allow overrules - grpc still works
 SERVER_ARGS_ADD_HTTP="--http-port -1 --http-health-port 8007 --allow-http 0"
 SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
@@ -122,34 +124,38 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-set +e
-python $MULTI_PORT_TESTS_PY -v >>$CLIENT_LOG 2>&1 -p -1 -hp 8007 -i http
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-set -e
 kill $SERVER_PID
 wait $SERVER_PID
 # overlap with grpc default
 SERVER_ARGS_ADD_HTTP="--http-health-port 8001"
 SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+set +e
 run_server_nowait
 sleep 5
+set -e
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Should not have started $SERVER\n***"
     cat $SERVER_LOG
+    RET=1
+    kill $SERVER_PID
+    wait $SERVER_PID
     exit 1
 fi
 # overlap with metrics default
 SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
   --http-profile-port 8007 --http-infer-port 8007"
 SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+set +e
 run_server_nowait
 sleep 5
+set -e
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Should not have started $SERVER\n***"
     cat $SERVER_LOG
     exit 1
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
 fi
 # disable metrics - no overlap with metrics default
 SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
