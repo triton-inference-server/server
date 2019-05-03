@@ -415,7 +415,7 @@ class InferBackendHandleImpl : public InferenceServer::InferBackendHandle {
   }
 
  private:
-  std::unique_ptr<ModelRepositoryManager::BackendHandle> backend_handle_;
+  std::shared_ptr<ModelRepositoryManager::BackendHandle> backend_handle_;
 };
 
 Status
