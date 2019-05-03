@@ -23,47 +23,58 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/servables/custom/custom_bundle.h"
-#include "src/servables/custom/custom_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/source_adapter.h"
-#include "tensorflow_serving/core/storage_path.h"
+#include "src/servables/tensorrt/plan_backend_factory.h"
 
-namespace tfs = tensorflow::serving;
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "src/core/constants.h"
+#include "src/core/filesystem.h"
+#include "src/core/logging.h"
+#include "src/core/model_config.pb.h"
+#include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Adapter that converts storage paths pointing to custom files into
-// the corresponding custom bundle.
-class CustomBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle> {
- public:
-  static tensorflow::Status Create(
-      const CustomBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+Status
+PlanBackendFactory::Create(
+    const PlanBundleSourceAdapterConfig& platform_config,
+    std::unique_ptr<PlanBackendFactory>* factory)
+{
+  LOG_VERBOSE(1) << "Create PlanBackendFactory for platform config \""
+                 << platform_config.DebugString() << "\"";
 
-  ~CustomBundleSourceAdapter() override;
+  factory->reset(new PlanBackendFactory(platform_config));
+  return Status::Success;
+}
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(CustomBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, CustomBundle>;
+Status
+PlanBackendFactory::CreateBackend(
+    const std::string& path, const ModelConfig& model_config,
+    std::unique_ptr<InferenceBackend>* backend)
+{
+  std::set<std::string> plan_files;
+  RETURN_IF_ERROR(GetDirectoryFiles(path, &plan_files));
 
-  CustomBundleSourceAdapter(
-      const CustomBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
-  {
+  std::unordered_map<std::string, std::vector<char>> models;
+  for (const auto& filename : plan_files) {
+    const auto plan_path = JoinPath({path, filename});
+    std::string model_data_str;
+    RETURN_IF_ERROR(ReadTextFile(plan_path, &model_data_str));
+    std::vector<char> model_data(model_data_str.begin(), model_data_str.end());
+    models.emplace(filename, std::move(model_data));
   }
 
-  const CustomBundleSourceAdapterConfig config_;
-};
+  // Create the bundle for the model and all the execution contexts
+  // requested for this model.
+  std::unique_ptr<PlanBundle> local_bundle(new PlanBundle);
+  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
+  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(models));
+
+  *backend = std::move(local_bundle);
+  return Status::Success;
+}
 
 }}  // namespace nvidia::inferenceserver

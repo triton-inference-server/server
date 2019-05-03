@@ -120,9 +120,9 @@ cc_library(
 )
 
 cc_library(
-    name = "graphdef_bundle_source_adapter",
-    srcs = ["graphdef_bundle_source_adapter.cc"],
-    hdrs = ["graphdef_bundle_source_adapter.h"],
+    name = "graphdef_backend_factory",
+    srcs = ["graphdef_backend_factory.cc"],
+    hdrs = ["graphdef_backend_factory.h"],
     deps = [
         ":graphdef_bundle",
         ":graphdef_bundle_proto",
@@ -130,11 +130,6 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@tf_serving//tensorflow_serving/core:loader",
-        "@tf_serving//tensorflow_serving/core:simple_loader",
-        "@tf_serving//tensorflow_serving/core:source_adapter",
-        "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/util:optional",
         "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
@@ -154,9 +149,9 @@ cc_library(
 )
 
 cc_library(
-    name = "savedmodel_bundle_source_adapter",
-    srcs = ["savedmodel_bundle_source_adapter.cc"],
-    hdrs = ["savedmodel_bundle_source_adapter.h"],
+    name = "savedmodel_backend_factory",
+    srcs = ["savedmodel_backend_factory.cc"],
+    hdrs = ["savedmodel_backend_factory.h"],
     deps = [
         ":savedmodel_bundle",
         ":savedmodel_bundle_proto",
@@ -164,11 +159,6 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@tf_serving//tensorflow_serving/core:loader",
-        "@tf_serving//tensorflow_serving/core:simple_loader",
-        "@tf_serving//tensorflow_serving/core:source_adapter",
-        "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/util:optional",
         "@org_tensorflow//tensorflow/core:core_cpu",
         "@org_tensorflow//tensorflow/core:lib",
     ],

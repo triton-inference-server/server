@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/ensemble/ensemble_bundle_source_adapter.h"
+#include "src/servables/custom/custom_backend_factory.h"
 
 #include <memory>
 #include <string>
@@ -35,70 +35,55 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/model_repository_manager.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-tensorflow::Status
-CreateEnsembleBundle(
-    const EnsembleBundleSourceAdapterConfig& adapter_config,
-    const std::string& path, std::unique_ptr<EnsembleBundle>* bundle)
+Status
+CustomBackendFactory::Create(
+    const CustomBundleSourceAdapterConfig& platform_config,
+    std::unique_ptr<CustomBackendFactory>* factory)
 {
-  const auto model_path = DirName(path);
-  const auto model_name = BaseName(model_path);
+  LOG_VERBOSE(1) << "Create CustomBackendFactory for platform config \""
+                 << platform_config.DebugString() << "\"";
 
-  ModelConfig model_config;
-  Status status = ModelRepositoryManager::GetModelConfig(
-      std::string(model_name), &model_config);
-  if (!status.IsOk()) {
-    return tensorflow::errors::Internal(status.Message());
+  factory->reset(new CustomBackendFactory(platform_config));
+  return Status::Success;
+}
+
+Status
+CustomBackendFactory::CreateBackend(
+    const std::string& path, const ModelConfig& model_config,
+    std::unique_ptr<InferenceBackend>* backend)
+{
+  // Read all the files in 'path'.
+  std::set<std::string> custom_files;
+  RETURN_IF_ERROR(GetDirectoryFiles(path, &custom_files));
+
+  std::unordered_map<std::string, std::string> custom_paths;
+  for (const auto& filename : custom_files) {
+    const auto custom_path = JoinPath({path, filename});
+
+    custom_paths.emplace(
+        std::piecewise_construct, std::make_tuple(filename),
+        std::make_tuple(custom_path));
   }
+
+  // Create the vector of server parameter values, indexed by the
+  // CustomServerParameter value.
+  std::vector<std::string> server_params(CUSTOM_SERVER_PARAMETER_CNT);
+  server_params[CustomServerParameter::INFERENCE_SERVER_VERSION] =
+      platform_config_.inference_server_version();
+  server_params[CustomServerParameter::MODEL_REPOSITORY_PATH] =
+      platform_config_.model_repository_path();
 
   // Create the bundle for the model and all the execution contexts
   // requested for this model.
-  bundle->reset(new EnsembleBundle);
-  status = (*bundle)->Init(path, model_config);
-  if (!status.IsOk()) {
-    bundle->reset();
-    return tensorflow::errors::Internal(status.Message());
-  }
+  std::unique_ptr<CustomBundle> local_bundle(new CustomBundle);
+  RETURN_IF_ERROR(local_bundle->Init(path, server_params, model_config));
+  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(custom_paths));
 
-  return tensorflow::Status::OK();
-}
-
-}  // namespace
-
-tensorflow::Status
-EnsembleBundleSourceAdapter::Create(
-    const EnsembleBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-        SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>* adapter)
-{
-  LOG_VERBOSE(1) << "Create EnsembleBundleSourceAdaptor for config \""
-                 << config.DebugString() << "\"";
-
-  Creator creator = std::bind(
-      &CreateEnsembleBundle, config, std::placeholders::_1,
-      std::placeholders::_2);
-
-  adapter->reset(new EnsembleBundleSourceAdapter(
-      config, creator, SimpleSourceAdapter::EstimateNoResources()));
-  return tensorflow::Status::OK();
-}
-
-EnsembleBundleSourceAdapter::~EnsembleBundleSourceAdapter()
-{
-  Detach();
+  *backend = std::move(local_bundle);
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
-
-namespace tensorflow { namespace serving {
-
-REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-    nvidia::inferenceserver::EnsembleBundleSourceAdapter,
-    nvidia::inferenceserver::EnsembleBundleSourceAdapterConfig);
-}}  // namespace tensorflow::serving

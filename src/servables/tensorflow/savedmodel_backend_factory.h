@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,60 +23,38 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/servables/ensemble/ensemble_bundle.h"
-
-#include <stdint.h>
-#include "src/core/constants.h"
-#include "src/core/ensemble_scheduler.h"
-#include "src/core/logging.h"
-#include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
+#include "src/core/status.h"
+#include "src/servables/tensorflow/savedmodel_bundle.h"
+#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
-Status
-EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
+// Adapter that converts storage paths pointing to SavedModel files
+// into the corresponding savedmodel bundle.
+class SavedModelBackendFactory {
+ public:
+  static Status Create(
+      const SavedModelBundleSourceAdapterConfig& platform_config,
+      std::unique_ptr<SavedModelBackendFactory>* factory);
 
-  std::unique_ptr<Scheduler> scheduler;
-  RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
-  RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
+  Status CreateBackend(
+      const std::string& path, const ModelConfig& model_config,
+      std::unique_ptr<InferenceBackend>* backend);
 
-  LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
+  ~SavedModelBackendFactory() = default;
 
-  return Status::Success;
-}
+ private:
+  DISALLOW_COPY_AND_ASSIGN(SavedModelBackendFactory);
 
-Status
-EnsembleBundle::SetInferenceServer(void* inference_server)
-{
-  // [TODO] update this since we can determine inference server on
-  // backend creation
-  EnsembleScheduler* scheduler =
-      static_cast<EnsembleScheduler*>(BackendScheduler());
-  return scheduler->SetInferenceServer(inference_server);
-}
+  SavedModelBackendFactory(
+      const SavedModelBundleSourceAdapterConfig& platform_config)
+      : platform_config_(platform_config)
+  {
+  }
 
-void
-EnsembleBundle::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  LOG_ERROR << "Unexpectedly invoked EnsembleBundle::Run()";
-
-  OnCompleteQueuedPayloads(Status(
-      RequestStatusCode::INTERNAL,
-      "unexpected invocation of EnsembleBundle::Run()"));
-}
-
-std::ostream&
-operator<<(std::ostream& out, const EnsembleBundle& pb)
-{
-  out << "name=" << pb.Name() << std::endl;
-  return out;
-}
+  const SavedModelBundleSourceAdapterConfig platform_config_;
+};
 
 }}  // namespace nvidia::inferenceserver

@@ -25,45 +25,35 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/status.h"
 #include "src/servables/tensorrt/plan_bundle.h"
 #include "src/servables/tensorrt/plan_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/source_adapter.h"
-#include "tensorflow_serving/core/storage_path.h"
-
-namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
 // Adapter that converts storage paths pointing to PLAN files into the
 // corresponding plan bundle.
-class PlanBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle> {
+class PlanBackendFactory {
  public:
-  static tensorflow::Status Create(
-      const PlanBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+  static Status Create(
+      const PlanBundleSourceAdapterConfig& platform_config,
+      std::unique_ptr<PlanBackendFactory>* factory);
 
-  ~PlanBundleSourceAdapter() override;
+  Status CreateBackend(
+      const std::string& path, const ModelConfig& model_config,
+      std::unique_ptr<InferenceBackend>* backend);
+
+  ~PlanBackendFactory() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(PlanBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, PlanBundle>;
+  DISALLOW_COPY_AND_ASSIGN(PlanBackendFactory);
 
-  PlanBundleSourceAdapter(
-      const PlanBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
+  PlanBackendFactory(const PlanBundleSourceAdapterConfig& platform_config)
+      : platform_config_(platform_config)
   {
   }
 
-  const PlanBundleSourceAdapterConfig config_;
+  const PlanBundleSourceAdapterConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

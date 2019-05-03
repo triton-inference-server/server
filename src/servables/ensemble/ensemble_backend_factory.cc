@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,47 +23,45 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/servables/tensorflow/savedmodel_bundle.h"
-#include "src/servables/tensorflow/savedmodel_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/storage_path.h"
+#include "src/servables/ensemble/ensemble_backend_factory.h"
 
-namespace tfs = tensorflow::serving;
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "src/core/constants.h"
+#include "src/core/filesystem.h"
+#include "src/core/logging.h"
+#include "src/core/model_config.pb.h"
+#include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Adapter that converts storage paths pointing to SavedModel files
-// into the corresponding savedmodel bundle.
-class SavedModelBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<
-          tfs::StoragePath, SavedModelBundle> {
- public:
-  static tensorflow::Status Create(
-      const SavedModelBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+Status
+EnsembleBackendFactory::Create(
+    const EnsembleBundleSourceAdapterConfig& platform_config,
+    std::unique_ptr<EnsembleBackendFactory>* factory)
+{
+  LOG_VERBOSE(1) << "Create EnsembleBackendFactory for platform config \""
+                 << platform_config.DebugString() << "\"";
 
-  ~SavedModelBundleSourceAdapter() override;
+  factory->reset(new EnsembleBackendFactory(platform_config));
+  return Status::Success;
+}
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(SavedModelBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, SavedModelBundle>;
+Status
+EnsembleBackendFactory::CreateBackend(
+    const std::string& path, const ModelConfig& model_config,
+    std::unique_ptr<InferenceBackend>* backend)
+{
+  // Create the bundle for the model and all the execution contexts
+  // requested for this model.
+  std::unique_ptr<EnsembleBundle> local_bundle(new EnsembleBundle);
+  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
 
-  SavedModelBundleSourceAdapter(
-      const SavedModelBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
-  {
-  }
-
-  const SavedModelBundleSourceAdapterConfig config_;
-};
+  *backend = std::move(local_bundle);
+  return Status::Success;
+}
 
 }}  // namespace nvidia::inferenceserver
