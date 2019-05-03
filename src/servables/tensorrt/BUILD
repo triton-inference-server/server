@@ -97,9 +97,9 @@ cc_library(
 )
 
 cc_library(
-    name = "plan_bundle_source_adapter",
-    srcs = ["plan_bundle_source_adapter.cc"],
-    hdrs = ["plan_bundle_source_adapter.h"],
+    name = "plan_backend_factory",
+    srcs = ["plan_backend_factory.cc"],
+    hdrs = ["plan_backend_factory.h"],
     deps = [
         ":plan_bundle",
         ":plan_bundle_proto",
@@ -107,11 +107,7 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@tf_serving//tensorflow_serving/core:loader",
-        "@tf_serving//tensorflow_serving/core:simple_loader",
-        "@tf_serving//tensorflow_serving/core:source_adapter",
-        "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/util:optional",
+        "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
 )

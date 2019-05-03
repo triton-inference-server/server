@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,45 +25,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/servables/ensemble/ensemble_bundle.h"
-#include "src/servables/ensemble/ensemble_bundle.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/source_adapter.h"
-#include "tensorflow_serving/core/storage_path.h"
-
-namespace tfs = tensorflow::serving;
+#include "src/core/status.h"
+#include "src/servables/tensorflow/graphdef_bundle.h"
+#include "src/servables/tensorflow/graphdef_bundle.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Adapter that converts storage paths pointing to ensemble files into the
-// corresponding ensemble bundle.
-class EnsembleBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, EnsembleBundle> {
+// Adapter that converts storage paths pointing to GraphDef files into
+// the corresponding graphdef bundle.
+class GraphDefBackendFactory {
  public:
-  static tensorflow::Status Create(
-      const EnsembleBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+  static Status Create(
+      const GraphDefBundleSourceAdapterConfig& platform_config,
+      std::unique_ptr<GraphDefBackendFactory>* factory);
 
-  ~EnsembleBundleSourceAdapter() override;
+  Status CreateBackend(
+      const std::string& path, const ModelConfig& model_config,
+      std::unique_ptr<InferenceBackend>* backend);
+
+  ~GraphDefBackendFactory() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(EnsembleBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, EnsembleBundle>;
+  DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
 
-  EnsembleBundleSourceAdapter(
-      const EnsembleBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
+  GraphDefBackendFactory(
+      const GraphDefBundleSourceAdapterConfig& platform_config)
+      : platform_config_(platform_config)
   {
   }
 
-  const EnsembleBundleSourceAdapterConfig config_;
+  const GraphDefBundleSourceAdapterConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

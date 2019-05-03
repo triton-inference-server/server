@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/tensorflow/savedmodel_bundle_source_adapter.h"
+#include "src/servables/tensorflow/savedmodel_backend_factory.h"
 
 #include <memory>
 #include <string>
@@ -35,34 +35,29 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/model_repository_manager.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-tensorflow::Status
-CreateSavedModelBundle(
-    const SavedModelBundleSourceAdapterConfig& adapter_config,
-    const std::string& path, std::unique_ptr<SavedModelBundle>* bundle)
+Status
+SavedModelBackendFactory::Create(
+    const SavedModelBundleSourceAdapterConfig& platform_config,
+    std::unique_ptr<SavedModelBackendFactory>* factory)
 {
-  const auto model_path = DirName(path);
-  const auto model_name = BaseName(model_path);
+  LOG_VERBOSE(1) << "Create SavedModelBackendFactory for platform config \""
+                 << platform_config.DebugString() << "\"";
 
-  ModelConfig model_config;
-  Status status = ModelRepositoryManager::GetModelConfig(
-      std::string(model_name), &model_config);
-  if (!status.IsOk()) {
-    return tensorflow::errors::Internal(status.Message());
-  }
+  factory->reset(new SavedModelBackendFactory(platform_config));
+  return Status::Success;
+}
 
+Status
+SavedModelBackendFactory::CreateBackend(
+    const std::string& path, const ModelConfig& model_config,
+    std::unique_ptr<InferenceBackend>* backend)
+{
   // Read all the savedmodel directories in 'path'.
   std::set<std::string> savedmodel_subdirs;
-  status = GetDirectorySubdirs(path, &savedmodel_subdirs);
-  if (!status.IsOk()) {
-    return tensorflow::errors::Internal(status.Message());
-  }
+  RETURN_IF_ERROR(GetDirectorySubdirs(path, &savedmodel_subdirs));
 
   std::unordered_map<std::string, std::string> savedmodel_paths;
   for (const auto& filename : savedmodel_subdirs) {
@@ -72,51 +67,13 @@ CreateSavedModelBundle(
         std::make_tuple(savedmodel_path));
   }
 
-  bundle->reset(new SavedModelBundle);
-  status = (*bundle)->Init(path, model_config);
-  if (status.IsOk()) {
-    status = (*bundle)->CreateExecutionContexts(
-        adapter_config.session_config(), savedmodel_paths);
-  }
-  if (!status.IsOk()) {
-    bundle->reset();
-    return tensorflow::errors::Internal(status.Message());
-  }
+  std::unique_ptr<SavedModelBundle> local_bundle(new SavedModelBundle);
+  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
+  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(
+      platform_config_.session_config(), savedmodel_paths));
 
-  return tensorflow::Status::OK();
-}
-
-}  // namespace
-
-tensorflow::Status
-SavedModelBundleSourceAdapter::Create(
-    const SavedModelBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-        tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-        adapter)
-{
-  LOG_VERBOSE(1) << "Create SavedModelBundleSourceAdaptor for config \""
-                 << config.DebugString() << "\"";
-
-  Creator creator = std::bind(
-      &CreateSavedModelBundle, config, std::placeholders::_1,
-      std::placeholders::_2);
-
-  adapter->reset(new SavedModelBundleSourceAdapter(
-      config, creator, SimpleSourceAdapter::EstimateNoResources()));
-  return tensorflow::Status::OK();
-}
-
-SavedModelBundleSourceAdapter::~SavedModelBundleSourceAdapter()
-{
-  Detach();
+  *backend = std::move(local_bundle);
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
-
-namespace tensorflow { namespace serving {
-
-REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-    nvidia::inferenceserver::SavedModelBundleSourceAdapter,
-    nvidia::inferenceserver::SavedModelBundleSourceAdapterConfig);
-}}  // namespace tensorflow::serving
