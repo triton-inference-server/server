@@ -60,6 +60,10 @@ any missing model definition files from their public model zoos::
   $ cd docs/examples
   $ ./fetch_models.sh
 
+And you must build the model definition file for the custom image preprocess
+model (see :ref:`section-building-the-example-custom-backends` for instructions
+on how to build it).
+
 .. _section-running-the-inference-server:
 
 Running The Inference Server

@@ -82,6 +82,21 @@ before issuing the above build command::
 
   # rm -fr bazel-bin/src
 
+.. _section-building-the-example-custom-backends:
+
+Building the Example Custom Backends
+------------------------------------
+
+Some examples of the custom backends can be found in the `custom directory
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_.
+These backends are built as part of the *build* container, so within the
+container, you can find the corresponding model files in
+/opt/tensorrtserver/custom. Or you can perform an incremental build with::
+
+  # cd /workspace
+  # bazel build -c opt src/custom/...
+  # cp /workspace/bazel-bin/src/custom/* /opt/tensorrtserver/custom/.
+
 Building the Client Libraries and Examples
 ------------------------------------------
 
