@@ -26,12 +26,12 @@
 
 #include "src/core/autofill.h"
 
+#include "src/backends/caffe2/autofill.h"
+#include "src/backends/tensorflow/autofill.h"
+#include "src/backends/tensorrt/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/servables/caffe2/autofill.h"
-#include "src/servables/tensorflow/autofill.h"
-#include "src/servables/tensorrt/autofill.h"
 #include "tensorflow/core/lib/io/path.h"
 #include "tensorflow/core/platform/env.h"
 

@@ -46,7 +46,6 @@ cc_library(
         "//src/core:server_header",
         "@com_google_googletest//:gtest",
         "@org_tensorflow//tensorflow/core:testlib",
-        "@tf_serving//tensorflow_serving/config:platform_config_proto",
     ],
 )
 

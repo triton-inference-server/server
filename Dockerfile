@@ -39,14 +39,14 @@ FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 
 # We cannot just pull libraries from the PyTorch container... we need
 # to:
-#   - copy over netdef_bundle_c2 interface so it can build with other
+#   - copy over netdef_backend_c2 interface so it can build with other
 #     C2 sources
 #   - need to patch as explained below
 
-# Copy netdef_bundle_c2 into Caffe2 core so it builds into the
-# libcaffe2 library. We want netdef_bundle_c2 to build against the
+# Copy netdef_backend_c2 into Caffe2 core so it builds into the
+# libcaffe2 library. We want netdef_backend_c2 to build against the
 # Caffe2 protobuf since it interfaces with that code.
-COPY src/servables/caffe2/netdef_bundle_c2.* \
+COPY src/backends/caffe2/netdef_backend_c2.* \
      /opt/pytorch/pytorch/caffe2/core/
 
 # Avoid failure when peer access already enabled for CUDA device

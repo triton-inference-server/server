@@ -245,14 +245,14 @@ CheckPortCollision()
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
-    (grpc_port_ != -1)) {
-      LOG_ERROR << "The server cannot listen to HTTP requests "
-                << "and gRPC requests at the same port";
-      return true;
+      (grpc_port_ != -1)) {
+    LOG_ERROR << "The server cannot listen to HTTP requests "
+              << "and gRPC requests at the same port";
+    return true;
   }
 
   // Check if Metric and GRPC have shared ports
-  if ((grpc_port_== metrics_port_) && (metrics_port_ != -1)) {
+  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1)) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "gRPC requests";
     return true;
@@ -323,7 +323,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
 
   // Enable gRPC endpoints if requested...
-  if (allow_grpc && grpc_port_!=-1) {
+  if (allow_grpc && grpc_port_ != -1) {
     grpc_service_ = StartGrpcService(server);
     if (grpc_service_ == nullptr) {
       LOG_ERROR << "Failed to start gRPC service";

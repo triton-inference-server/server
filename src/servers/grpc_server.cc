@@ -254,7 +254,7 @@ GRPCServer::~GRPCServer()
 Status
 GRPCServer::Create(
     InferenceServer* server, int32_t port, int infer_thread_cnt,
-      int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
+    int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
 {
   g_Resources = std::make_shared<AsyncResources>(
       server, 1 /* infer threads */, 1 /* mgmt threads */);
