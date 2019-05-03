@@ -83,9 +83,9 @@ library::
 
   $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
-You can optionally add *-\\-build-arg "PYVER=<ver>"* to set the Python
-version that you want the Python client library built for. Supported
-values for *<ver>* are 2.6 and 3.5, with 3.5 being the default.
+You can optionally add *-\\-build-arg "UBUNTU_VERSION=<ver>"* to set the Ubuntu
+version that you want the client library built for. Supported
+values for *<ver>* are 16.04 and 18.04, with 16.04 being the default.
 
 After the build completes the tensorrtserver_client docker image will
 contain the built client libraries and examples, and will also be
