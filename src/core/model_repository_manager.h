@@ -32,32 +32,24 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
-namespace tensorflow { namespace serving {
-class ModelConfig;
-class ServerCore;
-}}  // namespace tensorflow::serving
-namespace tfs = tensorflow::serving;
-
 namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
 class ServerStatusManager;
 
-/// A singleton to manage the model repository active in the server. A
-/// singleton is used because the servables have no connection to the
-/// server itself but they need to have access to the configuration.
-/// [TODO] The singleton and related functions will be removed once
-/// ModelRepositoryManager is improved as it will manage the servables directly.
+/// An object to manage the model repository active in the server.
 class ModelRepositoryManager {
  public:
   using VersionStateMap = std::map<int64_t, ModelReadyState>;
-  using ModelMap = std::map<std::string, VersionStateMap>;
+  using ModelStateMap = std::map<std::string, VersionStateMap>;
 
-  enum ActionType { LOAD, UNLOAD };
+  enum ActionType { NO_ACTION, LOAD, UNLOAD };
 
-  /// [TODO] BackendHandle and InferenceServer::InferenceBackendHandle are used
-  /// to keep TFS servables alive. They should be able to be simplified once
-  /// ModelRepositoryManager is improved.
+  /// BackendHandle manages the lifetime of the encapsulated backend,
+  /// the backend is alive as long as the handle is alive.
+  ///
+  /// [TODO] Move BackendHandle in backend.h as interface, and implement it in
+  /// model_repository_manager.h
   class BackendHandle {
    public:
     virtual ~BackendHandle() = default;
@@ -114,10 +106,15 @@ class ModelRepositoryManager {
   Status UnloadAllModels();
 
   /// \return the states of all versions of all live model backends.
-  const ModelMap GetLiveBackendStates();
+  const ModelStateMap GetLiveBackendStates();
 
-  /// \param model_name The model to get version states from.
-  /// \return the states of all versions of the specified model backends.
+  /// ModelRepositoryManager is improved as it will manage the servables
+  /// directly. \param model_name The model to get version states from. \return
+  /// the states of all versions of the specified model backends.
+  ///
+  /// [TODO] Instead of providing this function for server status manager to
+  /// poll version state, adding a mirror function in ServerStatusManager and
+  /// publish the version state changes via that mirror function.
   const VersionStateMap GetVersionStates(const std::string& model_name);
 
   /// Obtain the specified backend handle.
@@ -127,17 +124,11 @@ class ModelRepositoryManager {
   /// \return error status.
   Status GetBackendHandle(
       const std::string& model_name, const int64_t model_version,
-      std::unique_ptr<BackendHandle>* handle);
-
-  /// Get the configuration for a named model.
-  /// \param name The model name.
-  /// \param model_config Returns the model configuration.
-  /// \return OK if found, NOT_FOUND otherwise.
-  static Status GetModelConfig(
-      const std::string& name, ModelConfig* model_config);
+      std::shared_ptr<BackendHandle>* handle);
 
  private:
   struct ModelInfo;
+  class BackendLifeCycle;
 
   // Map from model name to information about the model.
   using ModelInfoMap =
@@ -147,7 +138,7 @@ class ModelRepositoryManager {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
       const PlatformConfigMap& platform_config_map, const bool autofill,
-      const bool polling_enabled);
+      const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -167,15 +158,7 @@ class ModelRepositoryManager {
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelConfigFromInstance(
-      const std::string& name, ModelConfig* model_config);
-
-  /// Get TFS-style configuration for a named model.
-  /// \param name The model name.
-  /// \param tfs_model_config Returns the TFS-style model configuration.
-  /// \return OK if found, NOT_FOUND otherwise.
-  Status GetTFSModelConfig(
-      const std::string& name, tfs::ModelConfig* tfs_model_config);
+  Status GetModelConfig(const std::string& name, ModelConfig* model_config);
 
   /// Get the platform for a named model.
   /// \param name The model name.
@@ -183,7 +166,15 @@ class ModelRepositoryManager {
   /// \return OK if found, NOT_FOUND otherwise.
   Status GetModelPlatform(const std::string& name, Platform* platform);
 
-  static ModelRepositoryManager* singleton;
+  /// Get the list of versions to be loaded for a named model based on version
+  /// policy.
+  /// \param name The model name.
+  /// \param model_config The model configuration.
+  /// \param versions Returns the versions to be loaded
+  /// \return The error status.
+  Status VersionsToLoad(
+      const std::string& name, const ModelConfig& model_config,
+      std::vector<int64_t>& versions);
 
   const std::string repository_path_;
   const PlatformConfigMap platform_config_map_;
@@ -194,8 +185,9 @@ class ModelRepositoryManager {
   std::mutex infos_mu_;
   ModelInfoMap infos_;
 
-  std::unique_ptr<tensorflow::serving::ServerCore> core_;
   std::shared_ptr<ServerStatusManager> status_manager_;
+
+  std::unique_ptr<BackendLifeCycle> backend_life_cycle_;
 };
 
 }}  // namespace nvidia::inferenceserver
