@@ -34,7 +34,7 @@ cc_library(
     deps = [
         "//src/core:model_config",
         "//src/core:model_config_proto",
-        "//src/servables/custom:custom",
+        "//src/backends/custom:custom",
     ],
 )
 

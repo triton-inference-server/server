@@ -58,7 +58,7 @@ Status GetSequenceControlProperties(
     float* fp32_false_value, float* fp32_true_value, int32_t* int32_false_value,
     int32_t* int32_true_value);
 
-/// Read a ModelConfig and normalize it as expected by model servables.
+/// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
 /// model configuration.
 /// \param platform_config_map Map from platform name to the backend

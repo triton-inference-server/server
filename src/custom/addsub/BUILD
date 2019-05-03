@@ -49,7 +49,7 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_cuda",
         "//src/core:model_config_proto",
-        "//src/servables/custom:custom",
+        "//src/backends/custom:custom",
         "@local_config_cuda//cuda:cuda_headers",
     ],
 )
