@@ -29,7 +29,10 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-#include "tensorflow/core/public/session.h"
+
+namespace tensorflow {
+class Session;
+}  // namespace tensorflow
 
 namespace nvidia { namespace inferenceserver {
 
@@ -45,11 +48,11 @@ class BaseBackend : public InferenceBackend {
   // tensorflow model specified in 'paths'. The model can be either a
   // graphdef or savedmodel
   Status CreateExecutionContexts(
-      const tensorflow::ConfigProto& session_config,
+      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const tensorflow::ConfigProto& session_config,
+      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const std::unordered_map<std::string, std::string>& paths);
 
  protected:

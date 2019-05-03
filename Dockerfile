@@ -30,7 +30,6 @@
 
 ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.04-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.04-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.04-py3
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
@@ -124,34 +123,25 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --build
 
 ############################################################################
-## Build stage: Build inference server based on TensorFlow container
+## Build stage: Build inference server
 ############################################################################
-FROM ${TENSORFLOW_IMAGE} AS trtserver_build
+FROM ${BASE_IMAGE} AS trtserver_build
 
 ARG TRTIS_VERSION=1.3.0dev
 ARG TRTIS_CONTAINER_VERSION=19.06dev
-ARG PYVER=3.5
 
-# The TFServing release branch must match the TF release used by
-# TENSORFLOW_IMAGE
-ARG TFS_BRANCH=r1.12
-
-# libcurl and libopencv are needed to build some testing
-# applications. libgoogle-glog0v5 is needed by caffe2 libraries.
-# libopencv is needed by image preprocessing custom backend
+# libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            software-properties-common \
+            autoconf \
             automake \
+            build-essential \
+            cmake \
             libgoogle-glog0v5 \
-            libopencv-dev \
-            libopencv-core-dev \
+            libre2-dev \
+            libssl-dev \
             libtool
-
-# Use the PYVER version of python
-RUN rm -f /usr/bin/python && \
-    rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python`echo $PYVER | cut -c1-1`
 
 # Caffe2 library requirements...
 COPY --from=trtserver_caffe2 \
@@ -190,71 +180,27 @@ WORKDIR /workspace
 RUN rm -fr *
 COPY . .
 
-# Pull the TFS release that matches the version of TF being used.
-RUN git clone --single-branch -b ${TFS_BRANCH} https://github.com/tensorflow/serving.git
-
-# Modify the TF model loader to allow us to set the default GPU
-RUN sha1sum -c tools/patch/tensorflow/checksums && \
-    patch -i tools/patch/tensorflow/cc/saved_model/loader.cc \
-          /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
-
-# TFS modifications. Use a checksum to detect if the TFS file has
-# changed... if it has need to verify our patch is still valid and
-# update the patch/checksum as necessary.
-RUN sha1sum -c tools/patch/tfs/checksums && \
-    patch -i tools/patch/tfs/model_servers/server_core.cc \
-          /workspace/serving/tensorflow_serving/model_servers/server_core.cc && \
-    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.cc \
-          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.cc && \
-    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.h \
-          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.h && \
-    patch -i tools/patch/tfs/sources/storage_path/file_system_storage_path_source.proto \
-          /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto && \
-    patch -i tools/patch/tfs/util/retrier.cc \
-          /workspace/serving/tensorflow_serving/util/retrier.cc && \
-    patch -i tools/patch/tfs/util/BUILD \
-          /workspace/serving/tensorflow_serving/util/BUILD && \
-    patch -i tools/patch/tfs/workspace.bzl \
-          /workspace/serving/tensorflow_serving/workspace.bzl
-
-ENV TF_NEED_GCP 1
-ENV TF_NEED_S3 1
-
-# Build the server and any testing artifacts
-RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
-    mv .bazelrc .bazelrc.orig && \
-    cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
-    bazel build -c opt \
-          src/servers/trtserver \
-          src/custom/... \
-          src/test/... && \
-    (cd /opt/tensorrtserver && ln -s /workspace/qa qa) && \
-    mkdir -p /opt/tensorrtserver/include && \
-    cp bazel-out/k8-opt/genfiles/src/core/api.pb.h /opt/tensorrtserver/include/. && \
-    cp bazel-out/k8-opt/genfiles/src/core/model_config.pb.h /opt/tensorrtserver/include/. && \
-    cp bazel-out/k8-opt/genfiles/src/core/request_status.pb.h /opt/tensorrtserver/include/. && \
-    cp bazel-out/k8-opt/genfiles/src/core/server_status.pb.h /opt/tensorrtserver/include/. && \
-    mkdir -p /opt/tensorrtserver/bin && \
-    cp bazel-bin/src/servers/trtserver /opt/tensorrtserver/bin/. && \
-    cp bazel-bin/src/test/caffe2plan /opt/tensorrtserver/bin/. && \
-    mkdir -p /opt/tensorrtserver/lib && \
-    cp bazel-bin/src/core/libtrtserver.so /opt/tensorrtserver/lib/. && \
-    mkdir -p /opt/tensorrtserver/custom && \
-    cp bazel-bin/src/custom/addsub/libaddsub.so /opt/tensorrtserver/custom/. && \
-    cp bazel-bin/src/custom/identity/libidentity.so /opt/tensorrtserver/custom/. && \
-    cp bazel-bin/src/custom/image_preprocess/libimagepreprocess.so /opt/tensorrtserver/custom/. && \
-    cp bazel-bin/src/custom/param/libparam.so /opt/tensorrtserver/custom/. && \
-    cp bazel-bin/src/custom/sequence/libsequence.so /opt/tensorrtserver/custom/. && \
-    bazel clean --expunge && \
-    rm -rf /root/.cache/bazel && \
-    rm -rf /tmp/*
+# Build the server. The build can fail the first time due to a
+# protobuf_generate_cpp error that doesn't repeat on subsequent
+# builds, which is why there are 2 make invocations below.
+RUN cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DTRTIS_ENABLE_METRICS=ON \
+          -DTRTIS_ENABLE_CUSTOM=ON \
+          -DTRTIS_ENABLE_TENSORFLOW=OFF \
+          -DTRTIS_ENABLE_TENSORRT=OFF \
+          -DTRTIS_ENABLE_CAFFE2=OFF && \
+    (make -j16 trtis || true) && \
+    make -j16 trtis && \
+    mkdir -p /opt/tensorrtserver && \
+    cp -r trtis/install/* /opt/tensorrtserver/. && \
+    (cd /opt/tensorrtserver && ln -s /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
-ENV PYVER ${PYVER}
 
 COPY nvidia_entrypoint.sh /opt/tensorrtserver
 ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
@@ -266,7 +212,6 @@ FROM ${BASE_IMAGE}
 
 ARG TRTIS_VERSION=1.3.0dev
 ARG TRTIS_CONTAINER_VERSION=19.06dev
-ARG PYVER=3.5
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
@@ -274,7 +219,6 @@ LABEL com.nvidia.tensorrtserver.version="${TENSORRT_SERVER_VERSION}"
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/tensorrtserver/bin:${PATH}
-ENV PYVER ${PYVER}
 
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -292,13 +236,12 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            libgoogle-glog0v5
+            libgoogle-glog0v5 \
+            libre2-1v5
 
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
-COPY --from=trtserver_build /workspace/serving/LICENSE LICENSE.tfserving
-COPY --from=trtserver_build /opt/tensorflow/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib

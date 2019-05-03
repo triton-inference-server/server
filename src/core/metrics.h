@@ -26,6 +26,8 @@
 //
 #pragma once
 
+#ifdef TRTIS_ENABLE_METRICS
+
 #include <atomic>
 #include <thread>
 #include "prometheus/registry.h"
@@ -136,3 +138,5 @@ class Metrics {
 };
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_METRICS

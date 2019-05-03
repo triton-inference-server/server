@@ -61,14 +61,14 @@ Status GetSequenceControlProperties(
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
 /// model configuration.
-/// \param platform_config_map Map from platform name to the backend
+/// \param backend_config_map Map from platform name to the backend
 /// configuration for that platform.
 /// \param autofill If true attempt to determine any missing required
 /// configuration from the model definition.
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 Status GetNormalizedModelConfig(
-    const std::string& path, const PlatformConfigMap& platform_config_map,
+    const std::string& path, const BackendConfigMap& backend_config_map,
     const bool autofill, ModelConfig* config);
 
 /// Validate that a model is specified correctly.

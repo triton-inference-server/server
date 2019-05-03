@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#ifdef TRTIS_ENABLE_METRICS
+
 #include "prometheus/registry.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
@@ -46,7 +48,7 @@ class MetricModelReporter {
   // Get the version of model for which metrics are being reported.
   int64_t ModelVersion() const { return model_version_; }
 
-  // Get a metric for the servable specialized for the given GPU index
+  // Get a metric for the backend specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
   prometheus::Counter& MetricInferenceSuccess(int gpu_device) const;
   prometheus::Counter& MetricInferenceFailure(int gpu_device) const;
@@ -80,3 +82,5 @@ class MetricModelReporter {
 };
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_METRICS

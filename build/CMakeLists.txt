@@ -27,6 +27,12 @@
 cmake_minimum_required (VERSION 3.5)
 project (tensorrt-inference-server)
 
+option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
+option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" ON)
+option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON)
+option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
+option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
+
 include(ExternalProject)
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
@@ -122,6 +128,56 @@ ExternalProject_Add(grpc
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
   DEPENDS grpc-repo c-ares protobuf zlib
 )
+
+#
+# Builds libevent
+#
+ExternalProject_Add(libevent
+  PREFIX libevent
+  GIT_REPOSITORY "https://github.com/libevent/libevent.git"
+  GIT_TAG "release-2.1.8-stable"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevent/src/libevent"
+  CMAKE_CACHE_ARGS
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install
+)
+
+#
+# Builds libevhtp
+#
+# Need to patch due to https://github.com/criticalstack/libevhtp/issues/135
+#
+ExternalProject_Add(libevhtp
+  PREFIX libevhtp
+  URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
+  URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
+  PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
+  CMAKE_CACHE_ARGS
+    -DEVHTP_DISABLE_SSL:BOOL=ON
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install
+  DEPENDS libevent
+)
+
+#
+# Builds Prometheus C++ library
+#
+ExternalProject_Add(prometheus-cpp
+  PREFIX prometheus-cpp
+  URL "https://github.com/jupp0r/prometheus-cpp/archive/v0.5.0.tar.gz"
+  URL_HASH SHA256=76c60f9b1bba19bcfb29b06749ec7530db7151692eb12443d00d3511e16696e2
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/src/prometheus-cpp"
+  CMAKE_CACHE_ARGS
+    -DENABLE_PUSH:BOOL=OFF
+    -DENABLE_PULL:BOOL=OFF
+    -DENABLE_TESTING:BOOL=OFF
+    -DUSE_THIRDPARTY_LIBRARIES:BOOL=OFF
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install
+)
+
 #
 # Builds TRTIS client libraries and examples
 #
@@ -136,5 +192,36 @@ ExternalProject_Add(trtis-clients
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/trtis-clients/install
+    -DTRTIS_ENABLE_METRICS:BOOL=OFF
   DEPENDS protobuf grpc
+)
+
+#
+# Builds TRTIS server library and main executable
+#
+set(TRTIS_DEPENDS protobuf grpc libevent libevhtp)
+if(${TRTIS_ENABLE_METRICS})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
+endif() # TRTIS_ENABLE_METRICS
+
+ExternalProject_Add(trtis
+  PREFIX trtis
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis"
+  CMAKE_CACHE_ARGS
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
+    -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
+    ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
+    -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
+    -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
+    -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/trtis/install
+    -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
+    -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
+    -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
+    -DTRTIS_ENABLE_CAFFE2:BOOL=${TRTIS_ENABLE_CAFFE2}
+    -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
+  DEPENDS ${TRTIS_DEPENDS}
 )

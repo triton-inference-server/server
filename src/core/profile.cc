@@ -26,8 +26,8 @@
 
 #include "src/core/profile.h"
 
-#include "cuda/include/cuda_profiler_api.h"
-#include "cuda/include/cuda_runtime_api.h"
+#include <cuda_profiler_api.h>
+#include <cuda_runtime_api.h>
 
 namespace nvidia { namespace inferenceserver {
 

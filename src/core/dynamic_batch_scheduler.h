@@ -86,7 +86,7 @@ class DynamicBatchScheduler : public Scheduler {
   std::condition_variable cv_;
 
   // Queue holding inference requests for the model represented by
-  // this servable.
+  // this scheduler.
   std::deque<Scheduler::Payload> queue_;
 
   std::vector<std::unique_ptr<std::thread>> scheduler_threads_;

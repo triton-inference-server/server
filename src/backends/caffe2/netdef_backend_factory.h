@@ -26,18 +26,23 @@
 #pragma once
 
 #include "src/backends/caffe2/netdef_backend.h"
-#include "src/backends/caffe2/netdef_backend.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// [TODO] change all "adapter" to "factory", "backend" to "backend"
-// Adapter that converts storage paths pointing to NetDef files into
+// Factory that converts storage paths pointing to NetDef files into
 // the corresponding netdef backend.
 class NetDefBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // Autofill missing required model configuration settings based on
+    // model definition file.
+    bool autofill;
+  };
+
   static Status Create(
-      const NetDefPlatformConfig& platform_config,
+      const Config& backend_config,
       std::unique_ptr<NetDefBackendFactory>* factory);
 
   Status CreateBackend(
@@ -49,12 +54,12 @@ class NetDefBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(NetDefBackendFactory);
 
-  NetDefBackendFactory(const NetDefPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  NetDefBackendFactory(const Config& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const NetDefPlatformConfig platform_config_;
+  const Config backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

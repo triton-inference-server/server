@@ -31,18 +31,20 @@
 #include <deque>
 #include <stdexcept>
 #include <thread>
-#include "src/backends/caffe2/netdef_backend.pb.h"
+#ifdef TRTIS_ENABLE_CAFFE2
 #include "src/backends/caffe2/netdef_backend_factory.h"
-#include "src/backends/custom/custom_backend.pb.h"
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_CUSTOM
 #include "src/backends/custom/custom_backend_factory.h"
-#include "src/backends/ensemble/ensemble_backend.pb.h"
+#endif  // TRTIS_ENABLE_CUSTOM
 #include "src/backends/ensemble/ensemble_backend_factory.h"
-#include "src/backends/tensorflow/graphdef_backend.pb.h"
+#ifdef TRTIS_ENABLE_TENSORFLOW
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
 #include "src/backends/tensorflow/savedmodel_backend_factory.h"
-#include "src/backends/tensorrt/plan_backend.pb.h"
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_TENSORRT
 #include "src/backends/tensorrt/plan_backend_factory.h"
+#endif  // TRTIS_ENABLE_TENSORRT
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
@@ -55,88 +57,63 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 
 void
-BuildPlatformConfigMap(
+BuildBackendConfigMap(
     const std::string& version, const std::string& model_store_path,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
-    const bool tf_allow_soft_placement, PlatformConfigMap* platform_configs)
+    const bool tf_allow_soft_placement, BackendConfigMap* backend_configs)
 {
-  ::google::protobuf::Any platform_config;
-
-  //// Tensorflow GraphDef
+#ifdef TRTIS_ENABLE_TENSORFLOW
+  //// Tensorflow GraphDef and SavedModel
   {
-    GraphDefPlatformConfig graphdef_config;
-
-    graphdef_config.set_autofill(!strict_model_config);
-
-    // Tensorflow session config
-    if (tf_gpu_memory_fraction == 0.0) {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
-    } else {
-      graphdef_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
-    }
-
-    graphdef_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    platform_config.PackFrom(graphdef_config);
-    (*platform_configs)[kTensorFlowGraphDefPlatform] = platform_config;
-  }
-
-  //// Tensorflow SavedModel
-  {
-    SavedModelPlatformConfig saved_model_config;
-
-    saved_model_config.set_autofill(!strict_model_config);
+    auto graphdef_config = std::make_shared<GraphDefBackendFactory::Config>();
+    graphdef_config->autofill = !strict_model_config;
 
     if (tf_gpu_memory_fraction == 0.0) {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_allow_growth(true);
+      graphdef_config->allow_gpu_memory_growth = true;
     } else {
-      saved_model_config.mutable_session_config()
-          ->mutable_gpu_options()
-          ->set_per_process_gpu_memory_fraction(tf_gpu_memory_fraction);
+      graphdef_config->allow_gpu_memory_growth = false;
+      graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
     }
 
-    saved_model_config.mutable_session_config()->set_allow_soft_placement(
-        tf_allow_soft_placement);
-    platform_config.PackFrom(saved_model_config);
-    (*platform_configs)[kTensorFlowSavedModelPlatform] = platform_config;
-  }
+    graphdef_config->allow_soft_placement = tf_allow_soft_placement;
 
+    (*backend_configs)[kTensorFlowGraphDefPlatform] = graphdef_config;
+    (*backend_configs)[kTensorFlowSavedModelPlatform] = graphdef_config;
+  }
+#endif  // TRTIS_ENABLE_TENSORFLOW
+
+#ifdef TRTIS_ENABLE_CAFFE2
   //// Caffe NetDef
   {
-    NetDefPlatformConfig netdef_config;
-    netdef_config.set_autofill(!strict_model_config);
-    platform_config.PackFrom(netdef_config);
-    (*platform_configs)[kCaffe2NetDefPlatform] = platform_config;
+    auto netdef_config = std::make_shared<NetDefBackendFactory::Config>();
+    netdef_config->autofill = !strict_model_config;
+    (*backend_configs)[kCaffe2NetDefPlatform] = netdef_config;
   }
+#endif  // TRTIS_ENABLE_CAFFE2
 
+#ifdef TRTIS_ENABLE_TENSORRT
   //// TensorRT
   {
-    PlanPlatformConfig plan_config;
-    plan_config.set_autofill(!strict_model_config);
-    platform_config.PackFrom(plan_config);
-    (*platform_configs)[kTensorRTPlanPlatform] = platform_config;
+    auto plan_config = std::make_shared<PlanBackendFactory::Config>();
+    plan_config->autofill = !strict_model_config;
+    (*backend_configs)[kTensorRTPlanPlatform] = plan_config;
   }
+#endif  // TRTIS_ENABLE_TENSORRT
 
+#ifdef TRTIS_ENABLE_CUSTOM
   //// Custom
   {
-    CustomPlatformConfig custom_config;
-    custom_config.set_inference_server_version(version);
-    custom_config.set_model_repository_path(model_store_path);
-    platform_config.PackFrom(custom_config);
-    (*platform_configs)[kCustomPlatform] = platform_config;
+    auto custom_config = std::make_shared<CustomBackendFactory::Config>();
+    custom_config->inference_server_version = version;
+    custom_config->model_repository_path = model_store_path;
+    (*backend_configs)[kCustomPlatform] = custom_config;
   }
+#endif  // TRTIS_ENABLE_CUSTOM
 
   //// Ensemble
   {
-    EnsemblePlatformConfig ensemble_config;
-    platform_config.PackFrom(ensemble_config);
-    (*platform_configs)[kEnsemblePlatform] = platform_config;
+    auto ensemble_config = std::make_shared<EnsembleBackendFactory::Config>();
+    (*backend_configs)[kEnsemblePlatform] = ensemble_config;
   }
 }
 
@@ -252,7 +229,7 @@ struct ModelRepositoryManager::ModelInfo {
 class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
-      const PlatformConfigMap& platform_map, const std::string& repository_path,
+      const BackendConfigMap& backend_map, const std::string& repository_path,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
   ~BackendLifeCycle();
@@ -335,12 +312,20 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::deque<std::unique_ptr<InferenceBackend>> release_queue_;
 
   const std::string& repository_path_;
+#ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_CUSTOM
   std::unique_ptr<CustomBackendFactory> custom_factory_;
-  std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
+#endif  // TRTIS_ENABLE_CUSTOM
+#ifdef TRTIS_ENABLE_TENSORFLOW
   std::unique_ptr<GraphDefBackendFactory> graphdef_factory_;
   std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_TENSORRT
   std::unique_ptr<PlanBackendFactory> plan_factory_;
+#endif  // TRTIS_ENABLE_TENSORRT
+  std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
 };
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
@@ -381,45 +366,53 @@ ModelRepositoryManager::BackendLifeCycle::~BackendLifeCycle()
 
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
-    const PlatformConfigMap& platform_map, const std::string& repository_path,
+    const BackendConfigMap& backend_map, const std::string& repository_path,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
       new BackendLifeCycle(repository_path));
 
+#ifdef TRTIS_ENABLE_TENSORFLOW
   {
-    GraphDefPlatformConfig config;
-    platform_map.find(kTensorFlowGraphDefPlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<GraphDefBackendFactory::Config>& config =
+        backend_map.find(kTensorFlowGraphDefPlatform)->second;
     RETURN_IF_ERROR(GraphDefBackendFactory::Create(
         config, &(local_life_cycle->graphdef_factory_)));
   }
   {
-    SavedModelPlatformConfig config;
-    platform_map.find(kTensorFlowSavedModelPlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<SavedModelBackendFactory::Config>& config =
+        backend_map.find(kTensorFlowSavedModelPlatform)->second;
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
   }
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_CAFFE2
   {
-    NetDefPlatformConfig config;
-    platform_map.find(kCaffe2NetDefPlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<NetDefBackendFactory::Config>& config =
+        backend_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_TENSORRT
   {
-    PlanPlatformConfig config;
-    platform_map.find(kTensorRTPlanPlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<PlanBackendFactory::Config>& config =
+        backend_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
+#endif  // TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_CUSTOM
   {
-    CustomPlatformConfig config;
-    platform_map.find(kCustomPlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<BackendConfig>& config =
+        backend_map.find(kCustomPlatform)->second;
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
+#endif  // TRTIS_ENABLE_CUSTOM
   {
-    EnsemblePlatformConfig config;
-    platform_map.find(kEnsemblePlatform)->second.UnpackTo(&config);
+    const std::shared_ptr<BackendConfig>& config =
+        backend_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         config, &(local_life_cycle->ensemble_factory_)));
   }
@@ -656,6 +649,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
   Status status;
   std::unique_ptr<InferenceBackend> is;
   switch (backend_info->platform_) {
+#ifdef TRTIS_ENABLE_TENSORFLOW
     case Platform::PLATFORM_TENSORFLOW_GRAPHDEF:
       status =
           graphdef_factory_->CreateBackend(version_path, model_config, &is);
@@ -664,15 +658,22 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       status =
           savedmodel_factory_->CreateBackend(version_path, model_config, &is);
       break;
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_TENSORRT
     case Platform::PLATFORM_TENSORRT_PLAN:
       status = plan_factory_->CreateBackend(version_path, model_config, &is);
       break;
+#endif  // TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_CAFFE2
     case Platform::PLATFORM_CAFFE2_NETDEF:
       status = netdef_factory_->CreateBackend(version_path, model_config, &is);
       break;
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_CUSTOM:
       status = custom_factory_->CreateBackend(version_path, model_config, &is);
       break;
+#endif  // TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_ENSEMBLE:
       status =
           ensemble_factory_->CreateBackend(version_path, model_config, &is);
@@ -754,10 +755,10 @@ ModelRepositoryManager::BackendLifeCycle::TriggerNextAction(
 ModelRepositoryManager::ModelRepositoryManager(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path,
-    const PlatformConfigMap& platform_config_map, const bool autofill,
+    const BackendConfigMap& backend_config_map, const bool autofill,
     const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle)
     : repository_path_(repository_path),
-      platform_config_map_(platform_config_map), autofill_(autofill),
+      backend_config_map_(backend_config_map), autofill_(autofill),
       polling_enabled_(polling_enabled), status_manager_(status_manager),
       backend_life_cycle_(std::move(life_cycle))
 {
@@ -783,20 +784,20 @@ ModelRepositoryManager::Create(
         "repository path is not a valid directory");
   }
 
-  PlatformConfigMap platform_config_map;
+  BackendConfigMap backend_config_map;
 
-  BuildPlatformConfigMap(
+  BuildBackendConfigMap(
       server_version, repository_path, strict_model_config,
-      tf_gpu_memory_fraction, tf_allow_soft_placement, &platform_config_map);
+      tf_gpu_memory_fraction, tf_allow_soft_placement, &backend_config_map);
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      platform_config_map, repository_path, &life_cycle));
+      backend_config_map, repository_path, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
-          status_manager, repository_path, platform_config_map,
+          status_manager, repository_path, backend_config_map,
           !strict_model_config, polling_enabled, std::move(life_cycle)));
 
   // Similar to PollAndUpdate(), but simplier
@@ -1011,7 +1012,7 @@ ModelRepositoryManager::Poll(
       // the model configuration (autofill) from the model
       // definition. In all cases normalize and validate the config.
       RETURN_IF_ERROR(GetNormalizedModelConfig(
-          full_path, platform_config_map_, autofill_, &model_config));
+          full_path, backend_config_map_, autofill_, &model_config));
       RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
 
       model_info->platform_ = GetPlatform(model_config.platform());

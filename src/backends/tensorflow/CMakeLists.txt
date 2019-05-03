@@ -25,39 +25,35 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (trtis-clients)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
 
 #
-# Protobuf
+# TensorFlow backends
 #
-set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
+set(
+  TENSORFLOW_SRCS
+  autofill.cc
+  base_backend.cc
+  graphdef_backend.cc
+  graphdef_backend_factory.cc
+  savedmodel_backend.cc
+  savedmodel_backend_factory.cc
+  loader.cc
+  tf_utils.cc
+)
 
-#
-# GRPC
-#
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+set(
+  TENSORFLOW_HDRS
+  autofill.h
+  base_backend.h
+  graphdef_backend.h
+  graphdef_backend_factory.h
+  savedmodel_backend.h
+  savedmodel_backend_factory.h
+  loader.h
+  tf_utils.h
+)
 
-add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/clients/c++ src/clients/c++)
-add_subdirectory(../../src/clients/python src/clients/python)
+add_library(
+  tensorflow-backend-library EXCLUDE_FROM_ALL OBJECT
+  ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
+)

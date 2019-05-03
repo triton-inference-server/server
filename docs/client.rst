@@ -513,8 +513,8 @@ Client API
 
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
-is available at `src/clients/c++/request.h
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/request.h>`_
+is available at `src/core/request.h
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/request.h>`_
 and in the API Reference.
 
 The Python client API provides similar capabilities as the C++

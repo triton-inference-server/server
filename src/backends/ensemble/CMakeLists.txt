@@ -25,39 +25,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (trtis-clients)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
 
 #
-# Protobuf
+# Ensemble backend
 #
-set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
+set(
+  ENSEMBLE_SRCS
+  ensemble_backend_factory.cc
+  ensemble_backend.cc
+)
 
-#
-# GRPC
-#
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+set(
+  ENSEMBLE_HDRS
+  ensemble_backend_factory.h
+  ensemble_backend.h
+)
 
-add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/clients/c++ src/clients/c++)
-add_subdirectory(../../src/clients/python src/clients/python)
+add_library(
+  ensemble-backend-library EXCLUDE_FROM_ALL OBJECT
+  ${ENSEMBLE_SRCS} ${ENSEMBLE_HDRS}
+)
+add_dependencies(ensemble-backend-library proto-library)

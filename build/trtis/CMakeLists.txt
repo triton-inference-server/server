@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (trtis-clients)
+project (trtis)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -37,11 +37,38 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(${TRTIS_ENABLE_METRICS})
+  add_definitions(-DTRTIS_ENABLE_METRICS=1)
+endif() # TRTIS_ENABLE_METRICS
+
+if(${TRTIS_ENABLE_TENSORFLOW})
+  add_definitions(-DTRTIS_ENABLE_TENSORFLOW=1)
+endif() # TRTIS_ENABLE_TENSORFLOW
+
+if(${TRTIS_ENABLE_TENSORRT})
+  add_definitions(-DTRTIS_ENABLE_TENSORRT=1)
+endif() # TRTIS_ENABLE_TENSORRT
+
+if(${TRTIS_ENABLE_CAFFE2})
+  add_definitions(-DTRTIS_ENABLE_CAFFE2=1)
+endif() # TRTIS_ENABLE_CAFFE2
+
+if(${TRTIS_ENABLE_CUSTOM})
+  add_definitions(-DTRTIS_ENABLE_CUSTOM=1)
+endif() # TRTIS_ENABLE_CUSTOM
+
 # For more recent cmakes this should not be necessary
 set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
 
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
+
+#
+# libevent
+#
+find_package(Libevent CONFIG REQUIRED)
+message(STATUS "Using libevent ${Libevent_VERSION}")
+include_directories(${LIBEVENT_INCLUDE_DIRS})
 
 #
 # Protobuf
@@ -59,5 +86,9 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 
 add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/clients/c++ src/clients/c++)
-add_subdirectory(../../src/clients/python src/clients/python)
+add_subdirectory(../../src/nvrpc src/nvrpc)
+add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
+add_subdirectory(../../src/backends/custom src/backends/custom)
+add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
+add_subdirectory(../../src/backends/tensorflow src/backends/tensorflow)
+add_subdirectory(../../src/servers src/servers)
