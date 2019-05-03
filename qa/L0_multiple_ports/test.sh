@@ -39,7 +39,7 @@ len=${#HP_ARR[@]}
 rm -f $CLIENT_LOG $SERVER_LOG
 
 RET=0
-HTTP Health w/o Main Port
+# HTTP Health w/o Main Port
 for (( n=0; n<$len; n++ )) ; do
   SERVER_ARGS_ADD_HTTP="--http-health-port ${HP_ARR[n]} --allow-http 1"
   SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
