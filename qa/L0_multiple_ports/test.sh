@@ -133,7 +133,7 @@ SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 set +e
 run_server_nowait
 sleep 5
-SERVER_PID && wait $SERVER_PID ; then
+if kill $SERVER_PID && wait $SERVER_PID ; then
     echo -e "\n***\n*** Should not have started $SERVER\n***"
     RET=1
     cat $SERVER_LOG
