@@ -75,9 +75,9 @@ cc_library(
 )
 
 cc_library(
-    name = "netdef_bundle_source_adapter",
-    srcs = ["netdef_bundle_source_adapter.cc"],
-    hdrs = ["netdef_bundle_source_adapter.h"],
+    name = "netdef_backend_factory",
+    srcs = ["netdef_backend_factory.cc"],
+    hdrs = ["netdef_backend_factory.h"],
     deps = [
         ":netdef_bundle",
         ":netdef_bundle_proto",
@@ -86,11 +86,6 @@ cc_library(
         "//src/core:model_config_proto",
         "//src/core:server_header",
         "@org_tensorflow//tensorflow/core:lib",
-        "@tf_serving//tensorflow_serving/core:loader",
-        "@tf_serving//tensorflow_serving/core:simple_loader",
-        "@tf_serving//tensorflow_serving/core:source_adapter",
-        "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/util:optional",
     ],
     alwayslink = 1,
 )

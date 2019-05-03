@@ -28,43 +28,33 @@
 #include "src/core/status.h"
 #include "src/servables/caffe2/netdef_bundle.h"
 #include "src/servables/caffe2/netdef_bundle.pb.h"
-#include "tensorflow/core/lib/core/errors.h"
-#include "tensorflow_serving/core/loader.h"
-#include "tensorflow_serving/core/simple_loader.h"
-#include "tensorflow_serving/core/source_adapter.h"
-#include "tensorflow_serving/core/storage_path.h"
-
-namespace tfs = tensorflow::serving;
 
 namespace nvidia { namespace inferenceserver {
 
+// [TODO] change all "adapter" to "factory", "bundle" to "backend"
 // Adapter that converts storage paths pointing to NetDef files into
 // the corresponding netdef bundle.
-class NetDefBundleSourceAdapter final
-    : public tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle> {
+class NetDefBackendFactory {
  public:
-  static tensorflow::Status Create(
-      const NetDefBundleSourceAdapterConfig& config,
-      std::unique_ptr<
-          tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-          adapter);
+  static Status Create(
+      const NetDefBundleSourceAdapterConfig& platform_config,
+      std::unique_ptr<NetDefBackendFactory>* factory);
 
-  ~NetDefBundleSourceAdapter() override;
+  Status CreateBackend(
+      const std::string& path, const ModelConfig& model_config,
+      std::unique_ptr<InferenceBackend>* backend);
+
+  ~NetDefBackendFactory() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(NetDefBundleSourceAdapter);
-  using SimpleSourceAdapter =
-      tfs::SimpleLoaderSourceAdapter<tfs::StoragePath, NetDefBundle>;
+  DISALLOW_COPY_AND_ASSIGN(NetDefBackendFactory);
 
-  NetDefBundleSourceAdapter(
-      const NetDefBundleSourceAdapterConfig& config,
-      typename SimpleSourceAdapter::Creator creator,
-      typename SimpleSourceAdapter::ResourceEstimator resource_estimator)
-      : SimpleSourceAdapter(creator, resource_estimator), config_(config)
+  NetDefBackendFactory(const NetDefBundleSourceAdapterConfig& platform_config)
+      : platform_config_(platform_config)
   {
   }
 
-  const NetDefBundleSourceAdapterConfig config_;
+  const NetDefBundleSourceAdapterConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servables/tensorflow/graphdef_bundle_source_adapter.h"
+#include "src/servables/tensorflow/graphdef_backend_factory.h"
 
 #include <memory>
 #include <string>
@@ -35,35 +35,29 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/model_repository_manager.h"
-#include "src/core/status.h"
-#include "tensorflow/core/lib/core/errors.h"
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-tensorflow::Status
-CreateGraphDefBundle(
-    const GraphDefBundleSourceAdapterConfig& adapter_config,
-    const std::string& path, std::unique_ptr<GraphDefBundle>* bundle)
+Status
+GraphDefBackendFactory::Create(
+    const GraphDefBundleSourceAdapterConfig& platform_config,
+    std::unique_ptr<GraphDefBackendFactory>* factory)
 {
-  const auto model_path = DirName(path);
-  const auto model_name = BaseName(model_path);
+  LOG_VERBOSE(1) << "Create GraphDefBundleSourceAdaptor for platform config \""
+                 << platform_config.DebugString() << "\"";
 
-  ModelConfig model_config;
-  Status status = ModelRepositoryManager::GetModelConfig(
-      std::string(model_name), &model_config);
-  if (!status.IsOk()) {
-    return tensorflow::errors::Internal(status.Message());
-  }
+  factory->reset(new GraphDefBackendFactory(platform_config));
+  return Status::Success;
+}
 
+Status
+GraphDefBackendFactory::CreateBackend(
+    const std::string& path, const ModelConfig& model_config,
+    std::unique_ptr<InferenceBackend>* backend)
+{
   // Read all the graphdef files in 'path'.
   std::set<std::string> graphdef_files;
-  status = GetDirectoryFiles(path, &graphdef_files);
-  if (!status.IsOk()) {
-    return tensorflow::errors::Internal(status.Message());
-  }
+  RETURN_IF_ERROR(GetDirectoryFiles(path, &graphdef_files));
 
   std::unordered_map<std::string, std::string> graphdef_paths;
   for (const auto& filename : graphdef_files) {
@@ -73,53 +67,13 @@ CreateGraphDefBundle(
         std::make_tuple(graphdef_path));
   }
 
-  bundle->reset(new GraphDefBundle);
-  status = (*bundle)->Init(path, model_config);
-  if (status.IsOk()) {
-    status = (*bundle)->CreateExecutionContexts(
-        adapter_config.session_config(), graphdef_paths);
-  }
-  if (!status.IsOk()) {
-    bundle->reset();
-    return tensorflow::errors::Internal(status.Message());
-  }
+  std::unique_ptr<GraphDefBundle> local_bundle(new GraphDefBundle);
+  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
+  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(
+      platform_config_.session_config(), graphdef_paths));
 
-  return tensorflow::Status::OK();
-}
-
-}  // namespace
-
-
-tensorflow::Status
-GraphDefBundleSourceAdapter::Create(
-    const GraphDefBundleSourceAdapterConfig& config,
-    std::unique_ptr<
-        tfs::SourceAdapter<tfs::StoragePath, std::unique_ptr<tfs::Loader>>>*
-        adapter)
-{
-  LOG_VERBOSE(1) << "Create GraphDefBundleSourceAdaptor for config \""
-                 << config.DebugString() << "\"";
-
-  Creator creator = std::bind(
-      &CreateGraphDefBundle, config, std::placeholders::_1,
-      std::placeholders::_2);
-
-  adapter->reset(new GraphDefBundleSourceAdapter(
-      config, creator, SimpleSourceAdapter::EstimateNoResources()));
-  return tensorflow::Status::OK();
-}
-
-GraphDefBundleSourceAdapter::~GraphDefBundleSourceAdapter()
-{
-  Detach();
+  *backend = std::move(local_bundle);
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
-
-namespace tensorflow { namespace serving {
-
-REGISTER_STORAGE_PATH_SOURCE_ADAPTER(
-    nvidia::inferenceserver::GraphDefBundleSourceAdapter,
-    nvidia::inferenceserver::GraphDefBundleSourceAdapterConfig);
-
-}}  // namespace tensorflow::serving

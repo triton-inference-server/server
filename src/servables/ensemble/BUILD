@@ -46,9 +46,9 @@ cc_library(
 )
 
 cc_library(
-    name = "ensemble_bundle_source_adapter",
-    srcs = ["ensemble_bundle_source_adapter.cc"],
-    hdrs = ["ensemble_bundle_source_adapter.h"],
+    name = "ensemble_backend_factory",
+    srcs = ["ensemble_backend_factory.cc"],
+    hdrs = ["ensemble_backend_factory.h"],
     deps = [
         ":ensemble_bundle",
         ":ensemble_bundle_proto",
@@ -56,11 +56,6 @@ cc_library(
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@tf_serving//tensorflow_serving/core:loader",
-        "@tf_serving//tensorflow_serving/core:simple_loader",
-        "@tf_serving//tensorflow_serving/core:source_adapter",
-        "@tf_serving//tensorflow_serving/core:storage_path",
-        "@tf_serving//tensorflow_serving/util:optional",
         "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
