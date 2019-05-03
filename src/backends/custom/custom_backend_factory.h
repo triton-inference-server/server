@@ -26,7 +26,7 @@
 #pragma once
 
 #include "src/backends/custom/custom_backend.h"
-#include "src/backends/custom/custom_backend.pb.h"
+#include "src/core/model_config.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -35,8 +35,16 @@ namespace nvidia { namespace inferenceserver {
 // the corresponding custom backend.
 class CustomBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // The inference server version.
+    std::string inference_server_version;
+
+    // The absolute path to the model repository root.
+    std::string model_repository_path;
+  };
+
   static Status Create(
-      const CustomPlatformConfig& platform_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<CustomBackendFactory>* factory);
 
   Status CreateBackend(
@@ -48,12 +56,12 @@ class CustomBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(CustomBackendFactory);
 
-  CustomBackendFactory(const CustomPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  CustomBackendFactory(const std::shared_ptr<Config>& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const CustomPlatformConfig platform_config_;
+  const std::shared_ptr<Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -28,7 +28,7 @@
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
-#include "src/clients/c++/request_common.h"
+#include "src/core/request_common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

@@ -40,13 +40,12 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 NetDefBackendFactory::Create(
-    const NetDefPlatformConfig& platform_config,
+    const Config& backend_config,
     std::unique_ptr<NetDefBackendFactory>* factory)
 {
-  LOG_VERBOSE(1) << "Create NetDefBackendFactory for platform config \""
-                 << platform_config.DebugString() << "\"";
+  LOG_VERBOSE(1) << "Create NetDefBackendFactory";
 
-  factory->reset(new NetDefBackendFactory(platform_config));
+  factory->reset(new NetDefBackendFactory(backend_config));
   return Status::Success;
 }
 

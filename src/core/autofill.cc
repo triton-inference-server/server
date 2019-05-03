@@ -26,15 +26,19 @@
 
 #include "src/core/autofill.h"
 
+#ifdef TRTIS_ENABLE_CAFFE2
 #include "src/backends/caffe2/autofill.h"
-#include "src/backends/onnx/autofill.h"
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_TENSORFLOW
 #include "src/backends/tensorflow/autofill.h"
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_TENSORRT
 #include "src/backends/tensorrt/autofill.h"
+#endif  // TRTIS_ENABLE_TENSORRT
+#include "src/backends/onnx/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "tensorflow/core/lib/io/path.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -100,7 +104,7 @@ AutoFillSimple::Fix(ModelConfig* config)
 //
 Status
 AutoFill::Create(
-    const std::string& model_name, const PlatformConfigMap& platform_config_map,
+    const std::string& model_name, const BackendConfigMap& backend_config_map,
     const std::string& model_path, const ModelConfig& config,
     std::unique_ptr<AutoFill>* autofill)
 {
@@ -109,18 +113,22 @@ AutoFill::Create(
   // If the config specifies a platform use it to create the
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
+#if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
+    defined(TRTIS_ENABLE_CAFFE2)
   const Platform platform = GetPlatform(config.platform());
+#endif
 
+#ifdef TRTIS_ENABLE_TENSORFLOW
   if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afsm;
-    ::google::protobuf::Any platform_config;
-    auto it = platform_config_map.find(kTensorFlowSavedModelPlatform);
-    if (it != platform_config_map.end()) {
-      platform_config = it->second;
+    std::shared_ptr<BackendConfig> backend_config;
+    auto it = backend_config_map.find(kTensorFlowSavedModelPlatform);
+    if (it != backend_config_map.end()) {
+      backend_config = it->second;
     }
     Status status = AutoFillSavedModel::Create(
-        model_name, platform_config, model_path, &afsm);
+        model_name, backend_config, model_path, &afsm);
     if (status.IsOk()) {
       *autofill = std::move(afsm);
       return Status::Success;
@@ -136,6 +144,7 @@ AutoFill::Create(
       return Status::Success;
     }
   }
+#endif  // TRTIS_ENABLE_TENSORFLOW
 
   // Check for ONNX model must be done before check for TensorRT plan
   // because TensorRT deserializeCudaEngine() function will cause program
@@ -157,6 +166,7 @@ AutoFill::Create(
     }
   }
 
+#ifdef TRTIS_ENABLE_TENSORRT
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afp;
@@ -166,7 +176,9 @@ AutoFill::Create(
       return Status::Success;
     }
   }
+#endif  // TRTIS_ENABLE_TENSORRT
 
+#ifdef TRTIS_ENABLE_CAFFE2
   if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afnd;
@@ -176,6 +188,7 @@ AutoFill::Create(
       return Status::Success;
     }
   }
+#endif  // TRTIS_ENABLE_CAFFE2
 
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.

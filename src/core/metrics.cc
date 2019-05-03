@@ -25,19 +25,20 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#ifdef TRTIS_ENABLE_METRICS
+
 #include "src/core/metrics.h"
 
+#include <cuda_runtime_api.h>
 #include <nvml.h>
 #include <thread>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
 Metrics::Metrics()
-    : gpu_metrics_enabled_(false),
-      registry_(std::make_shared<prometheus::Registry>()),
+    : registry_(std::make_shared<prometheus::Registry>()),
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -99,7 +100,8 @@ Metrics::Metrics()
               .Name("nv_energy_consumption")
               .Help("GPU energy consumption in joules since the trtserver "
                     "started")
-              .Register(*registry_))
+              .Register(*registry_)),
+      gpu_metrics_enabled_(false)
 {
 }
 
@@ -357,3 +359,5 @@ Metrics::GetSingleton()
 }
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_METRICS

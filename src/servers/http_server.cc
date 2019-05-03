@@ -26,13 +26,11 @@
 
 #include "src/servers/http_server.h"
 
+#include <event2/buffer.h>
+#include <evhtp/evhtp.h>
 #include <google/protobuf/text_format.h>
+#include <re2/re2.h>
 #include <algorithm>
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
-#include "evhtp/evhtp.h"
-#include "libevent/include/event2/buffer.h"
-#include "re2/re2.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -319,14 +317,12 @@ HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   infer_stats->StartRequestTimer(timer.get());
   infer_stats->SetRequestedVersion(model_version);
 
-  absl::string_view infer_request_header = absl::string_view(
+  std::string infer_request_header(
       evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
-  std::string infer_request_header_str(
-      infer_request_header.data(), infer_request_header.size());
 
   InferRequestHeader request_header;
   google::protobuf::TextFormat::ParseFromString(
-      infer_request_header_str, &request_header);
+      infer_request_header, &request_header);
 
   Status status = InferHelper(
       infer_stats, timer, model_name, model_version, request_header, req);

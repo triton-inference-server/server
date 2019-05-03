@@ -29,17 +29,10 @@ cmake_minimum_required (VERSION 3.5)
 #
 # Protobuf
 #
-set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-
-include_directories(${Protobuf_INCLUDE_DIRS})
-
 file(GLOB proto-srcs *.proto)
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${proto-srcs})
 protobuf_generate_python(PROTO_PY ${proto-srcs})
 
-set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
 set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
 set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
 
@@ -50,23 +43,9 @@ add_library(
 
 add_custom_target(proto-py-library DEPENDS ${PROTO_PY})
 
-install(
-  FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/api.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/model_config.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/request_status.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/server_status.pb.h
-  DESTINATION include
-)
-
 #
 # GRPC
 #
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
-
 get_filename_component(grpc_service_proto_abspath "grpc_service.proto" ABSOLUTE)
 get_filename_component(grpc_service_proto_dir "${grpc_service_proto_abspath}" PATH)
 set(GRPC_SRCS "grpc_service.grpc.pb.cc")
@@ -82,7 +61,7 @@ add_custom_command(
     -I "${grpc_service_proto_dir}"
     --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
     "grpc_service.proto"
-  DEPENDS "grpc_service.proto"
+  DEPENDS "grpc_service.proto" proto-library
 )
 
 find_program(PYTHON "python" REQUIRED)
@@ -94,7 +73,7 @@ add_custom_command(
     -I "${grpc_service_proto_dir}"
     --grpc_python_out "${CMAKE_CURRENT_BINARY_DIR}"
     "grpc_service.proto"
-  DEPENDS "grpc_service.proto"
+  DEPENDS "grpc_service.proto" proto-library
 )
 
 add_library(
@@ -119,3 +98,90 @@ add_library(
 )
 target_include_directories(model-config-cuda-library PRIVATE ${CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 add_dependencies(model-config-library proto-library)
+
+#
+# Common request interface used by both clients and server.
+#
+add_library(
+  request-library EXCLUDE_FROM_ALL OBJECT
+  request.cc request.h
+  request_common.cc request_common.h
+)
+add_dependencies(request-library proto-library)
+
+#
+# Inference server core
+#
+if(${TRTIS_ENABLE_METRICS})
+  find_package(prometheus-cpp CONFIG REQUIRED)
+  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
+endif() # TRTIS_ENABLE_METRICS
+
+set(
+  SERVER_SRCS
+  autofill.cc
+  backend.cc
+  dynamic_batch_scheduler.cc
+  ensemble_scheduler.cc
+  ensemble_utils.cc
+  filesystem.cc
+  label_provider.cc
+  logging.cc
+  metric_model_reporter.cc
+  metrics.cc
+  model_config_utils.cc
+  model_repository_manager.cc
+  profile.cc
+  provider.cc
+  provider_utils.cc
+  request_inprocess.cc
+  request_status.cc
+  sequence_batch_scheduler.cc
+  server.cc
+  server_status.cc
+  status.cc
+)
+
+set(
+  SERVER_HDRS
+  autofill.h
+  backend.h
+  constants.h
+  dynamic_batch_scheduler.h
+  ensemble_scheduler.h
+  ensemble_utils.h
+  filesystem.h
+  label_provider.h
+  logging.h
+  metric_model_reporter.h
+  metrics.h
+  model_config_utils.h
+  model_repository_manager.h
+  profile.h
+  provider.h
+  provider_utils.h
+  request_inprocess.h
+  request_status.h
+  scheduler.h
+  sequence_batch_scheduler.h
+  server.h
+  server_status.h
+  status.h
+)
+
+add_library(
+  server-library EXCLUDE_FROM_ALL OBJECT
+  ${SERVER_SRCS} ${SERVER_HDRS}
+)
+add_dependencies(server-library request-library proto-library)
+target_include_directories(
+  server-library
+  PRIVATE ${CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+)
+
+if(${TRTIS_ENABLE_METRICS})
+  target_include_directories(
+    server-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_METRICS

@@ -214,4 +214,33 @@ ConvertDataType(tensorflow::DataType dtype)
   return DataType::TYPE_INVALID;
 }
 
+RequestStatusCode
+FromTFError(const int tf_code)
+{
+  switch (tf_code) {
+    case 0:  // tensorflow::error::OK
+      return RequestStatusCode::SUCCESS;
+
+    case 3:  // tensorflow::error::INVALID_ARGUMENT
+      return RequestStatusCode::INVALID_ARG;
+
+    case 5:  // tensorflow::error::NOT_FOUND
+      return RequestStatusCode::NOT_FOUND;
+
+    case 6:  // tensorflow::error::ALREADY_EXISTS
+      return RequestStatusCode::NOT_FOUND;
+
+    case 14:  // tensorflow::error::UNAVAILABLE
+      return RequestStatusCode::UNAVAILABLE;
+
+    case 13:  // tensorflow::error::INTERNAL
+      return RequestStatusCode::INTERNAL;
+
+    default:
+      break;
+  }
+
+  return RequestStatusCode::UNKNOWN;
+}
+
 }}  // namespace nvidia::inferenceserver
