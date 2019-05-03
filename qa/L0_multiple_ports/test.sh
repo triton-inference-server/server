@@ -133,12 +133,6 @@ SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
 set +e
 run_server_nowait
 sleep 5
-if kill $import os
-from builtins import range
-from tensorrtserver.api import *
-import tensorrtserver.api.server_status_pb2 as server_status
-
-FLAGS = None
 SERVER_PID && wait $SERVER_PID ; then
     echo -e "\n***\n*** Should not have started $SERVER\n***"
     RET=1
