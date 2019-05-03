@@ -43,7 +43,7 @@ GraphDefBackendFactory::Create(
     const GraphDefPlatformConfig& platform_config,
     std::unique_ptr<GraphDefBackendFactory>* factory)
 {
-  LOG_VERBOSE(1) << "Create GraphDefBundleSourceAdaptor for platform config \""
+  LOG_VERBOSE(1) << "Create GraphDefBackendFactory for platform config \""
                  << platform_config.DebugString() << "\"";
 
   factory->reset(new GraphDefBackendFactory(platform_config));
