@@ -44,23 +44,13 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--protocol', type=str, required=False, default="http",
                         help='Protocol ("http"/"grpc") used to ' +
                         'communicate with inference service. Default is "http".')
-    parser.add_argument('-p', '--port', type=int, required=False, default=-1,
+    parser.add_argument('-p', '--port', type=int, required=False, default=8000,
                         help="The port for the server to listen on for all HTTP requests.")
-    parser.add_argument('-sp', "--status_port", type=int, required=False, default=-1,
-                        help="The port for the server to listen on for HTTP Status requests.")
     parser.add_argument('-hp', "--health_port", type=int, required=False, default=-1,
                         help="The port for the server to listen on for HTTP Health requests.")
-    parser.add_argument('-pp', "--profile_port", type=int, required=False, default=-1,
-                        help="The port for the server to listen on for HTTP Profile requests.")
-    parser.add_argument('-ip', "--infer_port", type=int, required=False, default=-1,
-                        help="The port for the server to listen on for HTTP Infer requests.")
 
     FLAGS = parser.parse_args()
-    if FLAGS.port!=-1:
-        FLAGS.status_port = FLAGS.port if FLAGS.status_port==-1 else FLAGS.status_port
-        FLAGS.health_port = FLAGS.port if FLAGS.health_port==-1 else FLAGS.health_port
-        FLAGS.profile_port = FLAGS.port if FLAGS.profile_port==-1 else FLAGS.profile_port
-        FLAGS.infer_port = FLAGS.port if FLAGS.infer_port==-1 else FLAGS.infer_port
+    # FLAGS.health_port = FLAGS.port if FLAGS.health_port==-1 else FLAGS.health_port
 
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
@@ -73,8 +63,8 @@ if __name__ == '__main__':
     batch_size = 1
 
     # infer
-    if FLAGS.infer_port !=-1:
-        ctx = InferContext(FLAGS.url+str(FLAGS.infer_port), protocol, model_name, model_version, FLAGS.verbose)
+    if FLAGS.port !=-1:
+        ctx = InferContext(FLAGS.url+str(FLAGS.port), protocol, model_name, model_version, FLAGS.verbose)
         # Create the data for the two input tensors. Initialize the first
         # to unique integers and the second to all ones.
         input0_data = np.arange(start=0, stop=16, dtype=np.int32)
@@ -107,7 +97,7 @@ if __name__ == '__main__':
         assert hctx.is_ready() == True
         assert hctx.is_live() == True
     # status
-    if FLAGS.status_port !=-1:
-        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.status_port), protocol, model_name, True)
+    if FLAGS.port !=-1:
+        sctx = ServerStatusContext(FLAGS.url+str(FLAGS.port), protocol, model_name, True)
         ss = sctx.get_server_status()
         assert server_status.SERVER_READY == ss.ready_state
