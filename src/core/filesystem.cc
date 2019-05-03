@@ -82,6 +82,8 @@ LocalFileSystem::FileExists(const std::string& path, bool* exists)
 Status
 LocalFileSystem::IsDirectory(const std::string& path, bool* is_dir)
 {
+  *is_dir = false;
+
   struct stat st;
   if (stat(path.c_str(), &st) != 0) {
     return Status(RequestStatusCode::INTERNAL, "failed to stat file " + path);

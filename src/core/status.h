@@ -60,9 +60,6 @@ class Status {
   // Return the status as a string.
   std::string AsString() const;
 
-  // Convert a TensorFlow status code to inference server status code.
-  static RequestStatusCode FromTFError(const int tf_code);
-
  private:
   RequestStatusCode code_;
   std::string msg_;
@@ -85,16 +82,6 @@ class Status {
     if (status__.Code() != RequestStatusCode::SUCCESS) { \
       return status__;                                   \
     }                                                    \
-  } while (false)
-
-// If TensorFlow status is non-OK, return the equivalent Status.
-#define RETURN_IF_TF_ERROR(TFS)                                            \
-  do {                                                                     \
-    const tensorflow::Status& status__ = (TFS);                            \
-    if (status__.code() != 0) {                                            \
-      return Status(                                                       \
-          Status::FromTFError(status__.code()), status__.error_message()); \
-    }                                                                      \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

@@ -206,17 +206,34 @@ GetByteSize(const ModelOutput& mio)
 Platform
 GetPlatform(const std::string& platform_str)
 {
+#ifdef TRTIS_ENABLE_TENSORFLOW
   if (platform_str == kTensorFlowGraphDefPlatform) {
     return Platform::PLATFORM_TENSORFLOW_GRAPHDEF;
-  } else if (platform_str == kTensorFlowSavedModelPlatform) {
+  }
+  if (platform_str == kTensorFlowSavedModelPlatform) {
     return Platform::PLATFORM_TENSORFLOW_SAVEDMODEL;
-  } else if (platform_str == kTensorRTPlanPlatform) {
+  }
+#endif  // TRTIS_ENABLE_TENSORFLOW
+
+#ifdef TRTIS_ENABLE_TENSORRT
+  if (platform_str == kTensorRTPlanPlatform) {
     return Platform::PLATFORM_TENSORRT_PLAN;
-  } else if (platform_str == kCaffe2NetDefPlatform) {
+  }
+#endif  // TRTIS_ENABLE_TENSORRT
+
+#ifdef TRTIS_ENABLE_CAFFE2
+  if (platform_str == kCaffe2NetDefPlatform) {
     return Platform::PLATFORM_CAFFE2_NETDEF;
-  } else if (platform_str == kCustomPlatform) {
+  }
+#endif  // TRTIS_ENABLE_CAFFE2
+
+#ifdef TRTIS_ENABLE_CUSTOM
+  if (platform_str == kCustomPlatform) {
     return Platform::PLATFORM_CUSTOM;
-  } else if (platform_str == kEnsemblePlatform) {
+  }
+#endif  // TRTIS_ENABLE_CUSTOM
+
+  if (platform_str == kEnsemblePlatform) {
     return Platform::PLATFORM_ENSEMBLE;
   } else if (platform_str == kOnnxRuntimeOnnxPlatform) {
     return Platform::PLATFORM_ONNXRUNTIME_ONNX;

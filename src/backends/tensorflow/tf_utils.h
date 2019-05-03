@@ -74,4 +74,16 @@ tensorflow::DataType ConvertDataType(DataType dtype);
 /// TensorFlow data-type.
 DataType ConvertDataType(tensorflow::DataType dtype);
 
+// Convert a TensorFlow status code to inference server status code.
+RequestStatusCode FromTFError(const int tf_code);
+
+// If TensorFlow status is non-OK, return the equivalent Status.
+#define RETURN_IF_TF_ERROR(TFS)                                              \
+  do {                                                                       \
+    const tensorflow::Status& status__ = (TFS);                              \
+    if (status__.code() != 0) {                                              \
+      return Status(FromTFError(status__.code()), status__.error_message()); \
+    }                                                                        \
+  } while (false)
+
 }}  // namespace nvidia::inferenceserver

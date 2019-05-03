@@ -25,39 +25,33 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
-project (trtis-clients)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
-
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
-include_directories("${PROJECT_SOURCE_DIR}/../..")
-include_directories("${PROJECT_BINARY_DIR}")
 
 #
-# Protobuf
+# nvrpc
 #
-set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
+set(
+  NVRPC_SRCS
+  Executor.cc
+  Server.cc
+  ThreadPool.cc
+)
 
-#
-# GRPC
-#
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+set(
+  NVRPC_HDRS
+  BidirectionalStreamingLifeCycle.h
+  Context.h
+  Executor.h
+  Interfaces.h
+  LifeCycleUnary.h
+  Resources.h
+  RPC.h
+  Server.h
+  Service.h
+  ThreadPool.h
+  future_std.h
+)
 
-add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/clients/c++ src/clients/c++)
-add_subdirectory(../../src/clients/python src/clients/python)
+add_library(
+  nvrpc-library EXCLUDE_FROM_ALL OBJECT
+  ${NVRPC_SRCS} ${NVRPC_HDRS}
+)

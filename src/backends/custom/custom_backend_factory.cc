@@ -40,13 +40,13 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 CustomBackendFactory::Create(
-    const CustomPlatformConfig& platform_config,
+    const std::shared_ptr<BackendConfig>& backend_config,
     std::unique_ptr<CustomBackendFactory>* factory)
 {
-  LOG_VERBOSE(1) << "Create CustomBackendFactory for platform config \""
-                 << platform_config.DebugString() << "\"";
+  LOG_VERBOSE(1) << "Create CustomBackendFactory";
 
-  factory->reset(new CustomBackendFactory(platform_config));
+  auto custom_backend_config = std::static_pointer_cast<Config>(backend_config);
+  factory->reset(new CustomBackendFactory(custom_backend_config));
   return Status::Success;
 }
 
@@ -72,9 +72,9 @@ CustomBackendFactory::CreateBackend(
   // CustomServerParameter value.
   std::vector<std::string> server_params(CUSTOM_SERVER_PARAMETER_CNT);
   server_params[CustomServerParameter::INFERENCE_SERVER_VERSION] =
-      platform_config_.inference_server_version();
+      backend_config_->inference_server_version;
   server_params[CustomServerParameter::MODEL_REPOSITORY_PATH] =
-      platform_config_.model_repository_path();
+      backend_config_->model_repository_path;
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.

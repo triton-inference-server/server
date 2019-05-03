@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/backends/tensorflow/graphdef_backend.h"
-#include "src/backends/tensorflow/graphdef_backend.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -35,8 +34,18 @@ namespace nvidia { namespace inferenceserver {
 // the corresponding graphdef backend.
 class GraphDefBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // Autofill missing required model configuration settings based on
+    // model definition file.
+    bool autofill;
+
+    bool allow_gpu_memory_growth;
+    float per_process_gpu_memory_fraction;
+    bool allow_soft_placement;
+  };
+
   static Status Create(
-      const GraphDefPlatformConfig& platform_config,
+      const Config& backend_config,
       std::unique_ptr<GraphDefBackendFactory>* factory);
 
   Status CreateBackend(
@@ -48,12 +57,12 @@ class GraphDefBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
 
-  GraphDefBackendFactory(const GraphDefPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  GraphDefBackendFactory(const Config& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const GraphDefPlatformConfig platform_config_;
+  const Config backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

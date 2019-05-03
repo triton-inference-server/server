@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "libevent/include/event2/buffer.h"
+#include <event2/buffer.h>
 #include "src/core/api.pb.h"
 #include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.h"

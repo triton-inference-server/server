@@ -137,7 +137,7 @@ class ModelRepositoryManager {
   ModelRepositoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
-      const PlatformConfigMap& platform_config_map, const bool autofill,
+      const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// Poll the model repository to determine the new set of models and
@@ -177,7 +177,7 @@ class ModelRepositoryManager {
       std::vector<int64_t>& versions);
 
   const std::string repository_path_;
-  const PlatformConfigMap platform_config_map_;
+  const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;
 

@@ -26,23 +26,15 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
-
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
-
 #
 # librequest.so
 #
 find_package(CURL REQUIRED)
 add_library(
   request SHARED
-  request.cc request_common.cc request_http.cc request_grpc.cc
+  request_http.cc request_grpc.cc
   $<TARGET_OBJECTS:model-config-library>
+  $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
 )
@@ -53,7 +45,16 @@ install(
   LIBRARY DESTINATION lib
 )
 install(
-  FILES request.h request_grpc.h request_http.h
+  FILES request_grpc.h request_http.h
+  DESTINATION include
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../core/request.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/api.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/request_status.pb.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/server_status.pb.h
   DESTINATION include
 )
 
