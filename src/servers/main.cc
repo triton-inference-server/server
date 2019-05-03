@@ -84,8 +84,8 @@ std::vector<int32_t> http_ports_;
 // disabled.
 int32_t metrics_port_ = 8002;
 
-bool allow_http = true;
-bool allow_grpc = true;
+bool allow_http_ = true;
+bool allow_grpc_ = true;
 bool allow_metrics_ = true;
 
 // endpoint names for http/gRPC
@@ -246,15 +246,15 @@ CheckPortCollision()
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
-       (grpc_port_ != -1) && (allow_http==true && allow_grpc==true)) {
-      LOG_ERROR << "The server cannot listen to HTTP requests "
-                << "and gRPC requests at the same port";
-      return true;
+      (grpc_port_ != -1) && allow_http_ && allow_grpc_) {
+    LOG_ERROR << "The server cannot listen to HTTP requests "
+              << "and gRPC requests at the same port";
+    return true;
   }
 
   // Check if Metric and GRPC have shared ports
-  if ((grpc_port_== metrics_port_) && (metrics_port_ != -1) &&
-      (allow_grpc==true && allow_metrics_==true)) {
+  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) &&
+      allow_grpc_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "gRPC requests";
     return true;
@@ -263,7 +263,7 @@ CheckPortCollision()
   // Check if Metric and HTTP have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
        http_ports_.end()) &&
-       (metrics_port_ != -1) && (allow_http==true && allow_metrics_==true)) {
+      (metrics_port_ != -1) && allow_http_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "HTTP requests";
     return true;
@@ -325,7 +325,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
 
   // Enable gRPC endpoints if requested...
-  if (allow_grpc && grpc_port_ != -1) {
+  if (allow_grpc_ && (grpc_port_ != -1)) {
     grpc_service_ = StartGrpcService(server);
     if (grpc_service_ == nullptr) {
       LOG_ERROR << "Failed to start gRPC service";
@@ -334,7 +334,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   }
 
   // Enable HTTP endpoints if requested...
-  if (allow_http) {
+  if (allow_http_) {
     std::map<int32_t, std::vector<std::string>> port_map;
 
     // Group by port numbers
@@ -487,10 +487,10 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
         allow_profiling = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_GRPC:
-        allow_grpc = ParseBoolOption(optarg);
+        allow_grpc_ = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_HTTP:
-        allow_http = ParseBoolOption(optarg);
+        allow_http_ = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_METRICS:
         allow_metrics_ = ParseBoolOption(optarg);
@@ -553,7 +553,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   LOG_SET_VERBOSE(log_verbose);
 
 
-  if (!allow_http && !allow_grpc) {
+  if (!allow_http_ && !allow_grpc_) {
     LOG_ERROR << "At least one of the following options must be true: "
               << "--allow-http, --allow-grpc";
 
