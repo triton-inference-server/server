@@ -38,7 +38,7 @@ class NetDefBackendTest : public ModelConfigTestBase {
 TEST_F(NetDefBackendTest, ModelConfigSanity)
 {
   BackendInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
+                                 const ModelConfig& config) -> Status {
     std::unique_ptr<NetDefBackend> backend(new NetDefBackend());
     Status status = backend->Init(path, config);
     if (status.IsOk()) {

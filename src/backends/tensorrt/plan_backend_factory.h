@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
 #include "src/backends/tensorrt/plan_backend.h"
 #include "src/backends/tensorrt/plan_backend.pb.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 

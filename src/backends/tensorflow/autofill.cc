@@ -26,15 +26,15 @@
 
 #include "src/backends/tensorflow/autofill.h"
 
+#include "src/backends/tensorflow/loader.h"
+#include "src/backends/tensorflow/savedmodel_backend.pb.h"
+#include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "src/backends/tensorflow/loader.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
-#include "src/backends/tensorflow/tf_utils.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
 #include "tensorflow/core/lib/io/path.h"

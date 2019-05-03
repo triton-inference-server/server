@@ -27,13 +27,13 @@
 #include "src/backends/tensorrt/autofill.h"
 
 #include <NvInfer.h>
+#include "src/backends/tensorrt/loader.h"
+#include "src/backends/tensorrt/plan_utils.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/backends/tensorrt/loader.h"
-#include "src/backends/tensorrt/plan_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 

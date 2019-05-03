@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
 #include "src/backends/tensorflow/savedmodel_backend.h"
 #include "src/backends/tensorflow/savedmodel_backend.pb.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -48,8 +48,7 @@ class SavedModelBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(SavedModelBackendFactory);
 
-  SavedModelBackendFactory(
-      const SavedModelPlatformConfig& platform_config)
+  SavedModelBackendFactory(const SavedModelPlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }

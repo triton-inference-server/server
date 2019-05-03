@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
 #include "src/backends/tensorflow/graphdef_backend.h"
 #include "src/backends/tensorflow/graphdef_backend.pb.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -48,8 +48,7 @@ class GraphDefBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
 
-  GraphDefBackendFactory(
-      const GraphDefPlatformConfig& platform_config)
+  GraphDefBackendFactory(const GraphDefPlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }

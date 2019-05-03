@@ -28,13 +28,13 @@
 
 #include <stdint.h>
 #include "cuda/include/cuda_runtime_api.h"
+#include "src/backends/custom/loader.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
-#include "src/backends/custom/loader.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -512,7 +512,8 @@ CustomGetNextInput(
     uint64_t* content_byte_size)
 {
   CustomBackend::Context::GetInputOutputContext* icontext =
-      static_cast<CustomBackend::Context::GetInputOutputContext*>(input_context);
+      static_cast<CustomBackend::Context::GetInputOutputContext*>(
+          input_context);
   return icontext->context_->GetNextInput(
       icontext, name, content, content_byte_size);
 }

@@ -39,7 +39,7 @@ class GraphDefBackendTest : public ModelConfigTestBase {
 TEST_F(GraphDefBackendTest, ModelConfigSanity)
 {
   BackendInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
+                                 const ModelConfig& config) -> Status {
     std::unique_ptr<GraphDefBackend> backend(new GraphDefBackend());
     Status status = backend->Init(path, config);
     if (status.IsOk()) {

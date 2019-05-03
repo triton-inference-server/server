@@ -81,7 +81,7 @@ EnsembleBackendTest::GetModelConfigsInRepository(
 TEST_F(EnsembleBackendTest, ModelConfigSanity)
 {
   BackendInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
+                                 const ModelConfig& config) -> Status {
     return Status::Success;
   };
 

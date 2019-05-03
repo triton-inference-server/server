@@ -26,11 +26,11 @@
 
 #include <string>
 #include "cuda/include/cuda.h"
+#include "src/backends/custom/custom.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_cuda.h"
 #include "src/custom/addsub/kernel.h"
-#include "src/backends/custom/custom.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout

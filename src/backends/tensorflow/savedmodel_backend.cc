@@ -27,12 +27,12 @@
 #include "src/backends/tensorflow/savedmodel_backend.h"
 
 #include <set>
+#include "src/backends/tensorflow/loader.h"
+#include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "src/backends/tensorflow/loader.h"
-#include "src/backends/tensorflow/tf_utils.h"
 #include "tensorflow/c/c_api.h"
 
 namespace nvidia { namespace inferenceserver {

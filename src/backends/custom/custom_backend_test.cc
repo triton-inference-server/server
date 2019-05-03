@@ -38,7 +38,7 @@ class CustomBackendTest : public ModelConfigTestBase {
 TEST_F(CustomBackendTest, ModelConfigSanity)
 {
   BackendInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
+                                 const ModelConfig& config) -> Status {
     std::unique_ptr<CustomBackend> backend(new CustomBackend());
     std::vector<std::string> server_params;
     Status status = backend->Init(path, server_params, config);

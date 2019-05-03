@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
 #include "src/backends/ensemble/ensemble_backend.h"
 #include "src/backends/ensemble/ensemble_backend.pb.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -48,8 +48,7 @@ class EnsembleBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(EnsembleBackendFactory);
 
-  EnsembleBackendFactory(
-      const EnsemblePlatformConfig& platform_config)
+  EnsembleBackendFactory(const EnsemblePlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }

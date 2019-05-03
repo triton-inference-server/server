@@ -27,11 +27,11 @@
 #include "src/backends/tensorflow/graphdef_backend.h"
 
 #include <set>
+#include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "src/backends/tensorflow/tf_utils.h"
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/graph/default_device.h"
 #include "tensorflow/core/lib/io/path.h"

@@ -39,7 +39,7 @@ class SavedModelBackendTest : public ModelConfigTestBase {
 TEST_F(SavedModelBackendTest, ModelConfigSanity)
 {
   BackendInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
+                                 const ModelConfig& config) -> Status {
     std::unique_ptr<SavedModelBackend> backend(new SavedModelBackend());
     Status status = backend->Init(path, config);
     if (status.IsOk()) {
