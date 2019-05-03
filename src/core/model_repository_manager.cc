@@ -31,25 +31,24 @@
 #include <deque>
 #include <stdexcept>
 #include <thread>
+#include "src/backends/caffe2/netdef_backend.pb.h"
+#include "src/backends/caffe2/netdef_backend_factory.h"
+#include "src/backends/custom/custom_backend.pb.h"
+#include "src/backends/custom/custom_backend_factory.h"
+#include "src/backends/ensemble/ensemble_backend.pb.h"
+#include "src/backends/ensemble/ensemble_backend_factory.h"
+#include "src/backends/tensorflow/graphdef_backend.pb.h"
+#include "src/backends/tensorflow/graphdef_backend_factory.h"
+#include "src/backends/tensorflow/savedmodel_backend.pb.h"
+#include "src/backends/tensorflow/savedmodel_backend_factory.h"
+#include "src/backends/tensorrt/plan_backend.pb.h"
+#include "src/backends/tensorrt/plan_backend_factory.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
-#include "src/backends/caffe2/netdef_backend_factory.h"
-#include "src/backends/caffe2/netdef_backend.pb.h"
-#include "src/backends/custom/custom_backend_factory.h"
-#include "src/backends/custom/custom_backend.pb.h"
-#include "src/backends/ensemble/ensemble_backend_factory.h"
-#include "src/backends/ensemble/ensemble_backend.pb.h"
-#include "src/backends/tensorflow/graphdef_backend_factory.h"
-#include "src/backends/tensorflow/graphdef_backend.pb.h"
-#include "src/backends/tensorflow/savedmodel_backend_factory.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
-#include "src/backends/tensorrt/plan_backend_factory.h"
-#include "src/backends/tensorrt/plan_backend.pb.h"
-#include "tensorflow_serving/config/platform_config.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -61,12 +60,7 @@ BuildPlatformConfigMap(
     const bool strict_model_config, const float tf_gpu_memory_fraction,
     const bool tf_allow_soft_placement, PlatformConfigMap* platform_configs)
 {
-  ::google::protobuf::Any graphdef_source_adapter_config;
-  ::google::protobuf::Any saved_model_source_adapter_config;
-  ::google::protobuf::Any plan_source_adapter_config;
-  ::google::protobuf::Any netdef_source_adapter_config;
-  ::google::protobuf::Any custom_source_adapter_config;
-  ::google::protobuf::Any ensemble_source_adapter_config;
+  ::google::protobuf::Any platform_config;
 
   //// Tensorflow GraphDef
   {
@@ -87,7 +81,8 @@ BuildPlatformConfigMap(
 
     graphdef_config.mutable_session_config()->set_allow_soft_placement(
         tf_allow_soft_placement);
-    graphdef_source_adapter_config.PackFrom(graphdef_config);
+    platform_config.PackFrom(graphdef_config);
+    (*platform_configs)[kTensorFlowGraphDefPlatform] = platform_config;
   }
 
   //// Tensorflow SavedModel
@@ -108,21 +103,24 @@ BuildPlatformConfigMap(
 
     saved_model_config.mutable_session_config()->set_allow_soft_placement(
         tf_allow_soft_placement);
-    saved_model_source_adapter_config.PackFrom(saved_model_config);
+    platform_config.PackFrom(saved_model_config);
+    (*platform_configs)[kTensorFlowSavedModelPlatform] = platform_config;
   }
 
   //// Caffe NetDef
   {
     NetDefPlatformConfig netdef_config;
     netdef_config.set_autofill(!strict_model_config);
-    netdef_source_adapter_config.PackFrom(netdef_config);
+    platform_config.PackFrom(netdef_config);
+    (*platform_configs)[kCaffe2NetDefPlatform] = platform_config;
   }
 
   //// TensorRT
   {
     PlanPlatformConfig plan_config;
     plan_config.set_autofill(!strict_model_config);
-    plan_source_adapter_config.PackFrom(plan_config);
+    platform_config.PackFrom(plan_config);
+    (*platform_configs)[kTensorRTPlanPlatform] = platform_config;
   }
 
   //// Custom
@@ -130,23 +128,16 @@ BuildPlatformConfigMap(
     CustomPlatformConfig custom_config;
     custom_config.set_inference_server_version(version);
     custom_config.set_model_repository_path(model_store_path);
-    custom_source_adapter_config.PackFrom(custom_config);
+    platform_config.PackFrom(custom_config);
+    (*platform_configs)[kCustomPlatform] = platform_config;
   }
 
   //// Ensemble
   {
     EnsemblePlatformConfig ensemble_config;
-    ensemble_source_adapter_config.PackFrom(ensemble_config);
+    platform_config.PackFrom(ensemble_config);
+    (*platform_configs)[kEnsemblePlatform] = platform_config;
   }
-
-  (*platform_configs)[kTensorFlowGraphDefPlatform] =
-      graphdef_source_adapter_config;
-  (*platform_configs)[kTensorFlowSavedModelPlatform] =
-      saved_model_source_adapter_config;
-  (*platform_configs)[kCaffe2NetDefPlatform] = netdef_source_adapter_config;
-  (*platform_configs)[kTensorRTPlanPlatform] = plan_source_adapter_config;
-  (*platform_configs)[kCustomPlatform] = custom_source_adapter_config;
-  (*platform_configs)[kEnsemblePlatform] = ensemble_source_adapter_config;
 }
 
 int64_t
