@@ -35,7 +35,7 @@
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
-class EnsembleBundleTest : public ModelConfigTestBase {
+class EnsembleBackendTest : public ModelConfigTestBase {
  public:
   bool GetModelConfigsInRepository(
       const std::string& model_base_path,
@@ -44,7 +44,7 @@ class EnsembleBundleTest : public ModelConfigTestBase {
 };
 
 bool
-EnsembleBundleTest::GetModelConfigsInRepository(
+EnsembleBackendTest::GetModelConfigsInRepository(
     const std::string& model_base_path,
     std::unordered_map<std::string, ModelConfig>& config_map,
     std::string* result)
@@ -78,9 +78,9 @@ EnsembleBundleTest::GetModelConfigsInRepository(
   return true;
 }
 
-TEST_F(EnsembleBundleTest, ModelConfigSanity)
+TEST_F(EnsembleBackendTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func = [](const std::string& path,
+  BackendInitFunc init_func = [](const std::string& path,
                                 const ModelConfig& config) -> Status {
     return Status::Success;
   };
@@ -94,7 +94,7 @@ TEST_F(EnsembleBundleTest, ModelConfigSanity)
       true /* autofill */, std::string() /* platform */, init_func);
 }
 
-TEST_F(EnsembleBundleTest, EnsembleConfigSanity)
+TEST_F(EnsembleBackendTest, EnsembleConfigSanity)
 {
   std::string error;
   std::unordered_map<std::string, ModelConfig> config_map;

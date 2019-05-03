@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/custom/custom_bundle.h"
+#include "src/backends/custom/custom_backend.h"
 
 #include <stdint.h>
 #include "cuda/include/cuda_runtime_api.h"
@@ -38,7 +38,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-CustomBundle::Context::Context(
+CustomBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       library_handle_(nullptr), library_context_handle_(nullptr),
@@ -47,9 +47,9 @@ CustomBundle::Context::Context(
 {
 }
 
-CustomBundle::Context::~Context()
+CustomBackend::Context::~Context()
 {
-  LOG_VERBOSE(1) << "~CustomBundle::Context " << name_;
+  LOG_VERBOSE(1) << "~CustomBackend::Context " << name_;
   if (FinalizeFn_ != nullptr) {
     int err = FinalizeFn_(library_context_handle_);
     if (err != 0) {
@@ -65,7 +65,7 @@ CustomBundle::Context::~Context()
 }
 
 Status
-CustomBundle::Init(
+CustomBackend::Init(
     const std::string& path, const std::vector<std::string>& server_params,
     const ModelConfig& config)
 {
@@ -78,7 +78,7 @@ CustomBundle::Init(
 }
 
 Status
-CustomBundle::CreateExecutionContexts(
+CustomBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::string>& libraries)
 {
   uint32_t total_context_cnt = 0;
@@ -116,12 +116,12 @@ CustomBundle::CreateExecutionContexts(
         RunBackend(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "custom bundle for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "custom backend for " << Name() << std::endl << *this;
   return Status::Success;
 }
 
 Status
-CustomBundle::CreateExecutionContext(
+CustomBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::string>& libraries)
 {
@@ -185,7 +185,7 @@ CustomBundle::CreateExecutionContext(
 }
 
 Status
-CustomBundle::InitBackend(uint32_t runner_idx)
+CustomBackend::InitBackend(uint32_t runner_idx)
 {
   // Each runner executes using the corresponding context...
   if (runner_idx >= contexts_.size()) {
@@ -233,7 +233,7 @@ CustomBundle::InitBackend(uint32_t runner_idx)
 }
 
 void
-CustomBundle::RunBackend(
+CustomBackend::RunBackend(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
     std::function<void(Status)> OnCompleteQueuedPayloads)
 {
@@ -264,8 +264,8 @@ CustomBundle::RunBackend(
 }
 
 Status
-CustomBundle::Context::Run(
-    CustomBundle* base, std::vector<Scheduler::Payload>* payloads)
+CustomBackend::Context::Run(
+    CustomBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -274,7 +274,7 @@ CustomBundle::Context::Run(
   // the shape for each input into a vector suitable to passing via
   // the custom backend interface. As a performance improvement for
   // models that don't have any variable-size input tensors we could
-  // calculate the input tensor shapes once during bundle
+  // calculate the input tensor shapes once during backend
   // initialization.
   std::unordered_map<std::string, std::unique_ptr<std::vector<int64_t>>>
       input_shapes;
@@ -438,7 +438,7 @@ CustomBundle::Context::Run(
 }
 
 bool
-CustomBundle::Context::GetNextInput(
+CustomBackend::Context::GetNextInput(
     GetInputOutputContext* input_context, const char* cname,
     const void** content, uint64_t* content_byte_size)
 {
@@ -451,7 +451,7 @@ CustomBundle::Context::GetNextInput(
 }
 
 bool
-CustomBundle::Context::GetOutput(
+CustomBackend::Context::GetOutput(
     GetInputOutputContext* output_context, const char* cname,
     size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
     void** content)
@@ -478,7 +478,7 @@ CustomBundle::Context::GetOutput(
 }
 
 std::string
-CustomBundle::Context::LibraryErrorString(const int err)
+CustomBackend::Context::LibraryErrorString(const int err)
 {
   if (ErrorStringFn_ != nullptr) {
     const char* str = ErrorStringFn_(library_context_handle_, err);
@@ -491,13 +491,13 @@ CustomBundle::Context::LibraryErrorString(const int err)
 }
 
 std::ostream&
-operator<<(std::ostream& out, const CustomBundle& pb)
+operator<<(std::ostream& out, const CustomBackend& pb)
 {
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context->name_ << ", gpu="
-        << ((context->gpu_device_ == CustomBundle::Context::NO_GPU_DEVICE)
+        << ((context->gpu_device_ == CustomBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
                 : std::to_string(context->gpu_device_))
         << std::endl;
@@ -511,8 +511,8 @@ CustomGetNextInput(
     void* input_context, const char* name, const void** content,
     uint64_t* content_byte_size)
 {
-  CustomBundle::Context::GetInputOutputContext* icontext =
-      static_cast<CustomBundle::Context::GetInputOutputContext*>(input_context);
+  CustomBackend::Context::GetInputOutputContext* icontext =
+      static_cast<CustomBackend::Context::GetInputOutputContext*>(input_context);
   return icontext->context_->GetNextInput(
       icontext, name, content, content_byte_size);
 }
@@ -522,8 +522,8 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
-  CustomBundle::Context::GetInputOutputContext* ocontext =
-      static_cast<CustomBundle::Context::GetInputOutputContext*>(
+  CustomBackend::Context::GetInputOutputContext* ocontext =
+      static_cast<CustomBackend::Context::GetInputOutputContext*>(
           output_context);
   return ocontext->context_->GetOutput(
       ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content);

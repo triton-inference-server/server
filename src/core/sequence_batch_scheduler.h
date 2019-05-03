@@ -154,7 +154,7 @@ class SequenceBatchScheduler : public Scheduler {
     std::vector<std::deque<Scheduler::Payload>> queues_;
 
     // The maximum active slot. A value of -1 indicates that no slots
-    // are active in the bundle.
+    // are active in the backend.
     int32_t max_active_slot_;
 
     // Is each batch slot active or not. An empty queue for a batch

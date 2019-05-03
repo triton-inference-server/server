@@ -67,12 +67,12 @@ GraphDefBackendFactory::CreateBackend(
         std::make_tuple(graphdef_path));
   }
 
-  std::unique_ptr<GraphDefBundle> local_bundle(new GraphDefBundle);
-  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
-  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(
+  std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
+  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(
       platform_config_.session_config(), graphdef_paths));
 
-  *backend = std::move(local_bundle);
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 

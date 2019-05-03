@@ -23,50 +23,27 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/backends/tensorrt/plan_bundle.h"
-#include "src/core/constants.h"
-#include "src/core/filesystem.h"
 #include "src/core/status.h"
-#include "src/test/model_config_test_base.h"
+#include "src/backends/tensorflow/base_backend.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class PlanBundleTest : public ModelConfigTestBase {
+class GraphDefBackend : public BaseBackend {
  public:
+  GraphDefBackend() = default;
+  GraphDefBackend(GraphDefBackend&&) = default;
+
+  Status Init(const std::string& path, const ModelConfig& config);
+
+  Status CreateSession(
+      const tensorflow::SessionOptions& options, const int gpu_device,
+      const std::string& model_path, tensorflow::Session** session,
+      IONameMap* input_name_map, IONameMap* output_name_map) override;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(GraphDefBackend);
 };
 
-TEST_F(PlanBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
-    std::unique_ptr<PlanBundle> bundle(new PlanBundle());
-    Status status = bundle->Init(path, config);
-    if (status.IsOk()) {
-      std::unordered_map<std::string, std::vector<char>> plan_blobs;
-
-      for (const auto& filename :
-           std::vector<std::string>{kTensorRTPlanFilename}) {
-        const auto plan_path = JoinPath({path, filename});
-        tensorflow::string blob_str;
-        ReadTextFile(plan_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        plan_blobs.emplace(filename, std::move(blob));
-      }
-
-      status = bundle->CreateExecutionContexts(plan_blobs);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kTensorRTPlanPlatform, init_func);
-
-  // Sanity tests with autofill and not providing the platform.
-  ValidateOne(
-      "inference_server/src/backends/tensorrt/testdata/autofill_sanity",
-      true /* autofill */, std::string() /* platform */, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

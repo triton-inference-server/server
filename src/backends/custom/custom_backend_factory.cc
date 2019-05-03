@@ -76,13 +76,13 @@ CustomBackendFactory::CreateBackend(
   server_params[CustomServerParameter::MODEL_REPOSITORY_PATH] =
       platform_config_.model_repository_path();
 
-  // Create the bundle for the model and all the execution contexts
+  // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<CustomBundle> local_bundle(new CustomBundle);
-  RETURN_IF_ERROR(local_bundle->Init(path, server_params, model_config));
-  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(custom_paths));
+  std::unique_ptr<CustomBackend> local_backend(new CustomBackend);
+  RETURN_IF_ERROR(local_backend->Init(path, server_params, model_config));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(custom_paths));
 
-  *backend = std::move(local_bundle);
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 

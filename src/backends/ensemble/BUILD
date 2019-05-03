@@ -31,14 +31,14 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "ensemble_bundle_proto",
-    srcs = ["ensemble_bundle.proto"],
+    name = "ensemble_backend_proto",
+    srcs = ["ensemble_backend.proto"],
 )
 
 cc_library(
-    name = "ensemble_bundle",
-    srcs = ["ensemble_bundle.cc"],
-    hdrs = ["ensemble_bundle.h"],
+    name = "ensemble_backend",
+    srcs = ["ensemble_backend.cc"],
+    hdrs = ["ensemble_backend.h"],
     deps = [
         "//src/core:constants",
         "//src/core:server_header",
@@ -50,8 +50,8 @@ cc_library(
     srcs = ["ensemble_backend_factory.cc"],
     hdrs = ["ensemble_backend_factory.h"],
     deps = [
-        ":ensemble_bundle",
-        ":ensemble_bundle_proto",
+        ":ensemble_backend",
+        ":ensemble_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -68,8 +68,8 @@ filegroup(
 )
 
 cc_test(
-    name = "ensemble_bundle_test",
-    srcs = ["ensemble_bundle_test.cc"],
+    name = "ensemble_backend_test",
+    srcs = ["ensemble_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",

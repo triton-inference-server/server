@@ -36,16 +36,16 @@ namespace nvidia { namespace inferenceserver { namespace test {
 
 class ModelConfigTestBase : public ::testing::Test {
  public:
-  using BundleInitFunc =
+  using BackendInitFunc =
       std::function<Status(const std::string&, const ModelConfig&)>;
 
   bool ValidateInit(
-      const std::string& path, bool autofill, BundleInitFunc init_func,
+      const std::string& path, bool autofill, BackendInitFunc init_func,
       std::string* result);
-  void ValidateAll(const std::string& platform, BundleInitFunc init_func);
+  void ValidateAll(const std::string& platform, BackendInitFunc init_func);
   void ValidateOne(
       const std::string& test_repository_rpath, bool autofill,
-      const std::string& platform, BundleInitFunc init_func);
+      const std::string& platform, BackendInitFunc init_func);
   void CompareActualWithExpected(
       const std::string& expected_path, const std::string& actual,
       std::string* fail_expected);

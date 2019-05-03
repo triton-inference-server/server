@@ -24,49 +24,49 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/tensorflow/graphdef_bundle.h"
+#include "src/backends/caffe2/netdef_backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "src/core/status.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
-class GraphDefBundleTest : public ModelConfigTestBase {
+class NetDefBackendTest : public ModelConfigTestBase {
  public:
 };
 
-TEST_F(GraphDefBundleTest, ModelConfigSanity)
+TEST_F(NetDefBackendTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func = [](const std::string& path,
+  BackendInitFunc init_func = [](const std::string& path,
                                 const ModelConfig& config) -> Status {
-    std::unique_ptr<GraphDefBundle> bundle(new GraphDefBundle());
-    Status status = bundle->Init(path, config);
+    std::unique_ptr<NetDefBackend> backend(new NetDefBackend());
+    Status status = backend->Init(path, config);
     if (status.IsOk()) {
-      std::unordered_map<std::string, std::string> graphdef_paths;
+      std::unordered_map<std::string, std::vector<char>> netdef_blobs;
 
-      for (const auto& filename :
-           std::vector<std::string>{kTensorFlowGraphDefFilename}) {
-        const auto graphdef_path = JoinPath({path, filename});
-        graphdef_paths.emplace(
-            std::piecewise_construct, std::make_tuple(filename),
-            std::make_tuple(graphdef_path));
+      for (const auto& filename : std::vector<std::string>{
+               kCaffe2NetDefFilename,
+               std::string(kCaffe2NetDefInitFilenamePrefix) +
+                   std::string(kCaffe2NetDefFilename)}) {
+        const auto netdef_path = JoinPath({path, filename});
+        std::string blob_str;
+        ReadTextFile(netdef_path, &blob_str);
+        std::vector<char> blob(blob_str.begin(), blob_str.end());
+        netdef_blobs.emplace(filename, std::move(blob));
       }
 
-      tensorflow::ConfigProto session_config;
-      status = bundle->CreateExecutionContexts(session_config, graphdef_paths);
+      status = backend->CreateExecutionContexts(netdef_blobs);
     }
 
     return status;
   };
 
   // Standard testing...
-  ValidateAll(kTensorFlowGraphDefPlatform, init_func);
+  ValidateAll(kCaffe2NetDefPlatform, init_func);
 
   // Sanity tests with autofill and not providing the platform.
   ValidateOne(
-      "inference_server/src/backends/tensorflow/testdata/"
-      "graphdef_autofill_sanity",
+      "inference_server/src/backends/caffe2/testdata/autofill_sanity",
       true /* autofill */, std::string() /* platform */, init_func);
 }
 

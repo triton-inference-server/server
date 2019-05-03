@@ -26,13 +26,13 @@
 #pragma once
 
 #include "src/core/status.h"
-#include "src/backends/tensorrt/plan_bundle.h"
-#include "src/backends/tensorrt/plan_bundle.pb.h"
+#include "src/backends/tensorrt/plan_backend.h"
+#include "src/backends/tensorrt/plan_backend.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Adapter that converts storage paths pointing to PLAN files into the
-// corresponding plan bundle.
+// corresponding plan backend.
 class PlanBackendFactory {
  public:
   static Status Create(

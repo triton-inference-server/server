@@ -26,14 +26,14 @@
 #pragma once
 
 #include "src/core/status.h"
-#include "src/backends/caffe2/netdef_bundle.h"
-#include "src/backends/caffe2/netdef_bundle.pb.h"
+#include "src/backends/caffe2/netdef_backend.h"
+#include "src/backends/caffe2/netdef_backend.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// [TODO] change all "adapter" to "factory", "bundle" to "backend"
+// [TODO] change all "adapter" to "factory", "backend" to "backend"
 // Adapter that converts storage paths pointing to NetDef files into
-// the corresponding netdef bundle.
+// the corresponding netdef backend.
 class NetDefBackendFactory {
  public:
   static Status Create(

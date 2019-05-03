@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/tensorflow/savedmodel_bundle.h"
+#include "src/backends/tensorflow/savedmodel_backend.h"
 
 #include <set>
 #include "src/core/constants.h"
@@ -38,16 +38,16 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-SavedModelBundle::Init(const std::string& path, const ModelConfig& config)
+SavedModelBackend::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kTensorFlowSavedModelPlatform));
-  RETURN_IF_ERROR(BaseBundle::Init(path, config));
+  RETURN_IF_ERROR(BaseBackend::Init(path, config));
 
   return Status::Success;
 }
 
 Status
-SavedModelBundle::CreateSession(
+SavedModelBackend::CreateSession(
     const tensorflow::SessionOptions& options, const int gpu_device,
     const std::string& model_path, tensorflow::Session** session,
     IONameMap* input_name_map, IONameMap* output_name_map)
@@ -177,7 +177,7 @@ SavedModelBundle::CreateSession(
 }
 
 Status
-SavedModelBundle::ValidateSequenceControl(
+SavedModelBackend::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     const tensorflow::SignatureDef& sig)
 {

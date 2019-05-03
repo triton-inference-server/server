@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/tensorflow/base_bundle.h"
+#include "src/backends/tensorflow/base_backend.h"
 
 #include <set>
 #include "cuda/include/cuda_runtime_api.h"
@@ -42,14 +42,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-BaseBundle::Context::Context(
+BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       session_(nullptr)
 {
 }
 
-BaseBundle::Context::Context(Context&& o)
+BaseBackend::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
       max_batch_size_(o.max_batch_size_),
       input_name_map_(std::move(o.input_name_map_)),
@@ -60,9 +60,9 @@ BaseBundle::Context::Context(Context&& o)
   o.session_ = nullptr;
 }
 
-BaseBundle::Context::~Context()
+BaseBackend::Context::~Context()
 {
-  LOG_VERBOSE(1) << "~BaseBundle::Context ";
+  LOG_VERBOSE(1) << "~BaseBackend::Context ";
 
   if (session_ != nullptr) {
     session_->Close().IgnoreError();
@@ -71,14 +71,14 @@ BaseBundle::Context::~Context()
 }
 
 Status
-BaseBundle::Init(const std::string& path, const ModelConfig& config)
+BaseBackend::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(SetModelConfig(path, config));
   return Status::Success;
 }
 
 Status
-BaseBundle::CreateExecutionContexts(
+BaseBackend::CreateExecutionContexts(
     const tensorflow::ConfigProto& session_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
@@ -123,13 +123,13 @@ BaseBundle::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "bundle for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "backend for " << Name() << std::endl << *this;
 
   return Status::Success;
 }
 
 Status
-BaseBundle::CreateExecutionContext(
+BaseBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const tensorflow::ConfigProto& session_config,
     const std::unordered_map<std::string, std::string>& paths)
@@ -210,7 +210,7 @@ BaseBundle::CreateExecutionContext(
 }
 
 void
-BaseBundle::Run(
+BaseBackend::Run(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
     std::function<void(Status)> OnCompleteQueuedPayloads)
 {
@@ -502,7 +502,7 @@ ReadStringOutputTensor(
 }  // namespace
 
 void
-BaseBundle::Context::SetInput(
+BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     TensorVec* input_tensors)
@@ -545,8 +545,8 @@ BaseBundle::Context::SetInput(
 }
 
 Status
-BaseBundle::Context::Run(
-    const BaseBundle* base, std::vector<Scheduler::Payload>* payloads)
+BaseBackend::Context::Run(
+    const BaseBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -697,17 +697,17 @@ BaseBundle::Context::Run(
 }
 
 std::ostream&
-operator<<(std::ostream& out, const BaseBundle& pb)
+operator<<(std::ostream& out, const BaseBackend& pb)
 {
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == BaseBundle::Context::NO_GPU_DEVICE)
+        << ((context.gpu_device_ == BaseBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
                 : std::to_string(context.gpu_device_))
         << ", max_batch_size="
-        << ((context.max_batch_size_ == BaseBundle::Context::NO_BATCHING)
+        << ((context.max_batch_size_ == BaseBackend::Context::NO_BATCHING)
                 ? "<none>"
                 : std::to_string(context.max_batch_size_))
         << std::endl;

@@ -31,8 +31,8 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "netdef_bundle_proto",
-    srcs = ["netdef_bundle.proto"],
+    name = "netdef_backend_proto",
+    srcs = ["netdef_backend.proto"],
 )
 
 cc_library(
@@ -53,17 +53,17 @@ cc_library(
     ],
 )
 
-# netdef_bundle_c2 is copied into and built along with Caffe2 to
+# netdef_backend_c2 is copied into and built along with Caffe2 to
 # ensure that it uses the same protobuf as Caffe2.
 cc_library(
-    name = "netdef_bundle",
+    name = "netdef_backend",
     srcs = [
-         "netdef_bundle.cc",
-#        "netdef_bundle_c2.cc" - see comment above
+         "netdef_backend.cc",
+#        "netdef_backend_c2.cc" - see comment above
     ],
     hdrs = [
-         "netdef_bundle.h",
-         "netdef_bundle_c2.h"
+         "netdef_backend.h",
+         "netdef_backend_c2.h"
     ],
     deps = [
         "//src/core:constants",
@@ -79,8 +79,8 @@ cc_library(
     srcs = ["netdef_backend_factory.cc"],
     hdrs = ["netdef_backend_factory.h"],
     deps = [
-        ":netdef_bundle",
-        ":netdef_bundle_proto",
+        ":netdef_backend",
+        ":netdef_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -97,8 +97,8 @@ filegroup(
 )
 
 cc_test(
-    name = "netdef_bundle_test",
-    srcs = ["netdef_bundle_test.cc"],
+    name = "netdef_backend_test",
+    srcs = ["netdef_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",

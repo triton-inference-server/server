@@ -55,12 +55,12 @@ EnsembleBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Create the bundle for the model and all the execution contexts
+  // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<EnsembleBundle> local_bundle(new EnsembleBundle);
-  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
+  std::unique_ptr<EnsembleBackend> local_backend(new EnsembleBackend);
+  RETURN_IF_ERROR(local_backend->Init(path, model_config));
 
-  *backend = std::move(local_bundle);
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 

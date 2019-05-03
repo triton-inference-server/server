@@ -31,16 +31,16 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "graphdef_bundle_proto",
-    srcs = ["graphdef_bundle.proto"],
+    name = "graphdef_backend_proto",
+    srcs = ["graphdef_backend.proto"],
     deps = [
         "@org_tensorflow//tensorflow/core:protos_all_cc",
     ],
 )
 
 cc_proto_library(
-    name = "savedmodel_bundle_proto",
-    srcs = ["savedmodel_bundle.proto"],
+    name = "savedmodel_backend_proto",
+    srcs = ["savedmodel_backend.proto"],
     deps = [
         "@org_tensorflow//tensorflow/core:protos_all_cc",
     ],
@@ -62,7 +62,7 @@ cc_library(
     deps = [
         ":autofill_header",
         ":loader",
-        ":savedmodel_bundle_proto",
+        ":savedmodel_backend_proto",
         ":tf_utils",
         "//src/core:server_header",
         "@org_tensorflow//tensorflow/cc/saved_model:tag_constants",
@@ -94,9 +94,9 @@ cc_library(
 )
 
 cc_library(
-    name = "base_bundle",
-    srcs = ["base_bundle.cc"],
-    hdrs = ["base_bundle.h"],
+    name = "base_backend",
+    srcs = ["base_backend.cc"],
+    hdrs = ["base_backend.h"],
     deps = [
         ":tf_utils",
         "//src/core:constants",
@@ -108,11 +108,11 @@ cc_library(
 )
 
 cc_library(
-    name = "graphdef_bundle",
-    srcs = ["graphdef_bundle.cc"],
-    hdrs = ["graphdef_bundle.h"],
+    name = "graphdef_backend",
+    srcs = ["graphdef_backend.cc"],
+    hdrs = ["graphdef_backend.h"],
     deps = [
-        ":base_bundle",
+        ":base_backend",
         ":tf_utils",
         "//src/core:model_config",
         "//src/core:server_header",
@@ -124,8 +124,8 @@ cc_library(
     srcs = ["graphdef_backend_factory.cc"],
     hdrs = ["graphdef_backend_factory.h"],
     deps = [
-        ":graphdef_bundle",
-        ":graphdef_bundle_proto",
+        ":graphdef_backend",
+        ":graphdef_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -136,11 +136,11 @@ cc_library(
 )
 
 cc_library(
-    name = "savedmodel_bundle",
-    srcs = ["savedmodel_bundle.cc"],
-    hdrs = ["savedmodel_bundle.h"],
+    name = "savedmodel_backend",
+    srcs = ["savedmodel_backend.cc"],
+    hdrs = ["savedmodel_backend.h"],
     deps = [
-        ":base_bundle",
+        ":base_backend",
         ":loader",
         ":tf_utils",
         "//src/core:model_config",
@@ -153,8 +153,8 @@ cc_library(
     srcs = ["savedmodel_backend_factory.cc"],
     hdrs = ["savedmodel_backend_factory.h"],
     deps = [
-        ":savedmodel_bundle",
-        ":savedmodel_bundle_proto",
+        ":savedmodel_backend",
+        ":savedmodel_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -172,8 +172,8 @@ filegroup(
 )
 
 cc_test(
-    name = "graphdef_bundle_test",
-    srcs = ["graphdef_bundle_test.cc"],
+    name = "graphdef_backend_test",
+    srcs = ["graphdef_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",
@@ -196,8 +196,8 @@ cc_test(
 )
 
 cc_test(
-    name = "savedmodel_bundle_test",
-    srcs = ["savedmodel_bundle_test.cc"],
+    name = "savedmodel_backend_test",
+    srcs = ["savedmodel_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",

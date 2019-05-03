@@ -31,8 +31,8 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "plan_bundle_proto",
-    srcs = ["plan_bundle.proto"],
+    name = "plan_backend_proto",
+    srcs = ["plan_backend.proto"],
 )
 
 cc_library(
@@ -83,9 +83,9 @@ cc_library(
 )
 
 cc_library(
-    name = "plan_bundle",
-    srcs = ["plan_bundle.cc"],
-    hdrs = ["plan_bundle.h"],
+    name = "plan_backend",
+    srcs = ["plan_backend.cc"],
+    hdrs = ["plan_backend.h"],
     deps = [
         ":loader",
         ":plan_utils",
@@ -101,8 +101,8 @@ cc_library(
     srcs = ["plan_backend_factory.cc"],
     hdrs = ["plan_backend_factory.h"],
     deps = [
-        ":plan_bundle",
-        ":plan_bundle_proto",
+        ":plan_backend",
+        ":plan_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -119,8 +119,8 @@ filegroup(
 )
 
 cc_test(
-    name = "plan_bundle_test",
-    srcs = ["plan_bundle_test.cc"],
+    name = "plan_backend_test",
+    srcs = ["plan_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",

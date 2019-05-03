@@ -24,49 +24,50 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/caffe2/netdef_bundle.h"
+#include "src/backends/tensorflow/savedmodel_backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
+#include "src/core/status.h"
 #include "src/test/model_config_test_base.h"
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
-class NetDefBundleTest : public ModelConfigTestBase {
+class SavedModelBackendTest : public ModelConfigTestBase {
  public:
 };
 
-TEST_F(NetDefBundleTest, ModelConfigSanity)
+TEST_F(SavedModelBackendTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func = [](const std::string& path,
+  BackendInitFunc init_func = [](const std::string& path,
                                 const ModelConfig& config) -> Status {
-    std::unique_ptr<NetDefBundle> bundle(new NetDefBundle());
-    Status status = bundle->Init(path, config);
+    std::unique_ptr<SavedModelBackend> backend(new SavedModelBackend());
+    Status status = backend->Init(path, config);
     if (status.IsOk()) {
-      std::unordered_map<std::string, std::vector<char>> netdef_blobs;
+      std::unordered_map<std::string, std::string> savedmodel_paths;
 
       for (const auto& filename : std::vector<std::string>{
-               kCaffe2NetDefFilename,
-               std::string(kCaffe2NetDefInitFilenamePrefix) +
-                   std::string(kCaffe2NetDefFilename)}) {
-        const auto netdef_path = JoinPath({path, filename});
-        std::string blob_str;
-        ReadTextFile(netdef_path, &blob_str);
-        std::vector<char> blob(blob_str.begin(), blob_str.end());
-        netdef_blobs.emplace(filename, std::move(blob));
+               kTensorFlowSavedModelFilename, "vnetsavedmodel"}) {
+        const auto savedmodel_path = JoinPath({path, filename});
+        savedmodel_paths.emplace(
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(savedmodel_path));
       }
 
-      status = bundle->CreateExecutionContexts(netdef_blobs);
+      tensorflow::ConfigProto session_config;
+      status =
+          backend->CreateExecutionContexts(session_config, savedmodel_paths);
     }
 
     return status;
   };
 
   // Standard testing...
-  ValidateAll(kCaffe2NetDefPlatform, init_func);
+  ValidateAll(kTensorFlowSavedModelPlatform, init_func);
 
   // Sanity tests with autofill and not providing the platform.
   ValidateOne(
-      "inference_server/src/backends/caffe2/testdata/autofill_sanity",
+      "inference_server/src/backends/tensorflow/testdata/"
+      "savedmodel_autofill_sanity",
       true /* autofill */, std::string() /* platform */, init_func);
 }
 

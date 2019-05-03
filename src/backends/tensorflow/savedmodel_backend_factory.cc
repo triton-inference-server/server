@@ -67,12 +67,12 @@ SavedModelBackendFactory::CreateBackend(
         std::make_tuple(savedmodel_path));
   }
 
-  std::unique_ptr<SavedModelBundle> local_bundle(new SavedModelBundle);
-  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
-  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(
+  std::unique_ptr<SavedModelBackend> local_backend(new SavedModelBackend);
+  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(
       platform_config_.session_config(), savedmodel_paths));
 
-  *backend = std::move(local_bundle);
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 

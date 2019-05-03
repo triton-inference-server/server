@@ -29,44 +29,42 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-#include "src/backends/caffe2/netdef_bundle_c2.h"
+#include "tensorflow/core/public/session.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class NetDefBundle : public InferenceBackend {
+// Base for both GraphDef and SavedModel backends
+class BaseBackend : public InferenceBackend {
  public:
-  NetDefBundle() = default;
-  NetDefBundle(NetDefBundle&&) = default;
+  BaseBackend() = default;
+  BaseBackend(BaseBackend&&) = default;
 
   Status Init(const std::string& path, const ModelConfig& config);
 
-  // Create a context for execution for each instance for the
-  // serialized netdefs specified in 'models'.
+  // Create a context for execution for each instance of the
+  // tensorflow model specified in 'paths'. The model can be either a
+  // graphdef or savedmodel
   Status CreateExecutionContexts(
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const tensorflow::ConfigProto& session_config,
+      const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const tensorflow::ConfigProto& session_config,
+      const std::unordered_map<std::string, std::string>& paths);
 
- private:
-  Status ValidateSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
-      std::vector<std::string>* input_names);
+ protected:
+  using IONameMap = std::unordered_map<std::string, std::string>;
 
-  // Run model on the context associated with 'runner_idx' to
-  // execute for one or more requests.
-  void Run(
-      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-      std::function<void(Status)> OnCompleteQueuedPayloads);
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(NetDefBundle);
-  friend std::ostream& operator<<(std::ostream&, const NetDefBundle&);
+  // Load model and create a corresponding session object.
+  virtual Status CreateSession(
+      const tensorflow::SessionOptions& options, const int gpu_device,
+      const std::string& model_path, tensorflow::Session** session,
+      IONameMap* input_name_map, IONameMap* output_name_map) = 0;
 
   // For each model instance there is a context.
   struct Context {
     // GPU device number that indicates that no gpu is available for a
-    // context
+    // context.
     static constexpr int NO_GPU_DEVICE = -1;
 
     // Max batch size value that indicates batching is not supported.
@@ -80,17 +78,14 @@ class NetDefBundle : public InferenceBackend {
 
     DISALLOW_COPY_AND_ASSIGN(Context);
 
-    Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    Status ValidateOutputs(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+    // Create TF tensor for an input.
+    using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
 
     // Set an input tensor data from payloads.
-    Status SetInput(
+    void SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
+        std::vector<Scheduler::Payload>* payloads, TensorVec* input_tensors);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -99,20 +94,7 @@ class NetDefBundle : public InferenceBackend {
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
     Status Run(
-        const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads);
-
-    // Set an input tensor from one or more payloads.
-    Status SetFixedSizedInputTensor(
-        const std::string& input_name, const std::vector<int64_t>& shape,
-        const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
-        const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
-
-    // Read an output tensor into one or more payloads.
-    Status ReadFixedSizedOutputTensor(
-        const std::string& name, const Caffe2Workspace::DataType dtype,
-        const size_t dtype_byte_size, const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads);
+        const BaseBackend* base, std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
     std::string name_;
@@ -124,13 +106,33 @@ class NetDefBundle : public InferenceBackend {
     // batching is not supported.
     int max_batch_size_;
 
-    // Caffe2 workspace.
-    std::unique_ptr<Caffe2Workspace> workspace_;
+    // Map from configuration name for an input to tensor name for
+    // that input in the model.
+    IONameMap input_name_map_;
+
+    // Map from configuration name for an output to tensor name for
+    // that output in the model.
+    IONameMap output_name_map_;
+
+    // Tensorflow session for this context.
+    tensorflow::Session* session_;
   };
 
+ private:
+  // Run model on the context associated with 'runner_idx' to
+  // execute for one or more requests.
+  void Run(
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(Status)> OnCompleteQueuedPayloads);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(BaseBackend);
+  friend std::ostream& operator<<(std::ostream&, const BaseBackend&);
+
+  // The contexts for this backend.
   std::vector<Context> contexts_;
 };
 
-std::ostream& operator<<(std::ostream& out, const NetDefBundle& pb);
+std::ostream& operator<<(std::ostream& out, const BaseBackend& pb);
 
 }}  // namespace nvidia::inferenceserver

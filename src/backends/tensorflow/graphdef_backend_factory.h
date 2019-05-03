@@ -26,13 +26,13 @@
 #pragma once
 
 #include "src/core/status.h"
-#include "src/backends/tensorflow/graphdef_bundle.h"
-#include "src/backends/tensorflow/graphdef_bundle.pb.h"
+#include "src/backends/tensorflow/graphdef_backend.h"
+#include "src/backends/tensorflow/graphdef_backend.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Adapter that converts storage paths pointing to GraphDef files into
-// the corresponding graphdef bundle.
+// the corresponding graphdef backend.
 class GraphDefBackendFactory {
  public:
   static Status Create(

@@ -67,13 +67,13 @@ PlanBackendFactory::CreateBackend(
     models.emplace(filename, std::move(model_data));
   }
 
-  // Create the bundle for the model and all the execution contexts
+  // Create the backend for the model and all the execution contexts
   // requested for this model.
-  std::unique_ptr<PlanBundle> local_bundle(new PlanBundle);
-  RETURN_IF_ERROR(local_bundle->Init(path, model_config));
-  RETURN_IF_ERROR(local_bundle->CreateExecutionContexts(models));
+  std::unique_ptr<PlanBackend> local_backend(new PlanBackend);
+  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
-  *backend = std::move(local_bundle);
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 

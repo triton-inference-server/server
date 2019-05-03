@@ -23,38 +23,51 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
+#include "src/backends/tensorflow/graphdef_backend.h"
+#include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/status.h"
-#include "src/backends/tensorflow/savedmodel_backend.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
+#include "src/test/model_config_test_base.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia { namespace inferenceserver { namespace test {
 
-// Adapter that converts storage paths pointing to SavedModel files
-// into the corresponding savedmodel backend.
-class SavedModelBackendFactory {
+class GraphDefBackendTest : public ModelConfigTestBase {
  public:
-  static Status Create(
-      const SavedModelBundleSourceAdapterConfig& platform_config,
-      std::unique_ptr<SavedModelBackendFactory>* factory);
-
-  Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
-      std::unique_ptr<InferenceBackend>* backend);
-
-  ~SavedModelBackendFactory() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(SavedModelBackendFactory);
-
-  SavedModelBackendFactory(
-      const SavedModelBundleSourceAdapterConfig& platform_config)
-      : platform_config_(platform_config)
-  {
-  }
-
-  const SavedModelBundleSourceAdapterConfig platform_config_;
 };
 
-}}  // namespace nvidia::inferenceserver
+TEST_F(GraphDefBackendTest, ModelConfigSanity)
+{
+  BackendInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
+    std::unique_ptr<GraphDefBackend> backend(new GraphDefBackend());
+    Status status = backend->Init(path, config);
+    if (status.IsOk()) {
+      std::unordered_map<std::string, std::string> graphdef_paths;
+
+      for (const auto& filename :
+           std::vector<std::string>{kTensorFlowGraphDefFilename}) {
+        const auto graphdef_path = JoinPath({path, filename});
+        graphdef_paths.emplace(
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(graphdef_path));
+      }
+
+      tensorflow::ConfigProto session_config;
+      status = backend->CreateExecutionContexts(session_config, graphdef_paths);
+    }
+
+    return status;
+  };
+
+  // Standard testing...
+  ValidateAll(kTensorFlowGraphDefPlatform, init_func);
+
+  // Sanity tests with autofill and not providing the platform.
+  ValidateOne(
+      "inference_server/src/backends/tensorflow/testdata/"
+      "graphdef_autofill_sanity",
+      true /* autofill */, std::string() /* platform */, init_func);
+}
+
+}}}  // namespace nvidia::inferenceserver::test

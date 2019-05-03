@@ -33,7 +33,7 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/backends/tensorflow/loader.h"
-#include "src/backends/tensorflow/savedmodel_bundle.pb.h"
+#include "src/backends/tensorflow/savedmodel_backend.pb.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"

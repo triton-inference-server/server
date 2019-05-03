@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/tensorflow/savedmodel_bundle.h"
+#include "src/backends/tensorrt/plan_backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/status.h"
@@ -32,42 +32,40 @@
 
 namespace nvidia { namespace inferenceserver { namespace test {
 
-class SavedModelBundleTest : public ModelConfigTestBase {
+class PlanBackendTest : public ModelConfigTestBase {
  public:
 };
 
-TEST_F(SavedModelBundleTest, ModelConfigSanity)
+TEST_F(PlanBackendTest, ModelConfigSanity)
 {
-  BundleInitFunc init_func = [](const std::string& path,
+  BackendInitFunc init_func = [](const std::string& path,
                                 const ModelConfig& config) -> Status {
-    std::unique_ptr<SavedModelBundle> bundle(new SavedModelBundle());
-    Status status = bundle->Init(path, config);
+    std::unique_ptr<PlanBackend> backend(new PlanBackend());
+    Status status = backend->Init(path, config);
     if (status.IsOk()) {
-      std::unordered_map<std::string, std::string> savedmodel_paths;
+      std::unordered_map<std::string, std::vector<char>> plan_blobs;
 
-      for (const auto& filename : std::vector<std::string>{
-               kTensorFlowSavedModelFilename, "vnetsavedmodel"}) {
-        const auto savedmodel_path = JoinPath({path, filename});
-        savedmodel_paths.emplace(
-            std::piecewise_construct, std::make_tuple(filename),
-            std::make_tuple(savedmodel_path));
+      for (const auto& filename :
+           std::vector<std::string>{kTensorRTPlanFilename}) {
+        const auto plan_path = JoinPath({path, filename});
+        tensorflow::string blob_str;
+        ReadTextFile(plan_path, &blob_str);
+        std::vector<char> blob(blob_str.begin(), blob_str.end());
+        plan_blobs.emplace(filename, std::move(blob));
       }
 
-      tensorflow::ConfigProto session_config;
-      status =
-          bundle->CreateExecutionContexts(session_config, savedmodel_paths);
+      status = backend->CreateExecutionContexts(plan_blobs);
     }
 
     return status;
   };
 
   // Standard testing...
-  ValidateAll(kTensorFlowSavedModelPlatform, init_func);
+  ValidateAll(kTensorRTPlanPlatform, init_func);
 
   // Sanity tests with autofill and not providing the platform.
   ValidateOne(
-      "inference_server/src/backends/tensorflow/testdata/"
-      "savedmodel_autofill_sanity",
+      "inference_server/src/backends/tensorrt/testdata/autofill_sanity",
       true /* autofill */, std::string() /* platform */, init_func);
 }
 

@@ -26,13 +26,13 @@
 #pragma once
 
 #include "src/core/status.h"
-#include "src/backends/custom/custom_bundle.h"
-#include "src/backends/custom/custom_bundle.pb.h"
+#include "src/backends/custom/custom_backend.h"
+#include "src/backends/custom/custom_backend.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Adapter that converts storage paths pointing to custom files into
-// the corresponding custom bundle.
+// the corresponding custom backend.
 class CustomBackendFactory {
  public:
   static Status Create(

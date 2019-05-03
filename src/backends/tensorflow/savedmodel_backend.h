@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,60 +23,32 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/backends/ensemble/ensemble_bundle.h"
-
-#include <stdint.h>
-#include "src/core/constants.h"
-#include "src/core/ensemble_scheduler.h"
-#include "src/core/logging.h"
-#include "src/core/model_config_utils.h"
-#include "src/core/server_status.h"
+#include "src/core/status.h"
+#include "src/backends/tensorflow/base_backend.h"
+#include "tensorflow/core/protobuf/meta_graph.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
-Status
-EnsembleBundle::Init(const std::string& path, const ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
+class SavedModelBackend : public BaseBackend {
+ public:
+  SavedModelBackend() = default;
+  SavedModelBackend(SavedModelBackend&&) = default;
 
-  std::unique_ptr<Scheduler> scheduler;
-  RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
-  RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
+  Status Init(const std::string& path, const ModelConfig& config);
 
-  LOG_VERBOSE(1) << "ensemble bundle for " << Name() << std::endl << *this;
+  Status CreateSession(
+      const tensorflow::SessionOptions& options, const int gpu_device,
+      const std::string& model_path, tensorflow::Session** session,
+      IONameMap* input_name_map, IONameMap* output_name_map) override;
 
-  return Status::Success;
-}
+ private:
+  Status ValidateSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      const tensorflow::SignatureDef& sig);
 
-Status
-EnsembleBundle::SetInferenceServer(void* inference_server)
-{
-  // [TODO] update this since we can determine inference server on
-  // backend creation
-  EnsembleScheduler* scheduler =
-      static_cast<EnsembleScheduler*>(BackendScheduler());
-  return scheduler->SetInferenceServer(inference_server);
-}
-
-void
-EnsembleBundle::Run(
-    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
-    std::function<void(Status)> OnCompleteQueuedPayloads)
-{
-  LOG_ERROR << "Unexpectedly invoked EnsembleBundle::Run()";
-
-  OnCompleteQueuedPayloads(Status(
-      RequestStatusCode::INTERNAL,
-      "unexpected invocation of EnsembleBundle::Run()"));
-}
-
-std::ostream&
-operator<<(std::ostream& out, const EnsembleBundle& pb)
-{
-  out << "name=" << pb.Name() << std::endl;
-  return out;
-}
+  DISALLOW_COPY_AND_ASSIGN(SavedModelBackend);
+};
 
 }}  // namespace nvidia::inferenceserver

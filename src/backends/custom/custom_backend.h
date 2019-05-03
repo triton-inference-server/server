@@ -33,10 +33,10 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class CustomBundle : public InferenceBackend {
+class CustomBackend : public InferenceBackend {
  public:
-  CustomBundle() = default;
-  CustomBundle(CustomBundle&&) = default;
+  CustomBackend() = default;
+  CustomBackend(CustomBackend&&) = default;
 
   Status Init(
       const std::string& path, const std::vector<std::string>& server_params,
@@ -61,8 +61,8 @@ class CustomBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(CustomBundle);
-  friend std::ostream& operator<<(std::ostream&, const CustomBundle&);
+  DISALLOW_COPY_AND_ASSIGN(CustomBackend);
+  friend std::ostream& operator<<(std::ostream&, const CustomBackend&);
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
   friend bool CustomGetOutput(
       void*, const char*, size_t, int64_t*, uint64_t, void**);
@@ -95,15 +95,15 @@ class CustomBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    Status Run(CustomBundle* base, std::vector<Scheduler::Payload>* payloads);
+    Status Run(CustomBackend* base, std::vector<Scheduler::Payload>* payloads);
 
     struct GetInputOutputContext {
       GetInputOutputContext(
-          CustomBundle::Context* context, Scheduler::Payload* payload)
+          CustomBackend::Context* context, Scheduler::Payload* payload)
           : context_(context), payload_(payload)
       {
       }
-      CustomBundle::Context* context_;
+      CustomBackend::Context* context_;
       Scheduler::Payload* payload_;
     };
 
@@ -148,7 +148,7 @@ class CustomBundle : public InferenceBackend {
   std::vector<std::unique_ptr<Context>> contexts_;
 };
 
-std::ostream& operator<<(std::ostream& out, const CustomBundle& pb);
+std::ostream& operator<<(std::ostream& out, const CustomBackend& pb);
 
 // Callback used by custom backends to get the next block of input for
 // a 'name'd input tensor.

@@ -33,7 +33,7 @@
 namespace nvidia { namespace inferenceserver {
 
 // To avoid namespace and protobuf collision between TensorFlow and
-// Caffe2, we keep Caffe2 interface isolated to netdef_bundle_c2. The
+// Caffe2, we keep Caffe2 interface isolated to netdef_backend_c2. The
 // interface to those isolated functions is provided by
 // Caffe2Workspace.
 class Caffe2Workspace {

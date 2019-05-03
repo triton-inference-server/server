@@ -31,8 +31,8 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "custom_bundle_proto",
-    srcs = ["custom_bundle.proto"],
+    name = "custom_backend_proto",
+    srcs = ["custom_backend.proto"],
 )
 
 cc_library(
@@ -43,9 +43,9 @@ cc_library(
 )
 
 cc_library(
-    name = "custom_bundle",
-    srcs = [ "custom_bundle.cc" ],
-    hdrs = [ "custom_bundle.h" ],
+    name = "custom_backend",
+    srcs = [ "custom_backend.cc" ],
+    hdrs = [ "custom_backend.h" ],
     deps = [
         ":custom",
         ":loader",
@@ -62,8 +62,8 @@ cc_library(
     srcs = ["custom_backend_factory.cc"],
     hdrs = ["custom_backend_factory.h"],
     deps = [
-        ":custom_bundle",
-        ":custom_bundle_proto",
+        ":custom_backend",
+        ":custom_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
@@ -84,8 +84,8 @@ cc_library(
 )
 
 cc_test(
-    name = "custom_bundle_test",
-    srcs = ["custom_bundle_test.cc"],
+    name = "custom_backend_test",
+    srcs = ["custom_backend_test.cc"],
     linkopts = [
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",

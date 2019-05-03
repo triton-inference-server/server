@@ -23,32 +23,43 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/core/status.h"
-#include "src/backends/tensorflow/base_bundle.h"
-#include "tensorflow/core/protobuf/meta_graph.pb.h"
+#include "src/backends/custom/custom_backend.h"
+#include "src/core/constants.h"
+#include "src/core/filesystem.h"
+#include "src/test/model_config_test_base.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia { namespace inferenceserver { namespace test {
 
-class SavedModelBundle : public BaseBundle {
+class CustomBackendTest : public ModelConfigTestBase {
  public:
-  SavedModelBundle() = default;
-  SavedModelBundle(SavedModelBundle&&) = default;
-
-  Status Init(const std::string& path, const ModelConfig& config);
-
-  Status CreateSession(
-      const tensorflow::SessionOptions& options, const int gpu_device,
-      const std::string& model_path, tensorflow::Session** session,
-      IONameMap* input_name_map, IONameMap* output_name_map) override;
-
- private:
-  Status ValidateSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
-      const tensorflow::SignatureDef& sig);
-
-  DISALLOW_COPY_AND_ASSIGN(SavedModelBundle);
 };
 
-}}  // namespace nvidia::inferenceserver
+TEST_F(CustomBackendTest, ModelConfigSanity)
+{
+  BackendInitFunc init_func = [](const std::string& path,
+                                const ModelConfig& config) -> Status {
+    std::unique_ptr<CustomBackend> backend(new CustomBackend());
+    std::vector<std::string> server_params;
+    Status status = backend->Init(path, server_params, config);
+    if (status.IsOk()) {
+      std::unordered_map<std::string, std::string> custom_paths;
+
+      for (const auto& filename : std::vector<std::string>{kCustomFilename}) {
+        const auto custom_path = JoinPath({path, filename});
+        custom_paths.emplace(
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(custom_path));
+      }
+
+      status = backend->CreateExecutionContexts(custom_paths);
+    }
+
+    return status;
+  };
+
+  // Standard testing...
+  ValidateAll(kCustomPlatform, init_func);
+}
+
+}}}  // namespace nvidia::inferenceserver::test

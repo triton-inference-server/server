@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,43 +23,36 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/backends/custom/custom_bundle.h"
-#include "src/core/constants.h"
-#include "src/core/filesystem.h"
-#include "src/test/model_config_test_base.h"
+#include "src/core/backend.h"
+#include "src/core/model_config.pb.h"
+#include "src/core/scheduler.h"
+#include "src/core/status.h"
 
-namespace nvidia { namespace inferenceserver { namespace test {
+namespace nvidia { namespace inferenceserver {
 
-class CustomBundleTest : public ModelConfigTestBase {
+class EnsembleBackend : public InferenceBackend {
  public:
+  EnsembleBackend() = default;
+  EnsembleBackend(EnsembleBackend&&) = default;
+
+  Status Init(const std::string& path, const ModelConfig& config);
+
+  Status SetInferenceServer(void* inference_server) override;
+
+ private:
+  // Run model on the context associated with 'runner_idx' to
+  // execute for one or more requests.
+  void Run(
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+      std::function<void(Status)> OnCompleteQueuedPayloads);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
+  friend std::ostream& operator<<(std::ostream&, const EnsembleBackend&);
 };
 
-TEST_F(CustomBundleTest, ModelConfigSanity)
-{
-  BundleInitFunc init_func = [](const std::string& path,
-                                const ModelConfig& config) -> Status {
-    std::unique_ptr<CustomBundle> bundle(new CustomBundle());
-    std::vector<std::string> server_params;
-    Status status = bundle->Init(path, server_params, config);
-    if (status.IsOk()) {
-      std::unordered_map<std::string, std::string> custom_paths;
+std::ostream& operator<<(std::ostream& out, const EnsembleBackend& pb);
 
-      for (const auto& filename : std::vector<std::string>{kCustomFilename}) {
-        const auto custom_path = JoinPath({path, filename});
-        custom_paths.emplace(
-            std::piecewise_construct, std::make_tuple(filename),
-            std::make_tuple(custom_path));
-      }
-
-      status = bundle->CreateExecutionContexts(custom_paths);
-    }
-
-    return status;
-  };
-
-  // Standard testing...
-  ValidateAll(kCustomPlatform, init_func);
-}
-
-}}}  // namespace nvidia::inferenceserver::test
+}}  // namespace nvidia::inferenceserver

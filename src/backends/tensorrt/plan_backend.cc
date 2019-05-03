@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/tensorrt/plan_bundle.h"
+#include "src/backends/tensorrt/plan_backend.h"
 
 #include <NvInfer.h>
 #include <stdint.h>
@@ -40,7 +40,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-PlanBundle::Context::Context(
+PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
       runtime_(nullptr), engine_(nullptr), context_(nullptr),
@@ -48,9 +48,9 @@ PlanBundle::Context::Context(
 {
 }
 
-PlanBundle::Context::~Context()
+PlanBackend::Context::~Context()
 {
-  LOG_VERBOSE(1) << "~PlanBundle::Context ";
+  LOG_VERBOSE(1) << "~PlanBackend::Context ";
 
   if (byte_sizes_ != nullptr) {
     delete[] byte_sizes_;
@@ -112,7 +112,7 @@ PlanBundle::Context::~Context()
 }
 
 Status
-PlanBundle::Init(const std::string& path, const ModelConfig& config)
+PlanBackend::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kTensorRTPlanPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
@@ -121,7 +121,7 @@ PlanBundle::Init(const std::string& path, const ModelConfig& config)
 }
 
 Status
-PlanBundle::CreateExecutionContexts(
+PlanBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
   // TensorRT engine creation is not thread-safe, so multiple creations
@@ -169,13 +169,13 @@ PlanBundle::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "plan bundle for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "plan backend for " << Name() << std::endl << *this;
 
   return Status::Success;
 }
 
 Status
-PlanBundle::CreateExecutionContext(
+PlanBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
@@ -321,7 +321,7 @@ PlanBundle::CreateExecutionContext(
 }
 
 Status
-PlanBundle::Context::InitializeInputBinding(
+PlanBackend::Context::InitializeInputBinding(
     const std::string& input_name, const DataType input_datatype,
     const DimsList& model_config_dims)
 {
@@ -390,7 +390,7 @@ PlanBundle::Context::InitializeInputBinding(
 }
 
 Status
-PlanBundle::Context::InitializeSequenceControlInputBindings(
+PlanBackend::Context::InitializeSequenceControlInputBindings(
     const ModelConfig& config)
 {
   if (config.has_sequence_batching()) {
@@ -421,7 +421,7 @@ PlanBundle::Context::InitializeSequenceControlInputBindings(
 }
 
 Status
-PlanBundle::Context::InitializeConfigInputBindings(
+PlanBackend::Context::InitializeConfigInputBindings(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
@@ -435,7 +435,7 @@ PlanBundle::Context::InitializeConfigInputBindings(
 }
 
 Status
-PlanBundle::Context::InitializeConfigOutputBindings(
+PlanBackend::Context::InitializeConfigOutputBindings(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
@@ -509,7 +509,7 @@ PlanBundle::Context::InitializeConfigOutputBindings(
 }
 
 void
-PlanBundle::Run(
+PlanBackend::Run(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
     std::function<void(Status)> OnCompleteQueuedPayloads)
 {
@@ -540,7 +540,7 @@ PlanBundle::Run(
 }
 
 bool
-PlanBundle::Context::BuildCudaGraph(const int batch_size)
+PlanBackend::Context::BuildCudaGraph(const int batch_size)
 {
   bool captured = true;
   cudaError_t cuerr;
@@ -582,7 +582,7 @@ PlanBundle::Context::BuildCudaGraph(const int batch_size)
 }
 
 Status
-PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
+PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -797,17 +797,17 @@ PlanBundle::Context::Run(std::vector<Scheduler::Payload>* payloads)
 }
 
 std::ostream&
-operator<<(std::ostream& out, const PlanBundle& pb)
+operator<<(std::ostream& out, const PlanBackend& pb)
 {
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context->name_ << ", gpu="
-        << ((context->gpu_device_ == PlanBundle::Context::NO_GPU_DEVICE)
+        << ((context->gpu_device_ == PlanBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
                 : std::to_string(context->gpu_device_))
         << ", max_batch_size="
-        << ((context->max_batch_size_ == PlanBundle::Context::NO_BATCHING)
+        << ((context->max_batch_size_ == PlanBackend::Context::NO_BATCHING)
                 ? "<none>"
                 : std::to_string(context->max_batch_size_))
         << std::endl

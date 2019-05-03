@@ -25,24 +25,23 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <NvInfer.h>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
+#include "src/backends/caffe2/netdef_backend_c2.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class PlanBundle : public InferenceBackend {
+class NetDefBackend : public InferenceBackend {
  public:
-  PlanBundle() = default;
-  PlanBundle(PlanBundle&&) = default;
+  NetDefBackend() = default;
+  NetDefBackend(NetDefBackend&&) = default;
 
   Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
-  // serialized plans specified in 'models'.
+  // serialized netdefs specified in 'models'.
   Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
@@ -50,6 +49,10 @@ class PlanBundle : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
 
  private:
+  Status ValidateSequenceControl(
+      const ModelSequenceBatching::Control::Kind control_kind,
+      std::vector<std::string>* input_names);
+
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
@@ -57,14 +60,13 @@ class PlanBundle : public InferenceBackend {
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(PlanBundle);
-  friend std::ostream& operator<<(std::ostream&, const PlanBundle&);
+  DISALLOW_COPY_AND_ASSIGN(NetDefBackend);
+  friend std::ostream& operator<<(std::ostream&, const NetDefBackend&);
 
   // For each model instance there is a context.
   struct Context {
     // GPU device number that indicates that no gpu is available for a
-    // context (which is an invalid state since TensorRT requires a
-    // GPU).
+    // context
     static constexpr int NO_GPU_DEVICE = -1;
 
     // Max batch size value that indicates batching is not supported.
@@ -73,20 +75,22 @@ class PlanBundle : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
+    Context(Context&& o);
     ~Context();
 
-    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
-    Status InitializeInputBinding(
-        const std::string& input_name, const DataType input_datatype,
-        const DimsList& input_dims);
-    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
-    Status InitializeConfigInputBindings(
+    Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
-    Status InitializeConfigOutputBindings(
+    Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
-    bool BuildCudaGraph(const int batch_size);
+
+    // Set an input tensor data from payloads.
+    Status SetInput(
+        const std::string& name, const DataType datatype, const DimsList& dims,
+        const size_t total_batch_size,
+        std::vector<Scheduler::Payload>* payloads,
+        std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -94,42 +98,39 @@ class PlanBundle : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    Status Run(std::vector<Scheduler::Payload>* payloads);
+    Status Run(
+        const NetDefBackend* base, std::vector<Scheduler::Payload>* payloads);
+
+    // Set an input tensor from one or more payloads.
+    Status SetFixedSizedInputTensor(
+        const std::string& input_name, const std::vector<int64_t>& shape,
+        const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
+        const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+        std::vector<std::unique_ptr<char[]>>* input_buffers);
+
+    // Read an output tensor into one or more payloads.
+    Status ReadFixedSizedOutputTensor(
+        const std::string& name, const Caffe2Workspace::DataType dtype,
+        const size_t dtype_byte_size, const size_t total_batch_size,
+        std::vector<Scheduler::Payload>* payloads);
 
     // Name of the model instance
-    const std::string name_;
+    std::string name_;
 
     // The GPU index active when this context was created.
-    const int gpu_device_;
+    int gpu_device_;
 
-    // Maximum batch size to allow. This is the minimum of what is
-    // supported by the model and what is requested in the
-    // configuration.
-    const int max_batch_size_;
+    // Maximum batch size to allow. NO_BATCHING indicates that
+    // batching is not supported.
+    int max_batch_size_;
 
-    // TensorRT components for the model
-    nvinfer1::IRuntime* runtime_;
-    nvinfer1::ICudaEngine* engine_;
-    nvinfer1::IExecutionContext* context_;
-
-    // For each binding index of the TensorRT engine, the size of the
-    // corresponding tensor and pointer to the CUDA buffer for the
-    // tensor. These are arrays with size equal to number of bindings.
-    uint64_t* byte_sizes_;
-    void** buffers_;
-
-    // The stream where operations are executed.
-    cudaStream_t stream_;
-
-    // The CUDA graphs captured for the model for different
-    // batch-sizes.
-    std::unordered_map<int, cudaGraph_t> cuda_graphs_;
-    std::unordered_map<int, cudaGraphExec_t> cuda_graph_execs_;
+    // Caffe2 workspace.
+    std::unique_ptr<Caffe2Workspace> workspace_;
   };
 
-  std::vector<std::unique_ptr<Context>> contexts_;
+  std::vector<Context> contexts_;
 };
 
-std::ostream& operator<<(std::ostream& out, const PlanBundle& pb);
+std::ostream& operator<<(std::ostream& out, const NetDefBackend& pb);
 
 }}  // namespace nvidia::inferenceserver

@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/caffe2/netdef_bundle.h"
+#include "src/backends/caffe2/netdef_backend.h"
 
 #include <NvInfer.h>
 #include <stdint.h>
@@ -82,13 +82,13 @@ ConvertDataType(DataType dtype)
 }  // namespace
 
 
-NetDefBundle::Context::Context(
+NetDefBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
 {
 }
 
-NetDefBundle::Context::Context(Context&& o)
+NetDefBackend::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
       max_batch_size_(o.max_batch_size_)
 {
@@ -97,13 +97,13 @@ NetDefBundle::Context::Context(Context&& o)
   workspace_.swap(o.workspace_);
 }
 
-NetDefBundle::Context::~Context()
+NetDefBackend::Context::~Context()
 {
-  LOG_VERBOSE(1) << "~NetDefBundle::Context ";
+  LOG_VERBOSE(1) << "~NetDefBackend::Context ";
 }
 
 Status
-NetDefBundle::Init(const std::string& path, const ModelConfig& config)
+NetDefBackend::Init(const std::string& path, const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kCaffe2NetDefPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
@@ -112,7 +112,7 @@ NetDefBundle::Init(const std::string& path, const ModelConfig& config)
 }
 
 Status
-NetDefBundle::CreateExecutionContexts(
+NetDefBackend::CreateExecutionContexts(
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
   uint32_t total_context_cnt = 0;
@@ -153,12 +153,12 @@ NetDefBundle::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "netdef bundle for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "netdef backend for " << Name() << std::endl << *this;
   return Status::Success;
 }
 
 Status
-NetDefBundle::CreateExecutionContext(
+NetDefBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
@@ -268,7 +268,7 @@ NetDefBundle::CreateExecutionContext(
 }
 
 Status
-NetDefBundle::ValidateSequenceControl(
+NetDefBackend::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
     std::vector<std::string>* input_names)
 {
@@ -282,7 +282,7 @@ NetDefBundle::ValidateSequenceControl(
 }
 
 Status
-NetDefBundle::Context::ValidateInputs(
+NetDefBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
@@ -306,7 +306,7 @@ NetDefBundle::Context::ValidateInputs(
 
 
 Status
-NetDefBundle::Context::ValidateOutputs(
+NetDefBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
@@ -329,7 +329,7 @@ NetDefBundle::Context::ValidateOutputs(
 }
 
 void
-NetDefBundle::Run(
+NetDefBackend::Run(
     uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
     std::function<void(Status)> OnCompleteQueuedPayloads)
 {
@@ -360,7 +360,7 @@ NetDefBundle::Run(
 }
 
 Status
-NetDefBundle::Context::SetFixedSizedInputTensor(
+NetDefBackend::Context::SetFixedSizedInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
     const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
@@ -436,7 +436,7 @@ NetDefBundle::Context::SetFixedSizedInputTensor(
 }
 
 Status
-NetDefBundle::Context::ReadFixedSizedOutputTensor(
+NetDefBackend::Context::ReadFixedSizedOutputTensor(
     const std::string& name, const Caffe2Workspace::DataType dtype,
     const size_t dtype_byte_size, const size_t total_batch_size,
     std::vector<Scheduler::Payload>* payloads)
@@ -495,7 +495,7 @@ NetDefBundle::Context::ReadFixedSizedOutputTensor(
 }
 
 Status
-NetDefBundle::Context::SetInput(
+NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers)
@@ -529,8 +529,8 @@ NetDefBundle::Context::SetInput(
 }
 
 Status
-NetDefBundle::Context::Run(
-    const NetDefBundle* base, std::vector<Scheduler::Payload>* payloads)
+NetDefBackend::Context::Run(
+    const NetDefBackend* base, std::vector<Scheduler::Payload>* payloads)
 {
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
@@ -634,13 +634,13 @@ NetDefBundle::Context::Run(
 }
 
 std::ostream&
-operator<<(std::ostream& out, const NetDefBundle& pb)
+operator<<(std::ostream& out, const NetDefBackend& pb)
 {
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
     out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == NetDefBundle::Context::NO_GPU_DEVICE)
+        << ((context.gpu_device_ == NetDefBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
                 : std::to_string(context.gpu_device_));
   }

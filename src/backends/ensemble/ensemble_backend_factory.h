@@ -26,13 +26,13 @@
 #pragma once
 
 #include "src/core/status.h"
-#include "src/backends/ensemble/ensemble_bundle.h"
-#include "src/backends/ensemble/ensemble_bundle.pb.h"
+#include "src/backends/ensemble/ensemble_backend.h"
+#include "src/backends/ensemble/ensemble_backend.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
 // Adapter that converts storage paths pointing to ensemble files into the
-// corresponding ensemble bundle.
+// corresponding ensemble backend.
 class EnsembleBackendFactory {
  public:
   static Status Create(
