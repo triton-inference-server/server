@@ -37,7 +37,7 @@ namespace nvidia { namespace inferenceserver {
 class NetDefBackendFactory {
  public:
   static Status Create(
-      const NetDefBundleSourceAdapterConfig& platform_config,
+      const NetDefPlatformConfig& platform_config,
       std::unique_ptr<NetDefBackendFactory>* factory);
 
   Status CreateBackend(
@@ -49,12 +49,12 @@ class NetDefBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(NetDefBackendFactory);
 
-  NetDefBackendFactory(const NetDefBundleSourceAdapterConfig& platform_config)
+  NetDefBackendFactory(const NetDefPlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }
 
-  const NetDefBundleSourceAdapterConfig platform_config_;
+  const NetDefPlatformConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

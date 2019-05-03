@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 GraphDefBackendFactory::Create(
-    const GraphDefBundleSourceAdapterConfig& platform_config,
+    const GraphDefPlatformConfig& platform_config,
     std::unique_ptr<GraphDefBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create GraphDefBundleSourceAdaptor for platform config \""

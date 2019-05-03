@@ -30,8 +30,8 @@ import "tensorflow/core/protobuf/config.proto";
 
 package nvidia.inferenceserver;
 
-// Config proto for GraphDefBundleSourceAdapter.
-message GraphDefBundleSourceAdapterConfig
+// Config proto for all GraphDefBackend.
+message GraphDefPlatformConfig
 {
   // TensorFlow Session configuration options.
   // See details at tensorflow/core/protobuf/config.proto.

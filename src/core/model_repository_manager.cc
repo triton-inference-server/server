@@ -70,7 +70,7 @@ BuildPlatformConfigMap(
 
   //// Tensorflow GraphDef
   {
-    GraphDefBundleSourceAdapterConfig graphdef_config;
+    GraphDefPlatformConfig graphdef_config;
 
     graphdef_config.set_autofill(!strict_model_config);
 
@@ -92,7 +92,7 @@ BuildPlatformConfigMap(
 
   //// Tensorflow SavedModel
   {
-    SavedModelBundleSourceAdapterConfig saved_model_config;
+    SavedModelPlatformConfig saved_model_config;
 
     saved_model_config.set_autofill(!strict_model_config);
 
@@ -113,21 +113,21 @@ BuildPlatformConfigMap(
 
   //// Caffe NetDef
   {
-    NetDefBundleSourceAdapterConfig netdef_config;
+    NetDefPlatformConfig netdef_config;
     netdef_config.set_autofill(!strict_model_config);
     netdef_source_adapter_config.PackFrom(netdef_config);
   }
 
   //// TensorRT
   {
-    PlanBundleSourceAdapterConfig plan_config;
+    PlanPlatformConfig plan_config;
     plan_config.set_autofill(!strict_model_config);
     plan_source_adapter_config.PackFrom(plan_config);
   }
 
   //// Custom
   {
-    CustomBundleSourceAdapterConfig custom_config;
+    CustomPlatformConfig custom_config;
     custom_config.set_inference_server_version(version);
     custom_config.set_model_repository_path(model_store_path);
     custom_source_adapter_config.PackFrom(custom_config);
@@ -135,7 +135,7 @@ BuildPlatformConfigMap(
 
   //// Ensemble
   {
-    EnsembleBundleSourceAdapterConfig ensemble_config;
+    EnsemblePlatformConfig ensemble_config;
     ensemble_source_adapter_config.PackFrom(ensemble_config);
   }
 
@@ -397,37 +397,37 @@ ModelRepositoryManager::BackendLifeCycle::Create(
       new BackendLifeCycle(repository_path));
 
   {
-    GraphDefBundleSourceAdapterConfig config;
+    GraphDefPlatformConfig config;
     platform_map.find(kTensorFlowGraphDefPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(GraphDefBackendFactory::Create(
         config, &(local_life_cycle->graphdef_factory_)));
   }
   {
-    SavedModelBundleSourceAdapterConfig config;
+    SavedModelPlatformConfig config;
     platform_map.find(kTensorFlowSavedModelPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
   }
   {
-    NetDefBundleSourceAdapterConfig config;
+    NetDefPlatformConfig config;
     platform_map.find(kCaffe2NetDefPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
   }
   {
-    PlanBundleSourceAdapterConfig config;
+    PlanPlatformConfig config;
     platform_map.find(kTensorRTPlanPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));
   }
   {
-    CustomBundleSourceAdapterConfig config;
+    CustomPlatformConfig config;
     platform_map.find(kCustomPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(CustomBackendFactory::Create(
         config, &(local_life_cycle->custom_factory_)));
   }
   {
-    EnsembleBundleSourceAdapterConfig config;
+    EnsemblePlatformConfig config;
     platform_map.find(kEnsemblePlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         config, &(local_life_cycle->ensemble_factory_)));

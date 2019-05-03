@@ -216,7 +216,7 @@ AutoFillSavedModel::Create(
   const auto savedmodel_path = JoinPath({version_path, savedmodel_dir});
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle;
-  SavedModelBundleSourceAdapterConfig saved_model_config;
+  SavedModelPlatformConfig saved_model_config;
   platform_config.UnpackTo(&saved_model_config);
   tensorflow::SessionOptions session_options;
   session_options.config = saved_model_config.session_config();

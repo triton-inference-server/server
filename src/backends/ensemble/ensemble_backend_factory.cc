@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 EnsembleBackendFactory::Create(
-    const EnsembleBundleSourceAdapterConfig& platform_config,
+    const EnsemblePlatformConfig& platform_config,
     std::unique_ptr<EnsembleBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create EnsembleBackendFactory for platform config \""

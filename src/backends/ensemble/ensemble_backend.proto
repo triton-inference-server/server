@@ -28,5 +28,5 @@ syntax = "proto3";
 
 package nvidia.inferenceserver;
 
-// Config proto for EnsembleBundleSourceAdapter.
-message EnsembleBundleSourceAdapterConfig {}
+// Config proto for all EnsembleBackend.
+message EnsemblePlatformConfig {}

@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 SavedModelBackendFactory::Create(
-    const SavedModelBundleSourceAdapterConfig& platform_config,
+    const SavedModelPlatformConfig& platform_config,
     std::unique_ptr<SavedModelBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create SavedModelBackendFactory for platform config \""

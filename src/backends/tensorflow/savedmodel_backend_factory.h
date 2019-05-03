@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 class SavedModelBackendFactory {
  public:
   static Status Create(
-      const SavedModelBundleSourceAdapterConfig& platform_config,
+      const SavedModelPlatformConfig& platform_config,
       std::unique_ptr<SavedModelBackendFactory>* factory);
 
   Status CreateBackend(
@@ -49,12 +49,12 @@ class SavedModelBackendFactory {
   DISALLOW_COPY_AND_ASSIGN(SavedModelBackendFactory);
 
   SavedModelBackendFactory(
-      const SavedModelBundleSourceAdapterConfig& platform_config)
+      const SavedModelPlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }
 
-  const SavedModelBundleSourceAdapterConfig platform_config_;
+  const SavedModelPlatformConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

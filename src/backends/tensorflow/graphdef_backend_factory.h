@@ -36,7 +36,7 @@ namespace nvidia { namespace inferenceserver {
 class GraphDefBackendFactory {
  public:
   static Status Create(
-      const GraphDefBundleSourceAdapterConfig& platform_config,
+      const GraphDefPlatformConfig& platform_config,
       std::unique_ptr<GraphDefBackendFactory>* factory);
 
   Status CreateBackend(
@@ -49,12 +49,12 @@ class GraphDefBackendFactory {
   DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
 
   GraphDefBackendFactory(
-      const GraphDefBundleSourceAdapterConfig& platform_config)
+      const GraphDefPlatformConfig& platform_config)
       : platform_config_(platform_config)
   {
   }
 
-  const GraphDefBundleSourceAdapterConfig platform_config_;
+  const GraphDefPlatformConfig platform_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

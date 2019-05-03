@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 PlanBackendFactory::Create(
-    const PlanBundleSourceAdapterConfig& platform_config,
+    const PlanPlatformConfig& platform_config,
     std::unique_ptr<PlanBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create PlanBackendFactory for platform config \""

@@ -40,7 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 CustomBackendFactory::Create(
-    const CustomBundleSourceAdapterConfig& platform_config,
+    const CustomPlatformConfig& platform_config,
     std::unique_ptr<CustomBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create CustomBackendFactory for platform config \""
