@@ -84,8 +84,9 @@ std::vector<int32_t> http_ports_;
 // disabled.
 int32_t metrics_port_ = 8002;
 
-bool allow_http = true;
-bool allow_grpc = true;
+bool allow_http_ = true;
+bool allow_grpc_ = true;
+bool allow_metrics_ = true;
 
 // endpoint names for http/gRPC
 std::vector<std::string> endpoint_names = {"status", "health", "profile",
@@ -244,15 +245,16 @@ CheckPortCollision()
 {
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
-       http_ports_.end()) &&
-      (grpc_port_ != -1)) {
+       http_ports_.end()) && (grpc_port_ != -1) &&
+       allow_http_ && allow_grpc_) {
     LOG_ERROR << "The server cannot listen to HTTP requests "
               << "and gRPC requests at the same port";
     return true;
   }
 
   // Check if Metric and GRPC have shared ports
-  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1)) {
+  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) &&
+       allow_grpc_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "gRPC requests";
     return true;
@@ -260,8 +262,8 @@ CheckPortCollision()
 
   // Check if Metric and HTTP have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
-       http_ports_.end()) &&
-      (metrics_port_ != -1)) {
+       http_ports_.end()) && (metrics_port_ != -1) &&
+       allow_http_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "HTTP requests";
     return true;
@@ -323,7 +325,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
 
   // Enable gRPC endpoints if requested...
-  if (allow_grpc && grpc_port_ != -1) {
+  if (allow_grpc_ && (grpc_port_ != -1)) {
     grpc_service_ = StartGrpcService(server);
     if (grpc_service_ == nullptr) {
       LOG_ERROR << "Failed to start gRPC service";
@@ -332,7 +334,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   }
 
   // Enable HTTP endpoints if requested...
-  if (allow_http) {
+  if (allow_http_) {
     std::map<int32_t, std::vector<std::string>> port_map;
 
     // Group by port numbers
@@ -420,7 +422,6 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
 
   bool exit_on_error = exit_on_failed_init_;
 
-  bool allow_metrics = true;
   bool allow_gpu_metrics = true;
   int32_t http_port = http_port_;
   int32_t grpc_port = grpc_port_;
@@ -486,13 +487,13 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
         allow_profiling = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_GRPC:
-        allow_grpc = ParseBoolOption(optarg);
+        allow_grpc_ = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_HTTP:
-        allow_http = ParseBoolOption(optarg);
+        allow_http_ = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_METRICS:
-        allow_metrics = ParseBoolOption(optarg);
+        allow_metrics_ = ParseBoolOption(optarg);
         break;
       case OPTION_ALLOW_GPU_METRICS:
         allow_gpu_metrics = ParseBoolOption(optarg);
@@ -552,7 +553,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   LOG_SET_VERBOSE(log_verbose);
 
 
-  if (!allow_http && !allow_grpc) {
+  if (!allow_http_ && !allow_grpc_) {
     LOG_ERROR << "At least one of the following options must be true: "
               << "--allow-http, --allow-grpc";
 
@@ -565,14 +566,14 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   grpc_port_ = grpc_port;
   http_health_port_ = http_health_port;
 
-  metrics_port_ = allow_metrics ? metrics_port : -1;
+  metrics_port_ = allow_metrics_ ? metrics_port : -1;
   http_ports_ = {http_port_, http_health_port_, http_port_, http_port_};
 
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision())
     return false;
 
-  allow_gpu_metrics_ = allow_metrics ? allow_gpu_metrics : false;
+  allow_gpu_metrics_ = allow_metrics_ ? allow_gpu_metrics : false;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
   http_thread_cnt_ = http_thread_cnt;
