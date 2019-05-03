@@ -43,9 +43,13 @@ using MetricTagsMap = ::google::protobuf::Map<
     ::google::protobuf::string, ::google::protobuf::string>;
 
 /// The type from platform name to the backend configuration for that
-/// platform.
-using PlatformConfigMap =
-    std::unordered_map<std::string, ::google::protobuf::Any>;
+/// platform. The configuration is determined primarily by
+/// command-line options and is the same for every backend created for
+/// a given platform.
+struct BackendConfig {
+};
+using BackendConfigMap =
+    std::unordered_map<std::string, std::shared_ptr<BackendConfig>>;
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
@@ -55,8 +59,10 @@ constexpr int WILDCARD_DIM = -1;
 enum Platform {
   PLATFORM_UNKNOWN = 0,
   PLATFORM_TENSORRT_PLAN = 1,
+#ifdef TRTIS_ENABLE_TENSORFLOW
   PLATFORM_TENSORFLOW_GRAPHDEF = 2,
   PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
+#endif  // TRTIS_ENABLE_TENSORFLOW
   PLATFORM_CAFFE2_NETDEF = 4,
   PLATFORM_CUSTOM = 5,
   PLATFORM_ENSEMBLE = 6,

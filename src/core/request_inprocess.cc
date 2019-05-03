@@ -26,13 +26,12 @@
 
 #include "src/core/request_inprocess.h"
 
-#include "src/clients/c++/request_common.h"
 #include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/provider.h"
 #include "src/core/provider_utils.h"
+#include "src/core/request_common.h"
 #include "src/core/server.h"
-#include "tensorflow_serving/model_servers/server_core.h"
 
 // If status is non-OK, return the corresponding Error.
 #define RETURN_IF_STATUS_ERROR(S)                        \

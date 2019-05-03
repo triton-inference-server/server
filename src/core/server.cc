@@ -50,7 +50,6 @@
 #include "src/core/request_status.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
-#include "tensorflow/core/platform/env.h"
 
 namespace nvidia { namespace inferenceserver {
 

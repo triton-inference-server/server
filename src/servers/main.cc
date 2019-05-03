@@ -32,9 +32,7 @@
 #include <csignal>
 #include <mutex>
 
-#include "prometheus/exposer.h"
 #include "src/core/logging.h"
-#include "src/core/metrics.h"
 #include "src/core/server.h"
 #include "src/core/status.h"
 #include "src/servers/grpc_server.h"
@@ -67,7 +65,7 @@ std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
 // The metrics service
-std::unique_ptr<prometheus::Exposer> exposer_;
+// FIXME std::unique_ptr<prometheus::Exposer> exposer_;
 
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
@@ -353,17 +351,20 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
+    // FIXME
+#if 0
     LOG_INFO << " localhost:" << std::to_string(metrics_port_)
              << " for metric reporting";
-    if (allow_gpu_metrics_) {
+   if (allow_gpu_metrics_) {
       nvidia::inferenceserver::Metrics::EnableGPUMetrics();
     }
 
     std::ostringstream stream;
     stream << "0.0.0.0:" << metrics_port_;
-    exposer_.reset(new prometheus::Exposer(stream.str()));
+   exposer_.reset(new prometheus::Exposer(stream.str()));
     exposer_->RegisterCollectable(
         nvidia::inferenceserver::Metrics::GetRegistry());
+#endif
   }
 
   return true;

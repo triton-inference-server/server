@@ -26,10 +26,9 @@
 
 #include "src/core/model_config_utils.h"
 
+#include <cuda_runtime_api.h>
 #include <deque>
 #include <set>
-#include "absl/strings/numbers.h"
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
@@ -43,7 +42,10 @@ GetModelVersionFromPath(const std::string& path, int64_t* version)
   auto version_dir = BaseName(path);
 
   // Determine the version from the last segment of 'path'
-  if (!absl::SimpleAtoi(version_dir, version)) {
+  try {
+    *version = std::atoll(version_dir.c_str());
+  }
+  catch (...) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to determine model version from " + path);
@@ -174,7 +176,7 @@ GetSequenceControlProperties(
 
 Status
 GetNormalizedModelConfig(
-    const std::string& path, const PlatformConfigMap& platform_config_map,
+    const std::string& path, const BackendConfigMap& backend_config_map,
     const bool autofill, ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
@@ -192,7 +194,7 @@ GetNormalizedModelConfig(
     const std::string model_name(BaseName(path));
     std::unique_ptr<AutoFill> af;
     RETURN_IF_ERROR(AutoFill::Create(
-        model_name, platform_config_map, std::string(path), *config, &af));
+        model_name, backend_config_map, std::string(path), *config, &af));
     RETURN_IF_ERROR(af->Fix(config));
 
     LOG_VERBOSE(1) << "autofilled config: " << config->DebugString();
@@ -207,17 +209,29 @@ GetNormalizedModelConfig(
   // If 'default_model_filename' is not specified set it appropriately
   // based upon 'platform'.
   if (config->default_model_filename().empty()) {
+#ifdef TRTIS_ENABLE_TENSORFLOW
     if (config->platform() == kTensorFlowGraphDefPlatform) {
       config->set_default_model_filename(kTensorFlowGraphDefFilename);
     } else if (config->platform() == kTensorFlowSavedModelPlatform) {
       config->set_default_model_filename(kTensorFlowSavedModelFilename);
-    } else if (config->platform() == kTensorRTPlanPlatform) {
+    } else
+#endif  // TRTIS_ENABLE_TENSORFLOW
+#ifdef TRTIS_ENABLE_TENSORRT
+        if (config->platform() == kTensorRTPlanPlatform) {
       config->set_default_model_filename(kTensorRTPlanFilename);
-    } else if (config->platform() == kCaffe2NetDefPlatform) {
+    } else
+#endif  // TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_CAFFE2
+        if (config->platform() == kCaffe2NetDefPlatform) {
       config->set_default_model_filename(kCaffe2NetDefFilename);
-    } else if (config->platform() == kCustomPlatform) {
+    } else
+#endif  // TRTIS_ENABLE_CAFFE2
+#ifdef TRTIS_ENABLE_CUSTOM
+        if (config->platform() == kCustomPlatform) {
       config->set_default_model_filename(kCustomFilename);
-    } else if (config->platform() == kEnsemblePlatform) {
+    } else
+#endif  // TRTIS_ENABLE_CUSTOM
+        if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
     } else if (config->platform() == kOnnxRuntimeOnnxPlatform) {
       config->set_default_model_filename(kOnnxRuntimeOnnxFilename);

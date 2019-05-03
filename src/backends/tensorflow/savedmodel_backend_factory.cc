@@ -40,13 +40,12 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 SavedModelBackendFactory::Create(
-    const SavedModelPlatformConfig& platform_config,
+    const GraphDefBackendFactory::Config& backend_config,
     std::unique_ptr<SavedModelBackendFactory>* factory)
 {
-  LOG_VERBOSE(1) << "Create SavedModelBackendFactory for platform config \""
-                 << platform_config.DebugString() << "\"";
+  LOG_VERBOSE(1) << "Create SavedModelBackendFactory";
 
-  factory->reset(new SavedModelBackendFactory(platform_config));
+  factory->reset(new SavedModelBackendFactory(backend_config));
   return Status::Success;
 }
 
@@ -70,7 +69,7 @@ SavedModelBackendFactory::CreateBackend(
   std::unique_ptr<SavedModelBackend> local_backend(new SavedModelBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));
   RETURN_IF_ERROR(local_backend->CreateExecutionContexts(
-      platform_config_.session_config(), savedmodel_paths));
+      backend_config_, savedmodel_paths));
 
   *backend = std::move(local_backend);
   return Status::Success;

@@ -145,7 +145,7 @@ class EnsembleContext {
   std::shared_ptr<InferResponseProvider> response_provider_;
   std::function<void(Status)> OnComplete_;
 
-  // Output tensors whose labels are not provided by the ensemble servable
+  // Output tensors whose labels are not provided by the ensemble
   std::unordered_map<size_t, std::string> no_label_tensors_;
 };
 

@@ -184,7 +184,7 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
 Status
 AutoFillSavedModel::Create(
     const std::string& model_name,
-    const ::google::protobuf::Any& platform_config,
+    const std::shared_ptr<BackendConfig>& backend_config,
     const std::string& model_path, std::unique_ptr<AutoFill>* autofill)
 {
   std::set<std::string> version_dirs;

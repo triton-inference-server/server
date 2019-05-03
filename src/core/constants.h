@@ -38,24 +38,37 @@ constexpr char kStatusRESTEndpoint[] = "api/status";
 constexpr char kProfileRESTEndpoint[] = "api/profile";
 constexpr char kHealthRESTEndpoint[] = "api/health";
 
+#ifdef TRTIS_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
 constexpr char kTensorFlowSavedModelPlatform[] = "tensorflow_savedmodel";
-constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
-constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
-constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
-constexpr char kCustomPlatform[] = "custom";
-constexpr char kEnsemblePlatform[] = "ensemble";
-constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
-
-constexpr char kModelConfigPbTxt[] = "config.pbtxt";
-constexpr char kTensorRTPlanFilename[] = "model.plan";
 constexpr char kTensorFlowGraphDefFilename[] = "model.graphdef";
 constexpr char kTensorFlowSavedModelFilename[] = "model.savedmodel";
+#endif  // TRTIS_ENABLE_TENSORFLOW
+
+#ifdef TRTIS_ENABLE_TENSORRT
+constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
+constexpr char kTensorRTPlanFilename[] = "model.plan";
+#endif  // TRTIS_ENABLE_TENSORRT
+
+#ifdef TRTIS_ENABLE_CAFFE2
+constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
 constexpr char kCaffe2NetDefFilename[] = "model.netdef";
-constexpr char kPyTorchLibTorchFilename[] = "model.pt";
 constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
-constexpr char kCustomFilename[] = "libcustom.so";
+#endif  // TRTIS_ENABLE_CAFFE2
+
+constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
+constexpr char kPyTorchLibTorchFilename[] = "model.pt";
+
+constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";
+
+#ifdef TRTIS_ENABLE_CUSTOM
+constexpr char kCustomPlatform[] = "custom";
+constexpr char kCustomFilename[] = "libcustom.so";
+#endif  // TRTIS_ENABLE_CUSTOM
+
+constexpr char kEnsemblePlatform[] = "ensemble";
+constexpr char kModelConfigPbTxt[] = "config.pbtxt";
 
 constexpr char kMetricsLabelModelName[] = "model";
 constexpr char kMetricsLabelModelVersion[] = "version";

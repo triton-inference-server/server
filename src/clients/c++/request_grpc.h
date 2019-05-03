@@ -27,7 +27,7 @@
 
 /// \file
 
-#include "src/clients/c++/request.h"
+#include "src/core/request.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

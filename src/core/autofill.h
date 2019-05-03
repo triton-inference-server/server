@@ -36,8 +36,7 @@ class AutoFill {
  public:
   /// Create an AutoFill object for a specific model.
   static Status Create(
-      const std::string& model_name,
-      const PlatformConfigMap& platform_config_map,
+      const std::string& model_name, const BackendConfigMap& backend_config_map,
       const std::string& model_path, const ModelConfig& config,
       std::unique_ptr<AutoFill>* autofill);
 

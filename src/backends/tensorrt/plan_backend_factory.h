@@ -26,7 +26,6 @@
 #pragma once
 
 #include "src/backends/tensorrt/plan_backend.h"
-#include "src/backends/tensorrt/plan_backend.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -35,8 +34,14 @@ namespace nvidia { namespace inferenceserver {
 // corresponding plan backend.
 class PlanBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // Autofill missing required model configuration settings based on
+    // model definition file.
+    bool autofill;
+  };
+
   static Status Create(
-      const PlanPlatformConfig& platform_config,
+      const Config& backend_config,
       std::unique_ptr<PlanBackendFactory>* factory);
 
   Status CreateBackend(
@@ -48,12 +53,12 @@ class PlanBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackendFactory);
 
-  PlanBackendFactory(const PlanPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  PlanBackendFactory(const Config& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const PlanPlatformConfig platform_config_;
+  const Config backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

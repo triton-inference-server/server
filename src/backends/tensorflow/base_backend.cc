@@ -79,7 +79,7 @@ BaseBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 BaseBackend::CreateExecutionContexts(
-    const tensorflow::ConfigProto& session_config,
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   if (LOG_VERBOSE_IS_ON(1)) {
@@ -97,7 +97,7 @@ BaseBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, session_config, paths));
+            instance_name, Context::NO_GPU_DEVICE, backend_config, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -105,7 +105,7 @@ BaseBackend::CreateExecutionContexts(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, session_config, paths));
+              instance_name, gpu_device, backend_config, paths));
           total_context_cnt++;
         }
       }
@@ -131,7 +131,7 @@ BaseBackend::CreateExecutionContexts(
 Status
 BaseBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const tensorflow::ConfigProto& session_config,
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const std::unordered_map<std::string, std::string>& paths)
 {
   // For a GPU context, determine the model file to use for device
@@ -182,7 +182,11 @@ BaseBackend::CreateExecutionContext(
   // related issues), so we can't use it here to set the GPU (see
   // CreateSession implementations for SetDefaultDevice). [DLIS-43]
   tensorflow::SessionOptions options;
-  options.config = session_config;
+  options.config.mutable_gpu_options()->set_allow_growth(
+      backend_config->allow_gpu_memory_growth);
+  options.config.mutable_gpu_options()->set_per_process_gpu_memory_fraction(
+      backend_config->per_process_gpu_memory_fraction);
+  options.config.set_allow_soft_placement(backend_config->allow_soft_placement);
 
   // Enable/disable XLA based on the model config optimization
   // setting.

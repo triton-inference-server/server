@@ -28,10 +28,10 @@
 
 #include <grpcpp/grpcpp.h>
 #include <iostream>
-#include "src/clients/c++/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.pb.h"
+#include "src/core/request_common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
