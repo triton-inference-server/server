@@ -383,7 +383,7 @@ InferResponseProvider::GetSecondaryLabelProvider(
 {
   auto it = secondary_label_provider_map_.find(name);
   if (it != secondary_label_provider_map_.end()) {
-    provider = &it->second;
+    *provider = it->second;
     return true;
   }
   return false;

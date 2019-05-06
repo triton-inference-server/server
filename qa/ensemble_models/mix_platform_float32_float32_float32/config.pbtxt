@@ -44,7 +44,6 @@ output [
     name: "OUTPUT0"
     data_type: TYPE_FP32
     dims: [ 16 ]
-    label_filename: "output0_labels.txt"
   },
   {
     name: "OUTPUT1"
