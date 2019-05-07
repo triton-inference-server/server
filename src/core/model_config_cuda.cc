@@ -26,7 +26,7 @@
 
 #include "src/core/model_config_cuda.h"
 
-#include "cuda/include/cuda_runtime_api.h"
+#include <cuda_runtime_api.h>
 
 namespace nvidia { namespace inferenceserver {
 

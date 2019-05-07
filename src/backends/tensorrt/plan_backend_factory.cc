@@ -40,11 +40,13 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 PlanBackendFactory::Create(
-    const Config& backend_config, std::unique_ptr<PlanBackendFactory>* factory)
+    const std::shared_ptr<BackendConfig>& backend_config,
+    std::unique_ptr<PlanBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create PlanBackendFactory";
 
-  factory->reset(new PlanBackendFactory(backend_config));
+  auto plan_backend_config = std::static_pointer_cast<Config>(backend_config);
+  factory->reset(new PlanBackendFactory(plan_backend_config));
   return Status::Success;
 }
 
