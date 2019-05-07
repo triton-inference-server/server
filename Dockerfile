@@ -67,6 +67,18 @@ RUN cd pytorch && \
       NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
       python setup.py install && python setup.py clean
 
+WORKDIR /opt
+# Download libtorch shared files and dependencies
+RUN wget https://download.pytorch.org/libtorch/nightly/cu100/libtorch-shared-with-deps-latest.zip && \
+    unzip libtorch-shared-with-deps-latest.zip && \
+    rm libtorch-shared-with-deps-latest.zip
+
+# CMake Libtorch Backend
+COPY libtorch_test /opt/libtorch_test
+RUN cd libtorch_test/build && \
+    cmake -DCMAKE_PREFIX_PATH=/opt/libtorch .. && \
+    make -j
+
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
 ############################################################################
