@@ -90,6 +90,7 @@ add_library(
   trtserver SHARED
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
+  $<TARGET_OBJECTS:model-config-cuda-library>
   $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
@@ -106,6 +107,14 @@ target_link_libraries(
   ${LIBEVENT_LIBRARIES}
   "-Wl,--version-script libtrtserver.ldscript"
 )
+
+if(${TRTIS_ENABLE_TENSORRT})
+  target_link_libraries(
+    trtserver
+    -lnvinfer
+    -lnvonnxparser_runtime
+  )
+endif() # TRTIS_ENABLE_TENSORRT
 
 if(${TRTIS_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)

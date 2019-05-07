@@ -396,13 +396,13 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
-    const std::shared_ptr<GraphDefBackendFactory::Config>& config =
+    const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kTensorFlowGraphDefPlatform)->second;
     RETURN_IF_ERROR(GraphDefBackendFactory::Create(
         config, &(local_life_cycle->graphdef_factory_)));
   }
   {
-    const std::shared_ptr<SavedModelBackendFactory::Config>& config =
+    const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kTensorFlowSavedModelPlatform)->second;
     RETURN_IF_ERROR(SavedModelBackendFactory::Create(
         config, &(local_life_cycle->savedmodel_factory_)));
@@ -410,7 +410,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #endif  // TRTIS_ENABLE_TENSORFLOW
 #ifdef TRTIS_ENABLE_CAFFE2
   {
-    const std::shared_ptr<NetDefBackendFactory::Config>& config =
+    const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kCaffe2NetDefPlatform)->second;
     RETURN_IF_ERROR(NetDefBackendFactory::Create(
         config, &(local_life_cycle->netdef_factory_)));
@@ -418,7 +418,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 #endif  // TRTIS_ENABLE_CAFFE2
 #ifdef TRTIS_ENABLE_TENSORRT
   {
-    const std::shared_ptr<PlanBackendFactory::Config>& config =
+    const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kTensorRTPlanPlatform)->second;
     RETURN_IF_ERROR(
         PlanBackendFactory::Create(config, &(local_life_cycle->plan_factory_)));

@@ -72,7 +72,8 @@ ExternalProject_Add(protobuf
   DEPENDS grpc-repo
 )
 
-# the location where protobuf-config.cmake will be installed varies by platform
+# Location where protobuf-config.cmake will be installed varies by
+# platform
 if (WIN32)
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/cmake")
 else()
@@ -107,7 +108,7 @@ ExternalProject_Add(c-ares
 )
 
 #
-# Builds GRPC
+# Build GRPC
 #
 ExternalProject_Add(grpc
   PREFIX grpc
@@ -130,7 +131,7 @@ ExternalProject_Add(grpc
 )
 
 #
-# Builds libevent
+# Build libevent
 #
 ExternalProject_Add(libevent
   PREFIX libevent
@@ -143,7 +144,7 @@ ExternalProject_Add(libevent
 )
 
 #
-# Builds libevhtp
+# Build libevhtp
 #
 # Need to patch due to https://github.com/criticalstack/libevhtp/issues/135
 #
@@ -162,7 +163,7 @@ ExternalProject_Add(libevhtp
 )
 
 #
-# Builds Prometheus C++ library
+# Build Prometheus C++ library
 #
 ExternalProject_Add(prometheus-cpp
   PREFIX prometheus-cpp
@@ -179,7 +180,19 @@ ExternalProject_Add(prometheus-cpp
 )
 
 #
-# Builds TRTIS client libraries and examples
+# Build TRTIS test utilities
+#
+ExternalProject_Add(trtis-test-utils
+  PREFIX trtis-test-utils
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-test-utils"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils"
+  CMAKE_CACHE_ARGS
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils/install
+    -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
+)
+
+#
+# Build TRTIS client libraries and examples
 #
 ExternalProject_Add(trtis-clients
   PREFIX trtis-clients
@@ -197,7 +210,7 @@ ExternalProject_Add(trtis-clients
 )
 
 #
-# Builds TRTIS server library and main executable
+# Build TRTIS server library and main executable
 #
 set(TRTIS_DEPENDS protobuf grpc libevent libevhtp)
 if(${TRTIS_ENABLE_METRICS})
