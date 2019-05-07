@@ -31,7 +31,6 @@
 ARG BASE_IMAGE=tensorrtserver
 ARG BUILD_IMAGE=tensorrtserver_build
 ARG CLIENT_IMAGE=tensorrtserver_client
-ARG INPROCESS_IMAGE=tensorrtserver_inprocess
 
 ############################################################################
 ## Build test utilites and executables
@@ -65,6 +64,7 @@ RUN mkdir -p qa/common && \
     cp /opt/tensorrtserver/custom/libaddsub.so \
       qa/L0_multiple_ports/models/simple/1/. && \
     mkdir qa/L0_simple_inprocess/models && \
+    cp /opt/tensorrtserver/bin/simple_inprocess qa/L0_simple_inprocess/. && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/. && \
     mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
     cp /opt/tensorrtserver/custom/libimagepreprocess.so \
@@ -118,15 +118,6 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp /tmp/client/python/tensorrtserver*.whl qa/pkgs/.
 
 ############################################################################
-## Copy artifacts from in-process container
-############################################################################
-FROM ${INPROCESS_IMAGE} AS inprocess
-
-WORKDIR /workspace
-COPY --from=client /workspace/qa/ qa/
-RUN cp build/simple_inprocess qa/L0_simple_inprocess/.
-
-############################################################################
 ## Create CI enabled image
 ############################################################################
 FROM $BASE_IMAGE
@@ -162,7 +153,7 @@ RUN pip install --upgrade numpy future grpcio
 
 # CI expects tests in /opt/tensorrtserver/qa
 WORKDIR /opt/tensorrtserver
-COPY --from=inprocess /workspace/qa/ qa/
+COPY --from=client /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.
