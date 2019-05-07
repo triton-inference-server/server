@@ -193,7 +193,7 @@ RUN cd build && \
           -DTRTIS_ENABLE_METRICS=ON \
           -DTRTIS_ENABLE_CUSTOM=ON \
           -DTRTIS_ENABLE_TENSORFLOW=OFF \
-          -DTRTIS_ENABLE_TENSORRT=OFF \
+          -DTRTIS_ENABLE_TENSORRT=ON \
           -DTRTIS_ENABLE_CAFFE2=OFF && \
     (make -j16 trtis || true) && \
     make -j16 trtis && \

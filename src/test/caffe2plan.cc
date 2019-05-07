@@ -26,6 +26,7 @@
 
 #include <NvCaffeParser.h>
 #include <NvInfer.h>
+#include <cuda_runtime_api.h>
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
@@ -35,7 +36,6 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
-#include "cuda/include/cuda_runtime_api.h"
 
 namespace {
 

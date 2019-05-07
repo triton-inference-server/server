@@ -26,7 +26,7 @@
 #pragma once
 
 #include <NvInfer.h>
-#include "cuda/include/cuda_runtime_api.h"
+#include <cuda_runtime_api.h>
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
