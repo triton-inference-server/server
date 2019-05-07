@@ -138,3 +138,13 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/../core/server_status.pb.h
   DESTINATION include
 )
+
+#
+# simple_inprocess
+#
+add_executable(simple_inprocess simple_inprocess.cc)
+target_link_libraries(simple_inprocess trtserver)
+install(
+  TARGETS simple_inprocess
+  RUNTIME DESTINATION bin
+)
