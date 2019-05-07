@@ -1,7 +1,0 @@
-b8b8c4a0d09513815d6531733c401a97bdbe8112  /workspace/serving/tensorflow_serving/model_servers/server_core.cc
-a4a19d5058e08441bce56444fa09e6b96fe0ab16  /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.cc
-3671863adc5454626dc3de0b94948def0c9fa1e1  /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.h
-4b3aab50d2bd6113c2e52e87fdd938dcfa828dd4  /workspace/serving/tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto
-39a0fdd3f0fbc2f2ed13a97335be63f16cadc607  /workspace/serving/tensorflow_serving/util/retrier.cc
-1f7d5d15099bda729b4e9803327d7dedbe037988  /workspace/serving/tensorflow_serving/util/BUILD
-1c4491ac158453e4fd91b7048f875204e024c731  /workspace/serving/tensorflow_serving/workspace.bzl
