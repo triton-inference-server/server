@@ -292,7 +292,7 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            libgoogle-glog0v5
+            libgoogle-glog0v5 unzip
 
 WORKDIR /opt
 # Download libtorch shared files and dependencies
