@@ -31,7 +31,6 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.04-py3
 ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.04-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.04-py3
-ARG CUDA_IMAGE=nvcr.io/nvidia/cuda:10.1-cudnn7-devel-ubuntu16.04
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
@@ -71,7 +70,7 @@ RUN cd pytorch && \
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
 ############################################################################
-FROM ${CUDA_IMAGE} AS trtserver_onnx
+FROM ${BASE_IMAGE} AS trtserver_onnx
 
 # Currently the prebuilt Onnx Runtime library is built on CUDA 9, thus it
 # needs to be built from source
