@@ -179,7 +179,7 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserve
 
 # Onnx Runtime library
 ARG ONNX_RUNTIME_VERSION=0.4.0
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h /usr/local/include/
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime /usr/local/include/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/
 RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/libonnxruntime.so
 
