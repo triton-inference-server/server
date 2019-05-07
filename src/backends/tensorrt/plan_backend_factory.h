@@ -41,7 +41,7 @@ class PlanBackendFactory {
   };
 
   static Status Create(
-      const Config& backend_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<PlanBackendFactory>* factory);
 
   Status CreateBackend(
@@ -53,12 +53,12 @@ class PlanBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(PlanBackendFactory);
 
-  PlanBackendFactory(const Config& backend_config)
+  PlanBackendFactory(const std::shared_ptr<Config>& backend_config)
       : backend_config_(backend_config)
   {
   }
 
-  const Config backend_config_;
+  const std::shared_ptr<Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

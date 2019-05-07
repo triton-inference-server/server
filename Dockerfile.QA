@@ -34,6 +34,15 @@ ARG CLIENT_IMAGE=tensorrtserver_client
 ARG INPROCESS_IMAGE=tensorrtserver_inprocess
 
 ############################################################################
+## Build test utilites and executables
+############################################################################
+FROM ${BUILD_IMAGE} AS test_utils
+
+WORKDIR /workspace
+RUN cd build && \
+    make -j16 trtis-test-utils
+
+############################################################################
 ## Copy artifacts from build container
 ############################################################################
 FROM ${BUILD_IMAGE} AS build
@@ -41,7 +50,6 @@ FROM ${BUILD_IMAGE} AS build
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
-    cp /opt/tensorrtserver/bin/caffe2plan qa/common/. && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_string_example/models && \
@@ -88,6 +96,8 @@ RUN mkdir -p qa/common && \
     mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp /opt/tensorrtserver/custom/libsequence.so \
        qa/custom_models/custom_sequence_int32/1/.
+
+COPY --from=test_utils /workspace/build/trtis-test-utils/install/bin/caffe2plan qa/common/
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
