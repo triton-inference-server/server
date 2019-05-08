@@ -115,6 +115,25 @@ if(${TRTIS_ENABLE_TENSORRT})
   )
 endif() # TRTIS_ENABLE_TENSORRT
 
+if(${TRTIS_ENABLE_CAFFE2})
+  target_link_libraries(
+    trtserver
+    -L/opt/tensorrtserver/lib
+    -lcaffe2
+    -lcaffe2_detectron_ops_gpu
+    -lcaffe2_gpu
+    -lc10
+    -lc10_cuda
+    -lmkl_core
+    -lmkl_gnu_thread
+    -lmkl_avx2
+    -lmkl_def
+    -lmkl_intel_lp64
+    -lmkl_rt
+    -lmkl_vml_def
+  )
+endif() # TRTIS_ENABLE_CAFFE2
+
 if(${TRTIS_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")

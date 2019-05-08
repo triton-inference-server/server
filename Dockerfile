@@ -194,7 +194,7 @@ RUN cd build && \
           -DTRTIS_ENABLE_CUSTOM=ON \
           -DTRTIS_ENABLE_TENSORFLOW=OFF \
           -DTRTIS_ENABLE_TENSORRT=ON \
-          -DTRTIS_ENABLE_CAFFE2=OFF && \
+          -DTRTIS_ENABLE_CAFFE2=ON && \
     (make -j16 trtis || true) && \
     make -j16 trtis && \
     mkdir -p /opt/tensorrtserver && \
@@ -229,6 +229,10 @@ ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
+
+# Needed by Caffe2 libraries to avoid:
+# Intel MKL FATAL ERROR: Cannot load libmkl_intel_thread.so
+ENV MKL_THREADING_LAYER GNU
 
 # Create a user that can be used to run the tensorrt-server as
 # non-root. Make sure that this user to given ID 1000.

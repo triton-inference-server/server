@@ -57,7 +57,7 @@ add_custom_target(
 )
 
 install(
-  FILES
+  PROGRAMS
     image_client.py
     ensemble_image_client.py
     grpc_image_client.py
