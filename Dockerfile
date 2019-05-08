@@ -294,6 +294,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             libgoogle-glog0v5 unzip
 
+##### Download and Build LibTorch #####
 WORKDIR /opt
 # Download libtorch shared files and dependencies
 RUN wget https://download.pytorch.org/libtorch/nightly/cu100/libtorch-shared-with-deps-latest.zip && \
