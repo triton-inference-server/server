@@ -40,12 +40,13 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 NetDefBackendFactory::Create(
-    const Config& backend_config,
+    const std::shared_ptr<BackendConfig>& backend_config,
     std::unique_ptr<NetDefBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create NetDefBackendFactory";
 
-  factory->reset(new NetDefBackendFactory(backend_config));
+  auto netdef_backend_config = std::static_pointer_cast<Config>(backend_config);
+  factory->reset(new NetDefBackendFactory(netdef_backend_config));
   return Status::Success;
 }
 
