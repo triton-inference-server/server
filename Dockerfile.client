@@ -79,11 +79,12 @@ COPY src/core src/core
 # error that doesn't repeat on subsequent builds, which is why there
 # are 2 make invocations below.
 RUN cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release && \
-    (make -j8 trtis-clients || true) && \
-    make -j8 trtis-clients && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
+    (make -j16 trtis-clients || true) && \
+    make -j16 trtis-clients
+RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
-    (cd trtis-clients/install && tar zcf /workspace/v$VERSION.clients.tar.gz *)
+    tar zcf /workspace/v$VERSION.clients.tar.gz *
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
@@ -91,4 +92,7 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip install --upgrade build/trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
+RUN pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow
+
+ENV PATH //workspace/install/bin:${PATH}
+ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}

@@ -25,21 +25,48 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 cmake_minimum_required (VERSION 3.5)
+project (trtis-custom-backends)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+include_directories("${PROJECT_SOURCE_DIR}/../..")
+include_directories("${PROJECT_BINARY_DIR}")
 
 #
-# caffe2plan
+# CUDA
 #
-if(${TRTIS_ENABLE_TENSORRT})
-add_executable(caffe2plan caffe2plan.cc)
-target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  caffe2plan
-  -lnvinfer
-  -lnvcaffe_parser
-  ${CUDA_LIBRARIES}
-)
-install(
-  TARGETS caffe2plan
-  RUNTIME DESTINATION bin
-)
-endif() # TRTIS_ENABLE_TENSORRT
+find_package(CUDA REQUIRED)
+message(STATUS "Using CUDA ${CUDA_VERSION}")
+set(CUDA_NVCC_FLAGS -std=c++11)
+
+#
+# Protobuf
+#
+set(protobuf_MODULE_COMPATIBLE TRUE)
+find_package(Protobuf CONFIG REQUIRED)
+message(STATUS "Using protobuf ${Protobuf_VERSION}")
+include_directories(${Protobuf_INCLUDE_DIRS})
+
+#
+# GRPC
+#
+find_package(gRPC CONFIG REQUIRED)
+message(STATUS "Using gRPC ${gRPC_VERSION}")
+include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+
+if(${TRTIS_ENABLE_CUSTOM})
+add_subdirectory(../../src/core src/core)
+add_subdirectory(../../src/custom/addsub src/custom/addsub)
+add_subdirectory(../../src/custom/identity src/custom/identity)
+add_subdirectory(../../src/custom/image_preprocess src/custom/image_preprocess)
+add_subdirectory(../../src/custom/param src/custom/param)
+add_subdirectory(../../src/custom/sequence src/custom/sequence)
+endif() # TRTIS_ENABLE_CUSTOM

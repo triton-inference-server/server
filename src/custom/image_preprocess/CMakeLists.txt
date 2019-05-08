@@ -27,19 +27,18 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# caffe2plan
+# libimagepreprocess.so
 #
-if(${TRTIS_ENABLE_TENSORRT})
-add_executable(caffe2plan caffe2plan.cc)
-target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  caffe2plan
-  -lnvinfer
-  -lnvcaffe_parser
-  ${CUDA_LIBRARIES}
+find_package(OpenCV REQUIRED)
+
+add_library(
+  imagepreprocess SHARED
+  image_preprocess.cc
+  $<TARGET_OBJECTS:proto-library>
 )
+target_include_directories(imagepreprocess PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(imagepreprocess ${OpenCV_LIBS})
 install(
-  TARGETS caffe2plan
-  RUNTIME DESTINATION bin
+  TARGETS imagepreprocess
+  LIBRARY DESTINATION lib
 )
-endif() # TRTIS_ENABLE_TENSORRT

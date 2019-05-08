@@ -33,13 +33,19 @@ ARG BUILD_IMAGE=tensorrtserver_build
 ARG CLIENT_IMAGE=tensorrtserver_client
 
 ############################################################################
-## Build test utilites and executables
+## Build test utilities and custom backends
 ############################################################################
 FROM ${BUILD_IMAGE} AS test_utils
 
+# image_preprocess custom backend requires opencv
+RUN apt-get install -y --no-install-recommends \
+            libopencv-dev \
+            libopencv-core-dev
+
 WORKDIR /workspace
 RUN cd build && \
-    make -j16 trtis-test-utils
+    (make -j16 trtis-test-utils trtis-custom-backends || true) && \
+    make -j16 trtis-test-utils trtis-custom-backends
 
 ############################################################################
 ## Copy artifacts from build container
@@ -53,50 +59,50 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_string_example/models && \
     cp -r docs/examples/model_repository/simple_string qa/L0_simple_string_example/models/. && \
-    mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/L0_simple_custom_example/models/simple/1/. && \
-    mkdir -p qa/L0_simple_ensemble/models/ensemble_add_sub_int32_int32_int32/1 && \
-    mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/L0_simple_ensemble/models/simple/1/. && \
-    mkdir -p qa/L0_multiple_ports/models/simple/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-      qa/L0_multiple_ports/models/simple/1/. && \
     mkdir qa/L0_simple_inprocess/models && \
     cp /opt/tensorrtserver/bin/simple_inprocess qa/L0_simple_inprocess/. && \
-    cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/. && \
-    mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
-    cp /opt/tensorrtserver/custom/libimagepreprocess.so \
-       qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/. && \
-    mkdir -p qa/L0_custom_param/models/param/1 && \
-    cp /opt/tensorrtserver/custom/libparam.so \
-       qa/L0_custom_param/models/param/1/. && \
-    mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
-    cp /opt/tensorrtserver/custom/libsequence.so \
-       qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
-    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer/. && \
-    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_variable/. && \
-    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_reshape/. && \
-    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_infer_zero/. && \
-    cp /opt/tensorrtserver/custom/libidentity.so qa/L0_sequence_batcher/. && \
-    mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/custom_models/custom_int32_int32_int32/1/. && \
-    mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
-    mkdir -p qa/custom_models/custom_float32_float32_float32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/custom_models/custom_float32_float32_float32/1/. && \
-    mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
-    cp /opt/tensorrtserver/custom/libaddsub.so \
-       qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
-    mkdir -p qa/custom_models/custom_sequence_int32/1 && \
-    cp /opt/tensorrtserver/custom/libsequence.so \
-       qa/custom_models/custom_sequence_int32/1/.
+    cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/.
 
 COPY --from=test_utils /workspace/build/trtis-test-utils/install/bin/caffe2plan qa/common/
+
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/custom_models/custom_int32_int32_int32/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/custom_models/custom_nobatch_int32_int32_int32/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/custom_models/custom_float32_float32_float32/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/custom_models/custom_nobatch_float32_float32_float32/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/L0_simple_custom_example/models/simple/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/L0_simple_ensemble/models/simple/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+     qa/L0_multiple_ports/models/simple/1/
+
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libimagepreprocess.so \
+     qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/
+
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libparam.so \
+     qa/L0_custom_param/models/param/1/
+
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libsequence.so \
+     qa/L0_simple_sequence_example/models/simple_sequence/1/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libsequence.so \
+     qa/custom_models/custom_sequence_int32/1/
+
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_infer/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_infer_variable/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_infer_reshape/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_infer_zero/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_sequence_batcher/
+COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+     qa/L0_perflab_nomodel/
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
@@ -113,16 +119,15 @@ FROM ${CLIENT_IMAGE} AS client
 WORKDIR /workspace
 COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
-    cp /tmp/client/bin/* qa/clients/. && \
-    cp /tmp/client/python/*.py qa/clients/. && \
-    cp /tmp/client/python/tensorrtserver*.whl qa/pkgs/.
+    cp install/bin/* qa/clients/. && \
+    cp install/lib/librequest.so qa/clients/. && \
+    cp install/python/*.py qa/clients/. && \
+    cp install/python/tensorrtserver*.whl qa/pkgs/.
 
 ############################################################################
 ## Create CI enabled image
 ############################################################################
 FROM $BASE_IMAGE
-
-ARG PYVER=3.5
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               jmeter \
@@ -132,22 +137,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-core-dev \
                               libpng12-dev \
                               libzmq3-dev \
-                              python$PYVER \
-                              python$PYVER-dev \
-                              python$PYVER-numpy \
-                              python`echo $PYVER | cut -c1-1`-pil \
+                              python \
                               python-protobuf \
                               swig && \
     rm -rf /var/lib/apt/lists/*
 
-# Use the PYVER version of python
-RUN rm -f /usr/bin/python && \
-    rm -f /usr/bin/python`echo $PYVER | cut -c1-1` && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python && \
-    ln -s /usr/bin/python$PYVER /usr/bin/python`echo $PYVER | cut -c1-1`
-
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python$PYVER get-pip.py && \
+    python get-pip.py && \
     rm get-pip.py
 RUN pip install --upgrade numpy future grpcio
 
@@ -157,7 +153,7 @@ COPY --from=client /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.
-RUN rm -fr qa/L0_copyrights qa/L0_unit_test qa/L1_tfs_unit_test && \
+RUN rm -fr qa/L0_copyrights qa/L0_unit_test && \
     pip install --upgrade qa/pkgs/tensorrtserver-*.whl
 
-ENV PYVER ${PYVER}
+ENV LD_LIBRARY_PATH /opt/tensorrtserver/qa/clients:${LD_LIBRARY_PATH}

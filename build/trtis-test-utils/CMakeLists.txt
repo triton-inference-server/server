@@ -36,10 +36,14 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
+
+#
+# CUDA
+#
+find_package(CUDA REQUIRED)
+message(STATUS "Using CUDA ${CUDA_VERSION}")
+set(CUDA_NVCC_FLAGS -std=c++11)
 
 add_subdirectory(../../src/test src/test)
