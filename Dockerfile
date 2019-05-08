@@ -68,6 +68,62 @@ RUN cd pytorch && \
       python setup.py install && python setup.py clean
 
 ############################################################################
+## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
+############################################################################
+FROM ${BASE_IMAGE} AS trtserver_onnx
+
+# Currently the prebuilt Onnx Runtime library is built on CUDA 9, thus it
+# needs to be built from source
+
+# Onnx Runtime release version
+ARG ONNX_RUNTIME_VERSION=0.4.0
+
+# Get release version of Onnx Runtime
+WORKDIR /workspace
+RUN apt-get update && apt-get install -y --no-install-recommends git
+RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Microsoft/onnxruntime
+
+ENV PATH="/opt/cmake/bin:${PATH}"
+ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
+RUN ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
+
+# Allow configure to pick up GDK and CuDNN where it expects it.
+# (Note: $CUDNN_VERSION is defined by NVidia's base image)
+RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
+    mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/include && \
+    ln -s /usr/include/cudnn.h /usr/local/cudnn-$_CUDNN_VERSION/cuda/include/cudnn.h && \
+    mkdir -p /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64 && \
+    ln -s /etc/alternatives/libcudnn_so /usr/local/cudnn-$_CUDNN_VERSION/cuda/lib64/libcudnn.so
+
+# Build and Install LLVM
+ARG LLVM_VERSION=6.0.1
+RUN cd /tmp && \
+    wget --no-verbose http://releases.llvm.org/$LLVM_VERSION/llvm-$LLVM_VERSION.src.tar.xz && \
+    xz -d llvm-$LLVM_VERSION.src.tar.xz && \
+    tar xvf llvm-$LLVM_VERSION.src.tar && \
+    cd llvm-$LLVM_VERSION.src && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build . -- -j$(nproc) && \
+    cmake -DCMAKE_INSTALL_PREFIX=/usr/local/llvm-$LLVM_VERSION -DBUILD_TYPE=Release -P cmake_install.cmake && \
+    cd /tmp && \
+    rm -rf llvm*
+
+ENV LD_LIBRARY_PATH /usr/local/openblas/lib:$LD_LIBRARY_PATH
+
+# Build files will be in /workspace/build
+ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use_openmp"
+RUN mkdir -p /workspace/build
+RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspace/build \
+            --config Release $COMMON_BUILD_ARGS \
+            --use_cuda \
+            --cuda_home /usr/local/cuda \
+            --cudnn_home /usr/local/cudnn-$(echo $CUDNN_VERSION | cut -d. -f1-2)/cuda \
+            --update \
+            --build
+
+############################################################################
 ## Build stage: Build inference server based on TensorFlow container
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
@@ -120,6 +176,12 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_gnu_thread.so /opt/tensorrtse
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_intel_lp64.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/
+
+# Onnx Runtime library
+ARG ONNX_RUNTIME_VERSION=0.4.0
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime /usr/local/include/
+COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/
+RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/libonnxruntime.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
