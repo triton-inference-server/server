@@ -27,19 +27,14 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# caffe2plan
+# libaddsub.so
 #
-if(${TRTIS_ENABLE_TENSORRT})
-add_executable(caffe2plan caffe2plan.cc)
-target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  caffe2plan
-  -lnvinfer
-  -lnvcaffe_parser
-  ${CUDA_LIBRARIES}
+cuda_add_library(
+  addsub SHARED
+  addsub.cu kernel.cu kernel.h
+  $<TARGET_OBJECTS:proto-library>
 )
 install(
-  TARGETS caffe2plan
-  RUNTIME DESTINATION bin
+  TARGETS addsub
+  LIBRARY DESTINATION lib
 )
-endif() # TRTIS_ENABLE_TENSORRT

@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "cuda/include/cuda.h"
+#include <cuda.h>
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace addsub {

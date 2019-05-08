@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cuda.h>
 #include <string>
-#include "cuda/include/cuda.h"
 #include "src/backends/custom/custom.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
