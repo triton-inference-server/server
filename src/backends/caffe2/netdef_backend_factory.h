@@ -42,7 +42,7 @@ class NetDefBackendFactory {
   };
 
   static Status Create(
-      const Config& backend_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<NetDefBackendFactory>* factory);
 
   Status CreateBackend(
@@ -54,12 +54,12 @@ class NetDefBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(NetDefBackendFactory);
 
-  NetDefBackendFactory(const Config& backend_config)
+  NetDefBackendFactory(const std::shared_ptr<Config>& backend_config)
       : backend_config_(backend_config)
   {
   }
 
-  const Config backend_config_;
+  const std::shared_ptr<Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

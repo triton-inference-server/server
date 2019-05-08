@@ -27,8 +27,8 @@
 #include "src/backends/caffe2/netdef_backend.h"
 
 #include <NvInfer.h>
+#include <cuda_runtime_api.h>
 #include <stdint.h>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"

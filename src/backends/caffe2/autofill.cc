@@ -29,7 +29,6 @@
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 

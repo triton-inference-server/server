@@ -48,6 +48,8 @@ set(
 )
 
 add_library(
-  netdef-backend-library EXCLUDE_FROM_ALL OBJECT
+  caffe2-backend-library EXCLUDE_FROM_ALL OBJECT
   ${NETDEF_SRCS} ${NETDEF_HDRS}
 )
+add_dependencies(caffe2-backend-library proto-library)
+target_include_directories(caffe2-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
