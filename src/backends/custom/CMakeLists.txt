@@ -48,4 +48,4 @@ add_library(
   ${CUSTOM_SRCS} ${CUSTOM_HDRS}
 )
 add_dependencies(custom-backend-library proto-library)
-target_include_directories(custom-backend-library PRIVATE ${CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_include_directories(custom-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})

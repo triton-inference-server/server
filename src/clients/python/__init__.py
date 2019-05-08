@@ -46,6 +46,8 @@ class _utf8(object):
         else:
             return value.encode('utf8')
 
+_request_path = pkg_resources.resource_filename('tensorrtserver.api', 'librequest.so')
+_request = cdll.LoadLibrary(_request_path)
 _crequest_path = pkg_resources.resource_filename('tensorrtserver.api', 'libcrequest.so')
 _crequest = cdll.LoadLibrary(_crequest_path)
 

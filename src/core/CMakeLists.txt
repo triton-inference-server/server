@@ -96,8 +96,8 @@ add_library(
   model-config-cuda-library EXCLUDE_FROM_ALL OBJECT
   model_config_cuda.cc model_config_cuda.h
 )
-target_include_directories(model-config-cuda-library PRIVATE ${CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-add_dependencies(model-config-library proto-library)
+target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
+add_dependencies(model-config-cuda-library proto-library)
 
 #
 # Common request interface used by both clients and server.
@@ -176,7 +176,7 @@ add_library(
 add_dependencies(server-library request-library proto-library)
 target_include_directories(
   server-library
-  PRIVATE ${CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
 )
 
 if(${TRTIS_ENABLE_METRICS})

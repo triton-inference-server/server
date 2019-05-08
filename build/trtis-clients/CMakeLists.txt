@@ -37,9 +37,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
