@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "caffe2/core/netdef_backend_c2.h"
+#include "caffe2/core/torch_backend_c2.h"
 
 #include <google/protobuf/io/coded_stream.h>
 #include <stdint.h>
