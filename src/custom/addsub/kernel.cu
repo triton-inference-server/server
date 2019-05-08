@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cuda.h>
 #include <stdint.h>
-#include "cuda/include/cuda.h"
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace addsub {

@@ -63,6 +63,13 @@ function main() {
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserver/__init__.py
 
+  # Use 'sed' command to fix protoc compiled imports (see
+  # https://github.com/google/protobuf/issues/1491).
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserver.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserver/api/*_pb2.py
+	sed -i "s/^import \([^ ]*\)_pb2 as \([^ ]*\)$/from tensorrtserver.api import \1_pb2 as \2/" \
+    ${WHLDIR}/tensorrtserver/api/*_pb2_grpc.py
+
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
   VERSION=$VERSION python setup.py bdist_wheel

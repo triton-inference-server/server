@@ -100,11 +100,10 @@ target_link_libraries(
   trtserver
   -L/usr/local/cuda/lib64/stubs
   -lnvidia-ml
-  -L/usr/local/cuda/lib64
-  -lcudart
   gRPC::grpc++
   gRPC::grpc
   ${LIBEVENT_LIBRARIES}
+  ${CUDA_LIBRARIES}
   "-Wl,--version-script libtrtserver.ldscript"
 )
 

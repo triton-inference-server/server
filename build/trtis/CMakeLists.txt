@@ -57,11 +57,15 @@ if(${TRTIS_ENABLE_CUSTOM})
   add_definitions(-DTRTIS_ENABLE_CUSTOM=1)
 endif() # TRTIS_ENABLE_CUSTOM
 
-# For more recent cmakes this should not be necessary
-set(CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/include")
-
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
+
+#
+# CUDA
+#
+find_package(CUDA REQUIRED)
+message(STATUS "Using CUDA ${CUDA_VERSION}")
+set(CUDA_NVCC_FLAGS -std=c++11)
 
 #
 # libevent
