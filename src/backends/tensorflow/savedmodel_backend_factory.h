@@ -25,8 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/backends/tensorflow/savedmodel_backend.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
+#include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -36,7 +35,7 @@ namespace nvidia { namespace inferenceserver {
 class SavedModelBackendFactory {
  public:
   static Status Create(
-      const GraphDefBackendFactory::Config& backend_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<SavedModelBackendFactory>* factory);
 
   Status CreateBackend(
@@ -48,12 +47,13 @@ class SavedModelBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(SavedModelBackendFactory);
 
-  SavedModelBackendFactory(const GraphDefBackendFactory::Config& backend_config)
+  SavedModelBackendFactory(
+      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config)
       : backend_config_(backend_config)
   {
   }
 
-  const GraphDefBackendFactory::Config backend_config_;
+  const std::shared_ptr<GraphDefBackendFactory::Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

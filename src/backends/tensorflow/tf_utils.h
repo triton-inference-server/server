@@ -25,13 +25,21 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.pb.h"
+#include "tensorflow/core/public/session_options.h"
 
 namespace nvidia { namespace inferenceserver {
+
+/// \return the tensorflow::SessionOptions for a backend
+/// configuration.
+Status NewSessionOptionsFromGraphDefBackendConfig(
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+    tensorflow::SessionOptions* session_options);
 
 /// \return true if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented

@@ -98,6 +98,7 @@ add_library(
 )
 target_link_libraries(
   trtserver
+  ${TRTIS_EXTRA_LDFLAGS}
   -L/usr/local/cuda/lib64/stubs
   -lnvidia-ml
   gRPC::grpc++
@@ -115,10 +116,18 @@ if(${TRTIS_ENABLE_TENSORRT})
   )
 endif() # TRTIS_ENABLE_TENSORRT
 
+if(${TRTIS_ENABLE_TENSORFLOW})
+  target_link_libraries(
+    trtserver
+    ${TRTIS_EXTRA_LDFLAGS}
+    -ltensorflow_trtis
+  )
+endif() # TRTIS_ENABLE_TENSORFLOW
+
 if(${TRTIS_ENABLE_CAFFE2})
   target_link_libraries(
     trtserver
-    -L/opt/tensorrtserver/lib
+    ${TRTIS_EXTRA_LDFLAGS}
     -lcaffe2
     -lcaffe2_detectron_ops_gpu
     -lcaffe2_gpu

@@ -23,44 +23,6 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-cmake_minimum_required (VERSION 3.5)
-
-#
-# TensorFlow backends
-#
-
-# Because TF loves to spew warnings... remove this once we create a
-# stub file that compiles into TF...
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
-
-set(
-  TENSORFLOW_SRCS
-  autofill.cc
-  base_backend.cc
-  graphdef_backend.cc
-  graphdef_backend_factory.cc
-  savedmodel_backend.cc
-  savedmodel_backend_factory.cc
-  loader.cc
-  tf_utils.cc
-)
-
-set(
-  TENSORFLOW_HDRS
-  autofill.h
-  base_backend.h
-  graphdef_backend.h
-  graphdef_backend_factory.h
-  savedmodel_backend.h
-  savedmodel_backend_factory.h
-  loader.h
-  tf_utils.h
-)
-
-add_library(
-  tensorflow-backend-library EXCLUDE_FROM_ALL OBJECT
-  ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
-)
-add_dependencies(tensorflow-backend-library proto-library)
-target_include_directories(tensorflow-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+{
+  global: *;
+};

@@ -34,6 +34,10 @@ option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
 option(TRTIS_NODEPENDS "Don't build required dependencies for TRTIS targets" OFF)
 
+set(TRTIS_EXTRA_INCLUDE_PATHS "" CACHE PATH "Extra include paths for TRTIS build")
+set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
+
+
 include(ExternalProject)
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
@@ -296,6 +300,8 @@ ExternalProject_Add(trtis
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
     -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
+    -DTRTIS_EXTRA_INCLUDE_PATHS:PATH=${TRTIS_EXTRA_INCLUDE_PATHS}
+    -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}

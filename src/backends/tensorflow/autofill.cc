@@ -27,7 +27,6 @@
 #include "src/backends/tensorflow/autofill.h"
 
 #include "src/backends/tensorflow/loader.h"
-#include "src/backends/tensorflow/savedmodel_backend.pb.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
@@ -37,7 +36,6 @@
 #include "src/core/model_config.pb.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
-#include "tensorflow/core/lib/io/path.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -215,11 +213,14 @@ AutoFillSavedModel::Create(
   const std::string savedmodel_dir = *(savedmodel_dirs.begin());
   const auto savedmodel_path = JoinPath({version_path, savedmodel_dir});
 
-  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
-  SavedModelPlatformConfig saved_model_config;
-  platform_config.UnpackTo(&saved_model_config);
+  auto graphdef_backend_config =
+      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
+
   tensorflow::SessionOptions session_options;
-  session_options.config = saved_model_config.session_config();
+  RETURN_IF_ERROR(NewSessionOptionsFromGraphDefBackendConfig(
+      graphdef_backend_config, &session_options));
+
+  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
   tensorflow::SignatureDef sig;
   RETURN_IF_ERROR(LoadSavedModel(
       model_name, savedmodel_path, session_options, &bundle, &sig));
