@@ -31,8 +31,9 @@ rm -f $TEST_LOG
 RET=0
 
 apt-get update && \
-    apt-get install -y --no-install-recommends zip doxygen && \
-    pip install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
+    apt-get install -y --no-install-recommends python3-pip zip doxygen && \
+    pip3 install --upgrade setuptools && \
+    pip3 install --upgrade sphinx sphinx-rtd-theme nbsphinx exhale
 
 set +e
 
