@@ -25,10 +25,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/public/session_options.h"
 
 namespace tensorflow {
 class Session;

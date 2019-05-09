@@ -60,6 +60,15 @@ endif() # TRTIS_ENABLE_CUSTOM
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
+FOREACH(p ${TRTIS_EXTRA_INCLUDE_PATHS})
+  include_directories("${p}")
+ENDFOREACH(p)
+
+set(TRTIS_EXTRA_LDFLAGS "")
+FOREACH(p ${TRTIS_EXTRA_LIB_PATHS})
+  set(TRTIS_EXTRA_LDFLAGS ${TRTIS_EXTRA_LDFLAGS} "-L${p}")
+ENDFOREACH(p)
+
 #
 # CUDA
 #

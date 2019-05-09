@@ -26,8 +26,8 @@
 
 #include "src/backends/tensorflow/base_backend.h"
 
+#include <cuda_runtime_api.h>
 #include <set>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -38,7 +38,7 @@
 #include "tensorflow/c/c_api.h"
 #include "tensorflow/core/framework/types.pb.h"
 #include "tensorflow/core/graph/default_device.h"
-#include "tensorflow/core/lib/io/path.h"
+#include "tensorflow/core/public/session.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -181,12 +181,12 @@ BaseBackend::CreateExecutionContext(
   // https://github.com/tensorflow/tensorflow/issues/8136 and many
   // related issues), so we can't use it here to set the GPU (see
   // CreateSession implementations for SetDefaultDevice). [DLIS-43]
-  tensorflow::SessionOptions options;
-  options.config.mutable_gpu_options()->set_allow_growth(
-      backend_config->allow_gpu_memory_growth);
-  options.config.mutable_gpu_options()->set_per_process_gpu_memory_fraction(
-      backend_config->per_process_gpu_memory_fraction);
-  options.config.set_allow_soft_placement(backend_config->allow_soft_placement);
+  auto graphdef_backend_config =
+      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
+
+  tensorflow::SessionOptions session_options;
+  RETURN_IF_ERROR(NewSessionOptionsFromGraphDefBackendConfig(
+      graphdef_backend_config, &session_options));
 
   // Enable/disable XLA based on the model config optimization
   // setting.
@@ -202,12 +202,12 @@ BaseBackend::CreateExecutionContext(
     }
   }
 
-  options.config.mutable_graph_options()
+  session_options.config.mutable_graph_options()
       ->mutable_optimizer_options()
       ->set_global_jit_level(xla);
 
   RETURN_IF_ERROR(CreateSession(
-      options, gpu_device, gdp_itr->second, &context.session_,
+      session_options, gpu_device, gdp_itr->second, &context.session_,
       &context.input_name_map_, &context.output_name_map_));
 
   return Status::Success;
