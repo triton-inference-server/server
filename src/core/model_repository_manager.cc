@@ -37,6 +37,8 @@
 #include "src/backends/custom/custom_backend_factory.h"
 #include "src/backends/ensemble/ensemble_backend.pb.h"
 #include "src/backends/ensemble/ensemble_backend_factory.h"
+#include "src/backends/onnx/onnx_backend.pb.h"
+#include "src/backends/onnx/onnx_backend_factory.h"
 #include "src/backends/tensorflow/graphdef_backend.pb.h"
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/savedmodel_backend.pb.h"

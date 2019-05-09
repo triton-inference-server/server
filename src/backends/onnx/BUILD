@@ -28,68 +28,47 @@ package(
     default_visibility = ["//visibility:public"],
 )
 
-#
-# HTTP service endpoint
-#
+load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
+
+cc_proto_library(
+    name = "onnx_backend_proto",
+    srcs = ["onnx_backend.proto"],
+)
+
 cc_library(
-    name = "http_server",
-    srcs = ["http_server.cc"],
-    hdrs = ["http_server.h"],
+    name = "onnx_utils",
+    srcs = ["onnx_utils.cc"],
+    hdrs = ["onnx_utils.h"],
     deps = [
-        "//src/core:all_cc_protos",
-        "//src/core:libtrtserver_import",
-        "@com_github_libevhtp//:libevhtp",
-        "@com_github_libevent_libevent//:libevent",
-        "@com_google_absl//absl/strings",
-        "@com_googlesource_code_re2//:re2",
+        "//src/core:model_config",
     ],
 )
 
-#
-# GRPC service endpoint
-#
 cc_library(
-    name = "grpc_server",
-    srcs = ["grpc_server.cc"],
-    hdrs = ["grpc_server.h"],
+    name = "onnx_backend",
+    srcs = ["onnx_backend.cc"],
+    hdrs = ["onnx_backend.h"],
     deps = [
-        "//src/core:all_cc_protos",
-        "//src/core:libtrtserver_import",
-        "//src/nvrpc:nvrpc",
-        "@com_github_libevent_libevent//:libevent", # FIXME, because provider_utils mixes HTTP/GRPC
-        "@grpc//:grpc++_unsecure",
+        ":onnx_utils",
+        "//src/core:constants",
+        "//src/core:model_config_proto",
+        "//src/core:model_config",
+        "//src/core:server_header",
+        "@local_config_cuda//cuda:cuda_headers"
     ],
 )
 
-#
-# Inference server
-#
-cc_binary(
-    name = "trtserver",
-    srcs = ["main.cc"],
+cc_library(
+    name = "onnx_backend_factory",
+    srcs = ["onnx_backend_factory.cc"],
+    hdrs = ["onnx_backend_factory.h"],
     deps = [
-        ":grpc_server",
-        ":http_server",
-        "//src/core:libtrtserver_import",
-        "@extern_lib//:libcaffe2",
-        "@extern_lib//:libcaffe2_detectron_ops_gpu",
-        "@extern_lib//:libcaffe2_gpu",
-        "@extern_lib//:libc10",
-        "@extern_lib//:libc10_cuda",
-        "@extern_lib//:libmkl_core",
-        "@extern_lib//:libmkl_gnu_thread",
-        "@extern_lib//:libmkl_avx2",
-        "@extern_lib//:libmkl_def",
-        "@extern_lib//:libmkl_intel_lp64",
-        "@extern_lib//:libmkl_rt",
-        "@extern_lib//:libmkl_vml_def",
-        "@extern_lib//:libonnxruntime",
-        "@prometheus//pull:pull",
+        ":onnx_backend",
+        ":onnx_backend_proto",
+        "//src/core:constants",
+        "//src/core:model_config",
+        "//src/core:model_config_proto",
+        "//src/core:server_header",
     ],
-    linkopts = [
-        "-pthread",
-        "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml",
-        "-lnvonnxparser_runtime"
-    ],
+    alwayslink = 1,
 )
