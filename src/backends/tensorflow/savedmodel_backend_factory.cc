@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "src/backends/tensorflow/savedmodel_backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -40,12 +41,14 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 SavedModelBackendFactory::Create(
-    const GraphDefBackendFactory::Config& backend_config,
+    const std::shared_ptr<BackendConfig>& backend_config,
     std::unique_ptr<SavedModelBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create SavedModelBackendFactory";
 
-  factory->reset(new SavedModelBackendFactory(backend_config));
+  auto savedmodel_backend_config =
+      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
+  factory->reset(new SavedModelBackendFactory(savedmodel_backend_config));
   return Status::Success;
 }
 
