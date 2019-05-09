@@ -44,7 +44,7 @@ int main(int argc, const char* argv[]) {
   std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/5) << '\n';
 
   std::vector<double> v = {1.0, 2.0, 3.0};
-  auto test_tensor = torch::from_blob(v.data(), v.size(),
+  at::Tensor test_tensor = torch::from_blob(v.data(), v.size(),
     torch::dtype(torch::kFloat64).requires_grad(true));
 
   // OR
@@ -58,7 +58,7 @@ int main(int argc, const char* argv[]) {
     7, 8, 9
   };
 
-  auto test_tensor2 = torch::from_blob(v.data(),/*sizes=*/{3, 3},
+  at::Tensor test_tensor2 = torch::from_blob(v.data(),/*sizes=*/{3, 3},
       /*strides=*/{1, 3}, torch::kInt32);
 
   std::cout << "datatype of Tensor: "<< test_tensor2.dtype(); // torch::kInt32
@@ -71,4 +71,8 @@ int main(int argc, const char* argv[]) {
   test_tensor = test_tensor.to(at::TensorOptions(at::kDouble));
   test_tensor = test_tensor.to(at::kDouble);
 
+  // at::Tensor tensor_image = torch::from_blob(image.data, {1, 3, image.rows, image.cols}, at::kByte);
+  // tensor_image = tensor_image.to(at::kFloat);
+  // at::TensorOptions options = torch::TensorOptions().dtype(torch::kFloat32);
+  // torch::Tensor tensor_in = tensor::from_blob(binary_array, {1, 10} /* IntArrRef dims */, options);
 }
