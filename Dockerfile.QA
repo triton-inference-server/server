@@ -43,7 +43,7 @@ RUN apt-get install -y --no-install-recommends \
             libopencv-core-dev
 
 WORKDIR /workspace
-RUN cd build && \
+RUN cd builddir && \
     (make -j16 trtis-test-utils trtis-custom-backends || true) && \
     make -j16 trtis-test-utils trtis-custom-backends
 
@@ -63,45 +63,45 @@ RUN mkdir -p qa/common && \
     cp /opt/tensorrtserver/bin/simple_inprocess qa/L0_simple_inprocess/. && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/.
 
-COPY --from=test_utils /workspace/build/trtis-test-utils/install/bin/caffe2plan qa/common/
+COPY --from=test_utils /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/
 
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/custom_models/custom_int32_int32_int32/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/custom_models/custom_nobatch_int32_int32_int32/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/custom_models/custom_float32_float32_float32/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/custom_models/custom_nobatch_float32_float32_float32/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/L0_simple_custom_example/models/simple/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/L0_simple_ensemble/models/simple/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libaddsub.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
      qa/L0_multiple_ports/models/simple/1/
 
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libimagepreprocess.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
      qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/
 
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libparam.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libparam.so \
      qa/L0_custom_param/models/param/1/
 
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libsequence.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libsequence.so \
      qa/L0_simple_sequence_example/models/simple_sequence/1/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libsequence.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libsequence.so \
      qa/custom_models/custom_sequence_int32/1/
 
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_infer/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_infer_variable/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_infer_reshape/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_infer_zero/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_sequence_batcher/
-COPY --from=test_utils /workspace/build/trtis-custom-backends/install/lib/libidentity.so \
+COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
      qa/L0_perflab_nomodel/
 
 # Generating the docs requires the docs source and the source code so

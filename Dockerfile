@@ -188,17 +188,18 @@ COPY . .
 # Build the server. The build can fail the first time due to a
 # protobuf_generate_cpp error that doesn't repeat on subsequent
 # builds, which is why there are 2 make invocations below.
-RUN cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release \
-          -DTRTIS_ENABLE_METRICS=ON \
-          -DTRTIS_ENABLE_CUSTOM=ON \
-          -DTRTIS_ENABLE_TENSORFLOW=OFF \
-          -DTRTIS_ENABLE_TENSORRT=ON \
-          -DTRTIS_ENABLE_CAFFE2=ON && \
-    (make -j16 trtis || true) && \
-    make -j16 trtis && \
-    mkdir -p /opt/tensorrtserver && \
-    cp -r trtis/install/* /opt/tensorrtserver/. && \
+RUN mkdir -p builddir && \
+    (cd builddir && \
+            cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DTRTIS_ENABLE_METRICS=ON \
+                  -DTRTIS_ENABLE_CUSTOM=ON \
+                  -DTRTIS_ENABLE_TENSORFLOW=OFF \
+                  -DTRTIS_ENABLE_TENSORRT=ON \
+                  -DTRTIS_ENABLE_CAFFE2=ON ../build && \
+            (make -j16 trtis || true) && \
+            make -j16 trtis && \
+            mkdir -p /opt/tensorrtserver && \
+            cp -r trtis/install/* /opt/tensorrtserver/.) && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
