@@ -26,6 +26,7 @@
 
 #include "src/backends/tensorflow/loader.h"
 
+#include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {

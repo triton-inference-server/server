@@ -33,6 +33,32 @@ ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.05-py3
 ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.05-py3
 
 ############################################################################
+## TensorFlow stage: Use TensorFlow container to build
+############################################################################
+FROM ${TENSORFLOW_IMAGE} AS trtserver_tf
+
+# Modify the TF model loader to allow us to set the default GPU for
+# multi-GPU support
+COPY tools/patch/tensorflow /tmp/trtis/tools/patch/tensorflow
+RUN sha1sum -c /tmp/trtis/tools/patch/tensorflow/checksums && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/cc/saved_model/loader.cc \
+          /opt/tensorflow/tensorflow/cc/saved_model/loader.cc && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/BUILD \
+          /opt/tensorflow/tensorflow/BUILD
+
+# The link script to hide all symbols except those needed by TRTIS
+COPY src/backends/tensorflow/libtensorflow_trtis.ldscript /opt/tensorflow/tensorflow/
+
+# Build TensorFlow library for TRTIS
+WORKDIR /opt/tensorflow
+RUN ./nvbuild.sh --python3.5 --configonly && \
+    bazel build -c opt tensorflow:libtensorflow_trtis.so && \
+    bazel clean --expunge && \
+    rm -rf /root/.cache/bazel && \
+    rm -rf /tmp/*
+>>>>>>> Cmake for TensorFlow backend
+
+############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
 ############################################################################
 FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
@@ -139,7 +165,20 @@ RUN apt-get update && \
             libssl-dev \
             libtool
 
-# Caffe2 library requirements...
+# TensorFlow headers and libraries
+COPY --from=trtserver_tf \
+     /opt/tensorflow/bazel-bin/tensorflow/libtensorflow_trtis.so /opt/tensorrtserver/lib/
+COPY --from=trtserver_tf \
+     /usr/local/lib/python3.5/dist-packages/tensorflow/include \
+     /opt/tensorrtserver/include/
+COPY --from=trtserver_tf \
+     /opt/tensorflow/tensorflow/c/c_api.h \
+     /opt/tensorrtserver/include/tensorflow/c/
+COPY --from=trtserver_tf \
+     /opt/tensorflow/tensorflow/cc/saved_model/*.h \
+     /opt/tensorrtserver/include/tensorflow/cc/saved_model/
+
+# Caffe2 libraries
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
      /opt/tensorrtserver/lib/
@@ -174,9 +213,12 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/includ
 
 # Onnx Runtime library
 ARG ONNX_RUNTIME_VERSION=0.4.0
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime /usr/local/include/
-COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/
-RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/libonnxruntime.so
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime \
+     /usr/local/include/
+COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
+     /opt/tensorrtserver/lib/
+RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
+    /opt/tensorrtserver/lib/libonnxruntime.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
@@ -188,14 +230,17 @@ COPY . .
 # Build the server. The build can fail the first time due to a
 # protobuf_generate_cpp error that doesn't repeat on subsequent
 # builds, which is why there are 2 make invocations below.
-RUN mkdir -p builddir && \
+RUN rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
                   -DTRTIS_ENABLE_CUSTOM=ON \
-                  -DTRTIS_ENABLE_TENSORFLOW=OFF \
+                  -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=ON \
-                  -DTRTIS_ENABLE_CAFFE2=ON ../build && \
+                  -DTRTIS_ENABLE_CAFFE2=ON \
+                  -DTRTIS_EXTRA_INCLUDE_PATHS="/opt/tensorrtserver/include" \
+                  -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib" \
+                  ../build && \
             (make -j16 trtis || true) && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver && \

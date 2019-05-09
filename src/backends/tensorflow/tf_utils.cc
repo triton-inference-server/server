@@ -28,6 +28,22 @@
 
 namespace nvidia { namespace inferenceserver {
 
+Status
+NewSessionOptionsFromGraphDefBackendConfig(
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+    tensorflow::SessionOptions* session_options)
+{
+  session_options->config.mutable_gpu_options()->set_allow_growth(
+      backend_config->allow_gpu_memory_growth);
+  session_options->config.mutable_gpu_options()
+      ->set_per_process_gpu_memory_fraction(
+          backend_config->per_process_gpu_memory_fraction);
+  session_options->config.set_allow_soft_placement(
+      backend_config->allow_soft_placement);
+
+  return Status::Success;
+}
+
 bool
 CompareDimsExact(
     const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
