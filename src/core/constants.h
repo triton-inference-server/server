@@ -42,6 +42,7 @@ constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
 constexpr char kTensorFlowSavedModelPlatform[] = "tensorflow_savedmodel";
 constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
 constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
+constexpr char kLibTorchPlatform[] = "libtorch_pt";
 constexpr char kCustomPlatform[] = "custom";
 constexpr char kEnsemblePlatform[] = "ensemble";
 constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";

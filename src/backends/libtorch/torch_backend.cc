@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/caffe2/torch_backend.h"
+#include "src/backends/libtorch/torch_backend.h"
 
 #include <NvInfer.h>
 #include <stdint.h>
@@ -93,7 +93,7 @@ LibTorchBackend::Context::~Context()
 Status
 LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, kCaffe2NetDefPlatform));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kLibTorchPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;
@@ -179,7 +179,7 @@ LibTorchBackend::CreateExecutionContext(
   const auto& mn_itr = models.find(cc_model_filename);
   if (mn_itr == models.end()) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to find NetDef model '" +
+        RequestStatusCode::INTERNAL, "unable to find LibTorch model '" +
                                          cc_model_filename + "' for " + Name());
   }
 

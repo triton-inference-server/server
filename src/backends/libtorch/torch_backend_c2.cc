@@ -235,6 +235,7 @@ LibTorchWorkspaceCreate(
   // add an operation that copies that input to the GPU. For each
   // output that is produced on the GPU add an operation that copies
   // that output to the CPU.
+  // TODO caffe to LibTorch
   std::unordered_map<std::string, std::string> io_name_map;
   caffe2::NetDef new_input_ops;
 
@@ -293,6 +294,7 @@ LibTorchWorkspaceCreate(
   // beginning of the ops. NetDef seems to require the tensor be
   // defined before references... not sure how it handles
   // cycles. Protobuf doesn't have any way to do this gracefully...
+  // TODO caffe to LibTorch
   if (new_input_ops.op().size() > 0) {
     new_input_ops.mutable_op()->MergeFrom(netdef_model.op());
     netdef_model.mutable_op()->CopyFrom(new_input_ops.op());
@@ -385,10 +387,10 @@ LibTorchWorkspaceImpl::SetInputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-        "failed to get NetDef blob for input '" + name + "': " + ex.msg());
+        "failed to get LibTorch blob for input '" + name + "': " + ex.msg());
   }
   if (blob == nullptr) {
-    return Error("failed to get NetDef blob for input '" + name + "'");
+    return Error("failed to get LibTorch blob for input '" + name + "'");
   }
 
   caffe2::Tensor* input = nullptr;
@@ -397,10 +399,10 @@ LibTorchWorkspaceImpl::SetInputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-        "failed to get NetDef tensor for input '" + name + "': " + ex.msg());
+        "failed to get LibTorch tensor for input '" + name + "': " + ex.msg());
   }
   if (input == nullptr) {
-    return Error("failed to get NetDef tensor for input '" + name + "'");
+    return Error("failed to get LibTorch tensor for input '" + name + "'");
   }
 
   input->Resize(shape);
@@ -409,7 +411,7 @@ LibTorchWorkspaceImpl::SetInputTensor(
   if (!pr.first) {
     return Error(
         "Failed to convert datatype '" + DataTypeName(dtype) +
-        "' to Torch NetDef datatype");
+        "' to Torch LibTorch datatype");
   }
 
   input->ShareExternalPointer(const_cast<char*>(content), pr.second, byte_size);
@@ -437,10 +439,10 @@ LibTorchWorkspaceImpl::GetOutputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-        "failed to get NetDef blob for output '" + name + "': " + ex.msg());
+        "failed to get LibTorch blob for output '" + name + "': " + ex.msg());
   }
   if (blob == nullptr) {
-    return Error("failed to get NetDef blob for output '" + name + "'");
+    return Error("failed to get LibTorch blob for output '" + name + "'");
   }
 
   caffe2::Tensor* output = nullptr;
@@ -449,17 +451,17 @@ LibTorchWorkspaceImpl::GetOutputTensor(
   }
   catch (caffe2::EnforceNotMet ex) {
     return Error(
-        "failed to get NetDef tensor for output '" + name + "': " + ex.msg());
+        "failed to get LibTorch tensor for output '" + name + "': " + ex.msg());
   }
   if (output == nullptr) {
-    return Error("failed to get NetDef tensor for output '" + name + "'");
+    return Error("failed to get LibTorch tensor for output '" + name + "'");
   }
 
   const auto pr = ConvertDatatype(dtype);
   if (!pr.first) {
     return Error(
         "Failed to convert datatype '" + DataTypeName(dtype) +
-        "' to Torch NetDef datatype");
+        "' to Torch LibTorch datatype");
   }
 
   if (pr.second != output->meta()) {
