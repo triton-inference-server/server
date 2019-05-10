@@ -124,6 +124,26 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --build
 
 ############################################################################
+## LibTorch Backend stage: Build LibTorch Backend on CUDA 10, CUDNN 7
+############################################################################
+FROM ${BASE_IMAGE} AS trtserver_libtorch
+
+# Build LibTorch from source github
+WORKDIR /workspace
+RUN apt-get update && apt-get install -y --no-install-recommends git && \
+    apt-get install -y python3.5 python3.5-dev python3-pip cmake && \
+    pip3 install pyaml mkl-devel
+RUN git clone --recursive https://github.com/pytorch/pytorch.git && cd pytorch
+RUN mkdir -p pytorch/build_libtorch && cd pytorch/build_libtorch && \
+    python3.5 ../tools/build_libtorch.py
+
+# CMake Libtorch Backend
+# COPY libtorch_test /opt/libtorch_test
+# RUN cd /opt/libtorch_test/build && \
+#     cmake -DCMAKE_PREFIX_PATH=/opt/libtorch .. && \
+#     make -j
+
+############################################################################
 ## Build stage: Build inference server based on TensorFlow container
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
@@ -182,6 +202,11 @@ ARG ONNX_RUNTIME_VERSION=0.4.0
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime /usr/local/include/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/
 RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} /opt/tensorrtserver/lib/libonnxruntime.so
+
+# LibTorch library
+COPY --from=trtserver_libtorch /workspace/pytorch/build_libtorch/include/ /usr/local/include
+COPY --from=trtserver_libtorch /workspace/pytorch/build_libtorch/lib/libtorch.so* \
+      /opt/tensorrtserver/lib/
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
@@ -292,20 +317,7 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-            libgoogle-glog0v5 unzip
-
-##### Download and Build LibTorch #####
-WORKDIR /opt
-# Download libtorch shared files and dependencies
-RUN wget https://download.pytorch.org/libtorch/nightly/cu100/libtorch-shared-with-deps-latest.zip && \
-    unzip libtorch-shared-with-deps-latest.zip && \
-    rm libtorch-shared-with-deps-latest.zip
-
-# CMake Libtorch Backend
-COPY libtorch_test /opt/libtorch_test
-RUN cd /opt/libtorch_test/build && \
-    cmake -DCMAKE_PREFIX_PATH=/opt/libtorch .. && \
-    make -j
+            libgoogle-glog0v5
 
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*

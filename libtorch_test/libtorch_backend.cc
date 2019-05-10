@@ -52,21 +52,21 @@ int main(int argc, const char* argv[]) {
   test_tensor = at::tensor(w);
 
   // 2D (N-D)
-  std::vector<int32_t> v = {
+  std::vector<int32_t> v2d = {
     1, 2, 3,
     4, 5, 6,
     7, 8, 9
   };
 
-  at::Tensor test_tensor2 = torch::from_blob(v.data(),/*sizes=*/{3, 3},
+  at::Tensor test_tensor2 = torch::from_blob(v2d.data(),/*sizes=*/{3, 3},
       /*strides=*/{1, 3}, torch::kInt32);
 
-  std::cout << "datatype of Tensor: "<< test_tensor2.dtype(); // torch::kInt32
-  std::cout << "No. of values: "<< test_tensor2.numel(); // 9
+  std::cout << "Datatype of Tensor: "<< test_tensor2.dtype(); // torch::kInt32
+  std::cout << "\nNo. of values: "<< test_tensor2.numel(); // 9
 
   torch::Tensor test_tensor3 = torch::tensor(3.14, torch::kCUDA);
-  torch::Scalar scalar = test_tensor3.item()
-  std::cout << "Tensor to Scalar" << scalar.to<float>();
+  torch::Scalar scalar = test_tensor3.item();
+  std::cout << "\nTensor to Scalar" << scalar.to<float>();
 
   test_tensor = test_tensor.to(at::TensorOptions(at::kDouble));
   test_tensor = test_tensor.to(at::kDouble);
