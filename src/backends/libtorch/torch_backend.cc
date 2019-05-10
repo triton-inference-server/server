@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -82,7 +82,6 @@ LibTorchBackend::Context::Context(Context&& o)
 {
   o.gpu_device_ = NO_GPU_DEVICE;
   o.max_batch_size_ = NO_BATCHING;
-  workspace_.swap(o.workspace_);
 }
 
 LibTorchBackend::Context::~Context()
@@ -93,7 +92,7 @@ LibTorchBackend::Context::~Context()
 Status
 LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, kLibTorchPlatform));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kLibTorchPtPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;
@@ -141,7 +140,7 @@ LibTorchBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "netdef backend for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "libtprch backend for " << Name() << std::endl << *this;
   return Status::Success;
 }
 
@@ -217,18 +216,15 @@ LibTorchBackend::CreateExecutionContext(
   }
 
   try {
-    // Create a Caffe2 workspace. We can't cross the raw protobuf
-    // across this boundary (since Caffe2 build may use a different
-    // protobuf).
-    LibTorchWorkspace* c2ws;LibTorchWorkspace
+    LibTorchWorkspace* c2ws;
     LibTorchWorkspace::Error err = LibTorchWorkspaceCreate(
         &c2ws, Config().name(), Config().max_batch_size(), input_names,
-        output_names, gpu_device, imn_itr->second, mn_itr->second);
+        output_names, gpu_device, mn_itr->second);
     if (!err.IsOk()) {
       return Status(RequestStatusCode::INTERNAL, err.Message());
     }
 
-    context.workspace_.reset(c2ws);
+    context.torch_model_ = c2ws.torch_model_;
   }
   catch (const std::exception& ex) {
     return Status(
@@ -262,13 +258,8 @@ LibTorchBackend::Context::ValidateInputs(
 {
   for (const auto& io : ios) {
     // For now, skipping the check if potential names is empty
-    if (!workspace_->PotentialInputNames().empty()) {
-      RETURN_IF_ERROR(
-          CheckAllowedModelInput(io, workspace_->PotentialInputNames()));
-    }
-
     if (ConvertDataType(io.data_type()) ==
-        LibTorchWorkspace::DataType::TYPE_INVALID) {
+        LibTorchWorkspace::DataTypeCode::Invalid) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -286,13 +277,8 @@ LibTorchBackend::Context::ValidateOutputs(
 {
   for (const auto& io : ios) {
     // For now, skipping the check if potential names is empty
-    if (!workspace_->PotentialOutputNames().empty()) {
-      RETURN_IF_ERROR(
-          CheckAllowedModelOutput(io, workspace_->PotentialOutputNames()));
-    }
-
     if (ConvertDataType(io.data_type()) ==
-        LibTorchWorkspace::DataType::TYPE_INVALID) {
+        LibTorchWorkspace::DataTypeCode::Invalid) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +

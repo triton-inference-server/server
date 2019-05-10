@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,9 +31,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// [TODO] change all "adapter" to "factory", "backend" to "backend"
-// Adapter that converts storage paths pointing to LibTorch files into
-// the corresponding netdef backend.
 class LibTorchBackendFactory {
  public:
   static Status Create(

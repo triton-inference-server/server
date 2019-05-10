@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ class LibTorchBackend : public InferenceBackend {
   Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
-  // serialized netdefs specified in 'models'.
+  // serialized .pt models specified in 'models'.
   Status CreateExecutionContexts(
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
@@ -126,6 +126,9 @@ class LibTorchBackend : public InferenceBackend {
 
     // LibTorch model.
     std::shared_ptr<torch::jit::script::Module> torch_model_;
+    std::vector<torch::jit::IValue> inputs_;
+    at::Tensor outputs_;
+
   };
 
   std::vector<Context> contexts_;

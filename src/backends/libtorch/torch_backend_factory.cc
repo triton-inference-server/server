@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -55,18 +55,14 @@ LibTorchBackendFactory::CreateBackend(
     const std::string& path, const ModelConfig& model_config,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  // Read all the netdef files in 'path'.
-  std::set<std::string> netdef_files;
-  RETURN_IF_ERROR(GetDirectoryFiles(path, &netdef_files));
+  // Read all the *.pt files in 'path'.
+  std::set<std::string> torch_files;
+  RETURN_IF_ERROR(GetDirectoryFiles(path, &torch_files));
 
   std::unordered_map<std::string, std::vector<char>> models;
-  for (const auto& filename : netdef_files) {
-    const auto netdef_path = JoinPath({path, filename});
-    std::string model_data_str;
-
-    RETURN_IF_ERROR(ReadTextFile(netdef_path, &model_data_str));
-    std::vector<char> model_data(model_data_str.begin(), model_data_str.end());
-    models.emplace(filename, std::move(model_data));
+  for (const auto& filename : torch_files) {
+    const auto torch_path = JoinPath({path, filename});
+    models.emplace(filename, std::move(torch_path));
   }
 
   // Create the backend for the model and all the execution contexts

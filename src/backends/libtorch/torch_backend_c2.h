@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -75,14 +75,14 @@ class LibTorchWorkspace {
     kDLMetal = 8,
     kDLVPI = 9,
     kDLROCM = 10,
-  } DeviceType;
+  } DLDeviceType;
 
   typedef enum {
     kDLInt = 0U,
     kDLUInt = 1U,
     kDLFloat = 2U,
     Invalid = 3U,
-  } DataTypeCode;
+  } DLDataTypeCode;
 
   typedef struct {
     // The value should be one of DLDataTypeCode enum values
@@ -90,13 +90,13 @@ class LibTorchWorkspace {
     uint8_t bits;
     // Number of lanes in the type, used for vector types
     uint16_t lanes;
-  } DataType;
+  } DLDataType;
 
   typedef struct {
-    DeviceType device_type;
+    DLDeviceType device_type;
     /* The device index */
     int device_id;
-  } DeviceContext;
+  } DLContext;
 
   virtual ~LibTorchWorkspace() = default;
 
@@ -124,16 +124,16 @@ class LibTorchWorkspace {
 extern "C" {
 
 #if defined(_MSC_VER)
-#define CAFFE2WS_EXPORT __declspec(dllexport)
+#define LIBTORCHWS_EXPORT __declspec(dllexport)
 #elif defined(__GNUC__)
-#define CAFFE2WS_EXPORT __attribute__((__visibility__("default")))
+#define LIBTORCHWS_EXPORT __attribute__((__visibility__("default")))
 #else
-#define CAFFE2WS_EXPORT
+#define LIBTORCHWS_EXPORT
 #endif
 
 // Create a LibTorchWorkspace that interfaces with the LibTorch library
 // for a model specified by its model path.
-CAFFE2WS_EXPORT LibTorchWorkspace::Error LibTorchWorkspaceCreate(
+LIBTORCHWS_EXPORT LibTorchWorkspace::Error LibTorchWorkspaceCreate(
     LibTorchWorkspace** c2ws, const std::string& model_name,
     const int max_batch_size, const std::vector<std::string>& input_names,
     const std::vector<std::string>& output_names, const int gpu_device,
