@@ -60,7 +60,7 @@ enum Platform {
   PLATFORM_CAFFE2_NETDEF = 4,
   PLATFORM_CUSTOM = 5,
   PLATFORM_ENSEMBLE = 6,
-  PLATFORM_ONNX_ONNX = 7
+  PLATFORM_ONNXRUNTIME_ONNX = 7
 };
 
 /// Get the number of elements in a shape.

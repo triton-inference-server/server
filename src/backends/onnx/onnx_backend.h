@@ -74,9 +74,9 @@ class OnnxBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
     ~Context();
 
+    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
@@ -110,7 +110,7 @@ class OnnxBackend : public InferenceBackend {
     OrtSession* session_;
   };
 
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const OnnxBackend& pb);

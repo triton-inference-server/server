@@ -218,8 +218,8 @@ GetPlatform(const std::string& platform_str)
     return Platform::PLATFORM_CUSTOM;
   } else if (platform_str == kEnsemblePlatform) {
     return Platform::PLATFORM_ENSEMBLE;
-  } else if (platform_str == kOnnxOnnxPlatform) {
-    return Platform::PLATFORM_ONNX_ONNX;
+  } else if (platform_str == kOnnxRuntimeOnnxPlatform) {
+    return Platform::PLATFORM_ONNXRUNTIME_ONNX;
   }
 
   return Platform::PLATFORM_UNKNOWN;

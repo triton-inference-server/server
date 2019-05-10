@@ -48,15 +48,6 @@ OnnxBackend::Context::Context(
 {
 }
 
-OnnxBackend::Context::Context(Context&& o)
-    : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_), session_(o.session_)
-{
-  o.gpu_device_ = NO_GPU_DEVICE;
-  o.max_batch_size_ = NO_BATCHING;
-  o.session_ = nullptr;
-}
-
 OnnxBackend::Context::~Context()
 {
   LOG_VERBOSE(1) << "~OnnxBackend::Context ";
@@ -69,7 +60,7 @@ OnnxBackend::Context::~Context()
 Status
 OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, kOnnxOnnxPlatform));
+  RETURN_IF_ERROR(ValidateModelConfig(config, kOnnxRuntimeOnnxPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   return Status::Success;
@@ -179,28 +170,28 @@ OnnxBackend::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
 
-  contexts_.emplace_back(instance_name, gpu_device, mbs);
-  Context& context = contexts_.back();
+  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  Context* context = contexts_.back().get();
 
   // [TODO] special handling for statefull model?
 
   // Create Onnx session
   OrtStatus* onnx_status = nullptr;
   OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
-  if (gpu_device == Context::NO_GPU_DEVICE) {
+  if (gpu_device != Context::NO_GPU_DEVICE) {
     onnx_status =
         OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
   }
   if (onnx_status == nullptr) {
     onnx_status = OrtCreateSession(
-        env, op_itr->second.c_str(), options, &context.session_);
+        env, op_itr->second.c_str(), options, &context->session_);
   }
   OrtReleaseSessionOptions(options);
 
   RETURN_IF_ORT_ERROR(onnx_status);
 
-  RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
-  RETURN_IF_ERROR(context.ValidateOutputs(Config().output()));
+  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
   return Status::Success;
 }
@@ -271,11 +262,11 @@ OnnxBackend::Run(
     if (payload.stats_ != nullptr) {
       compute_timers.emplace_back();
       payload.stats_->StartComputeTimer(&compute_timers.back());
-      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
+  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
 }
 
 Status
@@ -294,14 +285,14 @@ operator<<(std::ostream& out, const OnnxBackend& pb)
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
-    out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == OnnxBackend::Context::NO_GPU_DEVICE)
+    out << "  name=" << context->name_ << ", gpu="
+        << ((context->gpu_device_ == OnnxBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
-                : std::to_string(context.gpu_device_))
+                : std::to_string(context->gpu_device_))
         << ", max_batch_size="
-        << ((context.max_batch_size_ == OnnxBackend::Context::NO_BATCHING)
+        << ((context->max_batch_size_ == OnnxBackend::Context::NO_BATCHING)
                 ? "<none>"
-                : std::to_string(context.max_batch_size_))
+                : std::to_string(context->max_batch_size_))
         << std::endl;
   }
 

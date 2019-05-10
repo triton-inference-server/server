@@ -146,7 +146,7 @@ BuildPlatformConfigMap(
     OnnxPlatformConfig onnx_config;
     onnx_config.set_autofill(!strict_model_config);
     platform_config.PackFrom(onnx_config);
-    (*platform_configs)[kOnnxOnnxPlatform] = platform_config;
+    (*platform_configs)[kOnnxRuntimeOnnxPlatform] = platform_config;
   }
 }
 
@@ -436,9 +436,9 @@ ModelRepositoryManager::BackendLifeCycle::Create(
   }
   {
     OnnxPlatformConfig config;
-    platform_map.find(kOnnxOnnxPlatform)->second.UnpackTo(&config);
-    RETURN_IF_ERROR(OnnxBackendFactory::Create(
-        config, &(local_life_cycle->onnx_factory_)));
+    platform_map.find(kOnnxRuntimeOnnxPlatform)->second.UnpackTo(&config);
+    RETURN_IF_ERROR(
+        OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
   }
 
   *life_cycle = std::move(local_life_cycle);
@@ -694,9 +694,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       status =
           ensemble_factory_->CreateBackend(version_path, model_config, &is);
       break;
-    case Platform::PLATFORM_ONNX_ONNX:
-      status =
-          onnx_factory_->CreateBackend(version_path, model_config, &is);
+    case Platform::PLATFORM_ONNXRUNTIME_ONNX:
+      status = onnx_factory_->CreateBackend(version_path, model_config, &is);
     default:
       break;
   }

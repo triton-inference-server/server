@@ -42,7 +42,7 @@ InputOutputNames(
   } else {
     RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session, &num_nodes));
   }
-  
+
   // iterate over all input / output nodes
   OrtAllocator* allocator;
   RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&allocator));
@@ -50,13 +50,11 @@ InputOutputNames(
   for (size_t i = 0; i < num_nodes; i++) {
     char* node_name;
     if (is_input) {
-      onnx_status =
-        OrtSessionGetInputName(session, i, allocator, &node_name);
+      onnx_status = OrtSessionGetInputName(session, i, allocator, &node_name);
     } else {
-      onnx_status =
-        OrtSessionGetOutputName(session, i, allocator, &node_name);
+      onnx_status = OrtSessionGetOutputName(session, i, allocator, &node_name);
     }
-    
+
     if (onnx_status != nullptr) {
       break;
     }
@@ -68,7 +66,7 @@ InputOutputNames(
   return Status::Success;
 }
 
-} // namespace
+}  // namespace
 
 DataType
 ConvertDatatype(ONNXTensorElementDataType onnx_type)
