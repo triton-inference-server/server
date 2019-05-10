@@ -59,7 +59,7 @@ LibTorchBackendFactory::CreateBackend(
   std::set<std::string> torch_files;
   RETURN_IF_ERROR(GetDirectoryFiles(path, &torch_files));
 
-  std::unordered_map<std::string, std::vector<char>> models;
+  std::unordered_map<std::string, std::string> models;
   for (const auto& filename : torch_files) {
     const auto torch_path = JoinPath({path, filename});
     models.emplace(filename, std::move(torch_path));

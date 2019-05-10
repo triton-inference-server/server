@@ -237,6 +237,7 @@ LibTorchWorkspaceImpl::SetInputTensor(
 
   at::Tensor input_tensor = torch::from_blob(content,/*sizes=*/shape,
   /*strides=*/{1, 3}, pr.second.code/*torch::kInt8*/);
+  input_tensor.to(torch::kCPU);
 
   if ((input_tensor.numel() * pr.second.bits / 8) != byte_size) {
     return Error(
@@ -245,7 +246,8 @@ LibTorchWorkspaceImpl::SetInputTensor(
         std::to_string(input->size() * input->itemsize()));
   }
   inputs_.push_back(input_tensor);
-
+  // inputs_.to GPU if needed
+  std::cout << input_tensor.item().to<float>();
   return Error();
 }
 
@@ -264,27 +266,28 @@ LibTorchWorkspaceImpl::GetOutputTensor(
   //int32_t no_of_classes = 1;
   torch::Scalar scalar output_values = outputs_.argmax(no_of_classes).item();
 
-  const auto pr = ConvertDatatype(dtype);
-  if (!pr.first) {
-    return Error(
-        "Failed to convert datatype '" + DataTypeName(dtype) +
-        "' to Torch LibTorch datatype");
-  }
-
-  if (pr.second != output->meta()) {
-    return Error(
-        "unexpected datatype " + std::string(output->meta().name()) +
-        " for inference output '" + name + "', expecting " +
-        std::string(pr.second.name()));
-  }
-
-  content_shape->clear();
-  for (auto d : output->sizes()) {
-    content_shape->push_back(d);
-  }
-
-  *byte_size = output->nbytes();
-  *content = static_cast<const char*>(output->raw_data());
+  // const auto pr = ConvertDatatype(dtype);
+  // if (!pr.first) {
+  //   return Error(
+  //       "Failed to convert datatype '" + DataTypeName(dtype) +
+  //       "' to Torch LibTorch datatype");
+  // }
+  //
+  // if (pr.second != output->meta()) {
+  //   return Error(
+  //       "unexpected datatype " + std::string(output->meta().name()) +
+  //       " for inference output '" + name + "', expecting " +
+  //       std::string(pr.second.name()));
+  // }
+  //
+  // content_shape->clear();
+  // for (auto d : output->sizes()) {
+  //   content_shape->push_back(d);
+  // }
+  //
+  // *byte_size = output->nbytes();
+  // *content = static_cast<const char*>(output->raw_data());
+  memcpy(*content, static_cast<const char*>output_values.to<float>(), output_values.size() * sizeof(float));
 
   return Error();
 }

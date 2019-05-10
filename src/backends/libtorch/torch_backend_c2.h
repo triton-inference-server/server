@@ -30,10 +30,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include <ATen/Tensor.h>
 #include <ATen/ATen.h>
-#include <ATen/dlpack.h>
 #include <ATen/Functions.h>
+#include <ATen/Tensor.h>
+#include <ATen/dlpack.h>
 
 namespace nvidia { namespace inferenceserver {
 
