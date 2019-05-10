@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,8 +26,8 @@
 
 #include "src/backends/onnx/onnx_backend.h"
 
-#include <core/providers/cuda/cuda_provider_factory.h>
 #include <NvInfer.h>
+#include <core/providers/cuda/cuda_provider_factory.h>
 #include <stdint.h>
 #include <mutex>
 #include "cuda/include/cuda_runtime_api.h"
@@ -50,8 +50,7 @@ OnnxBackend::Context::Context(
 
 OnnxBackend::Context::Context(Context&& o)
     : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_),
-      session_(o.session_)
+      max_batch_size_(o.max_batch_size_), session_(o.session_)
 {
   o.gpu_device_ = NO_GPU_DEVICE;
   o.max_batch_size_ = NO_BATCHING;
@@ -70,7 +69,6 @@ OnnxBackend::Context::~Context()
 Status
 OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 {
-  // [TODO] add kOnnxOnnxPlatform and set default file name etc.
   RETURN_IF_ERROR(ValidateModelConfig(config, kOnnxOnnxPlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
@@ -79,8 +77,7 @@ OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 OnnxBackend::CreateExecutionContexts(
-    OrtEnv* env,
-    const std::unordered_map<std::string, std::string>& paths)
+    OrtEnv* env, const std::unordered_map<std::string, std::string>& paths)
 {
   // [TODO] configurable like in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
@@ -99,15 +96,16 @@ OnnxBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, env, session_options, paths));
+            instance_name, Context::NO_GPU_DEVICE, env, session_options,
+            paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
-          RETURN_IF_ERROR(
-              CreateExecutionContext(instance_name, gpu_device, env, session_options, paths));
+          RETURN_IF_ERROR(CreateExecutionContext(
+              instance_name, gpu_device, env, session_options, paths));
           total_context_cnt++;
         }
       }
@@ -132,8 +130,8 @@ OnnxBackend::CreateExecutionContexts(
 
 Status
 OnnxBackend::CreateExecutionContext(
-    const std::string& instance_name, const int gpu_device,
-    OrtEnv* env, OrtSessionOptions* base_session_options,
+    const std::string& instance_name, const int gpu_device, OrtEnv* env,
+    OrtSessionOptions* base_session_options,
     const std::unordered_map<std::string, std::string>& paths)
 {
   // For a GPU context, determine the model file to use for device
@@ -190,10 +188,12 @@ OnnxBackend::CreateExecutionContext(
   OrtStatus* onnx_status = nullptr;
   OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
   if (gpu_device == Context::NO_GPU_DEVICE) {
-    onnx_status = OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
+    onnx_status =
+        OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
   }
   if (onnx_status == nullptr) {
-    onnx_status = OrtCreateSession(env, op_itr->second.c_str(), options, &context.session_);
+    onnx_status = OrtCreateSession(
+        env, op_itr->second.c_str(), options, &context.session_);
   }
   OrtReleaseSessionOptions(options);
 
@@ -209,29 +209,11 @@ Status
 OnnxBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
-  // [TODO] put the following into onnx_utils files as it will also be useful
-  // for auto fill
-  size_t num_nodes;
-  RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session_, &num_nodes));
-
   std::set<std::string> input_node_names;
-  // iterate over all input nodes
-  OrtAllocator* allocator;
-  RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&allocator));
-  for (size_t i = 0; i < num_nodes; i++) {
-    char* input_name;
-    OrtStatus* onnx_status = OrtSessionGetInputName(session_, i, allocator, &input_name);
-    if (onnx_status != nullptr) {
-      OrtReleaseAllocator(allocator);
-      RETURN_IF_ORT_ERROR(onnx_status);
-    }
-    input_node_names.emplace(input_name);
-  }
-  OrtReleaseAllocator(allocator);
+  RETURN_IF_ERROR(InputNames(session_, input_node_names));
 
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(
-        CheckAllowedModelInput(io, input_node_names));
+    RETURN_IF_ERROR(CheckAllowedModelInput(io, input_node_names));
     if (ConvertDataType(io.data_type()) ==
         ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
@@ -248,29 +230,11 @@ Status
 OnnxBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
-  // [TODO] put the following into onnx_utils files as it will also be useful
-  // for auto fill
-  size_t num_nodes;
-  RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session_, &num_nodes));
-
   std::set<std::string> output_node_names;
-  // iterate over all output nodes
-  OrtAllocator* allocator;
-  RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&allocator));
-  for (size_t i = 0; i < num_nodes; i++) {
-    char* output_name;
-    OrtStatus* onnx_status = OrtSessionGetOutputName(session_, i, allocator, &output_name);
-    if (onnx_status != nullptr) {
-      OrtReleaseAllocator(allocator);
-      RETURN_IF_ORT_ERROR(onnx_status);
-    }
-    output_node_names.emplace(output_name);
-  }
-  OrtReleaseAllocator(allocator);
-  
+  RETURN_IF_ERROR(OutputNames(session_, output_node_names));
+
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(
-        CheckAllowedModelOutput(io, output_node_names));
+    RETURN_IF_ERROR(CheckAllowedModelOutput(io, output_node_names));
     if (ConvertDataType(io.data_type()) ==
         ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(

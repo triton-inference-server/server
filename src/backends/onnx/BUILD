@@ -41,6 +41,7 @@ cc_library(
     hdrs = ["onnx_utils.h"],
     deps = [
         "//src/core:model_config",
+        "//src/core:server_header",
     ],
 )
 

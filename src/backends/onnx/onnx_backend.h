@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,28 +25,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <core/session/onnxruntime_c_api.h>
 #include <NvInfer.h>
+#include <core/session/onnxruntime_c_api.h>
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
-
-#define RETURN_IF_ORT_ERROR(S)                                        \
-  do {                                                                \
-    OrtStatus* onnx_status = (S);                                     \
-    if (onnx_status != nullptr) {                                        \
-      OrtErrorCode code = OrtGetErrorCode(onnx_status);               \
-      std::string msg = std::string(OrtGetErrorMessage(onnx_status)); \
-      OrtReleaseStatus(onnx_status);                                  \
-      return Status(                                                  \
-        RequestStatusCode::INTERNAL,                                  \
-        "onnx runtime error " + std::to_string(code) + ": "           \
-        + std::string(msg));                                          \
-    }                                                                 \
-  } while (false)
 
 class OnnxBackend : public InferenceBackend {
  public:
@@ -58,11 +44,10 @@ class OnnxBackend : public InferenceBackend {
   // Create a context for execution for each instance for the
   // serialized plans specified in 'models'.
   Status CreateExecutionContexts(
-      OrtEnv* env,
-      const std::unordered_map<std::string, std::string>& paths);
+      OrtEnv* env, const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
-      const std::string& instance_name, const int gpu_device,
-      OrtEnv* env, OrtSessionOptions* base_session_options,
+      const std::string& instance_name, const int gpu_device, OrtEnv* env,
+      OrtSessionOptions* base_session_options,
       const std::unordered_map<std::string, std::string>& paths);
 
  private:
@@ -105,7 +90,8 @@ class OnnxBackend : public InferenceBackend {
     // an internal error that prevents any of the of requests from
     // completing. If an error is isolate to a single request payload
     // it will be reported in that payload.
-    Status Run(const OnnxBackend* base, std::vector<Scheduler::Payload>* payloads);
+    Status Run(
+        const OnnxBackend* base, std::vector<Scheduler::Payload>* payloads);
 
     // [TODO] Possible helper functions for Run()
 

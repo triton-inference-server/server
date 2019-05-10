@@ -219,6 +219,8 @@ GetNormalizedModelConfig(
       config->set_default_model_filename(kCustomFilename);
     } else if (config->platform() == kEnsemblePlatform) {
       // No actual model file is needed to be loaded for ensemble.
+    } else if (config->platform() == kOnnxOnnxPlatform) {
+      config->set_default_model_filename(kOnnxOnnxFilename);
     } else {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected platform type " +

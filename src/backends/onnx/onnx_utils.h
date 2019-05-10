@@ -28,11 +28,31 @@
 
 #include <core/session/onnxruntime_c_api.h>
 #include "src/core/model_config.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
+
+#define RETURN_IF_ORT_ERROR(S)                                           \
+  do {                                                                   \
+    OrtStatus* onnx_status = nullptr;                                    \
+    onnx_status = (S);                                                   \
+    if (onnx_status != nullptr) {                                        \
+      OrtErrorCode code = OrtGetErrorCode(onnx_status);                  \
+      std::string msg = std::string(OrtGetErrorMessage(onnx_status));    \
+      OrtReleaseStatus(onnx_status);                                     \
+      return Status(                                                     \
+          RequestStatusCode::INTERNAL, "onnx runtime error " +           \
+                                           std::to_string(code) + ": " + \
+                                           std::string(msg));            \
+    }                                                                    \
+  } while (false)
 
 DataType ConvertDataType(ONNXTensorElementDataType onnx_type);
 
 ONNXTensorElementDataType ConvertDataType(DataType data_type);
+
+Status InputNames(OrtSession* session, std::set<std::string>& names);
+
+Status OutputNames(OrtSession* session, std::set<std::string>& names);
 
 }}  // namespace nvidia::inferenceserver
