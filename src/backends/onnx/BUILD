@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,63 +31,45 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "ensemble_backend_proto",
-    srcs = ["ensemble_backend.proto"],
+    name = "onnx_backend_proto",
+    srcs = ["onnx_backend.proto"],
 )
 
 cc_library(
-    name = "ensemble_backend",
-    srcs = ["ensemble_backend.cc"],
-    hdrs = ["ensemble_backend.h"],
+    name = "onnx_utils",
+    srcs = ["onnx_utils.cc"],
+    hdrs = ["onnx_utils.h"],
     deps = [
-        "//src/core:constants",
+        "//src/core:model_config",
         "//src/core:server_header",
     ],
 )
 
 cc_library(
-    name = "ensemble_backend_factory",
-    srcs = ["ensemble_backend_factory.cc"],
-    hdrs = ["ensemble_backend_factory.h"],
+    name = "onnx_backend",
+    srcs = ["onnx_backend.cc"],
+    hdrs = ["onnx_backend.h"],
     deps = [
-        ":ensemble_backend",
-        ":ensemble_backend_proto",
+        ":onnx_utils",
+        "//src/core:constants",
+        "//src/core:model_config_proto",
+        "//src/core:model_config",
+        "//src/core:server_header",
+        "@local_config_cuda//cuda:cuda_headers"
+    ],
+)
+
+cc_library(
+    name = "onnx_backend_factory",
+    srcs = ["onnx_backend_factory.cc"],
+    hdrs = ["onnx_backend_factory.h"],
+    deps = [
+        ":onnx_backend",
+        ":onnx_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
-)
-
-filegroup(
-    name = "ensemble_testdata",
-    srcs = glob(
-        ["testdata/**/*"]),
-)
-
-cc_test(
-    name = "ensemble_backend_test",
-    srcs = ["ensemble_backend_test.cc"],
-    linkopts = [
-        "-L/opt/tensorrtserver/lib",
-        "-lcaffe2_gpu",
-        "-lcaffe2",
-        "-lonnxruntime",
-        "-lnvinfer",
-        "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml",
-        "-lnvonnxparser_runtime"
-    ],
-    data = [
-        ":ensemble_testdata"
-    ],
-    deps = [
-        "//src/test:model_config_test_base",
-        "//src/core:server",
-        "//src/test:testmain",
-        "@local_config_cuda//cuda:cudart",
-    ],
-    tags = ["exclusive"],
 )

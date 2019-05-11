@@ -56,6 +56,7 @@ INPROCESS_LDFLAGS := -L/opt/tensorrtserver/lib \
                      -ltrtserver \
                      -lcaffe2 \
                      -lcaffe2_gpu \
+                     -lonnxruntime \
                      -lcuda \
                      -lnvidia-ml
 

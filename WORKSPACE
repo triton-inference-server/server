@@ -100,6 +100,11 @@ cc_library(
     srcs = ["libmkl_vml_def.so"],
     visibility = ["//visibility:public"],
 )
+cc_library(
+    name = "libonnxruntime",
+    srcs = ["libonnxruntime.so"],
+    visibility = ["//visibility:public"],
+)
 """,
 )
 

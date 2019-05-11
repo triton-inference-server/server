@@ -44,6 +44,7 @@ constexpr char kTensorRTPlanPlatform[] = "tensorrt_plan";
 constexpr char kCaffe2NetDefPlatform[] = "caffe2_netdef";
 constexpr char kCustomPlatform[] = "custom";
 constexpr char kEnsemblePlatform[] = "ensemble";
+constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 
 constexpr char kModelConfigPbTxt[] = "config.pbtxt";
 constexpr char kTensorRTPlanFilename[] = "model.plan";
@@ -52,6 +53,7 @@ constexpr char kTensorFlowSavedModelFilename[] = "model.savedmodel";
 constexpr char kCaffe2NetDefFilename[] = "model.netdef";
 constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
 constexpr char kCustomFilename[] = "libcustom.so";
+constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";
 
 constexpr char kMetricsLabelModelName[] = "model";
 constexpr char kMetricsLabelModelVersion[] = "version";
