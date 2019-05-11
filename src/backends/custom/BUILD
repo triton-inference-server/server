@@ -90,6 +90,7 @@ cc_test(
         "-L/opt/tensorrtserver/lib",
         "-lcaffe2_gpu",
         "-lcaffe2",
+        "-lonnxruntime",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",

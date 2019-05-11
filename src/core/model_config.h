@@ -59,7 +59,8 @@ enum Platform {
   PLATFORM_TENSORFLOW_SAVEDMODEL = 3,
   PLATFORM_CAFFE2_NETDEF = 4,
   PLATFORM_CUSTOM = 5,
-  PLATFORM_ENSEMBLE = 6
+  PLATFORM_ENSEMBLE = 6,
+  PLATFORM_ONNXRUNTIME_ONNX = 7
 };
 
 /// Get the number of elements in a shape.

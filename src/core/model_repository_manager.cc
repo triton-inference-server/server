@@ -37,6 +37,8 @@
 #include "src/backends/custom/custom_backend_factory.h"
 #include "src/backends/ensemble/ensemble_backend.pb.h"
 #include "src/backends/ensemble/ensemble_backend_factory.h"
+#include "src/backends/onnx/onnx_backend.pb.h"
+#include "src/backends/onnx/onnx_backend_factory.h"
 #include "src/backends/tensorflow/graphdef_backend.pb.h"
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/savedmodel_backend.pb.h"
@@ -137,6 +139,14 @@ BuildPlatformConfigMap(
     EnsemblePlatformConfig ensemble_config;
     platform_config.PackFrom(ensemble_config);
     (*platform_configs)[kEnsemblePlatform] = platform_config;
+  }
+
+  //// Onnx Onnx
+  {
+    OnnxPlatformConfig onnx_config;
+    onnx_config.set_autofill(!strict_model_config);
+    platform_config.PackFrom(onnx_config);
+    (*platform_configs)[kOnnxRuntimeOnnxPlatform] = platform_config;
   }
 }
 
@@ -341,6 +351,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<GraphDefBackendFactory> graphdef_factory_;
   std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
   std::unique_ptr<PlanBackendFactory> plan_factory_;
+  std::unique_ptr<OnnxBackendFactory> onnx_factory_;
 };
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
@@ -422,6 +433,12 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     platform_map.find(kEnsemblePlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
         config, &(local_life_cycle->ensemble_factory_)));
+  }
+  {
+    OnnxPlatformConfig config;
+    platform_map.find(kOnnxRuntimeOnnxPlatform)->second.UnpackTo(&config);
+    RETURN_IF_ERROR(
+        OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
   }
 
   *life_cycle = std::move(local_life_cycle);
@@ -677,6 +694,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       status =
           ensemble_factory_->CreateBackend(version_path, model_config, &is);
       break;
+    case Platform::PLATFORM_ONNXRUNTIME_ONNX:
+      status = onnx_factory_->CreateBackend(version_path, model_config, &is);
     default:
       break;
   }
