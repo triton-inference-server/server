@@ -57,6 +57,8 @@ RUN sha1sum -c /tmp/patch/caffe2/checksums && \
 
 # Build same as in pytorch container... except for the NO_DISTRIBUTED
 # line where we turn off features not needed for trtserver
+# This will build both the caffe2 libraries needed by the Caffe2 NetDef backend
+# and the LibTorch library needed by the PyTorch backend.
 WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
 RUN cd pytorch && \
@@ -176,6 +178,11 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_gnu_thread.so /opt/tensorrtse
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_intel_lp64.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/
+
+# LibTorch library
+COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so.1 \
+      /opt/tensorrtserver/lib/
+RUN ln -s /opt/tensorrtserver/lib/libtorch.so.1 /opt/tensorrtserver/lib/libtorch.so
 
 # Onnx Runtime library
 ARG ONNX_RUNTIME_VERSION=0.4.0
