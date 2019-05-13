@@ -486,16 +486,81 @@ OnnxBackend::Context::ReadOutputTensors(
     const std::vector<const char*>& output_names,
     std::vector<Scheduler::Payload>* payloads)
 {
-  return Status(
-      RequestStatusCode::UNSUPPORTED, "ReadOutputTensors() implemented");
-
   for (size_t idx = 0; idx < output_names.size(); idx++) {
     std::string name = std::string(output_names[idx]);
 
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
-    // [TODO] copy data in output_tensors_ to payloads
+    OrtValue* output_tensor = output_tensors_[idx];
+    if (output_tensor == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "output tensor '" + name + "' does not found");
+    }
+
+    std::vector<int64_t> content_shape;
+    char* content = nullptr;
+
+    RETURN_IF_ORT_ERROR(
+        OrtGetTensorMutableData(output_tensor, (void**)&content));
+
+    // Get output type and shape
+    OrtTypeInfo* typeinfo;
+    RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, &typeinfo));
+    const OrtTensorTypeAndShapeInfo* type_and_shape =
+        OrtCastTypeInfoToTensorInfo(typeinfo);
+
+    content_shape.resize(OrtGetNumOfDimensions(type_and_shape));
+    OrtGetDimensions(
+        type_and_shape, content_shape.data(), content_shape.size());
+    ONNXTensorElementDataType type = OrtGetTensorElementType(type_and_shape);
+
+    OrtReleaseTypeInfo(typeinfo);
+
+    const size_t element_count = GetElementCount(content_shape);
+    const size_t total_byte_size =
+        element_count * GetDataTypeByteSize(ConvertFromOnnxDataType(type));
+    const size_t actual_byte_size =
+        element_count * GetDataTypeByteSize(output_config->data_type());
+    const size_t batch1_byte_size = total_byte_size / total_batch_size;
+
+    if (actual_byte_size != total_byte_size) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected size for output '" + name + "', byte-size " +
+              std::to_string(actual_byte_size) + " does not equal " +
+              std::to_string(total_batch_size) + " * " +
+              std::to_string(batch1_byte_size));
+    }
+
+    size_t content_offset = 0;
+
+    for (auto& payload : *payloads) {
+      const InferRequestHeader& request_header =
+          payload.request_provider_->RequestHeader();
+      const size_t expected_byte_size =
+          request_header.batch_size() * batch1_byte_size;
+
+      // If 'payload' requested this output then copy it from
+      // 'content'. If it did not request this output then just
+      // skip it in the 'content'.
+      if ((payload.response_provider_ != nullptr) &&
+          payload.response_provider_->RequiresOutput(name)) {
+        void* buffer;
+        Status status = payload.response_provider_->AllocateOutputBuffer(
+            name, &buffer, expected_byte_size, content_shape);
+        if (status.IsOk()) {
+          memcpy(buffer, content + content_offset, expected_byte_size);
+        }
+
+        if (!status.IsOk()) {
+          payload.status_ = status;
+        }
+      }
+
+      content_offset += expected_byte_size;
+    }
   }
   return Status::Success;
 }
