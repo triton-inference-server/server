@@ -44,7 +44,7 @@ namespace nvidia { namespace inferenceserver {
 OnnxBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
-      session_(nullptr)
+      session_(nullptr), allocator_info_(nullptr)
 {
 }
 
@@ -52,8 +52,12 @@ OnnxBackend::Context::~Context()
 {
   LOG_VERBOSE(1) << "~OnnxBackend::Context ";
 
+  ReleaseOrtRunResources();
   if (session_ != nullptr) {
     OrtReleaseSession(session_);
+  }
+  if (allocator_info_ != nullptr) {
+    OrtReleaseAllocatorInfo(allocator_info_);
   }
 }
 
@@ -70,7 +74,7 @@ Status
 OnnxBackend::CreateExecutionContexts(
     OrtEnv* env, const std::unordered_map<std::string, std::string>& paths)
 {
-  // [TODO] configurable like in Tensorflow models
+  // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
   OrtSessionOptions* session_options = OrtCreateSessionOptions();
@@ -78,6 +82,21 @@ OnnxBackend::CreateExecutionContexts(
   // disable graph optimization
   OrtSetSessionGraphOptimizationLevel(session_options, 0);
 
+  Status status = CreateExecutionContextsHelper(env, session_options, paths);
+
+  OrtReleaseSessionOptions(session_options);
+  RETURN_IF_ERROR(status);
+
+  LOG_VERBOSE(1) << "onnx backend for " << Name() << std::endl << *this;
+
+  return Status::Success;
+}
+
+Status
+OnnxBackend::CreateExecutionContextsHelper(
+    OrtEnv* env, OrtSessionOptions* session_options,
+    const std::unordered_map<std::string, std::string>& paths)
+{
   uint32_t total_context_cnt = 0;
 
   // Create a session for each instance.
@@ -113,8 +132,6 @@ OnnxBackend::CreateExecutionContexts(
           std::function<void(Status)> func) {
         Run(runner_idx, payloads, func);
       }));
-
-  LOG_VERBOSE(1) << "onnx backend for " << Name() << std::endl << *this;
 
   return Status::Success;
 }
@@ -193,6 +210,9 @@ OnnxBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
+  RETURN_IF_ORT_ERROR(OrtCreateCpuAllocatorInfo(
+      OrtArenaAllocator, OrtMemTypeDefault, &context->allocator_info_));
+
   return Status::Success;
 }
 
@@ -266,7 +286,10 @@ OnnxBackend::Run(
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
+  Status status = contexts_[runner_idx]->Run(this, payloads);
+  // Release all run related resources regardless of the run status
+  contexts_[runner_idx]->ReleaseOrtRunResources();
+  OnCompleteQueuedPayloads(status);
 }
 
 Status
@@ -276,7 +299,171 @@ OnnxBackend::Context::Run(
   LOG_VERBOSE(1) << "Running " << name_ << " with " << payloads->size()
                  << " request payloads";
 
-  return Status(RequestStatusCode::UNSUPPORTED, "not implemented");
+  std::shared_ptr<InferRequestProvider> input_request_provider;
+
+  // For each request in 'payloads' collect the total batch size for
+  // this inference execution. The batch-size, number of inputs, and
+  // size of each input has already been checked by each payloads
+  // request provider so don't need to do that here.
+  size_t total_batch_size = 0;
+  for (auto& payload : *payloads) {
+    if (!payload.status_.IsOk()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected payload with non-OK status given to runner for '" +
+              name_ + "'");
+    }
+
+    total_batch_size += payload.request_provider_->RequestHeader().batch_size();
+
+    // All payloads must have equally-sized input tensors so use any
+    // payload as the representative for the input tensors.
+    input_request_provider = payload.request_provider_;
+  }
+
+  // If there are no valid payloads then no need to run the
+  // inference. The payloads will have their error status set so can
+  // just return.
+  if (total_batch_size == 0) {
+    return Status::Success;
+  }
+
+  // total_batch_size can be 1 for models that don't support batching
+  // (i.e. max_batch_size_ == 0).
+  if ((total_batch_size != 1) && (total_batch_size > (size_t)max_batch_size_)) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "dynamic batch size " + std::to_string(total_batch_size) + " for '" +
+            name_ + "', max allowed is " + std::to_string(max_batch_size_));
+  }
+
+  // Hold reference to each buffer of input data to that it stays
+  // until the inference has completed.
+  std::vector<std::unique_ptr<char[]>> input_buffers;
+
+  std::vector<const char*> input_names;
+
+  for (const auto& input : input_request_provider->RequestHeader().input()) {
+    const std::string& name = input.name();
+
+    const ModelInput* input_config;
+    RETURN_IF_ERROR(base->GetInput(name, &input_config));
+
+    // Create a tensor for each input sized correctly for the total
+    // payload batch size. Concatenate input values from each payload
+    // into the corresponding tensor.
+    RETURN_IF_ERROR(SetInputTensor(
+        name, input_config->data_type(), input.dims(), total_batch_size,
+        payloads, &input_buffers, &input_names));
+  }
+
+  // Additional inputs added to the provider...
+  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      input_override_map = input_request_provider->GetInputOverride();
+  if (input_override_map != nullptr) {
+    for (const auto& pr : *input_override_map) {
+      const std::string& name = pr.first;
+      const std::shared_ptr<InferRequestProvider::InputOverride>& override =
+          pr.second;
+
+      RETURN_IF_ERROR(SetInputTensor(
+          name, override->datatype_, override->dims_, total_batch_size,
+          payloads, &input_buffers, &input_names));
+    }
+  }
+
+  // Request to retrieve all output specified in model config
+  // and reserve placeholder for output tensors
+  std::vector<const char*> output_names;
+  for (const auto& output : base->Config().output()) {
+    output_names.emplace_back(output.name().c_str());
+    output_tensors_.emplace_back(nullptr);
+  }
+
+  // Run...
+  RETURN_IF_ORT_ERROR(OrtRun(
+      session_, NULL /* run options */, input_names.data(),
+      (const OrtValue* const*)input_tensors_.data(), input_tensors_.size(),
+      output_names.data(), output_names.size(), output_tensors_.data()));
+
+  // Make sure each output is of the expected size and copy it into
+  // the payload responses.
+  return ReadOutputTensors(base, total_batch_size, output_names, payloads);
+}
+
+Status
+OnnxBackend::Context::SetInputTensor(
+    const std::string& name, const DataType datatype, const DimsList& dims,
+    size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<std::unique_ptr<char[]>>* input_buffers,
+    std::vector<const char*>* input_names)
+{
+  return Status(RequestStatusCode::UNSUPPORTED, "SetInputTensor() implemented");
+
+  input_names->emplace_back(name.c_str());
+  input_tensors_.emplace_back(nullptr);
+  input_buffers->emplace_back();
+
+  std::vector<int64_t> input_dims;
+  input_dims.push_back(total_batch_size);
+  for (const auto dim : dims) {
+    input_dims.push_back(dim);
+  }
+
+  // [TODO] calculate total size size
+  size_t total_byte_size = 0;
+
+  // [TODO] Concatenate data in payloads to input_buffers
+  input_buffers->back().reset(new char[total_byte_size]);
+
+  // [TODO] not handling STRING data type right now, need to use other
+  // Ort function to handle it.
+  RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
+      allocator_info_, input_buffers->back().get(), total_byte_size,
+      input_dims.data(), input_dims.size(), ConvertDataType(datatype),
+      &input_tensors_.back()));
+
+  return Status::Success;
+}
+
+Status
+OnnxBackend::Context::ReadOutputTensors(
+    const OnnxBackend* base, size_t total_batch_size,
+    const std::vector<const char*>& output_names,
+    std::vector<Scheduler::Payload>* payloads)
+{
+  return Status(
+      RequestStatusCode::UNSUPPORTED, "ReadOutputTensors() implemented");
+
+  for (size_t idx = 0; idx < output_names.size(); idx++) {
+    std::string name = std::string(output_names[idx]);
+
+    const ModelOutput* output_config;
+    RETURN_IF_ERROR(base->GetOutput(name, &output_config));
+
+    // [TODO] copy data in output_tensors_ to payloads
+  }
+  return Status::Success;
+}
+
+void
+OnnxBackend::Context::ReleaseOrtRunResources()
+{
+  // Release input tensor if set
+  for (auto& tensor : input_tensors_) {
+    if (tensor != nullptr) {
+      OrtReleaseValue(tensor);
+    }
+  }
+  input_tensors_.clear();
+
+  // Release output tensor if set
+  for (auto& tensor : output_tensors_) {
+    if (tensor != nullptr) {
+      OrtReleaseValue(tensor);
+    }
+  }
+  output_tensors_.clear();
 }
 
 std::ostream&
