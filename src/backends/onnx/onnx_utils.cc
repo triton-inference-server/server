@@ -69,7 +69,7 @@ InputOutputNames(
 }  // namespace
 
 DataType
-ConvertDatatype(ONNXTensorElementDataType onnx_type)
+ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
 {
   switch (onnx_type) {
     case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
@@ -116,7 +116,7 @@ ConvertDatatype(ONNXTensorElementDataType onnx_type)
 }
 
 ONNXTensorElementDataType
-ConvertDataType(DataType data_type)
+ConvertToOnnxDataType(DataType data_type)
 {
   switch (data_type) {
     case TYPE_UINT8:

@@ -225,7 +225,7 @@ OnnxBackend::Context::ValidateInputs(
 
   for (const auto& io : ios) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, input_node_names));
-    if (ConvertDataType(io.data_type()) ==
+    if (ConvertToOnnxDataType(io.data_type()) ==
         ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -246,7 +246,7 @@ OnnxBackend::Context::ValidateOutputs(
 
   for (const auto& io : ios) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, output_node_names));
-    if (ConvertDataType(io.data_type()) ==
+    if (ConvertToOnnxDataType(io.data_type()) ==
         ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -337,7 +337,7 @@ OnnxBackend::Context::Run(
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
-  // Hold reference to each buffer of input data to that it stays
+  // Hold reference to each buffer of input data so that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<char[]>> input_buffers;
 
@@ -398,29 +398,83 @@ OnnxBackend::Context::SetInputTensor(
     std::vector<std::unique_ptr<char[]>>* input_buffers,
     std::vector<const char*>* input_names)
 {
-  return Status(RequestStatusCode::UNSUPPORTED, "SetInputTensor() implemented");
-
   input_names->emplace_back(name.c_str());
   input_tensors_.emplace_back(nullptr);
   input_buffers->emplace_back();
 
+  size_t batch1_element_cnt = 1;
   std::vector<int64_t> input_dims;
   input_dims.push_back(total_batch_size);
   for (const auto dim : dims) {
     input_dims.push_back(dim);
+    batch1_element_cnt *= dim;
   }
 
-  // [TODO] calculate total size size
-  size_t total_byte_size = 0;
+  const size_t batch1_byte_size =
+      batch1_element_cnt * GetDataTypeByteSize(datatype);
+  const size_t total_byte_size = total_batch_size * batch1_byte_size;
 
-  // [TODO] Concatenate data in payloads to input_buffers
   input_buffers->back().reset(new char[total_byte_size]);
+  char* buffer = input_buffers->back().get();
+
+  // Visit the payloads in order and copy the input tensors to
+  // 'buffer'.
+  size_t buffer_copy_offset = 0;
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_byte_size =
+        request_header.batch_size() * batch1_byte_size;
+
+    size_t copied_byte_size = 0;
+    while (payload.status_.IsOk()) {
+      const void* content;
+      size_t content_byte_size = expected_byte_size - copied_byte_size;
+      payload.status_ = payload.request_provider_->GetNextInputContent(
+          name, &content, &content_byte_size, false);
+      if (!payload.status_.IsOk()) {
+        break;
+      }
+
+      // No more input content available then done with copying...
+      if (content == nullptr) {
+        break;
+      }
+
+      if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
+          total_byte_size) {
+        payload.status_ = Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size " +
+                std::to_string(
+                    buffer_copy_offset + copied_byte_size + content_byte_size) +
+                " for inference input '" + name + "', expecting " +
+                std::to_string(total_byte_size));
+        break;
+      }
+
+      memcpy(
+          static_cast<char*>(buffer) + buffer_copy_offset + copied_byte_size,
+          content, content_byte_size);
+      copied_byte_size += content_byte_size;
+    }
+
+    if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
+      payload.status_ = Status(
+          RequestStatusCode::INTERNAL,
+          "expected " + std::to_string(expected_byte_size) +
+              " bytes of data for inference input '" + name + "', got " +
+              std::to_string(copied_byte_size));
+    }
+
+    buffer_copy_offset += expected_byte_size;
+  }
 
   // [TODO] not handling STRING data type right now, need to use other
   // Ort function to handle it.
   RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
-      allocator_info_, input_buffers->back().get(), total_byte_size,
-      input_dims.data(), input_dims.size(), ConvertDataType(datatype),
+      allocator_info_, (void*)buffer, total_byte_size, input_dims.data(),
+      input_dims.size(), ConvertToOnnxDataType(datatype),
       &input_tensors_.back()));
 
   return Status::Success;
