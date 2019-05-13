@@ -47,9 +47,9 @@ namespace nvidia { namespace inferenceserver {
     }                                                                    \
   } while (false)
 
-DataType ConvertDataType(ONNXTensorElementDataType onnx_type);
+DataType ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type);
 
-ONNXTensorElementDataType ConvertDataType(DataType data_type);
+ONNXTensorElementDataType ConvertToOnnxDataType(DataType data_type);
 
 Status InputNames(OrtSession* session, std::set<std::string>& names);
 
