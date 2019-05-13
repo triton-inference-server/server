@@ -42,25 +42,38 @@ namespace nvidia { namespace inferenceserver {
 
 namespace {
 
-// Convert model datatype to non-protobuf equivalent datatype required
-// by LibTorchWorkspace.
-LibTorchWorkspace::DataTypeCode
-ConvertDataType(DataTypeCode dtype)
+DataType
+ConvertFromDLDataType(DLDataTypeCode dtype)
 {
   switch (dtype) {
-    case DataType::Invalid:
-      return LibTorchWorkspace::DataTypeCode::Invalid;
-    case DataType::kDLUInt:
-      return LibTorchWorkspace::DataTypeCode::kDLUInt;
-    case DataType::kDLInt:
-      return LibTorchWorkspace::DataTypeCode::kDLInt;
-    case DataType::kDLFloat:
-      return LibTorchWorkspace::DataTypeCode::kDLFloat;
+    case DLDataType::kDLUInt:
+      return TYPE_UINT32;
+    case DLDataType::kDLInt:
+      return TYPE_INT32;
+    case DLDataType::kDLFloat:
+      return TYPE_FP32;
     default:
       break;
   }
 
-  return LibTorchWorkspace::DataTypeCode::Invalid;
+  return TYPE_INVALID;
+}
+
+DLDataType
+ConvertToDLDataType(DataType dtype)
+{
+  switch (dtype) {
+    case TYPE_UINT32:
+      return DLDataType::kDLUInt;
+    case TYPE_INT32:
+      return DLDataType::kDLInt;
+    case TYPE_FP32:
+      return DLDataType::kDLFloat;
+    default:
+      break;
+  }
+
+  return DLDataType::Invalid;
 }
 
 }  // namespace
@@ -100,21 +113,18 @@ LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 LibTorchBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::string>& models)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   uint32_t total_context_cnt = 0;
 
   // Create a workspace for each instance.
-  //
-  // TODO [DLIS-52] Can this be optimized by sharing a workspace
-  // (across all instances?).
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
       if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, models));
+            instance_name, Context::NO_GPU_DEVICE, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -122,7 +132,7 @@ LibTorchBackend::CreateExecutionContexts(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(
-              CreateExecutionContext(instance_name, gpu_device, models));
+              CreateExecutionContext(instance_name, gpu_device, paths));
           total_context_cnt++;
         }
       }
@@ -147,7 +157,7 @@ LibTorchBackend::CreateExecutionContexts(
 Status
 LibTorchBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::unordered_map<std::string, std::string>& models)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   cudaError_t cuerr;
 
@@ -157,6 +167,8 @@ LibTorchBackend::CreateExecutionContext(
   std::string cc_model_filename;
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
+    LOG_INFO << "Creating instance " << instance_name << " on CPU using "
+             << cc_model_filename;
   } else {
     cudaDeviceProp cuprops;
     cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
@@ -174,9 +186,8 @@ LibTorchBackend::CreateExecutionContext(
                             : cc_itr->second;
   }
 
-
-  const auto& mn_itr = models.find(cc_model_filename);
-  if (mn_itr == models.end()) {
+  const auto& lp_itr = paths.find(cc_model_filename);
+  if (lp_itr == paths.end()) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to find LibTorch model '" +
                                          cc_model_filename + "' for " + Name());
@@ -197,16 +208,6 @@ LibTorchBackend::CreateExecutionContext(
   contexts_.emplace_back(instance_name, gpu_device, mbs);
   Context& context = contexts_.back();
 
-  // Extract input and output names from the config...
-  std::vector<std::string> input_names;
-  for (const auto& io : Config().input()) {
-    input_names.push_back(io.name());
-  }
-  std::vector<std::string> output_names;
-  for (const auto& io : Config().output()) {
-    output_names.push_back(io.name());
-  }
-
   // If this is a sequence model then add the required inputs...
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateSequenceControl(
@@ -216,15 +217,15 @@ LibTorchBackend::CreateExecutionContext(
   }
 
   try {
-    LibTorchWorkspace* c2ws;
+    LibTorchWorkspace* ltws;
     LibTorchWorkspace::Error err = LibTorchWorkspaceCreate(
-        &c2ws, Config().name(), Config().max_batch_size(), input_names,
-        output_names, gpu_device, mn_itr->second);
+        &ltws, Config().name(), Config().max_batch_size(), input_names,
+        output_names, gpu_device, lp_itr->second);
     if (!err.IsOk()) {
       return Status(RequestStatusCode::INTERNAL, err.Message());
     }
 
-    context.torch_model_ = c2ws.torch_model_;
+    context.torch_model_ = ltws.torch_model_;
   }
   catch (const std::exception& ex) {
     return Status(

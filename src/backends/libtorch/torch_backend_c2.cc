@@ -114,12 +114,12 @@ ReadBinaryProto(
 }
 
 std::pair<bool, const DLDataType>
-ConvertDatatype(const at::Type& type)
+ConvertTorchToDLDataType(const at::ScalarType& type)
 {
   DLDataType dtype;
   dtype.lanes = 1;
   dtype.bits = type.elementSizeInBytes() * 8;
-  switch (type.scalarType()) {
+  switch (type) {
     case at::ScalarType::Byte:
       dtype.code = DLDataTypeCode::kDLUInt;
       break;
@@ -153,17 +153,55 @@ ConvertDatatype(const at::Type& type)
   return std::make_pair(true, dtype);
 }
 
+std::pair<bool, const at::ScalarType>
+ConvertDLDataTypeToTorch(const DLDataType& type)
+{
+  at::ScalarType dtype;
+  switch (type.code) {
+    case DLDataTypeCode::kDLUInt:
+      dtype = at::ScalarType::Byte;
+      break;
+    case at::ScalarType::Char:
+      dtype = DLDataTypeCode::kDLInt;
+      break;
+    case DLDataTypeCode::kDLFloat:
+      dtype = at::ScalarType::Double;
+      break;
+    case DLDataTypeCode::kDLFloat:
+      dtype = at::ScalarType::Float;
+      break;
+    case DLDataTypeCode::kDLInt:
+      dtype = at::ScalarType::Int;
+      break;
+    case DLDataTypeCode::kDLInt:
+      dtype = at::ScalarType::Long;
+      break;
+    case DLDataTypeCode::kDLInt:
+      dtype = at::ScalarType::Short;
+      break;
+    case DLDataTypeCode::kDLFloat:
+      dtype = at::ScalarType::Half;
+      break;
+    case DLDataTypeCode::kDLUInt:
+      dtype = at::ScalarType::Bool;
+    default:
+        return std::make_pair(false, dtype);
+  }
+
+  return std::make_pair(true, dtype);
+}
+
 const std::string
-DataTypeName(const LibTorchWorkspace::DLDataType datatype)
+DataTypeName(const DLDataType datatype)
 {
   switch (datatype.code) {
-    case LibTorchWorkspace::DLDataTypeCode::Invalid;
+    case DLDataTypeCode::Invalid;
       return "INVALID";
-    case LibTorchWorkspace::DLDataTypeCode::kDLUInt;
+    case DLDataTypeCode::kDLUInt;
       return "UINT";
-    case LibTorchWorkspace::DLDataTypeCode::kDLInt;
+    case DLDataTypeCode::kDLInt;
       return "INT";
-    case LibTorchWorkspace::DLDataTypeCode::kDLFloat;
+    case DLDataTypeCode::kDLFloat;
       return "FLOAT";
   }
 
@@ -218,6 +256,7 @@ LibTorchWorkspaceImpl::Create(
   *ltws = new LibTorchWorkspaceImpl();
   (*ltws)->model_name_ = model_name;
   (*ltws)->max_batch_size_ = max_batch_size;
+  (*ltws)->torch_model_ = torch_model;
 
   return Error();
 }
@@ -225,10 +264,10 @@ LibTorchWorkspaceImpl::Create(
 LibTorchWorkspace::Error
 LibTorchWorkspaceImpl::SetInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
-    const LibTorchWorkspace::DLDataType dtype, const char* content,
+    const DLDataType dtype, const char* content,
     size_t byte_size)
 {
-  const auto pr = ConvertDatatype(dtype);
+  const auto pr = ConvertDLDataTypeToTorch(dtype);
   if (!pr.first) {
     return Error(
         "Failed to convert datatype '" + DataTypeName(dtype) +
@@ -236,7 +275,7 @@ LibTorchWorkspaceImpl::SetInputTensor(
   }
 
   at::Tensor input_tensor = torch::from_blob(content,/*sizes=*/shape,
-  /*strides=*/{1, 3}, pr.second.code/*torch::kInt8*/);
+  /*strides={1, 3}*/, pr.second.code/*torch::kInt8*/);
   input_tensor.to(torch::kCPU);
 
   if ((input_tensor.numel() * pr.second.bits / 8) != byte_size) {

@@ -41,12 +41,12 @@ class LibTorchBackend : public InferenceBackend {
   Status Init(const std::string& path, const ModelConfig& config);
 
   // Create a context for execution for each instance for the
-  // serialized .pt models specified in 'models'.
+  // serialized .pt models specified in 'paths'.
   Status CreateExecutionContexts(
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::string>& paths);
 
  private:
   Status ValidateSequenceControl(
