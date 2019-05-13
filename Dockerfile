@@ -57,6 +57,8 @@ RUN sha1sum -c /tmp/patch/caffe2/checksums && \
 
 # Build same as in pytorch container... except for the NO_DISTRIBUTED
 # line where we turn off features not needed for trtserver
+# This will build both the caffe2 libraries needed by the Caffe2 NetDef backend
+# and the LibTorch library needed by the PyTorch backend.
 WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
 RUN cd pytorch && \
@@ -66,8 +68,6 @@ RUN cd pytorch && \
       NCCL_LIB_DIR="/usr/lib/" \
       NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
       python setup.py install && python setup.py clean
-
-# PS: No need to build LibTorch from source as it is already present in the container
 
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
