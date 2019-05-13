@@ -67,7 +67,7 @@ RUN cd pytorch && \
       NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
       python setup.py install && python setup.py clean
 
-# PS: No need to build LibTorch from source as it is already present in the docker
+# PS: No need to build LibTorch from source as it is already present in the container
 
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
@@ -180,8 +180,9 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_rt.so /opt/tensorrtserver/lib
 COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserver/lib/
 
 # LibTorch library
-COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so* \
+COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so.1 \
       /opt/tensorrtserver/lib/
+RUN ln -s /opt/tensorrtserver/lib/libtorch.so.1 /opt/tensorrtserver/lib/libtorch.so
 
 # Onnx Runtime library
 ARG ONNX_RUNTIME_VERSION=0.4.0
