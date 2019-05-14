@@ -113,7 +113,7 @@ class LibTorchWorkspace {
 
   // Get the value for an output tensor after inferencing.
   virtual Error GetOutputTensor(
-      const std::string& name, const LibTorchWorkspace::DataType dtype,
+      const std::string& name, const DataType dtype,
       const char** content, size_t* byte_size,
       std::vector<int64_t>* content_shape) = 0;
 

@@ -105,6 +105,11 @@ cc_library(
     srcs = ["libonnxruntime.so"],
     visibility = ["//visibility:public"],
 )
+cc_library(
+    name = "libtorch",
+    srcs = ["libtorch.so"],
+    visibility = ["//visibility:public"],
+)
 """,
 )
 

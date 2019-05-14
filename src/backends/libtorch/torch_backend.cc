@@ -78,11 +78,6 @@ ConvertToDLDataType(DataType dtype)
 
 }  // namespace
 
-struct LibTorchModelContext {
-  std::shared_ptr<torch::jit::script::Module> module;
-  DLDeviceType device;
-};
-
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)

@@ -23,7 +23,7 @@ using namespace torch::data; // NOLINT
 
 int main(int argc, const char* argv[]) {
   if (argc != 2) {
-    std::cerr << "usage: libtorch_backend <path-to-exported-script-module>\n";
+    std::cerr << "usage: libtorch_backend <path-to-exported-script-module>" << std::endl;
     return -1;
   }
 
@@ -31,7 +31,7 @@ int main(int argc, const char* argv[]) {
   torch::Device device(torch::kCUDA, /*device id=*/0); // load on GPU
   std::shared_ptr<torch::jit::script::Module> module = torch::jit::load(argv[1], device);
   assert(module != nullptr);
-  std::cout << "Model loaded successfully\n";
+  std::cout << "Model loaded successfully" << std::endl;
 
   // Write vector to binary (file)
   std::vector<float> input_vector = {1.0, 2.0, 3.0, 4.0};
@@ -48,7 +48,7 @@ int main(int argc, const char* argv[]) {
   std::vector<int64_t> tensor_shape{2,2};
   torch::Tensor test_tensor = torch::from_blob(contents.data(), tensor_shape,
       torch::kFloat32);
-  std::cout << test_tensor << "\n";
+  std::cout << test_tensor << std::endl;
 
   // Create a vector of inputs
   std::vector<torch::jit::IValue> inputs;
@@ -73,13 +73,13 @@ int main(int argc, const char* argv[]) {
   for(int i=0;i<output_flat.sizes()[0];i++){
     outputs_vector.push_back(output_flat[i].item().to<float>());
   }
-  std::cout<< outputs_vector.size() << "\n";
+  std::cout<< outputs_vector.size() << std::endl;
   // Copy output into buffer
   memcpy(content, &outputs_vector[0], output_flat.nbytes()); // outputs_vector.size() * sizeof(float)
   // Test for Success
   torch::Tensor reconst_output = torch::from_blob(content, {2, 1000}, torch::kFloat32);
   if (reconst_output[0][0].item().to<float>() == output_flat[0].item().to<float>()){
-      std::cout<< "Works!\n";
+      std::cout<< "Works!" << std::endl;
   }
 
   // std::vector<double> v = {1.0, 2.0, 3.0};

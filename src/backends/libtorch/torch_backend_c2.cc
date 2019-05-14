@@ -153,42 +153,36 @@ ConvertTorchToDLDataType(const at::ScalarType& type)
   return std::make_pair(true, dtype);
 }
 
-std::pair<bool, const at::ScalarType>
-ConvertDLDataTypeToTorch(const DLDataType& type)
+std::pair<bool, const torch::ScalarType>
+ConvertDataTypeToTorchType(const DataType& dtype)
 {
-  at::ScalarType dtype;
-  switch (type.code) {
-    case DLDataTypeCode::kDLUInt:
-      dtype = at::ScalarType::Byte;
-      break;
-    case at::ScalarType::Char:
-      dtype = DLDataTypeCode::kDLInt;
-      break;
-    case DLDataTypeCode::kDLFloat:
-      dtype = at::ScalarType::Double;
-      break;
-    case DLDataTypeCode::kDLFloat:
-      dtype = at::ScalarType::Float;
-      break;
-    case DLDataTypeCode::kDLInt:
-      dtype = at::ScalarType::Int;
-      break;
-    case DLDataTypeCode::kDLInt:
-      dtype = at::ScalarType::Long;
-      break;
-    case DLDataTypeCode::kDLInt:
-      dtype = at::ScalarType::Short;
-      break;
-    case DLDataTypeCode::kDLFloat:
-      dtype = at::ScalarType::Half;
-      break;
-    case DLDataTypeCode::kDLUInt:
-      dtype = at::ScalarType::Bool;
+  torch::ScalarType type;
+  switch (data_type) {
+    case TYPE_UINT8:
+      type = torch::kByte;
+    case TYPE_INT8:
+      type = torch::kChar;
+    case TYPE_INT16:
+      type = torch::kShort;
+    case TYPE_INT32:
+      type = torch::kInt;
+    case TYPE_INT64:
+      type = torch::kLong;
+    case TYPE_FP16:
+      type = torch::kHalf;
+    case TYPE_FP32:
+      type = torch::kFloat;
+    case TYPE_FP64:
+      type = torch::kDouble;
+    case TYPE_UINT16:
+    case TYPE_UINT32:
+    case TYPE_UINT64:
+    case TYPE_STRING:
     default:
-        return std::make_pair(false, dtype);
+        return std::make_pair(false, type);
   }
 
-  return std::make_pair(true, dtype);
+  return std::make_pair(true, type);
 }
 
 const std::string
@@ -237,7 +231,7 @@ LibTorchWorkspaceCreate(
   LibTorchWorkspaceImpl* ltwsimpl;
   LibTorchWorkspace::Error err = LibTorchWorkspaceImpl::Create(
       &ltwsimpl, model_name, max_batch_size, input_names, output_names,
-      torch_model);
+      torch_model, device);
   *ltws = ltwsimpl;
   return err;
 }
@@ -260,14 +254,14 @@ LibTorchWorkspaceImpl::Create(
 LibTorchWorkspace::Error
 LibTorchWorkspaceImpl::SetInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
-    const DLDataType dtype, const char* content,
+    const DataType dtype, const char* content,
     size_t byte_size)
 {
-  const auto pr = ConvertDLDataTypeToTorch(dtype);
+  const auto pr = ConvertDataTypeToTorchType(dtype);
   if (!pr.first) {
     return Error(
-        "Failed to convert datatype '" + DataTypeName(dtype) +
-        "' to LibTorch datatype");
+        "Failed to convert DataType '" + DataTypeName(dtype) +
+        "' to Torch datatype");
   }
 
   torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second.code, device);
@@ -284,41 +278,30 @@ LibTorchWorkspaceImpl::SetInputTensor(
 
 LibTorchWorkspace::Error
 LibTorchWorkspaceImpl::GetOutputTensor(
-    const std::string& name, const LibTorchWorkspace::DataType dtype,
+    const std::string& name, const DataType dtype,
     const char** content, size_t* byte_size,
     std::vector<int64_t>* content_shape)
 {
+  // Initialize char* content[output_flat.nbytes()];
   torch::DeviceType output_device = torch::kCPU;
   try{
     outputs_ = outputs_.to(output_device)
-    return Error("failed to get LibTorch output '" + name + "'");
+    torch::Tensor output_flat = outputs_.flatten();
+    std::vector<float> outputs_vector;
+    for(int i=0;i<output_flat.sizes()[0];i++){
+      outputs_vector.push_back(output_flat[i].item().to<float>());
+    }
+    // Copy output into buffer
+    memcpy(*content, static_cast<const char*>&outputs_vector[0], output_flat.nbytes());
+    //  Set content shape
+    auto shape = outputs_.sizes();
+    for (auto itr = shape.begin(); itr != shape.end(); itr++){
+      content_shape.push_back(*itr);
+    }
   }
-  // get first n outputs_
-  //int32_t no_of_classes = 1;
-  // torch::Scalar scalar output_values = outputs_.argmax(no_of_classes).item();
-
-  // const auto pr = ConvertDatatype(dtype);
-  // if (!pr.first) {
-  //   return Error(
-  //       "Failed to convert datatype '" + DataTypeName(dtype) +
-  //       "' to Torch LibTorch datatype");
-  // }
-  //
-  // if (pr.second != output->meta()) {
-  //   return Error(
-  //       "unexpected datatype " + std::string(output->meta().name()) +
-  //       " for inference output '" + name + "', expecting " +
-  //       std::string(pr.second.name()));
-  // }
-  //
-  // content_shape->clear();
-  // for (auto d : output->sizes()) {
-  //   content_shape->push_back(d);
-  // }
-  //
-  // *byte_size = output->nbytes();
-  // *content = static_cast<const char*>(output->raw_data());
-  memcpy(*content, static_cast<const char*>output_values.to<float>(), output_values.size() * sizeof(float));
+  catch {
+    return Error("failed to get LibTorch output");
+  }
 
   return Error();
 }
@@ -329,8 +312,8 @@ LibTorchWorkspaceImpl::Run()
   try {
       outputs_ = torch_model_->forward(inputs_).toTensor();
   }
-  catch (Exception ex) {
-    return Error("failed to run model '" + model_name_ + "': " + ex.msg());
+  catch (exception& ex) {
+    return Error("failed to run model '" + model_name_ + "': " + ex.what());
   }
 
   return Error();
