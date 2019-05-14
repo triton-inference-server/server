@@ -61,7 +61,7 @@ enum Platform {
   PLATFORM_CUSTOM = 5,
   PLATFORM_ENSEMBLE = 6,
   PLATFORM_ONNXRUNTIME_ONNX = 7,
-  PLATFORM_LIBTORCH_PT = 8
+  PLATFORM_PYTORCH_LIBTORCH = 8
 };
 
 /// Get the number of elements in a shape.

@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/libtorch/torch_backend.h"
+#include "src/backends/pytorch/libtorch_backend.h"
 
 #include <NvInfer.h>
 #include <stdint.h>
@@ -36,60 +36,77 @@
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 
-#include <ATen/Functions.h>
+std::pair<bool, const torch::ScalarType>
+ConvertDataTypeToTorchType(const DataType& dtype)
+{
+  torch::ScalarType type;
+  switch (data_type) {
+    case TYPE_UINT8:
+      type = torch::kByte;
+    case TYPE_INT8:
+      type = torch::kChar;
+    case TYPE_INT16:
+      type = torch::kShort;
+    case TYPE_INT32:
+      type = torch::kInt;
+    case TYPE_INT64:
+      type = torch::kLong;
+    case TYPE_FP16:
+      type = torch::kHalf;
+    case TYPE_FP32:
+      type = torch::kFloat;
+    case TYPE_FP64:
+      type = torch::kDouble;
+    case TYPE_UINT16:
+    case TYPE_UINT32:
+    case TYPE_UINT64:
+    case TYPE_STRING:
+    default:
+        return std::make_pair(false, type);
+  }
+
+  return std::make_pair(true, type);
+}
+
+const std::string
+DataTypeName(const DataType& dtype)
+{
+  switch (data_type) {
+    case TYPE_UINT8:
+      return "TYPE_UINT8";
+    case TYPE_INT8:
+      return "TYPE_INT8";
+    case TYPE_INT16:
+      return "TYPE_INT16";
+    case TYPE_INT32:
+      return "TYPE_INT32";
+    case TYPE_INT64:
+      return "TYPE_INT64";
+    case TYPE_FP16:
+      return "TYPE_FP16";
+    case TYPE_FP32:
+      return "TYPE_FP32";
+    case TYPE_FP64:
+      return "TYPE_FP64";
+    case TYPE_UINT16:
+      return "TYPE_UINT16";
+    case TYPE_UINT32:
+      return "TYPE_UINT32";
+    case TYPE_UINT64:
+      return "TYPE_UINT64";
+    case TYPE_STRING:
+      return "TYPE_STRING";
+  }
+
+  return "<unknown>";
+}
 
 namespace nvidia { namespace inferenceserver {
-
-namespace {
-
-DataType
-ConvertFromDLDataType(DLDataTypeCode dtype)
-{
-  switch (dtype) {
-    case DLDataType::kDLUInt:
-      return TYPE_UINT32;
-    case DLDataType::kDLInt:
-      return TYPE_INT32;
-    case DLDataType::kDLFloat:
-      return TYPE_FP32;
-    default:
-      break;
-  }
-
-  return TYPE_INVALID;
-}
-
-DLDataType
-ConvertToDLDataType(DataType dtype)
-{
-  switch (dtype) {
-    case TYPE_UINT32:
-      return DLDataType::kDLUInt;
-    case TYPE_INT32:
-      return DLDataType::kDLInt;
-    case TYPE_FP32:
-      return DLDataType::kDLFloat;
-    default:
-      break;
-  }
-
-  return DLDataType::Invalid;
-}
-
-}  // namespace
 
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
 {
-}
-
-LibTorchBackend::Context::Context(Context&& o)
-    : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_)
-{
-  o.gpu_device_ = NO_GPU_DEVICE;
-  o.max_batch_size_ = NO_BATCHING;
 }
 
 LibTorchBackend::Context::~Context()
@@ -112,7 +129,7 @@ LibTorchBackend::CreateExecutionContexts(
 {
   uint32_t total_context_cnt = 0;
 
-  // Create a workspace for each instance.
+  // Create a context for each instance.
   for (const auto& group : Config().instance_group()) {
     for (int c = 0; c < group.count(); c++) {
       if (group.kind() == ModelInstanceGroup::KIND_CPU) {
@@ -145,7 +162,7 @@ LibTorchBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  LOG_VERBOSE(1) << "libtprch backend for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "libtorch backend for " << Name() << std::endl << *this;
   return Status::Success;
 }
 
@@ -201,7 +218,7 @@ LibTorchBackend::CreateExecutionContext(
                                                    : Config().max_batch_size();
 
   contexts_.emplace_back(instance_name, gpu_device, mbs);
-  Context& context = contexts_.back();
+  Context* context = contexts_.back().get();
 
   // If this is a sequence model then add the required inputs...
   if (Config().has_sequence_batching()) {
@@ -211,21 +228,22 @@ LibTorchBackend::CreateExecutionContext(
         ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names));
   }
 
+  if (gpu_device == Context::NO_GPU_DEVICE) {
+    device_ = torch::Device(torch::kCPU);
+  } else {
+    device_ = torch::Device(torch::kCUDA, device_option.device_id)
+  }
   try {
-    LibTorchWorkspace* ltws;
-    LibTorchWorkspace::Error err = LibTorchWorkspaceCreate(
-        &ltws, Config().name(), Config().max_batch_size(), input_names,
-        output_names, gpu_device, lp_itr->second);
-    if (!err.IsOk()) {
-      return Status(RequestStatusCode::INTERNAL, err.Message());
-    }
-
-    context.torch_model_ = ltws.torch_model_;
+    // lp_itr->second is the torch model path
+    torch_model_ = torch::jit::load(lp_itr->second, device_);
+    model_name_= Config().name();
+    max_batch_size_ = Config().max_batch_size();
+    gpu_device_ = gpu_device;
   }
   catch (const std::exception& ex) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "load failed for '" + Config().name() + "': " + ex.what());
+        "load failed for libtorch model -> '" + Config().name() + "': " + ex.what());
   }
 
   RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
@@ -253,9 +271,7 @@ LibTorchBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
-    // For now, skipping the check if potential names is empty
-    if (ConvertDataType(io.data_type()) ==
-        LibTorchWorkspace::DataTypeCode::Invalid) {
+    if (!ConvertDataType(io.data_type())->first) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -272,9 +288,7 @@ LibTorchBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
-    // For now, skipping the check if potential names is empty
-    if (ConvertDataType(io.data_type()) ==
-        LibTorchWorkspace::DataTypeCode::Invalid) {
+    if (!ConvertDataType(io.data_type())->first) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -319,7 +333,7 @@ LibTorchBackend::Run(
 Status
 LibTorchBackend::Context::SetFixedSizedInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
-    const LibTorchWorkspace::DataType dtype, const size_t batch1_byte_size,
+    const DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers)
 {
@@ -383,29 +397,49 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
     buffer_copy_offset += expected_byte_size;
   }
 
-  LibTorchWorkspace::Error err = workspace_->SetInputTensor(
-      name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
-  if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
-  }
+  RETURN_IF_ERROR(SetInputTensor(name, shape, dtype,
+      static_cast<const char*>(buffer), total_byte_size));
 
   return Status::Success;
 }
 
 Status
+LibTorchBackend::Context::SetInputTensor(
+    const std::string& name, const std::vector<int64_t>& shape,
+    const DataType dtype, const char* content, size_t byte_size)
+{
+  const auto pr = ConvertDataTypeToTorchType(dtype);
+  if (!pr.first) {
+    return Error(
+        "Failed to convert DataType '" + DataTypeName(dtype) +
+        "' to Torch datatype");
+  }
+
+  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second.code, device_);
+
+  if ((input_tensor.numel() * pr.second.bits / 8) != byte_size) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected size " + std::to_string(byte_size) +
+        " for inference input '" + name + "', expecting " +
+        std::to_string(input_tensor.nbytes()));
+  }
+  inputs_.push_back(input_tensor);
+
+  return Status::Success();
+}
+
+Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const LibTorchWorkspace::DataType dtype,
+    const std::string& name, const DataType dtype,
     const size_t dtype_byte_size, const size_t total_batch_size,
     std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
   const char* content = nullptr;
   size_t byte_size = 0;
-  LibTorchWorkspace::Error err = workspace_->GetOutputTensor(
-      name, dtype, &content, &byte_size, &content_shape);
-  if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
-  }
+  RETURN_IF_ERROR(GetOutputTensor(name, dtype, &content, &byte_size,
+      &content_shape));
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -452,6 +486,37 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 }
 
 Status
+LibTorchBackend::Context::GetOutputTensor(
+    const std::string& name, const DataType dtype,
+    const char** content, size_t* byte_size,
+    std::vector<int64_t>* content_shape)
+{
+  // Initialize char* content[output_flat.nbytes()];
+  torch::DeviceType output_device = torch::kCPU;
+  try{
+    outputs_ = outputs_.to(output_device)
+    torch::Tensor output_flat = outputs_.flatten();
+    std::vector<float> outputs_vector;
+    for(int i=0;i<output_flat.sizes()[0];i++){
+      outputs_vector.push_back(output_flat[i].item().to<float>());
+    }
+    // Copy output into buffer
+    memcpy(*content, static_cast<const char*>&outputs_vector[0], output_flat.nbytes());
+    //  Set content shape
+    auto shape = outputs_.sizes();
+    for (auto itr = shape.begin(); itr != shape.end(); itr++){
+      content_shape.push_back(*itr);
+    }
+  }
+  catch {
+    return Status(
+        RequestStatusCode::INTERNAL,"failed to get LibTorch output");
+  }
+
+  return Status::Success();
+}
+
+Status
 LibTorchBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
@@ -475,7 +540,7 @@ LibTorchBackend::Context::SetInput(
 
   // Checked at initialization time to make sure that STRING is not
   // being used for an input, so can just assume fixed-sized here.
-  const LibTorchWorkspace::DataType dtype = ConvertDataType(datatype);
+  const DataType dtype = ConvertDataType(datatype);
   const size_t batch1_byte_size =
       batch1_element_cnt * GetDataTypeByteSize(datatype);
   const size_t total_byte_size = total_batch_size * batch1_byte_size;
@@ -565,10 +630,7 @@ LibTorchBackend::Context::Run(
   }
 
   // Run...
-  LibTorchWorkspace::Error err = workspace_->Run();
-  if (!err.IsOk()) {
-    return Status(RequestStatusCode::INTERNAL, err.Message());
-  }
+  RETURN_IF_ERROR(Run());
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
@@ -580,11 +642,28 @@ LibTorchBackend::Context::Run(
 
     // Checked at initialization time to make sure that STRING is not
     // being used for an output, so can just assume fixed-sized here.
-    const LibTorchWorkspace::DataType dtype =
+    const DataType dtype =
         ConvertDataType(output_config->data_type());
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         name, dtype, GetDataTypeByteSize(output_config->data_type()),
         total_batch_size, payloads));
+  }
+
+  return Status::Success;
+}
+
+Status
+LibTorchBackend::Run(
+    uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
+    std::function<void(Status)> OnCompleteQueuedPayloads)
+{
+  try {
+      outputs_ = torch_model_->forward(inputs_).toTensor(); // toTuple() for two outputs
+  }
+  catch (exception& ex) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to run model '" + model_name_ + "': " + ex.what());
   }
 
   return Status::Success;

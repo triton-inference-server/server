@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 name: "resnet_model"
-platform: "libtorch_pt"
+platform: "pytorch_libtorch"
 max_batch_size: 8
 default_model_filename: "resnet_model.pt"
 input {

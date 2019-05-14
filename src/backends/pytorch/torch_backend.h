@@ -25,11 +25,19 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/backends/libtorch/torch_backend_c2.h"
+#include <NvInfer.h>
+#include <torch/torch.h>
+#include <torch/script.h> // One-stop header.
+
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
+
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -49,10 +57,6 @@ class LibTorchBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::string>& paths);
 
  private:
-  Status ValidateSequenceControl(
-      const ModelSequenceBatching::Control::Kind control_kind,
-      std::vector<std::string>* input_names);
-
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
@@ -75,7 +79,6 @@ class LibTorchBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);
@@ -104,13 +107,13 @@ class LibTorchBackend : public InferenceBackend {
     // Set an input tensor from one or more payloads.
     Status SetFixedSizedInputTensor(
         const std::string& input_name, const std::vector<int64_t>& shape,
-        const LibTorchWorkspace::DataType dtype, const size_t batch1_byte_size,
+        const DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
-        const std::string& name, const LibTorchWorkspace::DataType dtype,
+        const std::string& name, const DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads);
 
@@ -124,14 +127,14 @@ class LibTorchBackend : public InferenceBackend {
     // batching is not supported.
     int max_batch_size_;
 
-    // LibTorch model.
+    // LibTorch model and variables that will be reset and used for every run
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     std::vector<torch::jit::IValue> inputs_;
     torch::Tensor outputs_;
     torch::Device device_;
   };
 
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const LibTorchBackend& pb);

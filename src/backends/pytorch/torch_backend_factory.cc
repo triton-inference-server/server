@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/backends/libtorch/torch_backend_factory.h"
+#include "src/backends/pytorch/libtorch_backend_factory.h"
 
 #include <memory>
 #include <string>

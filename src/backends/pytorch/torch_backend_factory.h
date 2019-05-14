@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/backends/libtorch/torch_backend.h"
-#include "src/backends/libtorch/torch_backend.pb.h"
+#include "src/backends/pytorch/libtorch_backend.h"
+#include "src/backends/pytorch/libtorch_backend.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
