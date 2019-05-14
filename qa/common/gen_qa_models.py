@@ -120,6 +120,31 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
+    return None
+
 def create_graphdef_modelfile(
         models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
@@ -646,6 +671,95 @@ output [
             lfile.write("label" + str(l) + "\n")
 
 
+def create_onnx_modelfile(
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
+        input_dtype, output0_dtype, output1_dtype, swap=False):
+
+    if not tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                     input_shape, output0_shape, output1_shape):
+        return
+
+    onnx_input_dtype = np_to_onnx_dtype(input_dtype)
+    onnx_output0_dtype = np_to_onnx_dtype(output0_dtype)
+    onnx_output1_dtype = np_to_onnx_dtype(output1_dtype)
+
+    # Create the model
+    model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   input_dtype, output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    batch_dim = [] if max_batch == 0 else [max_batch]
+
+    in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + list(input_shape))
+    in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + list(input_shape))
+
+    out0 = onnx.helper.make_tensor_value_info("OUTPUT0", onnx_output0_dtype, batch_dim + list(output0_shape))
+    out1 = onnx.helper.make_tensor_value_info("OUTPUT1", onnx_output1_dtype, batch_dim + list(output1_shape))
+
+    internal_in0 = onnx.helper.make_node("Identity", ["INPUT0"], ["_INPUT0"])
+    internal_in1 = onnx.helper.make_node("Identity", ["INPUT1"], ["_INPUT1"])
+
+    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
+    if (onnx_input_dtype == onnx.TensorProto.INT8) or (onnx_input_dtype == onnx.TensorProto.INT16):
+        internal_in0 = onnx.helper.make_node("Cast", ["INPUT0"], ["_INPUT0"], to=onnx.TensorProto.INT32)
+        internal_in1 = onnx.helper.make_node("Cast", ["INPUT1"], ["_INPUT1"], to=onnx.TensorProto.INT32)
+
+    add = onnx.helper.make_node("Add", ["_INPUT0", "_INPUT1"], ["CAST0" if not swap else "CAST1"])
+    sub = onnx.helper.make_node("Sub", ["_INPUT0", "_INPUT1"], ["CAST1" if not swap else "CAST0"])
+    cast0 = onnx.helper.make_node("Cast", ["CAST0"], ["OUTPUT0"], to=onnx_output0_dtype)
+    cast1 = onnx.helper.make_node("Cast", ["CAST1"], ["OUTPUT1"], to=onnx_output1_dtype)
+
+    onnx_nodes = [internal_in0, internal_in1, add, sub, cast0, cast1]
+    onnx_inputs = [in0, in1]
+    onnx_outputs = [out0, out1]
+
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
+    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS")
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    onnx.save(model_def, model_version_dir + "/model.onnx")
+
+
+def create_onnx_modelconfig(
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
+        input_dtype, output0_dtype, output1_dtype,
+        output0_label_cnt, version_policy):
+
+    if not tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                     input_shape, output0_shape, output1_shape):
+        return
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   input_dtype, output0_dtype, output1_dtype)
+    config_dir = models_dir + "/" + model_name
+    # [TODO] move create_general_modelconfig() out of emu as it is general
+    # enough for all backends to use
+    config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
+            emu.repeat(input_dtype, 2), emu.repeat(input_shape, 2), emu.repeat(None, 2),
+            [output0_dtype, output1_dtype], [output0_shape, output1_shape], emu.repeat(None, 2),
+            ["output0_labels.txt", None],
+            version_policy=version_policy, force_tensor_number_suffix=True)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+    with open(config_dir + "/output0_labels.txt", "w") as lfile:
+        for l in range(output0_label_cnt):
+            lfile.write("label" + str(l) + "\n")
+
+
 def create_models(
         models_dir, input_dtype, output0_dtype, output1_dtype,
         input_shape, output0_shape, output1_shape,
@@ -742,6 +856,28 @@ def create_models(
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
 
+    if FLAGS.onnx:
+        # max-batch 8
+        create_onnx_modelconfig(
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype,
+            output0_label_cnt, version_policy)
+        create_onnx_modelfile(
+            models_dir, 8, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype)
+        # max-batch 0
+        create_onnx_modelconfig(
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype,
+            output0_label_cnt, version_policy)
+        create_onnx_modelfile(
+            models_dir, 0, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype)
+
     if FLAGS.ensemble:
         for pair in emu.platform_types_and_validation():
             if not pair[1](input_dtype, output0_dtype, output1_dtype,
@@ -803,6 +939,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--onnx', required=False, action='store_true',
+                        help='Generate Onnx Runtime Onnx models')
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
     parser.add_argument('--ensemble', required=False, action='store_true',
@@ -819,6 +957,8 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.tensorrt:
         import tensorrt.legacy as trt
+    if FLAGS.onnx:
+        import onnx
 
     import test_util as tu
 
@@ -891,6 +1031,17 @@ if __name__ == '__main__':
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
                 create_plan_modelfile(FLAGS.models_dir, 0, 3,
                                             (16,1,1), (16,1,1), (16,1,1), vt, vt, vt, swap=True)
+
+        if FLAGS.onnx:
+            for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
+                create_onnx_modelfile(FLAGS.models_dir, 8, 2,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_onnx_modelfile(FLAGS.models_dir, 8, 3,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_onnx_modelfile(FLAGS.models_dir, 0, 2,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
+                create_onnx_modelfile(FLAGS.models_dir, 0, 3,
+                                          (16,), (16,), (16,), vt, vt, vt, swap=True)
 
         if FLAGS.ensemble:
             for pair in emu.platform_types_and_validation():
