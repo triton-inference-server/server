@@ -218,25 +218,21 @@ LibTorchWorkspaceCreate(
     const std::vector<std::string>& output_names, const int gpu_device,
     const std::string torch_model_path)
 {
+  // Set the device for this model. It seems necessary to set the
+  // device not only on the network but also on each individual
+  // operator.
+  // Declare global torch::Device
+  if (gpu_device == LibTorchWorkspace::NO_GPU_DEVICE) {
+    device = torch::Device(torch::kCPU);
+  } else {
+    device = torch::Device(torch::kCUDA, device_option.device_id)
+  }
   try {
-    std::shared_ptr<torch::jit::script::Module> torch_model = torch::jit::load(torch_model_path);
+    std::shared_ptr<torch::jit::script::Module> torch_model = torch::jit::load(torch_model_path, device);
   }
   catch{
     return LibTorchWorkspace::Error("failed to load LibTorch model");
   }
-
-  // Set the device for this model. It seems necessary to set the
-  // device not only on the network but also on each individual
-  // operator.
-  DLContext device_option;
-  if (gpu_device == LibTorchWorkspace::NO_GPU_DEVICE) {
-    device_option.device_type = static_cast<int>(DLDeviceType::kDLCPU);
-  } else {
-    device_option.device_type = static_cast<int>(DLDeviceType::kDLGPU);
-    device_option.device_id = gpu_device;
-    torch_model->to(torch::Device(torch::kCUDA, device_option.device_id));
-  }
-
 
   LibTorchWorkspaceImpl* ltwsimpl;
   LibTorchWorkspace::Error err = LibTorchWorkspaceImpl::Create(
@@ -274,19 +270,15 @@ LibTorchWorkspaceImpl::SetInputTensor(
         "' to LibTorch datatype");
   }
 
-  at::Tensor input_tensor = torch::from_blob(content,/*sizes=*/shape,
-  /*strides={1, 3}*/, pr.second.code/*torch::kInt8*/);
-  input_tensor.to(torch::kCPU);
+  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second.code, device);
 
   if ((input_tensor.numel() * pr.second.bits / 8) != byte_size) {
     return Error(
         "unexpected size " + std::to_string(byte_size) +
         " for inference input '" + name + "', expecting " +
-        std::to_string(input->size() * input->itemsize()));
+        std::to_string(input_tensor.nbytes()));
   }
   inputs_.push_back(input_tensor);
-  // inputs_.to GPU if needed
-  std::cout << input_tensor.item().to<float>();
   return Error();
 }
 
@@ -303,7 +295,7 @@ LibTorchWorkspaceImpl::GetOutputTensor(
   }
   // get first n outputs_
   //int32_t no_of_classes = 1;
-  torch::Scalar scalar output_values = outputs_.argmax(no_of_classes).item();
+  // torch::Scalar scalar output_values = outputs_.argmax(no_of_classes).item();
 
   // const auto pr = ConvertDatatype(dtype);
   // if (!pr.first) {

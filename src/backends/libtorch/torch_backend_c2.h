@@ -119,6 +119,8 @@ class LibTorchWorkspace {
 
   // Run the model.
   virtual Error Run() = 0;
+
+  torch::Device device;
 };
 
 extern "C" {

@@ -127,7 +127,7 @@ class LibTorchBackend : public InferenceBackend {
     // LibTorch model.
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     std::vector<torch::jit::IValue> inputs_;
-    at::Tensor outputs_;
+    torch::Tensor outputs_;
   };
 
   std::vector<Context> contexts_;
