@@ -56,26 +56,34 @@ int main(int argc, const char* argv[]) {
   torch::Tensor input_tensor = torch::rand({1*batch_size, 3, 224, 224}, device);
   inputs.push_back(input_tensor);
   // Execute the model and store its outputs into a tensor.
-  torch::Tensor outputs = module->forward(inputs).toTensor();
-  outputs.to(torch::kCPU);
+  torch::Tensor output;
+  try {
+    auto outputs = module->forward(inputs).toTuple();
+    output = outputs->elements()[0].toTensor();
+    output.to(torch::kCPU);
+  }
+  catch (...){
+    std::cout << "Not a tuple" << std::endl;
+    output = module->forward(inputs).toTensor();
+  }
   // torch::Tensor output_mini = outputs.slice(/*dim=*/1, /*start=*/0, /*end=*/5);
   // std::cout << output_mini << "\n";
-  auto shape = outputs.sizes();
+  auto shape = output.sizes();
   std::cout<< shape << "\n";
 
   int64_t output_size = 1;
   for (auto itr = shape.begin(); itr != shape.end(); itr++){
     output_size *= *itr;
   }
-  torch::Tensor output_flat = outputs.flatten();
-  std::vector<float> outputs_vector;//[output_size];
+  torch::Tensor output_flat = output.flatten();
+  std::vector<float> output_vector;//[output_size];
   char* content[output_flat.nbytes()];
   for(int i=0;i<output_flat.sizes()[0];i++){
-    outputs_vector.push_back(output_flat[i].item().to<float>());
+    output_vector.push_back(output_flat[i].item().to<float>());
   }
-  std::cout<< outputs_vector.size() << std::endl;
+  std::cout<< output_vector.size() << std::endl;
   // Copy output into buffer
-  memcpy(content, &outputs_vector[0], output_flat.nbytes()); // outputs_vector.size() * sizeof(float)
+  memcpy(content, &output_vector[0], output_flat.nbytes()); // output_vector.size() * sizeof(float)
   // Test for Success
   torch::Tensor reconst_output = torch::from_blob(content, {2, 1000}, torch::kFloat32);
   if (reconst_output[0][0].item().to<float>() == output_flat[0].item().to<float>()){

@@ -241,12 +241,14 @@ LibTorchWorkspaceImpl::Create(
     LibTorchWorkspaceImpl** ltws, const std::string& model_name,
     const int max_batch_size, const std::vector<std::string>& input_names,
     const std::vector<std::string>& output_names,
-    std::shared_ptr<torch::jit::script::Module>& torch_model)
+    std::shared_ptr<torch::jit::script::Module>& torch_model,
+    torch::Device device)
 {
   *ltws = new LibTorchWorkspaceImpl();
   (*ltws)->model_name_ = model_name;
   (*ltws)->max_batch_size_ = max_batch_size;
   (*ltws)->torch_model_ = torch_model;
+  (*ltws)->device_ = device;
 
   return Error();
 }
@@ -264,7 +266,7 @@ LibTorchWorkspaceImpl::SetInputTensor(
         "' to Torch datatype");
   }
 
-  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second.code, device);
+  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second.code, device_);
 
   if ((input_tensor.numel() * pr.second.bits / 8) != byte_size) {
     return Error(
@@ -310,7 +312,7 @@ LibTorchWorkspace::Error
 LibTorchWorkspaceImpl::Run()
 {
   try {
-      outputs_ = torch_model_->forward(inputs_).toTensor();
+      outputs_ = torch_model_->forward(inputs_).toTensor(); // toTuple() for two outputs
   }
   catch (exception& ex) {
     return Error("failed to run model '" + model_name_ + "': " + ex.what());
