@@ -148,9 +148,6 @@ OnnxBackend::CreateExecutionContext(
   std::string cc_model_filename;
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
-
-    LOG_INFO << "Creating instance " << instance_name << " on CPU using "
-             << cc_model_filename;
   } else {
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
@@ -404,7 +401,11 @@ OnnxBackend::Context::SetInputTensor(
 
   size_t batch1_element_cnt = 1;
   std::vector<int64_t> input_dims;
-  input_dims.push_back(total_batch_size);
+
+  // Only add batch dimension if the model support batching
+  if (max_batch_size_ != NO_BATCHING) {
+    input_dims.push_back(total_batch_size);
+  }
   for (const auto dim : dims) {
     input_dims.push_back(dim);
     batch1_element_cnt *= dim;
