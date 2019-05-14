@@ -1,37 +1,33 @@
 diff --git a/tensorflow/BUILD b/tensorflow/BUILD
-index 823ad8f..ee1dabb 100644
+index 823ad8f..a370465 100644
 --- a/tensorflow/BUILD
 +++ b/tensorflow/BUILD
-@@ -625,3 +625,32 @@ py_library(
-     visibility = ["//visibility:public"],
-     deps = ["//tensorflow/python:no_contrib"],
+@@ -486,6 +486,20 @@ tf_cc_shared_object(
+     ],
  )
-+
+ 
 +cc_library(
 +    name = "trtis_tf",
 +    srcs = [
++        "tensorflow_backend_tf.cc"
++    ],
++    hdrs = [
++        "tensorflow_backend_tf.h"
 +    ],
 +    deps = [
-+        "//tensorflow/contrib:contrib_kernels",
-+        "//tensorflow/contrib:contrib_ops_op_lib",
-+        "//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
-+        "//tensorflow/contrib/tensorrt:trt_engine_op_kernel",
-+        "//tensorflow/contrib/tensorrt:trt_shape_function",
-+        "//tensorflow/core:framework_internal",
-+        "//tensorflow/core:tensorflow",
-+        "//tensorflow/cc:cc_ops",
-+        "//tensorflow/c:c_api",
++        "//tensorflow/cc/saved_model:loader",
++        "//tensorflow/cc/saved_model:tag_constants",
 +    ],
 +)
 +
-+cc_binary(
-+    name = "libtensorflow_trtis.so",
-+    deps = [
+ tf_cc_shared_object(
+     name = "libtensorflow_cc.so",
+     linkopts = select({
+@@ -502,6 +516,7 @@ tf_cc_shared_object(
+     }),
+     visibility = ["//visibility:public"],
+     deps = [
 +        ":trtis_tf",
-+        ":libtensorflow_trtis.ldscript"
-+    ],
-+    linkopts = [
-+        "-Wl,--version-script", "$(location :libtensorflow_trtis.ldscript)"
-+    ],
-+    linkshared = 1,
-+)
+         "//tensorflow:tf_exported_symbols.lds",
+         "//tensorflow:tf_version_script.lds",
+         "//tensorflow/c:c_api",

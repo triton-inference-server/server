@@ -44,19 +44,25 @@ RUN sha1sum -c /tmp/trtis/tools/patch/tensorflow/checksums && \
     patch -i /tmp/trtis/tools/patch/tensorflow/cc/saved_model/loader.cc \
           /opt/tensorflow/tensorflow/cc/saved_model/loader.cc && \
     patch -i /tmp/trtis/tools/patch/tensorflow/BUILD \
-          /opt/tensorflow/tensorflow/BUILD
+          /opt/tensorflow/tensorflow/BUILD && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/tf_version_script.lds \
+          /opt/tensorflow/tensorflow/tf_version_script.lds && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/nvbuild.sh \
+          /opt/tensorflow/nvbuild.sh && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/nvbuildopts \
+          /opt/tensorflow/nvbuildopts && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/bazel_build.sh \
+          /opt/tensorflow/bazel_build.sh
 
-# The link script to hide all symbols except those needed by TRTIS
-COPY src/backends/tensorflow/libtensorflow_trtis.ldscript /opt/tensorflow/tensorflow/
+# Copy tensorflow_backend_tf into TensorFlow so it builds into the
+# libtensorflow_cc library. We want tensorflow_backend_tf to build
+# against the TensorFlow protobuf since it interfaces with that code.
+COPY src/backends/tensorflow/tensorflow_backend_tf.* \
+     /opt/tensorflow/tensorflow/
 
 # Build TensorFlow library for TRTIS
 WORKDIR /opt/tensorflow
-RUN ./nvbuild.sh --python3.5 --configonly && \
-    bazel build -c opt tensorflow:libtensorflow_trtis.so && \
-    bazel clean --expunge && \
-    rm -rf /root/.cache/bazel && \
-    rm -rf /tmp/*
->>>>>>> Cmake for TensorFlow backend
+RUN ./nvbuild.sh --python3.5
 
 ############################################################################
 ## Caffe2 stage: Use PyTorch container to get Caffe2 backend
@@ -168,7 +174,9 @@ RUN apt-get update && \
 
 # TensorFlow headers and libraries
 COPY --from=trtserver_tf \
-     /opt/tensorflow/bazel-bin/tensorflow/libtensorflow_trtis.so /opt/tensorrtserver/lib/
+     /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
+COPY --from=trtserver_tf \
+     /usr/local/lib/tensorflow/libtensorflow_framework.so /opt/tensorrtserver/lib/
 COPY --from=trtserver_tf \
      /usr/local/lib/python3.5/dist-packages/tensorflow/include \
      /opt/tensorrtserver/include/

@@ -1,0 +1,7 @@
+diff --git a/nvbuildopts b/nvbuildopts
+index 8ae73a6..f202668 100644
+--- a/nvbuildopts
++++ b/nvbuildopts
+@@ -1 +1 @@
+--c opt --config=cuda --cxxopt=-D_GLIBCXX_USE_CXX11_ABI=0
++-c opt --config=nonccl --config=cuda --cxxopt=-D_GLIBCXX_USE_CXX11_ABI=0
