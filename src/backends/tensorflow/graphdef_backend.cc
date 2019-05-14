@@ -27,14 +27,12 @@
 #include "src/backends/tensorflow/graphdef_backend.h"
 
 #include <set>
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "tensorflow/c/c_api.h"
-#include "tensorflow/core/graph/default_device.h"
-#include "tensorflow/core/public/session.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -47,47 +45,34 @@ GraphDefBackend::Init(const std::string& path, const ModelConfig& config)
 }
 
 Status
-GraphDefBackend::CreateSession(
-    const tensorflow::SessionOptions& options, const int gpu_device,
-    const std::string& model_path, tensorflow::Session** session,
+GraphDefBackend::CreateTRTISTFModel(
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+    const int gpu_device, const bool has_graph_level, const int graph_level,
+    const std::string& model_path, TRTISTFModelHandle* trtistf_model,
     IONameMap* input_name_map, IONameMap* output_name_map)
 {
-  RETURN_IF_TF_ERROR(tensorflow::NewSession(options, session));
+  TRTISTF_Model* model = nullptr;
+  RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromGraphDef(
+      &model, model_path.c_str(), model_path.c_str(), gpu_device,
+      has_graph_level, graph_level, backend_config->allow_gpu_memory_growth,
+      backend_config->per_process_gpu_memory_fraction,
+      backend_config->allow_soft_placement));
 
-  tensorflow::GraphDef graph_def;
-  RETURN_IF_ERROR(ReadBinaryProto(model_path, &graph_def));
-  if (graph_def.node_size() == 0) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "model " + Name() + " has an empty network");
-  }
+  trtistf_model->reset(model);
 
-  // Set the default device to control the CPU/GPU that the graph runs
-  // on. This isn't foolproof since individual operations in the graph
-  // could specify a specific run location. But given that
-  // visible_device_list doesn't work it seems like the only option we
-  // have. [DLIS-43]
-  if (gpu_device == Context::NO_GPU_DEVICE) {
-    tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
-  } else {
-    tensorflow::graph::SetDefaultDevice(
-        "/gpu:" + std::to_string(gpu_device), &graph_def);
-  }
+  // For graphdef the model inputs and outputs are just "potential"
+  // inputs and outputs since graphdef doesn't explicitly list the
+  // inputs and outputs. Also, only the name is available, shape and
+  // datatype are not.
+  const TRTISTF_IOList* inputs = TRTISTF_ModelInputs(model);
+  const TRTISTF_IOList* outputs = TRTISTF_ModelOutputs(model);
 
-  RETURN_IF_TF_ERROR((*session)->Create(graph_def));
-
-  // Go through all graph nodes and collect the possible inputs and
-  // outputs. We use this to verify the requested inputs and outputs
-  // when initializing. Unfortunately graphdef isn't explicit in
-  // indicating inputs and outputs so we assume any Placeholder can be
-  // an input and any node can be an output.
   std::set<std::string> potential_inputs, potential_outputs;
-  for (const auto& node : graph_def.node()) {
-    if (node.op() == "Placeholder") {
-      potential_inputs.emplace(node.name());
-    } else {
-      potential_outputs.emplace(node.name());
-    }
+  for (const TRTISTF_IOList* itr = inputs; itr != nullptr; itr = itr->next_) {
+    potential_inputs.insert(itr->io_->name_);
+  }
+  for (const TRTISTF_IOList* itr = outputs; itr != nullptr; itr = itr->next_) {
+    potential_outputs.insert(itr->io_->name_);
   }
 
   if (potential_inputs.size() < (size_t)Config().input().size()) {

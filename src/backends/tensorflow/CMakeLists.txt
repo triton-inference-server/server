@@ -29,11 +29,10 @@ cmake_minimum_required (VERSION 3.5)
 #
 # TensorFlow backends
 #
-
-# Because TF loves to spew warnings... remove this once we create a
-# stub file that compiles into TF...
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
-
+# tensorflow_backend_tf is copied into and built along with TensorFlow
+# to ensure that it uses the same protobuf as TensorFlow, so not
+# included in these sources.
+#
 set(
   TENSORFLOW_SRCS
   autofill.cc
@@ -42,7 +41,6 @@ set(
   graphdef_backend_factory.cc
   savedmodel_backend.cc
   savedmodel_backend_factory.cc
-  loader.cc
   tf_utils.cc
 )
 
@@ -54,7 +52,7 @@ set(
   graphdef_backend_factory.h
   savedmodel_backend.h
   savedmodel_backend_factory.h
-  loader.h
+  tensorflow_backend_tf.h
   tf_utils.h
 )
 

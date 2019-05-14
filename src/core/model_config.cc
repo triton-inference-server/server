@@ -335,17 +335,20 @@ DimsListToString(const DimsList& dims)
 }
 
 std::string
-DimsListToString(const std::vector<int64_t>& dims)
+DimsListToString(const std::vector<int64_t>& dims, const int start_idx)
 {
-  bool first = true;
+  int idx = 0;
 
   std::string str("[");
   for (const auto& dim : dims) {
-    if (!first) {
-      str += ",";
+    if (idx >= start_idx) {
+      if (idx > start_idx) {
+        str += ",";
+      }
+      str += std::to_string(dim);
     }
-    str += std::to_string(dim);
-    first = false;
+
+    idx++;
   }
 
   str += "]";

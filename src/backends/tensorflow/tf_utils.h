@@ -26,20 +26,12 @@
 #pragma once
 
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
-#include "tensorflow/core/framework/tensor_shape.pb.h"
-#include "tensorflow/core/framework/types.pb.h"
-#include "tensorflow/core/public/session_options.h"
 
 namespace nvidia { namespace inferenceserver {
-
-/// \return the tensorflow::SessionOptions for a backend
-/// configuration.
-Status NewSessionOptionsFromGraphDefBackendConfig(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    tensorflow::SessionOptions* session_options);
 
 /// \return true if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented
@@ -49,7 +41,7 @@ Status NewSessionOptionsFromGraphDefBackendConfig(
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
 bool CompareDimsExact(
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching);
 
 /// \return Status::Success if a TensorFlow shape can support a model
@@ -63,35 +55,38 @@ bool CompareDimsExact(
 /// appropriate batch dimension.
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const TRTISTF_Shape* model_shape, const DimsList& dims,
     const bool supports_batching);
 
-/// \return true if a TensorFlow data-type matches a model
-/// configuration data-type.
-bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
+// Convert a vector representing a shape to string representation.
+/// \param dims The vector of dimensions to be converted.
+/// \return String representation of the vector in pattern
+/// "[d0,d1,...,dn]"
+std::string ShapeToString(
+    const TRTISTF_Shape* model_shape, const size_t start_idx = 0);
 
-/// \return the string representation of a TensorFlow shape.
-const std::string DimsDebugString(
-    const tensorflow::TensorShapeProto& dims, const int start_idx = 1);
-
-/// \return the TensorFlow data-type that corresponds to a model
-/// configuration data-type.
-tensorflow::DataType ConvertDataType(DataType dtype);
+/// \return true if a TF data-type matches a model configuration
+/// data-type.
+bool CompareDataType(TRTISTF_DataType model_dtype, DataType dtype);
 
 /// \return the model configuration data-type that corresponds to a
-/// TensorFlow data-type.
-DataType ConvertDataType(tensorflow::DataType dtype);
+/// TRTISTF data-type.
+DataType ConvertDataType(TRTISTF_DataType dtype);
 
-// Convert a TensorFlow status code to inference server status code.
-RequestStatusCode FromTFError(const int tf_code);
+/// \return the TRTISTF data-type corresponding to a model
+/// configuration data-type.
+TRTISTF_DataType ConvertDataType(DataType dtype);
 
-// If TensorFlow status is non-OK, return the equivalent Status.
-#define RETURN_IF_TF_ERROR(TFS)                                              \
-  do {                                                                       \
-    const tensorflow::Status& status__ = (TFS);                              \
-    if (status__.code() != 0) {                                              \
-      return Status(FromTFError(status__.code()), status__.error_message()); \
-    }                                                                        \
+// If TRTISTF Error is non-OK, return the equivalent TRTIS status.
+#define RETURN_IF_TRTISTF_ERROR(TFWS)                                   \
+  do {                                                                  \
+    TRTISTF_Error* error__ = (TFWS);                                    \
+    if (error__ != nullptr) {                                           \
+      auto status = Status(RequestStatusCode::INTERNAL, error__->msg_); \
+      TRTISTF_ErrorDelete(error__);                                     \
+      return status;                                                    \
+    }                                                                   \
+    TRTISTF_ErrorDelete(error__);                                       \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

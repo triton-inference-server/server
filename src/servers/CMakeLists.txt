@@ -122,7 +122,8 @@ if(${TRTIS_ENABLE_TENSORFLOW})
   target_link_libraries(
     trtserver
     ${TRTIS_EXTRA_LDFLAGS}
-    -ltensorflow_trtis
+    -ltensorflow_cc
+    -ltensorflow_framework
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 

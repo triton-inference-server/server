@@ -217,6 +217,7 @@ std::string DimsListToString(const DimsList& dims);
 /// \param dims The vector of dimensions to be converted.
 /// \return String representation of the vector in pattern
 /// "[d0,d1,...,dn]"
-std::string DimsListToString(const std::vector<int64_t>& dims);
+std::string DimsListToString(
+    const std::vector<int64_t>& dims, const int start_idx = 0);
 
 }}  // namespace nvidia::inferenceserver
