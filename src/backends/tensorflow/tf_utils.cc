@@ -28,41 +28,26 @@
 
 namespace nvidia { namespace inferenceserver {
 
-Status
-NewSessionOptionsFromGraphDefBackendConfig(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    tensorflow::SessionOptions* session_options)
-{
-  session_options->config.mutable_gpu_options()->set_allow_growth(
-      backend_config->allow_gpu_memory_growth);
-  session_options->config.mutable_gpu_options()
-      ->set_per_process_gpu_memory_fraction(
-          backend_config->per_process_gpu_memory_fraction);
-  session_options->config.set_allow_soft_placement(
-      backend_config->allow_soft_placement);
-
-  return Status::Success;
-}
-
 bool
 CompareDimsExact(
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
     const bool supports_batching)
 {
   // If the model configuration expects batching support in the model,
   // then the tensorflow shape first dimension must be -1.
   if (supports_batching) {
-    if ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1)) {
+    if ((model_shape.size() == 0) || (model_shape[0] != -1)) {
       return false;
     }
   }
 
-  if (model_shape.dim().size() != (dims.size() + (supports_batching ? 1 : 0))) {
+  if (model_shape.size() !=
+      (size_t)(dims.size() + (supports_batching ? 1 : 0))) {
     return false;
   }
 
   for (int i = 0; i < dims.size(); ++i) {
-    if (model_shape.dim(i + (supports_batching ? 1 : 0)).size() != dims[i]) {
+    if (model_shape[i + (supports_batching ? 1 : 0)] != dims[i]) {
       return false;
     }
   }
@@ -73,13 +58,13 @@ CompareDimsExact(
 Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
     const bool supports_batching)
 {
   // If the model configuration expects batching support in the model,
   // then the tensorflow shape first dimension must be -1.
   if (supports_batching &&
-      ((model_shape.dim().size() == 0) || (model_shape.dim(0).size() != -1))) {
+      ((model_shape.size() == 0) || (model_shape[0] != -1))) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name +
@@ -88,24 +73,24 @@ CompareDimsSupported(
             tensor_name +
             "' expected by framework is not a variable-size batch "
             "dimension: " +
-            DimsDebugString(model_shape));
+            DimsListToString(model_shape));
   }
 
   const int nonbatch_start_idx = (supports_batching ? 1 : 0);
 
   // Tensor rank in configuration must match what framework expects.
-  if (model_shape.dim().size() != (dims.size() + nonbatch_start_idx)) {
+  if (model_shape.size() != (size_t)(dims.size() + nonbatch_start_idx)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', tensor '" + tensor_name +
             "' shape expected by framework " +
-            DimsDebugString(model_shape, nonbatch_start_idx) +
+            DimsListToString(model_shape, nonbatch_start_idx) +
             " doesn't match model configuration shape " +
             DimsListToString(dims));
   }
 
   for (int i = 0; i < dims.size(); ++i) {
-    int64_t model_dim = model_shape.dim(i + nonbatch_start_idx).size();
+    int64_t model_dim = model_shape[i + nonbatch_start_idx];
     if (model_dim == -1) {
       continue;
     }
@@ -115,7 +100,7 @@ CompareDimsSupported(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + model_name + "', tensor '" + tensor_name +
               "' shape expected by framework " +
-              DimsDebugString(model_shape, nonbatch_start_idx) +
+              DimsListToString(model_shape, nonbatch_start_idx) +
               " doesn't match model configuration shape " +
               DimsListToString(dims));
     }
@@ -125,103 +110,47 @@ CompareDimsSupported(
 }
 
 bool
-CompareDataType(tensorflow::DataType model_dtype, DataType dtype)
+CompareDataType(TFWorkspace::DataType model_dtype, DataType dtype)
 {
-  tensorflow::DataType cdtype = ConvertDataType(dtype);
-  if (cdtype == tensorflow::DT_INVALID) {
+  DataType cdtype = ConvertDataType(model_dtype);
+  if (cdtype == DataType::TYPE_INVALID) {
     return false;
   }
 
-  return model_dtype == cdtype;
-}
-
-const std::string
-DimsDebugString(const tensorflow::TensorShapeProto& dims, const int start_idx)
-{
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = start_idx; i < dims.dim().size(); ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims.dim(i).size()));
-    first = false;
-  }
-  str.append("]");
-  return str;
-}
-
-tensorflow::DataType
-ConvertDataType(DataType dtype)
-{
-  switch (dtype) {
-    case DataType::TYPE_INVALID:
-      return tensorflow::DT_INVALID;
-    case DataType::TYPE_BOOL:
-      return tensorflow::DT_BOOL;
-    case DataType::TYPE_UINT8:
-      return tensorflow::DT_UINT8;
-    case DataType::TYPE_UINT16:
-      return tensorflow::DT_UINT16;
-    case DataType::TYPE_UINT32:
-      return tensorflow::DT_UINT32;
-    case DataType::TYPE_UINT64:
-      return tensorflow::DT_UINT64;
-    case DataType::TYPE_INT8:
-      return tensorflow::DT_INT8;
-    case DataType::TYPE_INT16:
-      return tensorflow::DT_INT16;
-    case DataType::TYPE_INT32:
-      return tensorflow::DT_INT32;
-    case DataType::TYPE_INT64:
-      return tensorflow::DT_INT64;
-    case DataType::TYPE_FP16:
-      return tensorflow::DT_HALF;
-    case DataType::TYPE_FP32:
-      return tensorflow::DT_FLOAT;
-    case DataType::TYPE_FP64:
-      return tensorflow::DT_DOUBLE;
-    case DataType::TYPE_STRING:
-      return tensorflow::DT_STRING;
-    default:
-      break;
-  }
-
-  return tensorflow::DT_INVALID;
+  return dtype == cdtype;
 }
 
 DataType
-ConvertDataType(tensorflow::DataType dtype)
+ConvertDataType(TFWorkspace::DataType dtype)
 {
   switch (dtype) {
-    case tensorflow::DT_INVALID:
+    case TFWorkspace::DataType::TYPE_INVALID:
       return DataType::TYPE_INVALID;
-    case tensorflow::DT_BOOL:
+    case TFWorkspace::DataType::TYPE_BOOL:
       return DataType::TYPE_BOOL;
-    case tensorflow::DT_UINT8:
+    case TFWorkspace::DataType::TYPE_UINT8:
       return DataType::TYPE_UINT8;
-    case tensorflow::DT_UINT16:
+    case TFWorkspace::DataType::TYPE_UINT16:
       return DataType::TYPE_UINT16;
-    case tensorflow::DT_UINT32:
+    case TFWorkspace::DataType::TYPE_UINT32:
       return DataType::TYPE_UINT32;
-    case tensorflow::DT_UINT64:
+    case TFWorkspace::DataType::TYPE_UINT64:
       return DataType::TYPE_UINT64;
-    case tensorflow::DT_INT8:
+    case TFWorkspace::DataType::TYPE_INT8:
       return DataType::TYPE_INT8;
-    case tensorflow::DT_INT16:
+    case TFWorkspace::DataType::TYPE_INT16:
       return DataType::TYPE_INT16;
-    case tensorflow::DT_INT32:
+    case TFWorkspace::DataType::TYPE_INT32:
       return DataType::TYPE_INT32;
-    case tensorflow::DT_INT64:
+    case TFWorkspace::DataType::TYPE_INT64:
       return DataType::TYPE_INT64;
-    case tensorflow::DT_HALF:
+    case TFWorkspace::DataType::TYPE_FP16:
       return DataType::TYPE_FP16;
-    case tensorflow::DT_FLOAT:
+    case TFWorkspace::DataType::TYPE_FP32:
       return DataType::TYPE_FP32;
-    case tensorflow::DT_DOUBLE:
+    case TFWorkspace::DataType::TYPE_FP64:
       return DataType::TYPE_FP64;
-    case tensorflow::DT_STRING:
+    case TFWorkspace::DataType::TYPE_STRING:
       return DataType::TYPE_STRING;
     default:
       break;
@@ -230,33 +159,43 @@ ConvertDataType(tensorflow::DataType dtype)
   return DataType::TYPE_INVALID;
 }
 
-RequestStatusCode
-FromTFError(const int tf_code)
+TFWorkspace::DataType
+ConvertDataType(DataType dtype)
 {
-  switch (tf_code) {
-    case 0:  // tensorflow::error::OK
-      return RequestStatusCode::SUCCESS;
-
-    case 3:  // tensorflow::error::INVALID_ARGUMENT
-      return RequestStatusCode::INVALID_ARG;
-
-    case 5:  // tensorflow::error::NOT_FOUND
-      return RequestStatusCode::NOT_FOUND;
-
-    case 6:  // tensorflow::error::ALREADY_EXISTS
-      return RequestStatusCode::NOT_FOUND;
-
-    case 14:  // tensorflow::error::UNAVAILABLE
-      return RequestStatusCode::UNAVAILABLE;
-
-    case 13:  // tensorflow::error::INTERNAL
-      return RequestStatusCode::INTERNAL;
-
+  switch (dtype) {
+    case DataType::TYPE_INVALID:
+      return TFWorkspace::DataType::TYPE_INVALID;
+    case DataType::TYPE_BOOL:
+      return TFWorkspace::DataType::TYPE_BOOL;
+    case DataType::TYPE_UINT8:
+      return TFWorkspace::DataType::TYPE_UINT8;
+    case DataType::TYPE_UINT16:
+      return TFWorkspace::DataType::TYPE_UINT16;
+    case DataType::TYPE_UINT32:
+      return TFWorkspace::DataType::TYPE_UINT32;
+    case DataType::TYPE_UINT64:
+      return TFWorkspace::DataType::TYPE_UINT64;
+    case DataType::TYPE_INT8:
+      return TFWorkspace::DataType::TYPE_INT8;
+    case DataType::TYPE_INT16:
+      return TFWorkspace::DataType::TYPE_INT16;
+    case DataType::TYPE_INT32:
+      return TFWorkspace::DataType::TYPE_INT32;
+    case DataType::TYPE_INT64:
+      return TFWorkspace::DataType::TYPE_INT64;
+    case DataType::TYPE_FP16:
+      return TFWorkspace::DataType::TYPE_FP16;
+    case DataType::TYPE_FP32:
+      return TFWorkspace::DataType::TYPE_FP32;
+    case DataType::TYPE_FP64:
+      return TFWorkspace::DataType::TYPE_FP64;
+    case DataType::TYPE_STRING:
+      return TFWorkspace::DataType::TYPE_STRING;
     default:
       break;
   }
 
-  return RequestStatusCode::UNKNOWN;
+  return TFWorkspace::DataType::TYPE_INVALID;
 }
 
 }}  // namespace nvidia::inferenceserver

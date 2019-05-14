@@ -27,13 +27,13 @@
 #include "src/backends/tensorflow/savedmodel_backend.h"
 
 #include <set>
-#include "src/backends/tensorflow/loader.h"
+#include "src/backends/tensorflow/graphdef_backend_factory.h"
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
-#include "tensorflow/c/c_api.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -47,46 +47,36 @@ SavedModelBackend::Init(const std::string& path, const ModelConfig& config)
 }
 
 Status
-SavedModelBackend::CreateSession(
-    const tensorflow::SessionOptions& options, const int gpu_device,
-    const std::string& model_path, tensorflow::Session** session,
+SavedModelBackend::CreateWorkspace(
+    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+    const int gpu_device, const bool has_graph_level, const int graph_level,
+    const std::string& model_path, std::unique_ptr<TFWorkspace>* workspace,
     IONameMap* input_name_map, IONameMap* output_name_map)
 {
-  // Set the default device to control the CPU/GPU that the graph runs
-  // on. This isn't foolproof since individual operations in the graph
-  // could specify a specific run location. But given that
-  // visible_device_list doesn't work it seems like the only option we
-  // have. [DLIS-43]
-  //
-  // The GraphDef where we need to use this workaround is only
-  // available in tensorflow/cc/saved_model/loader.cc so we use
-  // visible_device_list in pass in the gpu_device we want and then
-  // our (modified) loader.cc will use that to SetDefaultDevice
-  // appropriately.
-  tensorflow::SessionOptions session_options = options;
-  if (gpu_device == Context::NO_GPU_DEVICE) {
-    session_options.config.mutable_gpu_options()->set_visible_device_list(
-        "/cpu:0");
-  } else {
-    session_options.config.mutable_gpu_options()->set_visible_device_list(
-        "/gpu:" + std::to_string(gpu_device));
+  TFWorkspace* tfws = nullptr;
+  TFWorkspace::Error error = TFWorkspaceCreateFromSavedModel(
+      &tfws, model_path, model_path, gpu_device, has_graph_level, graph_level,
+      backend_config->allow_gpu_memory_growth,
+      backend_config->per_process_gpu_memory_fraction,
+      backend_config->allow_soft_placement);
+  if (!error.IsOk()) {
+    return Status(RequestStatusCode::INTERNAL, error.Message());
   }
 
-  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
-  tensorflow::SignatureDef sig;
-  RETURN_IF_ERROR(
-      LoadSavedModel(Name(), model_path, session_options, &bundle, &sig));
+  // The workspace inputs are the expected inputs and the outputs are
+  // the allowed outputs. Saved-model gives these explicitly so we can
+  // check precisely if the model configuration matches.
+  const TFWorkspace::IOList& tfwsinputs = tfws->Inputs();
+  const TFWorkspace::IOList& tfwsoutputs = tfws->Outputs();
 
-  // Collect all the expected input and allowed output tensor names
-  // based on the signature def.
   std::set<std::string> expected_inputs, allowed_outputs;
-  for (const auto& i : sig.inputs()) {
-    expected_inputs.emplace(i.first);
-    input_name_map->insert({i.first, i.second.name()});
+  for (auto& io : tfwsinputs) {
+    expected_inputs.insert(io.name_);
+    input_name_map->insert({io.name_, io.inmodel_name_});
   }
-  for (const auto& o : sig.outputs()) {
-    allowed_outputs.emplace(o.first);
-    output_name_map->insert({o.first, o.second.name()});
+  for (const auto& io : tfwsoutputs) {
+    allowed_outputs.insert(io.name_);
+    output_name_map->insert({io.name_, io.inmodel_name_});
   }
 
   size_t expected_input_cnt = (size_t)Config().input().size();
@@ -96,14 +86,14 @@ SavedModelBackend::CreateSession(
   // datatype.
   if (Config().has_sequence_batching()) {
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, sig));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, tfwsinputs));
     RETURN_IF_ERROR(ValidateSequenceControl(
-        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, sig));
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, tfwsinputs));
     expected_input_cnt += 2;
   }
 
   // Verify that the model configuration input and outputs match what
-  // is expected by the signature def.
+  // is expected by the model.
   if (expected_inputs.size() != expected_input_cnt) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -116,8 +106,13 @@ SavedModelBackend::CreateSession(
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, expected_inputs));
 
-    const auto& iitr = sig.inputs().find(io.name());
-    if (iitr == sig.inputs().end()) {
+    const std::string& find_name = io.name();
+    const auto& iitr = std::find_if(
+        tfwsinputs.begin(), tfwsinputs.end(),
+        [&find_name](const TFWorkspace::IO& io) {
+          return io.name_ == find_name;
+        });
+    if (iitr == tfwsinputs.end()) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unexpected inference input '" + io.name() + "'");
@@ -129,14 +124,14 @@ SavedModelBackend::CreateSession(
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     RETURN_IF_ERROR(CompareDimsSupported(
-        Name(), io.name(), iitr->second.tensor_shape(), dims,
-        Config().max_batch_size() > 0));
+        Name(), io.name(), iitr->shape_, dims, Config().max_batch_size() > 0));
 
-    if (!CompareDataType(iitr->second.dtype(), io.data_type())) {
+    if (!CompareDataType(iitr->data_type_, io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', input '" + io.name() +
-              "' data-type " + tensorflow::DataType_Name(iitr->second.dtype()) +
+              "' data-type " +
+              DataType_Name(ConvertDataType(iitr->data_type_)) +
               " doesn't match configuration data-type " +
               DataType_Name(io.data_type()));
     }
@@ -145,8 +140,13 @@ SavedModelBackend::CreateSession(
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
 
-    const auto& oitr = sig.outputs().find(io.name());
-    if (oitr == sig.outputs().end()) {
+    const std::string& find_name = io.name();
+    const auto& oitr = std::find_if(
+        tfwsoutputs.begin(), tfwsoutputs.end(),
+        [&find_name](const TFWorkspace::IO& io) {
+          return io.name_ == find_name;
+        });
+    if (oitr == tfwsoutputs.end()) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unexpected inference output '" + io.name() + "'");
@@ -158,20 +158,18 @@ SavedModelBackend::CreateSession(
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     RETURN_IF_ERROR(CompareDimsSupported(
-        Name(), io.name(), oitr->second.tensor_shape(), dims,
-        Config().max_batch_size() > 0));
+        Name(), io.name(), oitr->shape_, dims, Config().max_batch_size() > 0));
 
-    if (!CompareDataType(oitr->second.dtype(), io.data_type())) {
+    if (!CompareDataType(oitr->data_type_, io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', output '" + io.name() +
-              "' data-type " + tensorflow::DataType_Name(oitr->second.dtype()) +
+              "' data-type " +
+              DataType_Name(ConvertDataType(oitr->data_type_)) +
               " doesn't match configuration data-type " +
               DataType_Name(io.data_type()));
     }
   }
-
-  *session = bundle->session.release();
 
   return Status::Success;
 }
@@ -179,7 +177,7 @@ SavedModelBackend::CreateSession(
 Status
 SavedModelBackend::ValidateSequenceControl(
     const ModelSequenceBatching::Control::Kind control_kind,
-    const tensorflow::SignatureDef& sig)
+    const TFWorkspace::IOList& inputs)
 {
   std::string tensor_name;
   DataType tensor_datatype;
@@ -187,8 +185,11 @@ SavedModelBackend::ValidateSequenceControl(
       Config().sequence_batching(), Name(), control_kind, true /* required */,
       &tensor_name, &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
 
-  const auto& iitr = sig.inputs().find(tensor_name);
-  if (iitr == sig.inputs().end()) {
+  const auto& iitr = std::find_if(
+      inputs.begin(), inputs.end(), [&tensor_name](const TFWorkspace::IO& io) {
+        return io.name_ == tensor_name;
+      });
+  if (iitr == inputs.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
         "configuration specified sequence control '" + tensor_name +
@@ -199,22 +200,20 @@ SavedModelBackend::ValidateSequenceControl(
   DimsList dims;
   dims.Add(1);
 
-  if (!CompareDimsExact(
-          iitr->second.tensor_shape(), dims, Config().max_batch_size() > 0)) {
+  if (!CompareDimsExact(iitr->shape_, dims, Config().max_batch_size() > 0)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + Name() + "', sequence control '" +
-            tensor_name + "' dims " +
-            DimsDebugString(iitr->second.tensor_shape()) +
+            tensor_name + "' dims " + DimsListToString(iitr->shape_) +
             " don't match expected dims [1]");
   }
 
-  if (!CompareDataType(iitr->second.dtype(), tensor_datatype)) {
+  if (!CompareDataType(iitr->data_type_, tensor_datatype)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + Name() + "', sequence control '" +
             tensor_name + "' data-type " +
-            tensorflow::DataType_Name(iitr->second.dtype()) +
+            DataType_Name(ConvertDataType(iitr->data_type_)) +
             " doesn't match required data-type " +
             DataType_Name(tensor_datatype));
   }

@@ -32,8 +32,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// To avoid namespace and protobuf collision between TensorFlow and
-// Caffe2, we keep Caffe2 interface isolated to netdef_backend_c2. The
+// To avoid namespace and protobuf collision between TRTIS and Caffe2,
+// we keep Caffe2 interface isolated to netdef_backend_c2. The
 // interface to those isolated functions is provided by
 // Caffe2Workspace.
 class Caffe2Workspace {
@@ -59,7 +59,7 @@ class Caffe2Workspace {
     const std::string msg_;
   };
 
-  // Input or output datatype. Prototypes can't cross the
+  // Input or output datatype. Protobufs can't cross the
   // Caffe2Workspace boundary so need to have this non-protobuf
   // definition.
   enum DataType {

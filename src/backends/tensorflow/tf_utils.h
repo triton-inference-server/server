@@ -26,20 +26,12 @@
 #pragma once
 
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
-#include "tensorflow/core/framework/tensor_shape.pb.h"
-#include "tensorflow/core/framework/types.pb.h"
-#include "tensorflow/core/public/session_options.h"
 
 namespace nvidia { namespace inferenceserver {
-
-/// \return the tensorflow::SessionOptions for a backend
-/// configuration.
-Status NewSessionOptionsFromGraphDefBackendConfig(
-    const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    tensorflow::SessionOptions* session_options);
 
 /// \return true if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented
@@ -49,7 +41,7 @@ Status NewSessionOptionsFromGraphDefBackendConfig(
 /// the model to support batching and so the shape must have the
 /// appropriate batch dimension.
 bool CompareDimsExact(
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
     const bool supports_batching);
 
 /// \return Status::Success if a TensorFlow shape can support a model
@@ -63,35 +55,28 @@ bool CompareDimsExact(
 /// appropriate batch dimension.
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
-    const tensorflow::TensorShapeProto& model_shape, const DimsList& dims,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
     const bool supports_batching);
 
-/// \return true if a TensorFlow data-type matches a model
-/// configuration data-type.
-bool CompareDataType(tensorflow::DataType model_dtype, DataType dtype);
-
-/// \return the string representation of a TensorFlow shape.
-const std::string DimsDebugString(
-    const tensorflow::TensorShapeProto& dims, const int start_idx = 1);
-
-/// \return the TensorFlow data-type that corresponds to a model
-/// configuration data-type.
-tensorflow::DataType ConvertDataType(DataType dtype);
+/// \return true if a TF data-type matches a model configuration
+/// data-type.
+bool CompareDataType(TFWorkspace::DataType model_dtype, DataType dtype);
 
 /// \return the model configuration data-type that corresponds to a
-/// TensorFlow data-type.
-DataType ConvertDataType(tensorflow::DataType dtype);
+/// TFWorkspace data-type.
+DataType ConvertDataType(TFWorkspace::DataType dtype);
 
-// Convert a TensorFlow status code to inference server status code.
-RequestStatusCode FromTFError(const int tf_code);
+/// \return the TFWorkspace data-type corresponding to a model
+/// configuration data-type.
+TFWorkspace::DataType ConvertDataType(DataType dtype);
 
-// If TensorFlow status is non-OK, return the equivalent Status.
-#define RETURN_IF_TF_ERROR(TFS)                                              \
-  do {                                                                       \
-    const tensorflow::Status& status__ = (TFS);                              \
-    if (status__.code() != 0) {                                              \
-      return Status(FromTFError(status__.code()), status__.error_message()); \
-    }                                                                        \
+// If TFWorkspace Error is non-OK, return the equivalent TRTIS status.
+#define RETURN_IF_TFWS_ERROR(TFWS)                                   \
+  do {                                                               \
+    const TFWorkspace::Error& error__ = (TFWS);                      \
+    if (!error__.IsOk()) {                                           \
+      return Status(RequestStatusCode::INTERNAL, error__.Message()); \
+    }                                                                \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

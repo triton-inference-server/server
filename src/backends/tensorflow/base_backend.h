@@ -26,16 +26,11 @@
 #pragma once
 
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-#include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/public/session_options.h"
-
-namespace tensorflow {
-class Session;
-}  // namespace tensorflow
 
 namespace nvidia { namespace inferenceserver {
 
@@ -61,10 +56,11 @@ class BaseBackend : public InferenceBackend {
  protected:
   using IONameMap = std::unordered_map<std::string, std::string>;
 
-  // Load model and create a corresponding session object.
-  virtual Status CreateSession(
-      const tensorflow::SessionOptions& options, const int gpu_device,
-      const std::string& model_path, tensorflow::Session** session,
+  // Load model and create a corresponding TFWorkspace object.
+  virtual Status CreateWorkspace(
+      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+      const int gpu_device, const bool has_graph_level, const int graph_level,
+      const std::string& model_path, std::unique_ptr<TFWorkspace>* workspace,
       IONameMap* input_name_map, IONameMap* output_name_map) = 0;
 
   // For each model instance there is a context.
@@ -79,19 +75,17 @@ class BaseBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
     ~Context();
 
+    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
-
-    // Create TF tensor for an input.
-    using TensorVec = std::vector<std::pair<std::string, tensorflow::Tensor>>;
 
     // Set an input tensor data from payloads.
     void SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads, TensorVec* input_tensors);
+        std::vector<Scheduler::Payload>* payloads,
+        TFWorkspace::TensorVec* input_tensors);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -120,8 +114,8 @@ class BaseBackend : public InferenceBackend {
     // that output in the model.
     IONameMap output_name_map_;
 
-    // Tensorflow session for this context.
-    tensorflow::Session* session_;
+    // Tensorflow workspace for this context.
+    std::unique_ptr<TFWorkspace> workspace_;
   };
 
  private:
@@ -136,7 +130,7 @@ class BaseBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const BaseBackend&);
 
   // The contexts for this backend.
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const BaseBackend& pb);

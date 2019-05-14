@@ -29,7 +29,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 # NetDef backend
 #
-# netdef_backend_c2 is copied into and built along with Caffe2 to
+# netdef_backend_c2.cc is copied into and built along with Caffe2 to
 # ensure that it uses the same protobuf as Caffe2, so not included in
 # these sources.
 #
@@ -45,6 +45,7 @@ set(
   autofill.h
   netdef_backend_factory.h
   netdef_backend.h
+  netdef_backend_c2.h
 )
 
 add_library(

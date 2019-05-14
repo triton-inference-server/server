@@ -26,16 +26,13 @@
 
 #include "src/backends/tensorflow/autofill.h"
 
-#include "src/backends/tensorflow/loader.h"
+#include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
-#include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
-#include "tensorflow/cc/saved_model/loader.h"
-#include "tensorflow/cc/saved_model/tag_constants.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -46,8 +43,9 @@ class AutoFillSavedModelImpl : public AutoFill {
  public:
   AutoFillSavedModelImpl(
       const std::string& model_name, const std::string& savedmodel_dirname,
-      const tensorflow::SignatureDef& sig)
-      : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname), sig_(sig)
+      TFWorkspace* tfws)
+      : AutoFill(model_name), savedmodel_dirname_(savedmodel_dirname),
+        tfws_(tfws)
   {
   }
 
@@ -55,7 +53,7 @@ class AutoFillSavedModelImpl : public AutoFill {
 
  private:
   const std::string savedmodel_dirname_;
-  const tensorflow::SignatureDef sig_;
+  std::unique_ptr<TFWorkspace> tfws_;
 };
 
 Status
@@ -71,21 +69,22 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
     config->set_default_model_filename(savedmodel_dirname_);
   }
 
+  const TFWorkspace::IOList& inputs = tfws_->Inputs();
+  const TFWorkspace::IOList& outputs = tfws_->Outputs();
+
   // Assume model doesn't support batching unless we see a batch
   // dimension (-1) on signature of every model input and output.
   bool sig_supports_batch = true;
   if (config->input().size() == 0) {
-    for (const auto& sin : sig_.inputs()) {
-      const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
-      if ((shape.dim().size() == 0) || (shape.dim(0).size() != -1)) {
+    for (const auto& io : inputs) {
+      if ((io.shape_.size() == 0) || (io.shape_[0] != -1)) {
         sig_supports_batch = false;
       }
     }
   }
   if (config->output().size() == 0) {
-    for (const auto& sout : sig_.outputs()) {
-      const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
-      if ((shape.dim().size() == 0) || (shape.dim(0).size() != -1)) {
+    for (const auto& io : outputs) {
+      if ((io.shape_.size() == 0) || (io.shape_[0] != -1)) {
         sig_supports_batch = false;
       }
     }
@@ -110,27 +109,16 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
 
   // Inputs
   if (config->input().size() == 0) {
-    for (const auto& sin : sig_.inputs()) {
+    for (const auto& io : inputs) {
       ModelInput* config_input = config->add_input();
-      config_input->set_name(sin.first);
-
-      const DataType dt = ConvertDataType(sin.second.dtype());
-      if (dt == DataType::TYPE_INVALID) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to autofill for '" + model_name_ +
-                "', unsupported data-type '" +
-                tensorflow::DataType_Name(sin.second.dtype()) + "'");
-      }
-
-      config_input->set_data_type(dt);
+      config_input->set_name(io.name_);
+      config_input->set_data_type(ConvertDataType(io.data_type_));
 
       // The model signature supports batching then the first
       // dimension is -1 and should not appear in the model
       // configuration 'dims' that we are creating.
-      const tensorflow::TensorShapeProto& shape = sin.second.tensor_shape();
-      for (int i = (sig_supports_batch ? 1 : 0); i < shape.dim().size(); ++i) {
-        config_input->mutable_dims()->Add(shape.dim(i).size());
+      for (size_t i = (sig_supports_batch ? 1 : 0); i < io.shape_.size(); ++i) {
+        config_input->mutable_dims()->Add(io.shape_[i]);
       }
 
       // If input dims are empty then must use a reshape for the
@@ -144,27 +132,16 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
 
   // Outputs
   if (config->output().size() == 0) {
-    for (const auto& sout : sig_.outputs()) {
+    for (const auto& io : outputs) {
       ModelOutput* config_output = config->add_output();
-      config_output->set_name(sout.first);
-
-      const DataType dt = ConvertDataType(sout.second.dtype());
-      if (dt == DataType::TYPE_INVALID) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to autofill for '" + model_name_ +
-                "', unsupported data-type '" +
-                tensorflow::DataType_Name(sout.second.dtype()) + "'");
-      }
-
-      config_output->set_data_type(dt);
+      config_output->set_name(io.name_);
+      config_output->set_data_type(ConvertDataType(io.data_type_));
 
       // The model signature supports batching then the first
       // dimension is -1 and should not appear in the model
       // configuration 'dims' that we are creating.
-      const tensorflow::TensorShapeProto& shape = sout.second.tensor_shape();
-      for (int i = (sig_supports_batch ? 1 : 0); i < shape.dim().size(); ++i) {
-        config_output->mutable_dims()->Add(shape.dim(i).size());
+      for (size_t i = (sig_supports_batch ? 1 : 0); i < io.shape_.size(); ++i) {
+        config_output->mutable_dims()->Add(io.shape_[i]);
       }
 
       // If output dims are empty then must use a reshape for the
@@ -216,16 +193,18 @@ AutoFillSavedModel::Create(
   auto graphdef_backend_config =
       std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
-  tensorflow::SessionOptions session_options;
-  RETURN_IF_ERROR(NewSessionOptionsFromGraphDefBackendConfig(
-      graphdef_backend_config, &session_options));
+  TFWorkspace* tfws = nullptr;
+  TFWorkspace::Error error = TFWorkspaceCreateFromSavedModel(
+      &tfws, model_name, savedmodel_path, TFWorkspace::NO_GPU_DEVICE,
+      false /* have_graph */, 0 /* graph_level */,
+      graphdef_backend_config->allow_gpu_memory_growth,
+      graphdef_backend_config->per_process_gpu_memory_fraction,
+      graphdef_backend_config->allow_soft_placement);
+  if (!error.IsOk()) {
+    return Status(RequestStatusCode::INTERNAL, error.Message());
+  }
 
-  std::unique_ptr<tensorflow::SavedModelBundle> bundle;
-  tensorflow::SignatureDef sig;
-  RETURN_IF_ERROR(LoadSavedModel(
-      model_name, savedmodel_path, session_options, &bundle, &sig));
-
-  autofill->reset(new AutoFillSavedModelImpl(model_name, savedmodel_dir, sig));
+  autofill->reset(new AutoFillSavedModelImpl(model_name, savedmodel_dir, tfws));
   return Status::Success;
 }
 

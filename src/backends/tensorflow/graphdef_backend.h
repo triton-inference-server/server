@@ -37,9 +37,10 @@ class GraphDefBackend : public BaseBackend {
 
   Status Init(const std::string& path, const ModelConfig& config);
 
-  Status CreateSession(
-      const tensorflow::SessionOptions& options, const int gpu_device,
-      const std::string& model_path, tensorflow::Session** session,
+  Status CreateWorkspace(
+      const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
+      const int gpu_device, const bool has_graph_level, const int graph_level,
+      const std::string& model_path, std::unique_ptr<TFWorkspace>* workspace,
       IONameMap* input_name_map, IONameMap* output_name_map) override;
 
  private:
