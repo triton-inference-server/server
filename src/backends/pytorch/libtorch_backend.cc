@@ -248,7 +248,7 @@ LibTorchBackend::CreateExecutionContext(
 
   RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context.ValidateOutputs(Config().output()));
-
+  LOG_VERBOSE(1) << "Created execution Context";
   return Status::Success;
 }
 
@@ -399,7 +399,7 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
 
   RETURN_IF_ERROR(SetInputTensor(name, shape, dtype,
       static_cast<const char*>(buffer), total_byte_size));
-
+  LOG_VERBOSE(1) << "Input tensor loaded successfully";
   return Status::Success;
 }
 

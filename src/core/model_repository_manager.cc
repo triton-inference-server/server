@@ -39,6 +39,8 @@
 #include "src/backends/ensemble/ensemble_backend_factory.h"
 #include "src/backends/onnx/onnx_backend.pb.h"
 #include "src/backends/onnx/onnx_backend_factory.h"
+#include "src/backends/pytorch/libtorch_backend.pb.h"
+#include "src/backends/pytorch/libtorch_backend_factory.h"
 #include "src/backends/tensorflow/graphdef_backend.pb.h"
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/savedmodel_backend.pb.h"
@@ -147,6 +149,14 @@ BuildPlatformConfigMap(
     onnx_config.set_autofill(!strict_model_config);
     platform_config.PackFrom(onnx_config);
     (*platform_configs)[kOnnxRuntimeOnnxPlatform] = platform_config;
+  }
+
+  //// PyTorch LibTorch
+  {
+    LibTorchPlatformConfig libtorch_config;
+    libtorch_config.set_autofill(!strict_model_config);
+    platform_config.PackFrom(libtorch_config);
+    (*platform_configs)[kPyTorchLibTorchPlatform] = platform_config;
   }
 }
 
@@ -352,6 +362,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<SavedModelBackendFactory> savedmodel_factory_;
   std::unique_ptr<PlanBackendFactory> plan_factory_;
   std::unique_ptr<OnnxBackendFactory> onnx_factory_;
+  std::unique_ptr<LibTorchBackendFactory> libtorch_factory_;
 };
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
@@ -439,6 +450,12 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     platform_map.find(kOnnxRuntimeOnnxPlatform)->second.UnpackTo(&config);
     RETURN_IF_ERROR(
         OnnxBackendFactory::Create(config, &(local_life_cycle->onnx_factory_)));
+  }
+  {
+    LibTorchPlatformConfig config;
+    platform_map.find(kPyTorchLibTorchPlatform)->second.UnpackTo(&config);
+    RETURN_IF_ERROR(
+        LibTorchBackendFactory::Create(config, &(local_life_cycle->libtorch_factory_)));
   }
 
   *life_cycle = std::move(local_life_cycle);
@@ -696,6 +713,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       break;
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
       status = onnx_factory_->CreateBackend(version_path, model_config, &is);
+    case Platform::PLATFORM_PYTORCH_LIBTORCH:
+      status = libtorch_factory_->CreateBackend(version_path, model_config, &is);
     default:
       break;
   }
