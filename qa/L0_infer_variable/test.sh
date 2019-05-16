@@ -63,6 +63,17 @@ for TARGET in cpu gpu; do
         done
     done
 
+    # Handle Onnx models separately as instance group has been defined
+    # in the generated models
+    if [ $KIND == "KIND_CPU" ]; then
+        for FW in onnx; do
+            for MC in `ls models/${FW}*/config.pbtxt`; do
+                sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" $MC
+                sed -i "s/gpus: \[ 0 \]//" $MC
+            done
+        done
+    fi
+
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

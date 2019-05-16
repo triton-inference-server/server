@@ -99,6 +99,13 @@ class InferVariableTest(unittest.TestCase):
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
+        if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
+            # No basic ensemble models are created against custom models [TODO]
+            _infer_exact_helper(self, 'onnx', input_shape, 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+
     def test_raw_fff(self):
         self._full_exact(np.float32, np.float32, np.float32, (16,), (16,), (16,))
     def test_raw_fii(self):

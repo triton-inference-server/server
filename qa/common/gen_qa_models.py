@@ -676,6 +676,21 @@ def create_onnx_modelfile(
         input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
 
+    # Onnx use string for variable size dimension, and the same string
+    # will be inferred to have same value for the model run.
+    def normalize_variable_shape(shape, increment_index=True):
+        res = []
+        for dim in shape:
+            if dim == -1:
+                res.append("var_" + str(normalize_variable_shape.idx))
+                if increment_index:
+                    normalize_variable_shape.idx += 1
+            else:
+                res.append(dim)
+        return res
+        
+    normalize_variable_shape.idx = 0
+
     if not tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
         return
@@ -684,6 +699,10 @@ def create_onnx_modelfile(
     onnx_output0_dtype = np_to_onnx_dtype(output0_dtype)
     onnx_output1_dtype = np_to_onnx_dtype(output1_dtype)
 
+    onnx_input_shape = normalize_variable_shape(input_shape)
+    onnx_output0_shape = normalize_variable_shape(output0_shape)
+    onnx_output1_shape = normalize_variable_shape(output1_shape)
+
     # Create the model
     model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    input_dtype, output0_dtype, output1_dtype)
@@ -691,11 +710,11 @@ def create_onnx_modelfile(
 
     batch_dim = [] if max_batch == 0 else [max_batch]
 
-    in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + list(input_shape))
-    in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + list(input_shape))
+    in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + onnx_input_shape)
+    in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + onnx_input_shape)
 
-    out0 = onnx.helper.make_tensor_value_info("OUTPUT0", onnx_output0_dtype, batch_dim + list(output0_shape))
-    out1 = onnx.helper.make_tensor_value_info("OUTPUT1", onnx_output1_dtype, batch_dim + list(output1_shape))
+    out0 = onnx.helper.make_tensor_value_info("OUTPUT0", onnx_output0_dtype, batch_dim + onnx_output0_shape)
+    out1 = onnx.helper.make_tensor_value_info("OUTPUT1", onnx_output1_dtype, batch_dim + onnx_output1_shape)
 
     internal_in0 = onnx.helper.make_node("Identity", ["INPUT0"], ["_INPUT0"])
     internal_in1 = onnx.helper.make_node("Identity", ["INPUT1"], ["_INPUT1"])
