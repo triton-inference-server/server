@@ -169,11 +169,12 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                            input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a Onnx model."""
 
-    # [TODO] Examine if Onnx can support the following data type and tensor
-    # shape, refine the following checking if necessary
-
-    # STRING data type is not supported currently
-    if (input_dtype == np.object) or (output0_dtype == np.object) or (output1_dtype == np.object):
+    # If the input type is string the output type must be string or
+    # int32. This is because the QA models we generate convert strings
+    # internally to int32 for compute.
+    if ((input_dtype == np.object) and
+        (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
+         ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
         return False
 
     # Input and output shapes must be fixed-size.
