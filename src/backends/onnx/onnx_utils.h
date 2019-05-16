@@ -34,8 +34,7 @@ namespace nvidia { namespace inferenceserver {
 
 #define RETURN_IF_ORT_ERROR(S)                                           \
   do {                                                                   \
-    OrtStatus* status__ = nullptr;                                       \
-    status__ = (S);                                                      \
+    OrtStatus* status__ = (S);                                           \
     if (status__ != nullptr) {                                           \
       OrtErrorCode code = OrtGetErrorCode(status__);                     \
       std::string msg = std::string(OrtGetErrorMessage(status__));       \
