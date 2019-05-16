@@ -60,6 +60,13 @@ class InferZeroTest(unittest.TestCase):
             # model that does not support batching
             iu.infer_zero(self, 'netdef_nobatch', 1, dtype, shapes, shapes)
 
+        if tu.validate_for_onnx_model(dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_zero(self, 'onnx', bs, dtype, shapes, shapes)
+            # model that does not support batching
+            iu.infer_zero(self, 'onnx_nobatch', 1, dtype, shapes, shapes)
+
         for name in ["simple_zero", "sequence_zero", "fan_zero"]:
             if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
                                         shapes[0], shapes[0], shapes[0]):
