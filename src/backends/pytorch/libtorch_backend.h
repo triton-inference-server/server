@@ -28,12 +28,11 @@
 #include <NvInfer.h>
 #include <torch/torch.h>
 #include <torch/script.h> // One-stop header.
-
 #include "src/core/backend.h"
+#include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -77,8 +76,7 @@ class LibTorchBackend : public InferenceBackend {
     static constexpr int NO_BATCHING = 0;
 
     Context(
-        const std::string& name, const int gpu_device,
-        const int max_batch_size);
+        const std::string& name, const int gpu_device, const int max_batch_size);
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);
@@ -117,6 +115,15 @@ class LibTorchBackend : public InferenceBackend {
         const size_t dtype_byte_size, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads);
 
+    Status SetInputTensor(
+        const std::string& name, const std::vector<int64_t>& shape,
+        const DataType dtype, char* content, size_t byte_size);
+
+    Status GetOutputTensor(
+        const std::string& name, const DataType dtype, char** content,
+        size_t* byte_size, std::vector<int64_t>* content_shape);
+
+    Status Execute();
     // Name of the model instance
     std::string name_;
 
@@ -131,7 +138,7 @@ class LibTorchBackend : public InferenceBackend {
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     std::vector<torch::jit::IValue> inputs_;
     torch::Tensor outputs_;
-    torch::Device device_;
+    torch::Device device_ = torch::Device(torch::kCPU);
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;
