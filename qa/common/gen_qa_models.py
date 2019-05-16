@@ -710,6 +710,14 @@ def create_onnx_modelfile(
     cast0 = onnx.helper.make_node("Cast", ["CAST0"], ["OUTPUT0"], to=onnx_output0_dtype)
     cast1 = onnx.helper.make_node("Cast", ["CAST1"], ["OUTPUT1"], to=onnx_output1_dtype)
 
+    # Avoid cast from float16 to float16
+    # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
+    if onnx_input_dtype == onnx.TensorProto.FLOAT16:
+        if onnx_output0_dtype == onnx_input_dtype:
+            cast0 = onnx.helper.make_node("Identity", ["CAST0"], ["OUTPUT0"])
+        if onnx_output1_dtype == onnx_input_dtype:
+            cast1 = onnx.helper.make_node("Identity", ["CAST1"], ["OUTPUT1"])
+
     onnx_nodes = [internal_in0, internal_in1, add, sub, cast0, cast1]
     onnx_inputs = [in0, in1]
     onnx_outputs = [out0, out1]
@@ -739,13 +747,26 @@ def create_onnx_modelconfig(
     model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    input_dtype, output0_dtype, output1_dtype)
     config_dir = models_dir + "/" + model_name
+    
+    # Must make sure all Onnx models will be loaded to the same GPU if they are
+    # run on GPU. This is due to the current limitation of Onnx Runtime
+    instance_group_string = '''
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+'''
     # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             emu.repeat(input_dtype, 2), emu.repeat(input_shape, 2), emu.repeat(None, 2),
             [output0_dtype, output1_dtype], [output0_shape, output1_shape], emu.repeat(None, 2),
             ["output0_labels.txt", None],
-            version_policy=version_policy, force_tensor_number_suffix=True)
+            version_policy=version_policy, force_tensor_number_suffix=True,
+            instance_group_str=instance_group_string)
 
     try:
         os.makedirs(config_dir)
