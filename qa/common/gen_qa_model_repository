@@ -116,7 +116,7 @@ python3 $SRCDIR/gen_qa_models.py --onnx --netdef --variable --models_dir=$VARDES
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_zero_models.py --onnx --netdef --models_dir=$ZERODESTDIR
 chown -R $(id -u):$(id -g) $ZERODESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --netdef --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --netdef --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR

@@ -120,6 +120,31 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
+    return None
+
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, max_batch,
         dtype, input_shapes, output_shapes):
@@ -493,6 +518,116 @@ def create_ensemble_modelconfig(
     emu.create_identity_ensemble_modelconfig(
         "reshape", models_dir, model_version, max_batch, dtype,
         input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+
+
+def create_onnx_modelfile(
+        models_dir, model_version, max_batch,
+        dtype, input_shapes, output_shapes):
+
+    # Onnx use string for variable size dimension, and the same string
+    # will be inferred to have same value for the model run.
+    def normalize_variable_shape(shape, increment_index=True):
+        res = []
+        for dim in shape:
+            if dim == -1:
+                res.append("var_" + str(normalize_variable_shape.idx))
+                if increment_index:
+                    normalize_variable_shape.idx += 1
+            else:
+                res.append(dim)
+        return res
+        
+    normalize_variable_shape.idx = 0
+
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype,
+                                      input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    onnx_dtype = np_to_onnx_dtype(dtype)
+    io_cnt = len(input_shapes)
+
+    # Create the model
+    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   io_cnt, dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    batch_dim = [] if max_batch == 0 else [max_batch]
+
+    onnx_nodes = []
+    onnx_inputs = []
+    onnx_outputs = []
+    for io_num in range(io_cnt):
+        # Repeat so that the variable dimension name is different
+        in_shape = normalize_variable_shape(input_shapes[io_num])
+        out_shape = normalize_variable_shape(output_shapes[io_num])
+        in_name = "INPUT{}".format(io_num)
+        out_name = "OUTPUT{}".format(io_num)
+        out_shape_name = out_name + "_shape"
+
+        onnx_inputs.append(onnx.helper.make_tensor_value_info(in_name, onnx_dtype, batch_dim + in_shape))
+        onnx_outputs.append(onnx.helper.make_tensor_value_info(out_name, onnx_dtype, batch_dim + out_shape))
+        
+        if input_shapes == output_shapes:
+            onnx_nodes.append(onnx.helper.make_node("Identity", [in_name], [out_name]))
+        else:
+            onnx_nodes.append(onnx.helper.make_node("Shape", [out_name], [out_shape_name]))
+            onnx_nodes.append(onnx.helper.make_node("Reshape", [in_name, out_shape_name], [out_name]))
+
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
+    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS")
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    onnx.save(model_def, model_version_dir + "/model.onnx")
+
+
+def create_onnx_modelconfig(
+        models_dir, model_version, max_batch, dtype,
+        input_shapes, input_model_shapes, output_shapes, output_model_shapes):
+
+    assert len(input_shapes) == len(input_model_shapes)
+    assert len(output_shapes) == len(output_model_shapes)
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype,
+                                      input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    io_cnt = len(input_shapes)
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   io_cnt, dtype)
+    config_dir = models_dir + "/" + model_name
+    
+    # Must make sure all Onnx models will be loaded to the same GPU if they are
+    # run on GPU. This is due to the current limitation of Onnx Runtime
+    instance_group_string = '''
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+'''
+    
+    config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
+            emu.repeat(dtype, io_cnt), input_shapes, input_model_shapes,
+            emu.repeat(dtype, io_cnt), output_shapes, output_model_shapes,
+            emu.repeat(None, io_cnt), force_tensor_number_suffix=True,
+            instance_group_str=instance_group_string)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
     
 
 def create_models(models_dir, dtype, input_shapes, input_model_shapes,
@@ -534,6 +669,17 @@ def create_models(models_dir, dtype, input_shapes, input_model_shapes,
             create_netdef_modelconfig(models_dir, model_version, 0, dtype,
                                       input_shapes, input_model_shapes, output_shapes, output_model_shapes)
             create_netdef_modelfile(models_dir, model_version, 0, dtype,
+                                    input_model_shapes, output_model_shapes)
+
+    if FLAGS.onnx:
+        create_onnx_modelconfig(models_dir, model_version, 8, dtype,
+                                  input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+        create_onnx_modelfile(models_dir, model_version, 8, dtype,
+                                input_model_shapes, output_model_shapes)
+        if no_batch:
+            create_onnx_modelconfig(models_dir, model_version, 0, dtype,
+                                      input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+            create_onnx_modelfile(models_dir, model_version, 0, dtype,
                                     input_model_shapes, output_model_shapes)
 
     # Shouldn't create ensembles that reshape to zero-sized tensors. Reshaping
@@ -590,6 +736,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--onnx', required=False, action='store_true',
+                        help='Generate Onnx Runtime Onnx models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -602,6 +750,8 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.tensorrt:
         import tensorrt.legacy as trt
+    if FLAGS.onnx:
+        import onnx
 
     import test_util as tu
 
