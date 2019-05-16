@@ -221,6 +221,8 @@ GetNormalizedModelConfig(
       // No actual model file is needed to be loaded for ensemble.
     } else if (config->platform() == kOnnxRuntimeOnnxPlatform) {
       config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
+    } else if (config->platform() == kPyTorchLibTorchPlatform) {
+      config->set_default_model_filename(kPyTorchLibTorchFilename);
     } else {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected platform type " +
