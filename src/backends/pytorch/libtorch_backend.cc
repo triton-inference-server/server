@@ -87,7 +87,7 @@ ConvertDataTypeToTorchType(const DataType& dtype)
     case TYPE_STRING:
       break;
     default:
-        return std::make_pair(false, type);
+      return std::make_pair(false, type);
   }
 
   return std::make_pair(true, type);
@@ -141,7 +141,6 @@ LibTorchBackend::CreateExecutionContexts(
         Run(runner_idx, payloads, func);
       }));
 
-  // LOG_VERBOSE(1) << "libtorch backend for " << Name() << std::endl << *this;
   return Status::Success;
 }
 
@@ -202,9 +201,11 @@ LibTorchBackend::CreateExecutionContext(
   // If this is a sequence model then add the required inputs...
   // if (Config().has_sequence_batching()) {
   //   RETURN_IF_ERROR(ValidateSequenceControl(
-  //       ModelSequenceBatching::Control::CONTROL_SEQUENCE_START, &input_names));
+  //       ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
+  //       &input_names));
   //   RETURN_IF_ERROR(ValidateSequenceControl(
-  //       ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY, &input_names));
+  //       ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
+  //       &input_names));
   // }
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
@@ -215,19 +216,19 @@ LibTorchBackend::CreateExecutionContext(
   try {
     // lp_itr->second is the torch model path
     context->torch_model_ = torch::jit::load(lp_itr->second, context->device_);
-    context->name_= Config().name();
+    assert(context->torch_model_.device().type() == torch::kCUDA);
+    context->name_ = Config().name();
     context->max_batch_size_ = Config().max_batch_size();
     context->gpu_device_ = gpu_device;
   }
   catch (const std::exception& ex) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "load failed for libtorch model -> '" + Config().name() + "': " + ex.what());
+        RequestStatusCode::INTERNAL, "load failed for libtorch model -> '" +
+                                         Config().name() + "': " + ex.what());
   }
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
-  LOG_VERBOSE(1) << "Created execution Context";
   return Status::Success;
 }
 
@@ -238,8 +239,8 @@ LibTorchBackend::CreateExecutionContext(
 // {
 //   std::string tensor_name;
 //   RETURN_IF_ERROR(GetSequenceControlProperties(
-//       Config().sequence_batching(), Name(), control_kind, true /* required */,
-//       &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
+//       Config().sequence_batching(), Name(), control_kind, true /* required
+//       */, &tensor_name, nullptr, nullptr, nullptr, nullptr, nullptr));
 //   input_names->push_back(tensor_name);
 //
 //   return Status::Success;
@@ -381,8 +382,8 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
     buffer_copy_offset += expected_byte_size;
   }
 
-  RETURN_IF_ERROR(SetInputTensor(name, shape, dtype,
-      static_cast<char*>(buffer), total_byte_size));
+  RETURN_IF_ERROR(SetInputTensor(
+      name, shape, dtype, static_cast<char*>(buffer), total_byte_size));
   LOG_VERBOSE(1) << "Input tensor loaded successfully";
   return Status::Success;
 }
@@ -395,23 +396,23 @@ LibTorchBackend::Context::SetInputTensor(
   const auto pr = ConvertDataTypeToTorchType(dtype);
   if (!pr.first) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "Failed to convert DataType '" + DataType_Name(dtype) +
-        "' to Torch datatype");
+        RequestStatusCode::INTERNAL, "Failed to convert DataType '" +
+                                         DataType_Name(dtype) +
+                                         "' to Torch datatype");
   }
 
-  torch::TensorOptions options = torch::TensorOptions().device(device_).dtype(pr.second);
-  // options.set_device();
-  torch::Tensor input_tensor = torch::from_blob(content, shape, options);
-  LOG_VERBOSE(1) << input_tensor << std::endl;
-  // input_tensor.to(device_);
+  // torch::TensorOptions options =
+  //     torch::TensorOptions().device(device_).dtype(pr.second);
+  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second);
+  input_tensor = input_tensor.to(device_);
+  assert(input_tensor.device().type() == torch::kCUDA);
 
   if (input_tensor.nbytes() != byte_size) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unexpected size " + std::to_string(byte_size) +
-        " for inference input '" + name + "', expecting " +
-        std::to_string(input_tensor.nbytes()));
+            " for inference input '" + name + "', expecting " +
+            std::to_string(input_tensor.nbytes()));
   }
   inputs_.push_back(input_tensor);
 
@@ -420,15 +421,14 @@ LibTorchBackend::Context::SetInputTensor(
 
 Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const DataType dtype,
-    const size_t dtype_byte_size, const size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads)
+    const std::string& name, const DataType dtype, const size_t dtype_byte_size,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
   char* content = nullptr;
   size_t byte_size = 0;
-  RETURN_IF_ERROR(GetOutputTensor(name, dtype, &content, &byte_size,
-      &content_shape));
+  RETURN_IF_ERROR(
+      GetOutputTensor(name, dtype, &content, &byte_size, &content_shape));
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -476,34 +476,92 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
 Status
 LibTorchBackend::Context::GetOutputTensor(
-    const std::string& name, const DataType dtype,
-    char** content, size_t* byte_size,
-    std::vector<int64_t>* content_shape)
+    const std::string& name, const DataType dtype, char** content,
+    size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   torch::DeviceType output_device = torch::kCPU;
   // TODO: Fix for supporting multiple outputs
-  try{
+  try {
     outputs_ = outputs_.to(output_device);
     torch::Tensor output_flat = outputs_.flatten();
     *byte_size = output_flat.nbytes();
     *content = new char[*byte_size];
+
+    // Copy output into buffer
+    switch (dtype) {
+      case TYPE_UINT8: {
+        std::vector<uint8_t> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<uint8_t>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_INT8: {
+        std::vector<int8_t> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<int8_t>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_INT16: {
+        std::vector<int16_t> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<int16_t>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_INT32: {
+        std::vector<int> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<int>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_INT64: {
+        std::vector<long> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<long>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_FP16: {
+        // Experimental since no float16 natively in c++
+        std::vector<torch::Half> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<torch::Half>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_FP32: {
+        std::vector<float> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<float>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+      case TYPE_FP64: {
+        std::vector<double> outputs_vector;
+        for (int i = 0; i < output_flat.sizes()[0]; i++) {
+          outputs_vector.push_back(output_flat[i].item().to<double>());
+        }
+        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
+      } break;
+    }
+
     std::vector<float> outputs_vector;
-    for(int i=0;i<output_flat.sizes()[0];i++){
+    for (int i = 0; i < output_flat.sizes()[0]; i++) {
       outputs_vector.push_back(output_flat[i].item().to<float>());
     }
-    // Copy output into buffer
-    // memcpy(*content, static_cast<char*>(&outputs_vector[0]), output_flat.nbytes());
-    memcpy(*content, &outputs_vector[0], output_flat.nbytes());
     //  Set content shape
     auto shape = outputs_.sizes();
-    for (auto itr = shape.begin(); itr != shape.end(); itr++){
+    for (auto itr = shape.begin(); itr != shape.end(); itr++) {
       content_shape->push_back(*itr);
     }
   }
   catch (std::exception& ex) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "failed to get LibTorch output");// : " + ex.what());
+        "failed to get LibTorch output");  // : " + ex.what());
   }
 
   return Status::Success;
@@ -647,13 +705,14 @@ Status
 LibTorchBackend::Context::Execute()
 {
   try {
-      outputs_ = torch_model_->forward(inputs_).toTensor(); // toTuple() for two outputs
+    outputs_ =
+        torch_model_->forward(inputs_).toTensor();  // toTuple() for two outputs
   }
   catch (std::exception& ex) {
-      LOG_VERBOSE(1) << ex.what();
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to run model '" + name_);// + "': " + ex.what());
+    LOG_VERBOSE(1) << ex.what();
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to run model '" + name_);  // + "': " + ex.what());
   }
 
   return Status::Success;

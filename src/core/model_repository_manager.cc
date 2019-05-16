@@ -454,8 +454,8 @@ ModelRepositoryManager::BackendLifeCycle::Create(
   {
     LibTorchPlatformConfig config;
     platform_map.find(kPyTorchLibTorchPlatform)->second.UnpackTo(&config);
-    RETURN_IF_ERROR(
-        LibTorchBackendFactory::Create(config, &(local_life_cycle->libtorch_factory_)));
+    RETURN_IF_ERROR(LibTorchBackendFactory::Create(
+        config, &(local_life_cycle->libtorch_factory_)));
   }
 
   *life_cycle = std::move(local_life_cycle);
@@ -714,7 +714,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
       status = onnx_factory_->CreateBackend(version_path, model_config, &is);
     case Platform::PLATFORM_PYTORCH_LIBTORCH:
-      status = libtorch_factory_->CreateBackend(version_path, model_config, &is);
+      status =
+          libtorch_factory_->CreateBackend(version_path, model_config, &is);
     default:
       break;
   }

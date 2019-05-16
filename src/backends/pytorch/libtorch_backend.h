@@ -26,17 +26,17 @@
 #pragma once
 
 #include <NvInfer.h>
+#include <torch/script.h>  // One-stop header.
 #include <torch/torch.h>
-#include <torch/script.h> // One-stop header.
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <vector>
 #include "src/core/backend.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
-#include <set>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -76,7 +76,8 @@ class LibTorchBackend : public InferenceBackend {
     static constexpr int NO_BATCHING = 0;
 
     Context(
-        const std::string& name, const int gpu_device, const int max_batch_size);
+        const std::string& name, const int gpu_device,
+        const int max_batch_size);
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);
