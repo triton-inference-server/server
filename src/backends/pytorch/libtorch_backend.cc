@@ -309,6 +309,9 @@ LibTorchBackend::Run(
   }
 
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
+
+  // clear inputs (outputs need not be cleared as it will be re-initializated)
+  contexts_[runner_idx]->inputs_.clear();
 }
 
 Status
@@ -478,6 +481,7 @@ LibTorchBackend::Context::GetOutputTensor(
     std::vector<int64_t>* content_shape)
 {
   torch::DeviceType output_device = torch::kCPU;
+  // TODO: Fix for supporting multiple outputs
   try{
     outputs_ = outputs_.to(output_device);
     torch::Tensor output_flat = outputs_.flatten();
