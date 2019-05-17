@@ -89,7 +89,8 @@ class LibTorchBackend : public InferenceBackend {
 
     // Set an input tensor data from payloads.
     Status SetInput(
-        const std::string& name, const DataType datatype, const DimsList& dims,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+        const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
@@ -105,26 +106,26 @@ class LibTorchBackend : public InferenceBackend {
 
     // Set an input tensor from one or more payloads.
     Status SetFixedSizedInputTensor(
-        const std::string& input_name, const std::vector<int64_t>& shape,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& input_name, const std::vector<int64_t>& shape,
         const DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
-        const std::string& name, const int& op_index, const DataType dtype,
+        std::vector<torch::Tensor>* outputs_, const std::string& name, const int& op_index, const DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads);
 
     Status SetInputTensor(
-        const std::string& name, const std::vector<int64_t>& shape,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& name, const std::vector<int64_t>& shape,
         const DataType dtype, char* content, size_t byte_size);
 
     Status GetOutputTensor(
-        const int& op_index, const DataType dtype,
+        std::vector<torch::Tensor>* outputs_, const int& op_index, const DataType dtype,
         char** content, size_t* byte_size, std::vector<int64_t>* content_shape);
 
-    Status Execute();
+    Status Execute(std::vector<torch::jit::IValue>* inputs_, std::vector<torch::Tensor>* outputs_);
     // Name of the model instance
     std::string name_;
 
@@ -138,7 +139,7 @@ class LibTorchBackend : public InferenceBackend {
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     std::vector<torch::jit::IValue> inputs_;
     std::vector<torch::Tensor> outputs_;
-    torch::Device device_;// = torch::Device(torch::kCPU);
+    torch::Device device_;
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;

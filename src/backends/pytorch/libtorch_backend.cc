@@ -43,7 +43,8 @@ namespace nvidia { namespace inferenceserver {
 
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size), device_(torch::Device(torch::kCPU))
+    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
+      device_(torch::Device(torch::kCPU))
 {
 }
 
@@ -279,17 +280,14 @@ LibTorchBackend::Run(
   }
 
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
-
-  // clear inputs, outputs
-  contexts_[runner_idx]->inputs_.clear();
-  contexts_[runner_idx]->outputs_.clear();
 }
 
 Status
 LibTorchBackend::Context::SetFixedSizedInputTensor(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const DataType dtype, const size_t batch1_byte_size,
-    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    const std::vector<int64_t>& shape, const DataType dtype,
+    const size_t batch1_byte_size, const size_t total_byte_size,
+    std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers)
 {
   // The entire input tensor must be delivered as a single
@@ -352,14 +350,16 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
   }
 
   RETURN_IF_ERROR(SetInputTensor(
-      name, shape, dtype, static_cast<char*>(buffer), total_byte_size));
+      inputs_, name, shape, dtype, static_cast<char*>(buffer),
+      total_byte_size));
   return Status::Success;
 }
 
 Status
 LibTorchBackend::Context::SetInputTensor(
-    const std::string& name, const std::vector<int64_t>& shape,
-    const DataType dtype, char* content, size_t byte_size)
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    const std::vector<int64_t>& shape, const DataType dtype, char* content,
+    size_t byte_size)
 {
   const auto pr = ConvertDataTypeToTorchType(dtype);
   if (!pr.first) {
@@ -379,21 +379,22 @@ LibTorchBackend::Context::SetInputTensor(
             " for inference input '" + name + "', expecting " +
             std::to_string(input_tensor.nbytes()));
   }
-  inputs_.push_back(input_tensor);
+  inputs_->push_back(input_tensor);
 
   return Status::Success;
 }
 
 Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const int& op_index, const DataType dtype, const size_t dtype_byte_size,
+    std::vector<torch::Tensor>* outputs_, const std::string& name,
+    const int& op_index, const DataType dtype, const size_t dtype_byte_size,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
   char* content = nullptr;
   size_t byte_size = 0;
-  RETURN_IF_ERROR(
-      GetOutputTensor(op_index, dtype, &content, &byte_size, &content_shape));
+  RETURN_IF_ERROR(GetOutputTensor(
+      outputs_, op_index, dtype, &content, &byte_size, &content_shape));
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -440,29 +441,28 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
 Status
 LibTorchBackend::Context::GetOutputTensor(
-    const int& op_index, const DataType dtype, char** content,
-    size_t* byte_size, std::vector<int64_t>* content_shape)
+    std::vector<torch::Tensor>* outputs_, const int& op_index,
+    const DataType dtype, char** content, size_t* byte_size,
+    std::vector<int64_t>* content_shape)
 {
   torch::DeviceType output_device = torch::kCPU;
 
   try {
-    outputs_[op_index] = outputs_[op_index].to(output_device);
-    torch::Tensor output_flat = outputs_[op_index].flatten();
+    (*outputs_)[op_index] = (*outputs_)[op_index].to(output_device);
+    torch::Tensor output_flat = (*outputs_)[op_index].flatten();
     *byte_size = output_flat.nbytes();
     *content = new char[*byte_size];
 
     // Copy output into buffer
     std::memcpy(*content, output_flat.data_ptr(), output_flat.nbytes());
     //  Set content shape
-    auto shape = outputs_[op_index].sizes();
+    auto shape = (*outputs_)[op_index].sizes();
     for (auto itr = shape.begin(); itr != shape.end(); itr++) {
       content_shape->push_back(*itr);
     }
   }
   catch (std::exception& ex) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to get LibTorch output");
+    return Status(RequestStatusCode::INTERNAL, "failed to get LibTorch output");
   }
 
   return Status::Success;
@@ -470,7 +470,8 @@ LibTorchBackend::Context::GetOutputTensor(
 
 Status
 LibTorchBackend::Context::SetInput(
-    const std::string& name, const DataType datatype, const DimsList& dims,
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers)
 {
@@ -497,8 +498,8 @@ LibTorchBackend::Context::SetInput(
   const size_t total_byte_size = total_batch_size * batch1_byte_size;
 
   return SetFixedSizedInputTensor(
-      name, shape, datatype, batch1_byte_size, total_byte_size, payloads,
-      input_buffers);
+      inputs_, name, shape, datatype, batch1_byte_size, total_byte_size,
+      payloads, input_buffers);
 }
 
 Status
@@ -550,9 +551,9 @@ LibTorchBackend::Context::Run(
   // until the inference has completed.
   std::vector<std::unique_ptr<char[]>> input_buffers;
 
-  // Create a tensor for each input sized correctly for the total
-  // payload batch size. Concatenate input values from each payload
-  // into the corresponding tensor.
+  // Store input and output tensors
+  std::vector<torch::jit::IValue> inputs_;
+  std::vector<torch::Tensor> outputs_;
 
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
@@ -562,8 +563,8 @@ LibTorchBackend::Context::Run(
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInput(
-        name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers));
+        &inputs_, name, input_config->data_type(), input.dims(),
+        total_batch_size, payloads, &input_buffers));
   }
 
   // Additional inputs added to the provider...
@@ -575,13 +576,13 @@ LibTorchBackend::Context::Run(
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
       RETURN_IF_ERROR(SetInput(
-          name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &input_buffers));
+          &inputs_, name, override->datatype_, override->dims_,
+          total_batch_size, payloads, &input_buffers));
     }
   }
 
   // Run...
-  RETURN_IF_ERROR(Execute());
+  RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
@@ -596,8 +597,9 @@ LibTorchBackend::Context::Run(
     // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        name, output_index, dtype, GetDataTypeByteSize(output_config->data_type()),
-        total_batch_size, payloads));
+        &outputs_, name, output_index, dtype,
+        GetDataTypeByteSize(output_config->data_type()), total_batch_size,
+        payloads));
     output_index++;
   }
 
@@ -605,20 +607,22 @@ LibTorchBackend::Context::Run(
 }
 
 Status
-LibTorchBackend::Context::Execute()
+LibTorchBackend::Context::Execute(
+    std::vector<torch::jit::IValue>* inputs_,
+    std::vector<torch::Tensor>* outputs_)
 {
-  auto model_outputs_ = torch_model_->forward(inputs_);
+  auto model_outputs_ = torch_model_->forward(*inputs_);
 
   try {
     auto model_outputs_tuple = model_outputs_.toTuple();
-        for (auto &m_op : model_outputs_tuple->elements()){
-          outputs_.push_back(m_op.toTensor());
-        }
+    for (auto& m_op : model_outputs_tuple->elements()) {
+      outputs_->push_back(m_op.toTensor());
+    }
   }
   catch (std::exception& ex) {
     try {
       auto model_output_tensor = model_outputs_.toTensor();
-      outputs_.push_back(model_output_tensor);
+      outputs_->push_back(model_output_tensor);
     }
     catch (std::exception& ex) {
       LOG_VERBOSE(1) << ex.what();
