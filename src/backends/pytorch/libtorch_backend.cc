@@ -486,70 +486,7 @@ LibTorchBackend::Context::GetOutputTensor(
     *content = new char[*byte_size];
 
     // Copy output into buffer
-    switch (dtype) {
-      case TYPE_UINT8: {
-        std::vector<uint8_t> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<uint8_t>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_INT8: {
-        std::vector<int8_t> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<int8_t>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_INT16: {
-        std::vector<int16_t> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<int16_t>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_INT32: {
-        std::vector<int> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<int>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_INT64: {
-        std::vector<long> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<long>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_FP16: {
-        // Experimental since no float16 natively in c++
-        std::vector<torch::Half> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<torch::Half>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_FP32: {
-        std::vector<float> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<float>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-      case TYPE_FP64: {
-        std::vector<double> outputs_vector;
-        for (int i = 0; i < output_flat.sizes()[0]; i++) {
-          outputs_vector.push_back(output_flat[i].item().to<double>());
-        }
-        memcpy(*content, &outputs_vector[0], output_flat.nbytes());
-      } break;
-    }
-
-    std::vector<float> outputs_vector;
-    for (int i = 0; i < output_flat.sizes()[0]; i++) {
-      outputs_vector.push_back(output_flat[i].item().to<float>());
-    }
+    std::memcpy(*content, output_flat.data_ptr(), output_flat.nbytes());
     //  Set content shape
     auto shape = outputs_[op_index].sizes();
     for (auto itr = shape.begin(); itr != shape.end(); itr++) {
