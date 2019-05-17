@@ -216,7 +216,6 @@ LibTorchBackend::CreateExecutionContext(
   try {
     // lp_itr->second is the torch model path
     context->torch_model_ = torch::jit::load(lp_itr->second, context->device_);
-    assert(context->torch_model_.device().type() == torch::kCUDA);
     context->name_ = Config().name();
     context->max_batch_size_ = Config().max_batch_size();
     context->gpu_device_ = gpu_device;
@@ -384,7 +383,6 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
 
   RETURN_IF_ERROR(SetInputTensor(
       name, shape, dtype, static_cast<char*>(buffer), total_byte_size));
-  LOG_VERBOSE(1) << "Input tensor loaded successfully";
   return Status::Success;
 }
 
@@ -405,7 +403,6 @@ LibTorchBackend::Context::SetInputTensor(
   //     torch::TensorOptions().device(device_).dtype(pr.second);
   torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second);
   input_tensor = input_tensor.to(device_);
-  assert(input_tensor.device().type() == torch::kCUDA);
 
   if (input_tensor.nbytes() != byte_size) {
     return Status(

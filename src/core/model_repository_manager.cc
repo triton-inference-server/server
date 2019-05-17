@@ -713,9 +713,11 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       break;
     case Platform::PLATFORM_ONNXRUNTIME_ONNX:
       status = onnx_factory_->CreateBackend(version_path, model_config, &is);
+      break;
     case Platform::PLATFORM_PYTORCH_LIBTORCH:
       status =
           libtorch_factory_->CreateBackend(version_path, model_config, &is);
+      break;
     default:
       break;
   }
