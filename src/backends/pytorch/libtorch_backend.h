@@ -121,7 +121,7 @@ class LibTorchBackend : public InferenceBackend {
         const DataType dtype, char* content, size_t byte_size);
 
     Status GetOutputTensor(
-        const std::string& name, const int& op_index, const DataType dtype,
+        const int& op_index, const DataType dtype,
         char** content, size_t* byte_size, std::vector<int64_t>* content_shape);
 
     Status Execute();
@@ -135,11 +135,10 @@ class LibTorchBackend : public InferenceBackend {
     // batching is not supported.
     int max_batch_size_;
 
-    // LibTorch model and variables that will be reset and used for every run
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     std::vector<torch::jit::IValue> inputs_;
     std::vector<torch::Tensor> outputs_;
-    torch::Device device_ = torch::Device(torch::kCPU);
+    torch::Device device_;// = torch::Device(torch::kCPU);
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;
