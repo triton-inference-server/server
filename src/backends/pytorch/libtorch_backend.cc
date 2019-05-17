@@ -310,8 +310,9 @@ LibTorchBackend::Run(
 
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
 
-  // clear inputs (outputs need not be cleared as it will be re-initializated)
+  // clear inputs, outputs
   contexts_[runner_idx]->inputs_.clear();
+  contexts_[runner_idx]->outputs_.clear();
 }
 
 Status
@@ -418,14 +419,14 @@ LibTorchBackend::Context::SetInputTensor(
 
 Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
-    const std::string& name, const DataType dtype, const size_t dtype_byte_size,
+    const std::string& name, const int& op_index, const DataType dtype, const size_t dtype_byte_size,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
   char* content = nullptr;
   size_t byte_size = 0;
   RETURN_IF_ERROR(
-      GetOutputTensor(name, dtype, &content, &byte_size, &content_shape));
+      GetOutputTensor(name, op_index, dtype, &content, &byte_size, &content_shape));
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -473,14 +474,14 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
 Status
 LibTorchBackend::Context::GetOutputTensor(
-    const std::string& name, const DataType dtype, char** content,
+    const std::string& name, const int& op_index, const DataType dtype, char** content,
     size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   torch::DeviceType output_device = torch::kCPU;
   // TODO: Fix for supporting multiple outputs
   try {
-    outputs_ = outputs_.to(output_device);
-    torch::Tensor output_flat = outputs_.flatten();
+    outputs_[op_index] = outputs_[op_index].to(output_device);
+    torch::Tensor output_flat = outputs_[op_index].flatten();
     *byte_size = output_flat.nbytes();
     *content = new char[*byte_size];
 
@@ -550,7 +551,7 @@ LibTorchBackend::Context::GetOutputTensor(
       outputs_vector.push_back(output_flat[i].item().to<float>());
     }
     //  Set content shape
-    auto shape = outputs_.sizes();
+    auto shape = outputs_[op_index].sizes();
     for (auto itr = shape.begin(); itr != shape.end(); itr++) {
       content_shape->push_back(*itr);
     }
@@ -681,6 +682,7 @@ LibTorchBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
+  int output_index = 0;
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
 
@@ -691,8 +693,9 @@ LibTorchBackend::Context::Run(
     // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        name, dtype, GetDataTypeByteSize(output_config->data_type()),
+        name, output_index, dtype, GetDataTypeByteSize(output_config->data_type()),
         total_batch_size, payloads));
+    output_index++;
   }
 
   return Status::Success;
@@ -702,14 +705,23 @@ Status
 LibTorchBackend::Context::Execute()
 {
   try {
-    outputs_ =
-        torch_model_->forward(inputs_).toTensor();  // toTuple() for two outputs
+    auto model_outputs_ =
+        torch_model_->forward(inputs_).toTuple();
+        for (auto &m_op : model_outputs_->elements()){
+          outputs_.push_back(m_op.toTensor());
+        }
   }
   catch (std::exception& ex) {
-    LOG_VERBOSE(1) << ex.what();
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to run model '" + name_);  // + "': " + ex.what());
+    try {
+      auto model_outputs_ = torch_model_->forward(inputs_).toTensor();
+      outputs_.push_back(model_outputs_);
+    }
+    catch (std::exception& ex) {
+      LOG_VERBOSE(1) << ex.what();
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to run model '" + name_);  // + "': " + ex.what());
+    }
   }
 
   return Status::Success;
