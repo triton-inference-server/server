@@ -245,16 +245,16 @@ CheckPortCollision()
 {
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
-       http_ports_.end()) &&
-      (grpc_port_ != -1) && allow_http_ && allow_grpc_) {
+       http_ports_.end()) && (grpc_port_ != -1) &&
+       allow_http_ && allow_grpc_) {
     LOG_ERROR << "The server cannot listen to HTTP requests "
               << "and gRPC requests at the same port";
     return true;
   }
 
   // Check if Metric and GRPC have shared ports
-  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
-      allow_metrics_) {
+  if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) &&
+       allow_grpc_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "gRPC requests";
     return true;
@@ -262,8 +262,8 @@ CheckPortCollision()
 
   // Check if Metric and HTTP have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
-       http_ports_.end()) &&
-      (metrics_port_ != -1) && allow_http_ && allow_metrics_) {
+       http_ports_.end()) && (metrics_port_ != -1) &&
+       allow_http_ && allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
               << "HTTP requests";
     return true;

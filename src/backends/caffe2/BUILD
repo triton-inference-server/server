@@ -104,6 +104,7 @@ cc_test(
         "-lcaffe2_gpu",
         "-lcaffe2",
         "-lonnxruntime",
+        "-ltorch",
         "-lnvinfer",
         "-L/usr/local/cuda/lib64/stubs",
         "-lnvidia-ml",
