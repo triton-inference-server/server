@@ -122,6 +122,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --models_dir=$SEQDESTD
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --variable --models_dir=$VARSEQDESTDIR
 chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_models.py --libtorch --models_dir=$DESTDIR
+chown -R $(id -u):$(id -g) $DESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
