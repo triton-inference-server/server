@@ -158,7 +158,7 @@ def validate_for_ensemble_model(ensemble_type,
         for type_str in test_type_involved:
             if type_str in ensemble_type:
                 return False
-                
+
     # Otherwise, check input / output separately
     if input_dtype == np.object and "sequence" in ensemble_type:
         return False
@@ -175,6 +175,18 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
     if ((input_dtype == np.object) and
         (((output0_dtype != np.object) and (output0_dtype != np.int32)) or
          ((output1_dtype != np.object) and (output1_dtype != np.int32)))):
+         return False
+
+    return True
+
+def validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
+                                input_shape, output0_shape, output1_shape):
+    """Return True if input and output dtypes are supported by a libtorch model."""
+
+     # STRING and UINT16 data types are not supported currently
+    if (input_dtype == np.object) or (output0_dtype == np.object) or (output1_dtype == np.object):
+        return False
+    if (input_dtype == np.uint16) or (output0_dtype == np.uint16) or (output1_dtype == np.uint16):
         return False
 
     return True
