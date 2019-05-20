@@ -110,6 +110,13 @@ class InferTest(unittest.TestCase):
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=False)
 
+        if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                                    (input_size,), (input_size,), (input_size,)):
+            # No basic ensemble models are created against onnx models for now [TODO]
+            _infer_exact_helper(self, 'onnx', (input_size,), 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+
     def test_raw_bbb(self):
         self._full_exact(np.int8, np.int8, np.int8,
                          output0_raw=True, output1_raw=True, swap=True)

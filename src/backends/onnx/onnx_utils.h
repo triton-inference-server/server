@@ -34,12 +34,11 @@ namespace nvidia { namespace inferenceserver {
 
 #define RETURN_IF_ORT_ERROR(S)                                           \
   do {                                                                   \
-    OrtStatus* onnx_status = nullptr;                                    \
-    onnx_status = (S);                                                   \
-    if (onnx_status != nullptr) {                                        \
-      OrtErrorCode code = OrtGetErrorCode(onnx_status);                  \
-      std::string msg = std::string(OrtGetErrorMessage(onnx_status));    \
-      OrtReleaseStatus(onnx_status);                                     \
+    OrtStatus* status__ = (S);                                           \
+    if (status__ != nullptr) {                                           \
+      OrtErrorCode code = OrtGetErrorCode(status__);                     \
+      std::string msg = std::string(OrtGetErrorMessage(status__));       \
+      OrtReleaseStatus(status__);                                        \
       return Status(                                                     \
           RequestStatusCode::INTERNAL, "onnx runtime error " +           \
                                            std::to_string(code) + ": " + \

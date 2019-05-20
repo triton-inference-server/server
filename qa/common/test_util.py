@@ -150,6 +150,25 @@ def validate_for_ensemble_model(ensemble_type,
 
     return True
 
+def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                           input_shape, output0_shape, output1_shape):
+    """Return True if input and output dtypes are supported by a Onnx model."""
+
+    # [TODO] Examine if Onnx can support the following data type and tensor
+    # shape, refine the following checking if necessary
+
+    # STRING data type is not supported currently
+    if (input_dtype == np.object) or (output0_dtype == np.object) or (output1_dtype == np.object):
+        return False
+
+    # Input and output shapes must be fixed-size.
+    if (not shape_is_fixed(input_shape) or
+        not shape_is_fixed(output0_shape) or
+        not shape_is_fixed(output1_shape)):
+        return False
+
+    return True
+
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
     return "{}_{}_{}_{}".format(
         pf, np.dtype(input_dtype).name, np.dtype(output0_dtype).name,
