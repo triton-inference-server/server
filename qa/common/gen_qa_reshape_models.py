@@ -524,21 +524,6 @@ def create_onnx_modelfile(
         models_dir, model_version, max_batch,
         dtype, input_shapes, output_shapes):
 
-    # Onnx use string for variable size dimension, and the same string
-    # will be inferred to have same value for the model run.
-    def normalize_variable_shape(shape, increment_index=True):
-        res = []
-        for dim in shape:
-            if dim == -1:
-                res.append("var_" + str(normalize_variable_shape.idx))
-                if increment_index:
-                    normalize_variable_shape.idx += 1
-            else:
-                res.append(dim)
-        return res
-        
-    normalize_variable_shape.idx = 0
-
     assert len(input_shapes) == len(output_shapes)
     if not tu.validate_for_onnx_model(dtype, dtype, dtype,
                                       input_shapes[0], input_shapes[0], input_shapes[0]):
@@ -557,10 +542,11 @@ def create_onnx_modelfile(
     onnx_nodes = []
     onnx_inputs = []
     onnx_outputs = []
+    idx = 0
     for io_num in range(io_cnt):
         # Repeat so that the variable dimension name is different
-        in_shape = normalize_variable_shape(input_shapes[io_num])
-        out_shape = normalize_variable_shape(output_shapes[io_num])
+        in_shape, idx = tu.shape_to_onnx_shape(input_shapes[io_num], idx)
+        out_shape, idx = tu.shape_to_onnx_shape(output_shapes[io_num], idx)
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
         out_shape_name = out_name + "_shape"
@@ -605,6 +591,7 @@ def create_onnx_modelconfig(
     
     # Must make sure all Onnx models will be loaded to the same GPU if they are
     # run on GPU. This is due to the current limitation of Onnx Runtime
+    # https://github.com/microsoft/onnxruntime/issues/1034
     instance_group_string = '''
 instance_group [
   {
