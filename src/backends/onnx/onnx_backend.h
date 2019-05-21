@@ -106,23 +106,39 @@ class OnnxBackend : public InferenceBackend {
         std::vector<std::unique_ptr<char[]>>* input_buffers,
         std::vector<const char*>* input_names);
 
-    Status SetFixedSizedInputBuffer(
-        const std::string& name, const size_t batch1_byte_size,
-        const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-        std::unique_ptr<char[]>* input_buffer);
+    // Helper function to batch input data from payloads into one 'input_buffer'
+    void SetInputBuffer(
+        const std::string& name, const std::vector<size_t>& expected_byte_sizes,
+        std::vector<Scheduler::Payload>* payloads, char* input_buffer);
 
-    Status SetStringInputBuffer(
-        const std::string& name, const size_t batch1_element_cnt,
-        const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-        std::unique_ptr<char[]>* input_buffer, std::vector<const char*>* string_data);
+    // Helper function to modify 'input_buffer' into format needed for creating
+    // Onnx String tensor and to set meta data 'string_data'
+    void SetStringInputBuffer(
+        const std::string& name, const std::vector<size_t>& expected_byte_sizes,
+        const std::vector<size_t>& expected_element_cnts,
+        std::vector<Scheduler::Payload>* payloads, char* input_buffer,
+        std::vector<const char*>* string_data);
 
+    // Helper function to fill 'string_data' with 'cnt' number of empty string
     void FillStringData(std::vector<const char*>* string_data, size_t cnt);
 
     // Read output tensors into one or more payloads accordingly.
     Status ReadOutputTensors(
-        const OnnxBackend* base, size_t total_batch_size,
+        const OnnxBackend* base, const size_t total_batch_size,
         const std::vector<const char*>& output_names,
         std::vector<Scheduler::Payload>* payloads);
+
+    // Helper function to set output buffer of fixed size data type to payloads
+    void SetFixedSizeOutputBuffer(
+        const std::string& name, const size_t batch1_byte_size,
+        const char* content, const std::vector<int64_t>& content_shape,
+        std::vector<Scheduler::Payload>* payloads);
+
+    // Helper function to set output buffer of string data type to payloads
+    void SetStringOutputBuffer(
+        const std::string& name, const size_t batch1_element_cnt,
+        const char* content, const std::vector<int64_t>& content_shape,
+        const size_t* offsets, std::vector<Scheduler::Payload>* payloads);
 
     // Release the Onnx Runtime resources allocated for the run, if any.
     void ReleaseOrtRunResources();
