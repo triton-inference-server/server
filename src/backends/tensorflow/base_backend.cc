@@ -26,7 +26,6 @@
 
 #include "src/backends/tensorflow/base_backend.h"
 
-#include <cuda_runtime_api.h>
 #include <set>
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
@@ -39,6 +38,10 @@
 #include "tensorflow/core/framework/types.pb.h"
 #include "tensorflow/core/graph/default_device.h"
 #include "tensorflow/core/public/session.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -143,6 +146,7 @@ BaseBackend::CreateExecutionContext(
     LOG_INFO << "Creating instance " << instance_name << " on CPU using "
              << cc_model_filename;
   } else {
+#ifdef TRTIS_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -161,6 +165,9 @@ BaseBackend::CreateExecutionContext(
 
     LOG_INFO << "Creating instance " << instance_name << " on GPU "
              << gpu_device << " (" << cc << ") using " << cc_model_filename;
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& gdp_itr = paths.find(cc_model_filename);

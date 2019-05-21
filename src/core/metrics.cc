@@ -29,11 +29,14 @@
 
 #include "src/core/metrics.h"
 
-#include <cuda_runtime_api.h>
-#include <nvml.h>
 #include <thread>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#include <nvml.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -133,6 +136,11 @@ Metrics::EnableGPUMetrics()
 bool
 Metrics::InitializeNvmlMetrics()
 {
+#ifndef TRTIS_ENABLE_GPU
+  return false;
+#endif  // !TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_GPU
   nvmlReturn_t nvmlerr = nvmlInit();
   if (nvmlerr != NVML_SUCCESS) {
     LOG_ERROR << "failed to initialize NVML: NVML_ERROR " << nvmlerr;
@@ -304,6 +312,7 @@ Metrics::InitializeNvmlMetrics()
   }
 
   return true;
+#endif  // TRTIS_ENABLE_GPU
 }
 
 bool
@@ -317,6 +326,12 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
     return false;
   }
 
+  // If GPU support not enabled just silently fail.
+#ifndef TRTIS_ENABLE_GPU
+  return false;
+#endif  // !TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_GPU
   char pcibusid_str[64];
   cudaError_t cuerr = cudaDeviceGetPCIBusId(
       pcibusid_str, sizeof(pcibusid_str) - 1, cuda_device);
@@ -342,6 +357,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
 
   *uuid = uuid_str;
   return true;
+#endif  // TRTIS_ENABLE_GPU
 }
 
 std::shared_ptr<prometheus::Registry>
