@@ -45,6 +45,10 @@ if(${TRTIS_ENABLE_ASAN})
   set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${_ASAN_FLAGS}")
 endif() # TRTIS_ENABLE_ASAN
 
+if(${TRTIS_ENABLE_GPU})
+  add_definitions(-DTRTIS_ENABLE_GPU=1)
+endif() # TRTIS_ENABLE_GPU
+
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
 endif() # TRTIS_ENABLE_METRICS
@@ -80,9 +84,11 @@ ENDFOREACH(p)
 #
 # CUDA
 #
-find_package(CUDA REQUIRED)
-message(STATUS "Using CUDA ${CUDA_VERSION}")
-set(CUDA_NVCC_FLAGS -std=c++11)
+if(${TRTIS_ENABLE_GPU})
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+endif() # TRTIS_ENABLE_GPU
 
 #
 # libevent

@@ -26,7 +26,6 @@
 
 #include "src/core/server.h"
 
-#include <cuda_profiler_api.h>
 #include <stdint.h>
 #include <time.h>
 #include <unistd.h>

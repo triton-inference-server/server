@@ -26,8 +26,6 @@
 
 #include "src/backends/caffe2/netdef_backend.h"
 
-#include <NvInfer.h>
-#include <cuda_runtime_api.h>
 #include <stdint.h>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -35,6 +33,10 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -162,8 +164,6 @@ NetDefBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::vector<char>>& models)
 {
-  cudaError_t cuerr;
-
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
   std::string cc;
@@ -171,8 +171,9 @@ NetDefBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
+#ifdef TRTIS_ENABLE_GPU
     cudaDeviceProp cuprops;
-    cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
+    cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -185,8 +186,10 @@ NetDefBackend::CreateExecutionContext(
     cc_model_filename = (cc_itr == Config().cc_model_filenames().end())
                             ? Config().default_model_filename()
                             : cc_itr->second;
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
-
 
   const auto& mn_itr = models.find(cc_model_filename);
   if (mn_itr == models.end()) {

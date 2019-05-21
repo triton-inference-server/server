@@ -43,3 +43,10 @@ install(
   RUNTIME DESTINATION bin
 )
 endif() # TRTIS_ENABLE_TENSORRT
+
+# FIXME need to build model_config_base and replace this install with
+# the correct one
+install(
+  FILES model_config_test_base.h
+  DESTINATION include
+)

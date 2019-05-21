@@ -84,27 +84,29 @@ if(${TRTIS_ENABLE_CUSTOM})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:custom-backend-library>)
 endif() # TRTIS_ENABLE_CUSTOM
 
+set(CUDA_OBJS "")
+if(${TRTIS_ENABLE_GPU})
+  set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
+endif() # TRTIS_ENABLE_GPU
+
 configure_file(libtrtserver.ldscript libtrtserver.ldscript)
 
 add_library(
   trtserver SHARED
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:model-config-cuda-library>
   $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
+  ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
 target_link_libraries(
   trtserver
   ${TRTIS_EXTRA_LDFLAGS}
-  -L/usr/local/cuda/lib64/stubs
-  -lnvidia-ml
   gRPC::grpc++
   gRPC::grpc
   ${LIBEVENT_LIBRARIES}
-  ${CUDA_LIBRARIES}
   "-Wl,--version-script libtrtserver.ldscript"
 )
 
@@ -151,6 +153,15 @@ if(${TRTIS_ENABLE_METRICS})
     prometheus-cpp::core
   )
 endif() # TRTIS_ENABLE_METRICS
+
+if(${TRTIS_ENABLE_GPU})
+target_link_libraries(
+  trtserver
+  -L/usr/local/cuda/lib64/stubs
+  -lnvidia-ml
+  ${CUDA_LIBRARIES}
+)
+endif() # TRTIS_ENABLE_GPU
 
 install(
   TARGETS trtserver

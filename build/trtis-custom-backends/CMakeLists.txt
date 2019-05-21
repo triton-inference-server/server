@@ -37,15 +37,21 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(${TRTIS_ENABLE_GPU})
+  add_definitions(-DTRTIS_ENABLE_GPU=1)
+endif() # TRTIS_ENABLE_GPU
+
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
 
 #
 # CUDA
 #
-find_package(CUDA REQUIRED)
-message(STATUS "Using CUDA ${CUDA_VERSION}")
-set(CUDA_NVCC_FLAGS -std=c++11)
+if(${TRTIS_ENABLE_GPU})
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+endif() # TRTIS_ENABLE_GPU
 
 #
 # Protobuf
