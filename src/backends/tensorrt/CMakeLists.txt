@@ -54,4 +54,7 @@ add_library(
   ${PLAN_SRCS} ${PLAN_HDRS}
 )
 add_dependencies(tensorrt-backend-library proto-library)
-target_include_directories(tensorrt-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(tensorrt-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU

@@ -26,13 +26,16 @@
 
 #include "src/core/model_config_utils.h"
 
-#include <cuda_runtime_api.h>
 #include <deque>
 #include <set>
 #include "src/core/autofill.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -287,7 +290,8 @@ GetNormalizedModelConfig(
       group->set_name(config->name());
     }
 
-    int device_cnt;
+    int device_cnt = 0;
+#ifdef TRTIS_ENABLE_GPU
     cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
     if (cuerr == cudaErrorNoDevice) {
       device_cnt = 0;
@@ -297,6 +301,7 @@ GetNormalizedModelConfig(
           "unable to get number of CUDA devices for " + config->name() + ": " +
               cudaGetErrorString(cuerr));
     }
+#endif  // TRTIS_ENABLE_GPU
 
     // Assign default name, kind and count to each instance group that
     // doesn't give those values explicitly. For KIND_GPU, set GPUs to
@@ -457,7 +462,8 @@ ValidateModelConfig(
     // Make sure KIND_GPU instance group specifies at least one GPU and
     // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
     // not specify any GPUs.
-    int dcnt;
+#ifdef TRTIS_ENABLE_GPU
+    int dcnt = 0;
     cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
     if (cuerr == cudaErrorNoDevice) {
       dcnt = 0;
@@ -467,9 +473,16 @@ ValidateModelConfig(
           "failed to get device count for validation of model " +
               config.name() + ": " + cudaGetErrorString(cuerr));
     }
+#endif  // TRTIS_ENABLE_GPU
 
     for (const auto& group : config.instance_group()) {
       if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+#ifndef TRTIS_ENABLE_GPU
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "instance group " + group.name() + " of model " + config.name() +
+                " has kind KIND_GPU but server does not support GPUs");
+#else
         if (group.gpus().size() == 0) {
           return Status(
               RequestStatusCode::INVALID_ARG,
@@ -487,6 +500,7 @@ ValidateModelConfig(
                     std::to_string(dcnt - 1));
           }
         }
+#endif  // !TRTIS_ENABLE_GPU
       } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
         if (group.gpus().size() > 0) {
           return Status(

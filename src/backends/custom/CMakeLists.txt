@@ -48,4 +48,7 @@ add_library(
   ${CUSTOM_SRCS} ${CUSTOM_HDRS}
 )
 add_dependencies(custom-backend-library proto-library)
-target_include_directories(custom-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(custom-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
