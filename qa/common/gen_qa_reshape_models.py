@@ -145,6 +145,31 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+def np_to_torch_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return torch.bool
+    elif np_dtype == np.int8:
+        return torch.int8
+    elif np_dtype == np.int16:
+        return torch.int16
+    elif np_dtype == np.int32:
+        return torch.int
+    elif np_dtype == np.int64:
+        return torch.long
+    elif np_dtype == np.uint8:
+        return torch.uint8
+    elif np_dtype == np.uint16:
+        return None # Not supported in Torch
+    elif np_dtype == np.float16:
+        return torch.half
+    elif np_dtype == np.float32:
+        return torch.float
+    elif np_dtype == np.float64:
+        return torch.double
+    elif np_dtype == np_dtype_string:
+        return None # Not supported in Torch
+    return None
+
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, max_batch,
         dtype, input_shapes, output_shapes):
@@ -490,6 +515,117 @@ output [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_libtorch_modelfile(
+        models_dir, model_version, max_batch,
+        dtype, input_shapes, output_shapes):
+
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype,
+                                     input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+    io_cnt = len(input_shapes)
+    model_name = tu.get_zero_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
+
+    # Create the model that reshapes inputs to corresponding outputs
+    if io_cnt == 1:
+        class ReshapeNet(nn.Module):
+            def __init__(self, *args):
+                super(ReshapeNet, self).__init__()
+                self.shape = args
+            def forward(self, input0):
+                return input0.view(self.shape[0])
+    elif io_cnt == 2:
+        class ReshapeNet(nn.Module):
+            def __init__(self, *args):
+                super(ReshapeNet, self).__init__()
+                self.shape = args
+            def forward(self, input0, input1):
+                return input0.view(self.shape[0]), input1.view(self.shape[1])
+    elif io_cnt == 3:
+        class ReshapeNet(nn.Module):
+            def __init__(self, *args):
+                super(ReshapeNet, self).__init__()
+                self.shape = args
+            def forward(self, input0, input1, input2):
+                return input0.view(self.shape[0]), input1.view(self.shape[1]), input2.view(self.shape[2])
+
+    reshapeModel = ReshapeNet([op_shape for op_shape in output_shapes])
+    example_inputs = [torch.zeros(input_shapes[i], dtype=torch_dtype) for i in range(io_cnt)]
+    traced = torch.jit.trace(reshapeModel, tuple(example_inputs[i] for i in range(io_cnt)))
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_libtorch_modelconfig(
+        models_dir, model_version, max_batch, dtype,
+        input_shapes, input_model_shapes, output_shapes, output_model_shapes):
+
+    assert len(input_shapes) == len(input_model_shapes)
+    assert len(output_shapes) == len(output_model_shapes)
+    assert len(input_shapes) == len(output_shapes)
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype,
+                                     input_shapes[0], input_shapes[0], input_shapes[0]):
+        return
+
+    io_cnt = len(input_shapes)
+
+    model_name = tu.get_zero_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+'''.format(model_name, max_batch)
+
+    for io_num in range(io_cnt):
+        config += '''
+input [
+  {{
+    name: "INPUT{}"
+    data_type: {}
+    dims: [ {} ]
+    {}
+  }}
+]
+output [
+  {{
+    name: "OUTPUT{}"
+    data_type: {}
+    dims: [ {} ]
+    {}
+  }}
+]
+'''.format(io_num, np_to_model_dtype(dtype),
+           tu.shape_to_dims_str(input_shapes[io_num]),
+           "reshape: {{ shape: [ {} ] }}".format(
+               tu.shape_to_dims_str(input_model_shapes[io_num]))
+               if input_shapes[io_num] != input_model_shapes[io_num] else "",
+           io_num, np_to_model_dtype(dtype),
+           tu.shape_to_dims_str(output_shapes[io_num]),
+           "reshape: {{ shape: [ {} ] }}".format(
+               tu.shape_to_dims_str(output_model_shapes[io_num]))
+               if output_shapes[io_num] != output_model_shapes[io_num] else "")
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_ensemble_modelfile(
         models_dir, model_version, max_batch,
         dtype, input_shapes, output_shapes):
@@ -553,7 +689,7 @@ def create_onnx_modelfile(
 
         onnx_inputs.append(onnx.helper.make_tensor_value_info(in_name, onnx_dtype, batch_dim + in_shape))
         onnx_outputs.append(onnx.helper.make_tensor_value_info(out_name, onnx_dtype, batch_dim + out_shape))
-        
+
         if input_shapes == output_shapes:
             onnx_nodes.append(onnx.helper.make_node("Identity", [in_name], [out_name]))
         else:
@@ -588,7 +724,7 @@ def create_onnx_modelconfig(
     model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
-    
+
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             emu.repeat(dtype, io_cnt), input_shapes, input_model_shapes,
             emu.repeat(dtype, io_cnt), output_shapes, output_model_shapes,
@@ -601,7 +737,7 @@ def create_onnx_modelconfig(
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
-    
+
 
 def create_models(models_dir, dtype, input_shapes, input_model_shapes,
                   output_shapes=None, output_model_shapes=None, no_batch=True):
@@ -653,6 +789,17 @@ def create_models(models_dir, dtype, input_shapes, input_model_shapes,
             create_onnx_modelconfig(models_dir, model_version, 0, dtype,
                                       input_shapes, input_model_shapes, output_shapes, output_model_shapes)
             create_onnx_modelfile(models_dir, model_version, 0, dtype,
+                                    input_model_shapes, output_model_shapes)
+
+    if FLAGS.libtorch:
+        create_libtorch_modelconfig(models_dir, model_version, 8, dtype,
+                                  input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+        create_libtorch_modelfile(models_dir, model_version, 8, dtype,
+                                input_model_shapes, output_model_shapes)
+        if no_batch:
+            create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
+                                      input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+            create_libtorch_modelfile(models_dir, model_version, 0, dtype,
                                     input_model_shapes, output_model_shapes)
 
     # Shouldn't create ensembles that reshape to zero-sized tensors. Reshaping
@@ -711,6 +858,8 @@ if __name__ == '__main__':
                         help='Generate TensorRT PLAN models')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx Runtime Onnx models')
+    parser.add_argument('--libtorch', required=False, action='store_true',
+                        help='Generate Pytorch LibTorch models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -725,6 +874,9 @@ if __name__ == '__main__':
         import tensorrt.legacy as trt
     if FLAGS.onnx:
         import onnx
+    if FLAGS.libtorch:
+        import torch
+        from torch import nn
 
     import test_util as tu
 

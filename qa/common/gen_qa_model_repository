@@ -110,20 +110,18 @@ cat >$HOST_SRCDIR/$C2SCRIPT <<EOF
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
-python3 $SRCDIR/gen_qa_models.py --onnx --netdef --models_dir=$DESTDIR
+python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
-python3 $SRCDIR/gen_qa_models.py --onnx --netdef --variable --models_dir=$VARDESTDIR
+python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_zero_models.py --onnx --netdef --models_dir=$ZERODESTDIR
+python3 $SRCDIR/gen_qa_zero_models.py --onnx --netdef --libtorch --models_dir=$ZERODESTDIR
 chown -R $(id -u):$(id -g) $ZERODESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --libtorch --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --variable --models_dir=$VARSEQDESTDIR
 chown -R $(id -u):$(id -g) $VARSEQDESTDIR
-python3 $SRCDIR/gen_qa_models.py --libtorch --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$C2SCRIPT
