@@ -101,10 +101,22 @@ class OnnxBackend : public InferenceBackend {
 
     // Set an input tensor from one or more payloads.
     Status SetInputTensor(
-        const std::string& name, const DataType datatype, const DimsList& dims,
+        const std::string& name, const DataType data_type, const DimsList& dims,
         size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers,
         std::vector<const char*>* input_names);
+
+    Status SetFixedSizedInputBuffer(
+        const std::string& name, const size_t batch1_byte_size,
+        const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+        std::unique_ptr<char[]>* input_buffer);
+
+    Status SetStringInputBuffer(
+        const std::string& name, const size_t batch1_element_cnt,
+        const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+        std::unique_ptr<char[]>* input_buffer, std::vector<const char*>* string_data);
+
+    void FillStringData(std::vector<const char*>* string_data, size_t cnt);
 
     // Read output tensors into one or more payloads accordingly.
     Status ReadOutputTensors(
@@ -128,7 +140,7 @@ class OnnxBackend : public InferenceBackend {
 
     // Onnx Runtime variables that are used across runs
     OrtSession* session_;
-    OrtAllocatorInfo* allocator_info_;
+    OrtAllocator* allocator_;
 
     // Onnx Runtime variables that will be reset and used for every run
     std::vector<OrtValue*> input_tensors_;

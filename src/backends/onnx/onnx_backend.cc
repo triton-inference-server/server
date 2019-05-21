@@ -44,7 +44,7 @@ namespace nvidia { namespace inferenceserver {
 OnnxBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
-      session_(nullptr), allocator_info_(nullptr)
+      session_(nullptr), allocator_(nullptr)
 {
 }
 
@@ -56,8 +56,8 @@ OnnxBackend::Context::~Context()
   if (session_ != nullptr) {
     OrtReleaseSession(session_);
   }
-  if (allocator_info_ != nullptr) {
-    OrtReleaseAllocatorInfo(allocator_info_);
+  if (allocator_ != nullptr) {
+    OrtReleaseAllocator(allocator_);
   }
 }
 
@@ -207,8 +207,7 @@ OnnxBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
-  RETURN_IF_ORT_ERROR(OrtCreateCpuAllocatorInfo(
-      OrtArenaAllocator, OrtMemTypeDefault, &context->allocator_info_));
+  RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&context->allocator_));
 
   return Status::Success;
 }
@@ -390,7 +389,7 @@ OnnxBackend::Context::Run(
 
 Status
 OnnxBackend::Context::SetInputTensor(
-    const std::string& name, const DataType datatype, const DimsList& dims,
+    const std::string& name, const DataType data_type, const DimsList& dims,
     size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers,
     std::vector<const char*>* input_names)
@@ -411,12 +410,41 @@ OnnxBackend::Context::SetInputTensor(
     batch1_element_cnt *= dim;
   }
 
-  const size_t batch1_byte_size =
-      batch1_element_cnt * GetDataTypeByteSize(datatype);
+  size_t total_byte_size = 0;
+  if (data_type != TYPE_STRING) {
+    const size_t batch1_byte_size =
+        batch1_element_cnt * GetDataTypeByteSize(data_type);
+    total_byte_size = batch1_byte_size * total_batch_size;
+    RETURN_IF_ERROR(SetFixedSizedInputBuffer(name, batch1_byte_size, total_batch_size, payloads, &input_buffers->back()));
+    RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
+        OrtAllocatorGetInfo(allocator_), (void*)input_buffers->back().get(), total_byte_size,
+        input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
+        &input_tensors_.back()));
+  } else {
+    std::vector<const char*> string_data;
+    const size_t total_element_cnt = batch1_element_cnt * total_batch_size;
+    RETURN_IF_ERROR(SetStringInputBuffer(name, total_element_cnt, total_batch_size, payloads, &input_buffers->back(), &string_data));
+
+    RETURN_IF_ORT_ERROR(OrtCreateTensorAsOrtValue(
+        allocator_, input_dims.data(), input_dims.size(),
+        ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, &input_tensors_.back()));
+    RETURN_IF_ORT_ERROR(OrtFillStringTensor(input_tensors_.back(), string_data.data(), string_data.size()));
+  }
+
+  return Status::Success;
+}
+
+
+Status
+OnnxBackend::Context::SetFixedSizedInputBuffer(
+    const std::string& name, const size_t batch1_byte_size,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::unique_ptr<char[]>* input_buffer)
+{
   const size_t total_byte_size = total_batch_size * batch1_byte_size;
 
-  input_buffers->back().reset(new char[total_byte_size]);
-  char* buffer = input_buffers->back().get();
+  input_buffer->reset(new char[total_byte_size]);
+  char* buffer = input_buffer->get();
 
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
@@ -471,14 +499,147 @@ OnnxBackend::Context::SetInputTensor(
     buffer_copy_offset += expected_byte_size;
   }
 
-  // [TODO] not handling STRING data type right now, need to use other
-  // Ort function to handle it.
-  RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
-      allocator_info_, (void*)buffer, total_byte_size, input_dims.data(),
-      input_dims.size(), ConvertToOnnxDataType(datatype),
-      &input_tensors_.back()));
-
   return Status::Success;
+}
+
+Status
+OnnxBackend::Context::SetStringInputBuffer(
+    const std::string& name, const size_t batch1_element_cnt,
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    std::unique_ptr<char[]>* input_buffer, std::vector<const char*>* string_data)
+{
+  size_t total_byte_size = 0;
+  std::vector<size_t> expected_byte_sizes;
+  std::vector<size_t> expected_element_cnts;
+  for (auto& payload : *payloads) {
+    const auto& request_header = payload.request_provider_->RequestHeader();
+    expected_element_cnts.push_back(request_header.batch_size() * batch1_element_cnt);
+    for (const auto& in : request_header.input()) {
+      if (in.name() == name) {
+        // The provider has already checked that batch_byte_size is set for
+        // String data type
+        expected_byte_sizes.push_back(in.batch_byte_size());
+        total_byte_size += in.batch_byte_size();
+      }
+    }
+  }
+
+  // the buffer can be more compact as it only needs to store the string data
+  // as C string. But here used total byte size directly to simplify offset
+  // tracking.
+  input_buffer->reset((new char[total_byte_size+1]));
+  char* buffer = input_buffer->get();
+
+  std::vector<char> size_buffer;
+
+  // offset for each payload
+  size_t buffer_copy_offset = 0;
+  for (size_t idx = 0; idx < expected_byte_sizes.size(); idx++) {
+    auto& payload = (*payloads)[idx];
+    const size_t expected_byte_size = expected_byte_sizes[idx];
+    const size_t expected_element_cnt = expected_byte_sizes[idx];
+
+    size_t copied_byte_size = 0;
+    while (payload.status_.IsOk()) {
+      const void* content;
+      size_t content_byte_size = expected_byte_size - copied_byte_size;
+      // Not force_contiguous as the content will be copied into the buffer
+      // and maded contiguous anyway. Copy because we need to modify String
+      // data to be valid C string.
+      payload.status_ = payload.request_provider_->GetNextInputContent(
+          name, &content, &content_byte_size, false);
+      if (!payload.status_.IsOk()) {
+        break;
+      }
+
+      // No more input content available then done with copying...
+      if (content == nullptr) {
+        break;
+      }
+
+      if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
+          total_byte_size) {
+        payload.status_ = Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size " +
+                std::to_string(
+                    buffer_copy_offset + copied_byte_size + content_byte_size) +
+                " for inference input '" + name + "', expecting " +
+                std::to_string(total_byte_size));
+        break;
+      }
+
+      memcpy(
+          buffer + buffer_copy_offset + copied_byte_size,
+          content, content_byte_size);
+      copied_byte_size += content_byte_size;
+    }
+
+    if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
+      payload.status_ = Status(
+          RequestStatusCode::INTERNAL,
+          "expected " + std::to_string(expected_byte_size) +
+              " bytes of data for inference input '" + name + "', got " +
+              std::to_string(copied_byte_size));
+    }
+
+    size_t element_cnt = 0;
+    if (payload.status_.IsOk()) {
+      size_t remaining_bytes = expected_byte_size;
+      char* data_content = buffer + buffer_copy_offset;
+      // Continue if the remaining bytes may still contain size info
+      while (remaining_bytes >= sizeof(uint32_t)) {
+        if (element_cnt >= expected_element_cnt) {
+          payload.status_ = Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected number of string elements " +
+                  std::to_string(element_cnt + 1) + " for inference input '" +
+                  name + "', expecting " +
+                  std::to_string(expected_element_cnt));
+          break;
+        }
+
+        const uint32_t len = *(reinterpret_cast<const uint32_t*>(data_content));
+        remaining_bytes -= sizeof(uint32_t);
+        // Make first byte of size info 0, so that if there is string data
+        // in front of it, the data becomes valid C string.
+        *data_content = 0;
+        data_content = data_content + sizeof(uint32_t);
+        if (len > remaining_bytes) {
+          payload.status_ = Status(
+            RequestStatusCode::INVALID_ARG,
+            "incomplete string data for inference input '" + name +
+                "', expecting string of length " + std::to_string(len) +
+                " but only " + std::to_string(remaining_bytes) +
+                " bytes available");
+          break;
+        } else {
+          string_data->push_back(data_content);
+          element_cnt++;
+          data_content = data_content + len;
+          remaining_bytes -= len;
+        }
+      }
+    }
+
+    // [TODO] define this function, fill with know empty string (class member)
+    FillStringData(string_data, expected_element_cnt - element_cnt);
+
+    buffer_copy_offset += expected_byte_size;
+  }
+
+  // Make sure to make the last string data valid C string
+  buffer[total_byte_size] = 0;
+  return Status::Success;
+}
+
+void
+OnnxBackend::Context::FillStringData(std::vector<const char*>* string_data, size_t cnt)
+{
+  static const char* empty = "";
+  for (size_t c = 0; c < cnt; c++) {
+    string_data->push_back(empty);
+  }
 }
 
 Status
@@ -500,31 +661,29 @@ OnnxBackend::Context::ReadOutputTensors(
           "output tensor '" + name + "' does not found");
     }
 
-    std::vector<int64_t> content_shape;
-    char* content = nullptr;
-
-    RETURN_IF_ORT_ERROR(
-        OrtGetTensorMutableData(output_tensor, (void**)&content));
-
     // Get output type and shape
     OrtTypeInfo* typeinfo;
     RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, &typeinfo));
     const OrtTensorTypeAndShapeInfo* type_and_shape =
         OrtCastTypeInfoToTensorInfo(typeinfo);
 
+    std::vector<int64_t> content_shape;
     content_shape.resize(OrtGetNumOfDimensions(type_and_shape));
     OrtGetDimensions(
         type_and_shape, content_shape.data(), content_shape.size());
+
     ONNXTensorElementDataType type = OrtGetTensorElementType(type_and_shape);
 
     OrtReleaseTypeInfo(typeinfo);
 
+    // [TODO] move these to where needed (if only used in one of the cases)
     const size_t element_count = GetElementCount(content_shape);
     const size_t total_byte_size =
         element_count * GetDataTypeByteSize(ConvertFromOnnxDataType(type));
     const size_t actual_byte_size =
         element_count * GetDataTypeByteSize(output_config->data_type());
     const size_t batch1_byte_size = total_byte_size / total_batch_size;
+    const size_t batch1_element_cnt = element_count / total_batch_size;
 
     if (actual_byte_size != total_byte_size) {
       return Status(
@@ -535,32 +694,84 @@ OnnxBackend::Context::ReadOutputTensors(
               std::to_string(batch1_byte_size));
     }
 
-    size_t content_offset = 0;
+    if (type == ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING) {
+      size_t total_length = 0;
+      RETURN_IF_ORT_ERROR(OrtGetStringTensorDataLength(output_tensor, &total_length));
 
-    for (auto& payload : *payloads) {
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
+      char res[total_length];
+      size_t offsets[element_count+1];
+      RETURN_IF_ORT_ERROR(OrtGetStringTensorContent(output_tensor, res, total_length, offsets, element_count));
+      // Mark "passed end byte offset"
+      offsets[element_count] = total_length;
 
-      // If 'payload' requested this output then copy it from
-      // 'content'. If it did not request this output then just
-      // skip it in the 'content'.
-      if ((payload.response_provider_ != nullptr) &&
-          payload.response_provider_->RequiresOutput(name)) {
-        void* buffer;
-        Status status = payload.response_provider_->AllocateOutputBuffer(
-            name, &buffer, expected_byte_size, content_shape);
-        if (status.IsOk()) {
-          memcpy(buffer, content + content_offset, expected_byte_size);
+      size_t element_idx = 0;
+      for (auto& payload : *payloads) {
+        const InferRequestHeader& request_header =
+            payload.request_provider_->RequestHeader();
+        const size_t expected_element_cnt =
+            request_header.batch_size() * batch1_element_cnt;
+
+        // If 'payload' requested this output then copy it from
+        // 'content'. If it did not request this output then just
+        // skip it in the 'content'.
+        if ((payload.response_provider_ != nullptr) &&
+            payload.response_provider_->RequiresOutput(name)) {
+          // Calculate expected byte size in advance using string offsets
+          const size_t data_byte_size = offsets[element_idx + expected_element_cnt] - offsets[element_idx];
+          const size_t expected_byte_size = data_byte_size + sizeof(uint32_t) * expected_element_cnt;
+
+          void* buffer;
+          Status status = payload.response_provider_->AllocateOutputBuffer(
+              name, &buffer, expected_byte_size, content_shape);
+          if (status.IsOk()) {
+            size_t copied_byte_size = 0;
+            for (size_t e = 0; e < expected_element_cnt; ++e) {
+              const uint32_t len = offsets[element_idx + e + 1] - offsets[element_idx + e];
+              memcpy(static_cast<char*>(buffer) + copied_byte_size, static_cast<const void*>(&len), sizeof(uint32_t));
+              copied_byte_size += sizeof(uint32_t);
+
+              memcpy(static_cast<char*>(buffer) + copied_byte_size, res + offsets[element_idx + e], len);
+              copied_byte_size += len;
+            }
+          } else {
+            payload.status_ = status;
+          }
         }
 
-        if (!status.IsOk()) {
-          payload.status_ = status;
-        }
+        element_idx += expected_element_cnt;
       }
+    } else {
+      // Getting output content
+      char* content = nullptr;
 
-      content_offset += expected_byte_size;
+      RETURN_IF_ORT_ERROR(
+          OrtGetTensorMutableData(output_tensor, (void**)&content));
+
+      size_t content_offset = 0;
+
+      for (auto& payload : *payloads) {
+        const InferRequestHeader& request_header =
+            payload.request_provider_->RequestHeader();
+        const size_t expected_byte_size =
+            request_header.batch_size() * batch1_byte_size;
+
+        // If 'payload' requested this output then copy it from
+        // 'content'. If it did not request this output then just
+        // skip it in the 'content'.
+        if ((payload.response_provider_ != nullptr) &&
+            payload.response_provider_->RequiresOutput(name)) {
+          void* buffer;
+          Status status = payload.response_provider_->AllocateOutputBuffer(
+              name, &buffer, expected_byte_size, content_shape);
+          if (status.IsOk()) {
+            memcpy(buffer, content + content_offset, expected_byte_size);
+          } else {
+            payload.status_ = status;
+          }
+        }
+
+        content_offset += expected_byte_size;
+      }
     }
   }
   return Status::Success;
