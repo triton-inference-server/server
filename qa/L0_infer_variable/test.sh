@@ -57,11 +57,23 @@ for TARGET in cpu gpu; do
     done
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
+    # Onnx models are handled separately, see below
     for FW in graphdef savedmodel netdef custom; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
     done
+
+    # Handle Onnx models separately as instance group has been defined
+    # in the generated models
+    if [ $KIND == "KIND_CPU" ]; then
+        for FW in onnx; do
+            for MC in `ls models/${FW}*/config.pbtxt`; do
+                sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" $MC
+                sed -i "s/gpus: \[ 0 \]//" $MC
+            done
+        done
+    fi
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then

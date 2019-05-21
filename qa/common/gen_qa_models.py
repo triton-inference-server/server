@@ -684,6 +684,10 @@ def create_onnx_modelfile(
     onnx_output0_dtype = np_to_onnx_dtype(output0_dtype)
     onnx_output1_dtype = np_to_onnx_dtype(output1_dtype)
 
+    onnx_input_shape, idx = tu.shape_to_onnx_shape(input_shape, 0)
+    onnx_output0_shape, idx = tu.shape_to_onnx_shape(output0_shape, idx)
+    onnx_output1_shape, idx = tu.shape_to_onnx_shape(output1_shape, idx)
+
     # Create the model
     model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    input_dtype, output0_dtype, output1_dtype)
@@ -691,11 +695,11 @@ def create_onnx_modelfile(
 
     batch_dim = [] if max_batch == 0 else [max_batch]
 
-    in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + list(input_shape))
-    in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + list(input_shape))
+    in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + onnx_input_shape)
+    in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + onnx_input_shape)
 
-    out0 = onnx.helper.make_tensor_value_info("OUTPUT0", onnx_output0_dtype, batch_dim + list(output0_shape))
-    out1 = onnx.helper.make_tensor_value_info("OUTPUT1", onnx_output1_dtype, batch_dim + list(output1_shape))
+    out0 = onnx.helper.make_tensor_value_info("OUTPUT0", onnx_output0_dtype, batch_dim + onnx_output0_shape)
+    out1 = onnx.helper.make_tensor_value_info("OUTPUT1", onnx_output1_dtype, batch_dim + onnx_output1_shape)
 
     internal_in0 = onnx.helper.make_node("Identity", ["INPUT0"], ["_INPUT0"])
     internal_in1 = onnx.helper.make_node("Identity", ["INPUT1"], ["_INPUT1"])
@@ -750,6 +754,7 @@ def create_onnx_modelconfig(
     
     # Must make sure all Onnx models will be loaded to the same GPU if they are
     # run on GPU. This is due to the current limitation of Onnx Runtime
+    # https://github.com/microsoft/onnxruntime/issues/1034
     instance_group_string = '''
 instance_group [
   {
