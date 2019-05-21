@@ -79,6 +79,7 @@ for TARGET in cpu gpu; do
     cp -r ../ensemble_models/* models/.
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
+    # Onnx models are handled separately, see below
     for FW in graphdef savedmodel netdef custom; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC

@@ -120,6 +120,31 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
+    return None
+
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
 
@@ -320,6 +345,86 @@ def create_ensemble_modelconfig(
         [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt, [shape] * io_cnt)
 
 
+def create_onnx_modelfile(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    onnx_dtype = np_to_onnx_dtype(dtype)
+
+    # Create the model
+    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   io_cnt, dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    batch_dim = [] if max_batch == 0 else [max_batch]
+
+    onnx_nodes = []
+    onnx_inputs = []
+    onnx_outputs = []
+    idx = 0
+    for io_num in range(io_cnt):
+        # Repeat so that the variable dimension name is different
+        in_shape, idx = tu.shape_to_onnx_shape(shape, idx)
+        out_shape, idx = tu.shape_to_onnx_shape(shape, idx)
+        in_name = "INPUT{}".format(io_num)
+        out_name = "OUTPUT{}".format(io_num)
+
+        onnx_inputs.append(onnx.helper.make_tensor_value_info(in_name, onnx_dtype, batch_dim + in_shape))
+        onnx_outputs.append(onnx.helper.make_tensor_value_info(out_name, onnx_dtype, batch_dim + out_shape))
+        onnx_nodes.append(onnx.helper.make_node("Identity", [in_name], [out_name]))
+
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
+    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS")
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    onnx.save(model_def, model_version_dir + "/model.onnx")
+
+
+def create_onnx_modelconfig(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
+                                   io_cnt, dtype)
+    config_dir = models_dir + "/" + model_name
+    
+    # Must make sure all Onnx models will be loaded to the same GPU if they are
+    # run on GPU. This is due to the current limitation of Onnx Runtime
+    # https://github.com/microsoft/onnxruntime/issues/1034
+    instance_group_string = '''
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+'''
+    
+    config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
+            emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
+            emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
+            emu.repeat(None, io_cnt), force_tensor_number_suffix=True,
+            instance_group_str=instance_group_string)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
@@ -344,6 +449,13 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_netdef_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
             create_netdef_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
+    if FLAGS.onnx:
+        create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_onnx_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        if no_batch:
+            create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
         create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
@@ -363,6 +475,8 @@ if __name__ == '__main__':
                         help='Generate SavedModel models')
     parser.add_argument('--netdef', required=False, action='store_true',
                         help='Generate NetDef models')
+    parser.add_argument('--onnx', required=False, action='store_true',
+                        help='Generate Onnx Runtime Onnx models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -373,6 +487,8 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io, graph_util
+    if FLAGS.onnx:
+        import onnx
 
     import test_util as tu
 

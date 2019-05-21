@@ -75,6 +75,15 @@ class InferReshapeTest(unittest.TestCase):
             if no_batch:
                 iu.infer_zero(self, 'custom_nobatch', 1, dtype, input_shapes, output_shapes)
 
+        if tu.validate_for_onnx_model(dtype, dtype, dtype,
+                                    input_shapes[0], input_shapes[0], input_shapes[0]):
+            # model that supports batching
+            for bs in (1, 8):
+                iu.infer_zero(self, 'onnx', bs, dtype, input_shapes, output_shapes)
+            # model that does not support batching
+            if no_batch:
+                iu.infer_zero(self, 'onnx_nobatch', 1, dtype, input_shapes, output_shapes)
+
         for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
             if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
                                         input_shapes[0], input_shapes[0], input_shapes[0]):

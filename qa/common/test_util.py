@@ -45,6 +45,21 @@ def shape_is_fixed(shape):
 def shape_to_tf_shape(shape):
     return [None if i == -1 else i for i in shape]
 
+def shape_to_onnx_shape(shape, idx=0, increment_index=True):
+    # Onnx use string for variable size dimension, and the same string
+    # will be inferred to have same value for the model run.
+    # So there is an extra "idx" parameter to make sure the string is
+    # unique
+    res = []
+    for dim in shape:
+        if dim == -1:
+            res.append("var_" + str(idx))
+            if increment_index:
+                idx += 1
+        else:
+            res.append(dim)
+    return res, idx
+
 def shape_to_dims_str(shape):
     return ','.join(str(i) for i in shape)
 
@@ -165,6 +180,19 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
     if (not shape_is_fixed(input_shape) or
         not shape_is_fixed(output0_shape) or
         not shape_is_fixed(output1_shape)):
+        return False
+
+    return True
+
+def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
+                           input_shape, output0_shape, output1_shape):
+    """Return True if input and output dtypes are supported by a Onnx model."""
+
+    # [TODO] Examine if Onnx can support the following data type and tensor
+    # shape, refine the following checking if necessary
+
+    # STRING data type is not supported currently
+    if (input_dtype == np.object) or (output0_dtype == np.object) or (output1_dtype == np.object):
         return False
 
     return True
