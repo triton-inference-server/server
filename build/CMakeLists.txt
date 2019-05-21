@@ -32,11 +32,11 @@ option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" ON)
 option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON)
 option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
-option(TRTIS_NODEPENDS "Don't build required dependencies for TRTIS targets" OFF)
 
 set(TRTIS_EXTRA_INCLUDE_PATHS "" CACHE PATH "Extra include paths for TRTIS build")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
+option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 
 include(ExternalProject)
 
@@ -193,20 +193,14 @@ else()
   set(TRTIS_TEST_UTILS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-if (${TRTIS_NODEPENDS})
-  set(TRTIS_TEST_UTILS_DEPENDS "")
-else()
-  set(TRTIS_TEST_UTILS_DEPENDS "")
-endif()
-
 ExternalProject_Add(trtis-test-utils
   PREFIX trtis-test-utils
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-test-utils"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils"
+  BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_TEST_UTILS_INSTALL_PREFIX}
-  DEPENDS ${TRTIS_TEST_UTILS_DEPENDS}
 )
 
 #
@@ -218,16 +212,11 @@ else()
   set(TRTIS_CUSTOM_BACKENDS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-if (${TRTIS_NODEPENDS})
-  set(TRTIS_CUSTOM_BACKENDS_DEPENDS "")
-else()
-  set(TRTIS_CUSTOM_BACKENDS_DEPENDS "")
-endif()
-
 ExternalProject_Add(trtis-custom-backends
   PREFIX trtis-custom-backends
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-custom-backends"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-custom-backends"
+  BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
@@ -236,7 +225,6 @@ ExternalProject_Add(trtis-custom-backends
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CUSTOM_BACKENDS_INSTALL_PREFIX}
-  DEPENDS ${TRTIS_CUSTOM_BACKENDS_DEPENDS}
 )
 
 #
@@ -248,16 +236,11 @@ else()
   set(TRTIS_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-if (${TRTIS_NODEPENDS})
-  set(TRTIS_CLIENTS_DEPENDS "")
-else()
-  set(TRTIS_CLIENTS_DEPENDS protobuf grpc)
-endif()
-
 ExternalProject_Add(trtis-clients
   PREFIX trtis-clients
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-clients"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-clients"
+  BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
@@ -266,7 +249,7 @@ ExternalProject_Add(trtis-clients
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DTRTIS_ENABLE_METRICS:BOOL=OFF
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
-  DEPENDS ${TRTIS_CLIENTS_DEPENDS}
+  DEPENDS protobuf grpc
 )
 
 #
@@ -278,19 +261,16 @@ else()
   set(TRTIS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-if (${TRTIS_NODEPENDS})
-  set(TRTIS_DEPENDS "")
-else()
-  set(TRTIS_DEPENDS protobuf grpc libevent libevhtp)
-  if(${TRTIS_ENABLE_METRICS})
-    set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
-  endif() # TRTIS_ENABLE_METRICS
-endif()
+set(TRTIS_DEPENDS protobuf grpc libevent libevhtp)
+if(${TRTIS_ENABLE_METRICS})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
+endif() # TRTIS_ENABLE_METRICS
 
 ExternalProject_Add(trtis
   PREFIX trtis
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis"
+  BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
@@ -302,6 +282,7 @@ ExternalProject_Add(trtis
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -DTRTIS_EXTRA_INCLUDE_PATHS:PATH=${TRTIS_EXTRA_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
+    -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
@@ -312,4 +293,3 @@ ExternalProject_Add(trtis
 )
 
 unset(CMAKE_INSTALL_PREFIX CACHE)
-unset(TRTIS_NODEPENDS CACHE)

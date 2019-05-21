@@ -37,6 +37,14 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if(${TRTIS_ENABLE_ASAN})
+  set(CMAKE_BUILD_TYPE Debug)
+
+  set(_ASAN_FLAGS "-static-libstdc++ -static-libasan -fno-omit-frame-pointer -fsanitize=address")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${_ASAN_FLAGS}")
+  set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${_ASAN_FLAGS}")
+endif() # TRTIS_ENABLE_ASAN
+
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
 endif() # TRTIS_ENABLE_METRICS
