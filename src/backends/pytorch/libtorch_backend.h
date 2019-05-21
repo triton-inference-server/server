@@ -81,6 +81,7 @@ class LibTorchBackend : public InferenceBackend {
     ~Context();
 
     DISALLOW_COPY_AND_ASSIGN(Context);
+    DISALLOW_MOVE(Context);
 
     Status ValidateInputs(
         const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);

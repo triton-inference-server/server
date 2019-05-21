@@ -201,6 +201,7 @@ LibTorchBackend::CreateExecutionContext(
   } else {
     context->device_ = torch::Device(torch::kCUDA, gpu_device);
   }
+
   try {
     // lp_itr->second is the torch model path
     context->torch_model_ = torch::jit::load(lp_itr->second, context->device_);
@@ -445,10 +446,8 @@ LibTorchBackend::Context::GetOutputTensor(
     const DataType dtype, char** content, size_t* byte_size,
     std::vector<int64_t>* content_shape)
 {
-  torch::DeviceType output_device = torch::kCPU;
 
   try {
-    (*outputs_)[op_index] = (*outputs_)[op_index].to(output_device);
     torch::Tensor output_flat = (*outputs_)[op_index].flatten();
     *byte_size = output_flat.nbytes();
     *content = new char[*byte_size];
