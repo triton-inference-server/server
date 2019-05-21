@@ -29,11 +29,24 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libaddsub.so
 #
-cuda_add_library(
-  addsub SHARED
-  addsub.cu kernel.cu kernel.h
-  $<TARGET_OBJECTS:proto-library>
-)
+if(${TRTIS_ENABLE_GPU})
+  cuda_add_library(
+    addsub SHARED
+    addsub.cu kernel.cu kernel.h
+    $<TARGET_OBJECTS:proto-library>
+  )
+else()
+  set_source_files_properties(addsub.cu PROPERTIES LANGUAGE CXX)
+  set_source_files_properties(addsub.cu PROPERTIES COMPILE_FLAGS -xc++)
+  add_library(
+    addsub SHARED
+    addsub.cu
+    $<TARGET_OBJECTS:proto-library>
+  )
+  set_target_properties(addsub PROPERTIES LINKER_LANGUAGE CXX)
+endif() # TRTIS_ENABLE_GPU
+
+
 install(
   TARGETS addsub
   LIBRARY DESTINATION lib

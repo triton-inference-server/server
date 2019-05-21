@@ -63,4 +63,6 @@ add_library(
   ${TENSORFLOW_SRCS} ${TENSORFLOW_HDRS}
 )
 add_dependencies(tensorflow-backend-library proto-library)
-target_include_directories(tensorflow-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(tensorflow-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU

@@ -24,13 +24,16 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <cuda.h>
 #include <string>
 #include "src/backends/custom/custom.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda.h>
 #include "src/core/model_config_cuda.h"
 #include "src/custom/addsub/kernel.h"
+#endif  // TRTIS_ENABLE_GPU
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -88,20 +91,22 @@ class Context {
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
+#ifdef TRTIS_ENABLE_GPU
   int FreeCudaBuffers();
   int AllocateCudaBuffers(size_t byte_size);
+
+  int GetInputTensorGPU(
+      CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
+      const size_t expected_byte_size, uint8_t* input);
+  int ExecuteGPU(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+#endif  // TRTIS_ENABLE_GPU
 
   int GetInputTensorCPU(
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
       const size_t expected_byte_size, std::vector<uint8_t>* input);
-  int GetInputTensorGPU(
-      CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
-      const size_t expected_byte_size, uint8_t* input);
-
   int ExecuteCPU(
-      const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
-  int ExecuteGPU(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
@@ -119,6 +124,7 @@ class Context {
   // INT32 or FP32.
   DataType datatype_;
 
+#ifdef TRTIS_ENABLE_GPU
   // CUDA memory buffers for input and output tensors.
   size_t cuda_buffer_byte_size_;
   uint8_t* cuda_input0_;
@@ -128,20 +134,25 @@ class Context {
   // The contexts executing on a GPU, the CUDA stream to use for the
   // execution.
   cudaStream_t stream_;
+#endif  // TRTIS_ENABLE_GPU
 };
 
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
     : instance_name_(instance_name), model_config_(model_config),
-      gpu_device_(gpu_device), datatype_(DataType::TYPE_INVALID),
+      gpu_device_(gpu_device), datatype_(DataType::TYPE_INVALID)
+#ifdef TRTIS_ENABLE_GPU
+      ,
       cuda_buffer_byte_size_(0), cuda_input0_(nullptr), cuda_input1_(nullptr),
       cuda_output_(nullptr), stream_(nullptr)
+#endif  // TRTIS_ENABLE_GPU
 {
 }
 
 Context::~Context()
 {
+#ifdef TRTIS_ENABLE_GPU
   FreeCudaBuffers();
 
   if (stream_ != nullptr) {
@@ -152,8 +163,10 @@ Context::~Context()
     }
     stream_ = nullptr;
   }
+#endif  // TRTIS_ENABLE_GPU
 }
 
+#ifdef TRTIS_ENABLE_GPU
 int
 Context::FreeCudaBuffers()
 {
@@ -215,6 +228,7 @@ Context::AllocateCudaBuffers(size_t byte_size)
   cuda_buffer_byte_size_ = byte_size;
   return kSuccess;
 }
+#endif  // TRTIS_ENABLE_GPU
 
 int
 Context::Init()
@@ -266,6 +280,9 @@ Context::Init()
 
   // Additional initialization if executing on the GPU...
   if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
+#ifndef TRTIS_ENABLE_GPU
+    return kGpuNotSupported;
+#else
     // Very important to set the CUDA device before performing any
     // CUDA API calls. The device is maintained per-CPU-thread, and
     // the same CPU thread will always be used with this instance of
@@ -288,6 +305,7 @@ Context::Init()
                 << cudaGetErrorString(cuerr);
       return kCudaStream;
     }
+#endif  // !TRTIS_ENABLE_GPU
   }
 
   return kSuccess;
@@ -494,6 +512,7 @@ Context::ExecuteCPU(
   return kSuccess;
 }
 
+#ifdef TRTIS_ENABLE_GPU
 int
 Context::GetInputTensorGPU(
     CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
@@ -711,6 +730,7 @@ Context::ExecuteGPU(
 
   return kSuccess;
 }
+#endif  // TRTIS_ENABLE_GPU
 
 int
 Context::Execute(
@@ -720,7 +740,11 @@ Context::Execute(
   if (gpu_device_ == CUSTOM_NO_GPU_DEVICE) {
     return ExecuteCPU(payload_cnt, payloads, input_fn, output_fn);
   } else {
+#ifndef TRTIS_ENABLE_GPU
+    return kGpuNotSupported;
+#else
     return ExecuteGPU(payload_cnt, payloads, input_fn, output_fn);
+#endif  // !TRTIS_ENABLE_GPU
   }
 }
 

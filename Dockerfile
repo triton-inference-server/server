@@ -164,6 +164,7 @@ RUN apt-get update && \
             automake \
             build-essential \
             cmake \
+            git \
             libgoogle-glog0v5 \
             libre2-dev \
             libssl-dev \

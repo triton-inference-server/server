@@ -27,9 +27,11 @@
 cmake_minimum_required (VERSION 3.5)
 project (tensorrt-inference-server)
 
+include(CMakeDependentOption)
+include(ExternalProject)
+
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" ON)
-option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON)
 option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
 
@@ -37,8 +39,13 @@ set(TRTIS_EXTRA_INCLUDE_PATHS "" CACHE PATH "Extra include paths for TRTIS build
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
+option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
 
-include(ExternalProject)
+cmake_dependent_option(
+  TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON
+  "TRTIS_ENABLE_GPU" OFF)
+
+message(STATUS "tensorrt ${TRTIS_ENABLE_TENSORRT}")
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
@@ -199,6 +206,7 @@ ExternalProject_Add(trtis-test-utils
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-test-utils"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
+    -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_TEST_UTILS_INSTALL_PREFIX}
 )
@@ -223,6 +231,7 @@ ExternalProject_Add(trtis-custom-backends
     -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CUSTOM_BACKENDS_INSTALL_PREFIX}
 )
@@ -283,6 +292,7 @@ ExternalProject_Add(trtis
     -DTRTIS_EXTRA_INCLUDE_PATHS:PATH=${TRTIS_EXTRA_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
     -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
+    -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}

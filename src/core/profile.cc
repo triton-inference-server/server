@@ -26,14 +26,17 @@
 
 #include "src/core/profile.h"
 
+#ifdef TRTIS_ENABLE_GPU
 #include <cuda_profiler_api.h>
 #include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
 Status
 ProfileStartAll()
 {
+#ifdef TRTIS_ENABLE_GPU
   int dcnt;
   cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
   if (cuerr == cudaErrorNoDevice) {
@@ -62,6 +65,7 @@ ProfileStartAll()
               std::string(cudaGetErrorString(cuerr)));
     }
   }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }
@@ -69,6 +73,7 @@ ProfileStartAll()
 Status
 ProfileStopAll()
 {
+#ifdef TRTIS_ENABLE_GPU
   int dcnt;
   cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
   if (cuerr == cudaErrorNoDevice) {
@@ -97,6 +102,7 @@ ProfileStopAll()
               std::string(cudaGetErrorString(cuerr)));
     }
   }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }

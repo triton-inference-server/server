@@ -92,12 +92,14 @@ add_library(
 )
 add_dependencies(model-config-library proto-library)
 
-add_library(
-  model-config-cuda-library EXCLUDE_FROM_ALL OBJECT
-  model_config_cuda.cc model_config_cuda.h
-)
-target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
-add_dependencies(model-config-cuda-library proto-library)
+if(${TRTIS_ENABLE_GPU})
+  add_library(
+    model-config-cuda-library EXCLUDE_FROM_ALL OBJECT
+    model_config_cuda.cc model_config_cuda.h
+  )
+  target_include_directories(model-config-cuda-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  add_dependencies(model-config-cuda-library proto-library)
+endif() # TRTIS_ENABLE_GPU
 
 #
 # Common request interface used by both clients and server.
@@ -174,10 +176,13 @@ add_library(
   ${SERVER_SRCS} ${SERVER_HDRS}
 )
 add_dependencies(server-library request-library proto-library)
-target_include_directories(
-  server-library
-  PRIVATE ${CUDA_INCLUDE_DIRS}
-)
+
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(
+    server-library
+    PRIVATE ${CUDA_INCLUDE_DIRS}
+  )
+endif() # TRTIS_ENABLE_GPU
 
 if(${TRTIS_ENABLE_METRICS})
   target_include_directories(
