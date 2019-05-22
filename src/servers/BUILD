@@ -84,6 +84,7 @@ cc_binary(
         "@extern_lib//:libmkl_rt",
         "@extern_lib//:libmkl_vml_def",
         "@extern_lib//:libonnxruntime",
+        "@extern_lib//:libtorch",
         "@prometheus//pull:pull",
     ],
     linkopts = [
