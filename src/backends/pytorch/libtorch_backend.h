@@ -59,7 +59,7 @@ class LibTorchBackend : public InferenceBackend {
   // Run model on the context associated with 'runner_idx' to
   // execute for one or more requests.
   void Run(
-      int runner_idx, std::vector<Scheduler::Payload>* payloads,
+      uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
  private:
