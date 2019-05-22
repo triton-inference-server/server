@@ -112,7 +112,7 @@ export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
-python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --variable --models_dir=$VARDESTDIR
+python3 $SRCDIR/gen_qa_models.py --onnx --netdef --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_zero_models.py --onnx --netdef --libtorch --models_dir=$ZERODESTDIR
 chown -R $(id -u):$(id -g) $ZERODESTDIR

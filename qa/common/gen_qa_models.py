@@ -1055,16 +1055,7 @@ def create_models(
             models_dir, 8, model_version,
             input_shape, output0_shape, output1_shape,
             input_dtype, output0_dtype, output1_dtype)
-        # max-batch 0
-        create_libtorch_modelconfig(
-            models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype,
-            output0_label_cnt, version_policy)
-        create_libtorch_modelfile(
-            models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
-            input_dtype, output0_dtype, output1_dtype)
+        # max-batch 0 not supported
 
     if FLAGS.ensemble:
         for pair in emu.platform_types_and_validation():

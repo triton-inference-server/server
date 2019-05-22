@@ -822,11 +822,7 @@ def create_models(models_dir, dtype, input_shapes, input_model_shapes,
                                   input_shapes, input_model_shapes, output_shapes, output_model_shapes)
         create_libtorch_modelfile(models_dir, model_version, 8, dtype,
                                 input_model_shapes, output_model_shapes)
-        if no_batch:
-            create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
-                                      input_shapes, input_model_shapes, output_shapes, output_model_shapes)
-            create_libtorch_modelfile(models_dir, model_version, 0, dtype,
-                                    input_model_shapes, output_model_shapes)
+        # max-batch 0 not supported
 
     # Shouldn't create ensembles that reshape to zero-sized tensors. Reshaping
     # from / to zero dimension is not allow as ensemble inputs / outputs
