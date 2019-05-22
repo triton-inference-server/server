@@ -418,13 +418,24 @@ OnnxBackend::Context::SetInputTensor(
 
     expected_element_cnts.push_back(
         request_header.batch_size() * batch1_element_cnt);
-    for (const auto& in : request_header.input()) {
-      if (in.name() == name) {
-        // The provider has already checked that batch_byte_size is set
-        expected_byte_sizes.push_back(in.batch_byte_size());
-        total_byte_size += in.batch_byte_size();
+
+    if (data_type == TYPE_STRING) {
+      // For String data byte, obtain expected byte size from 'batch_byte_size'
+      // The provider has already checked that batch_byte_size is set
+      for (const auto& in : request_header.input()) {
+        if (in.name() == name) {
+          expected_byte_sizes.push_back(in.batch_byte_size());
+          break;
+        }
       }
+    } else {
+      // Otherwise calculate expected byte size from 'expected_element_cnts',
+      // so that the byte size for override input (not provided in request
+      // header's input field) can also be set correctly.
+      expected_byte_sizes.push_back(
+          expected_element_cnts.back() * GetDataTypeByteSize(data_type));
     }
+    total_byte_size += expected_byte_sizes.back();
   }
 
   // Reserve one more byte at the end of input_buffer to ensure last element
