@@ -514,14 +514,14 @@ sequence_batching {{
 }}
 input [
   {{
-    name: "INPUT"
+    name: "INPUT__0"
     data_type: {}
     dims: [ {} ]
   }}
 ]
 output [
   {{
-    name: "OUTPUT"
+    name: "OUTPUT__0"
     data_type: {}
     dims: [ 1, 1, 1 ]
   }}

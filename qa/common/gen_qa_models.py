@@ -877,25 +877,25 @@ max_batch_size: {}
 version_policy: {}
 input [
   {{
-    name: "INPUT0"
+    name: "INPUT__0"
     data_type: {}
     dims: [ {} ]
   }},
   {{
-    name: "INPUT1"
+    name: "INPUT__1"
     data_type: {}
     dims: [ {} ]
   }}
 ]
 output [
   {{
-    name: "OUTPUT0"
+    name: "OUTPUT__0"
     data_type: {}
     dims: [ {} ]
     label_filename: "output0_labels.txt"
   }},
   {{
-    name: "OUTPUT1"
+    name: "OUTPUT__1"
     data_type: {}
     dims: [ {} ]
   }}
