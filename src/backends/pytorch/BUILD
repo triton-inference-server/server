@@ -31,40 +31,14 @@ package(
 load("@protobuf_archive//:protobuf.bzl", "cc_proto_library")
 
 cc_proto_library(
-    name = "netdef_backend_proto",
-    srcs = ["netdef_backend.proto"],
+    name = "libtorch_backend_proto",
+    srcs = ["libtorch_backend.proto"],
 )
 
 cc_library(
-    name = "autofill_header",
-    hdrs = ["autofill.h"],
-    deps = [
-    ],
-)
-
-cc_library(
-    name = "autofill",
-    srcs = ["autofill.cc"],
-    deps = [
-        ":autofill_header",
-        "//src/core:constants",
-        "//src/core:server_header",
-        "@org_tensorflow//tensorflow/core:lib",
-    ],
-)
-
-# netdef_backend_c2 is copied into and built along with Caffe2 to
-# ensure that it uses the same protobuf as Caffe2.
-cc_library(
-    name = "netdef_backend",
-    srcs = [
-         "netdef_backend.cc",
-#        "netdef_backend_c2.cc" - see comment above
-    ],
-    hdrs = [
-         "netdef_backend.h",
-         "netdef_backend_c2.h"
-    ],
+    name = "libtorch_backend",
+    srcs = ["libtorch_backend.cc"],
+    hdrs = ["libtorch_backend.h"],
     deps = [
         "//src/core:constants",
         "//src/core:model_config_proto",
@@ -75,49 +49,16 @@ cc_library(
 )
 
 cc_library(
-    name = "netdef_backend_factory",
-    srcs = ["netdef_backend_factory.cc"],
-    hdrs = ["netdef_backend_factory.h"],
+    name = "libtorch_backend_factory",
+    srcs = ["libtorch_backend_factory.cc"],
+    hdrs = ["libtorch_backend_factory.h"],
     deps = [
-        ":netdef_backend",
-        ":netdef_backend_proto",
+        ":libtorch_backend",
+        ":libtorch_backend_proto",
         "//src/core:constants",
         "//src/core:model_config",
         "//src/core:model_config_proto",
         "//src/core:server_header",
-        "@org_tensorflow//tensorflow/core:lib",
     ],
     alwayslink = 1,
-)
-
-filegroup(
-    name = "caffe2_testdata",
-    srcs = glob(
-        ["testdata/**/*"]),
-)
-
-cc_test(
-    name = "netdef_backend_test",
-    srcs = ["netdef_backend_test.cc"],
-    linkopts = [
-        "-L/opt/tensorrtserver/lib",
-        "-lcaffe2_gpu",
-        "-lcaffe2",
-        "-lonnxruntime",
-        "-ltorch",
-        "-lnvinfer",
-        "-L/usr/local/cuda/lib64/stubs",
-        "-lnvidia-ml",
-        "-lnvonnxparser_runtime",
-    ],
-    data = [
-        ":caffe2_testdata"
-    ],
-    deps = [
-        "//src/test:model_config_test_base",
-        "//src/core:server",
-        "//src/test:testmain",
-        "@local_config_cuda//cuda:cudart",
-    ],
-    tags = ["exclusive"],
 )

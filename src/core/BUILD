@@ -256,6 +256,7 @@ cc_library(
         "//src/backends/custom:custom_backend_factory",
         "//src/backends/ensemble:ensemble_backend_factory",
         "//src/backends/onnx:onnx_backend_factory",
+        "//src/backends/pytorch:libtorch_backend_factory",
         "@com_github_libevent_libevent//:libevent",
         "@com_google_absl//absl/strings",
         "@local_config_cuda//cuda:cuda_headers",
