@@ -403,7 +403,6 @@ def create_onnx_modelconfig(
     instance_group_string = '''
 instance_group [
   {
-    count: 1
     kind: KIND_GPU
     gpus: [ 0 ]
   }
