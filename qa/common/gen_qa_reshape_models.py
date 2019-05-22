@@ -534,23 +534,30 @@ def create_libtorch_modelfile(
         class ReshapeNet(nn.Module):
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
-                self.shape = args
+                self.shape = args[0]
             def forward(self, input0):
                 return input0.view(self.shape[0])
     elif io_cnt == 2:
         class ReshapeNet(nn.Module):
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
-                self.shape = args
+                self.shape = args[0]
             def forward(self, input0, input1):
                 return input0.view(self.shape[0]), input1.view(self.shape[1])
     elif io_cnt == 3:
         class ReshapeNet(nn.Module):
             def __init__(self, *args):
                 super(ReshapeNet, self).__init__()
-                self.shape = args
+                self.shape = args[0]
             def forward(self, input0, input1, input2):
                 return input0.view(self.shape[0]), input1.view(self.shape[1]), input2.view(self.shape[2])
+    elif io_cnt == 4:
+        class ReshapeNet(nn.Module):
+            def __init__(self, *args):
+                super(ReshapeNet, self).__init__()
+                self.shape = args[0]
+            def forward(self, input0, input1, input2, input3):
+                return input0.view(self.shape[0])), input1.view(self.shape[1])), input2.view(self.shape[2])
 
     reshapeModel = ReshapeNet([op_shape for op_shape in output_shapes])
     example_inputs = [torch.zeros(input_shapes[i], dtype=torch_dtype) for i in range(io_cnt)]
@@ -584,7 +591,7 @@ def create_libtorch_modelconfig(
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
-platform: "tensorrt_plan"
+platform: "pytorch_libtorch"
 max_batch_size: {}
 '''.format(model_name, max_batch)
 
