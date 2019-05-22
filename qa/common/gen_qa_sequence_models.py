@@ -517,6 +517,16 @@ input [
     name: "INPUT__0"
     data_type: {}
     dims: [ {} ]
+  }},
+  {{
+    name: "INPUT__1"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "INPUT__2"
+    data_type: {}
+    dims: [ {} ]
   }}
 ]
 output [

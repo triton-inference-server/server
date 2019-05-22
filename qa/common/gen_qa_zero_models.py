@@ -559,9 +559,7 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     if FLAGS.libtorch:
         create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
         create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        if no_batch:
-            create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+        # max-batch 0 not supported
 
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
