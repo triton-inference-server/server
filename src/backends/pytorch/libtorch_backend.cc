@@ -29,7 +29,8 @@
 #include <NvInfer.h>
 #include <core/providers/cuda/cuda_provider_factory.h>
 #include <stdint.h>
-// #include <mutex>
+#include <cuda.h>
+#include <cuda_runtime.h>
 #include <exception>
 #include "cuda/include/cuda_runtime_api.h"
 #include "src/core/constants.h"
@@ -285,7 +286,7 @@ LibTorchBackend::Run(
 
 Status
 LibTorchBackend::Context::SetFixedSizedInputTensor(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index,
     const std::vector<int64_t>& shape, const DataType dtype,
     const size_t batch1_byte_size, const size_t total_byte_size,
     std::vector<Scheduler::Payload>* payloads,
@@ -351,14 +352,14 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
   }
 
   RETURN_IF_ERROR(SetInputTensor(
-      inputs_, name, shape, dtype, static_cast<char*>(buffer),
+      inputs_, name, ip_index, shape, dtype, static_cast<char*>(buffer),
       total_byte_size));
   return Status::Success;
 }
 
 Status
 LibTorchBackend::Context::SetInputTensor(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index,
     const std::vector<int64_t>& shape, const DataType dtype, char* content,
     size_t byte_size)
 {
@@ -380,7 +381,7 @@ LibTorchBackend::Context::SetInputTensor(
             " for inference input '" + name + "', expecting " +
             std::to_string(input_tensor.nbytes()));
   }
-  inputs_->push_back(input_tensor);
+  (*inputs_)[ip_index] = input_tensor;
 
   return Status::Success;
 }
@@ -453,7 +454,13 @@ LibTorchBackend::Context::GetOutputTensor(
     *content = new char[*byte_size];
 
     // Copy output into buffer
-    std::memcpy(*content, output_flat.data_ptr(), output_flat.nbytes());
+    if (output_flat.device() == torch::kCPU) {
+      std::memcpy(*content, output_flat.data_ptr(), output_flat.nbytes());
+    }
+    else {
+      cudaMemcpy(*content, output_flat.data_ptr(), output_flat.nbytes(), cudaMemcpyDeviceToHost);
+    }
+
     //  Set content shape
     auto shape = (*outputs_)[op_index].sizes();
     for (auto itr = shape.begin(); itr != shape.end(); itr++) {
@@ -469,7 +476,7 @@ LibTorchBackend::Context::GetOutputTensor(
 
 Status
 LibTorchBackend::Context::SetInput(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+    std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index,
     const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
     std::vector<std::unique_ptr<char[]>>* input_buffers)
@@ -497,7 +504,7 @@ LibTorchBackend::Context::SetInput(
   const size_t total_byte_size = total_batch_size * batch1_byte_size;
 
   return SetFixedSizedInputTensor(
-      inputs_, name, shape, datatype, batch1_byte_size, total_byte_size,
+      inputs_, name, ip_index, shape, datatype, batch1_byte_size, total_byte_size,
       payloads, input_buffers);
 }
 
@@ -551,18 +558,23 @@ LibTorchBackend::Context::Run(
   std::vector<std::unique_ptr<char[]>> input_buffers;
 
   // Store input and output tensors
-  std::vector<torch::jit::IValue> inputs_;
+  std::vector<torch::jit::IValue> inputs_(input_request_provider->RequestHeader().input().size());
   std::vector<torch::Tensor> outputs_;
+
+  // Input and output names must be of the form *__<index>
+  std::string deliminator = "__";
 
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
+    std::string index_str = name.substr(name.find(deliminator));
+    int ip_index = std::atoi(index_str.c_str());
 
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
     RETURN_IF_ERROR(SetInput(
-        &inputs_, name, input_config->data_type(), input.dims(),
+        &inputs_, name, ip_index, input_config->data_type(), input.dims(),
         total_batch_size, payloads, &input_buffers));
   }
 
@@ -574,8 +586,11 @@ LibTorchBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
+      std::string index_str = name.substr(name.find(deliminator));
+      int ip_index = std::atoi(index_str.c_str());
+
       RETURN_IF_ERROR(SetInput(
-          &inputs_, name, override->datatype_, override->dims_,
+          &inputs_, name, ip_index, override->datatype_, override->dims_,
           total_batch_size, payloads, &input_buffers));
     }
   }
@@ -585,9 +600,11 @@ LibTorchBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  int output_index = 0;
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
+    std::string index_str = name.substr(name.find(deliminator));
+
+    int op_index = std::atoi(index_str.c_str());
 
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
@@ -596,10 +613,9 @@ LibTorchBackend::Context::Run(
     // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        &outputs_, name, output_index, dtype,
+        &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
         payloads));
-    output_index++;
   }
 
   return Status::Success;
