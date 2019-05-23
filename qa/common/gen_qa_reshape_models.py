@@ -587,7 +587,7 @@ def create_libtorch_modelconfig(
     io_cnt = len(input_shapes)
 
     model_name = tu.get_zero_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -599,7 +599,7 @@ max_batch_size: {}
         config += '''
 input [
   {{
-    name: "INPUT{}"
+    name: "INPUT__{}"
     data_type: {}
     dims: [ {} ]
     {}
@@ -607,7 +607,7 @@ input [
 ]
 output [
   {{
-    name: "OUTPUT{}"
+    name: "OUTPUT__{}"
     data_type: {}
     dims: [ {} ]
     {}
