@@ -127,23 +127,39 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
 
         output_req = {}
-        if "OUTPUT0" in outputs:
+        OUTPUT0 = "OUTPUT0"
+        OUTPUT1 = "OUTPUT1"
+        INPUT0 = "INPUT0"
+        INPUT1 = "INPUT1"
+        if pf == "libtorch" or pf == "libtorch_nobatch":
+            outputs=("OUTPUT__0", "OUTPUT__1")
+            OUTPUT0 = "OUTPUT__0"
+            OUTPUT1 = "OUTPUT__1"
+            INPUT0 = "INPUT__0"
+            INPUT1 = "INPUT__1"
+        if OUTPUT0 in outputs:
             if output0_raw:
-                output_req["OUTPUT0"] = InferContext.ResultFormat.RAW
+                output_req[OUTPUT0] = InferContext.ResultFormat.RAW
             else:
-                output_req["OUTPUT0"] = (InferContext.ResultFormat.CLASS, num_classes)
-        if "OUTPUT1" in outputs:
+                output_req[OUTPUT0] = (InferContext.ResultFormat.CLASS, num_classes)
+        if OUTPUT1 in outputs:
             if output1_raw:
-                output_req["OUTPUT1"] = InferContext.ResultFormat.RAW
+                output_req[OUTPUT1] = InferContext.ResultFormat.RAW
             else:
-                output_req["OUTPUT1"] = (InferContext.ResultFormat.CLASS, num_classes)
+                output_req[OUTPUT1] = (InferContext.ResultFormat.CLASS, num_classes)
+
 
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=correlation_id, streaming=config[2],
                            verbose=True)
-        results = ctx.run(
-            { "INPUT0" : input0_list, "INPUT1" : input1_list },
-            output_req, batch_size)
+        if pf == "libtorch" or pf == "libtorch_nobatch":
+            results = ctx.run(
+                { "INPUT__0" : input0_list, "INPUT__1" : input1_list },
+                output_req, batch_size)
+        else:
+            results = ctx.run(
+                { "INPUT0" : input0_list, "INPUT1" : input1_list },
+                output_req, batch_size)
 
         if not skip_request_id_check:
             global _last_request_id
@@ -159,15 +175,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         tester.assertEqual(len(results), len(outputs))
         for (result_name, result_val) in iteritems(results):
             for b in range(batch_size):
-                if ((result_name == "OUTPUT0" and output0_raw) or
-                    (result_name == "OUTPUT1" and output1_raw)):
-                    if result_name == "OUTPUT0":
+                if ((result_name == OUTPUT0 and output0_raw) or
+                    (result_name == OUTPUT1 and output1_raw)):
+                    if result_name == OUTPUT0:
                         tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
-                                        "{}, OUTPUT0 expected: {}, got {}".format(
+                                        "{}, "+OUTPUT0+" expected: {}, got {}".format(
                                             model_name, expected0_list[b], result_val[b]))
-                    elif result_name == "OUTPUT1":
+                    elif result_name == OUTPUT1:
                         tester.assertTrue(np.array_equal(result_val[b], expected1_list[b]),
-                                        "{}, OUTPUT1 expected: {}, got {}".format(
+                                        "{}, "+OUTPUT1+" expected: {}, got {}".format(
                                             model_name, expected1_list[b], result_val[b]))
                     else:
                         tester.assertTrue(False, "unexpected raw result {}".format(result_name))
@@ -181,7 +197,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     expected1_flatten = expected1_list[b].flatten()
 
                     for idx, ctuple in enumerate(class_list):
-                        if result_name == "OUTPUT0":
+                        if result_name == OUTPUT0:
                             # can't compare indices since could have
                             # different indices with the same
                             # value/prob, so compare that the value of
@@ -192,7 +208,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             tester.assertEqual(ctuple[1], expected0_flatten[expected0_sort_idx[b][idx]])
                             if ctuple[0] == expected0_sort_idx[b][idx]:
                                 tester.assertEqual(ctuple[2], 'label{}'.format(expected0_sort_idx[b][idx]))
-                        elif result_name == "OUTPUT1":
+                        elif result_name == OUTPUT1:
                             tester.assertEqual(ctuple[1], expected1_flatten[ctuple[0]])
                             tester.assertEqual(ctuple[1], expected1_flatten[expected1_sort_idx[b][idx]])
                         else:
@@ -224,8 +240,12 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
         expected_dict = {}
 
         for io_num in range(io_cnt):
-            input_name = "INPUT{}".format(io_num)
-            output_name = "OUTPUT{}".format(io_num)
+            if pf == "libtorch" or pf == "libtorch_nobatch":
+                input_name = "INPUT__{}".format(io_num)
+                output_name = "OUTPUT__{}".format(io_num)
+            else:
+                input_name = "INPUT{}".format(io_num)
+                output_name = "OUTPUT{}".format(io_num)
 
             input_list = list()
             expected_list = list()

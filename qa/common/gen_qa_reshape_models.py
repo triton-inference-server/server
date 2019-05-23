@@ -798,13 +798,6 @@ def create_models(models_dir, dtype, input_shapes, input_model_shapes,
             create_onnx_modelfile(models_dir, model_version, 0, dtype,
                                     input_model_shapes, output_model_shapes)
 
-    if FLAGS.libtorch:
-        create_libtorch_modelconfig(models_dir, model_version, 8, dtype,
-                                  input_shapes, input_model_shapes, output_shapes, output_model_shapes)
-        create_libtorch_modelfile(models_dir, model_version, 8, dtype,
-                                input_model_shapes, output_model_shapes)
-        # max-batch 0 not supported
-
     # Shouldn't create ensembles that reshape to zero-sized tensors. Reshaping
     # from / to zero dimension is not allow as ensemble inputs / outputs
     # are passed from / to other model AS IF direct inference from client.
@@ -846,6 +839,24 @@ def create_trt_models(models_dir, dtype, input_shapes, input_model_shapes,
             create_plan_modelfile(models_dir, model_version, 0, dtype,
                                   input_model_shapes, output_model_shapes)
 
+def create_libtorch_models(models_dir, dtype, input_shapes, input_model_shapes,
+                      output_shapes=None, output_model_shapes=None, no_batch=True):
+    model_version = 1
+    if output_shapes is None:
+        output_shapes = input_shapes
+    if output_model_shapes is None:
+        output_model_shapes = input_model_shapes
+
+    if FLAGS.libtorch:
+        create_libtorch_modelconfig(models_dir, model_version, 8, dtype,
+                                  input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+        create_libtorch_modelfile(models_dir, model_version, 8, dtype,
+                                input_model_shapes, output_model_shapes)
+        if no_batch:
+            create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
+                                      input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+            create_libtorch_modelfile(models_dir, model_version, 0, dtype,
+                                    input_model_shapes, output_model_shapes)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -883,15 +894,23 @@ if __name__ == '__main__':
 
     import test_util as tu
 
-    # TensorRT must be handled separately since it doesn't support
+    # TensorRT and LibTorch must be handled separately since it doesn't support
     # zero-sized tensors.
     create_models(FLAGS.models_dir, np.float32, ([1],), ([],), no_batch=False)
     create_models(FLAGS.models_dir, np.float32, ([1], [8]), ([], [4,1,2]), no_batch=False)
     create_models(FLAGS.models_dir, np.float32, ([4,4], [2], [2,2,3]), ([16], [1,2], [3,2,2]))
+    create_libtorch_models(FLAGS.models_dir, np.float32, ([1],), ([1,1,1],), no_batch=False)
+    create_libtorch_models(FLAGS.models_dir, np.float32, ([1], [8]), ([1,1,1], [4,1,2]), no_batch=False)
+    create_libtorch_models(FLAGS.models_dir, np.float32, ([4,4], [2], [2,2,3]), ([16], [1,2], [3,2,2]))
     create_trt_models(FLAGS.models_dir, np.float32, ([1], [8]), ([1,1,1], [4,1,2]))
 
     # Models that reshape only the input, not the output.
     create_models(FLAGS.models_dir, np.float32,
+                  ([4,4], [2], [2,2,3], [1]), ([16], [1,2], [3,2,2], [1]),
+                  output_shapes=([16], [1,2], [3,2,2], [1]),
+                  output_model_shapes=([16], [1,2], [3,2,2], [1]))
+
+    create_libtorch_models(FLAGS.models_dir, np.float32,
                   ([4,4], [2], [2,2,3], [1]), ([16], [1,2], [3,2,2], [1]),
                   output_shapes=([16], [1,2], [3,2,2], [1]),
                   output_model_shapes=([16], [1,2], [3,2,2], [1]))
