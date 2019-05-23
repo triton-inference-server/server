@@ -45,17 +45,17 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch", "onnx_nobatch")
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef")
+    _trials = ("savedmodel", "graphdef", "netdef", "onnx")
 else:
-    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan")
+    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 res = []
 for trial in _trials:
     res.append(trial)
-    if "custom" in trial:
+    if ("custom" in trial) or ("onnx" in trial):
         continue
     for ensemble_prefix in ENSEMBLE_PREFIXES:
         res.append(ensemble_prefix + trial)
@@ -86,7 +86,8 @@ class SequenceBatcherTest(unittest.TestCase):
         global _check_exception
 
         if (("savedmodel" in trial) or ("graphdef" in trial) or
-            ("netdef" in trial) or ("custom" in trial)):
+            ("netdef" in trial) or ("custom" in trial) or
+            ("onnx" in trial)):
             tensor_shape = (1,)
         elif "plan" in trial:
             tensor_shape = (1,1,1)
@@ -192,7 +193,8 @@ class SequenceBatcherTest(unittest.TestCase):
         global _check_exception
 
         if (("savedmodel" in trial) or ("graphdef" in trial) or
-            ("netdef" in trial) or ("custom" in trial)):
+            ("netdef" in trial) or ("custom" in trial) or
+            ("onnx" in trial)):
             tensor_shape = (1,)
         elif "plan" in trial:
             tensor_shape = (1,1,1)
@@ -328,7 +330,8 @@ class SequenceBatcherTest(unittest.TestCase):
         # qa/common/gen_qa_sequence_models.py for more
         # information.
         if ((not _no_batching and ("custom" not in trial)) or
-            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial)):
+            ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
+            ("onnx" in trial)):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
