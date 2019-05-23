@@ -120,6 +120,31 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
+    return None
+
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, max_batch, dtype, shape):
 
@@ -496,6 +521,132 @@ instance_group [
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
+def create_onnx_modelfile(
+        models_dir, model_version, max_batch, dtype, shape):
+
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    model_name = tu.get_sequence_model_name(
+        "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    # Create the model. For now don't implement a proper accumulator
+    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
+    # tests know to expect this.
+    onnx_dtype = np_to_onnx_dtype(dtype)
+    onnx_input_shape, idx = tu.shape_to_onnx_shape(shape, 0)
+    onnx_start_shape, idx = tu.shape_to_onnx_shape(shape, idx)
+    onnx_ready_shape, idx = tu.shape_to_onnx_shape(shape, idx)
+    onnx_output_shape, idx = tu.shape_to_onnx_shape(shape, idx)
+
+    # If the input is a string then use int32 for operation and just
+    # cast to/from string for input and output.
+    onnx_control_dtype = onnx_dtype
+    if onnx_dtype == onnx.TensorProto.STRING:
+        onnx_control_dtype = onnx.TensorProto.INT32
+
+    batch_dim = [] if max_batch == 0 else [max_batch]
+
+    onnx_input = onnx.helper.make_tensor_value_info("INPUT", onnx_dtype, batch_dim + onnx_input_shape)
+    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype, batch_dim + onnx_start_shape)
+    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype, batch_dim + onnx_ready_shape)
+    onnx_output = onnx.helper.make_tensor_value_info("OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
+
+    internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
+
+    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
+    # Also casting String data type to int32
+    if ((onnx_dtype == onnx.TensorProto.INT8) or (onnx_dtype == onnx.TensorProto.INT16) or
+        (onnx_dtype == onnx.TensorProto.STRING)):
+        internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"], to=onnx.TensorProto.INT32)
+
+    add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
+    # Take advantage of knowledge that the READY false value is 0 and true is 1
+    mul = onnx.helper.make_node("Mul", ["READY", "add"], ["CAST"])
+    cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
+
+    # Avoid cast from float16 to float16
+    # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
+    if onnx_dtype == onnx.TensorProto.FLOAT16:
+        cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
+
+    onnx_nodes = [internal_input, add, mul, cast]
+    onnx_inputs = [onnx_input, onnx_start, onnx_ready]
+    onnx_outputs = [onnx_output]
+
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs, onnx_outputs)
+    model_def = onnx.helper.make_model(graph_proto, producer_name="TRTIS")
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    onnx.save(model_def, model_version_dir + "/model.onnx")
+
+
+def create_onnx_modelconfig(
+        models_dir, model_version, max_batch, dtype, shape):
+
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    model_name = tu.get_sequence_model_name(
+        "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
+    config_dir = models_dir + "/" + model_name
+
+    # Must make sure all Onnx models will be loaded to the same GPU if they are
+    # run on GPU. This is due to the current limitation of Onnx Runtime
+    # https://github.com/microsoft/onnxruntime/issues/1034
+    instance_group_string = '''
+instance_group [
+  {
+    kind: KIND_GPU
+    gpus: [ 0 ]
+  }
+]
+'''
+    # [TODO] move create_general_modelconfig() out of emu as it is general
+    # enough for all backends to use
+    config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
+            [dtype], [shape], [None], [dtype], [shape], [None], [None],
+            force_tensor_number_suffix=False, instance_group_str=instance_group_string)
+
+    config += '''
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{
+      name: "START"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+}}
+'''.format(type="fp32" if dtype == np.float32 else "int32")
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
 
 def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
@@ -528,6 +679,13 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + [1, 1])
             create_plan_modelfile(models_dir, model_version, 0, dtype, shape + [1, 1])
 
+    if FLAGS.onnx:
+        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_onnx_modelfile(models_dir, model_version, 8, dtype, shape)
+        if no_batch:
+            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
+
     if FLAGS.ensemble:
         for pair in emu.platform_types_and_validation():
             if pair[0] == "plan":
@@ -559,6 +717,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--onnx', required=False, action='store_true',
+                        help='Generate Onnx models')
     parser.add_argument('--variable', required=False, action='store_true',
                         help='Used variable-shape tensors for input/output')
     parser.add_argument('--ensemble', required=False, action='store_true',
@@ -575,6 +735,8 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.tensorrt:
         import tensorrt.legacy as trt
+    if FLAGS.onnx:
+        import onnx
 
     import test_util as tu
 
