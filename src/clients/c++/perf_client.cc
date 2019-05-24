@@ -394,6 +394,15 @@ class ConcurrencyManager {
       std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
       std::shared_ptr<size_t> concurrency);
 
+  /// Function for worker to send async inference requests to a sequence model.
+  /// \param err Returns the status of the worker
+  /// \param stats Returns the statistic of the InferContexts
+  /// \param concurrency The concurrency level that the worker should produce.
+  void AsyncSequenceInfer(
+      std::shared_ptr<nic::Error> err,
+      std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
+      std::shared_ptr<size_t> concurrency);
+
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
@@ -492,9 +501,20 @@ ConcurrencyManager::ChangeConcurrencyLevel(
     threads_contexts_stat_.emplace_back(
         new std::vector<nic::InferContext::Stat>());
     threads_concurrency_.emplace_back(new size_t(0));
-    threads_.emplace_back(
+    // Worker executes different functions to maintian concurrency.
+    // For sequence models, multiple contexts must be created for multiple
+    // concurrent sequences. But for other models, one context can send out
+    // multiple requests at the same time. Prefer to one single context as
+    // every infer context creates a worker thread implicitly.
+    if (on_sequence_model_) {
+      threads_.emplace_back(
+        &ConcurrencyManager::AsyncSequenceInfer, this, threads_status_.back(),
+        threads_contexts_stat_.back(), threads_concurrency_.back());
+    } else {
+      threads_.emplace_back(
         &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
         threads_contexts_stat_.back(), threads_concurrency_.back());
+    }
   }
 
   // Compute the new concurrency level for each thread (take floor)
@@ -644,9 +664,118 @@ ConcurrencyManager::GetAccumulatedContextStat(
   return nic::Error::Success;
 }
 
-// Function for worker threads
+// Function for worker threads, using only one context to maintain
+// concurrency assigned to worker
 void
 ConcurrencyManager::AsyncInfer(
+    std::shared_ptr<nic::Error> err,
+    std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
+    std::shared_ptr<size_t> concurrency)
+{
+  std::vector<uint8_t> input_buf;
+  std::unique_ptr<nic::InferContext::Options> options(nullptr);
+
+  stats->emplace_back();
+  std::unique_ptr<nic::InferContext> ctx;
+  std::map<uint64_t, std::pair<struct timespec, uint32_t>> requests_start_time;
+  size_t inflight_requests = 0;
+
+  // Create the context for inference of the specified model.
+  *err = PrepareInfer(&ctx, &options, input_buf);
+  if (!err->IsOk()) {
+    return;
+  }
+  ctx->SetRunOptions(*options);
+
+  // run inferencing until receiving exit signal to maintain server load.
+  uint32_t flags = 0;
+  do {
+    // Wait if no request should be sent and it is not exiting
+    {
+      std::unique_lock<std::mutex> lock(wake_mutex_);
+      wake_signal_.wait(
+          lock, [concurrency]() { return early_exit || (*concurrency > 0); });
+    }
+
+    // Create the context for inference of the specified model.
+    size_t num_reqs = *concurrency;
+    
+    std::shared_ptr<nic::InferContext::Request> request;
+
+    // Create async requests such that the number of ongoing requests
+    // matches the concurrency level (here is 'num_reqs')
+    while (inflight_requests < num_reqs) {
+      struct timespec start_time;
+      clock_gettime(CLOCK_MONOTONIC, &start_time);
+      *err = ctx->AsyncRun(&request);
+      if (!err->IsOk()) {
+        return;
+      }
+      requests_start_time.emplace(
+          request->Id(), std::make_pair(start_time, flags));
+      inflight_requests++;
+    }
+    
+    // Wait until at least requests is ready
+    bool is_ready;
+    *err = ctx->GetReadyAsyncRequest(&request, &is_ready, true);
+
+    if (!err->IsOk()) {
+      return;
+    } else if (!is_ready) {
+      *err = nic::Error(ni::RequestStatusCode::INTERNAL, "wait flag is set but no ready request is retrieved");
+      return;
+    }
+
+    // Get any request that is completed and
+    // record the end time of the request
+    std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+    while (inflight_requests != 0) {
+      // keep the loop until no more ready requests
+      *err = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
+      if (!err->IsOk()) {
+        return;
+      } else if (!is_ready) {
+        break;
+      }
+
+      *err =
+          ctx->GetAsyncRunResults(&results, &is_ready, request, false);
+
+      struct timespec end_time;
+      clock_gettime(CLOCK_MONOTONIC, &end_time);
+
+      if (!err->IsOk()) {
+        return;
+      }
+
+      auto itr = requests_start_time.find(request->Id());
+      struct timespec start_time = itr->second.first;
+      uint32_t flags = itr->second.second;
+      requests_start_time.erase(itr);
+      inflight_requests--;
+
+      // Add the request timestamp to shared vector with proper locking
+      status_report_mutex_.lock();
+      // Critical section
+      request_timestamps_->emplace_back(
+          std::make_tuple(start_time, end_time, flags));
+      // Update its InferContext statistic to shared Stat pointer
+      ctx->GetStat(&((*stats)[0]));
+      status_report_mutex_.unlock();
+    }
+
+    // Stop inferencing if an early exit has been signaled.
+  } while (!early_exit);
+}
+
+// Function for worker threads, using multiples contexts to maintain
+// (sequence) concurrency assigned to worker
+// [TODO] merge AsyncSequenceInfer() and AsyncInfer() once callback function
+// can be attached to context async run. (Result retrieval becomes unaware of
+// whether using multiple contexts or using one context)
+void
+ConcurrencyManager::AsyncSequenceInfer(
     std::shared_ptr<nic::Error> err,
     std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
     std::shared_ptr<size_t> concurrency)
