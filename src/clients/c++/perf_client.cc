@@ -508,12 +508,12 @@ ConcurrencyManager::ChangeConcurrencyLevel(
     // every infer context creates a worker thread implicitly.
     if (on_sequence_model_) {
       threads_.emplace_back(
-        &ConcurrencyManager::AsyncSequenceInfer, this, threads_status_.back(),
-        threads_contexts_stat_.back(), threads_concurrency_.back());
+          &ConcurrencyManager::AsyncSequenceInfer, this, threads_status_.back(),
+          threads_contexts_stat_.back(), threads_concurrency_.back());
     } else {
       threads_.emplace_back(
-        &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
-        threads_contexts_stat_.back(), threads_concurrency_.back());
+          &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
+          threads_contexts_stat_.back(), threads_concurrency_.back());
     }
   }
 
@@ -697,70 +697,69 @@ ConcurrencyManager::AsyncInfer(
       wake_signal_.wait(
           lock, [concurrency]() { return early_exit || (*concurrency > 0); });
     }
-    
+
     std::shared_ptr<nic::InferContext::Request> request;
 
     // Create async requests such that the number of ongoing requests
     // matches the concurrency level (here is '*concurrency')
-    while (inflight_requests < *concurrency) {
-      struct timespec start_time;
-      clock_gettime(CLOCK_MONOTONIC, &start_time);
-      *err = ctx->AsyncRun(&request);
-      if (!err->IsOk()) {
-        return;
-      }
-      requests_start_time.emplace(
-          request->Id(), std::make_pair(start_time, flags));
-      inflight_requests++;
+    struct timespec start_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    *err = ctx->AsyncRun(&request);
+    if (!err->IsOk()) {
+      return;
     }
-    
-    // Wait until at least one request is ready
+    requests_start_time.emplace(
+        request->Id(), std::make_pair(start_time, flags));
+    inflight_requests++;
+
+    // Try to process any ready request, wait if inflight requests matches
+    // requested concurrency
     bool is_ready;
-    *err = ctx->GetReadyAsyncRequest(&request, &is_ready, true);
+    *err = ctx->GetReadyAsyncRequest(
+        &request, &is_ready, (inflight_requests >= *concurrency));
 
     if (!err->IsOk()) {
       return;
-    } else if (!is_ready) {
-      *err = nic::Error(ni::RequestStatusCode::INTERNAL, "wait flag is set but no ready request is retrieved");
-      return;
     }
 
-    // Get any request that is completed and
-    // record the end time of the request
-    std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-    while (inflight_requests != 0) {
-      // keep the loop until no more ready requests
-      *err = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
-      if (!err->IsOk()) {
-        return;
-      } else if (!is_ready) {
-        break;
+    // If there is at least one ready request, loop until no more ready requests
+    if (is_ready) {
+      // Get any request that is completed and
+      // record the end time of the request
+      std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
+      while (inflight_requests != 0) {
+        // keep the loop until no more ready requests
+        *err = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
+        if (!err->IsOk()) {
+          return;
+        } else if (!is_ready) {
+          break;
+        }
+
+        *err = ctx->GetAsyncRunResults(&results, &is_ready, request, false);
+
+        struct timespec end_time;
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+
+        if (!err->IsOk()) {
+          return;
+        }
+
+        auto itr = requests_start_time.find(request->Id());
+        struct timespec start_time = itr->second.first;
+        uint32_t flags = itr->second.second;
+        requests_start_time.erase(itr);
+        inflight_requests--;
+
+        // Add the request timestamp to shared vector with proper locking
+        status_report_mutex_.lock();
+        // Critical section
+        request_timestamps_->emplace_back(
+            std::make_tuple(start_time, end_time, flags));
+        // Update its InferContext statistic to shared Stat pointer
+        ctx->GetStat(&((*stats)[0]));
+        status_report_mutex_.unlock();
       }
-
-      *err =
-          ctx->GetAsyncRunResults(&results, &is_ready, request, false);
-
-      struct timespec end_time;
-      clock_gettime(CLOCK_MONOTONIC, &end_time);
-
-      if (!err->IsOk()) {
-        return;
-      }
-
-      auto itr = requests_start_time.find(request->Id());
-      struct timespec start_time = itr->second.first;
-      uint32_t flags = itr->second.second;
-      requests_start_time.erase(itr);
-      inflight_requests--;
-
-      // Add the request timestamp to shared vector with proper locking
-      status_report_mutex_.lock();
-      // Critical section
-      request_timestamps_->emplace_back(
-          std::make_tuple(start_time, end_time, flags));
-      // Update its InferContext statistic to shared Stat pointer
-      ctx->GetStat(&((*stats)[0]));
-      status_report_mutex_.unlock();
     }
 
     // Stop inferencing if an early exit has been signaled.
