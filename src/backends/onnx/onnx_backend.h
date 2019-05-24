@@ -25,7 +25,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <NvInfer.h>
 #include <core/session/onnxruntime_c_api.h>
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"

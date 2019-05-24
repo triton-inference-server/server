@@ -33,9 +33,13 @@ include(ExternalProject)
 option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" ON)
 option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
+option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" ON)
+option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" ON)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
 
-set(TRTIS_EXTRA_INCLUDE_PATHS "" CACHE PATH "Extra include paths for TRTIS build")
+# Multiple paths may be specified by separating them with semicolon
+set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
+set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
@@ -44,8 +48,6 @@ option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
 cmake_dependent_option(
   TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON
   "TRTIS_ENABLE_GPU" OFF)
-
-message(STATUS "tensorrt ${TRTIS_ENABLE_TENSORRT}")
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
@@ -299,7 +301,8 @@ ExternalProject_Add(trtis
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
     -Dlibevhtp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevhtp/install/lib/cmake/libevhtp
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
-    -DTRTIS_EXTRA_INCLUDE_PATHS:PATH=${TRTIS_EXTRA_INCLUDE_PATHS}
+    -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
+    -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
     -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
@@ -307,6 +310,8 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
     -DTRTIS_ENABLE_CAFFE2:BOOL=${TRTIS_ENABLE_CAFFE2}
+    -DTRTIS_ENABLE_ONNXRUNTIME:BOOL=${TRTIS_ENABLE_ONNXRUNTIME}
+    -DTRTIS_ENABLE_PYTORCH:BOOL=${TRTIS_ENABLE_PYTORCH}
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_INSTALL_PREFIX}

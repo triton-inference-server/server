@@ -80,6 +80,12 @@ endif() # TRTIS_ENABLE_TENSORRT
 if(${TRTIS_ENABLE_CAFFE2})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:caffe2-backend-library>)
 endif() # TRTIS_ENABLE_CAFFE2
+if(${TRTIS_ENABLE_ONNXRUNTIME})
+  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:onnxruntime-backend-library>)
+endif() # TRTIS_ENABLE_ONNXRUNTIME
+if(${TRTIS_ENABLE_PYTORCH})
+  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:libtorch-backend-library>)
+endif() # TRTIS_ENABLE_PYTORCH
 if(${TRTIS_ENABLE_CUSTOM})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:custom-backend-library>)
 endif() # TRTIS_ENABLE_CUSTOM
@@ -127,7 +133,15 @@ if(${TRTIS_ENABLE_TENSORFLOW})
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 
-if(${TRTIS_ENABLE_CAFFE2})
+if(${TRTIS_ENABLE_PYTORCH})
+  target_link_libraries(
+    trtserver
+    ${TRTIS_EXTRA_LDFLAGS}
+    -ltorch
+  )
+endif() # TRTIS_ENABLE_PYTORCH
+
+if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
   target_link_libraries(
     trtserver
     ${TRTIS_EXTRA_LDFLAGS}
@@ -145,6 +159,14 @@ if(${TRTIS_ENABLE_CAFFE2})
     -lmkl_vml_def
   )
 endif() # TRTIS_ENABLE_CAFFE2
+
+if(${TRTIS_ENABLE_ONNXRUNTIME})
+  target_link_libraries(
+    trtserver
+    ${TRTIS_EXTRA_LDFLAGS}
+    -lonnxruntime
+  )
+endif() # TRTIS_ENABLE_ONNXRUNTIME
 
 if(${TRTIS_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)

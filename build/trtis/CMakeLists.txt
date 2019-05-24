@@ -65,16 +65,20 @@ if(${TRTIS_ENABLE_CAFFE2})
   add_definitions(-DTRTIS_ENABLE_CAFFE2=1)
 endif() # TRTIS_ENABLE_CAFFE2
 
+if(${TRTIS_ENABLE_ONNXRUNTIME})
+  add_definitions(-DTRTIS_ENABLE_ONNXRUNTIME=1)
+endif() # TRTIS_ENABLE_ONNXRUNTIME
+
+if(${TRTIS_ENABLE_PYTORCH})
+  add_definitions(-DTRTIS_ENABLE_PYTORCH=1)
+endif() # TRTIS_ENABLE_PYTORCH
+
 if(${TRTIS_ENABLE_CUSTOM})
   add_definitions(-DTRTIS_ENABLE_CUSTOM=1)
 endif() # TRTIS_ENABLE_CUSTOM
 
 include_directories("${PROJECT_SOURCE_DIR}/../..")
 include_directories("${PROJECT_BINARY_DIR}")
-
-FOREACH(p ${TRTIS_EXTRA_INCLUDE_PATHS})
-  include_directories("${p}")
-ENDFOREACH(p)
 
 set(TRTIS_EXTRA_LDFLAGS "")
 FOREACH(p ${TRTIS_EXTRA_LIB_PATHS})
@@ -117,6 +121,8 @@ add_subdirectory(../../src/nvrpc src/nvrpc)
 add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
 add_subdirectory(../../src/backends/custom src/backends/custom)
 add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
+add_subdirectory(../../src/backends/onnx src/backends/onnx)
+add_subdirectory(../../src/backends/pytorch src/backends/pytorch)
 add_subdirectory(../../src/backends/tensorflow src/backends/tensorflow)
 add_subdirectory(../../src/backends/tensorrt src/backends/tensorrt)
 add_subdirectory(../../src/servers src/servers)

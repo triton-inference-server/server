@@ -299,12 +299,12 @@ CompareDimsSupported(
 
   const int nonbatch_start_idx = (supports_batching ? 1 : 0);
   std::vector<int64_t> debatched_model_shape;
-  for (int i = nonbatch_start_idx; i < model_shape.size(); i++) {
+  for (size_t i = nonbatch_start_idx; i < model_shape.size(); i++) {
     debatched_model_shape.push_back(model_shape[i]);
   }
 
   // Tensor rank in configuration must match what framework expects.
-  if (model_shape.size() != (dims.size() + nonbatch_start_idx)) {
+  if (model_shape.size() != (size_t)(dims.size() + nonbatch_start_idx)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', tensor '" + tensor_name +

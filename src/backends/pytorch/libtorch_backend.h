@@ -25,9 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <NvInfer.h>
 #include <torch/script.h>  // One-stop header.
-#include <torch/torch.h>
 #include <set>
 #include <string>
 #include <unordered_map>
