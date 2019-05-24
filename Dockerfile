@@ -236,10 +236,22 @@ WORKDIR /workspace
 RUN rm -fr *
 COPY . .
 
-# Build the server. The build can fail the first time due to a
-# protobuf_generate_cpp error that doesn't repeat on subsequent
-# builds, which is why there are 2 make invocations below.
-RUN rm -fr builddir && mkdir -p builddir && \
+# Build the server.
+#
+# - Need to find CUDA stubs if they are available since some backends
+# may need to link against them. This is identical to the login in TF
+# container nvbuild.sh
+#
+# - The build can fail the first time due to a protobuf_generate_cpp
+# error that doesn't repeat on subsequent builds, which is why there
+# are 2 make invocations below.
+RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
+    if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
+        ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
+    fi && \
+    echo $LD_LIBRARY_PATH && \
+    rm -fr builddir && mkdir -p builddir && \
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
