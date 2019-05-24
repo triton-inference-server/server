@@ -32,9 +32,9 @@ NVIDIA TensorRT Inference Server
 
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
-    latest release of the TensorRT Inference Server is 1.1.0 and
-    is available on branch** `r19.04
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.04>`_.
+    latest release of the TensorRT Inference Server is 1.2.0 and
+    is available on branch** `r19.05
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.05>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -77,6 +77,13 @@ inference server provides the following features:
   the GPU support, concurrent execution, dynamic batching and other
   features provided by the server.
 
+* `Ensemble support
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/models_and_schedulers.html#ensemble-models>`_. An
+  ensemble represents a pipeline of one or more models and the
+  connection of input and output tensors between those models. A
+  single inference request to an ensemble will trigger the execution
+  of the entire pipeline.
+
 * Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
 
@@ -103,16 +110,16 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 1.1.0 and
-corresponds to the 19.04 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 1.2.0 and
+corresponds to the 19.05 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r19.04
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.04>`_.
+this release is `r19.05
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.05>`_.
 
 Backwards Compatibility
 -----------------------
 
-Continuing in version 1.1.0 the following interfaces maintain
+Continuing in version 1.2.0 the following interfaces maintain
 backwards compatibilty with the 1.0.0 release. If you have model
 configuration files, custom backends, or clients that use the
 inference server HTTP or GRPC APIs (either directly or through the
@@ -170,8 +177,12 @@ and `Support Matrix
 indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe which GPUs are supported by the inference server.
 
-Blog Posts
-^^^^^^^^^^
+Other Documentation
+^^^^^^^^^^^^^^^^^^^
+
+* `Maximizing Utilization for Data Center Inference with TensorRT
+  Inference Server
+  <https://on-demand-gtc.gputechconf.com/gtcnew/sessionview.php?sessionName=s9438-maximizing+utilization+for+data+center+inference+with+tensorrt+inference+server>`_.
 
 * `NVIDIA TensorRT Inference Server Boosts Deep Learning Inference
   <https://devblogs.nvidia.com/nvidia-serves-deep-learning-inference/>`_.
