@@ -764,6 +764,8 @@ instance_group [
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype))
 
     try:
