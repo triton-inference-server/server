@@ -690,21 +690,19 @@ ConcurrencyManager::AsyncInfer(
   // run inferencing until receiving exit signal to maintain server load.
   uint32_t flags = 0;
   do {
-    // Wait if no request should be sent and it is not exiting
-    {
+    // Only interact with synchronous mechanism if the worker should wait
+    if (*concurrency == 0) {
+      // Wait if no request should be sent and it is not exiting
       std::unique_lock<std::mutex> lock(wake_mutex_);
       wake_signal_.wait(
           lock, [concurrency]() { return early_exit || (*concurrency > 0); });
     }
-
-    // Create the context for inference of the specified model.
-    size_t num_reqs = *concurrency;
     
     std::shared_ptr<nic::InferContext::Request> request;
 
     // Create async requests such that the number of ongoing requests
-    // matches the concurrency level (here is 'num_reqs')
-    while (inflight_requests < num_reqs) {
+    // matches the concurrency level (here is '*concurrency')
+    while (inflight_requests < *concurrency) {
       struct timespec start_time;
       clock_gettime(CLOCK_MONOTONIC, &start_time);
       *err = ctx->AsyncRun(&request);
@@ -716,7 +714,7 @@ ConcurrencyManager::AsyncInfer(
       inflight_requests++;
     }
     
-    // Wait until at least requests is ready
+    // Wait until at least one request is ready
     bool is_ready;
     *err = ctx->GetReadyAsyncRequest(&request, &is_ready, true);
 
@@ -894,8 +892,9 @@ ConcurrencyManager::AsyncSequenceInfer(
       }
     }
 
-    // Wait if no request should be sent and it is not exiting
-    {
+    // Only interact with synchronous mechanism if the worker should wait
+    if (*concurrency == 0) {
+      // Wait if no request should be sent and it is not exiting
       std::unique_lock<std::mutex> lock(wake_mutex_);
       wake_signal_.wait(
           lock, [concurrency]() { return early_exit || (*concurrency > 0); });
