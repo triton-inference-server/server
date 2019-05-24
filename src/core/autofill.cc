@@ -35,7 +35,9 @@
 #ifdef TRTIS_ENABLE_TENSORRT
 #include "src/backends/tensorrt/autofill.h"
 #endif  // TRTIS_ENABLE_TENSORRT
+#ifdef TRTIS_ENABLE_ONNXRUNTIME
 #include "src/backends/onnx/autofill.h"
+#endif  // TRTIS_ENABLE_ONNXRUNTIME
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -114,7 +116,7 @@ AutoFill::Create(
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
 #if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
-    defined(TRTIS_ENABLE_CAFFE2)
+    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME)
   const Platform platform = GetPlatform(config.platform());
 #endif
 
@@ -146,6 +148,7 @@ AutoFill::Create(
   }
 #endif  // TRTIS_ENABLE_TENSORFLOW
 
+#ifdef TRTIS_ENABLE_ONNXRUNTIME
   // Check for ONNX model must be done before check for TensorRT plan
   // because TensorRT deserializeCudaEngine() function will cause program
   // to exit when it tries to deserialize an ONNX model.
@@ -165,6 +168,7 @@ AutoFill::Create(
       return Status::Success;
     }
   }
+#endif  // TRTIS_ENABLE_ONNXRUNTIME
 
 #ifdef TRTIS_ENABLE_TENSORRT
   if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||

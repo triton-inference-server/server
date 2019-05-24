@@ -26,11 +26,10 @@
 
 #include "src/backends/onnx/onnx_backend.h"
 
-#include <NvInfer.h>
 #include <core/providers/cuda/cuda_provider_factory.h>
+#include <cuda_runtime_api.h>
 #include <stdint.h>
 #include <mutex>
-#include "cuda/include/cuda_runtime_api.h"
 #include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
@@ -253,7 +252,7 @@ OnnxBackend::Context::ValidateSequenceControl(
 
   const int nonbatch_start_idx = (max_batch_size_ > 0) ? 1 : 0;
   std::vector<int64_t> debatched_dims;
-  for (int i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
+  for (size_t i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
     debatched_dims.push_back(iit->second.dims_[i]);
   }
 

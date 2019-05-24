@@ -25,16 +25,24 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/backends/pytorch/libtorch_backend.h"
-#include "src/backends/pytorch/libtorch_backend.pb.h"
+#include "src/core/constants.h"
+#include "src/core/model_config.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceBackend;
+
 class LibTorchBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // Autofill missing required model configuration settings based on
+    // model definition file.
+    bool autofill;
+  };
+
   static Status Create(
-      const LibTorchPlatformConfig& platform_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<LibTorchBackendFactory>* factory);
 
   Status CreateBackend(
@@ -46,12 +54,12 @@ class LibTorchBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(LibTorchBackendFactory);
 
-  LibTorchBackendFactory(const LibTorchPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  LibTorchBackendFactory(const std::shared_ptr<Config>& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const LibTorchPlatformConfig platform_config_;
+  const std::shared_ptr<Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver

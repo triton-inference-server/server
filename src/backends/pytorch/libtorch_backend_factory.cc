@@ -29,7 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
+#include "src/backends/pytorch/libtorch_backend.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -40,13 +40,14 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 LibTorchBackendFactory::Create(
-    const LibTorchPlatformConfig& platform_config,
+    const std::shared_ptr<BackendConfig>& backend_config,
     std::unique_ptr<LibTorchBackendFactory>* factory)
 {
-  LOG_VERBOSE(1) << "Create LibTorchBackendFactory for platform config \""
-                 << platform_config.DebugString() << "\"";
+  LOG_VERBOSE(1) << "Create LibTorchBackendFactory";
 
-  factory->reset(new LibTorchBackendFactory(platform_config));
+  auto libtorch_backend_config =
+      std::static_pointer_cast<Config>(backend_config);
+  factory->reset(new LibTorchBackendFactory(libtorch_backend_config));
   return Status::Success;
 }
 
