@@ -233,12 +233,20 @@ GetPlatform(const std::string& platform_str)
   }
 #endif  // TRTIS_ENABLE_CUSTOM
 
+#ifdef TRTIS_ENABLE_ONNXRUNTIME
+  if (platform_str == kOnnxRuntimeOnnxPlatform) {
+    return Platform::PLATFORM_ONNXRUNTIME_ONNX;
+  }
+#endif  // TRTIS_ENABLE_ONNXRUNTIME
+
+#ifdef TRTIS_ENABLE_PYTORCH
+  if (platform_str == kPyTorchLibTorchPlatform) {
+    return Platform::PLATFORM_PYTORCH_LIBTORCH;
+  }
+#endif  // TRTIS_ENABLE_PYTORCH
+
   if (platform_str == kEnsemblePlatform) {
     return Platform::PLATFORM_ENSEMBLE;
-  } else if (platform_str == kOnnxRuntimeOnnxPlatform) {
-    return Platform::PLATFORM_ONNXRUNTIME_ONNX;
-  } else if (platform_str == kPyTorchLibTorchPlatform) {
-    return Platform::PLATFORM_PYTORCH_LIBTORCH;
   }
 
   return Platform::PLATFORM_UNKNOWN;

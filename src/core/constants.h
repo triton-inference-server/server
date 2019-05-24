@@ -56,11 +56,15 @@ constexpr char kCaffe2NetDefFilename[] = "model.netdef";
 constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
 #endif  // TRTIS_ENABLE_CAFFE2
 
-constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
-constexpr char kPyTorchLibTorchFilename[] = "model.pt";
-
+#ifdef TRTIS_ENABLE_ONNXRUNTIME
 constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";
+#endif  // TRTIS_ENABLE_ONNXRUNTIME
+
+#ifdef TRTIS_ENABLE_PYTORCH
+constexpr char kPyTorchLibTorchPlatform[] = "pytorch_libtorch";
+constexpr char kPyTorchLibTorchFilename[] = "model.pt";
+#endif  // TRTIS_ENABLE_PYTORCH
 
 #ifdef TRTIS_ENABLE_CUSTOM
 constexpr char kCustomPlatform[] = "custom";

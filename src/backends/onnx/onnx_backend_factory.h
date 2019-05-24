@@ -25,17 +25,26 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <core/session/onnxruntime_c_api.h>
-#include "src/backends/onnx/onnx_backend.h"
-#include "src/backends/onnx/onnx_backend.pb.h"
+#include "src/core/constants.h"
+#include "src/core/model_config.h"
 #include "src/core/status.h"
+
+class OrtEnv;
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceBackend;
+
 class OnnxBackendFactory {
  public:
+  struct Config : public BackendConfig {
+    // Autofill missing required model configuration settings based on
+    // model definition file.
+    bool autofill;
+  };
+
   static Status Create(
-      const OnnxPlatformConfig& platform_config,
+      const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<OnnxBackendFactory>* factory);
 
   Status CreateBackend(
@@ -47,12 +56,12 @@ class OnnxBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(OnnxBackendFactory);
 
-  OnnxBackendFactory(const OnnxPlatformConfig& platform_config)
-      : platform_config_(platform_config)
+  OnnxBackendFactory(const std::shared_ptr<Config>& backend_config)
+      : backend_config_(backend_config)
   {
   }
 
-  const OnnxPlatformConfig platform_config_;
+  const std::shared_ptr<Config> backend_config_;
 };
 
 }}  // namespace nvidia::inferenceserver
