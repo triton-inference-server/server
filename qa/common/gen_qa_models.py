@@ -818,20 +818,26 @@ def create_libtorch_modelfile(
     # Create the model
     if not swap:
         class AddSubNet(nn.Module):
-            def __init__(self):
+            def __init__(self, *args):
+                self.torch_output0_dtype = args[0][0]
+                self.torch_output1_dtype = args[0][1]
                 super(AddSubNet, self).__init__()
             def forward(self, input0, input1):
-                return input0 + input1, input0 - input1
-        addSubModel = AddSubNet()
+                return (input0 + input1).to(self.torch_output0_dtype), \
+                    (input0 - input1).to(self.torch_output1_dtype)
+        addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype))
         example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
         traced = torch.jit.trace(addSubModel, (example_input, example_input))
     else:
         class SubAddNet(nn.Module):
-            def __init__(self):
+            def __init__(self, *args):
+                self.torch_output0_dtype = args[0][0]
+                self.torch_output1_dtype = args[0][1]
                 super(SubAddNet, self).__init__()
             def forward(self, input0, input1):
-                return input0 + input1, input0 - input1
-        subAddModel = SubAddNet()
+                return (input0 - input1).to(self.torch_output0_dtype), \
+                    (input0 + input1).to(self.torch_output1_dtype)
+        subAddModel = SubAddNet((torch_output0_dtype, torch_output1_dtype))
         example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
         traced = torch.jit.trace(subAddModel, (example_input, example_input))
 

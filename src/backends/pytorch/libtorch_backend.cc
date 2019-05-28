@@ -626,9 +626,10 @@ LibTorchBackend::Context::Execute(
     std::vector<torch::jit::IValue>* inputs_,
     std::vector<torch::Tensor>* outputs_)
 {
-  auto model_outputs_ = torch_model_->forward(*inputs_);
+  torch::jit::IValue model_outputs_;
 
   try {
+    model_outputs_ = torch_model_->forward(*inputs_);
     auto model_outputs_tuple = model_outputs_.toTuple();
     for (auto& m_op : model_outputs_tuple->elements()) {
       outputs_->push_back(m_op.toTensor());
@@ -643,7 +644,7 @@ LibTorchBackend::Context::Execute(
       LOG_VERBOSE(1) << ex.what();
       return Status(
           RequestStatusCode::INTERNAL,
-          "failed to run model '" + name_);  // + "': " + ex.what());
+          "failed to run model '" + name_);
     }
   }
 
