@@ -79,6 +79,7 @@ InferComplete(
   std::promise<TRTSERVER_InferenceResponse*>* p =
       reinterpret_cast<std::promise<TRTSERVER_InferenceResponse*>*>(userp);
   p->set_value(response);
+  delete p;
 }
 
 }  // namespace
@@ -105,7 +106,7 @@ main(int argc, char** argv)
     Usage(argv, "-r must be used to specify model repository path");
   }
 
-  // Create the options for the inference server.
+  // Create the server...
   TRTSERVER_ServerOptions* server_options = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsNew(&server_options), "creating server options");
@@ -114,20 +115,23 @@ main(int argc, char** argv)
           server_options, model_repository_path.c_str()),
       "setting model repository path");
 
-  // Create the server...
-  TRTSERVER_Server* server = nullptr;
-  FAIL_IF_ERR(TRTSERVER_ServerNew(&server, server_options), "creating server");
+  TRTSERVER_Server* server_ptr = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_ServerNew(&server_ptr, server_options), "creating server");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsDelete(server_options), "deleting server options");
+
+  std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
 
   // Wait until the server is both live and ready.
   size_t health_iters = 0;
   while (true) {
     bool live, ready;
     FAIL_IF_ERR(
-        TRTSERVER_ServerIsLive(server, &live), "unable to get server liveness");
+        TRTSERVER_ServerIsLive(server.get(), &live),
+        "unable to get server liveness");
     FAIL_IF_ERR(
-        TRTSERVER_ServerIsReady(server, &ready),
+        TRTSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
     std::cout << "Server Health: live " << live << ", ready " << ready
               << std::endl;
@@ -146,7 +150,7 @@ main(int argc, char** argv)
   {
     TRTSERVER_Protobuf* server_status_protobuf;
     FAIL_IF_ERR(
-        TRTSERVER_ServerStatus(server, &server_status_protobuf),
+        TRTSERVER_ServerStatus(server.get(), &server_status_protobuf),
         "unable to get server status protobuf");
     const char* buffer;
     size_t byte_size;
@@ -168,11 +172,12 @@ main(int argc, char** argv)
         "deleting status protobuf");
   }
 
-  // Print status of just the simple model.
-  {
+  // Wait for the simple model to become available.
+  while (true) {
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
-        TRTSERVER_ServerModelStatus(server, &model_status_protobuf, "simple"),
+        TRTSERVER_ServerModelStatus(
+            server.get(), &model_status_protobuf, "simple"),
         "unable to get model status protobuf");
     const char* buffer;
     size_t byte_size;
@@ -185,12 +190,28 @@ main(int argc, char** argv)
       FAIL("error: failed to parse model status");
     }
 
-    std::cout << "Model \"simple\" Status:" << std::endl;
-    std::cout << model_status.DebugString() << std::endl;
+    auto itr = model_status.model_status().find("simple");
+    if (itr == model_status.model_status().end()) {
+      FAIL("unable to find status for model 'simple'");
+    }
+
+    auto vitr = itr->second.version_status().find(1);
+    if (vitr == itr->second.version_status().end()) {
+      FAIL("unable to find version 1 status for model 'simple'");
+    }
+
+    std::cout << "'simple' model is "
+              << ni::ModelReadyState_Name(vitr->second.ready_state())
+              << std::endl;
+    if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
+      break;
+    }
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(model_status_protobuf),
         "deleting status protobuf");
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   // Create the memory allocator...
@@ -226,7 +247,7 @@ main(int argc, char** argv)
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, server, model_name.c_str(), model_version,
+          &request_provider, server.get(), model_name.c_str(), model_version,
           request_header_serialized.c_str(), request_header_serialized.size()),
       "creating inference request provider");
 
@@ -256,7 +277,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
-          server, request_provider, nullptr /* http_response_provider_hack */,
+          server.get(), request_provider,
+          nullptr /* http_response_provider_hack */,
           nullptr /* grpc_response_provider_hack */, InferComplete,
           reinterpret_cast<void*>(p)),
       "running inference");
@@ -349,9 +371,6 @@ main(int argc, char** argv)
       "deleting inference response");
   FAIL_IF_ERR(
       TRTSERVER_MemoryAllocatorDelete(allocator), "deleting memory allocator");
-
-  // Shutdown and delete the server
-  FAIL_IF_ERR(TRTSERVER_ServerDelete(server), "deleting server");
 
   return 0;
 }

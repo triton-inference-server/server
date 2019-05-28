@@ -39,6 +39,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(${TRTIS_ENABLE_ASAN})
   set(CMAKE_BUILD_TYPE Debug)
+  add_definitions(-DTRTIS_ENABLE_ASAN=1)
 
   set(_ASAN_FLAGS "-static-libstdc++ -static-libasan -fno-omit-frame-pointer -fsanitize=address")
   set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${_ASAN_FLAGS}")
