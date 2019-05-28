@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <mutex>
 #include "cuda/include/cuda_runtime_api.h"
+#include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -54,7 +55,7 @@ OnnxBackend::Context::~Context()
 
   ReleaseOrtRunResources();
   if (session_ != nullptr) {
-    OrtReleaseSession(session_);
+    OnnxLoader::UnloadSession(session_);
   }
   if (allocator_ != nullptr) {
     OrtReleaseAllocator(allocator_);
@@ -72,7 +73,7 @@ OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 OnnxBackend::CreateExecutionContexts(
-    OrtEnv* env, const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
@@ -82,7 +83,7 @@ OnnxBackend::CreateExecutionContexts(
   // disable graph optimization
   OrtSetSessionGraphOptimizationLevel(session_options, 0);
 
-  Status status = CreateExecutionContextsHelper(env, session_options, paths);
+  Status status = CreateExecutionContextsHelper(session_options, paths);
 
   OrtReleaseSessionOptions(session_options);
   RETURN_IF_ERROR(status);
@@ -94,7 +95,7 @@ OnnxBackend::CreateExecutionContexts(
 
 Status
 OnnxBackend::CreateExecutionContextsHelper(
-    OrtEnv* env, OrtSessionOptions* session_options,
+    OrtSessionOptions* session_options,
     const std::unordered_map<std::string, std::string>& paths)
 {
   uint32_t total_context_cnt = 0;
@@ -106,7 +107,7 @@ OnnxBackend::CreateExecutionContextsHelper(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, env, session_options,
+            instance_name, Context::NO_GPU_DEVICE, session_options,
             paths));
         total_context_cnt++;
       } else {
@@ -115,7 +116,7 @@ OnnxBackend::CreateExecutionContextsHelper(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, env, session_options, paths));
+              instance_name, gpu_device, session_options, paths));
           total_context_cnt++;
         }
       }
@@ -138,7 +139,7 @@ OnnxBackend::CreateExecutionContextsHelper(
 
 Status
 OnnxBackend::CreateExecutionContext(
-    const std::string& instance_name, const int gpu_device, OrtEnv* env,
+    const std::string& instance_name, const int gpu_device,
     OrtSessionOptions* base_session_options,
     const std::unordered_map<std::string, std::string>& paths)
 {
@@ -187,22 +188,21 @@ OnnxBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
-  // [TODO] special handling for statefull model?
-
-  // Create Onnx session
-  OrtStatus* onnx_status = nullptr;
+  // Set Onnx session option with proper device
   OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
   if (gpu_device != Context::NO_GPU_DEVICE) {
-    onnx_status =
+    OrtStatus* onnx_status = 
         OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
+    if (onnx_status != nullptr) {
+      OrtReleaseSessionOptions(options);
+      RETURN_IF_ORT_ERROR(onnx_status);
+    }
   }
-  if (onnx_status == nullptr) {
-    onnx_status = OrtCreateSession(
-        env, op_itr->second.c_str(), options, &context->session_);
-  }
-  OrtReleaseSessionOptions(options);
 
-  RETURN_IF_ORT_ERROR(onnx_status);
+  // Create Onnx session
+  Status status = OnnxLoader::LoadSession(op_itr->second, options, &context->session_);
+  OrtReleaseSessionOptions(options);
+  RETURN_IF_ERROR(status);
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));

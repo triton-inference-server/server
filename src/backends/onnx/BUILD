@@ -36,6 +36,16 @@ cc_proto_library(
 )
 
 cc_library(
+    name = "loader",
+    srcs = ["loader.cc"],
+    hdrs = ["loader.h"],
+    deps = [
+        ":onnx_utils",
+        "//src/core:server_header",
+    ],
+)
+
+cc_library(
     name = "onnx_utils",
     srcs = ["onnx_utils.cc"],
     hdrs = ["onnx_utils.h"],
@@ -50,6 +60,7 @@ cc_library(
     srcs = ["onnx_backend.cc"],
     hdrs = ["onnx_backend.h"],
     deps = [
+        ":loader",
         ":onnx_utils",
         "//src/core:constants",
         "//src/core:model_config_proto",
@@ -64,6 +75,7 @@ cc_library(
     srcs = ["onnx_backend_factory.cc"],
     hdrs = ["onnx_backend_factory.h"],
     deps = [
+        ":loader",
         ":onnx_backend",
         ":onnx_backend_proto",
         "//src/core:constants",
