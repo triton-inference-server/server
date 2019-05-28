@@ -73,3 +73,35 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+filegroup(
+    name = "onnx_testdata",
+    srcs = glob(
+        ["testdata/**/*"]),
+)
+
+cc_test(
+    name = "onnx_backend_test",
+    srcs = ["onnx_backend_test.cc"],
+    linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
+        "-ltorch",
+        "-lonnxruntime",
+        "-lnvinfer",
+        "-L/usr/local/cuda/lib64/stubs",
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime",
+    ],
+    data = [
+        ":onnx_testdata"
+    ],
+    deps = [
+        "//src/test:model_config_test_base",
+        "//src/core:server",
+        "//src/test:testmain",
+        "@local_config_cuda//cuda:cudart",
+    ],
+    tags = ["exclusive"],
+)
