@@ -27,6 +27,7 @@
 #include "src/core/autofill.h"
 
 #include "src/backends/caffe2/autofill.h"
+#include "src/backends/onnx/autofill.h"
 #include "src/backends/tensorflow/autofill.h"
 #include "src/backends/tensorrt/autofill.h"
 #include "src/core/constants.h"
@@ -132,6 +133,18 @@ AutoFill::Create(
     Status status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
     if (status.IsOk()) {
       *autofill = std::move(afgd);
+      return Status::Success;
+    }
+  }
+
+  // Check for Onnx model must be done before check for TensorRT plan
+  // [TODO] complete reasoning
+  if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
+    std::unique_ptr<AutoFill> afox;
+    Status status = AutoFillOnnx::Create(model_name, model_path, &afox);
+    if (status.IsOk()) {
+      *autofill = std::move(afox);
       return Status::Success;
     }
   }

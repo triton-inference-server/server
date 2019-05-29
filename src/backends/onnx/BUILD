@@ -36,6 +36,25 @@ cc_proto_library(
 )
 
 cc_library(
+    name = "autofill_header",
+    hdrs = ["autofill.h"],
+    deps = [
+    ],
+)
+
+cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    deps = [
+        ":autofill_header",
+        ":loader",
+        ":onnx_utils",
+        "//src/core:model_config_proto",
+        "//src/core:server_header",
+    ],
+)
+
+cc_library(
     name = "loader",
     srcs = ["loader.cc"],
     hdrs = ["loader.h"],
