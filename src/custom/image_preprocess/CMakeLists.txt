@@ -37,7 +37,10 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
 )
 target_include_directories(imagepreprocess PRIVATE ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(imagepreprocess ${OpenCV_LIBS})
+target_link_libraries(
+  imagepreprocess
+  PRIVATE ${OpenCV_LIBS}
+)
 install(
   TARGETS imagepreprocess
   LIBRARY DESTINATION lib

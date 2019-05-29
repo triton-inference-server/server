@@ -27,40 +27,66 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# trtserver
+# grpc endpoint
+#
+set(
+  GRPC_ENDPOINT_SRCS
+  grpc_server.cc
+)
+
+set(
+  GRPC_ENDPOINT_HDRS
+  grpc_server.h
+)
+
+add_library(
+  grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
+  ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
+)
+add_dependencies(grpc-endpoint-library grpc-library proto-library)
+
+#
+# http endpoint
 #
 find_package(libevhtp CONFIG REQUIRED)
 message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
 set(
-  TRTSERVER_SRCS
-  main.cc
-  grpc_server.cc
+  HTTP_ENDPOINT_SRCS
   http_server.cc
 )
 
 set(
-  TRTSERVER_HDRS
-  grpc_server.h
+  HTTP_ENDPOINT_HDRS
   http_server.h
+)
+
+add_library(
+  http-endpoint-library EXCLUDE_FROM_ALL OBJECT
+  ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
+)
+add_dependencies(http-endpoint-library proto-library)
+target_include_directories(
+  http-endpoint-library
+  PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+#
+# trtserver
+#
+set(
+  TRTSERVER_SRCS
+  main.cc
 )
 
 add_executable(
   main
-  ${TRTSERVER_SRCS} ${TRTSERVER_HDRS}
-  $<TARGET_OBJECTS:nvrpc-library>
+  ${TRTSERVER_SRCS}
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
-add_dependencies(main proto-library)
-target_include_directories(
-  main
-  PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
-)
 target_link_libraries(
   main
-  trtserver
-  libevhtp::evhtp
-  -lre2
+  PRIVATE trtserver
 )
 install(
   TARGETS main
@@ -104,67 +130,76 @@ add_library(
   $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
+  $<TARGET_OBJECTS:grpc-endpoint-library>
+  $<TARGET_OBJECTS:http-endpoint-library>
+  $<TARGET_OBJECTS:nvrpc-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
+set_target_properties(
+  trtserver
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
+)
 target_link_libraries(
   trtserver
-  ${TRTIS_EXTRA_LDFLAGS}
-  gRPC::grpc++
-  gRPC::grpc
-  ${LIBEVENT_LIBRARIES}
-  "-Wl,--version-script libtrtserver.ldscript"
+  PRIVATE ${TRTIS_EXTRA_LDFLAGS}
+  PRIVATE gRPC::grpc++
+  PRIVATE gRPC::grpc
+  PRIVATE ${LIBEVENT_LIBRARIES}
+  PRIVATE libevhtp::evhtp
+  PRIVATE -lre2
+  PRIVATE "-Wl,--version-script libtrtserver.ldscript"
 )
 
 if(${TRTIS_ENABLE_TENSORRT})
   target_link_libraries(
     trtserver
-    -lnvinfer
-    -lnvonnxparser_runtime
+    PUBLIC -lnvinfer
+    PUBLIC -lnvonnxparser_runtime
   )
 endif() # TRTIS_ENABLE_TENSORRT
 
 if(${TRTIS_ENABLE_TENSORFLOW})
   target_link_libraries(
     trtserver
-    ${TRTIS_EXTRA_LDFLAGS}
-    -ltensorflow_cc
-    -ltensorflow_framework
+    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC -ltensorflow_cc
+    PUBLIC -ltensorflow_framework
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 
 if(${TRTIS_ENABLE_PYTORCH})
   target_link_libraries(
     trtserver
-    ${TRTIS_EXTRA_LDFLAGS}
-    -ltorch
+    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC -ltorch
   )
 endif() # TRTIS_ENABLE_PYTORCH
 
 if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
   target_link_libraries(
     trtserver
-    ${TRTIS_EXTRA_LDFLAGS}
-    -lcaffe2
-    -lcaffe2_detectron_ops_gpu
-    -lcaffe2_gpu
-    -lc10
-    -lc10_cuda
-    -lmkl_core
-    -lmkl_gnu_thread
-    -lmkl_avx2
-    -lmkl_def
-    -lmkl_intel_lp64
-    -lmkl_rt
-    -lmkl_vml_def
+    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC -lcaffe2
+    PUBLIC -lcaffe2_detectron_ops_gpu
+    PUBLIC -lcaffe2_gpu
+    PUBLIC -lc10
+    PUBLIC -lc10_cuda
+    PUBLIC -lmkl_core
+    PUBLIC -lmkl_gnu_thread
+    PUBLIC -lmkl_avx2
+    PUBLIC -lmkl_def
+    PUBLIC -lmkl_intel_lp64
+    PUBLIC -lmkl_rt
+    PUBLIC -lmkl_vml_def
   )
 endif() # TRTIS_ENABLE_CAFFE2
 
 if(${TRTIS_ENABLE_ONNXRUNTIME})
   target_link_libraries(
     trtserver
-    ${TRTIS_EXTRA_LDFLAGS}
-    -lonnxruntime
+    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC -lonnxruntime
   )
 endif() # TRTIS_ENABLE_ONNXRUNTIME
 
@@ -173,16 +208,16 @@ if(${TRTIS_ENABLE_METRICS})
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
   target_link_libraries(
     trtserver
-    prometheus-cpp::core
+    PRIVATE prometheus-cpp::core
   )
 endif() # TRTIS_ENABLE_METRICS
 
 if(${TRTIS_ENABLE_GPU})
 target_link_libraries(
   trtserver
-  -L/usr/local/cuda/lib64/stubs
-  -lnvidia-ml
-  ${CUDA_LIBRARIES}
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRTIS_ENABLE_GPU
 
@@ -203,9 +238,12 @@ install(
 #
 # simple_inprocess
 #
-add_executable(simple_inprocess simple_inprocess.cc)
-target_link_libraries(simple_inprocess trtserver)
-install(
-  TARGETS simple_inprocess
-  RUNTIME DESTINATION bin
-)
+#add_executable(simple_inprocess simple_inprocess.cc)
+#target_link_libraries(
+#  simple_inprocess
+#  PRIVATE trtserver
+#)
+#install(
+#  TARGETS simple_inprocess
+#  RUNTIME DESTINATION bin
+#)
