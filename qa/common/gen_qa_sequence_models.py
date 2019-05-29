@@ -160,7 +160,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.uint16:
         return None # Not supported in Torch
     elif np_dtype == np.float16:
-        return torch.half
+        return None
     elif np_dtype == np.float32:
         return torch.float
     elif np_dtype == np.float64:
@@ -514,24 +514,14 @@ sequence_batching {{
 }}
 input [
   {{
-    name: "INPUT__0"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT__1"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT__2"
+    name: "INPUT"
     data_type: {}
     dims: [ {} ]
   }}
 ]
 output [
   {{
-    name: "OUTPUT__0"
+    name: "OUTPUT"
     data_type: {}
     dims: [ 1, 1, 1 ]
   }}
@@ -732,16 +722,26 @@ platform: "pytorch_libtorch"
 max_batch_size: {}
 input [
   {{
-    name: "INPUT"
+    name: "INPUT__0"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "INPUT__1"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "INPUT__2"
     data_type: {}
     dims: [ {} ]
   }}
 ]
 output [
   {{
-    name: "OUTPUT"
+    name: "OUTPUT__0"
     data_type: {}
-    dims: [ 1, 1, 1 ]
+    dims: [ 1 ]
   }}
 ]
 instance_group [
@@ -750,7 +750,6 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
-           "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
