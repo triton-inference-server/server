@@ -688,8 +688,8 @@ def create_libtorch_modelfile(
     class SequenceNet(nn.Module):
         def __init__(self, *args):
             super(SequenceNet, self).__init__()
-            self.shape = args[0]
-            self.dtype = torch_dtype
+            self.shape = args[0][0]
+            self.dtype = args[0][1]
             self.acc = torch.zeros(self.shape, dtype=self.dtype)
         def forward(self, input0, start0, ready0):
             if torch.equal(start0, torch.ones(self.shape, dtype=self.dtype)):
@@ -700,7 +700,7 @@ def create_libtorch_modelfile(
                 self.acc = tmp
             return self.acc
 
-    sequenceModel = SequenceNet(shape)
+    sequenceModel = SequenceNet([shape,torch_dtype])
     example_input = torch.zeros(shape, dtype=torch_dtype)
     traced = torch.jit.trace(sequenceModel, (example_input,example_input,example_input))
 

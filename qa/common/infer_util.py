@@ -132,17 +132,16 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         INPUT0 = "INPUT0"
         INPUT1 = "INPUT1"
         if pf == "libtorch" or pf == "libtorch_nobatch":
-            outputs=("OUTPUT__0", "OUTPUT__1")
             OUTPUT0 = "OUTPUT__0"
             OUTPUT1 = "OUTPUT__1"
             INPUT0 = "INPUT__0"
             INPUT1 = "INPUT__1"
-        if OUTPUT0 in outputs:
+        if "OUTPUT0" in outputs:
             if output0_raw:
                 output_req[OUTPUT0] = InferContext.ResultFormat.RAW
             else:
                 output_req[OUTPUT0] = (InferContext.ResultFormat.CLASS, num_classes)
-        if OUTPUT1 in outputs:
+        if "OUTPUT1" in outputs:
             if output1_raw:
                 output_req[OUTPUT1] = InferContext.ResultFormat.RAW
             else:
@@ -152,13 +151,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=correlation_id, streaming=config[2],
                            verbose=True)
-        if pf == "libtorch" or pf == "libtorch_nobatch":
-            results = ctx.run(
-                { "INPUT__0" : input0_list, "INPUT__1" : input1_list },
-                output_req, batch_size)
-        else:
-            results = ctx.run(
-                { "INPUT0" : input0_list, "INPUT1" : input1_list },
+        results = ctx.run(
+                { INPUT0 : input0_list, INPUT1 : input1_list },
                 output_req, batch_size)
 
         if not skip_request_id_check:
