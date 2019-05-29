@@ -48,7 +48,7 @@ namespace nvidia { namespace inferenceserver {
 
 struct OnnxTensorInfo {
   OnnxTensorInfo(ONNXTensorElementDataType type, std::vector<int64_t> dims)
-   : type_(type), dims_(dims)
+      : type_(type), dims_(dims)
   {
   }
 
@@ -68,8 +68,15 @@ Status InputNames(OrtSession* session, std::set<std::string>& names);
 
 Status OutputNames(OrtSession* session, std::set<std::string>& names);
 
-Status InputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos);
+Status InputInfos(
+    OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos);
 
-Status OutputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos);
+Status OutputInfos(
+    OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos);
+
+Status CompareDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
+    const bool supports_batching);
 
 }}  // namespace nvidia::inferenceserver

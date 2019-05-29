@@ -67,13 +67,15 @@ InputOutputNames(
 }
 
 Status
-InputOutputInfos(OrtSession* session, OrtAllocator* allocator, bool is_input, OnnxTensorInfoMap& infos)
+InputOutputInfos(
+    OrtSession* session, OrtAllocator* allocator, bool is_input,
+    OnnxTensorInfoMap& infos)
 {
   infos.clear();
 
   size_t num_nodes;
   if (is_input) {
-    RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session, &num_nodes));  
+    RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session, &num_nodes));
   } else {
     RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session, &num_nodes));
   }
@@ -84,7 +86,8 @@ InputOutputInfos(OrtSession* session, OrtAllocator* allocator, bool is_input, On
     if (is_input) {
       RETURN_IF_ORT_ERROR(OrtSessionGetInputName(session, i, allocator, &name));
     } else {
-      RETURN_IF_ORT_ERROR(OrtSessionGetOutputName(session, i, allocator, &name));
+      RETURN_IF_ORT_ERROR(
+          OrtSessionGetOutputName(session, i, allocator, &name));
     }
 
     OrtTypeInfo* typeinfo;
@@ -103,7 +106,7 @@ InputOutputInfos(OrtSession* session, OrtAllocator* allocator, bool is_input, On
     OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims);
 
     infos.emplace(name, OnnxTensorInfo(type, dims));
-    
+
     OrtReleaseTypeInfo(typeinfo);
   }
 
@@ -251,15 +254,75 @@ OutputNames(OrtSession* session, std::set<std::string>& names)
 }
 
 Status
-InputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
+InputInfos(
+    OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
 {
   return InputOutputInfos(session, allocator, true, infos);
 }
 
 Status
-OutputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
+OutputInfos(
+    OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
 {
   return InputOutputInfos(session, allocator, false, infos);
+}
+
+Status
+CompareDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
+    const std::vector<int64_t>& model_shape, const DimsList& dims,
+    const bool supports_batching)
+{
+  // If the model configuration expects batching support in the model,
+  // then the tensorflow shape first dimension must be -1.
+  if (supports_batching &&
+      ((model_shape.size() == 0) || (model_shape[0] != -1))) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name +
+            "', model configuration supports batching but first dimension of "
+            "tensor '" +
+            tensor_name +
+            "' expected by framework is not a variable-size batch "
+            "dimension: " +
+            DimsListToString(model_shape));
+  }
+
+  const int nonbatch_start_idx = (supports_batching ? 1 : 0);
+  std::vector<int64_t> debatched_model_shape;
+  for (int i = nonbatch_start_idx; i < model_shape.size(); i++) {
+    debatched_model_shape.push_back(model_shape[i]);
+  }
+
+  // Tensor rank in configuration must match what framework expects.
+  if (model_shape.size() != (dims.size() + nonbatch_start_idx)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', tensor '" + tensor_name +
+            "' shape expected by framework " +
+            DimsListToString(debatched_model_shape) +
+            " doesn't match model configuration shape " +
+            DimsListToString(dims));
+  }
+
+  for (int i = 0; i < dims.size(); ++i) {
+    int64_t model_dim = model_shape[i + nonbatch_start_idx];
+    if (model_dim == -1) {
+      continue;
+    }
+
+    if (model_dim != dims[i]) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', tensor '" + tensor_name +
+              "' shape expected by framework " +
+              DimsListToString(debatched_model_shape) +
+              " doesn't match model configuration shape " +
+              DimsListToString(dims));
+    }
+  }
+
+  return Status::Success;
 }
 
 }}  // namespace nvidia::inferenceserver
