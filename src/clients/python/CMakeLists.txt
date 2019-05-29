@@ -30,7 +30,10 @@ cmake_minimum_required (VERSION 3.5)
 # libcrequest.so
 #
 add_library(crequest SHARED crequest.cc)
-target_link_libraries(crequest request)
+target_link_libraries(
+  crequest
+  PUBLIC request
+)
 
 #
 # Wheel file
