@@ -66,7 +66,95 @@ InputOutputNames(
   return Status::Success;
 }
 
+Status
+InputOutputInfos(OrtSession* session, OrtAllocator* allocator, bool is_input, OnnxTensorInfoMap& infos)
+{
+  infos.clear();
+
+  size_t num_nodes;
+  if (is_input) {
+    RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session, &num_nodes));  
+  } else {
+    RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session, &num_nodes));
+  }
+
+  // iterate over all nodes
+  for (size_t i = 0; i < num_nodes; i++) {
+    char* name;
+    if (is_input) {
+      RETURN_IF_ORT_ERROR(OrtSessionGetInputName(session, i, allocator, &name));
+    } else {
+      RETURN_IF_ORT_ERROR(OrtSessionGetOutputName(session, i, allocator, &name));
+    }
+
+    OrtTypeInfo* typeinfo;
+    if (is_input) {
+      RETURN_IF_ORT_ERROR(OrtSessionGetInputTypeInfo(session, i, &typeinfo));
+    } else {
+      RETURN_IF_ORT_ERROR(OrtSessionGetOutputTypeInfo(session, i, &typeinfo));
+    }
+
+    const OrtTensorTypeAndShapeInfo* tensor_info =
+        OrtCastTypeInfoToTensorInfo(typeinfo);
+    ONNXTensorElementDataType type = OrtGetTensorElementType(tensor_info);
+
+    size_t num_dims = OrtGetNumOfDimensions(tensor_info);
+    std::vector<int64_t> dims(num_dims);
+    OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims);
+
+    infos.emplace(name, OnnxTensorInfo(type, dims));
+    
+    OrtReleaseTypeInfo(typeinfo);
+  }
+
+  return Status::Success;
+}
+
 }  // namespace
+
+std::string
+OnnxDataTypeName(ONNXTensorElementDataType onnx_type)
+{
+  switch (onnx_type) {
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
+      return "FLOAT";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:
+      return "UINT8";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:
+      return "INT8";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:
+      return "UINT16";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16:
+      return "INT16";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:
+      return "INT32";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
+      return "INT64";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING:
+      return "STRING";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_BOOL:
+      return "BOOL";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16:
+      return "FLOAT16";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:
+      return "DOUBLE";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:
+      return "UINT32";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64:
+      return "UINT64";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX64:
+      return "COMPLEX64";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_COMPLEX128:
+      return "COMPLEX64";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16:
+      return "BFLOAT16";
+    case ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED:
+    default:
+      break;
+  }
+
+  return "UNDEFINED";
+}
 
 DataType
 ConvertFromOnnxDataType(ONNXTensorElementDataType onnx_type)
@@ -160,6 +248,18 @@ Status
 OutputNames(OrtSession* session, std::set<std::string>& names)
 {
   return InputOutputNames(session, false, names);
+}
+
+Status
+InputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
+{
+  return InputOutputInfos(session, allocator, true, infos);
+}
+
+Status
+OutputInfos(OrtSession* session, OrtAllocator* allocator, OnnxTensorInfoMap& infos)
+{
+  return InputOutputInfos(session, allocator, false, infos);
 }
 
 }}  // namespace nvidia::inferenceserver
