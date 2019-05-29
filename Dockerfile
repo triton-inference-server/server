@@ -65,14 +65,9 @@ WORKDIR /opt/tensorflow
 RUN ./nvbuild.sh --python3.5
 
 ############################################################################
-## Caffe2 stage: Use PyTorch container to get Caffe2 backend
+## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
 ############################################################################
 FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
-
-# We cannot just pull libraries from the PyTorch container... we need
-# to:
-#   - copy over netdef_backend_c2 interface so it can build with other
-#     C2 sources
 
 # Copy netdef_backend_c2 into Caffe2 core so it builds into the
 # libcaffe2 library. We want netdef_backend_c2 to build against the
@@ -89,9 +84,7 @@ RUN pip uninstall -y torch
 RUN cd pytorch && \
     TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5+PTX" \
       CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
-      NCCL_INCLUDE_DIR="/usr/include/" \
-      NCCL_LIB_DIR="/usr/lib/" \
-      NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
+      NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_NCCL=OFF USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
       python setup.py install && python setup.py clean
 
 ############################################################################
