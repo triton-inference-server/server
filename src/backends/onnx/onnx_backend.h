@@ -86,9 +86,15 @@ class OnnxBackend : public InferenceBackend {
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const std::string& model_name,
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+        const size_t expected_input_cnt);
     Status ValidateOutputs(
+        const std::string& model_name,
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+    Status ValidateSequenceControl(
+        const std::string& model_name, const ModelSequenceBatching& batcher,
+        const ModelSequenceBatching::Control::Kind control_kind);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
