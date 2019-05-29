@@ -77,6 +77,6 @@ Status OutputInfos(
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const std::vector<int64_t>& model_shape, const DimsList& dims,
-    const bool supports_batching);
+    const int max_batch_size);
 
 }}  // namespace nvidia::inferenceserver

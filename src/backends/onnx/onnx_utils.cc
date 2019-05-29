@@ -271,12 +271,21 @@ Status
 CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const std::vector<int64_t>& model_shape, const DimsList& dims,
-    const bool supports_batching)
+    const int max_batch_size)
 {
   // If the model configuration expects batching support in the model,
-  // then the tensorflow shape first dimension must be -1.
-  if (supports_batching &&
-      ((model_shape.size() == 0) || (model_shape[0] != -1))) {
+  // then the model shape first dimension must be either -1
+  // or non-zero value that less than max_batch_size.
+  const bool supports_batching = (max_batch_size > 0);
+  bool valid_batch_dim = (model_shape.size() != 0);
+  if (valid_batch_dim) {
+    if (model_shape[0] != -1) {
+      if ((model_shape[0] > max_batch_size) || (model_shape[0] <= 0)) {
+        valid_batch_dim = false;
+      }
+    }
+  }
+  if (supports_batching && !valid_batch_dim) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name +
