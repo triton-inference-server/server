@@ -34,9 +34,9 @@ add_executable(caffe2plan caffe2plan.cc)
 target_include_directories(caffe2plan PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   caffe2plan
-  -lnvinfer
-  -lnvcaffe_parser
-  ${CUDA_LIBRARIES}
+  PRIVATE -lnvinfer
+  PRIVATE -lnvcaffe_parser
+  PRIVATE ${CUDA_LIBRARIES}
 )
 install(
   TARGETS caffe2plan
