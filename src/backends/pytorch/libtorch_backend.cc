@@ -567,7 +567,7 @@ LibTorchBackend::Context::Run(
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
-    std::string index_str = name.substr(name.find(deliminator));
+    std::string index_str = name.substr(name.find(deliminator)+2);
     int ip_index = std::atoi(index_str.c_str());
 
     const ModelInput* input_config;
@@ -586,7 +586,7 @@ LibTorchBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      std::string index_str = name.substr(name.find(deliminator));
+      std::string index_str = name.substr(name.find(deliminator)+2);
       int ip_index = std::atoi(index_str.c_str());
 
       RETURN_IF_ERROR(SetInput(
@@ -602,7 +602,7 @@ LibTorchBackend::Context::Run(
   // the payload responses.
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
-    std::string index_str = name.substr(name.find(deliminator));
+    std::string index_str = name.substr(name.find(deliminator)+2);
 
     int op_index = std::atoi(index_str.c_str());
 
@@ -640,7 +640,7 @@ LibTorchBackend::Context::Execute(
       auto model_output_tensor = model_outputs_.toTensor();
       outputs_->push_back(model_output_tensor);
     }
-    catch (std::exception& ex) {
+    catch (std::exception& exx) {
       LOG_VERBOSE(1) << ex.what();
       return Status(
           RequestStatusCode::INTERNAL,
