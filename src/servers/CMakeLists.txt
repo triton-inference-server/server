@@ -164,7 +164,6 @@ if(${TRTIS_ENABLE_TENSORFLOW})
     trtserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltensorflow_cc
-    PUBLIC -ltensorflow_framework
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 
