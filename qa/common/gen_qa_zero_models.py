@@ -145,31 +145,6 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
-def np_to_torch_dtype(np_dtype):
-    if np_dtype == np.bool:
-        return torch.bool
-    elif np_dtype == np.int8:
-        return torch.int8
-    elif np_dtype == np.int16:
-        return torch.int16
-    elif np_dtype == np.int32:
-        return torch.int
-    elif np_dtype == np.int64:
-        return torch.long
-    elif np_dtype == np.uint8:
-        return torch.uint8
-    elif np_dtype == np.uint16:
-        return None # Not supported in Torch
-    elif np_dtype == np.float16:
-        return torch.half
-    elif np_dtype == np.float32:
-        return torch.float
-    elif np_dtype == np.float64:
-        return torch.double
-    elif np_dtype == np_dtype_string:
-        return None # Not supported in Torch
-    return None
-
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
 
@@ -348,94 +323,6 @@ output [
         cfile.write(config)
 
 
-def create_libtorch_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
-
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    torch_dtype = np_to_torch_dtype(dtype)
-    model_name = tu.get_zero_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
-
-    # Create the model that copies inputs to corresponding outputs.
-    if io_cnt == 1:
-        class ZeroNet(nn.Module):
-            def __init__(self):
-                super(ZeroNet, self).__init__()
-            def forward(self, input0):
-                return input0
-    elif io_cnt == 2:
-        class ZeroNet(nn.Module):
-            def __init__(self):
-                super(ZeroNet, self).__init__()
-            def forward(self, input0, input1):
-                return input0, input1
-    elif io_cnt == 3:
-        class ZeroNet(nn.Module):
-            def __init__(self):
-                super(ZeroNet, self).__init__()
-            def forward(self, input0, input1, input2):
-                return input0, input1, input2
-
-    zeroModel = ZeroNet()
-    example_input = torch.zeros(shape, dtype=torch_dtype)
-    traced = torch.jit.trace(zeroModel, (example_input,)*io_cnt)
-
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass # ignore existing dir
-
-    traced.save(model_version_dir + "/model.pt")
-
-
-def create_libtorch_modelconfig(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
-
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
-    shape_str = tu.shape_to_dims_str(shape)
-
-    model_name = tu.get_zero_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
-    config_dir = models_dir + "/" + model_name
-    config = '''
-name: "{}"
-platform: "pytorch_libtorch"
-max_batch_size: {}
-'''.format(model_name, max_batch)
-
-    for io_num in range(io_cnt):
-        config += '''
-input [
-  {{
-    name: "INPUT__{}"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT__{}"
-    data_type: {}
-    dims: [ {} ]
-  }}
-]
-'''.format(io_num, np_to_model_dtype(dtype), shape_str,
-           io_num, np_to_model_dtype(dtype), shape_str)
-
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass # ignore existing dir
-
-    with open(config_dir + "/config.pbtxt", "w") as cfile:
-        cfile.write(config)
-
 
 def create_ensemble_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
@@ -556,11 +443,6 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
             create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
-    if FLAGS.libtorch:
-        create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        # max-batch 0 not supported
-
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
         create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
@@ -582,8 +464,6 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--libtorch', required=False, action='store_true',
-                        help='Generate Pytorch LibTorch models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -596,9 +476,6 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.onnx:
         import onnx
-    if FLAGS.libtorch:
-        import torch
-        from torch import nn
 
     import test_util as tu
 
