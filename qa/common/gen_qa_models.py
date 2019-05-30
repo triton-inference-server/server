@@ -161,7 +161,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.uint16:
         return None # Not supported in Torch
     elif np_dtype == np.float16:
-        return torch.half
+        return None
     elif np_dtype == np.float32:
         return torch.float
     elif np_dtype == np.float64:
@@ -814,7 +814,8 @@ def create_libtorch_modelfile(
 
     model_name = tu.get_model_name("libtorch_nobatch" if max_batch == 0 else "libtorch",
                                    input_dtype, output0_dtype, output1_dtype)
-
+    # handle for -1 (when variable) since can't create tensor with shape of [-1]
+    input_shape = [abs(ips) for ips in input_shape]
     # Create the model
     if not swap:
         class AddSubNet(nn.Module):
