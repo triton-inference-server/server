@@ -168,8 +168,6 @@ RUN apt-get update && \
 # TensorFlow libraries
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
-COPY --from=trtserver_tf \
-     /usr/local/lib/tensorflow/libtensorflow_framework.so /opt/tensorrtserver/lib/
 
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
