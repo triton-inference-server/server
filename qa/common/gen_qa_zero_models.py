@@ -145,31 +145,6 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
-def np_to_torch_dtype(np_dtype):
-    if np_dtype == np.bool:
-        return torch.bool
-    elif np_dtype == np.int8:
-        return torch.int8
-    elif np_dtype == np.int16:
-        return torch.int16
-    elif np_dtype == np.int32:
-        return torch.int
-    elif np_dtype == np.int64:
-        return torch.long
-    elif np_dtype == np.uint8:
-        return torch.uint8
-    elif np_dtype == np.uint16:
-        return None # Not supported in Torch
-    elif np_dtype == np.float16:
-        return torch.half
-    elif np_dtype == np.float32:
-        return torch.float
-    elif np_dtype == np.float64:
-        return torch.double
-    elif np_dtype == np_dtype_string:
-        return None # Not supported in Torch
-    return None
-
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
 
@@ -468,11 +443,6 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
             create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
-    if FLAGS.libtorch:
-        create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        # max-batch 0 not supported
-
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
         create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
@@ -494,8 +464,6 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx Runtime Onnx models')
-    parser.add_argument('--libtorch', required=False, action='store_true',
-                        help='Generate Pytorch LibTorch models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -508,9 +476,6 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.onnx:
         import onnx
-    if FLAGS.libtorch:
-        import torch
-        from torch import nn
 
     import test_util as tu
 
