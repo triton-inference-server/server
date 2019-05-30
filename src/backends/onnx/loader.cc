@@ -26,6 +26,8 @@
 
 #include "src/backends/onnx/loader.h"
 
+#include <thread>
+#include <future>
 #include "src/backends/onnx/onnx_utils.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -100,8 +102,12 @@ OnnxLoader::LoadSession(
       }
     }
 
-    OrtStatus* status = OrtCreateSession(
+    // Workaround for creating session on multiple GPUs until the issue
+    // on Onnx Runtime is resolved
+    // https://github.com/microsoft/onnxruntime/issues/1034
+    auto res = std::async(std::launch::async, &OrtCreateSession,
         loader->env_, model_path.c_str(), session_options, session);
+    OrtStatus* status = res.get();
 
     if (status != nullptr) {
       TryRelease(true);

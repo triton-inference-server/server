@@ -753,26 +753,14 @@ def create_onnx_modelconfig(
     model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    input_dtype, output0_dtype, output1_dtype)
     config_dir = models_dir + "/" + model_name
-    
-    # Must make sure all Onnx models will be loaded to the same GPU if they are
-    # run on GPU. This is due to the current limitation of Onnx Runtime
-    # https://github.com/microsoft/onnxruntime/issues/1034
-    instance_group_string = '''
-instance_group [
-  {
-    kind: KIND_GPU
-    gpus: [ 0 ]
-  }
-]
-'''
+   
     # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             emu.repeat(input_dtype, 2), emu.repeat(input_shape, 2), emu.repeat(None, 2),
             [output0_dtype, output1_dtype], [output0_shape, output1_shape], emu.repeat(None, 2),
             ["output0_labels.txt", None],
-            version_policy=version_policy, force_tensor_number_suffix=True,
-            instance_group_str=instance_group_string)
+            version_policy=version_policy, force_tensor_number_suffix=True)
 
     try:
         os.makedirs(config_dir)
