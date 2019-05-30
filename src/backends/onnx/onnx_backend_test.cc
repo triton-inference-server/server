@@ -46,8 +46,8 @@ TEST_F(OnnxBackendTest, ModelConfigSanity)
     if (status.IsOk()) {
       std::unordered_map<std::string, std::string> onnx_paths;
 
-      for (const auto& filename :
-           std::vector<std::string>{kOnnxRuntimeOnnxFilename}) {
+      for (const auto& filename : std::vector<std::string>{
+               kOnnxRuntimeOnnxFilename, "no_batch.onnx"}) {
         const auto onnx_path = JoinPath({path, filename});
         onnx_paths.emplace(
             std::piecewise_construct, std::make_tuple(filename),
