@@ -274,13 +274,13 @@ CompareDimsSupported(
     const int max_batch_size)
 {
   // If the model configuration expects batching support in the model,
-  // then the model shape first dimension must be either -1
-  // or non-zero value that less than max_batch_size.
+  // then the model shape first dimension must be either -1 (unbounded)
+  // or value that larger than max_batch_size.
   const bool supports_batching = (max_batch_size > 0);
   bool valid_batch_dim = (model_shape.size() != 0);
   if (valid_batch_dim) {
     if (model_shape[0] != -1) {
-      if ((model_shape[0] > max_batch_size) || (model_shape[0] <= 0)) {
+      if (model_shape[0] < max_batch_size) {
         valid_batch_dim = false;
       }
     }
