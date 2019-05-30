@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <mutex>
 #include "cuda/include/cuda_runtime_api.h"
+#include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -54,7 +55,7 @@ OnnxBackend::Context::~Context()
 
   ReleaseOrtRunResources();
   if (session_ != nullptr) {
-    OrtReleaseSession(session_);
+    OnnxLoader::UnloadSession(session_);
   }
   if (allocator_ != nullptr) {
     OrtReleaseAllocator(allocator_);
@@ -72,7 +73,7 @@ OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 OnnxBackend::CreateExecutionContexts(
-    OrtEnv* env, const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
@@ -82,7 +83,7 @@ OnnxBackend::CreateExecutionContexts(
   // disable graph optimization
   OrtSetSessionGraphOptimizationLevel(session_options, 0);
 
-  Status status = CreateExecutionContextsHelper(env, session_options, paths);
+  Status status = CreateExecutionContextsHelper(session_options, paths);
 
   OrtReleaseSessionOptions(session_options);
   RETURN_IF_ERROR(status);
@@ -94,7 +95,7 @@ OnnxBackend::CreateExecutionContexts(
 
 Status
 OnnxBackend::CreateExecutionContextsHelper(
-    OrtEnv* env, OrtSessionOptions* session_options,
+    OrtSessionOptions* session_options,
     const std::unordered_map<std::string, std::string>& paths)
 {
   uint32_t total_context_cnt = 0;
@@ -106,8 +107,7 @@ OnnxBackend::CreateExecutionContextsHelper(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, env, session_options,
-            paths));
+            instance_name, Context::NO_GPU_DEVICE, session_options, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -115,7 +115,7 @@ OnnxBackend::CreateExecutionContextsHelper(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, env, session_options, paths));
+              instance_name, gpu_device, session_options, paths));
           total_context_cnt++;
         }
       }
@@ -138,7 +138,7 @@ OnnxBackend::CreateExecutionContextsHelper(
 
 Status
 OnnxBackend::CreateExecutionContext(
-    const std::string& instance_name, const int gpu_device, OrtEnv* env,
+    const std::string& instance_name, const int gpu_device,
     OrtSessionOptions* base_session_options,
     const std::unordered_map<std::string, std::string>& paths)
 {
@@ -187,47 +187,143 @@ OnnxBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
-  // [TODO] special handling for statefull model?
-
-  // Create Onnx session
-  OrtStatus* onnx_status = nullptr;
+  // Set Onnx session option with proper device
   OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
   if (gpu_device != Context::NO_GPU_DEVICE) {
-    onnx_status =
+    OrtStatus* onnx_status =
         OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
+    if (onnx_status != nullptr) {
+      OrtReleaseSessionOptions(options);
+      RETURN_IF_ORT_ERROR(onnx_status);
+    }
   }
-  if (onnx_status == nullptr) {
-    onnx_status = OrtCreateSession(
-        env, op_itr->second.c_str(), options, &context->session_);
-  }
+
+  // Create Onnx session
+  Status status =
+      OnnxLoader::LoadSession(op_itr->second, options, &context->session_);
   OrtReleaseSessionOptions(options);
-
-  RETURN_IF_ORT_ERROR(onnx_status);
-
-  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
-  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
-
+  RETURN_IF_ERROR(status);
   RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&context->allocator_));
+
+  // If this is a sequence model then make sure that the required
+  // inputs are present in the model and have the correct shape and
+  // datatype.
+  size_t expected_input_cnt = (size_t)Config().input().size();
+  if (Config().has_sequence_batching()) {
+    RETURN_IF_ERROR(context->ValidateSequenceControl(
+        Config().name(), Config().sequence_batching(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_START));
+    RETURN_IF_ERROR(context->ValidateSequenceControl(
+        Config().name(), Config().sequence_batching(),
+        ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY));
+    expected_input_cnt += 2;
+  }
+
+  RETURN_IF_ERROR(context->ValidateInputs(
+      Config().name(), Config().input(), expected_input_cnt));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().name(), Config().output()));
+
+  return Status::Success;
+}
+
+Status
+OnnxBackend::Context::ValidateSequenceControl(
+    const std::string& model_name, const ModelSequenceBatching& batcher,
+    const ModelSequenceBatching::Control::Kind control_kind)
+{
+  std::string tensor_name;
+  DataType tensor_datatype;
+  RETURN_IF_ERROR(GetSequenceControlProperties(
+      batcher, model_name, control_kind, true /* required */, &tensor_name,
+      &tensor_datatype, nullptr, nullptr, nullptr, nullptr));
+
+  OnnxTensorInfoMap input_tensor_infos;
+  RETURN_IF_ERROR(InputInfos(session_, allocator_, input_tensor_infos));
+  const auto& iit = input_tensor_infos.find(tensor_name);
+  if (iit == input_tensor_infos.end()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "configuration specified sequence control '" + tensor_name +
+            "', but model does not provide that input");
+  }
+
+  // Control tensors must have shape [1].
+  DimsList dims;
+  dims.Add(1);
+
+  const int nonbatch_start_idx = (max_batch_size_ > 0) ? 1 : 0;
+  std::vector<int64_t> debatched_dims;
+  for (int i = nonbatch_start_idx; i < iit->second.dims_.size(); i++) {
+    debatched_dims.push_back(iit->second.dims_[i]);
+  }
+
+  if ((debatched_dims.size() != 1) || (debatched_dims[0] != 1)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', sequence control '" +
+            tensor_name + "' dims " + DimsListToString(debatched_dims) +
+            " don't match expected dims [1]");
+  }
+
+  if (ConvertToOnnxDataType(tensor_datatype) != iit->second.type_) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', sequence control '" +
+            tensor_name + "' data-type " + OnnxDataTypeName(iit->second.type_) +
+            " doesn't match required data-type " +
+            DataType_Name(tensor_datatype));
+  }
 
   return Status::Success;
 }
 
 Status
 OnnxBackend::Context::ValidateInputs(
-    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+    const std::string& model_name,
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+    const size_t expected_input_cnt)
 {
-  std::set<std::string> input_node_names;
-  RETURN_IF_ERROR(InputNames(session_, input_node_names));
+  std::set<std::string> input_tensor_names;
+  RETURN_IF_ERROR(InputNames(session_, input_tensor_names));
+
+  OnnxTensorInfoMap input_tensor_infos;
+  RETURN_IF_ERROR(InputInfos(session_, allocator_, input_tensor_infos));
+
+  if (input_tensor_infos.size() != expected_input_cnt) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', configuration expects " +
+            std::to_string(expected_input_cnt) + " inputs, model provides " +
+            std::to_string(input_tensor_infos.size()));
+  }
 
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(CheckAllowedModelInput(io, input_node_names));
-    if (ConvertToOnnxDataType(io.data_type()) ==
-        ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
+    auto iit = input_tensor_infos.find(io.name());
+    if (iit == input_tensor_infos.end()) {
+      RETURN_IF_ERROR(CheckAllowedModelInput(io, input_tensor_names));
+    }
+
+    auto onnx_data_type = ConvertToOnnxDataType(io.data_type());
+    if (onnx_data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
-              " for input '" + io.name() + "' for model '" + name_ + "'");
+              " for input '" + io.name() + "' for model '" + model_name + "'");
+    } else if (onnx_data_type != iit->second.type_) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', input '" + io.name() +
+              "' data-type " + OnnxDataTypeName(iit->second.type_) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
     }
+
+    // If a reshape is provided for the input then use that when
+    // validating that the model matches what is expected.
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+    RETURN_IF_ERROR(CompareDimsSupported(
+        model_name, io.name(), iit->second.dims_, dims, max_batch_size_));
   }
 
   return Status::Success;
@@ -235,20 +331,42 @@ OnnxBackend::Context::ValidateInputs(
 
 Status
 OnnxBackend::Context::ValidateOutputs(
+    const std::string& model_name,
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
-  std::set<std::string> output_node_names;
-  RETURN_IF_ERROR(OutputNames(session_, output_node_names));
+  std::set<std::string> output_tensor_names;
+  RETURN_IF_ERROR(OutputNames(session_, output_tensor_names));
+
+  OnnxTensorInfoMap output_tensor_infos;
+  RETURN_IF_ERROR(OutputInfos(session_, allocator_, output_tensor_infos));
 
   for (const auto& io : ios) {
-    RETURN_IF_ERROR(CheckAllowedModelOutput(io, output_node_names));
-    if (ConvertToOnnxDataType(io.data_type()) ==
-        ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
+    auto iit = output_tensor_infos.find(io.name());
+    if (iit == output_tensor_infos.end()) {
+      RETURN_IF_ERROR(CheckAllowedModelOutput(io, output_tensor_names));
+    }
+
+    auto onnx_data_type = ConvertToOnnxDataType(io.data_type());
+    if (onnx_data_type == ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
-              " for output '" + io.name() + "' for model '" + name_ + "'");
+              " for output '" + io.name() + "' for model '" + model_name + "'");
+    } else if (onnx_data_type != iit->second.type_) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', output '" + io.name() +
+              "' data-type " + OnnxDataTypeName(iit->second.type_) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
     }
+
+    // If a reshape is provided for the input then use that when
+    // validating that the model matches what is expected.
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+    RETURN_IF_ERROR(CompareDimsSupported(
+        model_name, io.name(), iit->second.dims_, dims, max_batch_size_));
   }
 
   return Status::Success;

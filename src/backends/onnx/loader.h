@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,33 +26,55 @@
 #pragma once
 
 #include <core/session/onnxruntime_c_api.h>
-#include "src/backends/onnx/onnx_backend.h"
-#include "src/backends/onnx/onnx_backend.pb.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class OnnxBackendFactory {
+/// A singleton to load Onnx model because loading models requires
+/// Onnx Runtime environment which is unique per process
+class OnnxLoader {
  public:
-  static Status Create(
-      const OnnxPlatformConfig& platform_config,
-      std::unique_ptr<OnnxBackendFactory>* factory);
+  ~OnnxLoader();
 
-  Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
-      std::unique_ptr<InferenceBackend>* backend);
+  /// Initialize loader with default environment settings
+  static Status Init();
 
-  ~OnnxBackendFactory();
+  /// Stop loader, and once all Onnx sessions are unloaded via UnloadSession()
+  /// the resource it allocated will be released
+  static Status Stop();
+
+  /// Load a Onnx model from a path and return the corresponding
+  /// OrtSession.
+  ///
+  /// \param model_path The path to the Onnx model
+  /// \param session_options The options to use when creating the session
+  /// \param session Returns the Onnx model session
+  /// \return Error status.
+  static Status LoadSession(
+      const std::string& model_path, const OrtSessionOptions* session_options,
+      OrtSession** session);
+
+  /// Unload a Onnx model session
+  ///
+  /// \param session The Onnx model session to be unloaded
+  static Status UnloadSession(OrtSession* session);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(OnnxBackendFactory);
+  OnnxLoader(OrtEnv* env) : env_(env), live_session_cnt_(0), closing_(false) {}
 
-  OnnxBackendFactory(const OnnxPlatformConfig& platform_config)
-      : platform_config_(platform_config)
-  {
-  }
+  /// Decrease 'live_session_cnt_' if 'decrement_session_cnt' is true, and then
+  /// release Onnx Runtime environment if it is closing and no live sessions
+  ///
+  /// \param decrement_session_cnt Whether to decrease the 'live_session_cnt_'
+  static void TryRelease(bool decrement_session_cnt);
 
-  const OnnxPlatformConfig platform_config_;
+  static OnnxLoader* loader;
+
+  OrtEnv* env_;
+
+  std::mutex mu_;
+  size_t live_session_cnt_;
+  bool closing_;
 };
 
 }}  // namespace nvidia::inferenceserver

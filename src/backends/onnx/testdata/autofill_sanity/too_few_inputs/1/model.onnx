@@ -1,0 +1,33 @@
+TRTIS:Ô
+
+INPUT0_INPUT0"Identity
+
+INPUT1_INPUT1"Identity
+
+_INPUT0
+_INPUT1CAST0"Add
+
+_INPUT0
+_INPUT1CAST1"Sub
+!
+CAST0OUTPUT0"Cast*	
+to 
+!
+CAST1OUTPUT1"Cast*	
+to onnx_int32_int8_int8Z
+INPUT0
+
+var_0
+Z
+INPUT1
+
+var_0
+b
+OUTPUT0
+
+var_1
+b
+OUTPUT1
+
+var_2
+B
