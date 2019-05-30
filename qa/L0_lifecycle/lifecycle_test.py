@@ -604,8 +604,23 @@ class LifeCycleTest(unittest.TestCase):
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Change the model configuration to have the default version
-        # policy (so that only version 3) is available.
+        # Change the model configuration to use wrong label file
+        for base_name, model_name in zip(models_base, models):
+            shutil.copyfile("config.pbtxt.wrong." + base_name, "models/" + model_name + "/config.pbtxt")
+
+        time.sleep(5) # wait for models to reload
+        for model_name in models:
+            for model_name, model_shape in zip(models_base, models_shape):
+                try:
+                    iu.infer_exact(self, model_name, model_shape, 1,
+                                   np.float32, np.float32, np.float32, swap=(version == 3),
+                                   model_version=version, output0_raw=False)
+                    self.assertTrue(False, "expected error for wrong label for " + model_name)
+                except AssertionError as ex:
+                    self.assertTrue(str(ex).startswith("'label"), str(ex))
+
+        # Change the model configuration to use correct label file and to have
+        # the default version policy (so that only version 3) is available.
         for base_name, model_name in zip(models_base, models):
             shutil.copyfile("config.pbtxt." + base_name, "models/" + model_name + "/config.pbtxt")
 

@@ -232,6 +232,11 @@ for i in savedmodel plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     sed '/^version_policy/d' \
         $DATADIR/qa_model_repository/${i}_float32_float32_float32/config.pbtxt > config.pbtxt.${i}
+    sed 's/output0_labels/wrong_output0_labels/' \
+        $DATADIR/qa_model_repository/${i}_float32_float32_float32/config.pbtxt > config.pbtxt.wrong.${i}
+    sed 's/label/label9/' \
+        $DATADIR/qa_model_repository/${i}_float32_float32_float32/output0_labels.txt > \
+        models/${i}_float32_float32_float32/wrong_output0_labels.txt
 done
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
