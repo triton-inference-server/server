@@ -592,8 +592,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
           ModelReadyState::MODEL_UNKNOWN, ActionType::NO_ACTION, model_config));
     }
 
-    // Reload model if it is being served
+    // Update model config and reload model if it is being served
     std::lock_guard<std::mutex> lock(vit->second->mtx_);
+    vit->second->model_config_ = model_config;
     Unload(model_name, version, vit->second.get());
     RETURN_IF_ERROR(Load(model_name, version, vit->second.get()));
   }
