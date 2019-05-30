@@ -397,23 +397,10 @@ def create_onnx_modelconfig(
                                    io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
     
-    # Must make sure all Onnx models will be loaded to the same GPU if they are
-    # run on GPU. This is due to the current limitation of Onnx Runtime
-    # https://github.com/microsoft/onnxruntime/issues/1034
-    instance_group_string = '''
-instance_group [
-  {
-    kind: KIND_GPU
-    gpus: [ 0 ]
-  }
-]
-'''
-    
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
             emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
-            emu.repeat(None, io_cnt), force_tensor_number_suffix=True,
-            instance_group_str=instance_group_string)
+            emu.repeat(None, io_cnt), force_tensor_number_suffix=True)
 
     try:
         os.makedirs(config_dir)
