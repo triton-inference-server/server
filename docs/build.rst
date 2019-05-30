@@ -44,7 +44,7 @@ change directory to the root of the repo and checkout the release
 version of the branch that you want to build (or the master branch if
 you want to build the under-development version)::
 
-  $ git checkout r19.05
+  $ git checkout r19.06
 
 Then use docker to build::
 

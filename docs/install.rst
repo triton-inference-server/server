@@ -54,7 +54,7 @@ the most recent version of CUDA, Docker, and nvidia-docker.
 After performing the above setup, you can pull the TensorRT Inference
 Server container using the following command::
 
-  docker pull nvcr.io/nvidia/tensorrtserver:19.05-py3
+  docker pull nvcr.io/nvidia/tensorrtserver:19.06-py3
 
-Replace *19.05* with the version of inference server that you want to
+Replace *19.06* with the version of inference server that you want to
 pull.
