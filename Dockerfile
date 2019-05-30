@@ -123,8 +123,8 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
 ############################################################################
 FROM ${TENSORFLOW_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=1.3.0dev
-ARG TRTIS_CONTAINER_VERSION=19.06dev
+ARG TRTIS_VERSION=1.4.0dev
+ARG TRTIS_CONTAINER_VERSION=19.07dev
 ARG PYVER=3.5
 
 # The TFServing release branch must match the TF release used by
@@ -268,8 +268,8 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.3.0dev
-ARG TRTIS_CONTAINER_VERSION=19.06dev
+ARG TRTIS_VERSION=1.4.0dev
+ARG TRTIS_CONTAINER_VERSION=19.07dev
 ARG PYVER=3.5
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
