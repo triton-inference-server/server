@@ -660,7 +660,8 @@ message ModelConfig
   //@@
   //@@     The framework for the model. Possible values are
   //@@     "tensorrt_plan", "tensorflow_graphdef",
-  //@@     "tensorflow_savedmodel", and "caffe2_netdef".
+  //@@     "tensorflow_savedmodel", "caffe2_netdef",
+  //@@     "onnxruntime_onnx", and "custom".
   //@@
   string platform = 2;
 
