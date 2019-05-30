@@ -29,6 +29,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "src/backends/onnx/loader.h"
 #include "src/backends/onnx/onnx_utils.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
@@ -40,9 +41,7 @@ namespace nvidia { namespace inferenceserver {
 
 OnnxBackendFactory::~OnnxBackendFactory()
 {
-  if (env_ != nullptr) {
-    OrtReleaseEnv(env_);
-  }
+  OnnxLoader::Stop();
 }
 
 Status
@@ -55,8 +54,7 @@ OnnxBackendFactory::Create(
 
   std::unique_ptr<OnnxBackendFactory> local(
       new OnnxBackendFactory(platform_config));
-  RETURN_IF_ORT_ERROR(
-      OrtCreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &local->env_));
+  RETURN_IF_ERROR(OnnxLoader::Init());
 
   *factory = std::move(local);
   return Status::Success;
@@ -82,7 +80,7 @@ OnnxBackendFactory::CreateBackend(
   // requested for this model.
   std::unique_ptr<OnnxBackend> local_backend(new OnnxBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(env_, onnx_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(onnx_paths));
 
   *backend = std::move(local_backend);
   return Status::Success;

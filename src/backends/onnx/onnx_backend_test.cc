@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,36 +23,55 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include <core/session/onnxruntime_c_api.h>
 #include "src/backends/onnx/onnx_backend.h"
-#include "src/backends/onnx/onnx_backend.pb.h"
+#include "src/backends/onnx/loader.h"
+#include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/status.h"
+#include "src/test/model_config_test_base.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace nvidia { namespace inferenceserver { namespace test {
 
-class OnnxBackendFactory {
+class OnnxBackendTest : public ModelConfigTestBase {
  public:
-  static Status Create(
-      const OnnxPlatformConfig& platform_config,
-      std::unique_ptr<OnnxBackendFactory>* factory);
-
-  Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
-      std::unique_ptr<InferenceBackend>* backend);
-
-  ~OnnxBackendFactory();
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(OnnxBackendFactory);
-
-  OnnxBackendFactory(const OnnxPlatformConfig& platform_config)
-      : platform_config_(platform_config)
-  {
-  }
-
-  const OnnxPlatformConfig platform_config_;
 };
 
-}}  // namespace nvidia::inferenceserver
+TEST_F(OnnxBackendTest, ModelConfigSanity)
+{
+  BackendInitFunc init_func = [](const std::string& path,
+                                 const ModelConfig& config) -> Status {
+    std::unique_ptr<OnnxBackend> backend(new OnnxBackend());
+    Status status = backend->Init(path, config);
+    if (status.IsOk()) {
+      std::unordered_map<std::string, std::string> onnx_paths;
+
+      for (const auto& filename : std::vector<std::string>{
+               kOnnxRuntimeOnnxFilename, "no_batch.onnx"}) {
+        const auto onnx_path = JoinPath({path, filename});
+        onnx_paths.emplace(
+            std::piecewise_construct, std::make_tuple(filename),
+            std::make_tuple(onnx_path));
+      }
+
+      status = backend->CreateExecutionContexts(onnx_paths);
+    }
+
+    return status;
+  };
+
+  // Initalize Onnx loader before test
+  OnnxLoader::Init();
+
+  // Standard testing...
+  ValidateAll(kOnnxRuntimeOnnxPlatform, init_func);
+
+  // Sanity tests with autofill and not providing the platform.
+  ValidateOne(
+      "inference_server/src/backends/onnx/testdata/autofill_sanity",
+      true /* autofill */, std::string() /* platform */, init_func);
+
+  OnnxLoader::Stop();
+}
+
+}}}  // namespace nvidia::inferenceserver::test

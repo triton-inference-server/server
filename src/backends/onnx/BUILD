@@ -36,6 +36,35 @@ cc_proto_library(
 )
 
 cc_library(
+    name = "autofill_header",
+    hdrs = ["autofill.h"],
+    deps = [
+    ],
+)
+
+cc_library(
+    name = "autofill",
+    srcs = ["autofill.cc"],
+    deps = [
+        ":autofill_header",
+        ":loader",
+        ":onnx_utils",
+        "//src/core:model_config_proto",
+        "//src/core:server_header",
+    ],
+)
+
+cc_library(
+    name = "loader",
+    srcs = ["loader.cc"],
+    hdrs = ["loader.h"],
+    deps = [
+        ":onnx_utils",
+        "//src/core:server_header",
+    ],
+)
+
+cc_library(
     name = "onnx_utils",
     srcs = ["onnx_utils.cc"],
     hdrs = ["onnx_utils.h"],
@@ -50,6 +79,7 @@ cc_library(
     srcs = ["onnx_backend.cc"],
     hdrs = ["onnx_backend.h"],
     deps = [
+        ":loader",
         ":onnx_utils",
         "//src/core:constants",
         "//src/core:model_config_proto",
@@ -64,6 +94,7 @@ cc_library(
     srcs = ["onnx_backend_factory.cc"],
     hdrs = ["onnx_backend_factory.h"],
     deps = [
+        ":loader",
         ":onnx_backend",
         ":onnx_backend_proto",
         "//src/core:constants",
@@ -72,4 +103,36 @@ cc_library(
         "//src/core:server_header",
     ],
     alwayslink = 1,
+)
+
+filegroup(
+    name = "onnx_testdata",
+    srcs = glob(
+        ["testdata/**/*"]),
+)
+
+cc_test(
+    name = "onnx_backend_test",
+    srcs = ["onnx_backend_test.cc"],
+    linkopts = [
+        "-L/opt/tensorrtserver/lib",
+        "-lcaffe2_gpu",
+        "-lcaffe2",
+        "-ltorch",
+        "-lonnxruntime",
+        "-lnvinfer",
+        "-L/usr/local/cuda/lib64/stubs",
+        "-lnvidia-ml",
+        "-lnvonnxparser_runtime",
+    ],
+    data = [
+        ":onnx_testdata"
+    ],
+    deps = [
+        "//src/test:model_config_test_base",
+        "//src/core:server",
+        "//src/test:testmain",
+        "@local_config_cuda//cuda:cudart",
+    ],
+    tags = ["exclusive"],
 )

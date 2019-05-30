@@ -536,8 +536,6 @@ def create_onnx_modelfile(
     # tests know to expect this.
     onnx_dtype = np_to_onnx_dtype(dtype)
     onnx_input_shape, idx = tu.shape_to_onnx_shape(shape, 0)
-    onnx_start_shape, idx = tu.shape_to_onnx_shape(shape, idx)
-    onnx_ready_shape, idx = tu.shape_to_onnx_shape(shape, idx)
     onnx_output_shape, idx = tu.shape_to_onnx_shape(shape, idx)
 
     # If the input is a string then use int32 for operation and just
@@ -549,8 +547,8 @@ def create_onnx_modelfile(
     batch_dim = [] if max_batch == 0 else [max_batch]
 
     onnx_input = onnx.helper.make_tensor_value_info("INPUT", onnx_dtype, batch_dim + onnx_input_shape)
-    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype, batch_dim + onnx_start_shape)
-    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype, batch_dim + onnx_ready_shape)
+    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype, batch_dim + [1])
+    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype, batch_dim + [1])
     onnx_output = onnx.helper.make_tensor_value_info("OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
 
     internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
