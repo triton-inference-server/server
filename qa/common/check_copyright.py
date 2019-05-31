@@ -37,6 +37,7 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'caffemodel')
 SKIP_PATHS = ('deploy/single_server/.helmignore',
               'docs/examples/model_repository',
+              'docs/examples/ensemble_model_repository',
               'qa/custom_models/custom_float32_float32_float32/output0_labels.txt',
               'qa/custom_models/custom_nobatch_float32_float32_float32/output0_labels.txt',
               'qa/custom_models/custom_int32_int32_int32/output0_labels.txt',
