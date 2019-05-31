@@ -166,6 +166,7 @@ definition. By default, the name of this file or directory must be:
 * **model.graphdef** for TensorFlow GraphDef models
 * **model.savedmodel** for TensorFlow SavedModel models
 * **model.netdef** and **init_model.netdef** for Caffe2 Netdef models
+* **model.onnx** for ONNX Runtime ONNX models
 
 This default name can be overridden using the *default_model_filename*
 property in the :ref:`model configuration
@@ -290,18 +291,28 @@ Capability and so it is typically necessary to use the :ref:`model
 configuration's <section-model-configuration>` *cc_model_filenames*
 property as described above.
 
+.. _section-onnx-models:
+
 ONNX Models
 ^^^^^^^^^^^
 
-The TensorRT Inference Server cannot directly perform inferencing
-using `ONNX <http://onnx.ai/>`_ models. An ONNX model must be
-converted to either a TensorRT Plan or a Caffe2 NetDef. To convert
-your ONNX model to a TensorRT Plan use either the `ONNX Parser
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-developer-guide/index.html#api>`_
-included in TensorRT or the `open-source TensorRT backend for ONNX
-<https://github.com/onnx/onnx-tensorrt>`_. Another option is to
-convert your ONNX model to Caffe2 NetDef `as described here
-<https://github.com/pytorch/pytorch/tree/master/caffe2/python/onnx>`_.
+An ONNX model is a single file that by default must be named model.onnx.
+A minimal model repository for a single ONNX model would look like::
+
+  models/
+    <model-name>/
+      config.pbtxt
+      1/
+        model.onnx
+
+As described in :ref:`section-generated-model-configuration` the
+config.pbtxt is optional for some models. In cases where it is not
+required the minimal model repository would look like::
+
+  models/
+    <model-name>/
+      1/
+        model.onnx
 
 .. _section-custom-backends:
 
