@@ -594,11 +594,19 @@ def create_onnx_modelconfig(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
     config_dir = models_dir + "/" + model_name
 
+    instance_group_string = '''
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]
+'''
+
     # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             [dtype], [shape], [None], [dtype], [shape], [None], [None],
-            force_tensor_number_suffix=False)
+            force_tensor_number_suffix=False, instance_group_str=instance_group_string)
 
     config += '''
 sequence_batching {{
