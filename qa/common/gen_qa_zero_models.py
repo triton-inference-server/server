@@ -323,6 +323,7 @@ output [
         cfile.write(config)
 
 
+
 def create_ensemble_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
     if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype,
@@ -396,7 +397,7 @@ def create_onnx_modelconfig(
     model_name = tu.get_zero_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
                                    io_cnt, dtype)
     config_dir = models_dir + "/" + model_name
-    
+
     config = emu.create_general_modelconfig(model_name, "onnxruntime_onnx", max_batch,
             emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
             emu.repeat(dtype, io_cnt), emu.repeat(shape, io_cnt), emu.repeat(shape, io_cnt),
