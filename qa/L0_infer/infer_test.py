@@ -67,7 +67,7 @@ class InferTest(unittest.TestCase):
                                model_version, swap, outputs, use_http, use_grpc,
                                skip_request_id_check, use_streaming,
                                correlation_id)
-        
+
         input_size = 16
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
@@ -85,7 +85,7 @@ class InferTest(unittest.TestCase):
                     _infer_exact_helper(self, prefix + pf, (input_size,), 8,
                                     input_dtype, output0_dtype, output1_dtype,
                                     output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-            
+
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
@@ -114,6 +114,13 @@ class InferTest(unittest.TestCase):
                                     (input_size,), (input_size,), (input_size,)):
             # No basic ensemble models are created against onnx models for now [TODO]
             _infer_exact_helper(self, 'onnx', (input_size,), 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            
+        if tu.validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
+                                    (input_size,), (input_size,), (input_size,)):
+            # No basic ensemble models are created wuth libtorch models for now [TODO]
+            _infer_exact_helper(self, 'libtorch', (input_size,), 8,
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
@@ -378,7 +385,7 @@ class InferTest(unittest.TestCase):
             # Sanity check that infer_exact failed since this ensemble is provided
             # with unexpected labels
             pass
-        
+
         for bs in (1, 8):
             iu.infer_exact(self, "label_override", (16,), bs,
                 np.int32, np.float32, np.float32, output0_raw=False, output1_raw=False)
