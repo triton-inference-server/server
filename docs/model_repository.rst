@@ -350,6 +350,6 @@ Currently, the ensemble backend does not require any version specific data,
 so each model version subdirectory must exist but should be empty.
 
 An example of an ensemble backend in a model repository can be found in the
-`docs/examples/model_repository/preprocess_resnet50_ensemble
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository/preprocess_resnet50_ensemble>`_
+`docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/ensemble_model_repository/preprocess_resnet50_ensemble>`_
 directory.
