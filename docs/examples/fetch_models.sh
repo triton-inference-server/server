@@ -41,10 +41,13 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb model_repository/inception_graphdef/1/model.graphdef
 
-# Custom models. Only the source code is provided, users must build
+# Custom models. The source code is also provided, users may also build
 # the model definition files in order to use them (see "Building" section in
 # the documentation).
 mkdir -p model_repository/image_preprocess_nchw_3x224x224_inception/1
+wget -O /tmp/custom_models.tar.gz `curl https://api.github.com/repos/NVIDIA/tensorrt-inference-server/releases/latest | grep -oP -m 1 '(?<=browser_download_url\":\ \")https.*\.tar\.gz(?=\")'` | head -1
+(cd /tmp && tar xzf custom_models.tar.gz)
+mv /tmp/custom_models/libimagepreprocess.so model_repository/image_preprocess_nchw_3x224x224_inception/1/.
 
 # Ensemble models
 # (ensemble models are fully specified in their model configuration, but need to
