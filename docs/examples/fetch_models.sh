@@ -40,13 +40,3 @@ wget -O /tmp/inception_v3_2016_08_28_frozen.pb.tar.gz \
      https://storage.googleapis.com/download.tensorflow.org/models/inception_v3_2016_08_28_frozen.pb.tar.gz
 (cd /tmp && tar xzf inception_v3_2016_08_28_frozen.pb.tar.gz)
 mv /tmp/inception_v3_2016_08_28_frozen.pb model_repository/inception_graphdef/1/model.graphdef
-
-# Custom models. Only the source code is provided, users must build
-# the model definition files in order to use them (see "Building" section in
-# the documentation).
-mkdir -p model_repository/image_preprocess_nchw_3x224x224_inception/1
-
-# Ensemble models
-# (ensemble models are fully specified in their model configuration, but need to
-#  create empty version directories to be recognized as valid model directories)
-mkdir -p model_repository/preprocess_resnet50_ensemble/1
