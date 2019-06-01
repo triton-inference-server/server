@@ -87,7 +87,7 @@ class SequenceBatcherTest(unittest.TestCase):
 
         if (("savedmodel" in trial) or ("graphdef" in trial) or
             ("netdef" in trial) or ("custom" in trial) or
-            ("onnx" in trial)):
+            ("onnx" in trial) or ("libtorch" in trial)):
             tensor_shape = (1,)
         elif "plan" in trial:
             tensor_shape = (1,1,1)
@@ -136,9 +136,15 @@ class SequenceBatcherTest(unittest.TestCase):
                         input_list.append(in0)
 
                     start_ms = int(round(time.time() * 1000))
-                    results = ctx.run(
-                        { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
-                        batch_size=batch_size, flags=flags)
+                    if "libtorch" not in trial:
+                        results = ctx.run(
+                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            batch_size=batch_size, flags=flags)
+                    else:
+                        results = ctx.run(
+                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            batch_size=batch_size, flags=flags)
+
                     end_ms = int(round(time.time() * 1000))
 
                     self.assertEqual(len(results), 1)
@@ -194,7 +200,7 @@ class SequenceBatcherTest(unittest.TestCase):
 
         if (("savedmodel" in trial) or ("graphdef" in trial) or
             ("netdef" in trial) or ("custom" in trial) or
-            ("onnx" in trial)):
+            ("onnx" in trial) or ("libtorch" in trial)):
             tensor_shape = (1,)
         elif "plan" in trial:
             tensor_shape = (1,1,1)
@@ -243,9 +249,14 @@ class SequenceBatcherTest(unittest.TestCase):
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
 
-                    result_ids.append(ctx.async_run(
-                        { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
-                        batch_size=batch_size, flags=flags))
+                    if "libtorch" not in trial:
+                        result_ids.append(ctx.async_run(
+                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            batch_size=batch_size, flags=flags))
+                    else:
+                        result_ids.append(ctx.async_run(
+                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            batch_size=batch_size, flags=flags))
 
                 # Wait for the results in the order sent
                 result = None
@@ -331,7 +342,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # information.
         if ((not _no_batching and ("custom" not in trial)) or
             ("graphdef" in trial) or ("netdef" in trial) or ("plan" in trial) or
-            ("onnx" in trial)):
+            ("onnx" in trial))  or ("libtorch" in trial):
             expected_result = value
             if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
@@ -438,10 +449,10 @@ class SequenceBatcherTest(unittest.TestCase):
                             base_model_name = model_name[(len(prefix)):]
                             self.assertTrue(
                                 ex.message().startswith(
-                                    str("in ensemble '{}', " + 
+                                    str("in ensemble '{}', " +
                                         "inference request to model '{}' must specify " +
                                         "batch-size 1 due to requirements of sequence " +
-                                        "batcher").format(model_name, base_model_name)))        
+                                        "batcher").format(model_name, base_model_name)))
                             return
                     self.assertTrue(
                         ex.message().startswith(
@@ -480,7 +491,7 @@ class SequenceBatcherTest(unittest.TestCase):
                             base_model_name = model_name[(len(prefix)):]
                             self.assertTrue(
                                 ex.message().startswith(
-                                    str("in ensemble '{}', " + 
+                                    str("in ensemble '{}', " +
                                         "inference request to model '{}' must specify a " +
                                         "non-zero correlation ID").format(model_name, base_model_name)))
                             return
@@ -522,7 +533,7 @@ class SequenceBatcherTest(unittest.TestCase):
                             base_model_name = model_name[(len(prefix)):]
                             self.assertTrue(
                                 ex.message().startswith(
-                                    str("in ensemble '{}', " + 
+                                    str("in ensemble '{}', " +
                                         "inference request for sequence 37469245 to " +
                                         "model '{}' must specify the START flag on the first " +
                                         "request of the sequence").format(model_name, base_model_name)))
@@ -569,7 +580,7 @@ class SequenceBatcherTest(unittest.TestCase):
                             base_model_name = model_name[(len(prefix)):]
                             self.assertTrue(
                                 ex.message().startswith(
-                                    str("in ensemble '{}', " + 
+                                    str("in ensemble '{}', " +
                                         "inference request for sequence 3 to model '{}' must " +
                                         "specify the START flag on the first request of " +
                                         "the sequence").format(model_name, base_model_name)))
@@ -1419,7 +1430,7 @@ class SequenceBatcherTest(unittest.TestCase):
                         base_model_name = model_name[(len(prefix)):]
                         self.assertTrue(
                             ex.message().startswith(
-                                str("in ensemble '{}', " + 
+                                str("in ensemble '{}', " +
                                     "inference request for sequence 1001 to " +
                                     "model '{}' must specify the START flag on the first " +
                                     "request of the sequence").format(model_name, base_model_name)))

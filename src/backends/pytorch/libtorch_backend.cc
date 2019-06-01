@@ -553,12 +553,22 @@ LibTorchBackend::Context::Run(
             name_ + "', max allowed is " + std::to_string(max_batch_size_));
   }
 
+  // Additional inputs added to the provider...
+  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
+      input_override_map = input_request_provider->GetInputOverride();
+
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
   std::vector<std::unique_ptr<char[]>> input_buffers;
 
+  size_t overide_inputs = 0;
+  if (input_override_map != nullptr) {
+    overide_inputs = input_override_map->size();
+  }
+
   // Store input and output tensors
-  std::vector<torch::jit::IValue> inputs_(input_request_provider->RequestHeader().input().size());
+  std::vector<torch::jit::IValue> inputs_(input_request_provider->RequestHeader().input().size() \
+    + overide_inputs);
   std::vector<torch::Tensor> outputs_;
 
   // Input and output names must be of the form *__<index>
@@ -578,9 +588,6 @@ LibTorchBackend::Context::Run(
         total_batch_size, payloads, &input_buffers));
   }
 
-  // Additional inputs added to the provider...
-  const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-      input_override_map = input_request_provider->GetInputOverride();
   if (input_override_map != nullptr) {
     for (const auto& pr : *input_override_map) {
       const std::string& name = pr.first;
