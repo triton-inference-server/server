@@ -244,6 +244,9 @@ AutoFillOnnx::Create(
   // All versions should share the same model configuration, thus use the first
   // one that can be loaded successfully.
   Status status;
+  bool unsupported_opset = false;
+  const std::string opset_error(
+      "onnx runtime error " + std::to_string(ORT_NOT_IMPLEMENTED));
   for (const auto& version : version_dirs) {
     const auto version_path = JoinPath({model_path, version});
 
@@ -265,11 +268,25 @@ AutoFillOnnx::Create(
     if (status.IsOk()) {
       local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
       break;
+    } else if (
+        (status.Message().compare(0, opset_error.size(), opset_error)) == 0) {
+      local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
+      unsupported_opset = true;
+      // no break in case there is a valid version
     }
   }
 
   OrtReleaseSessionOptions(session_options);
+
+  // If it is due to unsupported opset, return success with limited autofill
+  // capability
+  if (!status.IsOk() && unsupported_opset) {
+    *autofill = std::move(local_autofill);
+    return Status::Success;
+  }
+
   // Return if none of the version can be loaded successfully
+  // due to reasons other than unsupported opset
   RETURN_IF_ERROR(status);
 
   OrtStatus* ort_status;

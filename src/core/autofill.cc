@@ -137,8 +137,16 @@ AutoFill::Create(
     }
   }
 
-  // Check for Onnx model must be done before check for TensorRT plan
-  // [TODO] complete reasoning
+  // Check for ONNX model must be done before check for TensorRT plan
+  // because TensorRT deserializeCudaEngine() function will cause program
+  // to exit when it tries to deserialize an ONNX model.
+  // However this is not bulletproof as ONNX Runtime does not support
+  // ONNX models with opset < 8, thus under AutoFillOnnx class, there
+  // is additional check on reason of loading failure.
+  //
+  // [TODO] remove additional checking once TensorRT provides
+  // an elegent way to handle passing incorrect model format (i.e. ONNX model)
+  // to deserializeCudaEngine()
   if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
