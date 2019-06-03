@@ -199,7 +199,7 @@ RUN git clone --single-branch -b ${TFS_BRANCH} https://github.com/tensorflow/ser
 # Modify the TF model loader to allow us to set the default GPU
 RUN sha1sum -c tools/patch/tensorflow/checksums && \
     patch -i tools/patch/tensorflow/cc/saved_model/loader.cc \
-          /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
+          /opt/tensorflow/tensorflow-source/tensorflow/cc/saved_model/loader.cc
 
 # TFS modifications. Use a checksum to detect if the TFS file has
 # changed... if it has need to verify our patch is still valid and
@@ -226,7 +226,7 @@ ENV TF_NEED_S3 1
 # Build the server and any testing artifacts
 RUN (cd /opt/tensorflow && ./nvbuild.sh --python$PYVER --configonly) && \
     mv .bazelrc .bazelrc.orig && \
-    cat .bazelrc.orig /opt/tensorflow/.tf_configure.bazelrc > .bazelrc && \
+    cat .bazelrc.orig /opt/tensorflow/tensorflow-source/.tf_configure.bazelrc > .bazelrc && \
     bazel build -c opt \
           src/servers/trtserver \
           src/custom/... \
@@ -301,7 +301,7 @@ WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
 COPY --from=trtserver_build /workspace/serving/LICENSE LICENSE.tfserving
-COPY --from=trtserver_build /opt/tensorflow/LICENSE LICENSE.tensorflow
+COPY --from=trtserver_build /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib

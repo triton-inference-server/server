@@ -28,7 +28,7 @@ workspace(name = "inference_server")
 
 local_repository(
   name = "org_tensorflow",
-  path = "/opt/tensorflow/",
+  path = "/opt/tensorflow/tensorflow-source",
 )
 
 local_repository(
