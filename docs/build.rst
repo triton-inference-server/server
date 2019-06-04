@@ -125,8 +125,8 @@ For the inference server to support NVIDIA GPUs you must install CUDA,
 cuBLAS and cuDNN. These libraries must be installed on system include
 and library paths so that they are available for the CMake build. The
 version of the libraries used in the Dockerfile build can be found in
-the `Framework Containers Support
-Matrix<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_.
+the `Framework Containers Support Matrix
+<https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 
 For a given version of the inference server you can attempt to build
 with non-supported versions of the libraries but you may have build or
@@ -141,8 +141,8 @@ TensorRT
 The TensorRT includes and libraries must be installed on system
 include and library paths so that they are available for the CMake
 build. The version of TensorRT used in the Dockerfile build can be
-found in the `Framework Containers Support
-Matrix<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_.
+found in the `Framework Containers Support Matrix
+<https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 
 For a given version of the inference server you can attempt to build
 with non-supported versions of TensorRT but you may have build or
@@ -157,10 +157,10 @@ TensorFlow
 ..........
 
 The version of TensorFlow used in the Dockerfile build can be found in
-the `Framework Containers Support
-Matrix<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_.
+the `Framework Containers Support Matrix
+<https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 The trtserver_tf section of the Dockerfile shows how to build the
-required TensorFlow libary from the `NGC<https://ngc.nvidia.com>`_
+required TensorFlow libary from the `NGC <https://ngc.nvidia.com>`_
 TensorFlow container.
 
 You can build and install a different version of the TensorFlow
@@ -209,11 +209,11 @@ PyTorch and Caffe2
 ..................
 
 The version of PyTorch and Caffe2 used in the Dockerfile build can be
-found in the `Framework Containers Support
-Matrix<https://docs.nvidia.com/deeplearning/sdk/inference-release-notes/index.html>`_.
+found in the `Framework Containers Support Matrix
+<https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 The trtserver_caffe2 section of the Dockerfile shows how to build the
-required PyTorch and Caffe2 libaries from the
-`NGC<https://ngc.nvidia.com>`_ PyTorch container.
+required PyTorch and Caffe2 libaries from the `NGC
+<https://ngc.nvidia.com>`_ PyTorch container.
 
 You can build and install a different version of the libraries but if
 you want to enable the Caffe2 backend you must include
@@ -311,8 +311,8 @@ Building Custom Backends
 ------------------------
 
 The source repository contains several example custom backends in the
-`src/custom
-directory<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_.
+`src/custom directory
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_.
 These custom backends are built using CMake::
 
   $ mkdir builddir
