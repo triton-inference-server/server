@@ -56,7 +56,8 @@ for m in \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_sequence_object \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_sequence_float32 \
-        ../custom_models/custom_sequence_int32 ; do
+        ../custom_models/custom_sequence_int32 \
+        $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32 ; do
     cp -r $m models1/. && \
         (cd models1/$(basename $m) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
@@ -83,7 +84,8 @@ for m in \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 ; do
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 \
+        $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32 ; do
     cp -r $m models0/. && \
         (cd models0/$(basename $m) && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
@@ -100,7 +102,8 @@ for m in \
         $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 ; do
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
+        $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32 ; do
     cp -r $m modelsv/. && \
         (cd modelsv/$(basename $m) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \

@@ -675,27 +675,22 @@ def create_libtorch_modelfile(
 
     torch_dtype = np_to_torch_dtype(dtype)
 
-    class SequenceNet(nn.Module):
-        def __init__(self, *args):
-            super(SequenceNet, self).__init__()
-            self.shape = args[0][0]
-            self.dtype = args[0][1]
-            self.acc = torch.zeros(self.shape, dtype=self.dtype)
-        def forward(self, input0, start0, ready0):
-            if torch.equal(start0, torch.ones(self.shape, dtype=self.dtype)):
-                tmp = input0
-            else:
-                tmp = self.acc + input0
-            if torch.equal(ready0, torch.ones(self.shape, dtype=self.dtype)):
-                self.acc = tmp
-            return self.acc
+    model_name = tu.get_sequence_model_name("libtorch_nobatch" if max_batch == 0
+            else "libtorch", dtype)
+    # handle for -1 (when variable) since can't create tensor with shape of [-1]
+    shape = [abs(ips) for ips in shape]
 
-    sequenceModel = SequenceNet([shape,torch_dtype])
+    class SequenceNet(nn.Module):
+        def __init__(self):
+            super(SequenceNet, self).__init__()
+        def forward(self, input0, start0, ready0):
+            tmp = input0 + start0
+            return tmp*ready0
+
+    sequenceModel = SequenceNet()
     example_input = torch.zeros(shape, dtype=torch_dtype)
     traced = torch.jit.trace(sequenceModel, (example_input,example_input,example_input))
 
-    model_name = tu.get_sequence_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -720,19 +715,32 @@ def create_libtorch_modelconfig(
 name: "{}"
 platform: "pytorch_libtorch"
 max_batch_size: {}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{
+      name: "START__1"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY__2"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+}}
 input [
   {{
     name: "INPUT__0"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT__1"
-    data_type: {}
-    dims: [ {} ]
-  }},
-  {{
-    name: "INPUT__2"
     data_type: {}
     dims: [ {} ]
   }}
@@ -750,6 +758,7 @@ instance_group [
   }}
 ]
 '''.format(model_name, max_batch,
+           "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32",
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
