@@ -289,16 +289,16 @@ The Python version of the image classification client is available at
 To use ensemble\_image\_client (or ensemble\_image\_client.py) you must first
 have a running inference server that is serving the
 "preprocess_resnet50_ensemble" model and the models it depends on. The models
-are provided in example model repository see
+are provided in example ensemble model repository see
 :ref:`section-example-model-repository` for instructions on how to create one.
 
 Follow the instructions in :ref:`section-running-the-inference-server`
-to launch the server using the model repository. Once the server is
+to launch the server using the ensemble model repository. Once the server is
 running you can use the ensemble\_image\_client application to send inference
 requests to the server. You can specify a single image or a directory
 holding images. Here we send a request for the ensemble from the
-:ref:`example model repository <section-example-model-repository>` for an image
-from the `qa/images
+:ref:`example ensemble model repository <section-example-model-repository>` for
+an image from the `qa/images
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/images>`_
 directory::
 
