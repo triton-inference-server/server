@@ -327,6 +327,10 @@ PyTorch Models
 ^^^^^^^^^^^
 
 An PyTorch model is a single file that by default must be named model.pt.
+Notice that a PyTorch model must be traced with an example input and saved as a
+TorchScript Module as shown `here <https://pytorch.org/tutorials/advanced/cpp_export.html>`_.
+It is possible that some models traced with different versions of PyTorch may
+not be supported by the inference server due to changes in the underlying opset.
 A minimal model repository for a single PyTorch model would look like::
 
   models/

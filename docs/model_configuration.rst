@@ -158,6 +158,14 @@ minimal configuration above. Specifically:
   batching, the initial batch dimension must be variable-size for all inputs
   and outputs.
 
+* :ref:`PyTorch TorchScript <section-pytorch-models>` models have an optional
+  output configuration in the model configuration file to support cases where
+  there are variable number and/or datatypes of output. Both the input and
+  outputs in the configuration must follow a specific naming convention i.e.
+  "\<name\>__\<index\>". Where <index> is the index of the corresponding input or
+  output. If the model supports variable size input tensors, their dimensions
+  in the configuration must be -1 for all variable-size inputs and outputs.
+
 When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the :ref:`Status
 API <section-api-status>`.
@@ -195,7 +203,7 @@ inference server does not support that datatype for that model.
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
 |Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |PyTorch  |NumPy         |
 +==============+==============+==============+==============+==============+=========+==============+
-|TYPE_BOOL     |              |DT_BOOL       |BOOL          |BOOL          |bool     |bool          |
+|TYPE_BOOL     |              |DT_BOOL       |BOOL          |BOOL          |kBool     |bool          |
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
 |TYPE_UINT8    |              |DT_UINT8      |UINT8         |UINT8         |kByte     |uint8         |
 +--------------+--------------+--------------+--------------+--------------+---------+--------------+
