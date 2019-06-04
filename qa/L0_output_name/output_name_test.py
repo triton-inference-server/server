@@ -49,7 +49,7 @@ class OutputNameValidationTest(unittest.TestCase):
         request_ = self.requestGenerator("DUMMY", FLAGS)
         # Send request
         response_ = grpc_stub.Infer(request_)
-        return response_.request_status.code==5
+        return response_.request_status.code==3
 
     def requestGenerator(self, output_name, FLAGS):
         # Prepare request for Infer gRPC
