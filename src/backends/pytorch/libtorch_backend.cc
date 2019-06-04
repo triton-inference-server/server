@@ -425,9 +425,10 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
       if (status.IsOk()) {
         if (device_ == torch::kCPU) {
           memcpy(buffer, (char*)content + content_offset, expected_byte_size);
-        }
-        else {
-          cudaMemcpy(buffer, (char*)content + content_offset, expected_byte_size, cudaMemcpyDeviceToHost);
+        } else {
+          cudaMemcpy(
+              buffer, (char*)content + content_offset, expected_byte_size,
+              cudaMemcpyDeviceToHost);
         }
       }
 
