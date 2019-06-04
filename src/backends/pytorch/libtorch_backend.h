@@ -90,8 +90,8 @@ class LibTorchBackend : public InferenceBackend {
 
     // Set an input tensor data from payloads.
     Status SetInput(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index,
-        const DataType datatype, const DimsList& dims,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+        const int& ip_index, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
@@ -107,26 +107,32 @@ class LibTorchBackend : public InferenceBackend {
 
     // Set an input tensor from one or more payloads.
     Status SetFixedSizedInputTensor(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index, const std::vector<int64_t>& shape,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+        const int& ip_index, const std::vector<int64_t>& shape,
         const DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
         std::vector<std::unique_ptr<char[]>>* input_buffers);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
-        std::vector<torch::Tensor>* outputs_, const std::string& name, const int& op_index,
-        const DataType dtype, const size_t dtype_byte_size, const size_t total_batch_size,
+        std::vector<torch::Tensor>* outputs_, const std::string& name,
+        const int& op_index, const DataType dtype, const size_t dtype_byte_size,
+        const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads);
 
     Status SetInputTensor(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name, const int& ip_index, const std::vector<int64_t>& shape,
+        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
+        const int& ip_index, const std::vector<int64_t>& shape,
         const DataType dtype, char* content, size_t byte_size);
 
     Status GetOutputTensor(
-        std::vector<torch::Tensor>* outputs_, const int& op_index, const DataType dtype,
-        char** content, size_t* byte_size, std::vector<int64_t>* content_shape);
+        std::vector<torch::Tensor>* outputs_, const int& op_index,
+        const DataType dtype, char** content, size_t* byte_size,
+        std::vector<int64_t>* content_shape);
 
-    Status Execute(std::vector<torch::jit::IValue>* inputs_, std::vector<torch::Tensor>* outputs_);
+    Status Execute(
+        std::vector<torch::jit::IValue>* inputs_,
+        std::vector<torch::Tensor>* outputs_);
     // Name of the model instance
     std::string name_;
 
