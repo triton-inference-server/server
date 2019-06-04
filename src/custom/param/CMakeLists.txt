@@ -29,11 +29,27 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libparam.so
 #
+configure_file(libparam.ldscript libparam.ldscript)
+
 add_library(
   param SHARED
   param.cc
+  $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
 )
+set_target_properties(
+  param
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libparam.ldscript
+)
+set_target_properties(
+  param
+  PROPERTIES LINK_FLAGS "-Wl,--version-script libparam.ldscript"
+)
+target_link_libraries(
+  param
+  PRIVATE protobuf::libprotobuf
+)
+
 install(
   TARGETS param
   LIBRARY DESTINATION lib

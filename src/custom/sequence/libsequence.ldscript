@@ -23,48 +23,11 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-cmake_minimum_required (VERSION 3.5)
-
-#
-# libaddsub.so
-#
-configure_file(libaddsub.ldscript libaddsub.ldscript)
-
-if(${TRTIS_ENABLE_GPU})
-  cuda_add_library(
-    addsub SHARED
-    addsub.cu kernel.cu kernel.h
-    $<TARGET_OBJECTS:model-config-library>
-    $<TARGET_OBJECTS:model-config-cuda-library>
-    $<TARGET_OBJECTS:proto-library>
-  )
-else()
-  set_source_files_properties(addsub.cu PROPERTIES LANGUAGE CXX)
-  set_source_files_properties(addsub.cu PROPERTIES COMPILE_FLAGS -xc++)
-  add_library(
-    addsub SHARED
-    addsub.cu
-    $<TARGET_OBJECTS:model-config-library>
-    $<TARGET_OBJECTS:proto-library>
-  )
-  set_target_properties(addsub PROPERTIES LINKER_LANGUAGE CXX)
-endif() # TRTIS_ENABLE_GPU
-
-set_target_properties(
-  addsub
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libaddsub.ldscript
-)
-set_target_properties(
-  addsub
-  PROPERTIES LINK_FLAGS "-Wl,--version-script libaddsub.ldscript"
-)
-target_link_libraries(
-  addsub
-  protobuf::libprotobuf
-)
-
-install(
-  TARGETS addsub
-  LIBRARY DESTINATION lib
-)
+{
+  global:
+    CustomErrorString;
+    CustomExecute;
+    CustomFinalize;
+    CustomInitialize;
+  local: *;
+};

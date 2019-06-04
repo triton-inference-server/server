@@ -32,6 +32,14 @@
 extern "C" {
 #endif
 
+#if defined(_MSC_VER)
+#define TRTIS_CUSTOM_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+#define TRTIS_CUSTOM_EXPORT __attribute__((__visibility__("default")))
+#else
+#define TRTIS_CUSTOM_EXPORT
+#endif
+
 /// GPU device number that indicates that no GPU is available for a
 /// context. In CustomInitializeData this value is used for
 /// 'gpu_device_id' to indicate that the model must execute on the
@@ -199,7 +207,8 @@ typedef int (*CustomExecuteFn_t)(
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomInitialize(const CustomInitializeData* data, void** custom_context);
+TRTIS_CUSTOM_EXPORT int CustomInitialize(
+    const CustomInitializeData* data, void** custom_context);
 
 /// Finalize a custom context. All state associated with the context
 /// should be freed.
@@ -209,7 +218,7 @@ int CustomInitialize(const CustomInitializeData* data, void** custom_context);
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomFinalize(void* custom_context);
+TRTIS_CUSTOM_EXPORT int CustomFinalize(void* custom_context);
 
 /// Get the string for an error code.
 ///
@@ -218,7 +227,8 @@ int CustomFinalize(void* custom_context);
 /// \param errcode The error code.
 /// \return The error code string, or nullptr if the error code has no
 /// string representation.
-const char* CustomErrorString(void* custom_context, int errcode);
+TRTIS_CUSTOM_EXPORT const char* CustomErrorString(
+    void* custom_context, int errcode);
 
 /// Execute the custom model.
 ///
@@ -233,7 +243,7 @@ const char* CustomErrorString(void* custom_context, int errcode);
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.
-int CustomExecute(
+TRTIS_CUSTOM_EXPORT int CustomExecute(
     void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
