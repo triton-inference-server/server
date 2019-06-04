@@ -33,7 +33,9 @@
 // tensorflow_backend_tf. We use a strict C interface to avoid any ABI
 // problems since we don't know how TF is built.
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 #if defined(_MSC_VER)
 #define TRTISTF_EXPORT __declspec(dllexport)
@@ -218,4 +220,6 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelRun(
     TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
     const char** output_names, TRTISTF_TensorList** output_tensors);
 
+#ifdef __cplusplus
 }  // extern "C"
+#endif
