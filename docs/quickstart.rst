@@ -30,14 +30,13 @@ Quickstart
 
 The TensorRT Inference Server is available in two ways:
 
-* As a pre-built Docker container container available from the `NVIDIA
-  GPU Cloud (NGC) <https://ngc.nvidia.com>`_. For more information,
-  see :ref:`section-using-a-prebuilt-docker-container`.
+* As a pre-built Docker container available from the `NVIDIA GPU Cloud
+  (NGC) <https://ngc.nvidia.com>`_. For more information, see
+  :ref:`section-using-a-prebuilt-docker-container`.
 
-* As buildable source code located in GitHub. Building the inference
-  server yourself requires the usage of Docker and the TensorFlow and
-  PyTorch containers available from `NGC <https://ngc.nvidia.com>`_.
-  For more information, see :ref:`section-building-from-source-code`.
+* As buildable source code located in GitHub. You can :ref:`build your
+  own container using Docker<section-building-with-docker>` or you can
+  :ref:`build using CMake<section-building-with-cmake>`.
 
 .. _section-prerequisites:
 
@@ -48,23 +47,16 @@ Regardless of which method you choose (starting with a pre-built
 container from NGC or building from source), you must perform the
 following prerequisite steps:
 
-* Ensure you have access and are logged into NGC.  For step-by-step
-  instructions, see the `NGC Getting Started Guide
-  <http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
-
-* Install Docker and nvidia-docker.  For DGX users, see `Preparing to
-  use NVIDIA Containers
-  <http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html>`_.
-  For users other than DGX, see the `nvidia-docker installation
-  documentation <https://github.com/NVIDIA/nvidia-docker>`_.
-
 * Clone the TensorRT Inference Server GitHub repo. Even if you choose
   to get the pre-built inference server from NGC, you need the GitHub
   repo for the example model repository and to build the example
   applications. Go to
-  https://github.com/NVIDIA/tensorrt-inference-server, select the
-  r<xx.yy> release branch that you are using, and then select the
-  clone or download drop down button.
+  https://github.com/NVIDIA/tensorrt-inference-server and then select
+  the *clone* or *download* drop down button. After clone the repo be
+  sure to select the r<xx.yy> release branch that corresponds to the
+  version of the server you want to use::
+
+  $ git checkout r19.05
 
 * Create a model repository containing one or more models that you
   want the inference server to serve. An example model repository is
@@ -75,6 +67,19 @@ following prerequisite steps:
 
   $ cd docs/examples
   $ ./fetch_models.sh
+
+If you are starting with a pre-built NGC container perform these
+additional steps:
+
+* Ensure you have access and are logged into NGC.  For step-by-step
+  instructions, see the `NGC Getting Started Guide
+  <http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
+
+* Install Docker and nvidia-docker.  For DGX users, see `Preparing to
+  use NVIDIA Containers
+  <http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html>`_.
+  For users other than DGX, see the `nvidia-docker installation
+  documentation <https://github.com/NVIDIA/nvidia-docker>`_.
 
 .. _section-using-a-prebuilt-docker-container:
 
@@ -97,10 +102,10 @@ and the example client applications.
 #. :ref:`Get the example client applications <section-getting-the-client-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
-.. _section-building-from-source-code:
+.. _section-building-with-docker:
 
-Building From Source Code
--------------------------
+Building With Docker
+--------------------
 
 Make sure you complete the steps in :ref:`section-prerequisites`
 before attempting to build the inference server. To build the
@@ -123,20 +128,44 @@ example client applications.
 #. :ref:`Get the example client applications <section-getting-the-client-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
+.. _section-building-with-cmake:
+
+Building With CMake
+-------------------
+
+Make sure you complete the steps in :ref:`section-prerequisites`
+before attempting to build the inference server. To build with CMake
+you must decide which features of the inference server you want, build
+any required dependencies, and the lastly build the TensorRT Inference
+Server itself. See :ref:`section-building-the-server-with-cmake` for
+details on how to build with CMake.
+
+After the build completes follow these steps to run the server and the
+example client applications.
+
+#. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
+#. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
+#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
+#. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
+
 .. _section-run-tensorrt-inference-server:
 
 Run TensorRT Inference Server
 -----------------------------
 
 Assuming the example model repository is available in
-/full/path/to/example/model/repository, use the following command to
-run the inference server container::
+/full/path/to/example/model/repository, if you build using Docker use
+the following command to run the inference server container::
 
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> trtserver --model-store=/models
 
 Where <docker image> is *nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3* if
 you pulled the inference server container from NGC, or is
 *tensorrtserver* if you built the inference server from source.
+
+If you built using CMake run the inference server directly on your host system::
+
+    $ trtserver --model-store=/full/path/to/example/model/repository
 
 For more information, see :ref:`section-running-the-inference-server`.
 
@@ -197,15 +226,14 @@ examples, and a Python wheel file for the Python client library::
 
   $ docker build -t tensorrtserver_client -f Dockerfile.client .
 
-After the build completes, the tensorrtserver_client Docker image
-will contain the built client libraries and examples. Run the client
-image so that the client examples can access the inference server
-running in its own container::
+After the build completes, the tensorrtserver_client Docker image will
+contain the built client libraries and examples. Run the client image
+so that the client examples can access the inference server::
 
   $ docker run -it --rm --net=host tensorrtserver_client
 
 It is also possible to build the client examples without Docker and
-for some platforms per-compiled client examples are available. For
+for some platforms pre-compiled client examples are available. For
 more information, see
 :ref:`section-getting-the-client-libraries-and-examples`.
 

@@ -30,7 +30,7 @@ Installing the Server
 
 The TensorRT Inference Server is available as a pre-built Docker
 container or you can :ref:`build it from source
-<section-building-the-server>`.
+<section-building>`.
 
 .. _section-installing-prebuilt-containers:
 
