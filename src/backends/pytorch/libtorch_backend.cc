@@ -393,7 +393,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
 {
   std::vector<int64_t> content_shape;
-  char* content = nullptr;
+  void* content = nullptr;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
       outputs_, op_index, dtype, &content, &byte_size, &content_shape));
@@ -427,7 +427,12 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
       Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape);
       if (status.IsOk()) {
-        memcpy(buffer, content + content_offset, expected_byte_size);
+        if (device_ == torch::kCPU) {
+          memcpy(buffer, (char*)content + content_offset, expected_byte_size);
+        }
+        else {
+          cudaMemcpy(buffer, (char*)content + content_offset, expected_byte_size, cudaMemcpyDeviceToHost);
+        }
       }
 
       if (!status.IsOk()) {
@@ -444,22 +449,15 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const DataType dtype, char** content, size_t* byte_size,
+    const DataType dtype, void** content, size_t* byte_size,
     std::vector<int64_t>* content_shape)
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].flatten();
     *byte_size = output_flat.nbytes();
-    *content = new char[*byte_size];
 
     // Copy output into buffer
-    if (output_flat.device() == torch::kCPU) {
-      std::memcpy(*content, output_flat.data_ptr(), output_flat.nbytes());
-    } else {
-      cudaMemcpy(
-          *content, output_flat.data_ptr(), output_flat.nbytes(),
-          cudaMemcpyDeviceToHost);
-    }
+    *content = output_flat.data_ptr();
 
     //  Set content shape
     auto shape = (*outputs_)[op_index].sizes();
