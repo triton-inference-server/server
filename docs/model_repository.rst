@@ -297,6 +297,12 @@ ONNX Models
 ^^^^^^^^^^^
 
 An ONNX model is a single file that by default must be named model.onnx.
+Notice that some ONNX models may not be supported by the inference server
+as they are not supported by the underlying ONNX Runtime (due to either
+using `stale ONNX opset version
+<https://github.com/Microsoft/onnxruntime/blob/master/docs/Versioning.md#version-matrix>`_
+or containing operators with `unsupported types
+<https://github.com/microsoft/onnxruntime/issues/1122>`_).
 A minimal model repository for a single ONNX model would look like::
 
   models/
