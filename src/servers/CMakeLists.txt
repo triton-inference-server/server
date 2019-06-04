@@ -140,6 +140,10 @@ set_target_properties(
   trtserver
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtrtserver.ldscript
 )
+set_target_properties(
+  trtserver
+  PROPERTIES LINK_FLAGS "-Wl,--version-script libtrtserver.ldscript"
+)
 target_link_libraries(
   trtserver
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
@@ -148,7 +152,6 @@ target_link_libraries(
   PRIVATE ${LIBEVENT_LIBRARIES}
   PRIVATE libevhtp::evhtp
   PRIVATE -lre2
-  PRIVATE "-Wl,--version-script libtrtserver.ldscript"
 )
 
 if(${TRTIS_ENABLE_TENSORRT})
