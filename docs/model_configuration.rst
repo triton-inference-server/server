@@ -74,6 +74,14 @@ of which are 16 entry float32 tensors. The minimal configuration is::
     }
   ]
 
+**PyTorch Naming Convention:** Due to the absence of names for inputs and outputs
+in the model, the "name" attribute of both the inputs and outputs in the
+configuration must follow a specific naming convention i.e. "\<name\>__\<index\>".
+Where <name> can be any string and <index> refers to the position of the
+corresponding input/output. This means if there are two inputs and two outputs
+they must be name as: "INPUT__0", "INPUT__1" and "OUTPUT__0", "OUTPUT__1" such
+that "INPUT__0" refers to first input and INPUT__1 refers to the second input.
+
 The name of the model must match the :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>` of the model repository
 directory containing the model. The :cpp:var:`platform
@@ -160,11 +168,7 @@ minimal configuration above. Specifically:
 
 * :ref:`PyTorch TorchScript <section-pytorch-models>` models have an optional
   output configuration in the model configuration file to support cases where
-  there are variable number and/or datatypes of output. Both the input and
-  outputs in the configuration must follow a specific naming convention i.e.
-  "\<name\>__\<index\>". Where <index> is the index of the corresponding input or
-  output. If the model supports variable size input tensors, their dimensions
-  in the configuration must be -1 for all variable-size inputs and outputs.
+  there are variable number and/or datatypes of output.
 
 When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the :ref:`Status
