@@ -59,6 +59,9 @@ ConvertDataTypeToTorchType(const DataType& dtype)
 {
   torch::ScalarType type;
   switch (dtype) {
+    case TYPE_BOOL:
+      type = torch::kBool;
+      break;
     case TYPE_UINT8:
       type = torch::kByte;
       break;
