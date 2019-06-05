@@ -31,6 +31,8 @@
 #include <atomic>
 #include <thread>
 #include "prometheus/registry.h"
+#include "prometheus/serializer.h"
+#include "prometheus/text_serializer.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -41,6 +43,9 @@ class Metrics {
 
   // Get the prometheus registry
   static std::shared_ptr<prometheus::Registry> GetRegistry();
+
+  // Get serialized metrics
+  static const std::string SerializedMetrics();
 
   // Get the UUID for a CUDA device. Return true and initialize 'uuid'
   // if a UUID is found, return false if a UUID cannot be returned.
@@ -109,6 +114,7 @@ class Metrics {
   bool InitializeNvmlMetrics();
 
   std::shared_ptr<prometheus::Registry> registry_;
+  std::unique_ptr<prometheus::Serializer> serializer_;
 
   prometheus::Family<prometheus::Counter>& inf_success_family_;
   prometheus::Family<prometheus::Counter>& inf_failure_family_;

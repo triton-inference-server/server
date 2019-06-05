@@ -31,12 +31,10 @@
 #include <google/protobuf/text_format.h>
 #include <re2/re2.h>
 #include <algorithm>
-#include "prometheus/registry.h"
-#include "prometheus/serializer.h"
-#include "prometheus/text_serializer.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
@@ -127,31 +125,23 @@ HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 }
 
 // Handle HTTP requests to obtain prometheus metrics
-class HTTPPrometheusServer : public HTTPServerImpl {
+class HTTPMetricsServer : public HTTPServerImpl {
  public:
-  explicit HTTPPrometheusServer(
-      const std::shared_ptr<prometheus::Registry>& metrics_registry,
-      const int32_t port, const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), registry_(metrics_registry),
-        serializer_(new prometheus::TextSerializer()),
-        api_regex_(R"(/metrics/?)")
+  explicit HTTPMetricsServer(const int32_t port, const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), api_regex_(R"(/metrics/?)")
   {
   }
 
-  ~HTTPPrometheusServer() = default;
+  ~HTTPMetricsServer() = default;
 
  private:
   void Handle(evhtp_request_t* req) override;
-
-  // Prometheus utilities
-  std::shared_ptr<prometheus::Registry> registry_;
-  std::unique_ptr<prometheus::Serializer> serializer_;
 
   re2::RE2 api_regex_;
 };
 
 void
-HTTPPrometheusServer::Handle(evhtp_request_t* req)
+HTTPMetricsServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -163,8 +153,7 @@ HTTPPrometheusServer::Handle(evhtp_request_t* req)
 
   // Call to prometheus endpoints should not have any trailing string
   if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    const std::string metrics =
-        serializer_->Serialize(registry_.get()->Collect());
+    const std::string metrics = Metrics::SerializedMetrics();
     evbuffer_add(req->buffer_out, metrics.c_str(), metrics.size());
     evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
@@ -645,15 +634,16 @@ HTTPServer::Create(
 }
 
 Status
-HTTPServer::CreatePrometheus(
-    const std::shared_ptr<prometheus::Registry>& metrics_registry,
-    const int32_t port, const int thread_cnt,
-    std::unique_ptr<HTTPServer>* prometheus_server)
+HTTPServer::CreateMetricsServer(
+    const int32_t port, const int thread_cnt, const bool allow_gpu_metrics,
+    std::unique_ptr<HTTPServer>* metrics_server)
 {
+  if (allow_gpu_metrics) {
+    Metrics::EnableGPUMetrics();
+  }
   std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting Prometheus Metrics Service at " << addr;
-  prometheus_server->reset(
-      new HTTPPrometheusServer(metrics_registry, port, thread_cnt));
+  LOG_INFO << "Starting Metrics Service at " << addr;
+  metrics_server->reset(new HTTPMetricsServer(port, thread_cnt));
 
   return Status::Success;
 }

@@ -65,7 +65,7 @@ std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
 // The metrics service
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> prometheus_service_;
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
@@ -316,13 +316,13 @@ StartMultipleHttpService(
 }
 
 std::unique_ptr<nvidia::inferenceserver::HTTPServer>
-StartPrometheusService()
+StartMetricsService()
 {
   std::unique_ptr<nvidia::inferenceserver::HTTPServer> service;
   nvidia::inferenceserver::Status status =
-      nvidia::inferenceserver::HTTPServer::CreatePrometheus(
-          nvidia::inferenceserver::Metrics::GetRegistry(), metrics_port_,
-          1 /* HTTP thread count */, &service);
+      nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
+          metrics_port_, 1 /* HTTP thread count */, allow_gpu_metrics_,
+          &service);
   if (status.IsOk()) {
     status = service->Start();
   }
@@ -369,13 +369,9 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-   if (allow_gpu_metrics_) {
-      nvidia::inferenceserver::Metrics::EnableGPUMetrics();
-    }
-
-    prometheus_service_ = StartPrometheusService();
-    if (prometheus_service_ == nullptr) {
-      LOG_ERROR << "Failed to start Prometheus Metrics service";
+    metrics_service_ = StartMetricsService();
+    if (metrics_service_ == nullptr) {
+      LOG_ERROR << "Failed to start Metrics service";
       return false;
     }
   }
@@ -665,8 +661,8 @@ main(int argc, char** argv)
       http_eps->Stop();
     }
   }
-  if (prometheus_service_) {
-    prometheus_service_->Stop();
+  if (metrics_service_) {
+    metrics_service_->Stop();
   }
 
   return (stop_status) ? 0 : 1;
