@@ -348,7 +348,8 @@ InferResponseProvider::OutputBufferContents(
 Status
 InferResponseProvider::CheckAndSetIfBufferedOutput(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape, Output** output)
+    const std::vector<int64_t>& content_shape, Output** output,
+    const DataType dtype)
 {
   const auto& pr = output_map_.find(name);
   if (pr == output_map_.end()) {
@@ -363,6 +364,7 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   loutput->cls_count_ = 0;
   loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
+  loutput->dtype_ = dtype;
 
   if (pr->second->has_cls()) {
     loutput->cls_count_ = pr->second->cls().count();
@@ -471,7 +473,13 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
     } else {
       // Class result...
       // TODO fix for No Output Config for LibTorch
-      switch (output_config->data_type()) {
+      DataType output_dtype;
+      if (!pt_no_op_config) {
+        output_dtype = output_config->data_type();
+      } else {
+        output_dtype = output.dtype_;
+      }
+      switch (output_dtype) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
               poutput, output.buffer_.get(), batch1_element_count, batch_size,
@@ -539,8 +547,8 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
           return Status(
               RequestStatusCode::INVALID_ARG,
               "class result not available for output '" + output.name_ +
-                  "' due to unsupported type '" +
-                  DataType_Name(output_config->data_type()) + "'");
+                  "' due to unsupported type '" + DataType_Name(output_dtype) +
+                  "'");
       }
     }
 
@@ -580,13 +588,13 @@ InternalInferResponseProvider::MutableResponseHeader()
 Status
 InternalInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape, const DataType dtype)
 {
   *content = nullptr;
 
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
+      name, content, content_byte_size, content_shape, &output, dtype));
 
   // Always write output tensor to an output buffer no matter
   // if output has cls field defined

@@ -243,7 +243,7 @@ class InferResponseProvider {
   // request. The output must be listed in the request header.
   virtual Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape) = 0;
+      const std::vector<int64_t>& content_shape, const DataType dtype) = 0;
 
   // Get the address and byte-size of an output buffer. Error is
   // returned if the buffer is not already allocated.
@@ -275,7 +275,8 @@ class InferResponseProvider {
   // allocate space for it and point to that space with 'content'
   Status CheckAndSetIfBufferedOutput(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, Output** output);
+      const std::vector<int64_t>& content_shape, Output** output,
+      const DataType dtype);
 
  protected:
   const InferRequestHeader& request_header_;
@@ -292,6 +293,7 @@ class InferResponseProvider {
     size_t cls_count_;
     void* ptr_;
     size_t byte_size_;
+    DataType dtype_;
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;

@@ -450,7 +450,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
         payload.response_provider_->RequiresOutput(name)) {
       void* buffer;
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape);
+          name, &buffer, expected_byte_size, content_shape, dtype);
       if (status.IsOk()) {
         if (device_ == torch::kCPU) {
           memcpy(buffer, (char*)content + content_offset, expected_byte_size);
