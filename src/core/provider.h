@@ -243,7 +243,8 @@ class InferResponseProvider {
   // request. The output must be listed in the request header.
   virtual Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, const DataType dtype = TYPE_FP32) = 0;
+      const std::vector<int64_t>& content_shape,
+      const DataType dtype = TYPE_FP32) = 0;
 
   // Get the address and byte-size of an output buffer. Error is
   // returned if the buffer is not already allocated.
@@ -326,7 +327,8 @@ class InternalInferResponseProvider : public InferResponseProvider {
   InferResponseHeader* MutableResponseHeader() override;
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, const DataType dtype = TYPE_FP32) override;
+      const std::vector<int64_t>& content_shape,
+      const DataType dtype = TYPE_FP32) override;
 
   // Retrieve the data buffer of output 'name'.
   Status GetSystemMemory(
@@ -357,7 +359,8 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   InferResponseHeader* MutableResponseHeader() override;
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, const DataType dtype = TYPE_FP32) override;
+      const std::vector<int64_t>& content_shape,
+      const DataType dtype = TYPE_FP32) override;
 
  private:
   GRPCInferResponseProvider(
@@ -386,7 +389,8 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   InferResponseHeader* MutableResponseHeader() override;
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, const DataType dtype = TYPE_FP32) override;
+      const std::vector<int64_t>& content_shape,
+      const DataType dtype = TYPE_FP32) override;
 
  private:
   HTTPInferResponseProvider(
@@ -412,7 +416,8 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
   InferResponseHeader* MutableResponseHeader() override;
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
-      const std::vector<int64_t>& content_shape, const DataType dtype = TYPE_FP32) override;
+      const std::vector<int64_t>& content_shape,
+      const DataType dtype = TYPE_FP32) override;
 
  private:
   DelegatingInferResponseProvider(

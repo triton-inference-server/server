@@ -633,16 +633,12 @@ LibTorchBackend::Context::Run(
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
 
-
   //  When no Output in Model Config:
-  LOG_VERBOSE(1) << "No. of Output from Config: "
-                 << base->Config().output().size();
   if (base->Config().output().size() == 0) {
     for (size_t i = 0; i < outputs_.size(); i++) {
       torch::ScalarType ttype = outputs_[i].scalar_type();
 
       const std::string& name = "OUTPUT__" + std::to_string(i);
-      LOG_VERBOSE(1) << name + " has dtype: " << ttype;
       const DataType dtype = ConvertTorchTypeToDataType(ttype);
       RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
           &outputs_, name, i, dtype, GetDataTypeByteSize(dtype),
