@@ -121,6 +121,9 @@ class InferenceBackend {
 
   // Map from output name to the model configuration for that output.
   std::unordered_map<std::string, ModelOutput> output_map_;
+
+  // Platform name
+  std::string platform_name_;
 };
 
 }}  // namespace nvidia::inferenceserver

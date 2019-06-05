@@ -93,6 +93,32 @@ ConvertDataTypeToTorchType(const DataType& dtype)
   return std::make_pair(true, type);
 }
 
+DataType
+ConvertTorchTypeToDataType(const torch::ScalarType& ttype)
+{
+  switch (ttype) {
+    case torch::kBool:
+      return TYPE_BOOL;
+    case torch::kByte:
+      return TYPE_UINT8;
+    case torch::kChar:
+      return TYPE_INT8;
+    case torch::kShort:
+      return TYPE_INT16;
+    case torch::kInt:
+      return TYPE_INT32;
+    case torch::kLong:
+      return TYPE_INT64;
+    case torch::kHalf:
+      return TYPE_FP16;
+    case torch::kFloat:
+      return TYPE_FP32;
+    case torch::kDouble:
+      return TYPE_FP64;
+  }
+  return TYPE_FP32;
+}
+
 Status
 LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -605,6 +631,24 @@ LibTorchBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
+
+
+  //  When no Output in Model Config:
+  LOG_VERBOSE(1) << "No. of Output from Config: "
+                 << base->Config().output().size();
+  if (base->Config().output().size() == 0) {
+    for (size_t i = 0; i < outputs_.size(); i++) {
+      torch::ScalarType ttype = outputs_[i].scalar_type();
+
+      const std::string& name = "OUTPUT__" + std::to_string(i);
+      LOG_VERBOSE(1) << name + " has dtype: " << ttype;
+      const DataType dtype = ConvertTorchTypeToDataType(ttype);
+      RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
+          &outputs_, name, i, dtype, GetDataTypeByteSize(dtype),
+          total_batch_size, payloads));
+    }
+  }
+
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
     std::string index_str = name.substr(name.find(deliminator) + 2);
@@ -618,9 +662,8 @@ LibTorchBackend::Context::Run(
     // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
-        &outputs_, name, op_index, dtype,
-        GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        payloads));
+        &outputs_, name, op_index, dtype, GetDataTypeByteSize(dtype),
+        total_batch_size, payloads));
   }
 
   return Status::Success;

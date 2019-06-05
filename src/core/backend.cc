@@ -56,14 +56,20 @@ Status
 InferenceBackend::GetOutput(
     const std::string& name, const ModelOutput** output) const
 {
-  const auto itr = output_map_.find(name);
-  if (itr == output_map_.end()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG, "unexpected inference output '" + name +
-                                            "' for model '" + Name() + "'");
-  }
+  if ((output_map_.size() == 0) && (platform_name_ == "pytorch_libtorch")) {
+    *output = nullptr;
+    return Status::Success;
+  } else {
+    const auto itr = output_map_.find(name);
+    if (itr == output_map_.end()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG, "unexpected inference output '" +
+                                              name + "' for model '" + Name() +
+                                              "'");
+    }
 
-  *output = &itr->second;
+    *output = &itr->second;
+  }
   return Status::Success;
 }
 
@@ -101,6 +107,7 @@ InferenceBackend::SetModelConfig(
     }
   }
 
+  platform_name_ = config.platform();
   return Status::Success;
 }
 

@@ -408,11 +408,14 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   const size_t batch_size = request_header_.batch_size();
   response_header->set_batch_size(batch_size);
 
+  bool pt_no_op_config = false;
   int output_idx = 0;
   for (const auto& output : outputs_) {
     const ModelOutput* output_config;
     RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
 
+    if (output_config == nullptr)
+      pt_no_op_config = true;
     // Verify that the actual output shape matches what is expected by
     // the model configuration. If there is an output reshape, we've
     // already verified that reshape and dims have same element count
@@ -428,16 +431,18 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       skip_batch = false;
     }
 
-    const DimsList& expected_shape = (output_config->has_reshape())
-                                         ? output_config->reshape().shape()
-                                         : output_config->dims();
-    if (!CompareDimsWithWildcard(expected_shape, batch1_backend_shape)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "output '" + output.name_ + "' for model '" + is.Name() +
-              "' has shape " + DimsListToString(batch1_backend_shape) +
-              " but model configuration specifies shape " +
-              DimsListToString(expected_shape));
+    if (!pt_no_op_config) {
+      const DimsList& expected_shape = (output_config->has_reshape())
+                                           ? output_config->reshape().shape()
+                                           : output_config->dims();
+      if (!CompareDimsWithWildcard(expected_shape, batch1_backend_shape)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "output '" + output.name_ + "' for model '" + is.Name() +
+                "' has shape " + DimsListToString(batch1_backend_shape) +
+                " but model configuration specifies shape " +
+                DimsListToString(expected_shape));
+      }
     }
 
     auto poutput = response_header->add_output();
@@ -452,13 +457,20 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       // are non-variable so use them directly. If there is not a
       // reshape then use output shape as that will have actual sized
       // in place of any wildcard dimensions.
-      if (output_config->has_reshape()) {
-        poutput->mutable_raw()->mutable_dims()->CopyFrom(output_config->dims());
+      if (!pt_no_op_config) {
+        if (output_config->has_reshape()) {
+          poutput->mutable_raw()->mutable_dims()->CopyFrom(
+              output_config->dims());
+        } else {
+          poutput->mutable_raw()->mutable_dims()->CopyFrom(
+              batch1_backend_shape);
+        }
       } else {
         poutput->mutable_raw()->mutable_dims()->CopyFrom(batch1_backend_shape);
       }
     } else {
       // Class result...
+      // TODO fix for No Output Config for LibTorch
       switch (output_config->data_type()) {
         case DataType::TYPE_UINT8:
           AddClassResults<uint8_t>(
