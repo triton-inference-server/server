@@ -45,15 +45,19 @@ model repository containing the models that the server will make
 available for inferencing.
 
 An example model repository containing a Caffe2 ResNet50, a TensorFlow
-Inception model, an ONNX densenet model, a simple TensorFlow GraphDef model
-(used by the :ref:`simple_client example <section-client-api>`),
-and a simple TensorFlow GraphDef model using String tensors (used by the
-:ref:`simple_string_client example <section-client-api>`) are provided in the
-`docs/examples/model_repository
+Inception model, an ONNX densenet model, a simple TensorFlow GraphDef
+model (used by the :ref:`simple_client example <section-client-api>`),
+and a simple TensorFlow GraphDef model using String tensors (used by
+the :ref:`simple_string_client example <section-client-api>`) are
+provided in the `docs/examples/model_repository
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/model_repository>`_
 directory. Before using the example model repository you must fetch
-any missing model definition files from their public model zoos::
+any missing model definition files from their public model zoos. Be
+sure to checkout the release version of the branch that corresponds to
+the server you are using (or the master branch if you are using a
+server build from master)::
 
+  $ git checkout r19.05
   $ cd docs/examples
   $ ./fetch_models.sh
 
@@ -65,12 +69,12 @@ and an ensemble (used by the
 :ref:`ensemble_image_client example <section-ensemble_image_classification_example>`).
 
 Before using the example ensemble model repository, in addition to
-fetching public model definition files as mentioned above, you must build
-the model definition file for the custom image preprocess model
-(see :ref:`section-building-the-example-custom-backends` for instructions
-on how to build it). Also note that although ensemble models are fully specified
-in their model configuration, empty version directories are required for them
-to be recognized as valid model directories::
+fetching public model definition files as mentioned above, you must
+build the model definition file for the custom image preprocess model
+(see :ref:`section-building-custom-backends` for instructions on how
+to build it). Also note that although ensemble models are fully
+specified in their model configuration, empty version directories are
+required for them to be recognized as valid model directories::
 
   $ cd docs/examples
   $ mkdir -p ensemble_model_repository/preprocess_resnet50_ensemble/1
@@ -97,7 +101,7 @@ Where *<tensorrtserver image name>* will be something like
 **nvcr.io/nvidia/tensorrtserver:19.05-py3** if you :ref:`pulled the
 container from the NGC registry
 <section-installing-prebuilt-containers>`, or **tensorrtserver** if
-you :ref:`built it from source <section-building-the-server>`.
+you :ref:`built it from source <section-building>`.
 
 The nvidia-docker -v option maps /path/to/model/repository on the host
 into the container at /models, and the -\\-model-store option to the
@@ -109,8 +113,8 @@ listens for HTTP requests (port 8000), listens for GRPC requests (port
 
 The -\\-shm-size and -\\-ulimit flags are recommended to improve the
 server's performance. For -\\-shm-size the minimum recommended size is
-1g but larger sizes may be necessary depending on the number and size
-of models being served.
+1g but smaller or larger sizes may be used depending on the number and
+size of models being served.
 
 For more information on the Prometheus metrics provided by the
 inference server see :ref:`section-metrics`.
@@ -127,7 +131,7 @@ described in :ref:`section-running-the-inference-server`::
   $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
 
 Because a GPU is not available, the inference server will be unable to
-load any model configuration that requires a GPU or that specified a
+load any model configuration that requires a GPU or that specifies a
 GPU instance by an :ref:`instance-group <section-instance-groups>`
 configuration.
 
