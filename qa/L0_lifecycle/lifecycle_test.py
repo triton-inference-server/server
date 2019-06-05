@@ -617,7 +617,7 @@ class LifeCycleTest(unittest.TestCase):
                                    model_version=version, output0_raw=False)
                     self.assertTrue(False, "expected error for wrong label for " + model_name)
                 except AssertionError as ex:
-                    self.assertTrue(str(ex).startswith("'label"), str(ex))
+                    self.assertTrue("'label9" in str(ex) and "!=" in str(ex), str(ex))
 
         # Change the model configuration to use correct label file and to have
         # the default version policy (so that only version 3) is available.
