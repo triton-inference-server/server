@@ -93,5 +93,5 @@ The **all_custom_ops** entry in BUILD is updated to include
 modifications must be made to BUILD.
 
 After making these changes, :ref:`build the server
-<section-building-the-server>` and the custom operations will be
+<section-building>` and the custom operations will be
 available to every TensorFlow model loaded into the server.

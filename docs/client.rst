@@ -106,8 +106,8 @@ Python examples in /workspace/build/trtis-clients/install/python. A
 tar file containing all the library and example binaries and Python
 scripts is at /workspace/v<version>.clients.tar.gz.
 
-Build Using Makefile
-^^^^^^^^^^^^^^^^^^^^
+Build Using CMake
+^^^^^^^^^^^^^^^^^
 
 The actual client build is performed using CMake. The build
 dependencies and requirements are shown in Dockerfile.client. To build
@@ -119,11 +119,9 @@ to be built on additional platforms.
 To build the libaries and examples using CMake, first change
 directory to the root of the repo and checkout the release version of
 the branch that you want to build (or the master branch if you want to
-build the under-development version). The branch you use for the
-client build should match the version of the inference server you are
-using::
+build the under-development version)::
 
-  $ git checkout r19.04
+  $ git checkout r19.05
 
 Then change to the build/ directory and run the following to configure
 and build::
@@ -148,12 +146,13 @@ client libraries and examples from the `GitHub release page
 <https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
 corresponding to the release you are interested in. The client
 libraries and examples are found in the "Assets" section of the
-release page in a tar file named after the version of the release, for
-example, v1.1.0.clients.tar.gz.
+release page in a tar file named after the version of the release and the OS they were built for. For
+example, v1.2.0_ubuntu1604.clients.tar.gz.
 
-The pre-built libraries and examples can be used on a Ubuntu-16.04
-host or you can install them into the TensorRT Inference Server
-container to have both the clients and server in the same container::
+The pre-built libraries and examples can be used on the corresponding
+host system (for example Ubuntu-16.04 or Ubuntu-18.04) or you can
+install them into the TensorRT Inference Server container to have both
+the clients and server in the same container::
 
   $ mkdir clients
   $ cd clients
@@ -165,16 +164,22 @@ libraries in lib/, and Python client examples and wheel file in
 python/.
 
 To use the C++ libraries and examples you must install some
-dependencies::
+dependencies. What dependencies you need to install depends on your
+OS. For Ubuntu 16.04::
 
   $ apt-get update
   $ apt-get install curl libcurl3-dev
 
+For Ubuntu 18.04::
+
+  $ apt-get update
+  $ apt-get install curl libcurl4-openssl-dev
+
 The Python examples require that you additionally install the wheel
 file and some other dependencies::
 
-  $ apt-get install python3 python3-pip
-  $ pip3 install --user --upgrade python/tensorrtserver-*.whl numpy pillow
+  $ apt-get install python python-pip
+  $ pip install --user --upgrade python/tensorrtserver-*.whl numpy pillow
 
 The C++ image_client example uses OpenCV for image manipulation so for
 that example you must install the following::
