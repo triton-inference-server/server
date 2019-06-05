@@ -30,24 +30,25 @@ project (tensorrt-inference-server)
 include(CMakeDependentOption)
 include(ExternalProject)
 
-option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
-option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" ON)
-option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" ON)
-option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" ON)
-option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" ON)
-option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" ON)
+option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
+option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" OFF)
+option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" OFF)
+option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" OFF)
+option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" OFF)
+option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 
 # Multiple paths may be specified by separating them with semicolon
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
 set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
+option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
 
-cmake_dependent_option(
-  TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" ON
-  "TRTIS_ENABLE_GPU" OFF)
+if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
+  message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
+endif()
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
