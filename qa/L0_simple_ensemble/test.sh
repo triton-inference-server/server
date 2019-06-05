@@ -34,6 +34,9 @@ SERVER_ARGS=--model-store=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+# ensure ensemble model has version sub-directory
+mkdir -p `pwd`/models/ensemble_add_sub_int32_int32_int32/1
+
 rm -f $CLIENT_LOG $SERVER_LOG
 
 run_server
