@@ -24,9 +24,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 import numpy as np
 from tensorrtserver.api import *
 import test_util as tu
+
+# unicode() doesn't exist on python3, for how we use it the
+# corresponding function is bytes()
+if sys.version_info.major == 3:
+    unicode = bytes
 
 _last_request_id = 0
 
@@ -104,12 +110,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             expected0_val_list.append(op0)
             expected1_val_list.append(op1)
             if output0_dtype == np.object:
-                expected0_list.append(np.array([bytes(str(x), encoding='utf-8')
+                expected0_list.append(np.array([unicode(str(x), encoding='utf-8')
                                                 for x in (op0.flatten())], dtype=object).reshape(op1.shape))
             else:
                 expected0_list.append(op0)
             if output1_dtype == np.object:
-                expected1_list.append(np.array([bytes(str(x), encoding='utf-8')
+                expected1_list.append(np.array([unicode(str(x), encoding='utf-8')
                                                 for x in (op1.flatten())], dtype=object).reshape(op1.shape))
             else:
                 expected1_list.append(op1)
@@ -252,7 +258,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                     in0 = in0.astype(tensor_dtype)
                     expected0 = np.ndarray.copy(in0)
                 else:
-                    expected0 = np.array([bytes(str(x), encoding='utf-8')
+                    expected0 = np.array([unicode(str(x), encoding='utf-8')
                                     for x in in0.flatten()], dtype=object)
                     in0 = np.array([str(x) for x in in0.flatten()],
                                    dtype=object).reshape(in0.shape)
