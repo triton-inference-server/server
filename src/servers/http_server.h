@@ -33,7 +33,7 @@ class InferenceServer;
 
 class HTTPServer {
  public:
-  static Status Create(
+  static Status CreateAPIServer(
       InferenceServer* server,
       const std::map<int32_t, std::vector<std::string>>& port_map,
       const int thread_cnt,

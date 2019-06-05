@@ -611,7 +611,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse()
 }
 
 Status
-HTTPServer::Create(
+HTTPServer::CreateAPIServer(
     InferenceServer* server,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)

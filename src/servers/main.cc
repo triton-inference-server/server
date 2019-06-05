@@ -294,7 +294,7 @@ StartMultipleHttpService(
     const std::map<int32_t, std::vector<std::string>>& port_map)
 {
   nvidia::inferenceserver::Status status =
-      nvidia::inferenceserver::HTTPServer::Create(
+      nvidia::inferenceserver::HTTPServer::CreateAPIServer(
           server, port_map, http_thread_cnt_, &http_endpoint_services_);
   if (status.IsOk()) {
     for (auto& http_eps : http_endpoint_services_) {
