@@ -115,8 +115,9 @@ ConvertTorchTypeToDataType(const torch::ScalarType& ttype)
       return TYPE_FP32;
     case torch::kDouble:
       return TYPE_FP64;
+    default:
+      return TYPE_FP32;
   }
-  return TYPE_FP32;
 }
 
 Status

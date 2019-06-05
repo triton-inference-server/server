@@ -673,11 +673,11 @@ GRPCInferResponseProvider::MutableResponseHeader()
 Status
 GRPCInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape, const DataType dtype)
 {
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
+      name, content, content_byte_size, content_shape, &output, dtype));
 
   // Must always add a raw output into the list so that the number and
   // order of raw output entries equals the output meta-data. But
@@ -732,13 +732,13 @@ HTTPInferResponseProvider::MutableResponseHeader()
 Status
 HTTPInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape, const DataType dtype)
 {
   *content = nullptr;
 
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
+      name, content, content_byte_size, content_shape, &output, dtype));
 
   if ((output->ptr_ == nullptr) && (content_byte_size > 0)) {
     // Reserve requested space in evbuffer...
@@ -811,13 +811,13 @@ DelegatingInferResponseProvider::MutableResponseHeader()
 Status
 DelegatingInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape, const DataType dtype)
 {
   *content = nullptr;
 
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
+      name, content, content_byte_size, content_shape, &output, dtype));
 
   if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
     char* buffer = new char[content_byte_size];
