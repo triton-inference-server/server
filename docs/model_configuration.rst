@@ -74,12 +74,20 @@ of which are 16 entry float32 tensors. The minimal configuration is::
     }
   ]
 
+**PyTorch Naming Convention:** Due to the absence of names for inputs and outputs
+in the model, the "name" attribute of both the inputs and outputs in the
+configuration must follow a specific naming convention i.e. "\<name\>__\<index\>".
+Where <name> can be any string and <index> refers to the position of the
+corresponding input/output. This means if there are two inputs and two outputs
+they must be name as: "INPUT__0", "INPUT__1" and "OUTPUT__0", "OUTPUT__1" such
+that "INPUT__0" refers to first input and INPUT__1 refers to the second input.
+
 The name of the model must match the :cpp:var:`name
 <nvidia::inferenceserver::ModelConfig::name>` of the model repository
 directory containing the model. The :cpp:var:`platform
 <nvidia::inferenceserver::ModelConfig::platform>` must be one of
 **tensorrt_plan**, **tensorflow_graphdef**, **tensorflow_savedmodel**,
-**caffe2_netdef**, **onnxruntime_onnx**, or **custom**.
+**caffe2_netdef**, **onnxruntime_onnx**, **pytorch_libtorch** or **custom**.
 
 The datatypes allowed for input and output tensors varies based on the
 type of the model. Section :ref:`section-datatypes` describes the
@@ -158,6 +166,10 @@ minimal configuration above. Specifically:
   batching, the initial batch dimension must be variable-size for all inputs
   and outputs.
 
+* :ref:`PyTorch TorchScript <section-pytorch-models>` models have an optional
+  output configuration in the model configuration file to support cases where
+  there are variable number and/or datatypes of output.
+
 When using -\\-strict-model-config=false you can see the model
 configuration that was generated for a model by using the :ref:`Status
 API <section-api-status>`.
@@ -192,35 +204,35 @@ supported by the server and for the Python numpy library. If a model
 framework does not have an entry for a given datatype, then the
 inference server does not support that datatype for that model.
 
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |NumPy         |
-+==============+==============+==============+==============+==============+==============+
-|TYPE_BOOL     |              |DT_BOOL       |BOOL          |BOOL          |bool          |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_UINT8    |              |DT_UINT8      |UINT8         |UINT8         |uint8         |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_UINT16   |              |DT_UINT16     |UINT16        |UINT16        |uint16        |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_UINT32   |              |DT_UINT32     |              |UINT32        |uint32        |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_UINT64   |              |DT_UINT64     |              |UINT64        |uint64        |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |INT8          |int8          |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_INT16    |              |DT_INT16      |INT16         |INT16         |int16         |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |INT32         |int32         |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_INT64    |              |DT_INT64      |INT64         |INT64         |int64         |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |FLOAT16       |float16       |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |FLOAT         |float32       |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |DOUBLE        |float64       |
-+--------------+--------------+--------------+--------------+--------------+--------------+
-|TYPE_STRING   |              |DT_STRING     |              |STRING        |dtype(object) |
-+--------------+--------------+--------------+--------------+--------------+--------------+
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|Type          |TensorRT      |TensorFlow    |Caffe2        |ONNX Runtime  |PyTorch  |NumPy         |
++==============+==============+==============+==============+==============+=========+==============+
+|TYPE_BOOL     |              |DT_BOOL       |BOOL          |BOOL          |kBool     |bool          |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_UINT8    |              |DT_UINT8      |UINT8         |UINT8         |kByte     |uint8         |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_UINT16   |              |DT_UINT16     |UINT16        |UINT16        |         |uint16        |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_UINT32   |              |DT_UINT32     |              |UINT32        |         |uint32        |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_UINT64   |              |DT_UINT64     |              |UINT64        |         |uint64        |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_INT8     | kINT8        |DT_INT8       |INT8          |INT8          |kChar     |int8          |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_INT16    |              |DT_INT16      |INT16         |INT16         |kShort    |int16         |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_INT32    | kINT32       |DT_INT32      |INT32         |INT32         |kInt    |int32         |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_INT64    |              |DT_INT64      |INT64         |INT64         |kLong    |int64         |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_FP16     | kHALF        |DT_HALF       |FLOAT16       |FLOAT16       |         |float16       |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |FLOAT         |kFloat  |float32       |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |DOUBLE        |kDouble  |float64       |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
+|TYPE_STRING   |              |DT_STRING     |              |STRING        |         |dtype(object) |
++--------------+--------------+--------------+--------------+--------------+---------+--------------+
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
@@ -236,6 +248,9 @@ is the 32-bit floating-point datatype.
 For ONNX Runtime each value is prepended with ONNX_TENSOR_ELEMENT_DATA_TYPE_.
 For example, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT is the 32-bit floating-point
 datatype.
+
+For PyTorch each value is in the torch namespace. For example, torch::kFloat
+is the 32-bit floating-point datatype.
 
 For Numpy each value is in the numpy module. For example, numpy.float32
 is the 32-bit floating-point datatype.
