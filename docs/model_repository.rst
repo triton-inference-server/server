@@ -167,6 +167,7 @@ definition. By default, the name of this file or directory must be:
 * **model.savedmodel** for TensorFlow SavedModel models
 * **model.netdef** and **init_model.netdef** for Caffe2 Netdef models
 * **model.onnx** for ONNX Runtime ONNX models
+* **model.pt** for PyTorch TorchScript models
 
 This default name can be overridden using the *default_model_filename*
 property in the :ref:`model configuration
@@ -319,6 +320,24 @@ required the minimal model repository would look like::
     <model-name>/
       1/
         model.onnx
+
+.. _section-pytorch-models:
+
+PyTorch Models
+^^^^^^^^^^^
+
+An PyTorch model is a single file that by default must be named model.pt.
+Notice that a PyTorch model must be traced with an example input and saved as a
+TorchScript Module as shown `here <https://pytorch.org/tutorials/advanced/cpp_export.html>`_.
+It is possible that some models traced with different versions of PyTorch may
+not be supported by the inference server due to changes in the underlying opset.
+A minimal model repository for a single PyTorch model would look like::
+
+  models/
+    <model-name>/
+      config.pbtxt
+      1/
+        model.pt
 
 .. _section-custom-backends:
 
