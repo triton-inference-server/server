@@ -31,6 +31,9 @@
 #include <google/protobuf/text_format.h>
 #include <re2/re2.h>
 #include <algorithm>
+#include "prometheus/registry.h"
+#include "prometheus/serializer.h"
+#include "prometheus/text_serializer.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -43,9 +46,8 @@ namespace nvidia { namespace inferenceserver {
 // Generic HTTP server using evhtp
 class HTTPServerImpl : public HTTPServer {
  public:
-  explicit HTTPServerImpl(
-      InferenceServer* server, int32_t port, int thread_cnt)
-      : server_(server), port_(port), thread_cnt_(thread_cnt)
+  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
+      : port_(port), thread_cnt_(thread_cnt)
   {
   }
 
@@ -61,8 +63,6 @@ class HTTPServerImpl : public HTTPServer {
 
   static void StopCallback(int sock, short events, void* arg);
 
-  // [TODO] only needed by APIs?
-  InferenceServer* server_;
   int32_t port_;
   int thread_cnt_;
 
@@ -130,9 +130,11 @@ HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 class HTTPPrometheusServer : public HTTPServerImpl {
  public:
   explicit HTTPPrometheusServer(
-      InferenceServer* server, int32_t port, int thread_cnt)
-      : HTTPServerImpl(server, port, thread_cnt),
-        api_regex_(R"(?/)")
+      const std::shared_ptr<prometheus::Registry>& metrics_registry,
+      const int32_t port, const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), registry_(metrics_registry),
+        serializer_(new prometheus::TextSerializer()),
+        api_regex_(R"(/metrics/?)")
   {
   }
 
@@ -140,6 +142,10 @@ class HTTPPrometheusServer : public HTTPServerImpl {
 
  private:
   void Handle(evhtp_request_t* req) override;
+
+  // Prometheus utilities
+  std::shared_ptr<prometheus::Registry> registry_;
+  std::unique_ptr<prometheus::Serializer> serializer_;
 
   re2::RE2 api_regex_;
 };
@@ -156,11 +162,11 @@ HTTPPrometheusServer::Handle(evhtp_request_t* req)
   }
 
   // Call to prometheus endpoints should not have any trailing string
-  // [TODO] remove 'true' condition after verifying correctness of
-  // retrieving prometheus matric
-  if (true || RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    // [TODO] get prometheus matric
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
+    const std::string metrics =
+        serializer_->Serialize(registry_.get()->Collect());
+    evbuffer_add(req->buffer_out, metrics.c_str(), metrics.size());
+    evhtp_send_reply(req, EVHTP_RES_OK);
   } else {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
@@ -171,8 +177,9 @@ class HTTPAPIServer : public HTTPServerImpl {
  public:
   explicit HTTPAPIServer(
       InferenceServer* server, const std::vector<std::string>& endpoints,
-      int32_t port, int thread_cnt)
-      : HTTPServerImpl(server, port, thread_cnt), endpoint_names_(endpoints),
+      const int32_t port, const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), server_(server),
+        endpoint_names_(endpoints),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
@@ -226,7 +233,9 @@ class HTTPAPIServer : public HTTPServerImpl {
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
+  InferenceServer* server_;
   std::vector<std::string> endpoint_names_;
+
   re2::RE2 api_regex_;
   re2::RE2 health_regex_;
   re2::RE2 infer_regex_;
@@ -278,8 +287,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPAPIServer::HandleHealth(
-    evhtp_request_t* req, const std::string& health_uri)
+HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
@@ -415,8 +423,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 }
 
 void
-HTTPAPIServer::HandleStatus(
-    evhtp_request_t* req, const std::string& status_uri)
+HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
@@ -639,13 +646,14 @@ HTTPServer::Create(
 
 Status
 HTTPServer::CreatePrometheus(
-    InferenceServer* server, int32_t port,
-    int thread_cnt, std::unique_ptr<HTTPServer>* prometheus_server)
+    const std::shared_ptr<prometheus::Registry>& metrics_registry,
+    const int32_t port, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* prometheus_server)
 {
   std::string addr = "0.0.0.0:" + std::to_string(port);
-  LOG_INFO << "Starting HTTPService at " << addr;
+  LOG_INFO << "Starting Prometheus Metrics Service at " << addr;
   prometheus_server->reset(
-      new HTTPPrometheusServer(server, port, thread_cnt));
+      new HTTPPrometheusServer(metrics_registry, port, thread_cnt));
 
   return Status::Success;
 }

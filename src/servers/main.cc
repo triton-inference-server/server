@@ -65,7 +65,7 @@ std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
 // The metrics service
-// FIXME std::unique_ptr<prometheus::Exposer> exposer_;
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> prometheus_service_;
 
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
@@ -315,6 +315,24 @@ StartMultipleHttpService(
   return status;
 }
 
+std::unique_ptr<nvidia::inferenceserver::HTTPServer>
+StartPrometheusService()
+{
+  std::unique_ptr<nvidia::inferenceserver::HTTPServer> service;
+  nvidia::inferenceserver::Status status =
+      nvidia::inferenceserver::HTTPServer::CreatePrometheus(
+          nvidia::inferenceserver::Metrics::GetRegistry(), metrics_port_,
+          1 /* HTTP thread count */, &service);
+  if (status.IsOk()) {
+    status = service->Start();
+  }
+  if (!status.IsOk()) {
+    service.reset();
+  }
+
+  return std::move(service);
+}
+
 bool
 StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 {
@@ -351,20 +369,15 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    // FIXME
-#if 0
-    LOG_INFO << " localhost:" << std::to_string(metrics_port_)
-             << " for metric reporting";
    if (allow_gpu_metrics_) {
       nvidia::inferenceserver::Metrics::EnableGPUMetrics();
     }
 
-    std::ostringstream stream;
-    stream << "0.0.0.0:" << metrics_port_;
-   exposer_.reset(new prometheus::Exposer(stream.str()));
-    exposer_->RegisterCollectable(
-        nvidia::inferenceserver::Metrics::GetRegistry());
-#endif
+    prometheus_service_ = StartPrometheusService();
+    if (prometheus_service_ == nullptr) {
+      LOG_ERROR << "Failed to start Prometheus Metrics service";
+      return false;
+    }
   }
 
   return true;
@@ -651,6 +664,9 @@ main(int argc, char** argv)
     if (http_eps != nullptr) {
       http_eps->Stop();
     }
+  }
+  if (prometheus_service_) {
+    prometheus_service_->Stop();
   }
 
   return (stop_status) ? 0 : 1;

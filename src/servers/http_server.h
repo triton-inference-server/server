@@ -27,6 +27,10 @@
 
 #include "src/core/status.h"
 
+namespace prometheus {
+class Registry;
+}
+
 namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
@@ -36,11 +40,13 @@ class HTTPServer {
   static Status Create(
       InferenceServer* server,
       const std::map<int32_t, std::vector<std::string>>& port_map,
-      int thread_cnt, std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+      const int thread_cnt,
+      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
 
   static Status CreatePrometheus(
-      InferenceServer* server, int32_t port,
-      int thread_cnt, std::unique_ptr<HTTPServer>* prometheus_server);
+      const std::shared_ptr<prometheus::Registry>& metrics_registry,
+      int32_t port, int thread_cnt,
+      std::unique_ptr<HTTPServer>* prometheus_server);
 
   virtual Status Start() = 0;
   virtual Status Stop() = 0;
