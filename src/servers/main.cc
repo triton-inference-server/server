@@ -65,7 +65,7 @@ std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
 
 // The metrics service
-// FIXME std::unique_ptr<prometheus::Exposer> exposer_;
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
@@ -294,7 +294,7 @@ StartMultipleHttpService(
     const std::map<int32_t, std::vector<std::string>>& port_map)
 {
   nvidia::inferenceserver::Status status =
-      nvidia::inferenceserver::HTTPServer::Create(
+      nvidia::inferenceserver::HTTPServer::CreateAPIServer(
           server, port_map, http_thread_cnt_, &http_endpoint_services_);
   if (status.IsOk()) {
     for (auto& http_eps : http_endpoint_services_) {
@@ -313,6 +313,24 @@ StartMultipleHttpService(
   }
 
   return status;
+}
+
+std::unique_ptr<nvidia::inferenceserver::HTTPServer>
+StartMetricsService()
+{
+  std::unique_ptr<nvidia::inferenceserver::HTTPServer> service;
+  nvidia::inferenceserver::Status status =
+      nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
+          metrics_port_, 1 /* HTTP thread count */, allow_gpu_metrics_,
+          &service);
+  if (status.IsOk()) {
+    status = service->Start();
+  }
+  if (!status.IsOk()) {
+    service.reset();
+  }
+
+  return std::move(service);
 }
 
 bool
@@ -351,20 +369,11 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    // FIXME
-#if 0
-    LOG_INFO << " localhost:" << std::to_string(metrics_port_)
-             << " for metric reporting";
-   if (allow_gpu_metrics_) {
-      nvidia::inferenceserver::Metrics::EnableGPUMetrics();
+    metrics_service_ = StartMetricsService();
+    if (metrics_service_ == nullptr) {
+      LOG_ERROR << "Failed to start Metrics service";
+      return false;
     }
-
-    std::ostringstream stream;
-    stream << "0.0.0.0:" << metrics_port_;
-   exposer_.reset(new prometheus::Exposer(stream.str()));
-    exposer_->RegisterCollectable(
-        nvidia::inferenceserver::Metrics::GetRegistry());
-#endif
   }
 
   return true;
@@ -651,6 +660,9 @@ main(int argc, char** argv)
     if (http_eps != nullptr) {
       http_eps->Stop();
     }
+  }
+  if (metrics_service_) {
+    metrics_service_->Stop();
   }
 
   return (stop_status) ? 0 : 1;
