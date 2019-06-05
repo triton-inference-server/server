@@ -1179,6 +1179,10 @@ ModelRepositoryManager::VersionsToLoad(
     }
   }
 
+  if (versions.empty()) {
+    return Status(RequestStatusCode::INVALID_ARG, "at least one version must be available under the version policy of model '" + name + "'");
+  }
+
   return Status::Success;
 }
 
