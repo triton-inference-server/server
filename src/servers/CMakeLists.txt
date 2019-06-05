@@ -70,6 +70,15 @@ target_include_directories(
   http-endpoint-library
   PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
 )
+# Needs to include header files for prometheus to build successfully
+if(${TRTIS_ENABLE_METRICS})
+  find_package(prometheus-cpp CONFIG REQUIRED)
+  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
+  target_include_directories(
+    http-endpoint-library
+    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_METRICS
 
 #
 # trtserver
