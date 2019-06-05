@@ -33,10 +33,15 @@ class InferenceServer;
 
 class HTTPServer {
  public:
-  static Status Create(
+  static Status CreateAPIServer(
       InferenceServer* server,
       const std::map<int32_t, std::vector<std::string>>& port_map,
-      int thread_cnt, std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+      const int thread_cnt,
+      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+
+  static Status CreateMetricsServer(
+      int32_t port, int thread_cnt, const bool allow_gpu_metrics,
+      std::unique_ptr<HTTPServer>* metrics_server);
 
   virtual Status Start() = 0;
   virtual Status Stop() = 0;

@@ -42,6 +42,7 @@ namespace nvidia { namespace inferenceserver {
 
 Metrics::Metrics()
     : registry_(std::make_shared<prometheus::Registry>()),
+      serializer_(new prometheus::TextSerializer()),
       inf_success_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_success")
@@ -365,6 +366,14 @@ Metrics::GetRegistry()
 {
   auto singleton = Metrics::GetSingleton();
   return singleton->registry_;
+}
+
+const std::string
+Metrics::SerializedMetrics()
+{
+  auto singleton = Metrics::GetSingleton();
+  return singleton->serializer_->Serialize(
+      singleton->registry_.get()->Collect());
 }
 
 Metrics*

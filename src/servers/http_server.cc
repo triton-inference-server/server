@@ -34,87 +34,35 @@
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Handle HTTP requests
+// Generic HTTP server using evhtp
 class HTTPServerImpl : public HTTPServer {
  public:
-  explicit HTTPServerImpl(
-      InferenceServer* server, const std::vector<std::string>& endpoints,
-      int32_t port, int thread_cnt)
-      : server_(server), endpoint_names_(endpoints), port_(port),
-        thread_cnt_(thread_cnt),
-        api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
-        health_regex_(R"(/(live|ready))"),
-        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
+  explicit HTTPServerImpl(const int32_t port, const int thread_cnt)
+      : port_(port), thread_cnt_(thread_cnt)
   {
   }
 
-  ~HTTPServerImpl() { Stop(); }
+  virtual ~HTTPServerImpl() { Stop(); }
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
   Status Start() override;
   Status Stop() override;
 
- private:
-  // Class object associated to evhtp thread, requests received are bounded
-  // with the thread that accepts it. Need to keep track of that and let the
-  // corresponding thread send back the reply
-  class InferRequest {
-   public:
-    InferRequest(
-        evhtp_request_t* req, uint64_t id,
-        const std::shared_ptr<InferRequestProvider>& request_provider,
-        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-        const std::shared_ptr<ModelInferStats>& infer_stats,
-        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
-
-    evhtp_res FinalizeResponse();
-
-   private:
-    friend class HTTPServerImpl;
-    evhtp_request_t* req_;
-    evthr_t* thread_;
-    uint64_t id_;
-    RequestStatus request_status_;
-    std::shared_ptr<InferRequestProvider> request_provider_;
-    std::shared_ptr<HTTPInferResponseProvider> response_provider_;
-    std::shared_ptr<ModelInferStats> infer_stats_;
-    std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
-  };
-
-  void Handle(evhtp_request_t* req);
-  void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
-  void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
-  void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
-  void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
-
-  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
-  Status InferHelper(
-      std::shared_ptr<ModelInferStats>& infer_stats,
-      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
-      const std::string& model_name, int64_t model_version,
-      InferRequestHeader& request_header, evhtp_request_t* req);
-
-  void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
-  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
-  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+ protected:
+  virtual void Handle(evhtp_request_t* req) = 0;
 
   static void StopCallback(int sock, short events, void* arg);
 
-  InferenceServer* server_;
-  std::vector<std::string> endpoint_names_;
   int32_t port_;
   int thread_cnt_;
-  re2::RE2 api_regex_;
-  re2::RE2 health_regex_;
-  re2::RE2 infer_regex_;
-  re2::RE2 status_regex_;
 
   evhtp_t* htp_;
   struct event_base* evbase_;
@@ -176,8 +124,119 @@ HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
   (static_cast<HTTPServerImpl*>(arg))->Handle(req);
 }
 
+#ifdef TRTIS_ENABLE_METRICS
+
+// Handle HTTP requests to obtain prometheus metrics
+class HTTPMetricsServer : public HTTPServerImpl {
+ public:
+  explicit HTTPMetricsServer(const int32_t port, const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), api_regex_(R"(/metrics/?)")
+  {
+  }
+
+  ~HTTPMetricsServer() = default;
+
+ private:
+  void Handle(evhtp_request_t* req) override;
+
+  re2::RE2 api_regex_;
+};
+
 void
-HTTPServerImpl::Handle(evhtp_request_t* req)
+HTTPMetricsServer::Handle(evhtp_request_t* req)
+{
+  LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
+                 << req->uri->path->full;
+
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  // Call to prometheus endpoints should not have any trailing string
+  if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
+    const std::string metrics = Metrics::SerializedMetrics();
+    evbuffer_add(req->buffer_out, metrics.c_str(), metrics.size());
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  } else {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  }
+}
+
+#endif // TRTIS_ENABLE_METRICS
+
+// Handle HTTP requests to inference server APIs
+class HTTPAPIServer : public HTTPServerImpl {
+ public:
+  explicit HTTPAPIServer(
+      InferenceServer* server, const std::vector<std::string>& endpoints,
+      const int32_t port, const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), server_(server),
+        endpoint_names_(endpoints),
+        api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
+        health_regex_(R"(/(live|ready))"),
+        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
+  {
+  }
+
+  ~HTTPAPIServer() = default;
+
+ private:
+  // Class object associated to evhtp thread, requests received are bounded
+  // with the thread that accepts it. Need to keep track of that and let the
+  // corresponding thread send back the reply
+  class InferRequest {
+   public:
+    InferRequest(
+        evhtp_request_t* req, uint64_t id,
+        const std::shared_ptr<InferRequestProvider>& request_provider,
+        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
+        const std::shared_ptr<ModelInferStats>& infer_stats,
+        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
+
+    evhtp_res FinalizeResponse();
+
+   private:
+    friend class HTTPAPIServer;
+    evhtp_request_t* req_;
+    evthr_t* thread_;
+    uint64_t id_;
+    RequestStatus request_status_;
+    std::shared_ptr<InferRequestProvider> request_provider_;
+    std::shared_ptr<HTTPInferResponseProvider> response_provider_;
+    std::shared_ptr<ModelInferStats> infer_stats_;
+    std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
+  };
+
+  void Handle(evhtp_request_t* req) override;
+
+  void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
+  void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
+  void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
+  void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
+
+  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
+  Status InferHelper(
+      std::shared_ptr<ModelInferStats>& infer_stats,
+      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
+      const std::string& model_name, int64_t model_version,
+      InferRequestHeader& request_header, evhtp_request_t* req);
+
+  void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
+  static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
+  static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+
+  InferenceServer* server_;
+  std::vector<std::string> endpoint_names_;
+
+  re2::RE2 api_regex_;
+  re2::RE2 health_regex_;
+  re2::RE2 infer_regex_;
+  re2::RE2 status_regex_;
+};
+
+void
+HTTPAPIServer::Handle(evhtp_request_t* req)
 {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
@@ -221,8 +280,7 @@ HTTPServerImpl::Handle(evhtp_request_t* req)
 }
 
 void
-HTTPServerImpl::HandleHealth(
-    evhtp_request_t* req, const std::string& health_uri)
+HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
@@ -253,7 +311,7 @@ HTTPServerImpl::HandleHealth(
 }
 
 void
-HTTPServerImpl::HandleProfile(
+HTTPAPIServer::HandleProfile(
     evhtp_request_t* req, const std::string& profile_uri)
 {
   ServerStatTimerScoped timer(
@@ -290,7 +348,7 @@ HTTPServerImpl::HandleProfile(
 }
 
 void
-HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
+HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -358,8 +416,7 @@ HTTPServerImpl::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 }
 
 void
-HTTPServerImpl::HandleStatus(
-    evhtp_request_t* req, const std::string& status_uri)
+HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
 {
   ServerStatTimerScoped timer(
       server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
@@ -418,7 +475,7 @@ HTTPServerImpl::HandleStatus(
 }
 
 Status
-HTTPServerImpl::InferHelper(
+HTTPAPIServer::InferHelper(
     std::shared_ptr<ModelInferStats>& infer_stats,
     std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
     const std::string& model_name, int64_t model_version,
@@ -459,7 +516,7 @@ HTTPServerImpl::InferHelper(
 }
 
 void
-HTTPServerImpl::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   evhtp_request_t* request = (evhtp_request_t*)arg;
   evhtp_send_reply(request, EVHTP_RES_OK);
@@ -467,7 +524,7 @@ HTTPServerImpl::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPServerImpl::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
+HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
   evhtp_request_t* request = (evhtp_request_t*)arg;
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
@@ -475,7 +532,7 @@ HTTPServerImpl::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 void
-HTTPServerImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
+HTTPAPIServer::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
 {
   if (req->FinalizeResponse() == EVHTP_RES_OK) {
     evthr_defer(req->thread_, OKReplyCallback, req->req_);
@@ -484,7 +541,7 @@ HTTPServerImpl::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
   }
 }
 
-HTTPServerImpl::InferRequest::InferRequest(
+HTTPAPIServer::InferRequest::InferRequest(
     evhtp_request_t* req, uint64_t id,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
@@ -500,7 +557,7 @@ HTTPServerImpl::InferRequest::InferRequest(
 }
 
 evhtp_res
-HTTPServerImpl::InferRequest::FinalizeResponse()
+HTTPAPIServer::InferRequest::FinalizeResponse()
 {
   InferResponseHeader* response_header =
       response_provider_->MutableResponseHeader();
@@ -558,7 +615,7 @@ HTTPServerImpl::InferRequest::FinalizeResponse()
 }
 
 Status
-HTTPServer::Create(
+HTTPServer::CreateAPIServer(
     InferenceServer* server,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
@@ -574,9 +631,31 @@ HTTPServer::Create(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPService at " << addr;
     http_servers->emplace_back(
-        new HTTPServerImpl(server, ep_map.second, ep_map.first, thread_cnt));
+        new HTTPAPIServer(server, ep_map.second, ep_map.first, thread_cnt));
   }
 
   return Status::Success;
 }
+
+Status
+HTTPServer::CreateMetricsServer(
+    const int32_t port, const int thread_cnt, const bool allow_gpu_metrics,
+    std::unique_ptr<HTTPServer>* metrics_server)
+{
+#ifndef TRTIS_ENABLE_METRICS
+  return Status(RequestStatusCode::UNAVAILABLE, "Metrics support is disabled");
+#endif // !TRTIS_ENABLE_METRICS
+
+#ifdef TRTIS_ENABLE_METRICS
+  if (allow_gpu_metrics) {
+    Metrics::EnableGPUMetrics();
+  }
+  std::string addr = "0.0.0.0:" + std::to_string(port);
+  LOG_INFO << "Starting Metrics Service at " << addr;
+  metrics_server->reset(new HTTPMetricsServer(port, thread_cnt));
+
+  return Status::Success;
+#endif // TRTIS_ENABLE_METRICS
+}
+
 }}  // namespace nvidia::inferenceserver
