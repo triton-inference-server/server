@@ -36,9 +36,11 @@ source ../common/util.sh
 RET=0
 rm -fr *.log
 
+LOG_IDX=0
+
 # LifeCycleTest.test_parse_error_noexit_strict
 SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=true --exit-on-error=false"
-SERVER_LOG="./inference_server_0.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -59,9 +61,11 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_parse_error_noexit
 SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
-SERVER_LOG="./inference_server_1.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -82,6 +86,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_parse_error_modelfail
 rm -fr models
 mkdir models
@@ -91,7 +97,7 @@ done
 rm models/graphdef_float32_float32_float32/*/*
 
 SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_2.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -113,6 +119,43 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
+# LifeCycleTest.test_parse_error_model_no_version
+rm -fr models
+mkdir models
+for i in savedmodel netdef plan ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
+mkdir -p models/graphdef_float32_float32_float32
+cp $DATADIR/qa_model_repository/graphdef_float32_float32_float32/config.pbtxt \
+    models/graphdef_float32_float32_float32/.
+
+SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server_tolive
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# give plenty of time for model to load (and fail to load)
+wait_for_model_stable $SERVER_TIMEOUT
+
+set +e
+python $LC_TEST LifeCycleTest.test_parse_error_model_no_version >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_dynamic_model_load_unload
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
@@ -122,7 +165,7 @@ done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_3.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -141,6 +184,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
 rm -fr models savedmodel_float32_float32_float32
 mkdir models
@@ -151,7 +196,7 @@ cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
 SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
              --repository-poll-secs=1 --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_4.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -170,6 +215,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_dynamic_version_load_unload
 rm -fr models
 mkdir models
@@ -178,7 +225,7 @@ for i in graphdef ; do
 done
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_5.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -197,6 +244,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_dynamic_version_load_unload_disabled
 rm -fr models
 mkdir models
@@ -206,7 +255,7 @@ done
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 \
              --allow-poll-model-repository=false --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_6.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -225,6 +274,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # LifeCycleTest.test_dynamic_model_modify
 rm -fr models config.pbtxt.*
 mkdir models
@@ -240,7 +291,7 @@ for i in savedmodel plan ; do
 done
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_7.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -259,6 +310,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1)) 
+
 # Send HTTP request to invalid endpoints
 rm -fr models
 mkdir models
@@ -268,7 +321,7 @@ done
 
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 \
              --allow-poll-model-repository=false --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_8.log"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -294,6 +347,8 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1)) 
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
