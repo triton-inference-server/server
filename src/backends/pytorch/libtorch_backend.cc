@@ -438,11 +438,11 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
           cudaMemcpy(
               buffer, (char*)content + content_offset, expected_byte_size,
               cudaMemcpyDeviceToHost);
-        }
 #else
           return Status(
               RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
+        }
       }
 
       if (!status.IsOk()) {
