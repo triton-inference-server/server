@@ -154,6 +154,12 @@ class ModelRepositoryManager {
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
+  /// Update the configuration of newly added / modified model and serve
+  /// the model based on its version policy.
+  /// \param model_name The name of the model to be updated.
+  /// \param is_added If the model is being added to the model repository.
+  Status Update(const std::string& model_name, bool is_added);
+
   /// Get the configuration for a named model.
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
