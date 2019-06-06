@@ -96,6 +96,33 @@ ConvertDataTypeToTorchType(const DataType& dtype)
   return std::make_pair(true, type);
 }
 
+DataType
+ConvertTorchTypeToDataType(const torch::ScalarType& ttype)
+{
+  switch (ttype) {
+    case torch::kBool:
+      return TYPE_BOOL;
+    case torch::kByte:
+      return TYPE_UINT8;
+    case torch::kChar:
+      return TYPE_INT8;
+    case torch::kShort:
+      return TYPE_INT16;
+    case torch::kInt:
+      return TYPE_INT32;
+    case torch::kLong:
+      return TYPE_INT64;
+    case torch::kHalf:
+      return TYPE_FP16;
+    case torch::kFloat:
+      return TYPE_FP32;
+    case torch::kDouble:
+      return TYPE_FP64;
+    default:
+      return TYPE_FP32;
+  }
+}
+
 Status
 LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -464,6 +491,18 @@ LibTorchBackend::Context::GetOutputTensor(
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].flatten();
+
+    // verify output datatype matches datatype from model config
+    DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
+    if (dtype != rec_dtype) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "DataType " + DataType_Name(rec_dtype) +
+              " does not match expected DataType " + DataType_Name(dtype) +
+              " (for OUTPUT__" + std::to_string(op_index) +
+              ") specified in model config");
+    }
+
     *byte_size = output_flat.nbytes();
 
     // Copy output into buffer
@@ -613,19 +652,20 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
-  // TODO Verify Output shape and datatype after model execution
+  // TODO Validate Output shape after model execution
 
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
     std::string index_str = name.substr(name.find(deliminator) + 2);
     int op_index = std::atoi(index_str.c_str());
-    if ((op_index < 0) || (op_index >= outputs_.size())) {
+    int max_index = outputs_.size() - 1;
+    if ((op_index < 0) || (op_index > max_index)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "The output " + name +
               " in the model config refers to an output index which doesn't "
               "exist. This model has " +
-              std::to_string(outputs_.size() - 1) + " outputs");
+              std::to_string(max_index + 1) + " outputs");
     }
   }
   // Prepare set of Outputs requested for
