@@ -127,7 +127,7 @@ class LifeCycleTest(unittest.TestCase):
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
-def test_parse_error_model_no_version(self):
+    def test_parse_error_model_no_version(self):
         # --strict-readiness=true so server is live but not ready
         input_size = 16
         tensor_shape = (input_size,)
@@ -161,9 +161,11 @@ def test_parse_error_model_no_version(self):
         try:
             for model_name in ["savedmodel", "netdef"]:
                 iu.infer_exact(self, model_name, tensor_shape, 1,
-                               np.float32, np.float32, np.float32)
-            iu.infer_exact(self, 'plan', (input_size, 1, 1), 1,
-                           np.float32, np.float32, np.float32)
+                               np.float32, np.float32, np.float32, swap=True)
+            for version in [1, 3]:
+                iu.infer_exact(self, 'plan', (input_size, 1, 1), 1,
+                               np.float32, np.float32, np.float32,
+                               swap=(version == 3), model_version=version)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
