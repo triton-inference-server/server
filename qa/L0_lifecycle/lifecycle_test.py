@@ -127,6 +127,58 @@ class LifeCycleTest(unittest.TestCase):
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
+    def test_parse_error_model_no_version(self):
+        # --strict-readiness=true so server is live but not ready
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # Server was started but with a model that fails to load
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                uptime = ss.uptime_ns
+                self.assertGreater(uptime, 0)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                self.assertEqual(len(ss.model_status[model_name].version_status), 0,
+                                "expected no version for model " + model_name)
+
+                hctx = ServerHealthContext(pair[0], pair[1], True)
+                self.assertFalse(hctx.is_ready())
+                self.assertTrue(hctx.is_live())
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Sanity check that other models are loaded properly
+        try:
+            for model_name in ["savedmodel", "netdef"]:
+                iu.infer_exact(self, model_name, tensor_shape, 1,
+                               np.float32, np.float32, np.float32, swap=True)
+            for version in [1, 3]:
+                iu.infer_exact(self, 'plan', (input_size, 1, 1), 1,
+                               np.float32, np.float32, np.float32,
+                               swap=(version == 3), model_version=version)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        try:
+            iu.infer_exact(self, 'graphdef', tensor_shape, 1,
+                           np.float32, np.float32, np.float32)
+            self.assertTrue(False, "expected error for unavailable model " + model_name)
+        except InferenceServerException as ex:
+            self.assertEqual("inference:0", ex.server_id())
+            self.assertTrue(
+                ex.message().startswith(
+                    "Inference request for unknown model 'graphdef_float32_float32_float32'"))
+
     def test_dynamic_model_load_unload(self):
         input_size = 16
         tensor_shape = (input_size,)

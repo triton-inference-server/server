@@ -871,22 +871,20 @@ ModelRepositoryManager::Create(
         "Unexpected initial state for model repository");
   }
 
+  Status status = Status::Success;
   for (const auto& name : added) {
-    ModelConfig model_config;
-    RETURN_IF_ERROR(local_manager->GetModelConfig(name, &model_config));
-    RETURN_IF_ERROR(
-        local_manager->status_manager_->InitForModel(name, model_config));
-
-    std::vector<int64_t> versions;
-    RETURN_IF_ERROR(
-        local_manager->VersionsToLoad(name, model_config, versions));
-    RETURN_IF_ERROR(local_manager->backend_life_cycle_->AsyncLoad(
-        name, versions, model_config));
+    // If there is error on model loading, just report it and move to next model
+    Status update_status = local_manager->Update(name, true);
+    if (!update_status.IsOk()) {
+      LOG_ERROR << "failed to load model '" << name
+                << "': " << update_status.Message();
+      status = update_status;
+    }
   }
 
   *model_repository_manager = std::move(local_manager);
 
-  return Status::Success;
+  return status;
 }
 
 Status
@@ -902,29 +900,23 @@ ModelRepositoryManager::PollAndUpdate()
     return Status::Success;
   }
 
-  // Added models should be loaded and be initialized for status
-  // reporting.
+  // Added models should be loaded
   for (const auto& name : added) {
-    ModelConfig model_config;
-    RETURN_IF_ERROR(GetModelConfig(name, &model_config));
-    RETURN_IF_ERROR(status_manager_->InitForModel(name, model_config));
-
-    std::vector<int64_t> versions;
-    RETURN_IF_ERROR(VersionsToLoad(name, model_config, versions));
-    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+    Status status = Update(name, true);
+    if (!status.IsOk()) {
+      LOG_ERROR << "failed to load model '" << name
+                << "': " << status.Message();
+    }
   }
 
   // If there are any modified model, (re)load them to pick up
-  // the changes. We want to keep the current status information
-  // so don't re-init it.
+  // the changes.
   for (const auto& name : modified) {
-    ModelConfig model_config;
-    RETURN_IF_ERROR(GetModelConfig(name, &model_config));
-    RETURN_IF_ERROR(status_manager_->UpdateConfigForModel(name, model_config));
-
-    std::vector<int64_t> versions;
-    RETURN_IF_ERROR(VersionsToLoad(name, model_config, versions));
-    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+    Status status = Update(name, false);
+    if (!status.IsOk()) {
+      LOG_ERROR << "failed to reload model '" << name
+                << "': " << status.Message();
+    }
   }
 
   for (const auto& name : deleted) {
@@ -934,6 +926,26 @@ ModelRepositoryManager::PollAndUpdate()
     backend_life_cycle_->AsyncLoad(name, versions, model_config);
   }
 
+  return Status::Success;
+}
+
+Status
+ModelRepositoryManager::Update(const std::string& model_name, bool is_added)
+{
+  ModelConfig model_config;
+  std::vector<int64_t> versions;
+  RETURN_IF_ERROR(GetModelConfig(model_name, &model_config));
+  // Added model should be initialized for status reporting. Otherwise,
+  // we want to keep the current status information so don't re-init it.
+  if (is_added) {
+    RETURN_IF_ERROR(status_manager_->InitForModel(model_name, model_config));
+  } else {
+    RETURN_IF_ERROR(
+        status_manager_->UpdateConfigForModel(model_name, model_config));
+  }
+  RETURN_IF_ERROR(VersionsToLoad(model_name, model_config, versions));
+  RETURN_IF_ERROR(
+      backend_life_cycle_->AsyncLoad(model_name, versions, model_config));
   return Status::Success;
 }
 
@@ -1177,6 +1189,14 @@ ModelRepositoryManager::VersionsToLoad(
       // all
       versions.assign(existing_versions.begin(), existing_versions.end());
     }
+  }
+
+  if (versions.empty()) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "at least one version must be available under the version policy of "
+        "model '" +
+            name + "'");
   }
 
   return Status::Success;
