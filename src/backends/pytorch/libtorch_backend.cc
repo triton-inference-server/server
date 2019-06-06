@@ -26,7 +26,6 @@
 
 #include "src/backends/pytorch/libtorch_backend.h"
 
-#include <cuda_runtime_api.h>
 #include <stdint.h>
 #include <exception>
 #include "src/core/constants.h"
@@ -35,6 +34,10 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -149,17 +152,16 @@ LibTorchBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::string>& paths)
 {
-  cudaError_t cuerr;
-
-  // For a GPU context, determine the model file to use for device
+    // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
   std::string cc;
   std::string cc_model_filename;
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
+#ifdef TRTIS_ENABLE_GPU
     cudaDeviceProp cuprops;
-    cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
+    cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,
@@ -172,6 +174,9 @@ LibTorchBackend::CreateExecutionContext(
     cc_model_filename = (cc_itr == Config().cc_model_filenames().end())
                             ? Config().default_model_filename()
                             : cc_itr->second;
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& lp_itr = paths.find(cc_model_filename);
@@ -429,10 +434,14 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
         if (device_ == torch::kCPU) {
           memcpy(buffer, (char*)content + content_offset, expected_byte_size);
         } else {
+#ifdef TRTIS_ENABLE_GPU
           cudaMemcpy(
               buffer, (char*)content + content_offset, expected_byte_size,
               cudaMemcpyDeviceToHost);
         }
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
       }
 
       if (!status.IsOk()) {
