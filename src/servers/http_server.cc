@@ -163,7 +163,7 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   }
 }
 
-#endif // TRTIS_ENABLE_METRICS
+#endif  // TRTIS_ENABLE_METRICS
 
 // Handle HTTP requests to inference server APIs
 class HTTPAPIServer : public HTTPServerImpl {
@@ -644,7 +644,7 @@ HTTPServer::CreateMetricsServer(
 {
 #ifndef TRTIS_ENABLE_METRICS
   return Status(RequestStatusCode::UNAVAILABLE, "Metrics support is disabled");
-#endif // !TRTIS_ENABLE_METRICS
+#endif  // !TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_METRICS
   if (allow_gpu_metrics) {
@@ -655,7 +655,7 @@ HTTPServer::CreateMetricsServer(
   metrics_server->reset(new HTTPMetricsServer(port, thread_cnt));
 
   return Status::Success;
-#endif // TRTIS_ENABLE_METRICS
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -152,7 +152,7 @@ LibTorchBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::unordered_map<std::string, std::string>& paths)
 {
-    // For a GPU context, determine the model file to use for device
+  // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
   std::string cc;
   std::string cc_model_filename;
@@ -440,7 +440,8 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
               cudaMemcpyDeviceToHost);
         }
 #else
-    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+          return Status(
+              RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
       }
 
