@@ -877,7 +877,7 @@ ModelRepositoryManager::Create(
     Status update_status = local_manager->Update(name, true);
     if (!update_status.IsOk()) {
       LOG_ERROR << "failed to load model '" << name
-                << "': " << status.Message();
+                << "': " << update_status.Message();
       status = update_status;
     }
   }

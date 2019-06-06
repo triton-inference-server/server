@@ -252,6 +252,12 @@ InferenceServer::HandleHealth(
       *health = status.IsOk();
       if (*health) {
         for (const auto& ms : server_status.model_status()) {
+          // If a model status is present but no version status,
+          // the model is not ready as there is no proper version to be served
+          if (ms.second.version_status().size() == 0) {
+            *health = false;
+            goto strict_done;
+          }
           for (const auto& vs : ms.second.version_status()) {
             if (vs.second.ready_state() != ModelReadyState::MODEL_READY) {
               *health = false;
