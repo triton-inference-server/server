@@ -698,12 +698,25 @@ TRTISTF_ModelCreateFromSavedModel(
   // Verify that a "serving_default" signature exists, that is what
   // will be used to verify the inputs and outputs.
   static const std::string DEFAULT_SERVING_SIGNATURE_DEF_KEY("serving_default");
-  const auto& sig_itr = bundle->meta_graph_def.signature_def().find(
+  static const std::string INIT_OP_SIGNATURE_DEF_KEY("__saved_model_init_op");
+  static const std::string TRAIN_OP_SIGNATURE_DEF_KEY("__saved_model_train_op");
+  auto sig_itr = bundle->meta_graph_def.signature_def().find(
       DEFAULT_SERVING_SIGNATURE_DEF_KEY);
   if (sig_itr == bundle->meta_graph_def.signature_def().end()) {
-    return TRTISTF_ErrorNew(
-        "unable to load model '" + std::string(model_name) + "', expected '" +
-        DEFAULT_SERVING_SIGNATURE_DEF_KEY + "' signature");
+    // If default serving signature_def key is not found, maybe it is named
+    // something else, use one that is neither init_op key nor train_op key
+    for (sig_itr = bundle->meta_graph_def.signature_def().begin();
+         sig_itr != bundle->meta_graph_def.signature_def().end(); sig_itr++) {
+      if ((sig_itr->first != INIT_OP_SIGNATURE_DEF_KEY) &&
+          (sig_itr->first != TRAIN_OP_SIGNATURE_DEF_KEY)) {
+        break;
+      }
+    }
+    if (sig_itr == bundle->meta_graph_def.signature_def().end()) {
+      return TRTISTF_ErrorNew(
+          "unable to load model '" + std::string(model_name) + "', expected '" +
+          DEFAULT_SERVING_SIGNATURE_DEF_KEY + "' signature");
+    }
   }
 
   const tensorflow::SignatureDef& def = sig_itr->second;
