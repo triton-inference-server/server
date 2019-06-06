@@ -613,8 +613,21 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
-  // TODO Verify Output shape and number are valid after model execution
+  // TODO Verify Output shape and datatype after model execution
 
+  for (const auto& output : base->Config().output()) {
+    const std::string& name = output.name();
+    std::string index_str = name.substr(name.find(deliminator) + 2);
+    int op_index = std::atoi(index_str.c_str());
+    if ((op_index < 0) || (op_index >= outputs_.size())) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "The output " + name +
+              " in the model config refers to an output index which doesn't "
+              "exist. This model has " +
+              std::to_string(outputs_.size() - 1) + " outputs");
+    }
+  }
   // Prepare set of Outputs requested for
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
