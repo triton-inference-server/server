@@ -613,12 +613,22 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
+  // TODO Verify Output shape and number are valid after model execution
+
+  // Prepare set of Outputs requested for
+  std::set<std::string> required_outputs;
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    for (const auto& output : request_header.output()) {
+      required_outputs.insert(output.name());
+    }
+  }
+
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  for (const auto& output : base->Config().output()) {
-    const std::string& name = output.name();
+  for (const auto& name : required_outputs) {
     std::string index_str = name.substr(name.find(deliminator) + 2);
-
     int op_index = std::atoi(index_str.c_str());
 
     const ModelOutput* output_config;
