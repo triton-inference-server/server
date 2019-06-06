@@ -31,7 +31,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -Werror")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
@@ -52,6 +52,10 @@ endif() # TRTIS_ENABLE_GPU
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
 endif() # TRTIS_ENABLE_METRICS
+
+if(${TRTIS_ENABLE_GCS})
+  add_definitions(-DTRTIS_ENABLE_GCS=1)
+endif() # TRTIS_ENABLE_GCS
 
 if(${TRTIS_ENABLE_TENSORFLOW})
   add_definitions(-DTRTIS_ENABLE_TENSORFLOW=1)

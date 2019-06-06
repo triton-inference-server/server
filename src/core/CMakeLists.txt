@@ -109,6 +109,11 @@ if(${TRTIS_ENABLE_METRICS})
   message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
 endif() # TRTIS_ENABLE_METRICS
 
+if(${TRTIS_ENABLE_GCS})
+  find_package(storage_client REQUIRED)
+  message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
+endif() # TRTIS_ENABLE_GCS
+
 set(
   SERVER_SRCS
   autofill.cc
@@ -180,3 +185,10 @@ if(${TRTIS_ENABLE_METRICS})
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRTIS_ENABLE_METRICS
+
+if(${TRTIS_ENABLE_GCS})
+  target_include_directories(
+    server-library
+    PRIVATE $<TARGET_PROPERTY:storage_client,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_GCS

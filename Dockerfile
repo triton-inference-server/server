@@ -165,6 +165,20 @@ RUN apt-get update && \
             libssl-dev \
             libtool
 
+#libcurl4-openSSL-dev is needed for GCS
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl3-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl4-openssl-dev; \
+    else \
+        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        exit 1; \
+    fi
+
 # TensorFlow libraries
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
@@ -235,6 +249,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
+                  -DTRTIS_ENABLE_GCS=ON\
                   -DTRTIS_ENABLE_CUSTOM=ON \
                   -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=ON \
@@ -248,6 +263,9 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             (make -j16 trtis || true) && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver/include && \
+            cp google-cloud-cpp/install/lib/libstorage_client.so.1 /opt/tensorrtserver/lib/. && \
+            cp google-cloud-cpp/install/lib/libgoogle_cloud_cpp_common.so.0 /opt/tensorrtserver/lib/. && \
+            cp crc32c/install/lib/libcrc32c.so /opt/tensorrtserver/lib/. && \
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
