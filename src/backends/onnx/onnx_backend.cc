@@ -26,8 +26,6 @@
 
 #include "src/backends/onnx/onnx_backend.h"
 
-#include <core/providers/cuda/cuda_provider_factory.h>
-#include <cuda_runtime_api.h>
 #include <stdint.h>
 #include <mutex>
 #include "src/backends/onnx/loader.h"
@@ -38,6 +36,11 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <core/providers/cuda/cuda_provider_factory.h>
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -148,6 +151,7 @@ OnnxBackend::CreateExecutionContext(
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
   } else {
+#ifdef TRTIS_ENABLE_GPU
     cudaDeviceProp cuprops;
     cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_device);
     if (cuerr != cudaSuccess) {
@@ -162,6 +166,9 @@ OnnxBackend::CreateExecutionContext(
     cc_model_filename = (cc_itr == Config().cc_model_filenames().end())
                             ? Config().default_model_filename()
                             : cc_itr->second;
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   const auto& op_itr = paths.find(cc_model_filename);
@@ -189,12 +196,16 @@ OnnxBackend::CreateExecutionContext(
   // Set Onnx session option with proper device
   OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
   if (gpu_device != Context::NO_GPU_DEVICE) {
+#ifdef TRTIS_ENABLE_GPU
     OrtStatus* onnx_status =
         OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
     if (onnx_status != nullptr) {
       OrtReleaseSessionOptions(options);
       RETURN_IF_ORT_ERROR(onnx_status);
     }
+#else
+    return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   // Create Onnx session
