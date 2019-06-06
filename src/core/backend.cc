@@ -56,7 +56,7 @@ Status
 InferenceBackend::GetOutput(
     const std::string& name, const ModelOutput** output) const
 {
-  if ((output_map_.size() == 0) && (platform_name_ == "pytorch_libtorch")) {
+  if ((output_map_.size() == 0) && (config_.platform() == "pytorch_libtorch")) {
     *output = nullptr;
     return Status::Success;
   } else {
@@ -107,7 +107,6 @@ InferenceBackend::SetModelConfig(
     }
   }
 
-  platform_name_ = config.platform();
   return Status::Success;
 }
 
