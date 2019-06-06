@@ -496,11 +496,10 @@ LibTorchBackend::Context::GetOutputTensor(
     DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
     if (dtype != rec_dtype) {
       return Status(
-          RequestStatusCode::INTERNAL,
-          "DataType " + DataType_Name(rec_dtype) +
-              " does not match expected DataType " + DataType_Name(dtype) +
-              " (for OUTPUT__" + std::to_string(op_index) +
-              ") specified in model config");
+          RequestStatusCode::INVALID_ARG,
+          "unexpected datatype " + DataType_Name(rec_dtype) +
+              " for inference output 'OUTPUT__" + std::to_string(op_index) +
+              "', expecting " + DataType_Name(dtype));
     }
 
     *byte_size = output_flat.nbytes();
