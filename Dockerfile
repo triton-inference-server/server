@@ -301,6 +301,8 @@ RUN apt-get update && \
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
+COPY --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
+COPY --from=trtserver_tf /opt/tensorflow/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib
