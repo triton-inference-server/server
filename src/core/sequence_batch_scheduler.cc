@@ -352,17 +352,19 @@ SequenceBatchScheduler::Enqueue(
     return;
   }
 
+  // Need to grab the target contents before the erase below since
+  // that can free it.
+  const size_t batcher_idx = target->batcher_idx_;
+  const uint32_t slot = target->slot_;
+
   // At this point the request has been assigned to a slot. If the
   // sequence is ending then stop tracking the correlation.
   if (seq_end) {
     sequence_to_batchslot_map_.erase(correlation_id);
   }
 
-  // Enqueue request into batcher and slot.
-  const size_t batcher_idx = target->batcher_idx_;
-  const uint32_t slot = target->slot_;
-
-  // No need to hold the lock while enqueuing in a specific batcher.
+  // Enqueue request into batcher and slot.  No need to hold the lock
+  // while enqueuing in a specific batcher.
   lock.unlock();
 
   LOG_VERBOSE(1) << "Enqueuing sequence inference request for model '"
@@ -506,17 +508,22 @@ SequenceBatchScheduler::ReaperThread(const int nice)
       // should release the slot but otherwise do nothing with the
       // payload.
       if (idle_sb_itr != sequence_to_batchslot_map_.end()) {
+        // Need to grab the contents before the erase below since that
+        // can free it.
+        const size_t batcher_idx = idle_sb_itr->second.batcher_idx_;
+        const uint32_t slot = idle_sb_itr->second.slot_;
+
         LOG_VERBOSE(1) << "reaper enqueuing force-end in batcher "
-                       << idle_sb_itr->second.batcher_idx_ << ", slot "
-                       << idle_sb_itr->second.slot_ << " for sequence "
+                       << batcher_idx << ", slot " << slot << " for sequence "
                        << idle_correlation_id;
+
 
         sequence_to_batchslot_map_.erase(idle_correlation_id);
 
         std::unique_ptr<ModelInferStats::ScopedTimer> idle_queue_timer;
-        batchers_[idle_sb_itr->second.batcher_idx_]->Enqueue(
-            idle_sb_itr->second.slot_, idle_correlation_id, idle_queue_timer,
-            nullptr, nullptr, nullptr, nullptr);
+        batchers_[batcher_idx]->Enqueue(
+            slot, idle_correlation_id, idle_queue_timer, nullptr, nullptr,
+            nullptr, nullptr);
         cid_itr = correlation_id_timestamps_.erase(cid_itr);
       } else {
         // If the idle correlation ID is in the backlog, then just
