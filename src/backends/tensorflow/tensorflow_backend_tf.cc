@@ -709,9 +709,9 @@ TRTISTF_ModelCreateFromSavedModel(
          sig_itr != bundle->meta_graph_def.signature_def().end(); sig_itr++) {
       if ((sig_itr->first != INIT_OP_SIGNATURE_DEF_KEY) &&
           (sig_itr->first != TRAIN_OP_SIGNATURE_DEF_KEY)) {
-        LOG(WARNING) << "unable to find default serving signature "
-                     << "'serving_default', using signature '"
-                     << sig_itr->first << "'";
+        LOG(WARNING) << "unable to find default serving signature '"
+                     << DEFAULT_SERVING_SIGNATURE_DEF_KEY
+                     << "', using signature '" << sig_itr->first << "'";
         break;
       }
     }
