@@ -59,17 +59,17 @@ std::condition_variable exit_cv_;
 // exit if even one model fails to load).
 bool exit_on_failed_init_ = true;
 
-// The HTTP and GRPC service/s
+// The HTTP, GRPC and metrics service/s
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
-    http_endpoint_services_;
+    http_services_;
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
-
-// The metrics service
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 
 // The HTTP and GRPC ports. Initialized to default values and
 // modifyied based on command-line args. Set to -1 to indicate the
 // protocol is disabled.
+bool allow_http_ = true;
+bool allow_grpc_ = true;
 int32_t http_port_ = 8000;
 int32_t grpc_port_ = 8001;
 
@@ -80,11 +80,13 @@ std::vector<int32_t> http_ports_;
 // The metric port. Initialized to default values and modifyied based
 // on command-line args. Set to -1 to indicate the protocol is
 // disabled.
-int32_t metrics_port_ = 8002;
-
-bool allow_http_ = true;
-bool allow_grpc_ = true;
+#ifdef TRTIS_ENABLE_METRICS
 bool allow_metrics_ = true;
+int32_t metrics_port_ = 8002;
+#else
+bool allow_metrics_ = false;
+int32_t metrics_port_ = -1;
+#endif  // TRTIS_ENABLE_METRICS
 
 // endpoint names for http/gRPC
 std::vector<std::string> endpoint_names = {"status", "health", "profile",
@@ -282,6 +284,7 @@ StartGrpcService(nvidia::inferenceserver::InferenceServer* server)
   }
 
   if (!status.IsOk()) {
+    LOG_ERROR << status.Message();
     service.reset();
   }
 
@@ -289,15 +292,15 @@ StartGrpcService(nvidia::inferenceserver::InferenceServer* server)
 }
 
 nvidia::inferenceserver::Status
-StartMultipleHttpService(
+StartHttpService(
     nvidia::inferenceserver::InferenceServer* server,
     const std::map<int32_t, std::vector<std::string>>& port_map)
 {
   nvidia::inferenceserver::Status status =
       nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-          server, port_map, http_thread_cnt_, &http_endpoint_services_);
+          server, port_map, http_thread_cnt_, &http_services_);
   if (status.IsOk()) {
-    for (auto& http_eps : http_endpoint_services_) {
+    for (auto& http_eps : http_services_) {
       if (http_eps != nullptr) {
         status = http_eps->Start();
       }
@@ -305,7 +308,8 @@ StartMultipleHttpService(
   }
 
   if (!status.IsOk()) {
-    for (auto& http_eps : http_endpoint_services_) {
+    LOG_ERROR << status.Message();
+    for (auto& http_eps : http_services_) {
       if (http_eps != nullptr) {
         http_eps.reset();
       }
@@ -327,6 +331,7 @@ StartMetricsService()
     status = service->Start();
   }
   if (!status.IsOk()) {
+    LOG_ERROR << status.Message();
     service.reset();
   }
 
@@ -360,7 +365,7 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
       }
     }
 
-    create_status = StartMultipleHttpService(server, port_map);
+    create_status = StartHttpService(server, port_map);
     if (!create_status.IsOk()) {
       LOG_ERROR << "Failed to start HTTP service";
       return false;
@@ -656,7 +661,7 @@ main(int argc, char** argv)
   if (grpc_service_) {
     grpc_service_->Stop();
   }
-  for (auto& http_eps : http_endpoint_services_) {
+  for (auto& http_eps : http_services_) {
     if (http_eps != nullptr) {
       http_eps->Stop();
     }

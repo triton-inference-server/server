@@ -25,11 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#ifdef TRTIS_ENABLE_METRICS
-
-#include "prometheus/registry.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
+
+#ifdef TRTIS_ENABLE_METRICS
+#include "prometheus/registry.h"
+#endif  // TRTIS_ENABLE_METRICS
 
 namespace nvidia { namespace inferenceserver {
 
@@ -50,6 +51,7 @@ class MetricModelReporter {
 
   // Get a metric for the backend specialized for the given GPU index
   // (if -1 then return non-specialized version of the metric).
+#ifdef TRTIS_ENABLE_METRICS
   prometheus::Counter& MetricInferenceSuccess(int gpu_device) const;
   prometheus::Counter& MetricInferenceFailure(int gpu_device) const;
   prometheus::Counter& MetricInferenceCount(int gpu_device) const;
@@ -58,18 +60,20 @@ class MetricModelReporter {
   prometheus::Counter& MetricInferenceComputeDuration(int gpu_device) const;
   prometheus::Counter& MetricInferenceQueueDuration(int gpu_device) const;
   prometheus::Histogram& MetricInferenceLoadRatio(int gpu_device) const;
+#endif  // TRTIS_ENABLE_METRICS
 
  private:
+  const std::string model_name_;
+  const int64_t model_version_;
+  const MetricTagsMap model_tags_;
+
+#ifdef TRTIS_ENABLE_METRICS
   void GetMetricLabels(
       std::map<std::string, std::string>* labels, const int gpu_device) const;
   prometheus::Counter& GetCounterMetric(
       std::map<int, prometheus::Counter*>& metrics,
       prometheus::Family<prometheus::Counter>& family,
       const int gpu_device) const;
-
-  const std::string model_name_;
-  const int64_t model_version_;
-  const MetricTagsMap model_tags_;
 
   mutable std::map<int, prometheus::Counter*> metric_inf_success_;
   mutable std::map<int, prometheus::Counter*> metric_inf_failure_;
@@ -79,8 +83,7 @@ class MetricModelReporter {
   mutable std::map<int, prometheus::Counter*> metric_inf_compute_duration_us_;
   mutable std::map<int, prometheus::Counter*> metric_inf_queue_duration_us_;
   mutable std::map<int, prometheus::Histogram*> metric_inf_load_ratio_;
+#endif  // TRTIS_ENABLE_METRICS
 };
 
 }}  // namespace nvidia::inferenceserver
-
-#endif  // TRTIS_ENABLE_METRICS
