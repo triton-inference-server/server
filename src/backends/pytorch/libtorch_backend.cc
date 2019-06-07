@@ -707,10 +707,17 @@ LibTorchBackend::Context::Run(
     // Checked at initialization time to make sure that STRING is not
     // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
+
+    // If a reshape is provided for the input then use that when
+    // validating that the model matches what is expected.
+    const DimsList& output_dims = (output_config->has_reshape())
+                                      ? output_config->reshape().shape()
+                                      : output_config->dims();
+
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        payloads, output_config->dims()));
+        payloads, output_dims));
   }
 
   return Status::Success;
