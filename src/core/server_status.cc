@@ -366,14 +366,17 @@ ModelInferStats::~ModelInferStats()
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
         model_name_, model_version, batch_size_, request_duration_ns_);
+#ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
       metric_reporter_->MetricInferenceFailure(gpu_device_).Increment();
     }
+#endif  // TRTIS_ENABLE_METRICS
   } else {
     status_manager_->UpdateSuccessInferStats(
         model_name_, model_version, batch_size_, execution_count_,
         request_duration_ns_, queue_duration_ns_, compute_duration_ns_);
 
+#ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
       metric_reporter_->MetricInferenceSuccess(gpu_device_).Increment();
       metric_reporter_->MetricInferenceCount(gpu_device_)
@@ -395,6 +398,7 @@ ModelInferStats::~ModelInferStats()
               (double)request_duration_ns_ /
               std::max(1.0, (double)compute_duration_ns_));
     }
+#endif  // TRTIS_ENABLE_METRICS
   }
 }
 

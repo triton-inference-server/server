@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifdef TRTIS_ENABLE_METRICS
-
 #include "src/core/metric_model_reporter.h"
 
 #include "src/core/constants.h"
@@ -40,6 +38,8 @@ MetricModelReporter::MetricModelReporter(
       model_tags_(model_tags)
 {
 }
+
+#ifdef TRTIS_ENABLE_METRICS
 
 void
 MetricModelReporter::GetMetricLabels(
@@ -155,6 +155,6 @@ MetricModelReporter::MetricInferenceLoadRatio(int gpu_device) const
   return hist;
 }
 
-}}  // namespace nvidia::inferenceserver
-
 #endif  // TRTIS_ENABLE_METRICS
+
+}}  // namespace nvidia::inferenceserver
