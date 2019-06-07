@@ -421,13 +421,31 @@ Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     std::vector<torch::Tensor>* outputs_, const std::string& name,
     const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    const DimsList& dims)
 {
   std::vector<int64_t> content_shape;
   void* content = nullptr;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
       outputs_, op_index, dtype, &content, &byte_size, &content_shape));
+
+  // verify shape of output matches shape from model config
+  int8_t dim_i = 0;
+  if (max_batch_size_ != NO_BATCHING) {
+    dim_i++;
+  }
+  for (int i = 0; i < dims.size(); i++) {
+    if (dims[i] != -1) {
+      if (dims[i] != content_shape[i + dim_i]) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unexpected shape for output '" + name + "', dimension " +
+                std::to_string(content_shape[i + dim_i]) + " does not equal " +
+                std::to_string(dims[i]) + " specified in config");
+      }
+    }
+  }
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -692,7 +710,7 @@ LibTorchBackend::Context::Run(
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        payloads));
+        payloads, output_config->dims()));
   }
 
   return Status::Success;
