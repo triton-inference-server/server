@@ -428,21 +428,34 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
   void* content = nullptr;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
-      outputs_, op_index, dtype, &content, &byte_size, &content_shape));
+      outputs_, op_index, name, dtype, &content, &byte_size, &content_shape));
 
   // verify shape of output matches shape from model config
-  int8_t dim_i = 0;
-  if (max_batch_size_ != NO_BATCHING) {
-    dim_i++;
-  }
+  const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
+
   for (int i = 0; i < dims.size(); i++) {
     if (dims[i] != -1) {
-      if (dims[i] != content_shape[i + dim_i]) {
+      if (dims[i] != content_shape[i + batch_offset]) {
+
+        // create print friendly array of shapes
+        std::string expected_shape = "[ ";
+        std::string output_shape = "[ ";
+        for (size_t i = batch_offset; i < content_shape.size() - 1; i++) {
+          output_shape += std::to_string(content_shape[i]) + ", ";
+        }
+        output_shape +=
+            std::to_string(content_shape[content_shape.size() - 1]) + " ]";
+
+        for (int i = 0; i < dims.size() - 1; i++) {
+          expected_shape += std::to_string(dims[i]) + ", ";
+        }
+        expected_shape += std::to_string(dims[dims.size() - 1]) + " ]";
+
         return Status(
-            RequestStatusCode::INTERNAL,
-            "unexpected shape for output '" + name + "', dimension " +
-                std::to_string(content_shape[i + dim_i]) + " does not equal " +
-                std::to_string(dims[i]) + " specified in config");
+            RequestStatusCode::INVALID_ARG,
+            "unexpected shape for output '" + name +
+                "', model configuration shape is " + expected_shape +
+                ", inference shape is " + output_shape);
       }
     }
   }
@@ -453,7 +466,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
   if (byte_size != total_byte_size) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        RequestStatusCode::INVALID_ARG,
         "unexpected size for output '" + name + "', byte-size " +
             std::to_string(byte_size) + " does not equal " +
             std::to_string(total_batch_size) + " * " +
@@ -504,8 +517,8 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const DataType dtype, void** content, size_t* byte_size,
-    std::vector<int64_t>* content_shape)
+    const std::string& name, const DataType dtype, void** content,
+    size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].flatten();
@@ -516,8 +529,8 @@ LibTorchBackend::Context::GetOutputTensor(
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unexpected datatype " + DataType_Name(rec_dtype) +
-              " for inference output 'OUTPUT__" + std::to_string(op_index) +
-              "', expecting " + DataType_Name(dtype));
+              " for inference output '" + name + "', expecting " +
+              DataType_Name(dtype));
     }
 
     *byte_size = output_flat.nbytes();
@@ -669,8 +682,6 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
-  // TODO Validate Output shape after model execution
-
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
     std::string index_str = name.substr(name.find(deliminator) + 2);
@@ -704,16 +715,16 @@ LibTorchBackend::Context::Run(
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
-    // Checked at initialization time to make sure that STRING is not
-    // being used for an output, so can just assume fixed-sized here.
     const DataType dtype = output_config->data_type();
 
-    // If a reshape is provided for the input then use that when
+    // If a reshape is provided for the output then use that when
     // validating that the model matches what is expected.
     const DimsList& output_dims = (output_config->has_reshape())
                                       ? output_config->reshape().shape()
                                       : output_config->dims();
 
+    // Checked at initialization time to make sure that STRING is not
+    // being used for an output, so can just assume fixed-sized here.
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
