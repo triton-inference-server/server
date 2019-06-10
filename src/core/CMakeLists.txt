@@ -102,16 +102,6 @@ if(${TRTIS_ENABLE_GPU})
 endif() # TRTIS_ENABLE_GPU
 
 #
-# Common request interface used by both clients and server.
-#
-add_library(
-  request-library EXCLUDE_FROM_ALL OBJECT
-  request.cc request.h
-  request_common.cc request_common.h
-)
-add_dependencies(request-library proto-library)
-
-#
 # Inference server core
 #
 if(${TRTIS_ENABLE_METRICS})
@@ -136,7 +126,6 @@ set(
   profile.cc
   provider.cc
   provider_utils.cc
-  request_inprocess.cc
   request_status.cc
   sequence_batch_scheduler.cc
   server.cc
@@ -162,7 +151,6 @@ set(
   profile.h
   provider.h
   provider_utils.h
-  request_inprocess.h
   request_status.h
   scheduler.h
   sequence_batch_scheduler.h
@@ -175,7 +163,7 @@ add_library(
   server-library EXCLUDE_FROM_ALL OBJECT
   ${SERVER_SRCS} ${SERVER_HDRS}
 )
-add_dependencies(server-library request-library proto-library)
+add_dependencies(server-library proto-library)
 
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(
