@@ -82,6 +82,11 @@ class BaseBackend : public InferenceBackend {
     DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
+    Status ValidateInputs(
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+    Status ValidateOutputs(
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+
     // Set an input tensor data from payloads.
     void SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
