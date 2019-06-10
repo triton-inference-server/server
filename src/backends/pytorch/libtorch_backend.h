@@ -142,9 +142,8 @@ class LibTorchBackend : public InferenceBackend {
     int max_batch_size_;
 
     std::shared_ptr<torch::jit::script::Module> torch_model_;
-    std::vector<torch::jit::IValue> inputs_;
-    std::vector<torch::Tensor> outputs_;
     torch::Device device_;
+    std::unordered_map<std::string, int> io_index_map_;
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;

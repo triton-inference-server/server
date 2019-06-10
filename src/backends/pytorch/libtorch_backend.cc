@@ -253,6 +253,8 @@ Status
 LibTorchBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
+  std::string deliminator = "__";
+
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
@@ -260,6 +262,10 @@ LibTorchBackend::Context::ValidateInputs(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
+    } else {
+      const std::string& name = io.name();
+      int op_index = std::atoi(name.substr(name.find(deliminator) + 2).c_str());
+      io_index_map_[name] = op_index;
     }
   }
 
@@ -271,6 +277,8 @@ Status
 LibTorchBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
+  std::string deliminator = "__";
+
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
@@ -278,6 +286,10 @@ LibTorchBackend::Context::ValidateOutputs(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
+    } else {
+      const std::string& name = io.name();
+      int op_index = std::atoi(name.substr(name.find(deliminator) + 2).c_str());
+      io_index_map_[name] = op_index;
     }
   }
 
@@ -648,15 +660,10 @@ LibTorchBackend::Context::Run(
       input_request_provider->RequestHeader().input().size() + overide_inputs);
   std::vector<torch::Tensor> outputs_;
 
-  // Input and output names must be of the form *__<index>
-  std::string deliminator = "__";
-
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
-    std::string index_str = name.substr(name.find(deliminator) + 2);
-    int ip_index = std::atoi(index_str.c_str());
-
+    int ip_index = io_index_map_[name];
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
@@ -670,9 +677,7 @@ LibTorchBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      std::string index_str = name.substr(name.find(deliminator) + 2);
-      int ip_index = std::atoi(index_str.c_str());
-
+      int ip_index = io_index_map_[name];
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
           total_batch_size, payloads, &input_buffers));
@@ -682,20 +687,20 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
+  // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {
-    const std::string& name = output.name();
-    std::string index_str = name.substr(name.find(deliminator) + 2);
-    int op_index = std::atoi(index_str.c_str());
+    int op_index = io_index_map_[output.name()];
     int max_index = outputs_.size() - 1;
     if ((op_index < 0) || (op_index > max_index)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "The output " + name +
+          "The output " + output.name() +
               " in the model config refers to an output index which doesn't "
               "exist. This model has " +
               std::to_string(max_index + 1) + " outputs");
     }
   }
+
   // Prepare set of Outputs requested for
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
@@ -706,12 +711,9 @@ LibTorchBackend::Context::Run(
     }
   }
 
-  // Make sure each output is of the expected size and copy it into
-  // the payload responses.
+  // Ensure outputs have the expected size and copy it to the payload responses.
   for (const auto& name : required_outputs) {
-    std::string index_str = name.substr(name.find(deliminator) + 2);
-    int op_index = std::atoi(index_str.c_str());
-
+    int op_index = io_index_map_[name];
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
