@@ -68,11 +68,9 @@ find_package(gRPC CONFIG REQUIRED)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 
-if(${TRTIS_ENABLE_CUSTOM})
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/custom/addsub src/custom/addsub)
 add_subdirectory(../../src/custom/identity src/custom/identity)
 add_subdirectory(../../src/custom/image_preprocess src/custom/image_preprocess)
 add_subdirectory(../../src/custom/param src/custom/param)
 add_subdirectory(../../src/custom/sequence src/custom/sequence)
-endif() # TRTIS_ENABLE_CUSTOM
