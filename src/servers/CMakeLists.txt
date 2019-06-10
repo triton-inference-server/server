@@ -136,7 +136,6 @@ add_library(
   trtserver SHARED
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
   $<TARGET_OBJECTS:grpc-endpoint-library>
