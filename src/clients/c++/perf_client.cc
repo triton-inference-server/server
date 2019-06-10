@@ -160,7 +160,10 @@ typedef struct PerformanceStatusStruct {
   uint64_t client_sequence_count;
   uint64_t client_duration_ns;
   uint64_t client_avg_latency_ns;
-  uint64_t client_percentile_latency_ns;
+  // The additional percentile that are requested to be reported
+  uint64_t client_requested_percentile_latency_ns;
+  // a vector of percentiles to be reported (<percentile, value> pair)
+  std::vector<std::pair<size_t, uint64_t>> client_percentile_latency_ns;
   // Using usec to avoid square of large number (large in nsec)
   uint64_t std_us;
   uint64_t client_avg_request_time_ns;
@@ -981,7 +984,7 @@ class InferenceProfiler {
   InferenceProfiler(
       const bool verbose, const bool profile, const double stable_offset,
       const int32_t measurement_window_ms, const size_t max_measurement_count,
-      const bool report_percentile, const size_t percentile,
+      const bool extra_percentile, const size_t percentile,
       const bool on_sequence_model, const std::string& model_name,
       const int64_t model_version,
       std::unique_ptr<nic::ProfileContext> profile_ctx,
@@ -1069,7 +1072,7 @@ class InferenceProfiler {
   double stable_offset_;
   uint64_t measurement_window_ms_;
   size_t max_measurement_count_;
-  bool report_percentile_;
+  bool extra_percentile_;
   size_t percentile_;
 
   bool on_sequence_model_;
@@ -1105,7 +1108,7 @@ InferenceProfiler::Create(
 InferenceProfiler::InferenceProfiler(
     const bool verbose, const bool profile, const double stable_offset,
     const int32_t measurement_window_ms, const size_t max_measurement_count,
-    const bool report_percentile, const size_t percentile,
+    const bool extra_percentile, const size_t percentile,
     const bool on_sequence_model, const std::string& model_name,
     const int64_t model_version,
     std::unique_ptr<nic::ProfileContext> profile_ctx,
@@ -1114,7 +1117,7 @@ InferenceProfiler::InferenceProfiler(
     : verbose_(verbose), profile_(profile), stable_offset_(stable_offset),
       measurement_window_ms_(measurement_window_ms),
       max_measurement_count_(max_measurement_count),
-      report_percentile_(report_percentile), percentile_(percentile),
+      extra_percentile_(extra_percentile), percentile_(percentile),
       on_sequence_model_(on_sequence_model), model_name_(model_name),
       model_version_(model_version), profile_ctx_(std::move(profile_ctx)),
       status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
@@ -1150,9 +1153,9 @@ InferenceProfiler::Profile(
     if (verbose_) {
       std::cout << "  Pass [" << infer_per_sec.size()
                 << "] throughput: " << infer_per_sec.back() << " infer/sec. ";
-      if (report_percentile_) {
+      if (extra_percentile_) {
         std::cout << percentile_ << "-th percentile latency: "
-                  << (status_summary.client_percentile_latency_ns / 1000)
+                  << (status_summary.client_requested_percentile_latency_ns / 1000)
                   << " usec" << std::endl;
       } else {
         std::cout << "Avg latency: "
@@ -1346,9 +1349,8 @@ InferenceProfiler::ValidLatencyMeasurement(
     }
   }
 
-  if (report_percentile_) {
-    std::sort(valid_latencies.begin(), valid_latencies.end());
-  }
+  // Always sort measured latencies as percentile will be reported as default
+  std::sort(valid_latencies.begin(), valid_latencies.end());
 
   return valid_latencies;
 }
@@ -1374,13 +1376,21 @@ InferenceProfiler::SummarizeLatency(
 
   summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
 
-  if (report_percentile_) {
+  if (extra_percentile_) {
     // Round to nearest integer index by + 0.5
     size_t index = (percentile_ / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_percentile_latency_ns = latencies[index];
-    summary.reporting_latency_ns = summary.client_percentile_latency_ns;
+    summary.client_requested_percentile_latency_ns = latencies[index];
+    summary.reporting_latency_ns = summary.client_requested_percentile_latency_ns;
   } else {
     summary.reporting_latency_ns = summary.client_avg_latency_ns;
+  }
+
+  // retrieve other interesting percentile
+  summary.client_percentile_latency_ns.clear();
+  std::vector<size_t> percentiles{50, 90, 95, 99};
+  for (const auto percentile : percentiles) {
+    size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
+    summary.client_percentile_latency_ns.emplace_back(percentile, latencies[index]);
   }
 
   // calculate standard deviation
@@ -1531,8 +1541,8 @@ Report(
                                 : 0;
 
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
-  const uint64_t percentile_latency_us =
-      summary.client_percentile_latency_ns / 1000;
+  const uint64_t requested_percentile_latency_us =
+      summary.client_requested_percentile_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
   const uint64_t avg_request_time_us =
@@ -1590,11 +1600,16 @@ Report(
             << " infer/sec" << std::endl;
   if (percentile != -1) {
     std::cout << "    " << percentile
-              << "-th percentile latency: " << percentile_latency_us << " usec"
+              << "-th percentile latency: " << requested_percentile_latency_us << " usec"
               << std::endl;
   } else {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
+  }
+  for (const auto& percentile : summary.client_percentile_latency_ns) {
+    std::cout << "    " << percentile.first
+              << "-th percentile latency: " << (percentile.second / 1000) << " usec"
+              << std::endl;
   }
   std::cout << client_library_detail << std::endl
             << "  Server: " << std::endl
@@ -1944,7 +1959,14 @@ main(int argc, char** argv)
 
       ofs << "Concurrency,Inferences/Second,Client Send,"
           << "Network+Server Send/Recv,Server Queue,"
-          << "Server Compute,Client Recv" << std::endl;
+          << "Server Compute,Client Recv";
+      for (const auto& percentile : summary[0].client_percentile_latency_ns) {
+        ofs << "," << percentile.first << "-th Percentile";
+      }
+      if (percentile != -1) {
+        ofs << "," << percentile << "-th Percentile";
+      }
+      ofs << std::endl;
 
       // Sort summary results in order of increasing infer/sec.
       std::sort(
@@ -1966,7 +1988,14 @@ main(int argc, char** argv)
             << (status.client_avg_send_time_ns / 1000) << ","
             << (avg_network_misc_ns / 1000) << "," << (avg_queue_ns / 1000)
             << "," << (avg_compute_ns / 1000) << ","
-            << (status.client_avg_receive_time_ns / 1000) << std::endl;
+            << (status.client_avg_receive_time_ns / 1000);
+        for (const auto& percentile : status.client_percentile_latency_ns) {
+          ofs << "," << (percentile.second / 1000);
+        }
+        if (percentile != -1) {
+          ofs << "," << (status.client_requested_percentile_latency_ns / 1000);
+        }
+        ofs << std::endl;
       }
       ofs.close();
     }
