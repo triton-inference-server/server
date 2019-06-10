@@ -32,9 +32,10 @@ cmake_minimum_required (VERSION 3.5)
 find_package(CURL REQUIRED)
 add_library(
   request SHARED
+  request.cc request.h
+  request_common.cc request_common.h
   request_http.cc request_grpc.cc
   $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:request-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
 )
@@ -51,12 +52,11 @@ install(
   LIBRARY DESTINATION lib
 )
 install(
-  FILES request_grpc.h request_http.h
+  FILES request.h request_grpc.h request_http.h
   DESTINATION include
 )
 install(
   FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../core/request.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/api.pb.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../core/request_status.pb.h
