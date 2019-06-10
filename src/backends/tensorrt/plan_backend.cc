@@ -111,6 +111,24 @@ PlanBackend::Context::~Context()
   }
 }
 
+bool
+ValidDataType(const DataType& dtype)
+{
+  switch (dtype) {
+    case TYPE_FP32:
+      return true;
+    case TYPE_FP16:
+      return true;
+    case TYPE_INT8:
+      return true;
+    case TYPE_INT32:
+      return true;
+    default:
+      return false;
+  }
+  return false;
+}
+
 Status
 PlanBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -257,6 +275,8 @@ PlanBackend::CreateExecutionContext(
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
   }
 
+  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
@@ -316,6 +336,39 @@ PlanBackend::CreateExecutionContext(
 
   LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
            << " (" << cc << ") with stream priority " << cuda_stream_priority;
+
+  return Status::Success;
+}
+
+Status
+PlanBackend::Context::ValidateInputs(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+{
+  for (const auto& io : ios) {
+    if (ValidDataType(io.data_type())) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for input '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
+
+  return Status::Success;
+}
+
+
+Status
+PlanBackend::Context::ValidateOutputs(
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+{
+  for (const auto& io : ios) {
+    if (ValidDataType(io.data_type())) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for output '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
 
   return Status::Success;
 }

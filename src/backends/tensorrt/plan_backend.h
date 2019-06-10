@@ -78,6 +78,11 @@ class PlanBackend : public InferenceBackend {
     DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
+    Status ValidateInputs(
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+    Status ValidateOutputs(
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+
     Status InitializeInputBinding(
         const std::string& input_name, const DataType input_datatype,
         const DimsList& input_dims);
