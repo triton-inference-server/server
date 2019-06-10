@@ -687,6 +687,26 @@ BaseBackend::Context::Run(
       skip_element_cnt = false;
     }
 
+    const DimsList& output_dims = (output_config->has_reshape())
+                                      ? output_config->reshape().shape()
+                                      : output_config->dims();
+
+    // verify shape of output matches shape from model config
+    const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
+
+    for (int i = 0; i < output_dims.size(); i++) {
+      if (output_dims[i] != -1) {
+        if (output_dims[i] != shapevec[i + batch_offset]) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected shape for output '" + name +
+                  "', model configuration shape is " +
+                  DimsListToString(shapevec) + ", inference shape is " +
+                  DimsListToString(output_dims));
+        }
+      }
+    }
+
     TRTISTF_DataType dtype = ConvertDataType(output_config->data_type());
     if (dtype != TRTISTF_TensorDataType(output_tensor)) {
       return Status(
