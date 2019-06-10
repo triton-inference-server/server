@@ -35,9 +35,9 @@
 // This custom backend returns system and configuration parameter
 // values every time it is executed.
 //
-// Inputs are ignored but here must be a single output that is a
-// variable-sized vector of strings. The output is used to return the
-// parameter values.
+// A single int32, shape [ 1 ] input must be provided. A single output
+// is produced that is a variable-sized vector of strings. The output
+// strings return the input value and the parameter values.
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace param {
@@ -49,6 +49,8 @@ enum ErrorCodes {
   kUnknown,
   kInvalidModelConfig,
   kBatching,
+  kInput,
+  kInputContents,
   kOutput,
   kOutputBuffer
 };
@@ -60,8 +62,8 @@ class Context {
       const std::string& instance_name, const ModelConfig& config,
       const size_t server_parameter_cnt, const char** server_parameters);
 
-  // Initialize the context. Validate that the model configuration,
-  // etc. is something that we can handle.
+  // Initialize the context. Validate that the model configuration is
+  // something that we can handle.
   int Init();
 
   // Perform custom execution on the payloads.
@@ -95,13 +97,27 @@ Context::Context(
 int
 Context::Init()
 {
-  // Batching is not supported..
+  // Batching is not supported...
   if (model_config_.max_batch_size() != 0) {
     return kBatching;
   }
 
-  // Don't care how many inputs there are but there must be a single
-  // output that allows a variable-length vector of strings.
+  // There must be a single int32, shape [ 1 ] input.
+  if (model_config_.input_size() != 1) {
+    return kInput;
+  }
+  if (model_config_.input(0).dims_size() != 1) {
+    return kInput;
+  }
+  if (model_config_.input(0).dims(0) != 1) {
+    return kInput;
+  }
+  if (model_config_.input(0).data_type() != DataType::TYPE_INT32) {
+    return kInput;
+  }
+
+  // There must be a single output that allows a variable-length
+  // vector of strings.
   if (model_config_.output_size() != 1) {
     return kOutput;
   }
@@ -124,8 +140,8 @@ Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
-  // Batching is not supported so there must be a single payload of
-  // batch-size 1.
+  // Batching is not supported so we never expect to see more that a
+  // single payload with batch-size 1.
   if ((payload_cnt != 1) || (payloads[0].batch_size != 1)) {
     return kUnknown;
   }
@@ -137,21 +153,60 @@ Context::Execute(
 
   const char* output_name = payloads[0].required_output_names[0];
 
-  // The output is a vector of strings, with one element for each
-  // parameter from the system and model configuration. Each string is
-  // represented in the output buffer by a 4-byte length followed by
-  // the string itself, with no terminating null.
-  size_t param_cnt = 0;
+  // Always expect 1 input... We could get the input name from the
+  // model configuration during init time but we can als read it from
+  // the payload as we do here.
+  if (payloads[0].input_cnt != 1) {
+    return kUnknown;
+  }
+
+  const char* input_name = payloads[0].input_names[0];
+
+  // The output is a vector of strings, with one element for the input
+  // and one element for each parameter from the system and model
+  // configuration. TRTIS requires that each string be represented in
+  // the output buffer by a 4-byte length followed by the string
+  // itself, with no terminating null.
+  size_t output_cnt = 0;
   std::string output;
 
-  for (const auto& value : server_params_) {
-    const std::string key = "server_" + std::to_string(param_cnt) + "=";
+  // Read the input value and convert it to a string in the output.
+  {
+    const void* content;
+    uint64_t content_byte_size = 64;
+    if (!input_fn(
+            payloads[0].input_context, input_name, &content,
+            &content_byte_size)) {
+      return kInputContents;
+    }
+
+    // If 'content' returns nullptr or if the content is not the
+    // expected size, then something went wrong.
+    if ((content == nullptr) ||
+        (content_byte_size != GetDataTypeByteSize(DataType::TYPE_INT32))) {
+      return kInputContents;
+    }
+
+    const int32_t* icontent = reinterpret_cast<const int32_t*>(content);
+
+    const std::string key = std::string(input_name) + "=";
+    const std::string value = std::to_string(*icontent);
     uint32_t byte_size = key.size() + value.size();
     output.append(reinterpret_cast<const char*>(&byte_size), 4);
     output.append(key);
     output.append(value);
+    output_cnt++;
+  }
 
-    param_cnt++;
+  size_t sparam_cnt = 0;
+  for (const auto& value : server_params_) {
+    const std::string key = "server_" + std::to_string(sparam_cnt) + "=";
+    uint32_t byte_size = key.size() + value.size();
+    output.append(reinterpret_cast<const char*>(&byte_size), 4);
+    output.append(key);
+    output.append(value);
+    sparam_cnt++;
+    output_cnt++;
   }
 
   for (const auto& pr : model_config_.parameters()) {
@@ -161,12 +216,11 @@ Context::Execute(
     output.append(reinterpret_cast<const char*>(&byte_size), 4);
     output.append(key);
     output.append(value);
-
-    param_cnt++;
+    output_cnt++;
   }
 
   std::vector<int64_t> output_shape;
-  output_shape.push_back(param_cnt);
+  output_shape.push_back(output_cnt);
 
   void* obuffer;
   if (!output_fn(
@@ -175,8 +229,8 @@ Context::Execute(
     return kOutputBuffer;
   }
 
-  // If no error but the 'obuffer' is returned as nullptr, then
-  // skip writing this output.
+  // If there is no error but the 'obuffer' is returned as nullptr,
+  // then skip writing this output.
   if (obuffer != nullptr) {
     memcpy(obuffer, output.data(), output.size());
   }
@@ -234,6 +288,10 @@ CustomErrorString(void* custom_context, int errcode)
       return "invalid model configuration";
     case kBatching:
       return "batching not supported";
+    case kInput:
+      return "expected single int32 input with shape [ 1 ]";
+    case kInputContents:
+      return "unable to get input tensor values";
     case kOutput:
       return "expected single output, variable-size vector of string";
     case kOutputBuffer:

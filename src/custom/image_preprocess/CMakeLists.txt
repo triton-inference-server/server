@@ -31,13 +31,11 @@ cmake_minimum_required (VERSION 3.5)
 #
 find_package(OpenCV REQUIRED)
 
-configure_file(libimage_preprocess.ldscript libimage_preprocess.ldscript)
+configure_file(libimage_preprocess.ldscript libimage_preprocess.ldscript COPYONLY)
 
 add_library(
   imagepreprocess SHARED
   image_preprocess.cc
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
 )
 target_include_directories(imagepreprocess PRIVATE ${OpenCV_INCLUDE_DIRS})
 set_target_properties(
@@ -50,7 +48,7 @@ set_target_properties(
 )
 target_link_libraries(
   imagepreprocess
-  PRIVATE protobuf::libprotobuf
+  PRIVATE custombackend
   PRIVATE ${OpenCV_LIBS}
 )
 

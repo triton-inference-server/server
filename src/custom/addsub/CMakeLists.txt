@@ -29,15 +29,14 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libaddsub.so
 #
-configure_file(libaddsub.ldscript libaddsub.ldscript)
+configure_file(libaddsub.ldscript libaddsub.ldscript COPYONLY)
 
 if(${TRTIS_ENABLE_GPU})
+  set(CUDA_LIBRARIES PUBLIC ${CUDA_LIBRARIES})
   cuda_add_library(
     addsub SHARED
     addsub.cu kernel.cu kernel.h
-    $<TARGET_OBJECTS:model-config-library>
     $<TARGET_OBJECTS:model-config-cuda-library>
-    $<TARGET_OBJECTS:proto-library>
   )
 else()
   set_source_files_properties(addsub.cu PROPERTIES LANGUAGE CXX)
@@ -45,8 +44,6 @@ else()
   add_library(
     addsub SHARED
     addsub.cu
-    $<TARGET_OBJECTS:model-config-library>
-    $<TARGET_OBJECTS:proto-library>
   )
   set_target_properties(addsub PROPERTIES LINKER_LANGUAGE CXX)
 endif() # TRTIS_ENABLE_GPU
@@ -61,7 +58,7 @@ set_target_properties(
 )
 target_link_libraries(
   addsub
-  protobuf::libprotobuf
+  PRIVATE custombackend
 )
 
 install(
