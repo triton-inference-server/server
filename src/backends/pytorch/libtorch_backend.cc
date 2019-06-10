@@ -254,6 +254,7 @@ LibTorchBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   std::string deliminator = "__";
+  int ip_index;
 
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
@@ -264,8 +265,22 @@ LibTorchBackend::Context::ValidateInputs(
               " for input '" + io.name() + "' for model '" + name_ + "'");
     } else {
       const std::string& name = io.name();
-      int op_index = std::atoi(name.substr(name.find(deliminator) + 2).c_str());
-      io_index_map_[name] = op_index;
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Input '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Input '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      input_index_map_[name] = ip_index;
     }
   }
 
@@ -278,6 +293,7 @@ LibTorchBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   std::string deliminator = "__";
+  int op_index;
 
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
@@ -288,8 +304,22 @@ LibTorchBackend::Context::ValidateOutputs(
               " for output '" + io.name() + "' for model '" + name_ + "'");
     } else {
       const std::string& name = io.name();
-      int op_index = std::atoi(name.substr(name.find(deliminator) + 2).c_str());
-      io_index_map_[name] = op_index;
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Output '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        op_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Output '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      output_index_map_[name] = op_index;
     }
   }
 
@@ -448,26 +478,12 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
   for (int i = 0; i < dims.size(); i++) {
     if (dims[i] != -1) {
       if (dims[i] != content_shape[i + batch_offset]) {
-
-        // create print friendly array of shapes
-        std::string expected_shape = "[ ";
-        std::string output_shape = "[ ";
-        for (size_t i = batch_offset; i < content_shape.size() - 1; i++) {
-          output_shape += std::to_string(content_shape[i]) + ", ";
-        }
-        output_shape +=
-            std::to_string(content_shape[content_shape.size() - 1]) + " ]";
-
-        for (int i = 0; i < dims.size() - 1; i++) {
-          expected_shape += std::to_string(dims[i]) + ", ";
-        }
-        expected_shape += std::to_string(dims[dims.size() - 1]) + " ]";
-
         return Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape for output '" + name +
-                "', model configuration shape is " + expected_shape +
-                ", inference shape is " + output_shape);
+                "', model configuration shape is " +
+                DimsListToString(content_shape) + ", inference shape is " +
+                DimsListToString(dims));
       }
     }
   }
@@ -663,7 +679,7 @@ LibTorchBackend::Context::Run(
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
-    int ip_index = io_index_map_[name];
+    int ip_index = input_index_map_[name];
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
@@ -677,7 +693,7 @@ LibTorchBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      int ip_index = io_index_map_[name];
+      int ip_index = input_index_map_[name];
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
           total_batch_size, payloads, &input_buffers));
@@ -689,7 +705,7 @@ LibTorchBackend::Context::Run(
 
   // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {
-    int op_index = io_index_map_[output.name()];
+    int op_index = output_index_map_[output.name()];
     int max_index = outputs_.size() - 1;
     if ((op_index < 0) || (op_index > max_index)) {
       return Status(
@@ -713,7 +729,7 @@ LibTorchBackend::Context::Run(
 
   // Ensure outputs have the expected size and copy it to the payload responses.
   for (const auto& name : required_outputs) {
-    int op_index = io_index_map_[name];
+    int op_index = output_index_map_[name];
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 

@@ -143,7 +143,8 @@ class LibTorchBackend : public InferenceBackend {
 
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     torch::Device device_;
-    std::unordered_map<std::string, int> io_index_map_;
+    std::unordered_map<std::string, int> input_index_map_;
+    std::unordered_map<std::string, int> output_index_map_;
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;
