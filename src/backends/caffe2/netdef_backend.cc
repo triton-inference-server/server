@@ -442,7 +442,7 @@ Status
 NetDefBackend::Context::ReadFixedSizedOutputTensor(
     const std::string& name, const Caffe2Workspace::DataType dtype,
     const size_t dtype_byte_size, const size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads)
+    std::vector<Scheduler::Payload>* payloads, const DimsList& dims)
 {
   std::vector<int64_t> content_shape;
   const char* content = nullptr;
@@ -451,6 +451,36 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
       name, dtype, &content, &byte_size, &content_shape);
   if (!err.IsOk()) {
     return Status(RequestStatusCode::INTERNAL, err.Message());
+  }
+
+  // verify shape of output matches shape from model config
+  const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
+
+  for (int i = 0; i < dims.size(); i++) {
+    if (dims[i] != -1) {
+      if (dims[i] != content_shape[i + batch_offset]) {
+
+        // create print friendly array of shapes
+        std::string expected_shape = "[ ";
+        std::string output_shape = "[ ";
+        for (size_t i = batch_offset; i < content_shape.size() - 1; i++) {
+          output_shape += std::to_string(content_shape[i]) + ", ";
+        }
+        output_shape +=
+            std::to_string(content_shape[content_shape.size() - 1]) + " ]";
+
+        for (int i = 0; i < dims.size() - 1; i++) {
+          expected_shape += std::to_string(dims[i]) + ", ";
+        }
+        expected_shape += std::to_string(dims[dims.size() - 1]) + " ]";
+
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected shape for output '" + name +
+                "', model configuration shape is " + expected_shape +
+                ", inference shape is " + output_shape);
+      }
+    }
   }
 
   const size_t total_byte_size =
@@ -628,9 +658,14 @@ NetDefBackend::Context::Run(
     // being used for an output, so can just assume fixed-sized here.
     const Caffe2Workspace::DataType dtype =
         ConvertDataType(output_config->data_type());
+
+    const DimsList& output_dims = (output_config->has_reshape())
+                                      ? output_config->reshape().shape()
+                                      : output_config->dims();
+
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         name, dtype, GetDataTypeByteSize(output_config->data_type()),
-        total_batch_size, payloads));
+        total_batch_size, payloads, output_dims));
   }
 
   return Status::Success;
