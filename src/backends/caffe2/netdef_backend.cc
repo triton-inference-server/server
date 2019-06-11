@@ -459,26 +459,12 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
   for (int i = 0; i < dims.size(); i++) {
     if (dims[i] != -1) {
       if (dims[i] != content_shape[i + batch_offset]) {
-
-        // create print friendly array of shapes
-        std::string expected_shape = "[ ";
-        std::string output_shape = "[ ";
-        for (size_t i = batch_offset; i < content_shape.size() - 1; i++) {
-          output_shape += std::to_string(content_shape[i]) + ", ";
-        }
-        output_shape +=
-            std::to_string(content_shape[content_shape.size() - 1]) + " ]";
-
-        for (int i = 0; i < dims.size() - 1; i++) {
-          expected_shape += std::to_string(dims[i]) + ", ";
-        }
-        expected_shape += std::to_string(dims[dims.size() - 1]) + " ]";
-
         return Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape for output '" + name +
-                "', model configuration shape is " + expected_shape +
-                ", inference shape is " + output_shape);
+                "', model configuration shape is " +
+                DimsListToString(content_shape) + ", inference shape is " +
+                DimsListToString(dims));
       }
     }
   }
