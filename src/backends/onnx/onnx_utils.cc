@@ -292,9 +292,9 @@ CompareDimsSupported(
             "', model configuration supports batching but first dimension of "
             "tensor '" +
             tensor_name +
-            "' expected by framework is not a variable-size batch "
-            "dimension: " +
-            DimsListToString(model_shape));
+            "' expected by framework is not a variable-size batch dimension: " +
+            ShapeToString(model_shape) +
+            " whereas model configuration shape is: " + DimsListToString(dims));
   }
 
   const int nonbatch_start_idx = (supports_batching ? 1 : 0);
