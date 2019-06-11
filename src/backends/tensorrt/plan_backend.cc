@@ -345,7 +345,7 @@ PlanBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
-    if (ValidDataType(io.data_type())) {
+    if (!ValidDataType(io.data_type())) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -362,7 +362,7 @@ PlanBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
-    if (ValidDataType(io.data_type())) {
+    if (!ValidDataType(io.data_type())) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
