@@ -30,6 +30,11 @@
 NVIDIA TensorRT Inference Server
 ================================
 
+    **NOTICE: The master branch has recently converted to using CMake
+    to build the server, clients and other artifacts. Read the new
+    documentation carefully to understand the new** `build process
+    <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/build.html>`_.
+
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
     latest release of the TensorRT Inference Server is 1.2.0 and
