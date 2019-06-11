@@ -75,21 +75,17 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
   // Assume model doesn't support batching unless we see a batch
   // dimension (-1) on signature of every model input and output.
   bool sig_supports_batch = true;
-  if (config->input().size() == 0) {
-    for (const TRTISTF_IOList* itr = inputs; itr != nullptr; itr = itr->next_) {
-      TRTISTF_IO* io = itr->io_;
-      if ((io->shape_->rank_ == 0) || (io->shape_->dims_[0] != -1)) {
-        sig_supports_batch = false;
-      }
+  for (const TRTISTF_IOList* itr = inputs; itr != nullptr; itr = itr->next_) {
+    TRTISTF_IO* io = itr->io_;
+    if ((io->shape_->rank_ == 0) || (io->shape_->dims_[0] != -1)) {
+      sig_supports_batch = false;
     }
   }
-  if (config->output().size() == 0) {
-    for (const TRTISTF_IOList* itr = outputs; itr != nullptr;
-         itr = itr->next_) {
-      TRTISTF_IO* io = itr->io_;
-      if ((io->shape_->rank_ == 0) || (io->shape_->dims_[0] != -1)) {
-        sig_supports_batch = false;
-      }
+  for (const TRTISTF_IOList* itr = outputs; itr != nullptr;
+        itr = itr->next_) {
+    TRTISTF_IO* io = itr->io_;
+    if ((io->shape_->rank_ == 0) || (io->shape_->dims_[0] != -1)) {
+      sig_supports_batch = false;
     }
   }
 
