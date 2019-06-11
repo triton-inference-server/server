@@ -38,7 +38,7 @@ ARG CLIENT_IMAGE=tensorrtserver_client
 FROM ${BUILD_IMAGE} AS test_utils
 
 # image_preprocess custom backend requires opencv
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
             libopencv-dev \
             libopencv-core-dev
 
