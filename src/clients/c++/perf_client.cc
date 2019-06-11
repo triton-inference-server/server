@@ -175,7 +175,7 @@ typedef struct PerformanceStatusStruct {
   bool on_sequence_model;
 
   // placeholder for the latency value that is used for conditional checking
-  uint64_t reporting_latency_ns;
+  uint64_t stabilizing_latency_ns;
 } PerfStatus;
 
 
@@ -1146,7 +1146,7 @@ InferenceProfiler::Profile(
     RETURN_IF_ERROR(Measure(status_summary));
 
     infer_per_sec.push_back(status_summary.client_infer_per_sec);
-    latencies.push_back(status_summary.reporting_latency_ns);
+    latencies.push_back(status_summary.stabilizing_latency_ns);
     avg_ips += (double)infer_per_sec.back() / recent_k;
     avg_latency += latencies.back() / recent_k;
 
@@ -1154,8 +1154,9 @@ InferenceProfiler::Profile(
       std::cout << "  Pass [" << infer_per_sec.size()
                 << "] throughput: " << infer_per_sec.back() << " infer/sec. ";
       if (extra_percentile_) {
-        std::cout << percentile_ << "-th percentile latency: "
-                  << (status_summary.client_requested_percentile_latency_ns / 1000)
+        std::cout << "p" << percentile_ << " latency: "
+                  << (status_summary.client_requested_percentile_latency_ns /
+                      1000)
                   << " usec" << std::endl;
       } else {
         std::cout << "Avg latency: "
@@ -1380,9 +1381,10 @@ InferenceProfiler::SummarizeLatency(
     // Round to nearest integer index by + 0.5
     size_t index = (percentile_ / 100.0) * (latencies.size() - 1) + 0.5;
     summary.client_requested_percentile_latency_ns = latencies[index];
-    summary.reporting_latency_ns = summary.client_requested_percentile_latency_ns;
+    summary.stabilizing_latency_ns =
+        summary.client_requested_percentile_latency_ns;
   } else {
-    summary.reporting_latency_ns = summary.client_avg_latency_ns;
+    summary.stabilizing_latency_ns = summary.client_avg_latency_ns;
   }
 
   // retrieve other interesting percentile
@@ -1390,7 +1392,8 @@ InferenceProfiler::SummarizeLatency(
   std::vector<size_t> percentiles{50, 90, 95, 99};
   for (const auto percentile : percentiles) {
     size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_percentile_latency_ns.emplace_back(percentile, latencies[index]);
+    summary.client_percentile_latency_ns.emplace_back(
+        percentile, latencies[index]);
   }
 
   // calculate standard deviation
@@ -1599,16 +1602,16 @@ Report(
   std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl;
   if (percentile != -1) {
-    std::cout << "    " << percentile
-              << "-th percentile latency: " << requested_percentile_latency_us << " usec"
+    std::cout << "    p" << percentile << " latency: "
+              << requested_percentile_latency_us << " usec"
               << std::endl;
   } else {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
   }
   for (const auto& percentile : summary.client_percentile_latency_ns) {
-    std::cout << "    " << percentile.first
-              << "-th percentile latency: " << (percentile.second / 1000) << " usec"
+    std::cout << "    p" << percentile.first << " latency: "
+              << (percentile.second / 1000) << " usec"
               << std::endl;
   }
   std::cout << client_library_detail << std::endl
@@ -1901,9 +1904,9 @@ main(int argc, char** argv)
     }
   }
   if (percentile == -1) {
-    std::cout << "  Reporting average latency" << std::endl;
+    std::cout << "  Stabilizing using average latency" << std::endl;
   } else {
-    std::cout << "  Reporting " << percentile << "-th percentile latency"
+    std::cout << "  Stabilizing using p" << percentile << " latency"
               << std::endl;
   }
   std::cout << std::endl;
@@ -1924,9 +1927,9 @@ main(int argc, char** argv)
       if (err.IsOk()) {
         err = Report(status_summary, count, percentile, protocol, verbose);
         summary.push_back(status_summary);
-        uint64_t reporting_latency_ms =
-            status_summary.reporting_latency_ns / (1000 * 1000);
-        if ((reporting_latency_ms >= latency_threshold_ms) || !err.IsOk()) {
+        uint64_t stabilizing_latency_ms =
+            status_summary.stabilizing_latency_ns / (1000 * 1000);
+        if ((stabilizing_latency_ms >= latency_threshold_ms) || !err.IsOk()) {
           std::cerr << err << std::endl;
           break;
         }
@@ -1945,13 +1948,13 @@ main(int argc, char** argv)
     if (percentile == -1) {
       std::cout << "Average Batch Latency" << std::endl;
     } else {
-      std::cout << percentile << "-th Percentile Batch Latency" << std::endl;
+      std::cout << "p" << percentile << " Batch Latency" << std::endl;
     }
 
     for (PerfStatus& status : summary) {
       std::cout << "Concurrency: " << status.concurrency << ", "
                 << status.client_infer_per_sec << " infer/sec, latency "
-                << (status.reporting_latency_ns / 1000) << " usec" << std::endl;
+                << (status.stabilizing_latency_ns / 1000) << " usec" << std::endl;
     }
 
     if (!filename.empty()) {
@@ -1961,10 +1964,10 @@ main(int argc, char** argv)
           << "Network+Server Send/Recv,Server Queue,"
           << "Server Compute,Client Recv";
       for (const auto& percentile : summary[0].client_percentile_latency_ns) {
-        ofs << "," << percentile.first << "-th Percentile";
+        ofs << ",p" << percentile.first << " latency";
       }
       if (percentile != -1) {
-        ofs << "," << percentile << "-th Percentile";
+        ofs << ",p" << percentile << " latency";
       }
       ofs << std::endl;
 
