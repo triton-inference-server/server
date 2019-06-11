@@ -35,9 +35,6 @@ cat <<EOF
 NVIDIA Release ${NVIDIA_TENSORRT_SERVER_VERSION} (build ${NVIDIA_BUILD_ID})
 
 Copyright (c) 2018-2019, NVIDIA CORPORATION.  All rights reserved.
-Copyright 2019 The TensorFlow Authors.  All rights reserved.
-Copyright 2019 The TensorFlow Serving Authors.  All rights reserved.
-Copyright (c) 2016-present, Facebook Inc. All rights reserved.
 
 Various files include modifications (c) NVIDIA CORPORATION.  All rights reserved.
 NVIDIA modifications are covered by the license terms that apply to the underlying
