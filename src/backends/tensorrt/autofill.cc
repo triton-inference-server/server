@@ -151,7 +151,7 @@ AutoFillPlan::Create(
       ModelInput* config_input = config.add_input();
       config_input->set_name(engine->getBindingName(i));
       config_input->set_data_type(
-          ConvertDatatype(engine->getBindingDataType(i)));
+          ConvertTrtTypeToDataType(engine->getBindingDataType(i)));
       nvinfer1::Dims dims = engine->getBindingDimensions(i);
       for (int didx = 0; didx < dims.nbDims; ++didx) {
         config_input->mutable_dims()->Add(dims.d[didx]);
@@ -160,7 +160,7 @@ AutoFillPlan::Create(
       ModelOutput* config_output = config.add_output();
       config_output->set_name(engine->getBindingName(i));
       config_output->set_data_type(
-          ConvertDatatype(engine->getBindingDataType(i)));
+          ConvertTrtTypeToDataType(engine->getBindingDataType(i)));
       nvinfer1::Dims dims = engine->getBindingDimensions(i);
       for (int didx = 0; didx < dims.nbDims; ++didx) {
         config_output->mutable_dims()->Add(dims.d[didx]);

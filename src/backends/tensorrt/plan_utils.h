@@ -31,7 +31,10 @@
 
 namespace nvidia { namespace inferenceserver {
 
-DataType ConvertDatatype(nvinfer1::DataType trt_type);
+DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
+
+std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
+    const DataType& dtype);
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 

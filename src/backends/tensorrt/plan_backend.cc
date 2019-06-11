@@ -111,24 +111,6 @@ PlanBackend::Context::~Context()
   }
 }
 
-bool
-ValidDataType(const DataType& dtype)
-{
-  switch (dtype) {
-    case TYPE_FP32:
-      return true;
-    case TYPE_FP16:
-      return true;
-    case TYPE_INT8:
-      return true;
-    case TYPE_INT32:
-      return true;
-    default:
-      return false;
-  }
-  return false;
-}
-
 Status
 PlanBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -345,7 +327,7 @@ PlanBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
   for (const auto& io : ios) {
-    if (!ValidDataType(io.data_type())) {
+    if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -362,7 +344,7 @@ PlanBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
   for (const auto& io : ios) {
-    if (!ValidDataType(io.data_type())) {
+    if (!ConvertDataTypeToTrtType(io.data_type()).first) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
@@ -399,7 +381,7 @@ PlanBackend::Context::InitializeInputBinding(
             name_);
   }
 
-  DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
+  DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
   if (dt != input_datatype) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -513,7 +495,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
               "' is expected to be an input in model for " + name_);
     }
 
-    DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
+    DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
     if (dt != io.data_type()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
