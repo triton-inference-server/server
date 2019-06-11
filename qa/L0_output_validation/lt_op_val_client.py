@@ -68,14 +68,14 @@ class OutputValidationTest(unittest.TestCase):
         self.assertTrue(str(r.headers).find("model configuration specifies shape") != -1)
 
     # for naming convention violation
-    def test_reshape(self):
+    def test_name(self):
         url_ = 'http://localhost:8000/api/infer/libtorch_name_1_float32'
         input0_data = np.ones((1,)).astype(np.float32)
         headers = {'NV-InferRequest': 'batch_size: 1 input { name: "INPUT0" } output { name: "OUTPUT0"}'}
         r = requests.post(url_, data=input0_data.tobytes(), headers=headers)
         print(r.headers)
         # INTERNAL error (does not load model) hence unavailable
-        self.assertTrue(str(r.headers).find("request for unknown model") != -1)
+        self.assertTrue(str(r.headers).find("UNAVAILABLE") != -1)
 
     # successful run
     def test_success(self):

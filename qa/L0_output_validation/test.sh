@@ -34,12 +34,9 @@ SERVER_ARGS=--model-store=$DATADIR
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+/opt/tensorrtserver/bin/trtserver --model-store=/data/inferenceserver/libtorch_validation_store &
+SERVER_PID=$!
+sleep 30
 
 RET=0
 CLIENT_LOG=client.log
