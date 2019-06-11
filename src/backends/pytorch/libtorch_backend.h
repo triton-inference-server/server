@@ -116,7 +116,7 @@ class LibTorchBackend : public InferenceBackend {
         std::vector<torch::Tensor>* outputs_, const std::string& name,
         const int& op_index, const DataType dtype, const size_t dtype_byte_size,
         const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads);
+        std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
 
     Status SetInputTensor(
         std::vector<torch::jit::IValue>* inputs_, const std::string& name,
@@ -125,8 +125,8 @@ class LibTorchBackend : public InferenceBackend {
 
     Status GetOutputTensor(
         std::vector<torch::Tensor>* outputs_, const int& op_index,
-        const DataType dtype, void** content, size_t* byte_size,
-        std::vector<int64_t>* content_shape);
+        const std::string& name, const DataType dtype, void** content,
+        size_t* byte_size, std::vector<int64_t>* content_shape);
 
     Status Execute(
         std::vector<torch::jit::IValue>* inputs_,
@@ -142,9 +142,9 @@ class LibTorchBackend : public InferenceBackend {
     int max_batch_size_;
 
     std::shared_ptr<torch::jit::script::Module> torch_model_;
-    std::vector<torch::jit::IValue> inputs_;
-    std::vector<torch::Tensor> outputs_;
     torch::Device device_;
+    std::unordered_map<std::string, int> input_index_map_;
+    std::unordered_map<std::string, int> output_index_map_;
   };
 
   std::vector<std::unique_ptr<Context>> contexts_;

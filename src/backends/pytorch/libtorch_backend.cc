@@ -96,6 +96,33 @@ ConvertDataTypeToTorchType(const DataType& dtype)
   return std::make_pair(true, type);
 }
 
+DataType
+ConvertTorchTypeToDataType(const torch::ScalarType& ttype)
+{
+  switch (ttype) {
+    case torch::kBool:
+      return TYPE_BOOL;
+    case torch::kByte:
+      return TYPE_UINT8;
+    case torch::kChar:
+      return TYPE_INT8;
+    case torch::kShort:
+      return TYPE_INT16;
+    case torch::kInt:
+      return TYPE_INT32;
+    case torch::kLong:
+      return TYPE_INT64;
+    case torch::kHalf:
+      return TYPE_FP16;
+    case torch::kFloat:
+      return TYPE_FP32;
+    case torch::kDouble:
+      return TYPE_FP64;
+    default:
+      return TYPE_FP32;
+  }
+}
+
 Status
 LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -226,6 +253,9 @@ Status
 LibTorchBackend::Context::ValidateInputs(
     const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
 {
+  std::string deliminator = "__";
+  int ip_index;
+
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
@@ -233,6 +263,24 @@ LibTorchBackend::Context::ValidateInputs(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for input '" + io.name() + "' for model '" + name_ + "'");
+    } else {
+      const std::string& name = io.name();
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Input '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Input '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      input_index_map_[name] = ip_index;
     }
   }
 
@@ -244,6 +292,9 @@ Status
 LibTorchBackend::Context::ValidateOutputs(
     const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
 {
+  std::string deliminator = "__";
+  int op_index;
+
   for (const auto& io : ios) {
     const auto pr = ConvertDataTypeToTorchType(io.data_type());
     if (!pr.first) {
@@ -251,6 +302,24 @@ LibTorchBackend::Context::ValidateOutputs(
           RequestStatusCode::INTERNAL,
           "unsupported datatype " + DataType_Name(io.data_type()) +
               " for output '" + io.name() + "' for model '" + name_ + "'");
+    } else {
+      const std::string& name = io.name();
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Output '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        op_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Output '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      output_index_map_[name] = op_index;
     }
   }
 
@@ -394,13 +463,30 @@ Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     std::vector<torch::Tensor>* outputs_, const std::string& name,
     const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads)
+    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
+    const DimsList& dims)
 {
   std::vector<int64_t> content_shape;
   void* content = nullptr;
   size_t byte_size = 0;
   RETURN_IF_ERROR(GetOutputTensor(
-      outputs_, op_index, dtype, &content, &byte_size, &content_shape));
+      outputs_, op_index, name, dtype, &content, &byte_size, &content_shape));
+
+  // verify shape of output matches shape from model config
+  const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
+
+  for (int i = 0; i < dims.size(); i++) {
+    if (dims[i] != -1) {
+      if (dims[i] != content_shape[i + batch_offset]) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected shape for output '" + name +
+                "', model configuration shape is " +
+                DimsListToString(content_shape) + ", inference shape is " +
+                DimsListToString(dims));
+      }
+    }
+  }
 
   const size_t total_byte_size =
       GetElementCount(content_shape) * dtype_byte_size;
@@ -408,7 +494,7 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
   if (byte_size != total_byte_size) {
     return Status(
-        RequestStatusCode::INTERNAL,
+        RequestStatusCode::INVALID_ARG,
         "unexpected size for output '" + name + "', byte-size " +
             std::to_string(byte_size) + " does not equal " +
             std::to_string(total_batch_size) + " * " +
@@ -459,11 +545,22 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 Status
 LibTorchBackend::Context::GetOutputTensor(
     std::vector<torch::Tensor>* outputs_, const int& op_index,
-    const DataType dtype, void** content, size_t* byte_size,
-    std::vector<int64_t>* content_shape)
+    const std::string& name, const DataType dtype, void** content,
+    size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   try {
     torch::Tensor output_flat = (*outputs_)[op_index].flatten();
+
+    // verify output datatype matches datatype from model config
+    DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
+    if (dtype != rec_dtype) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected datatype " + DataType_Name(rec_dtype) +
+              " for inference output '" + name + "', expecting " +
+              DataType_Name(dtype));
+    }
+
     *byte_size = output_flat.nbytes();
 
     // Copy output into buffer
@@ -579,15 +676,10 @@ LibTorchBackend::Context::Run(
       input_request_provider->RequestHeader().input().size() + overide_inputs);
   std::vector<torch::Tensor> outputs_;
 
-  // Input and output names must be of the form *__<index>
-  std::string deliminator = "__";
-
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
-    std::string index_str = name.substr(name.find(deliminator) + 2);
-    int ip_index = std::atoi(index_str.c_str());
-
+    int ip_index = input_index_map_[name];
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
@@ -601,9 +693,7 @@ LibTorchBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      std::string index_str = name.substr(name.find(deliminator) + 2);
-      int ip_index = std::atoi(index_str.c_str());
-
+      int ip_index = input_index_map_[name];
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
           total_batch_size, payloads, &input_buffers));
@@ -613,24 +703,50 @@ LibTorchBackend::Context::Run(
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
 
-  // Make sure each output is of the expected size and copy it into
-  // the payload responses.
+  // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {
-    const std::string& name = output.name();
-    std::string index_str = name.substr(name.find(deliminator) + 2);
+    int op_index = output_index_map_[output.name()];
+    int max_index = outputs_.size() - 1;
+    if ((op_index < 0) || (op_index > max_index)) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "The output " + output.name() +
+              " in the model config refers to an output index which doesn't "
+              "exist. This model has " +
+              std::to_string(max_index + 1) + " outputs");
+    }
+  }
 
-    int op_index = std::atoi(index_str.c_str());
+  // Prepare set of Outputs requested for
+  std::set<std::string> required_outputs;
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    for (const auto& output : request_header.output()) {
+      required_outputs.insert(output.name());
+    }
+  }
 
+  // Ensure outputs have the expected size and copy it to the payload responses.
+  for (const auto& name : required_outputs) {
+    int op_index = output_index_map_[name];
     const ModelOutput* output_config;
     RETURN_IF_ERROR(base->GetOutput(name, &output_config));
 
+    const DataType dtype = output_config->data_type();
+
+    // If a reshape is provided for the output then use that when
+    // validating that the model matches what is expected.
+    const DimsList& output_dims = (output_config->has_reshape())
+                                      ? output_config->reshape().shape()
+                                      : output_config->dims();
+
     // Checked at initialization time to make sure that STRING is not
     // being used for an output, so can just assume fixed-sized here.
-    const DataType dtype = output_config->data_type();
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        payloads));
+        payloads, output_dims));
   }
 
   return Status::Success;
