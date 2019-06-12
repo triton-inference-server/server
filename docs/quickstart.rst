@@ -118,7 +118,7 @@ under-development version)::
 
 Then use docker to build::
 
-  $ docker build --pull -t tensorrtserver
+  $ docker build --pull -t tensorrtserver .
 
 After the build completes follow these steps to run the server and the
 example client applications.
