@@ -30,12 +30,15 @@
 
 ARG BASE_IMAGE=tensorrtserver
 ARG BUILD_IMAGE=tensorrtserver_build
+ARG CBE_IMAGE=tensorrtserver_cbe
 ARG CLIENT_IMAGE=tensorrtserver_client
 
 ############################################################################
-## Build test utilities and custom backends
+## Build test utilities and custom backends in the BUILD_IMAGE since
+## it has already been configured correctly and has some existing
+## build artifacts. Copy artifacts into QA area.
 ############################################################################
-FROM ${BUILD_IMAGE} AS test_utils
+FROM ${BUILD_IMAGE} AS build
 
 # image_preprocess custom backend requires opencv
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -46,11 +49,6 @@ WORKDIR /workspace
 RUN cd builddir && \
     (make -j16 trtis-test-utils trtis-custom-backends || true) && \
     make -j16 trtis-test-utils trtis-custom-backends
-
-############################################################################
-## Copy artifacts from build container
-############################################################################
-FROM ${BUILD_IMAGE} AS build
 
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
@@ -63,46 +61,57 @@ RUN mkdir -p qa/common && \
 #    cp /opt/tensorrtserver/bin/simple_inprocess qa/L0_simple_inprocess/. && \
 #    cp -r docs/examples/model_repository/simple qa/L0_simple_inprocess/models/.
 
-COPY --from=test_utils /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/
+RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.
 
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/custom_models/custom_int32_int32_int32/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/custom_models/custom_nobatch_int32_int32_int32/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/custom_models/custom_float32_float32_float32/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/custom_models/custom_nobatch_float32_float32_float32/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/L0_simple_custom_example/models/simple/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/L0_simple_ensemble/models/simple/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libaddsub.so \
-     qa/L0_multiple_ports/models/simple/1/
+RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/custom_models/custom_int32_int32_int32/1/. && \
+    mkdir -p qa/custom_models/custom_nobatch_int32_int32_int32/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/custom_models/custom_nobatch_int32_int32_int32/1/. && \
+    mkdir -p qa/custom_models/custom_float32_float32_float32/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/custom_models/custom_float32_float32_float32/1/. && \
+    mkdir -p qa/custom_models/custom_nobatch_float32_float32_float32/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/custom_models/custom_nobatch_float32_float32_float32/1/. && \
+    mkdir -p qa/L0_simple_custom_example/models/simple/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/L0_simple_custom_example/models/simple/1/. && \
+    mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/L0_simple_ensemble/models/simple/1/. && \
+    mkdir -p qa/L0_multiple_ports/models/simple/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/L0_multiple_ports/models/simple/1/.
 
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
-     qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/
+RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \
+        qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1/.
 
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libparam.so \
-     qa/L0_custom_param/models/param/1/
+RUN mkdir -p qa/L0_custom_param/models/param/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libparam.so \
+        qa/L0_custom_param/models/param/1/.
 
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libsequence.so \
-     qa/L0_simple_sequence_example/models/simple_sequence/1/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libsequence.so \
-     qa/custom_models/custom_sequence_int32/1/
+RUN mkdir -p qa/L0_simple_sequence_example/models/simple_sequence/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+        qa/L0_simple_sequence_example/models/simple_sequence/1/. && \
+    mkdir -p qa/custom_models/custom_sequence_int32/1 && \
+    cp builddir/trtis-custom-backends/install/lib/libsequence.so \
+        qa/custom_models/custom_sequence_int32/1/.
 
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_infer/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_infer_variable/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_infer_reshape/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_infer_zero/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_sequence_batcher/
-COPY --from=test_utils /workspace/builddir/trtis-custom-backends/install/lib/libidentity.so \
-     qa/L0_perflab_nomodel/
+RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_infer/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_infer_variable/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_infer_reshape/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_infer_zero/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_sequence_batcher/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_perflab_nomodel/.
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
@@ -123,6 +132,15 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/lib/librequest.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
     cp install/python/tensorrtserver*.whl qa/pkgs/.
+
+############################################################################
+## Copy artifacts from custom backend container
+############################################################################
+FROM ${CBE_IMAGE} AS cbe
+
+WORKDIR /workspace
+COPY --from=client /workspace/qa/ qa/
+RUN cp -r install qa/L0_custom_backend/.
 
 ############################################################################
 ## Create CI enabled image
@@ -149,7 +167,7 @@ RUN pip install --upgrade numpy pillow future grpcio requests
 
 # CI expects tests in /opt/tensorrtserver/qa
 WORKDIR /opt/tensorrtserver
-COPY --from=client /workspace/qa/ qa/
+COPY --from=cbe /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.

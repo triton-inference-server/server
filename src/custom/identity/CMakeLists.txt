@@ -29,13 +29,11 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libidentity.so
 #
-configure_file(libidentity.ldscript libidentity.ldscript)
+configure_file(libidentity.ldscript libidentity.ldscript COPYONLY)
 
 add_library(
   identity SHARED
   identity.cc
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
   identity
@@ -47,7 +45,7 @@ set_target_properties(
 )
 target_link_libraries(
   identity
-  PRIVATE protobuf::libprotobuf
+  PRIVATE custombackend
 )
 
 install(
