@@ -271,8 +271,8 @@ main(int argc, char** argv)
     exit(1);
   } else if (
       error.Message() !=
-      "No asynchronous requests should be returned, all requests will be "
-      "captured via their callback function") {
+      "No asynchronous requests can be returned, all outstanding requests "
+      "will signal completion via their callback function") {
     std::cerr
         << "Expecting different error message on GetReadyAsyncRequest, got: "
         << error.Message() << std::endl;

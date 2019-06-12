@@ -610,6 +610,9 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error Run(ResultMap* results) = 0;
 
+  /// DEPRECATED: This function is deprecated and will be removed in
+  /// a future version of this API. Instead use AsyncRun(OnCompleteFn).
+  ///
   /// Send an asynchronous request to the inference server to perform
   /// an inference to produce results for the outputs specified in the
   /// most recent call to SetRunOptions().
@@ -643,6 +646,10 @@ class InferContext {
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) = 0;
 
+  /// DEPRECATED: This function is deprecated and will be removed in
+  /// a future version of this API. This function is only useful with
+  /// the deprecated version of AsyncRun(). Instead use AsyncRun(OnCompleteFn).
+  ///
   /// Get any one completed asynchronous request.
   /// \param async_request Returns the Request object holding the
   /// completed request.

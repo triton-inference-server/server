@@ -938,8 +938,8 @@ InferContextImpl::GetReadyAsyncRequest(
     if (!has_dangling_request) {
       return Error(
           RequestStatusCode::UNAVAILABLE,
-          "No asynchronous requests should be returned, all requests will be "
-          "captured via their callback function");
+          "No asynchronous requests can be returned, all outstanding requests "
+          "will signal completion via their callback function");
     }
   }
 
