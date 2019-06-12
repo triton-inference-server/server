@@ -52,11 +52,12 @@ GraphDefBackend::CreateTRTISTFModel(
     IONameMap* input_name_map, IONameMap* output_name_map)
 {
   TRTISTF_Model* model = nullptr;
+  tensorflow::GraphDef graph_def;
   RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromGraphDef(
       &model, model_path.c_str(), model_path.c_str(), gpu_device,
       has_graph_level, graph_level, backend_config->allow_gpu_memory_growth,
       backend_config->per_process_gpu_memory_fraction,
-      backend_config->allow_soft_placement));
+      backend_config->allow_soft_placement, &graph_def));
 
   trtistf_model->reset(model);
 
@@ -86,9 +87,58 @@ GraphDefBackend::CreateTRTISTFModel(
 
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
+
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+    try {
+      RETURN_IF_ERROR(CompareDimsSupported(
+          Name(), io.name(), GetTensorShape(graphdef, io.name()), dims,
+          Config().max_batch_size() > 0));
+    }
+    catch(auto& e){
+      continue;
+    }
+
+    DataType dt = ConvertDataType(GetTensorDtype(graphdef, io.name()));
+
+    if (!CompareDataType(dt, io.data_type())) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', input '" + io.name() +
+              "' data-type " +
+              DataType_Name(dt) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
+    }
   }
+
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
+
+    const DimsList& dims =
+        (io.has_reshape()) ? io.reshape().shape() : io.dims();
+
+    try {
+      RETURN_IF_ERROR(CompareDimsSupported(
+          Name(), io.name(), GetTensorShape(graphdef, io.name()), dims,
+          Config().max_batch_size() > 0));
+    }
+    catch(auto& e){
+      continue;
+    }
+
+    DataType dt = ConvertDataType(GetTensorDtype(graphdef, io.name()));
+
+    if (!CompareDataType(dt, io.data_type())) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + Name() + "', output '" + io.name() +
+              "' data-type " +
+              DataType_Name(dt) +
+              " doesn't match configuration data-type " +
+              DataType_Name(io.data_type()));
+    }
   }
 
   return Status::Success;
