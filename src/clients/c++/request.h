@@ -618,16 +618,14 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(std::shared_ptr<Request>* async_request) = 0;
 
-  /// See AsyncRun() above. Different from the AsyncRun() above, this function
-  /// doesn't return the Request object used to retrieve the inference results,
-  /// and such Request object will not be returned via GetAsyncRunResults() even
-  /// if the request is finished. Instead, the InferContext pointer and the
-  /// Request object will be passed to the provided 'callback' function. It is
-  /// the function caller's choice on either retrieving the results inside the
-  /// callback function or pushing it to a different thread so that
-  /// the InferContext is unblocked.
-  /// \param async_request Returns a Request object that can be used
-  /// to retrieve the inference results for the request.
+  /// Similar to AsyncRun() above. However, this function does not return the
+  /// Request object for retrieving the inference results, and such Request
+  /// object will not be returned via GetAsyncRunResults(). Instead, once the
+  /// request is completed, the InferContext pointer and the Request object will
+  /// be passed to the provided 'callback' function. It is the function caller's
+  /// choice on either retrieving the results inside the callback function or
+  /// deferring it to a different thread so that the InferContext is unblocked.
+  /// \param callback The callback function to be invoked on request completion
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(OnCompleteFn callback) = 0;
 
