@@ -78,11 +78,11 @@ void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
 nic::Error* InferContextRun(InferContextCtx* ctx);
-nic::Error* InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id);
+nic::Error* InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id);
 nic::Error* InferContextGetAsyncRunResults(
-    InferContextCtx* ctx, bool* is_ready, size_t request_id, bool wait);
+    InferContextCtx* ctx, bool* is_ready, uint64_t request_id, bool wait);
 nic::Error* InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, bool* is_ready, size_t* request_id, bool wait);
+    InferContextCtx* ctx, bool* is_ready, uint64_t* request_id, bool wait);
 
 //==============================================================================
 // InferContext::Options
@@ -114,6 +114,9 @@ typedef struct InferContextResultCtx InferContextResultCtx;
 nic::Error* InferContextResultNew(
     InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
     const char* result_name);
+nic::Error* InferContextAsyncResultNew(
+    InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
+    const uint64_t request_id, const char* result_name);
 void InferContextResultDelete(InferContextResultCtx* ctx);
 nic::Error* InferContextResultModelName(
     InferContextResultCtx* ctx, const char** model_name);

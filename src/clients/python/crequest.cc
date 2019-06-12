@@ -234,8 +234,9 @@ ServerStatusContextGetServerStatus(
 //==============================================================================
 struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
-  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
+  nic::InferContext::ResultMap results;
+  std::unordered_map<size_t, nic::InferContext::ResultMap> async_results;
+  std::unordered_map<size_t, std::shared_ptr<nic::InferContext::Request>> requests;
 };
 
 nic::Error*
@@ -302,29 +303,30 @@ InferContextRun(InferContextCtx* ctx)
 }
 
 nic::Error*
-InferContextAsyncRun(InferContextCtx* ctx, size_t* request_id)
+InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id)
 {
   std::shared_ptr<nic::InferContext::Request> request;
   nic::Error err = ctx->ctx->AsyncRun(&request);
-  ctx->requests.push_back(request);
+  ctx->requests.emplace(request->Id(), request);
   *request_id = request->Id();
   return new nic::Error(err);
 }
 
 nic::Error*
 InferContextGetAsyncRunResults(
-    InferContextCtx* ctx, bool* is_ready, size_t request_id, bool wait)
+    InferContextCtx* ctx, bool* is_ready, uint64_t request_id, bool wait)
 {
-  for (auto itr = ctx->requests.begin(); itr != ctx->requests.end(); itr++) {
-    if ((*itr)->Id() == request_id) {
-      ctx->results.clear();
-      nic::Error err =
-          ctx->ctx->GetAsyncRunResults(&ctx->results, is_ready, *itr, wait);
-      if (*is_ready) {
-        ctx->requests.erase(itr);
-      }
-      return new nic::Error(err);
+  auto itr = ctx->requests.find(request_id);
+  if (itr != ctx->requests.end()) {
+    nic::InferContext::ResultMap results;
+    nic::Error err =
+        ctx->ctx->GetAsyncRunResults(&results, is_ready, itr->second, wait);
+    if (*is_ready) {
+      ctx->requests.erase(itr);
+      ctx->async_results.emplace(request_id, std::move(results));
     }
+
+    return new nic::Error(err);
   }
   return new nic::Error(
       ni::RequestStatusCode::INVALID_ARG,
@@ -333,7 +335,7 @@ InferContextGetAsyncRunResults(
 
 nic::Error*
 InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, bool* is_ready, size_t* request_id, bool wait)
+    InferContextCtx* ctx, bool* is_ready, uint64_t* request_id, bool wait)
 {
   // Here we assume that all asynchronous request is created by calling
   // InferContextAsyncRun(). Thus we don't need to check ctx->requests.
@@ -468,6 +470,39 @@ InferContextResultNew(
 
   lctx->result.swap(itr->second);
   *ctx = lctx;
+  return nullptr;
+}
+
+nic::Error*
+InferContextAsyncResultNew(
+    InferContextResultCtx** ctx, InferContextCtx* infer_ctx,
+    const uint64_t request_id, const char* result_name)
+{
+  InferContextResultCtx* lctx = new InferContextResultCtx;
+
+  auto res_itr = infer_ctx->async_results.find(request_id);
+  if (res_itr == infer_ctx->async_results.end()) {
+    return new nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find results for request '" + std::to_string(request_id) + "'");
+  }
+
+  auto itr = res_itr->second.find(result_name);
+  if ((itr == res_itr->second.end()) || (itr->second == nullptr)) {
+    return new nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find result for output '" + std::string(result_name) + "'");
+  }
+
+  lctx->result.swap(itr->second);
+  *ctx = lctx;
+
+  // clean up async_requests if all outputs are retrieved
+  res_itr->second.erase(itr);
+  if (res_itr->second.empty()) {
+    infer_ctx->async_results.erase(res_itr);
+  }
+
   return nullptr;
 }
 

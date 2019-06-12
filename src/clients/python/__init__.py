@@ -140,6 +140,9 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
 _crequest_infer_ctx_result_new.argtypes = [POINTER(c_void_p), c_void_p, _utf8]
+_crequest_infer_ctx_async_result_new = _crequest.InferContextAsyncResultNew
+_crequest_infer_ctx_async_result_new.restype = c_void_p
+_crequest_infer_ctx_async_result_new.argtypes = [POINTER(c_void_p), c_void_p, c_uint64, _utf8]
 _crequest_infer_ctx_result_del = _crequest.InferContextResultDelete
 _crequest_infer_ctx_result_del.argtypes = [c_void_p]
 _crequest_infer_ctx_result_modelname = _crequest.InferContextResultModelName
@@ -690,14 +693,18 @@ class InferContext:
             finally:
                 _crequest_infer_ctx_input_del(input)
 
-    def _get_results(self, outputs, batch_size):
+    def _get_results(self, outputs, batch_size, request_id=None):
         # Create the result map.
         results = dict()
         for (output_name, output_format) in iteritems(outputs):
             result = c_void_p()
             try:
-                _raise_if_error(
-                    c_void_p(_crequest_infer_ctx_result_new(byref(result), self._ctx, output_name)))
+                if request_id is None:
+                    _raise_if_error(
+                        c_void_p(_crequest_infer_ctx_result_new(byref(result), self._ctx, output_name)))
+                else:
+                    _raise_if_error(
+                        c_void_p(_crequest_infer_ctx_async_result_new(byref(result), self._ctx, request_id, output_name)))
 
                 # The model name and version are the same for every
                 # result so only set once
@@ -992,7 +999,7 @@ class InferContext:
         requested_outputs = self._requested_outputs_dict[request_id]
         del self._requested_outputs_dict[request_id]
 
-        return self._get_results(requested_outputs[0], requested_outputs[1])
+        return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
 
     def get_ready_async_request(self, wait):
         """Get the request ID of an async_run() request that has completed but
