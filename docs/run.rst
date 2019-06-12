@@ -64,14 +64,14 @@ server build from master)::
 An example ensemble model repository is also provided in the
 `docs/examples/ensemble_model_repository
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/ensemble_model_repository>`_
-directory. It contains a custom image preprocess model, Caffe2 ResNet50,
-and an ensemble (used by the
-:ref:`ensemble_image_client example <section-ensemble_image_classification_example>`).
+directory. It contains a custom image preprocess model, Caffe2
+ResNet50, and an ensemble (used by the :ref:`ensemble_image_client
+example <section-ensemble_image_classification_example>`).
 
 Before using the example ensemble model repository, in addition to
 fetching public model definition files as mentioned above, you must
 build the model definition file for the custom image preprocess model
-(see :ref:`section-building-custom-backends` for instructions on how
+(see :ref:`section-building-a-custom-backend` for instructions on how
 to build it). Also note that although ensemble models are fully
 specified in their model configuration, empty version directories are
 required for them to be recognized as valid model directories::

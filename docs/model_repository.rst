@@ -81,9 +81,9 @@ corresponding to the directory name.
 For more information about how the model versions are handled by the
 server see :ref:`section-model-versions`.  Within each version
 subdirectory there are one or more model definition files that specify
-the actual model, except for
-:ref:`ensemble models <section-ensemble-models>`. The model
-definition can be either a :ref:`framework-specific model file
+the actual model, except for :ref:`ensemble models
+<section-ensemble-models>`. The model definition can be either a
+:ref:`framework-specific model file
 <section-framework-model-definition>` or a shared library implementing
 a :ref:`custom backend <section-custom-backends>`.
 
@@ -369,11 +369,12 @@ interface is also documented in the API Reference.
 Example Custom Backend
 ^^^^^^^^^^^^^^^^^^^^^^
 
-An example of a custom backend can be found in the `addsub backend
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/addsub/addsub.cc>`_. You
-can see the custom backend being used as part of CI testing in
-`L0_infer
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/L0_infer>`_.
+Several example custom backends can be found in the `src/custom
+directory
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/src/custom>`_. For
+more information on building your own custom backends as well as a
+simple example you can build yourself, see
+:ref:`section-building-a-custom-backend`.
 
 .. _section-ensemble-backends:
 

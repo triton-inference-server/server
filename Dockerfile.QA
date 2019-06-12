@@ -140,7 +140,7 @@ FROM ${CBE_IMAGE} AS cbe
 
 WORKDIR /workspace
 COPY --from=client /workspace/qa/ qa/
-RUN cp -r install qa/L0_custom_backend/.
+RUN (cd qa/L0_custom_backend && tar xzf /workspace/*.custombackend.tar.gz)
 
 ############################################################################
 ## Create CI enabled image
