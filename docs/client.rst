@@ -146,8 +146,8 @@ client libraries and examples from the `GitHub release page
 <https://github.com/NVIDIA/tensorrt-inference-server/releases>`_
 corresponding to the release you are interested in. The client
 libraries and examples are found in the "Assets" section of the
-release page in a tar file named after the version of the release and the OS they were built for. For
-example, v1.2.0_ubuntu1604.clients.tar.gz.
+release page in a tar file named after the version of the release and
+the OS, for example, v1.2.0_ubuntu1604.clients.tar.gz.
 
 The pre-built libraries and examples can be used on the corresponding
 host system (for example Ubuntu-16.04 or Ubuntu-18.04) or you can
@@ -303,12 +303,13 @@ library to communicate with the server.
 Ensemble Image Classification Example Application
 -------------------------------------------------
 
-In comparison to the image classification example above, this example uses an
-ensemble of a custom image preprocessing model and a Caffe2 ResNet50 model, so
-that you can send the image binaries and receive classification results without
-preprocessing the images beforehand. The ensemble image classification example
-that uses the C++ client API is available at
-`src/clients/c++/ensemble\_image\_client.cc
+In comparison to the image classification example above, this example
+uses an ensemble of an image-preprocessing model implemented as a
+custom backend and a Caffe2 ResNet50 model. This ensemble allows you
+to send the raw image binaries in the request and receive
+classification results without preprocessing the images on the
+client. The ensemble image classification example that uses the C++
+client API is available at `src/clients/c++/ensemble\_image\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
 `src/clients/python/ensemble\_image\_client.py

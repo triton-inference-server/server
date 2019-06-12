@@ -34,10 +34,10 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 
-# Build the custom backend using the cbe sdk in "install"
+# Build the custom backend using the cbe sdk in "custom-backend-sdk"
 mkdir -p models/param/1
 g++ -fpic -shared -std=c++11 -o models/param/1/libparam.so \
-    install/src/param.cc -Iinstall/include install/lib/libcustombackend.a
+    custom-backend-sdk/src/param.cc -Icustom-backend-sdk/include custom-backend-sdk/lib/libcustombackend.a
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Compilation failed\n***"
     exit 1
