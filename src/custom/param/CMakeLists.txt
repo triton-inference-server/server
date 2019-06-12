@@ -29,13 +29,11 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libparam.so
 #
-configure_file(libparam.ldscript libparam.ldscript)
+configure_file(libparam.ldscript libparam.ldscript COPYONLY)
 
 add_library(
   param SHARED
   param.cc
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
   param
@@ -47,7 +45,7 @@ set_target_properties(
 )
 target_link_libraries(
   param
-  PRIVATE protobuf::libprotobuf
+  PRIVATE custombackend
 )
 
 install(

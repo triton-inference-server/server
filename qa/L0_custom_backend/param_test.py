@@ -89,8 +89,8 @@ if __name__ == '__main__':
    if not p2.startswith("server_1="):
       print("error: expected server_1 parameter, got {}".format(p2));
       sys.exit(1);
-   if not p2.endswith("L0_custom_param/models"):
-      print("error: expected model-store to end with L0_custom_param/models, got {}".format(p2));
+   if not p2.endswith("L0_custom_backend/models"):
+      print("error: expected model-store to end with L0_custom_backend/models, got {}".format(p2));
       sys.exit(1);
 
    # configuration param values can be returned in any order.

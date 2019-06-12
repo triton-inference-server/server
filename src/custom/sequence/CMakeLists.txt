@@ -29,13 +29,11 @@ cmake_minimum_required (VERSION 3.5)
 #
 # libsequence.so
 #
-configure_file(libsequence.ldscript libsequence.ldscript)
+configure_file(libsequence.ldscript libsequence.ldscript COPYONLY)
 
 add_library(
   sequence SHARED
   sequence.cc
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
 )
 set_target_properties(
   sequence
@@ -47,7 +45,7 @@ set_target_properties(
 )
 target_link_libraries(
   sequence
-  PRIVATE protobuf::libprotobuf
+  PRIVATE custombackend
 )
 
 install(

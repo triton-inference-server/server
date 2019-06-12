@@ -130,7 +130,7 @@ if(${TRTIS_ENABLE_GPU})
   set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
 endif() # TRTIS_ENABLE_GPU
 
-configure_file(libtrtserver.ldscript libtrtserver.ldscript)
+configure_file(libtrtserver.ldscript libtrtserver.ldscript COPYONLY)
 
 add_library(
   trtserver SHARED
