@@ -119,7 +119,7 @@ AutoFill::Create(
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
 #if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
-    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) || \
+    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) ||  \
     defined(TRTIS_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
 #endif

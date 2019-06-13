@@ -107,8 +107,11 @@ main(int argc, char** argv)
   size_t health_iters = 0;
   while (true) {
     bool live, ready;
-    FAIL_IF_ERR(TRTSERVER_ServerIsLive(server, &live), "unable to get server liveness");
-    FAIL_IF_ERR(TRTSERVER_ServerIsReady(server, &ready), "unable to get server readiness");
+    FAIL_IF_ERR(
+        TRTSERVER_ServerIsLive(server, &live), "unable to get server liveness");
+    FAIL_IF_ERR(
+        TRTSERVER_ServerIsReady(server, &ready),
+        "unable to get server readiness");
     std::cout << "Server Health: live " << live << ", ready " << ready
               << std::endl;
     if (live && ready) {

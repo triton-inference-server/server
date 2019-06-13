@@ -45,9 +45,9 @@ TEST_F(PyTorchBackendTest, ModelConfigSanity)
     if (status.IsOk()) {
       std::unordered_map<std::string, std::string> pytorch_paths;
 
-      for (const auto& filename : std::vector<std::string>{
-               kPyTorchLibTorchPlatform,
-               std::string(kPyTorchLibTorchFilename) }) {
+      for (const auto& filename :
+           std::vector<std::string>{kPyTorchLibTorchPlatform,
+                                    std::string(kPyTorchLibTorchFilename)}) {
         const auto pytorch_path = JoinPath({path, filename});
         pytorch_paths.emplace(
             std::piecewise_construct, std::make_tuple(filename),

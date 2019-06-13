@@ -81,8 +81,8 @@ AutoFillPyTorch::Create(
   RETURN_IF_ERROR(GetDirectoryFiles(version_path, &pytorch_files));
   if (pytorch_files.size() != 1) {
     return Status(
-        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find pt file");
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name + "', unable to find pt file");
   }
 
   const std::string pt_file = *(pytorch_files.begin());
