@@ -293,7 +293,7 @@ CompareDimsSupported(
             "tensor '" +
             tensor_name +
             "' expected by framework is not a variable-size batch dimension: " +
-            ShapeToString(model_shape) +
+            DimsListToString(model_shape) +
             " whereas model configuration shape is: " + DimsListToString(dims));
   }
 
