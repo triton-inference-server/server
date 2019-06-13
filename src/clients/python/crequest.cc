@@ -236,7 +236,8 @@ struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
   nic::InferContext::ResultMap results;
   std::unordered_map<size_t, nic::InferContext::ResultMap> async_results;
-  std::unordered_map<size_t, std::shared_ptr<nic::InferContext::Request>> requests;
+  std::unordered_map<size_t, std::shared_ptr<nic::InferContext::Request>>
+      requests;
 };
 
 nic::Error*
@@ -309,6 +310,20 @@ InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id)
   nic::Error err = ctx->ctx->AsyncRun(&request);
   ctx->requests.emplace(request->Id(), request);
   *request_id = request->Id();
+  return new nic::Error(err);
+}
+
+nic::Error*
+InferContextAsyncRunWithCallback(
+    InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t))
+{
+  nic::Error err = ctx->ctx->AsyncRun(
+      [ctx, callback](
+          nic::InferContext*,
+          std::shared_ptr<nic::InferContext::Request> request) {
+        ctx->requests.emplace(request->Id(), request);
+        (*callback)(ctx, request->Id());
+      });
   return new nic::Error(err);
 }
 
@@ -484,7 +499,8 @@ InferContextAsyncResultNew(
   if (res_itr == infer_ctx->async_results.end()) {
     return new nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "unable to find results for request '" + std::to_string(request_id) + "'");
+        "unable to find results for request '" + std::to_string(request_id) +
+            "'");
   }
 
   auto itr = res_itr->second.find(result_name);
