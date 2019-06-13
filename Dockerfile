@@ -247,8 +247,10 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   ../build && \
             (make -j16 trtis || true) && \
             make -j16 trtis && \
-            mkdir -p /opt/tensorrtserver && \
-            cp -r trtis/install/* /opt/tensorrtserver/.) && \
+            mkdir -p /opt/tensorrtserver/include && \
+            cp -r trtis/install/bin /opt/tensorrtserver/. && \
+            cp -r trtis/install/lib /opt/tensorrtserver/. && \
+            cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
     (cd /opt/tensorrtserver && ln -s /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}

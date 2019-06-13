@@ -25,10 +25,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SIMPLE_CLIENT=./simple_inprocess
-
+SIMPLE_CLIENT=./simple_lib
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
+
+# Build the client by linking against libtrtserver.so.
+rm -fr $SIMPLE_CLIENT
+g++ -std=c++11 -o $SIMPLE_CLIENT simple_lib.cc -I/opt/tensorrtserver/include -L/opt/tensorrtserver/lib -ltrtserver
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Compilation failed\n***"
+    exit 1
+fi
 
 rm -f $CLIENT_LOG
 

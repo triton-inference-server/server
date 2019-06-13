@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {
   global:
+    TRTSERVER_*;
     *nvidia15inferenceserver10Log*;
     *nvidia15inferenceserver8gLogger*;
     *nvidia15inferenceserver10GRPCServer*;
