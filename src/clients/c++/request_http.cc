@@ -465,7 +465,8 @@ class HttpRequestImpl : public RequestImpl {
  public:
   HttpRequestImpl(
       const uint64_t id,
-      const std::vector<std::shared_ptr<InferContext::Input>> inputs);
+      const std::vector<std::shared_ptr<InferContext::Input>> inputs,
+      InferContext::OnCompleteFn callback = nullptr);
   ~HttpRequestImpl();
 
   // Initialize the request for HTTP transfer. */
@@ -544,11 +545,15 @@ class InferHttpContextImpl : public InferContextImpl {
 
   Error Run(ResultMap* results) override;
   Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  private:
+  Error AsyncRun(
+      std::shared_ptr<Request>* async_request,
+      InferContext::OnCompleteFn callback);
   static size_t RequestProvider(void*, size_t, size_t, void*);
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
@@ -573,9 +578,11 @@ class InferHttpContextImpl : public InferContextImpl {
 
 HttpRequestImpl::HttpRequestImpl(
     const uint64_t id,
-    const std::vector<std::shared_ptr<InferContext::Input>> inputs)
-    : RequestImpl(id), easy_handle_(curl_easy_init()), header_list_(nullptr),
-      inputs_(inputs), input_pos_idx_(0), result_pos_idx_(0)
+    const std::vector<std::shared_ptr<InferContext::Input>> inputs,
+    InferContext::OnCompleteFn callback)
+    : RequestImpl(id, std::move(callback)), easy_handle_(curl_easy_init()),
+      header_list_(nullptr), inputs_(inputs), input_pos_idx_(0),
+      result_pos_idx_(0)
 {
   if (easy_handle_ != nullptr) {
     SetRunIndex(reinterpret_cast<uintptr_t>(easy_handle_));
@@ -863,6 +870,21 @@ InferHttpContextImpl::Run(ResultMap* results)
 Error
 InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
+  return AsyncRun(async_request, nullptr);
+}
+
+Error
+InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
+{
+  std::shared_ptr<Request> async_request;
+  return AsyncRun(&async_request, std::move(callback));
+}
+
+Error
+InferHttpContextImpl::AsyncRun(
+    std::shared_ptr<Request>* async_request,
+    InferContext::OnCompleteFn callback)
+{
   if (!multi_handle_) {
     return Error(
         RequestStatusCode::INTERNAL,
@@ -879,7 +901,7 @@ InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
   }
 
   HttpRequestImpl* current_context =
-      new HttpRequestImpl(0 /* temp id */, inputs);
+      new HttpRequestImpl(0 /* temp id */, inputs, std::move(callback));
   async_request->reset(static_cast<Request*>(current_context));
 
   if (!current_context->easy_handle_) {
@@ -1122,6 +1144,7 @@ InferHttpContextImpl::AsyncTransfer()
   int place_holder = 0;
   CURLMsg* msg = nullptr;
   do {
+    std::vector<std::shared_ptr<Request>> request_with_callback;
     bool has_completed = false;
     // sleep if no work is available
     std::unique_lock<std::mutex> lock(mutex_);
@@ -1166,12 +1189,21 @@ InferHttpContextImpl::AsyncTransfer()
       }
       http_request->http_status_ = msg->data.result;
       http_request->SetIsReady(true);
+
       has_completed = true;
+      if (http_request->HasCallback()) {
+        request_with_callback.emplace_back(itr->second);
+      }
     }
     lock.unlock();
     // if it has completed tasks, send signal in case the main thread is waiting
     if (has_completed) {
       cv_.notify_all();
+    }
+    for (auto& request : request_with_callback) {
+      HttpRequestImpl* request_ptr =
+          static_cast<HttpRequestImpl*>(request.get());
+      request_ptr->callback_(this, std::move(request));
     }
   } while (!exiting_);
 }

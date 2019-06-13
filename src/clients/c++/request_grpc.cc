@@ -316,7 +316,8 @@ GrpcResultImpl::GrpcResultImpl(
 
 class GrpcRequestImpl : public RequestImpl {
  public:
-  GrpcRequestImpl(const uint64_t id);
+  GrpcRequestImpl(
+      const uint64_t id, InferContext::OnCompleteFn callback = nullptr);
 
   Error GetResults(
       const InferGrpcContextImpl& ctx, InferContext::ResultMap* results) const;
@@ -345,12 +346,15 @@ class InferGrpcContextImpl : public InferContextImpl {
   Error InitGrpc(const std::string& server_url);
 
   virtual Error Run(ResultMap* results) override;
-  virtual Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
+  Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
 
  protected:
+  virtual Error AsyncRun(
+      std::shared_ptr<Request>* async_request, OnCompleteFn callback);
   virtual void AsyncTransfer();
   Error PreRunProcessing(std::shared_ptr<Request>& request);
 
@@ -368,8 +372,9 @@ class InferGrpcContextImpl : public InferContextImpl {
 
 //==============================================================================
 
-GrpcRequestImpl::GrpcRequestImpl(const uint64_t id)
-    : RequestImpl(id), grpc_status_(),
+GrpcRequestImpl::GrpcRequestImpl(
+    const uint64_t id, InferContext::OnCompleteFn callback)
+    : RequestImpl(id, std::move(callback)), grpc_status_(),
       grpc_response_(std::make_shared<InferResponse>())
 {
   SetRunIndex(id);
@@ -552,6 +557,20 @@ InferGrpcContextImpl::Run(ResultMap* results)
 Error
 InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
 {
+  return AsyncRun(async_request, nullptr);
+}
+
+Error
+InferGrpcContextImpl::AsyncRun(OnCompleteFn callback)
+{
+  std::shared_ptr<Request> request;
+  return AsyncRun(&request, std::move(callback));
+}
+
+Error
+InferGrpcContextImpl::AsyncRun(
+    std::shared_ptr<Request>* async_request, OnCompleteFn callback)
+{
   if (!worker_.joinable()) {
     worker_ = std::thread(&InferGrpcContextImpl::AsyncTransfer, this);
   }
@@ -561,7 +580,8 @@ InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
   {
     std::lock_guard<std::mutex> lock(mutex_);
     // Also need to protect the id
-    current_context = new GrpcRequestImpl(async_request_id_++);
+    current_context =
+        new GrpcRequestImpl(async_request_id_++, std::move(callback));
     async_request->reset(static_cast<Request*>(current_context));
 
     run_index = current_context->Id();
@@ -693,6 +713,7 @@ InferGrpcContextImpl::AsyncTransfer()
     lock.unlock();
     // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
     if (!exiting_) {
+      std::shared_ptr<Request> request_with_callback;
       size_t got;
       bool ok = true;
       bool status = async_request_completion_queue_.Next((void**)(&got), &ok);
@@ -717,9 +738,17 @@ InferGrpcContextImpl::AsyncTransfer()
             std::static_pointer_cast<GrpcRequestImpl>(itr->second);
         grpc_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
         grpc_request->SetIsReady(true);
+        if (grpc_request->HasCallback()) {
+          request_with_callback = itr->second;
+        }
       }
       // send signal in case the main thread is waiting
       cv_.notify_all();
+      if (request_with_callback != nullptr) {
+        GrpcRequestImpl* request =
+            static_cast<GrpcRequestImpl*>(request_with_callback.get());
+        request->callback_(this, std::move(request_with_callback));
+      }
     }
   } while (!exiting_);
 }
@@ -756,14 +785,17 @@ InferGrpcContext::Create(
 
 class InferGrpcStreamContextImpl : public InferGrpcContextImpl {
  public:
+  using InferGrpcContextImpl::AsyncRun;
+
   InferGrpcStreamContextImpl(
       const std::string&, const std::string&, int64_t, CorrelationID, bool);
   virtual ~InferGrpcStreamContextImpl();
 
   Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
 
  private:
+  Error AsyncRun(
+      std::shared_ptr<Request>* async_request, OnCompleteFn callback) override;
   void AsyncTransfer() override;
 
   // gRPC objects for using the streaming API
@@ -805,12 +837,14 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
 }
 
 Error
-InferGrpcStreamContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
+InferGrpcStreamContextImpl::AsyncRun(
+    std::shared_ptr<Request>* async_request, OnCompleteFn callback)
 {
   GrpcRequestImpl* current_context;
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    current_context = new GrpcRequestImpl(async_request_id_++);
+    current_context =
+        new GrpcRequestImpl(async_request_id_++, std::move(callback));
     async_request->reset(static_cast<Request*>(current_context));
 
     uintptr_t run_index = current_context->Id();
@@ -849,7 +883,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
       continue;
     }
 
-    // Get request ID
+    std::shared_ptr<Request> request_with_callback;
     uintptr_t run_index = response.meta_data().id();
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -867,9 +901,17 @@ InferGrpcStreamContextImpl::AsyncTransfer()
       grpc_request->grpc_response_->Swap(&response);
       grpc_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
       grpc_request->SetIsReady(true);
+      if (grpc_request->HasCallback()) {
+        request_with_callback = itr->second;
+      }
     }
     // send signal in case the main thread is waiting for response
     cv_.notify_all();
+    if (request_with_callback != nullptr) {
+      GrpcRequestImpl* request =
+          static_cast<GrpcRequestImpl*>(request_with_callback.get());
+      request->callback_(this, std::move(request_with_callback));
+    }
   }
   stream_->Finish();
 }

@@ -319,7 +319,10 @@ class ResultImpl : public InferContext::Result {
 
 class RequestImpl : public InferContext::Request {
  public:
-  RequestImpl(const uint64_t id) : id_(id), ready_(false) {}
+  RequestImpl(const uint64_t id, InferContext::OnCompleteFn callback = nullptr)
+      : callback_(std::move(callback)), id_(id), ready_(false)
+  {
+  }
   virtual ~RequestImpl() = default;
 
   uint64_t Id() const override { return id_; };
@@ -331,12 +334,18 @@ class RequestImpl : public InferContext::Request {
   bool IsReady() const { return ready_; }
   void SetIsReady(bool r) { ready_ = r; }
 
+  bool HasCallback() const { return (callback_ != nullptr); }
+
   RequestTimers& Timer() { return timer_; }
 
   // Set non-RAW results from the inference response
   Error PostRunProcessing(
       const InferResponseHeader& infer_response,
       InferContext::ResultMap* results) const;
+
+ protected:
+  // Callback function to be called once the request is completed.
+  InferContext::OnCompleteFn callback_;
 
  private:
   // Identifier seen by user

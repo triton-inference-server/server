@@ -120,6 +120,19 @@ install(
 )
 
 #
+# simple_callback_client
+#
+add_executable(simple_callback_client simple_callback_client.cc)
+target_link_libraries(
+  simple_callback_client
+  PRIVATE request
+)
+install(
+  TARGETS simple_callback_client
+  RUNTIME DESTINATION bin
+)
+
+#
 # simple_sequence_client
 #
 add_executable(simple_sequence_client simple_sequence_client.cc)
