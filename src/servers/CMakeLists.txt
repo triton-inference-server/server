@@ -238,22 +238,6 @@ install(
 
 install(
   FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/api.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/model_config.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/request_status.pb.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/server_status.pb.h
+    ../core/trtserver.h
   DESTINATION include
 )
-
-#
-# simple_inprocess
-#
-#add_executable(simple_inprocess simple_inprocess.cc)
-#target_link_libraries(
-#  simple_inprocess
-#  PRIVATE trtserver
-#)
-#install(
-#  TARGETS simple_inprocess
-#  RUNTIME DESTINATION bin
-#)

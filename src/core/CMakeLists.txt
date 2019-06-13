@@ -131,6 +131,7 @@ set(
   server.cc
   server_status.cc
   status.cc
+  trtserver.cc
 )
 
 set(
@@ -157,6 +158,7 @@ set(
   server.h
   server_status.h
   status.h
+  trtserver.h
 )
 
 add_library(

@@ -81,8 +81,7 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
       sig_supports_batch = false;
     }
   }
-  for (const TRTISTF_IOList* itr = outputs; itr != nullptr;
-        itr = itr->next_) {
+  for (const TRTISTF_IOList* itr = outputs; itr != nullptr; itr = itr->next_) {
     TRTISTF_IO* io = itr->io_;
     if ((io->shape_->rank_ == 0) || (io->shape_->dims_[0] != -1)) {
       sig_supports_batch = false;

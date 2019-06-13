@@ -1602,16 +1602,16 @@ Report(
   std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl;
   if (percentile != -1) {
-    std::cout << "    p" << percentile << " latency: "
-              << requested_percentile_latency_us << " usec"
+    std::cout << "    p" << percentile
+              << " latency: " << requested_percentile_latency_us << " usec"
               << std::endl;
   } else {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
   }
   for (const auto& percentile : summary.client_percentile_latency_ns) {
-    std::cout << "    p" << percentile.first << " latency: "
-              << (percentile.second / 1000) << " usec"
+    std::cout << "    p" << percentile.first
+              << " latency: " << (percentile.second / 1000) << " usec"
               << std::endl;
   }
   std::cout << client_library_detail << std::endl
@@ -1954,7 +1954,8 @@ main(int argc, char** argv)
     for (PerfStatus& status : summary) {
       std::cout << "Concurrency: " << status.concurrency << ", "
                 << status.client_infer_per_sec << " infer/sec, latency "
-                << (status.stabilizing_latency_ns / 1000) << " usec" << std::endl;
+                << (status.stabilizing_latency_ns / 1000) << " usec"
+                << std::endl;
     }
 
     if (!filename.empty()) {
