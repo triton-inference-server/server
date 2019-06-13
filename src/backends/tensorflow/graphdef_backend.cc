@@ -127,16 +127,17 @@ GraphDefBackend::CreateTRTISTFModel(
       continue;
     }
 
-    if (!CompareDataType(input->data_type_, io.data_type())) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', input '" + io.name() +
-              "' data-type " +
-              DataType_Name(ConvertDataType(input->data_type_)) +
-              " doesn't match configuration data-type " +
-              DataType_Name(io.data_type()));
+    if (input->data_type_ != TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+      if (!CompareDataType(input->data_type_, io.data_type())) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unable to load model '" + Name() + "', input '" + io.name() +
+                "' data-type " +
+                DataType_Name(ConvertDataType(input->data_type_)) +
+                " doesn't match configuration data-type " +
+                DataType_Name(io.data_type()));
+        }
     }
-
   }
 
   for (const auto& io : Config().output()) {
@@ -165,14 +166,16 @@ GraphDefBackend::CreateTRTISTFModel(
       continue;
     }
 
-    if (!CompareDataType(output->data_type_, io.data_type())) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + Name() + "', output '" + io.name() +
-              "' data-type " +
-              DataType_Name(ConvertDataType(output->data_type_)) +
-              " doesn't match configuration data-type " +
-              DataType_Name(io.data_type()));
+    if (output->data_type_ != TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+      if (!CompareDataType(output->data_type_, io.data_type())) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unable to load model '" + Name() + "', output '" + io.name() +
+                "' data-type " +
+                DataType_Name(ConvertDataType(output->data_type_)) +
+                " doesn't match configuration data-type " +
+                DataType_Name(io.data_type()));
+      }
     }
   }
 

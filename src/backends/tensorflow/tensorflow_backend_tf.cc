@@ -649,13 +649,6 @@ TRTISTF_ModelCreateFromGraphDef(
           }
       }
 
-      if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
-        return TRTISTF_ErrorNew(
-            "unable to process input '" + std::string(io->name_) + "' for '" +
-            std::string(model_name) + "', unsupported data-type '" +
-            tensorflow::DataType_Name(tf_dt) + "'");
-      }
-
       io->data_type_ = dt;
       io->shape_ = TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
     } else {
@@ -683,13 +676,6 @@ TRTISTF_ModelCreateFromGraphDef(
                   tensor_shape.push_back(dim_size);
               }
           }
-      }
-
-      if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
-        return TRTISTF_ErrorNew(
-            "unable to process output '" + std::string(io->name_) + "' for '" +
-            std::string(model_name) + "', unsupported data-type '" +
-            tensorflow::DataType_Name(tf_dt) + "'");
       }
 
       io->data_type_ = dt;
@@ -801,7 +787,7 @@ TRTISTF_ModelCreateFromSavedModel(
     if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return TRTISTF_ErrorNew(
           "unable to process input '" + std::string(io->name_) + "' for '" +
-          std::string(model_name) + "', unsupported data-type '" +
+          std::string(model_name) + "', unsupported datatype '" +
           tensorflow::DataType_Name(sin.second.dtype()) + "'");
     }
 
@@ -827,7 +813,7 @@ TRTISTF_ModelCreateFromSavedModel(
     if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return TRTISTF_ErrorNew(
           "unable to process output '" + std::string(io->name_) + "' for '" +
-          std::string(model_name) + "', unsupported data-type '" +
+          std::string(model_name) + "', unsupported datatype '" +
           tensorflow::DataType_Name(sout.second.dtype()) + "'");
     }
 
