@@ -568,7 +568,7 @@ def create_onnx_modelfile(
     if onnx_dtype == onnx.TensorProto.STRING:
         onnx_control_dtype = onnx.TensorProto.INT32
 
-    batch_dim = [] if max_batch == 0 else [max_batch]
+    batch_dim = [] if max_batch == 0 else [None]
 
     onnx_input = onnx.helper.make_tensor_value_info("INPUT", onnx_dtype, batch_dim + onnx_input_shape)
     onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype, batch_dim + [1])
