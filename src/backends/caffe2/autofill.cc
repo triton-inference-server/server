@@ -62,6 +62,12 @@ AutoFillNetDef::Create(
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
+  if (version_dirs.size() == 0) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "' due to no version directories");
+  }
+
   if (version_dirs.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -74,10 +80,15 @@ AutoFillNetDef::Create(
   // files) within the version directory...
   std::set<std::string> netdef_files;
   RETURN_IF_ERROR(GetDirectoryFiles(version_path, &netdef_files));
+  const std::string expected_init_filename =
+      std::string(kCaffe2NetDefInitFilenamePrefix) +
+      std::string(kCaffe2NetDefFilename);
   if (netdef_files.size() != 2) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
-                                         "', unable to find netdef files");
+                                         "', unable to find netdef files: '" +
+                                         kCaffe2NetDefFilename + "' and '" +
+                                         expected_init_filename + "'");
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
@@ -86,9 +97,6 @@ AutoFillNetDef::Create(
   const std::string netdef1_file = *(std::next(netdef_files.begin()));
   const auto netdef1_path = JoinPath({version_path, netdef1_file});
 
-  const std::string expected_init_filename =
-      std::string(kCaffe2NetDefInitFilenamePrefix) +
-      std::string(kCaffe2NetDefFilename);
 
   // If find both files named with the default netdef names then
   // assume it is a netdef. In the future we can be smarter here and

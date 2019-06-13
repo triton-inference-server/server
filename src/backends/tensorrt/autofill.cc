@@ -97,6 +97,12 @@ AutoFillPlan::Create(
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
+  if (version_dirs.size() == 0) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "' due to no version directories");
+  }
+
   if (version_dirs.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL,
