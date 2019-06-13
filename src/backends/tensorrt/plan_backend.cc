@@ -350,9 +350,8 @@ PlanBackend::Context::InitializeInputBinding(
   if (dt != input_datatype) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "unexpected datatype " + DataType_Name(dt) +
-            " for input '" + input_name + "', expecting " +
-            DataType_Name(input_datatype));
+        "unexpected datatype " + DataType_Name(dt) + " for input '" +
+            input_name + "', expecting " + DataType_Name(input_datatype));
   }
 
   nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
