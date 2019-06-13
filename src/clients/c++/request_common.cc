@@ -925,12 +925,29 @@ InferContextImpl::GetReadyAsyncRequest(
     return Error(
         RequestStatusCode::UNAVAILABLE,
         "No asynchronous requests have been sent");
+  } else {
+    bool has_dangling_request = false;
+    for (auto& ongoing_async_request : this->ongoing_async_requests_) {
+      auto request_impl =
+          static_cast<RequestImpl*>(ongoing_async_request.second.get());
+      if (!request_impl->HasCallback()) {
+        has_dangling_request = true;
+        break;
+      }
+    }
+    if (!has_dangling_request) {
+      return Error(
+          RequestStatusCode::UNAVAILABLE,
+          "No asynchronous requests can be returned, all outstanding requests "
+          "will signal completion via their callback function");
+    }
   }
 
   cv_.wait(lock, [is_ready, request, this, wait] {
     for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-      if (std::static_pointer_cast<RequestImpl>(ongoing_async_request.second)
-              ->IsReady()) {
+      auto request_impl =
+          static_cast<RequestImpl*>(ongoing_async_request.second.get());
+      if (!request_impl->HasCallback() && request_impl->IsReady()) {
         *request = ongoing_async_request.second;
         *is_ready = true;
         return true;

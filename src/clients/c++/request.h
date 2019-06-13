@@ -550,6 +550,8 @@ class InferContext {
 
  public:
   using ResultMap = std::map<std::string, std::unique_ptr<Result>>;
+  using OnCompleteFn =
+      std::function<void(InferContext*, const std::shared_ptr<Request>&)>;
 
   virtual ~InferContext() = 0;
 
@@ -608,6 +610,9 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error Run(ResultMap* results) = 0;
 
+  /// DEPRECATED: This function is deprecated and will be removed in
+  /// a future version of this API. Instead use AsyncRun(OnCompleteFn).
+  ///
   /// Send an asynchronous request to the inference server to perform
   /// an inference to produce results for the outputs specified in the
   /// most recent call to SetRunOptions().
@@ -615,6 +620,17 @@ class InferContext {
   /// to retrieve the inference results for the request.
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(std::shared_ptr<Request>* async_request) = 0;
+
+  /// Similar to AsyncRun() above. However, this function does not return the
+  /// Request object for retrieving the inference results, and such Request
+  /// object will not be returned via GetAsyncRunResults(). Instead, once the
+  /// request is completed, the InferContext pointer and the Request object will
+  /// be passed to the provided 'callback' function. It is the function caller's
+  /// choice on either retrieving the results inside the callback function or
+  /// deferring it to a different thread so that the InferContext is unblocked.
+  /// \param callback The callback function to be invoked on request completion
+  /// \return Error object indicating success or failure.
+  virtual Error AsyncRun(OnCompleteFn callback) = 0;
 
   /// Get the results of the asynchronous request referenced by
   /// 'async_request'.
@@ -630,6 +646,10 @@ class InferContext {
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) = 0;
 
+  /// DEPRECATED: This function is deprecated and will be removed in
+  /// a future version of this API. This function is only useful with
+  /// the deprecated version of AsyncRun(). Instead use AsyncRun(OnCompleteFn).
+  ///
   /// Get any one completed asynchronous request.
   /// \param async_request Returns the Request object holding the
   /// completed request.
