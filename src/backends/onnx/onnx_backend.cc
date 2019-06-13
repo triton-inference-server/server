@@ -279,7 +279,7 @@ OnnxBackend::Context::ValidateSequenceControl(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', sequence control '" +
-            tensor_name + "' data-type " + OnnxDataTypeName(iit->second.type_) +
+            tensor_name + "' datatype " + OnnxDataTypeName(iit->second.type_) +
             " doesn't match required data-type " +
             DataType_Name(tensor_datatype));
   }
