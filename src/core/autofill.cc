@@ -38,6 +38,9 @@
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
 #include "src/backends/onnx/autofill.h"
 #endif  // TRTIS_ENABLE_ONNXRUNTIME
+#ifdef TRTIS_ENABLE_PYTORCH
+#include "src/backends/pytorch/autofill.h"
+#endif  // TRTIS_ENABLE_PYTORCH
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -116,7 +119,8 @@ AutoFill::Create(
   // appropriate autofill object, otherwise just try creating each
   // autofill object to see if one can detect the platform.
 #if defined(TRTIS_ENABLE_TENSORFLOW) || defined(TRTIS_ENABLE_TENSORRT) || \
-    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME)
+    defined(TRTIS_ENABLE_CAFFE2) || defined(TRTIS_ENABLE_ONNXRUNTIME) || \
+    defined(TRTIS_ENABLE_PYTORCH)
   const Platform platform = GetPlatform(config.platform());
 #endif
 
@@ -147,6 +151,18 @@ AutoFill::Create(
     }
   }
 #endif  // TRTIS_ENABLE_TENSORFLOW
+
+#ifdef TRTIS_ENABLE_PYTORCH
+  if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
+    std::unique_ptr<AutoFill> afpt;
+    Status status = AutoFillNetDef::Create(model_name, model_path, &afpt);
+    if (status.IsOk()) {
+      *autofill = std::move(afpt);
+      return Status::Success;
+    }
+  }
+#endif  // TRTIS_ENABLE_PYTORCH
 
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
   // Check for ONNX model must be done before check for TensorRT plan

@@ -1,0 +1,25 @@
+max_batch_size: 8
+input [
+  {
+    name: "INPUT__0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT__1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT__0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT__1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]

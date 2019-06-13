@@ -31,12 +31,14 @@ cmake_minimum_required (VERSION 3.5)
 #
 set(
   LIBTORCH_SRCS
+  autofill.cc
   libtorch_backend_factory.cc
   libtorch_backend.cc
 )
 
 set(
   LIBTORCH_HDRS
+  autofill.h
   libtorch_backend_factory.h
   libtorch_backend.h
 )
