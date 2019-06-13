@@ -30,7 +30,10 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "trtserver/trtserver.h"
+#include "src/core/server_status.pb.h"
+#include "src/core/trtserver.h"
+
+namespace ni = nvidia::inferenceserver;
 
 #define FAIL_IF_ERR(X, MSG)                                  \
   do {                                                       \
@@ -54,7 +57,6 @@ Usage(char** argv, const std::string& msg = std::string())
   }
 
   std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
-  std::cerr << "\t-v" << std::endl;
   std::cerr << "\t-r [model repository absolute path]" << std::endl;
 
   exit(1);
@@ -65,16 +67,12 @@ Usage(char** argv, const std::string& msg = std::string())
 int
 main(int argc, char** argv)
 {
-  bool verbose = false;
   std::string model_repository_path;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vr:")) != -1) {
+  while ((opt = getopt(argc, argv, "r:")) != -1) {
     switch (opt) {
-      case 'v':
-        verbose = true;
-        break;
       case 'r':
         model_repository_path = optarg;
         break;
@@ -124,6 +122,59 @@ main(int argc, char** argv)
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
+
+  // Print status of the server.
+  {
+    TRTSERVER_Protobuf* server_status_protobuf;
+    FAIL_IF_ERR(
+        TRTSERVER_ServerStatus(server, &server_status_protobuf),
+        "unable to get server status protobuf");
+    const char* buffer;
+    size_t byte_size;
+    FAIL_IF_ERR(
+        TRTSERVER_ProtobufSerialize(
+            server_status_protobuf, &buffer, &byte_size),
+        "unable to serialize server status protobuf");
+
+    ni::ServerStatus server_status;
+    if (!server_status.ParseFromArray(buffer, byte_size)) {
+      std::cerr << "error: failed to parse server status" << std::endl;
+      exit(1);
+    }
+
+    std::cout << "Server Status:" << std::endl;
+    std::cout << server_status.DebugString() << std::endl;
+
+    FAIL_IF_ERR(
+        TRTSERVER_ProtobufDelete(server_status_protobuf),
+        "deleting status protobuf");
+  }
+
+  // Print status of just the simple model.
+  {
+    TRTSERVER_Protobuf* model_status_protobuf;
+    FAIL_IF_ERR(
+        TRTSERVER_ServerModelStatus(server, &model_status_protobuf, "simple"),
+        "unable to get model status protobuf");
+    const char* buffer;
+    size_t byte_size;
+    FAIL_IF_ERR(
+        TRTSERVER_ProtobufSerialize(model_status_protobuf, &buffer, &byte_size),
+        "unable to serialize model status protobuf");
+
+    ni::ServerStatus model_status;
+    if (!model_status.ParseFromArray(buffer, byte_size)) {
+      std::cerr << "error: failed to parse model status" << std::endl;
+      exit(1);
+    }
+
+    std::cout << "Model \"simple\" Status:" << std::endl;
+    std::cout << model_status.DebugString() << std::endl;
+
+    FAIL_IF_ERR(
+        TRTSERVER_ProtobufDelete(model_status_protobuf),
+        "deleting status protobuf");
   }
 
   // Shutdown and delete the server
