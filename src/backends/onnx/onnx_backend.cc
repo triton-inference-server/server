@@ -322,9 +322,9 @@ OnnxBackend::Context::ValidateInputs(
     } else if (onnx_data_type != iit->second.type_) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + model_name + "', input '" + io.name() +
-              "' data-type " + OnnxDataTypeName(iit->second.type_) +
-              " doesn't match configuration data-type " +
+          "unable to load model '" + model_name + ", unexpected datatype " +
+              DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              " for input '" + io.name() + "', expecting " +
               DataType_Name(io.data_type()));
     }
 
@@ -365,9 +365,9 @@ OnnxBackend::Context::ValidateOutputs(
     } else if (onnx_data_type != iit->second.type_) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "unable to load model '" + model_name + "', output '" + io.name() +
-              "' data-type " + OnnxDataTypeName(iit->second.type_) +
-              " doesn't match configuration data-type " +
+          "unable to load model '" + model_name + ", unexpected datatype " +
+              DataType_Name(ConvertFromOnnxDataType(iit->second.type_)) +
+              " for output '" + io.name() + "', expecting " +
               DataType_Name(io.data_type()));
     }
 

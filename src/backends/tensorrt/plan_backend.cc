@@ -350,18 +350,19 @@ PlanBackend::Context::InitializeInputBinding(
   if (dt != input_datatype) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "input '" + input_name + "' datatype is " +
-            DataType_Name(input_datatype) + ", model specifies " +
-            DataType_Name(dt) + " for " + name_);
+        "unexpected datatype " + DataType_Name(dt) +
+            " for input '" + input_name + "', expecting " +
+            DataType_Name(input_datatype));
   }
 
   nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
   if (!CompareDims(engine_dims, model_config_dims)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "input '" + input_name + "' dims " + DimsDebugString(engine_dims) +
-            " don't match configuration dims " +
-            DimsListToString(model_config_dims) + " for " + name_);
+        "unexpected shape for input '" + input_name +
+            "', model configuration shape is " +
+            DimsListToString(model_config_dims) + ", inference shape is " +
+            DimsDebugString(engine_dims));
   }
 
   const int64_t byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
@@ -464,9 +465,9 @@ PlanBackend::Context::InitializeConfigOutputBindings(
     if (dt != io.data_type()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "output '" + io.name() + "' datatype is " +
-              DataType_Name(io.data_type()) + ", model specifies " +
-              DataType_Name(dt) + " for " + name_);
+          "unexpected datatype " + DataType_Name(dt) +
+              " for inference output '" + io.name() + "', expecting " +
+              DataType_Name(io.data_type()));
     }
 
     const DimsList& model_config_dims =
@@ -476,9 +477,10 @@ PlanBackend::Context::InitializeConfigOutputBindings(
     if (!CompareDims(engine_dims, model_config_dims)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "output '" + io.name() + "' dims " + DimsDebugString(engine_dims) +
-              " don't match configuration dims " +
-              DimsListToString(model_config_dims) + " for " + name_);
+          "unexpected shape for output '" + io.name() +
+              "', model configuration shape is " +
+              DimsListToString(model_config_dims) + ", inference shape is " +
+              DimsDebugString(engine_dims));
     }
 
     const int64_t byte_size =
