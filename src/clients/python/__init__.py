@@ -907,7 +907,7 @@ class InferContext:
 
     def async_run(self, inputs, outputs, batch_size=1, flags=0):
         """DEPRECATED: This function is deprecated and will be removed in
-        a future version of this API. Instead use async_run(callback, ...).
+        a future version of this API. Instead use async_run_with_cb().
   
         Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
@@ -974,7 +974,7 @@ class InferContext:
 
         return c_request_id.value
 
-    def async_run(self, callback, inputs, outputs, batch_size=1, flags=0):
+    def async_run_with_cb(self, callback, inputs, outputs, batch_size=1, flags=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1104,7 +1104,7 @@ class InferContext:
     def get_ready_async_request(self, wait):
         """DEPRECATED: This function is deprecated and will be removed in
         a future version of this API. This function is only useful with
-        the deprecated version of async_run(). Instead use async_run(callback, ...).
+        the deprecated version of async_run(). Instead use async_run_with_cb().
         
         Get the request ID of an async_run() request that has completed but
         not yet had results read with get_async_run_results().

@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     # Send async inference and wait for them to finish
     for idx in range(context._request_cnt):
-        result = ctx.async_run(partial(active_callback, context, idx),
+        result = ctx.async_run_with_cb(partial(active_callback, context, idx),
                                   { 'INPUT0' : (input0_data,),
                                     'INPUT1' : (input1_data,) },
                                   { 'OUTPUT0' : InferContext.ResultFormat.RAW,
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         context._cv.release()
 
     # Send async inference and wait for its callback is invoked
-    result = ctx.async_run(partial(passive_callback, context),
+    result = ctx.async_run_with_cb(partial(passive_callback, context),
                               { 'INPUT0' : (input0_data,),
                                 'INPUT1' : (input1_data,) },
                               { 'OUTPUT0' : InferContext.ResultFormat.RAW,
