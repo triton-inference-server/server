@@ -79,6 +79,24 @@ TRTSERVER_EXPORT const char* TRTSERVER_ErrorCodeString(TRTSERVER_Error* error);
 TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
 
 //
+// TRTSERVER_Protobuf
+//
+// Object representing a protobuf.
+//
+struct TRTSERVER_Protobuf;
+
+// Delete a protobuf object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufDelete(
+    TRTSERVER_Protobuf* protobuf);
+
+// Get the base and size of the buffer containing the serialized
+// version of the protobuf. The buffer is owned by the
+// TRTSERVER_Protobuf object and should not be modified or freed by
+// the caller.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufSerialize(
+    TRTSERVER_Protobuf* protobuf, const char** base, size_t* byte_size);
+
+//
 // TRTSERVER_ServerOptions
 //
 // Options to use when creating an inference server.
@@ -125,6 +143,18 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerIsLive(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerIsReady(
     TRTSERVER_Server* server, bool* ready);
 
+// Get the current server status for all models as a
+// TRTSERVER_protobuf object. The caller takes ownership of the object
+// and must call TRTSERVER_ProtobufDelete to release the object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStatus(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** status);
+
+// Get the current server status for a single model as a
+// TRTSERVER_protobuf object. The caller takes ownership of the object
+// and must call TRTSERVER_ProtobufDelete to release the object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
+    const char* model_name);
 
 #ifdef __cplusplus
 }

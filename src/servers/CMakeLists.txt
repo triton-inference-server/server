@@ -103,6 +103,24 @@ install(
 )
 
 #
+# simple
+#
+add_executable(
+  simple
+  simple.cc
+  $<TARGET_OBJECTS:proto-library>
+)
+target_link_libraries(
+  simple
+  PRIVATE trtserver
+  PRIVATE protobuf::libprotobuf
+)
+install(
+  TARGETS simple
+  RUNTIME DESTINATION bin
+)
+
+#
 # libtrtserver.so
 #
 set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)
