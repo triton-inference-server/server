@@ -79,6 +79,33 @@ TrtServerError::TrtServerError(
   } while (false)
 
 //
+// TrtServerProtobuf
+//
+// Implementation for TRTSERVER_Protobuf.
+//
+class TrtServerProtobuf {
+ public:
+  TrtServerProtobuf(google::protobuf::MessageLite* msg) : msg_(msg) {}
+
+  void Serialize(const char** base, size_t* byte_size);
+
+ private:
+  std::unique_ptr<google::protobuf::MessageLite> msg_;
+  std::string serialized_;
+};
+
+void
+TrtServerProtobuf::Serialize(const char** base, size_t* byte_size)
+{
+  if (serialized_.empty()) {
+    msg_->SerializeToString(&serialized_);
+  }
+
+  *base = serialized_.c_str();
+  *byte_size = serialized_.size();
+}
+
+//
 // TrtServerOptions
 //
 // Implementation for TRTSERVER_ServerOptions.
@@ -86,18 +113,11 @@ TrtServerError::TrtServerError(
 class TrtServerOptions {
  public:
   const std::string& ModelRepositoryPath() const { return repo_path_; }
-
-  void SetModelRepositoryPath(const char* path);
+  void SetModelRepositoryPath(const char* path) { repo_path_ = path; }
 
  private:
   std::string repo_path_;
 };
-
-void
-TrtServerOptions::SetModelRepositoryPath(const char* path)
-{
-  repo_path_ = path;
-}
 
 }  // namespace
 
@@ -154,6 +174,26 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
   return lerror->Message().c_str();
+}
+
+//
+// TRTSERVER_Protobuf
+//
+TRTSERVER_Error*
+TRTSERVER_ProtobufDelete(TRTSERVER_Protobuf* protobuf)
+{
+  TrtServerProtobuf* lprotobuf = reinterpret_cast<TrtServerProtobuf*>(protobuf);
+  delete lprotobuf;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ProtobufSerialize(
+    TRTSERVER_Protobuf* protobuf, const char** base, size_t* byte_size)
+{
+  TrtServerProtobuf* lprotobuf = reinterpret_cast<TrtServerProtobuf*>(protobuf);
+  lprotobuf->Serialize(base, byte_size);
+  return nullptr;  // Success
 }
 
 //
@@ -233,6 +273,41 @@ TRTSERVER_ServerIsReady(TRTSERVER_Server* server, bool* ready)
 
   ni::RequestStatus request_status;
   lserver->HandleHealth(&request_status, ready, "ready");
+  return TrtServerError::Create(request_status.code(), request_status.msg());
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerStatus(TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::RequestStatus request_status;
+  ni::ServerStatus* server_status = new ni::ServerStatus();
+  lserver->HandleStatus(&request_status, server_status, std::string());
+  if (request_status.code() == ni::RequestStatusCode::SUCCESS) {
+    TrtServerProtobuf* protobuf = new TrtServerProtobuf(server_status);
+    *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
+  }
+
+  return TrtServerError::Create(request_status.code(), request_status.msg());
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerModelStatus(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
+    const char* model_name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::RequestStatus request_status;
+  ni::ServerStatus* server_status = new ni::ServerStatus();
+  lserver->HandleStatus(
+      &request_status, server_status, std::string(model_name));
+  if (request_status.code() == ni::RequestStatusCode::SUCCESS) {
+    TrtServerProtobuf* protobuf = new TrtServerProtobuf(server_status);
+    *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
+  }
+
   return TrtServerError::Create(request_status.code(), request_status.msg());
 }
 
