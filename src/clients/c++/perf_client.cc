@@ -1607,6 +1607,7 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--percentile <percentile>" << std::endl;
+  std::cerr << "\t--data-directory <path>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "The -d flag enables dynamic concurrent request count where the number"
@@ -1665,9 +1666,17 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::endl;
   std::cerr
       << "For --percentile, it indicates that the specified percentile in terms"
-      << " of latency will be reported and used to detemine if the measurement"
-      << " is stable instead of average latency."
-      << " Default is -1 to indicate no percentile will be used or reported."
+      << " of latency will also be reported and used to detemine if the"
+      << " measurement is stable instead of average latency."
+      << " Default is -1 to indicate no percentile will be used."
+      << std::endl;
+  std::cerr
+      << "For --data-directory, it indicates that the perf client will use user"
+      << " provided data instead of synthetic data for model inputs. For each"
+      << " input, there must be a binary file with the same name as the input's"
+      << " within the data directory. And such file must contain the data"
+      << " for the input in a batch-1 request. The perf client will reuse"
+      << " the data to match the specified batch size."
       << std::endl;
 
   exit(1);
@@ -1698,6 +1707,7 @@ main(int argc, char** argv)
   int64_t model_version = -1;
   std::string url("localhost:8000");
   std::string filename("");
+  std::string data_directory("");
   ProtocolType protocol = ProtocolType::HTTP;
 
   // {name, has_arg, *flag, val}
@@ -1705,6 +1715,7 @@ main(int argc, char** argv)
                                          {"max-threads", 1, 0, 1},
                                          {"sequence-length", 1, 0, 2},
                                          {"percentile", 1, 0, 3},
+                                         {"data-directory", 1, 0, 4},
                                          {0, 0, 0, 0}};
 
   // Parse commandline...
@@ -1724,6 +1735,9 @@ main(int argc, char** argv)
         break;
       case 3:
         percentile = std::atoi(optarg);
+        break;
+      case 4:
+        data_directory = optarg;
         break;
       case 'v':
         verbose = true;
