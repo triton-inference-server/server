@@ -62,6 +62,12 @@ AutoFillPyTorch::Create(
   // There must be at least one version directory that we can inspect
   // to attempt to determine the platform. For now we only handle the
   // case where there is one version directory.
+  if (version_dirs.size() == 0) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
+                                         "' due to no version directories");
+  }
+
   if (version_dirs.size() != 1) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -70,8 +76,7 @@ AutoFillPyTorch::Create(
 
   const auto version_path = JoinPath({model_path, *(version_dirs.begin())});
 
-  // There must be a single pt model (which is spread across two
-  // files) within the version directory...
+  // There must be a single pt model within the version directory...
   std::set<std::string> pytorch_files;
   RETURN_IF_ERROR(GetDirectoryFiles(version_path, &pytorch_files));
   if (pytorch_files.size() != 1) {
@@ -82,13 +87,6 @@ AutoFillPyTorch::Create(
 
   const std::string pt_file = *(pytorch_files.begin());
   const auto pt_path = JoinPath({version_path, pt_file});
-
-  if(!(pt_file == kPyTorchLibTorchFilename)) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to autofill for '" + model_name +
-            "', unable to find pt file named '" + kPyTorchLibTorchFilename + "'");
-  }
 
   autofill->reset(new AutoFillPyTorchImpl(model_name));
   return Status::Success;
