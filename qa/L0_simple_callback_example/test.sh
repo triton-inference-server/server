@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SIMPLE_CALLBACK_CLIENT=../clients/simple_callback_client
-# SIMPLE_CALLBACK_CLIENT_PY=../clients/simple_callback_client.py
+SIMPLE_CALLBACK_CLIENT_PY=../clients/simple_callback_client.py
 
 CLIENT_LOG="./client.log"
 
@@ -58,10 +58,10 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# python $SIMPLE_CALLBACK_CLIENT_PY -v >>$CLIENT_LOG 2>&1
-# if [ $? -ne 0 ]; then
-#     RET=1
-# fi
+python $SIMPLE_CALLBACK_CLIENT_PY -v >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
