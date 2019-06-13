@@ -26,6 +26,9 @@
 
 #include "src/core/trtserver.h"
 
+#include "src/core/backend.h"
+#include "src/core/logging.h"
+#include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 
@@ -42,6 +45,7 @@ class TrtServerError {
  public:
   static TRTSERVER_Error* Create(
       ni::RequestStatusCode code, const std::string& msg);
+  static TRTSERVER_Error* Create(const ni::RequestStatus& status);
   ni::RequestStatusCode Code() const { return code_; }
   const std::string& Message() const { return msg_; }
 
@@ -64,6 +68,12 @@ TrtServerError::Create(ni::RequestStatusCode code, const std::string& msg)
   return reinterpret_cast<TRTSERVER_Error*>(new TrtServerError(code, msg));
 }
 
+TRTSERVER_Error*
+TrtServerError::Create(const ni::RequestStatus& status)
+{
+  return Create(status.code(), status.msg());
+}
+
 TrtServerError::TrtServerError(
     ni::RequestStatusCode code, const std::string& msg)
     : code_(code), msg_(msg)
@@ -73,7 +83,7 @@ TrtServerError::TrtServerError(
 #define RETURN_IF_STATUS_ERROR(S)                                         \
   do {                                                                    \
     const ni::Status& status__ = (S);                                     \
-    if (status__.Code() != RequestStatusCode::SUCCESS) {                  \
+    if (status__.Code() != ni::RequestStatusCode::SUCCESS) {              \
       return TrtServerError::Create(status__.Code(), status__.Message()); \
     }                                                                     \
   } while (false)
@@ -85,22 +95,21 @@ TrtServerError::TrtServerError(
 //
 class TrtServerProtobuf {
  public:
-  TrtServerProtobuf(google::protobuf::MessageLite* msg) : msg_(msg) {}
-
-  void Serialize(const char** base, size_t* byte_size);
+  TrtServerProtobuf(const google::protobuf::MessageLite& msg);
+  void Serialize(const char** base, size_t* byte_size) const;
 
  private:
-  std::unique_ptr<google::protobuf::MessageLite> msg_;
   std::string serialized_;
 };
 
-void
-TrtServerProtobuf::Serialize(const char** base, size_t* byte_size)
+TrtServerProtobuf::TrtServerProtobuf(const google::protobuf::MessageLite& msg)
 {
-  if (serialized_.empty()) {
-    msg_->SerializeToString(&serialized_);
-  }
+  msg.SerializeToString(&serialized_);
+}
 
+void
+TrtServerProtobuf::Serialize(const char** base, size_t* byte_size) const
+{
   *base = serialized_.c_str();
   *byte_size = serialized_.size();
 }
@@ -118,6 +127,114 @@ class TrtServerOptions {
  private:
   std::string repo_path_;
 };
+
+//
+// TrtServerRequestProvider
+//
+// Implementation for TRTSERVER_InferenceRequestProvider.
+//
+class TrtServerRequestProvider {
+ public:
+  TrtServerRequestProvider(
+      const char* model_name, int64_t model_version,
+      const std::shared_ptr<ni::InferRequestHeader>& request_header);
+
+  const std::string& ModelName() const { return model_name_; }
+  int64_t ModelVersion() const { return model_version_; }
+  ni::InferRequestHeader* InferRequestHeader() const;
+  const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
+  InputMap() const;
+
+  void SetInputData(const char* input_name, const void* base, size_t byte_size);
+
+ private:
+  const std::string model_name_;
+  const int64_t model_version_;
+  std::shared_ptr<ni::InferRequestHeader> request_header_;
+  std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>> input_map_;
+};
+
+TrtServerRequestProvider::TrtServerRequestProvider(
+    const char* model_name, int64_t model_version,
+    const std::shared_ptr<ni::InferRequestHeader>& request_header)
+    : model_name_(model_name), model_version_(model_version),
+      request_header_(request_header)
+{
+}
+
+ni::InferRequestHeader*
+TrtServerRequestProvider::InferRequestHeader() const
+{
+  return request_header_.get();
+}
+
+const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
+TrtServerRequestProvider::InputMap() const
+{
+  return input_map_;
+}
+
+void
+TrtServerRequestProvider::SetInputData(
+    const char* input_name, const void* base, size_t byte_size)
+{
+  auto pr = input_map_.emplace(input_name, nullptr);
+  std::shared_ptr<ni::SystemMemory>& smem = pr.first->second;
+  if (pr.second) {
+    smem.reset(new ni::SystemMemoryReference());
+  }
+
+  std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
+      static_cast<const char*>(base), byte_size);
+}
+
+//
+// TrtServerResponse
+//
+// Implementation for TRTSERVER_InferenceResponse.
+//
+class TrtServerResponse {
+ public:
+  TrtServerResponse(
+      const std::shared_ptr<ni::RequestStatus>& status,
+      const std::shared_ptr<ni::InferResponseProvider>& provider);
+  TRTSERVER_Error* Status() const;
+  const ni::InferResponseHeader& Header() const;
+  TRTSERVER_Error* OutputData(
+      const char* name, const void** base, size_t* byte_size) const;
+
+ private:
+  std::shared_ptr<ni::RequestStatus> request_status_;
+  std::shared_ptr<ni::InferResponseProvider> response_provider_;
+};
+
+TrtServerResponse::TrtServerResponse(
+    const std::shared_ptr<ni::RequestStatus>& status,
+    const std::shared_ptr<ni::InferResponseProvider>& provider)
+    : request_status_(status), response_provider_(provider)
+{
+}
+
+TRTSERVER_Error*
+TrtServerResponse::Status() const
+{
+  return TrtServerError::Create(*request_status_);
+}
+
+const ni::InferResponseHeader&
+TrtServerResponse::Header() const
+{
+  return response_provider_->ResponseHeader();
+}
+
+TRTSERVER_Error*
+TrtServerResponse::OutputData(
+    const char* name, const void** base, size_t* byte_size) const
+{
+  RETURN_IF_STATUS_ERROR(
+      response_provider_->OutputBufferContents(name, base, byte_size));
+  return nullptr;  // Success
+}
 
 }  // namespace
 
@@ -194,6 +311,113 @@ TRTSERVER_ProtobufSerialize(
   TrtServerProtobuf* lprotobuf = reinterpret_cast<TrtServerProtobuf*>(protobuf);
   lprotobuf->Serialize(base, byte_size);
   return nullptr;  // Success
+}
+
+//
+// TRTSERVER_MemoryAllocator
+//
+TRTSERVER_Error*
+TRTSERVER_MemoryAllocatorNew(
+    TRTSERVER_MemoryAllocator** allocator, TRTSERVER_MemoryAllocFn_t alloc_fn,
+    TRTSERVER_MemoryDeleteFn_t delete_fn)
+{
+  // FIXME: allocator requires provider changes that are
+  // not-yet-implemented so for now do nothing
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_MemoryAllocatorDelete(TRTSERVER_MemoryAllocator* allocator)
+{
+  // FIXME: allocator requires provider changes that are
+  // not-yet-implemented so for now do nothing
+  return nullptr;  // Success
+}
+
+//
+// TRTSERVER_InferenceRequestProvider
+//
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestProviderNew(
+    TRTSERVER_InferenceRequestProvider** request_provider,
+    const char* model_name, int64_t model_version,
+    const char* request_header_base, size_t request_header_byte_size)
+{
+  std::shared_ptr<ni::InferRequestHeader> request_header =
+      std::make_shared<ni::InferRequestHeader>();
+  if (!request_header->ParseFromArray(
+          request_header_base, request_header_byte_size)) {
+    return TrtServerError::Create(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to parse InferRequestHeader");
+  }
+
+  *request_provider = reinterpret_cast<TRTSERVER_InferenceRequestProvider*>(
+      new TrtServerRequestProvider(model_name, model_version, request_header));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestProviderDelete(
+    TRTSERVER_InferenceRequestProvider* request_provider)
+{
+  TrtServerRequestProvider* lprovider =
+      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+  delete lprovider;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestProviderSetInputData(
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    const char* input_name, const void* base, size_t byte_size)
+{
+  TrtServerRequestProvider* lprovider =
+      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+  lprovider->SetInputData(input_name, base, byte_size);
+  return nullptr;  // Success
+}
+
+//
+// TRTSERVER_InferenceResponse
+//
+TRTSERVER_Error*
+TRTSERVER_InferenceResponseDelete(TRTSERVER_InferenceResponse* response)
+{
+  TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
+  delete lresponse;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceResponseStatus(TRTSERVER_InferenceResponse* response)
+{
+  TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
+  return lresponse->Status();
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceResponseHeader(
+    TRTSERVER_InferenceResponse* response, TRTSERVER_Protobuf** header)
+{
+  TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
+  TRTSERVER_Error* status = lresponse->Status();
+  if (status != nullptr) {
+    return status;
+  }
+
+  TrtServerProtobuf* protobuf = new TrtServerProtobuf(lresponse->Header());
+  *header = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceResponseOutputData(
+    TRTSERVER_InferenceResponse* response, const char* name, const void** base,
+    size_t* byte_size)
+{
+  TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
+  return lresponse->OutputData(name, base, byte_size);
 }
 
 //
@@ -282,8 +506,8 @@ TRTSERVER_ServerStatus(TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::RequestStatus request_status;
-  ni::ServerStatus* server_status = new ni::ServerStatus();
-  lserver->HandleStatus(&request_status, server_status, std::string());
+  ni::ServerStatus server_status;
+  lserver->HandleStatus(&request_status, &server_status, std::string());
   if (request_status.code() == ni::RequestStatusCode::SUCCESS) {
     TrtServerProtobuf* protobuf = new TrtServerProtobuf(server_status);
     *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
@@ -300,15 +524,72 @@ TRTSERVER_ServerModelStatus(
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::RequestStatus request_status;
-  ni::ServerStatus* server_status = new ni::ServerStatus();
+  ni::ServerStatus server_status;
   lserver->HandleStatus(
-      &request_status, server_status, std::string(model_name));
+      &request_status, &server_status, std::string(model_name));
   if (request_status.code() == ni::RequestStatusCode::SUCCESS) {
     TrtServerProtobuf* protobuf = new TrtServerProtobuf(server_status);
     *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
   }
 
   return TrtServerError::Create(request_status.code(), request_status.msg());
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerInferAsync(
+    TRTSERVER_Server* server,
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    TRTSERVER_InferenceCompleteFn_t complete_fn, void* userp)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerRequestProvider* lprovider =
+      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+  ni::InferRequestHeader* request_header = lprovider->InferRequestHeader();
+
+  auto infer_stats = std::make_shared<ni::ModelInferStats>(
+      lserver->StatusManager(), lprovider->ModelName());
+  auto timer = std::make_shared<ni::ModelInferStats::ScopedTimer>();
+  infer_stats->StartRequestTimer(timer.get());
+  infer_stats->SetRequestedVersion(lprovider->ModelVersion());
+  infer_stats->SetFailed(true);
+
+  std::shared_ptr<ni::InferenceServer::InferBackendHandle> backend = nullptr;
+  RETURN_IF_STATUS_ERROR(ni::InferenceServer::InferBackendHandle::Create(
+      lserver, lprovider->ModelName(), lprovider->ModelVersion(), &backend));
+  infer_stats->SetMetricReporter(
+      backend->GetInferenceBackend()->MetricReporter());
+  infer_stats->SetBatchSize(request_header->batch_size());
+
+  RETURN_IF_STATUS_ERROR(ni::NormalizeRequestHeader(
+      *backend->GetInferenceBackend(), *request_header));
+
+  std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
+  RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
+      lprovider->ModelName(), lprovider->ModelVersion(), *request_header,
+      lprovider->InputMap(), &infer_request_provider));
+
+  std::shared_ptr<ni::DelegatingInferResponseProvider> infer_response_provider;
+  RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
+      *request_header, backend->GetInferenceBackend()->GetLabelProvider(),
+      &infer_response_provider));
+
+  auto request_status = std::make_shared<ni::RequestStatus>();
+  lserver->HandleInfer(
+      request_status.get(), backend, infer_request_provider,
+      infer_response_provider, infer_stats,
+      [infer_stats, timer, request_status, infer_response_provider, server,
+       complete_fn, userp]() mutable {
+        infer_stats->SetFailed(false);
+        timer.reset();
+
+        TrtServerResponse* response =
+            new TrtServerResponse(request_status, infer_response_provider);
+        complete_fn(
+            server, reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
+            userp);
+      });
+
+  return nullptr;  // Success
 }
 
 #ifdef __cplusplus
