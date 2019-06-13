@@ -27,6 +27,7 @@
 #include "src/backends/tensorflow/graphdef_backend.h"
 
 #include <set>
+#include <exception>
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
@@ -35,6 +36,22 @@
 #include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
+
+  namespace {
+
+  const TRTISTF_IO*
+  FindIOByName(const TRTISTF_IOList* ios, const std::string& name)
+  {
+    for (const TRTISTF_IOList* itr = ios; itr != nullptr; itr = itr->next_) {
+      if (itr->io_->name_ == name) {
+        return itr->io_;
+      }
+    }
+
+    return nullptr;
+  }
+
+  }  // namespace
 
 Status
 GraphDefBackend::Init(const std::string& path, const ModelConfig& config)
@@ -52,12 +69,11 @@ GraphDefBackend::CreateTRTISTFModel(
     IONameMap* input_name_map, IONameMap* output_name_map)
 {
   TRTISTF_Model* model = nullptr;
-  tensorflow::GraphDef graph_def;
   RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromGraphDef(
       &model, model_path.c_str(), model_path.c_str(), gpu_device,
       has_graph_level, graph_level, backend_config->allow_gpu_memory_growth,
       backend_config->per_process_gpu_memory_fraction,
-      backend_config->allow_soft_placement, &graph_def));
+      backend_config->allow_soft_placement));
 
   trtistf_model->reset(model);
 
@@ -88,54 +104,73 @@ GraphDefBackend::CreateTRTISTFModel(
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
 
+    const TRTISTF_IO* input = FindIOByName(inputs, io.name());
+    if (input == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected inference input '" + io.name() + "'");
+    }
+
+    // If a reshape is provided for the input then use that when
+    // validating that the TF model matches what is expected.
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     try {
-      RETURN_IF_ERROR(CompareDimsSupported(
-          Name(), io.name(), GetTensorShape(graphdef, io.name()), dims,
-          Config().max_batch_size() > 0));
+      if (input->shape_->rank_ != 0) {
+        RETURN_IF_ERROR(CompareDimsSupported(
+            Name(), io.name(), input->shape_, dims,
+            Config().max_batch_size() > 0));
+        }
     }
-    catch(auto& e){
+    catch (const std::exception& ex) {
       continue;
     }
 
-    DataType dt = ConvertDataType(GetTensorDtype(graphdef, io.name()));
-
-    if (!CompareDataType(dt, io.data_type())) {
+    if (!CompareDataType(input->data_type_, io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', input '" + io.name() +
               "' data-type " +
-              DataType_Name(dt) +
+              DataType_Name(ConvertDataType(input->data_type_)) +
               " doesn't match configuration data-type " +
               DataType_Name(io.data_type()));
     }
+
   }
 
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
 
+    const TRTISTF_IO* output = FindIOByName(outputs, io.name());
+    if (output == nullptr) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected inference output '" + io.name() + "'");
+    }
+
+    // If a reshape is provided for the output then use that when
+    // validating that the TF model matches what is expected.
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
     try {
-      RETURN_IF_ERROR(CompareDimsSupported(
-          Name(), io.name(), GetTensorShape(graphdef, io.name()), dims,
-          Config().max_batch_size() > 0));
+      if (output->shape_->rank_ != 0) {
+        RETURN_IF_ERROR(CompareDimsSupported(
+            Name(), io.name(), output->shape_, dims,
+            Config().max_batch_size() > 0));
+        }
     }
-    catch(auto& e){
+    catch (const std::exception& ex) {
       continue;
     }
 
-    DataType dt = ConvertDataType(GetTensorDtype(graphdef, io.name()));
-
-    if (!CompareDataType(dt, io.data_type())) {
+    if (!CompareDataType(output->data_type_, io.data_type())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unable to load model '" + Name() + "', output '" + io.name() +
               "' data-type " +
-              DataType_Name(dt) +
+              DataType_Name(ConvertDataType(output->data_type_)) +
               " doesn't match configuration data-type " +
               DataType_Name(io.data_type()));
     }

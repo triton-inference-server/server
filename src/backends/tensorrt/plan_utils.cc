@@ -65,7 +65,7 @@ ConvertDataTypeToTrtType(const DataType& dtype)
     default:
       return std::make_pair(false, trt_type);
   }
-  return std::make_pair(false, trt_type);
+  return std::make_pair(true, trt_type);
 }
 
 bool

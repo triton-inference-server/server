@@ -582,7 +582,7 @@ TRTISTF_ModelCreateFromGraphDef(
     const char* model_path, const int gpu_device, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement, tensorflow::GraphDef* graph_def)
+    const bool allow_soft_placement)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
@@ -592,9 +592,10 @@ TRTISTF_ModelCreateFromGraphDef(
   tensorflow::Session* session;
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
 
+  tensorflow::GraphDef graph_def;
   RETURN_IF_TF_ERROR(tensorflow::ReadBinaryProto(
-      tensorflow::Env::Default(), model_path, graph_def));
-  if (graph_def->node_size() == 0) {
+      tensorflow::Env::Default(), model_path, &graph_def));
+    if (graph_def.node_size() == 0) {
     return TRTISTF_ErrorNew(
         "model " + std::string(model_name) + " has an empty network");
   }
@@ -605,13 +606,13 @@ TRTISTF_ModelCreateFromGraphDef(
   // visible_device_list doesn't work it seems like the only option we
   // have. [DLIS-43]
   if (gpu_device == TRTISTF_NO_GPU_DEVICE) {
-    tensorflow::graph::SetDefaultDevice("/cpu:0", graph_def);
+    tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
   } else {
     tensorflow::graph::SetDefaultDevice(
-        "/gpu:" + std::to_string(gpu_device), graph_def);
+        "/gpu:" + std::to_string(gpu_device), &graph_def);
   }
 
-  RETURN_IF_TF_ERROR(session->Create(*graph_def));
+  RETURN_IF_TF_ERROR(session->Create(graph_def));
 
   // Go through all graph nodes and collect the possible inputs and
   // outputs. We use this to verify the requested inputs and outputs
@@ -620,13 +621,79 @@ TRTISTF_ModelCreateFromGraphDef(
   // an input and any node can be an output.
   TRTISTF_IOList* potential_inputs = nullptr;
   TRTISTF_IOList* potential_outputs = nullptr;
-  for (const auto& node : graph_def->node()) {
+  for (const auto& node : graph_def.node()) {
     if (node.op() == "Placeholder") {
       potential_inputs =
           TRTISTF_IOListNew(node.name().c_str(), nullptr, potential_inputs);
+
+      TRTISTF_IO* io = potential_inputs->io_;
+
+      TRTISTF_DataType dt;
+      tensorflow::DataType tf_dt;
+      std::vector<int64_t> tensor_shape;
+      auto attr_map = node.attr();
+      for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
+          auto key = it->first;
+          auto value = it->second;
+          if (key == "dtype") {
+              dt = ConvertDataType(value.type());
+              tf_dt = value.type();
+          }
+          if (value.has_shape()) {
+              auto shape = value.shape();
+              for (int i=0; i<shape.dim_size(); ++i) {
+                  auto dim = shape.dim(i);
+                  auto dim_size = dim.size();
+                  tensor_shape.push_back(dim_size);
+              }
+          }
+      }
+
+      if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+        return TRTISTF_ErrorNew(
+            "unable to process input '" + std::string(io->name_) + "' for '" +
+            std::string(model_name) + "', unsupported data-type '" +
+            tensorflow::DataType_Name(tf_dt) + "'");
+      }
+
+      io->data_type_ = dt;
+      io->shape_ = TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
     } else {
       potential_outputs =
           TRTISTF_IOListNew(node.name().c_str(), nullptr, potential_outputs);
+
+      TRTISTF_IO* io = potential_outputs->io_;
+
+      TRTISTF_DataType dt;
+      tensorflow::DataType tf_dt;
+      std::vector<int64_t> tensor_shape;
+      auto attr_map = node.attr();
+      for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
+          auto key = it->first;
+          auto value = it->second;
+          if (key == "dtype") {
+              dt = ConvertDataType(value.type());
+              tf_dt = value.type();
+          }
+          if (value.has_shape()) {
+              auto shape = value.shape();
+              for (int i=0; i<shape.dim_size(); ++i) {
+                  auto dim = shape.dim(i);
+                  auto dim_size = dim.size();
+                  tensor_shape.push_back(dim_size);
+              }
+          }
+      }
+
+      if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+        return TRTISTF_ErrorNew(
+            "unable to process output '" + std::string(io->name_) + "' for '" +
+            std::string(model_name) + "', unsupported data-type '" +
+            tensorflow::DataType_Name(tf_dt) + "'");
+      }
+
+      io->data_type_ = dt;
+      io->shape_ = TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
     }
   }
 
@@ -635,48 +702,6 @@ TRTISTF_ModelCreateFromGraphDef(
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
-}
-
-TRTISTF_Shape*
-GetTensorShape(tensorflow::GraphDef graph_def, std::string tensor_name)
-{
-    std::vector<int64_t> tensor_shape;
-    for (int i=0; i < graph_def.node_size(); ++i) {
-        if (graph_def.node(i).name() == tensor_name) {
-            auto node = graph_def.node(i);
-            auto attr_map = node.attr();
-            for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
-                auto value = it->second;
-                if (value.has_shape()) {
-                    auto shape = value.shape();
-                    for (int i=0; i<shape.dim_size(); ++i) {
-                        auto dim = shape.dim(i);
-                        auto dim_size = dim.size();
-                        tensor_shape.push_back(dim_size);
-                    }
-                }
-            }
-        }
-    }
-    return TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
-}
-
-TRTISTF_DataType
-GetTensorDtype(tensorflow::GraphDef graph_def, std::string tensor_name)
-{
-    for (int i=0; i < graph_def.node_size(); ++i) {
-        if (graph_def.node(i).name() == tensor_name) {
-            auto node = graph_def.node(i);
-            auto attr_map = node.attr();
-            for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
-                auto key = it->first;
-                auto value = it->second;
-                if (key == "dtype") {
-                    return ConvertDataType(value.type());
-                }
-            }
-        }
-    }
 }
 
 TRTISTF_Error*

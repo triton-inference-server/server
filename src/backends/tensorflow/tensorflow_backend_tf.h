@@ -29,14 +29,6 @@
 #include <stdint.h>
 #include <string>
 
-#include "tensorflow/core/framework/tensor.h"
-#include "tensorflow/core/framework/tensor_shape.pb.h"
-#include "tensorflow/core/framework/types.pb.h"
-#include "tensorflow/core/lib/core/status.h"
-#include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/protobuf/meta_graph.pb.h"
-#include "tensorflow/core/public/session.h"
-
 // To avoid namespace and protobuf collision between TRTIS and
 // TensorFlow, we keep TensorFlow interface isolated to
 // tensorflow_backend_tf. We use a strict C interface to avoid any ABI
@@ -198,7 +190,7 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromGraphDef(
     const char* model_path, const int gpu_device, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement, tensorflow::GraphDef* graph_def);
+    const bool allow_soft_placement);
 
 // Create a SavedModel model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
@@ -228,10 +220,6 @@ TRTISTF_EXPORT TRTISTF_IOList* TRTISTF_ModelOutputs(TRTISTF_Model* model);
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelRun(
     TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
     const char** output_names, TRTISTF_TensorList** output_tensors);
-
-TRTISTF_Shape* GetTensorShape(tensorflow::GraphDef graph_def, std::string tensor_name);
-
-TRTISTF_DataType GetTensorDtype(tensorflow::GraphDef graph_def, std::string tensor_name);
 
 #ifdef __cplusplus
 }  // extern "C"
