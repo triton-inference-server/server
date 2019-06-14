@@ -65,6 +65,7 @@ install(
     ensemble_image_client.py
     grpc_image_client.py
     simple_client.py
+    simple_callback_client.py
     simple_string_client.py
     simple_sequence_client.py
   DESTINATION python
