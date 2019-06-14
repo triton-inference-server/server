@@ -26,6 +26,7 @@
 
 from builtins import range
 from enum import IntEnum
+from functools import partial
 from future.utils import iteritems
 from ctypes import *
 import numpy as np
@@ -104,6 +105,10 @@ _crequest_infer_ctx_run.argtypes = [c_void_p]
 _crequest_infer_ctx_async_run = _crequest.InferContextAsyncRun
 _crequest_infer_ctx_async_run.restype = c_void_p
 _crequest_infer_ctx_async_run.argtypes = [c_void_p, POINTER(c_uint64)]
+_async_run_callback_prototype = CFUNCTYPE(None, c_void_p, c_uint64)
+_crequest_infer_ctx_async_run_with_cb = _crequest.InferContextAsyncRunWithCallback
+_crequest_infer_ctx_async_run_with_cb.restype = c_void_p
+_crequest_infer_ctx_async_run_with_cb.argtypes = [c_void_p, _async_run_callback_prototype]
 _crequest_infer_ctx_get_async_run_results = _crequest.InferContextGetAsyncRunResults
 _crequest_infer_ctx_get_async_run_results.restype = c_void_p
 _crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, POINTER(c_bool), c_uint64, c_bool]
@@ -548,6 +553,10 @@ class InferContext:
         self._last_request_model_name = None
         self._last_request_model_version = None
         self._requested_outputs_dict = dict()
+        # Similar to _requested_outputs_dict, but contains other resources
+        # that has to be kept for callback
+        self._callback_resources_dict = dict()
+        self._callback_resources_dict_id = 0
         self._ctx = c_void_p()
 
         imodel_version = -1 if model_version is None else model_version
@@ -569,6 +578,16 @@ class InferContext:
 
     def __exit__(self, type, value, traceback):
         self.close()
+
+    def _async_callback_wrapper(self, dict_id, callback, cb_ctx, cb_request_id):
+        # By this point, request id is known and '_requested_outputs_dict'
+        # can be set to retrieve results properly
+        self._requested_outputs_dict[cb_request_id] = dict_id
+        # 'ctx_obj' is captured by partial and used for Python API,
+        # 'cb_ctx' is placeholder as crequest API provides pointer to the struct
+        # directly to be consistent with the C++ API
+        callback(self, cb_request_id)
+        return None
 
     def _get_result_numpy_dtype(self, result):
         ctype = c_uint32()
@@ -887,7 +906,10 @@ class InferContext:
         return self._get_results(outputs, batch_size)
 
     def async_run(self, inputs, outputs, batch_size=1, flags=0):
-        """Run inference using the supplied 'inputs' to calculate the outputs
+        """DEPRECATED: This function is deprecated and will be removed in
+        a future version of this API. Instead use async_run_with_cb().
+  
+        Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
         Unlike run(), async_run() returns immediately after sending
@@ -952,6 +974,82 @@ class InferContext:
 
         return c_request_id.value
 
+    def async_run_with_cb(self, callback, inputs, outputs, batch_size=1, flags=0):
+        """Run inference using the supplied 'inputs' to calculate the outputs
+        specified by 'outputs'.
+
+        Similar to AsyncRun() above. However, this function does not return the
+        integer identifier. Instead, once the request is completed, the InferContext
+        object and the integer identifier will be passed to the provided 'callback'
+        function. It is the function caller's choice on either retrieving the results
+        inside the callback function or deferring it to a different thread so that
+        the InferContext is unblocked.
+
+        Parameters
+        ----------
+        callback : function
+            Python function that accepts an InferContext object that sends the
+            request and an integer identifier as arguments. This function will
+            be invoked once the request is completed.
+
+        inputs : dict
+            Dictionary from input name to the value(s) for that
+            input. An input value is specified as a numpy array. Each
+            input in the dictionary maps to a list of values (i.e. a
+            list of numpy array objects), where the length of the list
+            must equal the 'batch_size'.
+
+        outputs : dict
+            Dictionary from output name to a value indicating the
+            ResultFormat that should be used for that output. For RAW
+            the value should be ResultFormat.RAW. For CLASS the value
+            should be a tuple (ResultFormat.CLASS, k), where 'k'
+            indicates how many classification results should be
+            returned for the output.
+
+        batch_size : int
+            The batch size of the inference. Each input must provide
+            an appropriately sized batch of inputs.
+
+        flags : int
+            The flags to use for the inference. The bitwise-or of
+            InferRequestHeader.Flag values.
+
+        Returns
+        -------
+        int
+            Integer identifier which must be passed to
+            get_async_run_results() to wait on and retrieve the
+            inference results.
+
+        Raises
+        ------
+        InferenceServerException
+            If all inputs are not specified, if the size of input data
+            does not match expectations, if unknown output names are
+            specified or if server fails to perform inference.
+
+        """
+        # Same situation as in run(), but the list will be kept inside
+        # the object given that the request is asynchronous
+        contiguous_input = list()
+
+        # Set run option and input values
+        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
+
+        # Wrap over the provided callback
+        wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)
+        c_cb = _async_run_callback_prototype(wrapped_cb)
+
+        # Run asynchronous inference...
+        _raise_if_error(
+            c_void_p(
+                _crequest_infer_ctx_async_run_with_cb(self._ctx, c_cb)))
+
+        self._callback_resources_dict[self._callback_resources_dict_id] = \
+            (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
+        self._callback_resources_dict_id += 1
+
     def get_async_run_results(self, request_id, wait):
         """Retrieve the results of a previous async_run() using the supplied
         'request_id'
@@ -997,12 +1095,20 @@ class InferContext:
             return None
 
         requested_outputs = self._requested_outputs_dict[request_id]
+        if isinstance(requested_outputs, int):
+            idx = requested_outputs
+            requested_outputs = self._callback_resources_dict[idx]
+            del self._callback_resources_dict[idx]
         del self._requested_outputs_dict[request_id]
 
         return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
 
     def get_ready_async_request(self, wait):
-        """Get the request ID of an async_run() request that has completed but
+        """DEPRECATED: This function is deprecated and will be removed in
+        a future version of this API. This function is only useful with
+        the deprecated version of async_run(). Instead use async_run_with_cb().
+        
+        Get the request ID of an async_run() request that has completed but
         not yet had results read with get_async_run_results().
 
         Parameters

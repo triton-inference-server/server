@@ -79,6 +79,8 @@ nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
 nic::Error* InferContextRun(InferContextCtx* ctx);
 nic::Error* InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id);
+nic::Error* InferContextAsyncRunWithCallback(
+    InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t));
 nic::Error* InferContextGetAsyncRunResults(
     InferContextCtx* ctx, bool* is_ready, uint64_t request_id, bool wait);
 nic::Error* InferContextGetReadyAsyncRequest(

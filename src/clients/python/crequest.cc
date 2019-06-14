@@ -314,6 +314,20 @@ InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id)
 }
 
 nic::Error*
+InferContextAsyncRunWithCallback(
+    InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t))
+{
+  nic::Error err = ctx->ctx->AsyncRun(
+      [ctx, callback](
+          nic::InferContext*,
+          std::shared_ptr<nic::InferContext::Request> request) {
+        ctx->requests.emplace(request->Id(), request);
+        (*callback)(ctx, request->Id());
+      });
+  return new nic::Error(err);
+}
+
+nic::Error*
 InferContextGetAsyncRunResults(
     InferContextCtx* ctx, bool* is_ready, uint64_t request_id, bool wait)
 {
