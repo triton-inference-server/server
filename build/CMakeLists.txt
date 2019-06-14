@@ -36,7 +36,6 @@ option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" OFF)
 option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" OFF)
 option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" OFF)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
-option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 
 # Multiple paths may be specified by separating them with semicolon
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
@@ -50,6 +49,9 @@ option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
 endif()
+
+# Cloud storage support
+option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
@@ -208,20 +210,24 @@ ExternalProject_Add(prometheus-cpp
 ExternalProject_Add(crc32c
   PREFIX crc32c
   GIT_REPOSITORY "https://github.com/google/crc32c.git"
-  GIT_TAG "1.0.6"
+  GIT_TAG "1.1.0"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/crc32c/src/crc32c"
   CMAKE_CACHE_ARGS
-    -DBUILD_SHARED_LIBS:STRING=yes
     -DCRC32C_BUILD_TESTS:BOOL=OFF
+    -DBUILD_SHARED_LIBS:STRING=no
     -DCRC32C_BUILD_BENCHMARKS:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/install
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c
 )
 
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} 
+
+# This is necessary because google-cloud-cpp 
+# does not pass protobuf_DIR and gRPC_DIR etc to its 
+# external projects but expects them in CMAKE_PREFIX_PATH
+set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} 
    ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-   ${CMAKE_CURRENT_BINARY_DIR}/
+   ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
    ${_FINDPACKAGE_PROTOBUF_CONFIG_DIR})
 
 #
@@ -230,16 +236,12 @@ set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
 ExternalProject_Add(google-cloud-cpp
   PREFIX google-cloud-cpp
   GIT_REPOSITORY "https://github.com/googleapis/google-cloud-cpp.git"
-  GIT_TAG "v0.10.x"
+  GIT_TAG "v0.10.0"
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/src/google-cloud-cpp"
   CMAKE_CACHE_ARGS
     -DGOOGLE_CLOUD_CPP_DEPENDENCY_PROVIDER:STRING=package
-    -DGOOGLE_CLOUD_CPP_PROTOBUF_PROVIDER:STRING=package
     -DBUILD_TESTING:BOOL=OFF
-    -DBUILD_SHARED_LIBS:BOOL=ON
-    -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
-    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
-    -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/install/lib/cmake/Crc32c
+    -DCMAKE_PREFIX_PATH:PATH=${GCS_CMAKE_PREFIX_PATH}
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install
   DEPENDS grpc protobuf crc32c
@@ -352,7 +354,7 @@ ExternalProject_Add(trtis
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
-    -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/install/lib/cmake/Crc32c
+    -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
     -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}

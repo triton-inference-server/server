@@ -263,9 +263,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             (make -j16 trtis || true) && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver/include && \
-            cp google-cloud-cpp/install/lib/libstorage_client.so.1 /opt/tensorrtserver/lib/. && \
-            cp google-cloud-cpp/install/lib/libgoogle_cloud_cpp_common.so.0 /opt/tensorrtserver/lib/. && \
-            cp crc32c/install/lib/libcrc32c.so /opt/tensorrtserver/lib/. && \
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \

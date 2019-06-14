@@ -27,7 +27,9 @@
 #include "src/core/filesystem.h"
 
 #include <dirent.h>
+#ifdef TRTIS_ENABLE_GCS
 #include <google/cloud/storage/client.h>
+#endif  // TRTIS_ENABLE_GCS
 #include <google/protobuf/text_format.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -210,6 +212,8 @@ LocalFileSystem::WriteTextFile(
   return Status::Success;
 }
 
+#ifdef TRTIS_ENABLE_GCS
+
 class GCSFileSystem : public FileSystem {
  public:
   GCSFileSystem();
@@ -229,12 +233,13 @@ class GCSFileSystem : public FileSystem {
       const std::string& path, const std::string& contents) override;
 
  private:
-  google::cloud::StatusOr<gcs::Client> client_;
   Status ParsePath(
       const std::string& path, std::string* bucket, std::string* object);
   Status MetaDataExists(
       const std::string path, bool* exists,
       google::cloud::StatusOr<gcs::ObjectMetadata>* metadata);
+
+  google::cloud::StatusOr<gcs::Client> client_;
 };
 
 GCSFileSystem::GCSFileSystem()
@@ -265,7 +270,6 @@ GCSFileSystem::ParsePath(
   *bucket = path.substr(bucket_start, bucket_end - bucket_start);
   *object = path.substr(bucket_end + 1);
 
-
   if (bucket->empty()) {
     return Status(
         RequestStatusCode::INTERNAL, "No bucket name found in path: " + path);
@@ -279,10 +283,10 @@ GCSFileSystem::ParsePath(
   return Status::Success;
 }
 
+// Helper function to take care of lack of trailing slashes
 std::string
-AppendSlash(std::string& name)
+AppendSlash(const std::string& name)
 {
-  // Helper function to take care of lack of trailing slashes
   if (name.empty()) {
     return "/";
   }
@@ -292,7 +296,6 @@ AppendSlash(std::string& name)
   }
   return name;
 }
-
 
 Status
 GCSFileSystem::FileExists(const std::string& path, bool* exists)
@@ -330,12 +333,13 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
         "Could not get MetaData for bucket with name " + bucket);
   }
 
+
   // Check if whether it has children. If at least one child, it is a directory
   for (auto&& object_metadata :
        client_->ListObjects(bucket, gcs::Prefix(AppendSlash(object_path)))) {
     if (object_metadata) {
       *is_dir = true;
-      return Status::Success;
+      break;
     }
   }
   return Status::Success;
@@ -393,6 +397,11 @@ GCSFileSystem::GetDirectoryContents(
       return Status(
           RequestStatusCode::INTERNAL,
           "Could not list contents of directory at " + path);
+    }
+
+    // In the case of empty directories, the directory itself will appear here
+    if (object_metadata->name() == full_dir) {
+      continue;
     }
 
     // We have to make sure that subdirectory contents do not appear here
@@ -509,10 +518,12 @@ GCSFileSystem::WriteTextFile(
   return Status::Success;
 }
 
+#endif  // TRTIS_ENABLE_GCS
 
 Status
 GetFileSystem(const std::string& path, FileSystem** file_system)
 {
+#ifdef TRTIS_ENABLE_GCS
   // Check if this is a GCS path (gs://$BUCKET_NAME)
   if (!path.empty() && !path.rfind("gs://", 0)) {
     static GCSFileSystem gcs_fs;
@@ -521,7 +532,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 
     return Status::Success;
   }
-
+#endif  // TRTIS_ENABLE_GCS
   // For now assume all paths are local...
   static LocalFileSystem local_fs;
   *file_system = &local_fs;
