@@ -523,16 +523,21 @@ GCSFileSystem::WriteTextFile(
 Status
 GetFileSystem(const std::string& path, FileSystem** file_system)
 {
-#ifdef TRTIS_ENABLE_GCS
   // Check if this is a GCS path (gs://$BUCKET_NAME)
   if (!path.empty() && !path.rfind("gs://", 0)) {
+#ifndef TRTIS_ENABLE_GCS
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "trtis has detected a Google Cloud Storage address but has not been "
+        "compiled"
+        "with support for GCS. Build with TRTIS_ENABLE_GCS=ON.");
+#else
     static GCSFileSystem gcs_fs;
     RETURN_IF_ERROR(gcs_fs.CheckClient());
     *file_system = &gcs_fs;
-
     return Status::Success;
-  }
 #endif  // TRTIS_ENABLE_GCS
+  }
   // For now assume all paths are local...
   static LocalFileSystem local_fs;
   *file_system = &local_fs;

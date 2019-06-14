@@ -26,8 +26,6 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers")
-
 #
 # Protobuf
 #
@@ -114,6 +112,7 @@ endif() # TRTIS_ENABLE_METRICS
 if(${TRTIS_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
+  set_source_files_properties(filesystem.cc PROPERTIES COMPILE_FLAGS -Wno-missing-field-initializers)
 endif() # TRTIS_ENABLE_GCS
 
 set(
