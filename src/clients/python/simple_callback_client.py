@@ -30,11 +30,29 @@ import argparse
 from functools import partial
 import numpy as np
 import os
-import threading
+import sys
 from builtins import range
 from tensorrtserver.api import *
 
+if sys.version_info >= (3, 0):
+  import queue
+else:
+  import Queue as queue
+
 FLAGS = None
+
+# User defined class to store infer_ctx and request id
+# from callback function and let main thread to handle them
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+# Callback function used for async_run_with_cb(), it can capture
+# additional information using functools.partial as long as the last
+# two arguments are reserved for InferContext and request id
+def completion_callback(user_data, idx, infer_ctx, request_id):
+    print("Callback " + str(idx) + " is called")
+    user_data._completed_requests.put((infer_ctx, request_id, idx))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -65,93 +83,37 @@ if __name__ == '__main__':
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input1_data = np.ones(shape=16, dtype=np.int32)
 
-    # Send inference request to the inference server. Get results for
-    # both output tensors.
-    class Context:
-        def __init__(self, input0_data, input1_data):
-            self._lock = threading.Lock()
-            self._cv = threading.Condition(self._lock)
-            self._input0_data = input0_data
-            self._input1_data = input1_data
-            self._request_cnt = 2
-            self._done_cnt = 0
-            self._recent_ctx_obj = None
-            self._recent_request_id = None
-            self._success = True
-    
-    context = Context(input0_data, input1_data)
-    def active_callback(context, idx, ctx_obj, request_id):
-        result = ctx_obj.get_async_run_results(request_id, True)
-        context._cv.acquire(True)
-        print("Callback " + str(idx) + " is called")
+    request_cnt = 2
+    user_data = UserData()
+
+    # Send async inference
+    for idx in range(request_cnt):
+        result = ctx.async_run_with_cb(partial(completion_callback, user_data, idx),
+                                        { 'INPUT0' : (input0_data,),
+                                          'INPUT1' : (input1_data,) },
+                                        { 'OUTPUT0' : InferContext.ResultFormat.RAW,
+                                          'OUTPUT1' : InferContext.ResultFormat.RAW },
+                                        batch_size)
+
+    done_cnt = 0
+    while True:
+        # Wait for deferred items from callback functions
+        (infer_ctx, request_id, idx) = user_data._completed_requests.get()
+
+        # Retrieve results and error checking
+        result = infer_ctx.get_async_run_results(request_id, True)
         output0_data = result['OUTPUT0'][0]
         output1_data = result['OUTPUT1'][0]
+        print("Main thread retrieved request " + str(idx) + "'s results:")
         print(output0_data)
         print(output1_data)
         for i in range(16):
-            if (context._input0_data[i] + context._input1_data[i]) != output0_data[i]:
+            if (input0_data[i] + input1_data[i]) != output0_data[i]:
                 print("error: incorrect sum")
-                context._success = False
-                break
-            if (context._input0_data[i] - context._input1_data[i]) != output1_data[i]:
+                sys.exit(1)
+            if (input0_data[i] - input1_data[i]) != output1_data[i]:
                 print("error: incorrect difference")
-                context._success = False
-                break
-        context._done_cnt += 1
-        context._cv.notify_all()
-        context._cv.release()
-
-    # Send async inference and wait for them to finish
-    for idx in range(context._request_cnt):
-        result = ctx.async_run_with_cb(partial(active_callback, context, idx),
-                                  { 'INPUT0' : (input0_data,),
-                                    'INPUT1' : (input1_data,) },
-                                  { 'OUTPUT0' : InferContext.ResultFormat.RAW,
-                                    'OUTPUT1' : InferContext.ResultFormat.RAW },
-                                  batch_size)
-
-    context._cv.acquire()
-    while context._done_cnt != context._request_cnt:
-        context._cv.wait()
-    context._cv.release()
-
-    if not context._success:
-      sys.exit(1)
-
-    # defer retrieval to main thread
-    def passive_callback(context, ctx_obj, request_id):
-        context._cv.acquire(True)
-        # set related InferContext and request id to shared Context object
-        context._recent_ctx_obj = ctx_obj
-        context._recent_request_id = request_id
-        context._cv.notify_all()
-        context._cv.release()
-
-    # Send async inference and wait for its callback is invoked
-    result = ctx.async_run_with_cb(partial(passive_callback, context),
-                              { 'INPUT0' : (input0_data,),
-                                'INPUT1' : (input1_data,) },
-                              { 'OUTPUT0' : InferContext.ResultFormat.RAW,
-                                'OUTPUT1' : InferContext.ResultFormat.RAW },
-                              batch_size)
-
-    context._cv.acquire()
-    while context._recent_ctx_obj is None:
-        context._cv.wait()
-    context._cv.release()
-
-    # Retrieve InferContext and request id from the shared context
-    result = context._recent_ctx_obj.get_async_run_results(context._recent_request_id, True)
-    print("Deferred retrieval to main thread")
-    output0_data = result['OUTPUT0'][0]
-    output1_data = result['OUTPUT1'][0]
-    print(output0_data)
-    print(output1_data)
-    for i in range(16):
-        if (context._input0_data[i] + context._input1_data[i]) != output0_data[i]:
-            print("error: incorrect sum")
-            sys.exit(1)
-        if (context._input0_data[i] - context._input1_data[i]) != output1_data[i]:
-            print("error: incorrect difference")
-            self._success = False
-            sys.exit(1)
+                sys.exit(1)
+        done_cnt += 1
+        if done_cnt == request_cnt:
+            break

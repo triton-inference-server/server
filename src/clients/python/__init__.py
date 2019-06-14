@@ -991,6 +991,7 @@ class InferContext:
             Python function that accepts an InferContext object that sends the
             request and an integer identifier as arguments. This function will
             be invoked once the request is completed.
+
         inputs : dict
             Dictionary from input name to the value(s) for that
             input. An input value is specified as a numpy array. Each
@@ -1045,7 +1046,8 @@ class InferContext:
             c_void_p(
                 _crequest_infer_ctx_async_run_with_cb(self._ctx, c_cb)))
 
-        self._callback_resources_dict[self._callback_resources_dict_id] = (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
+        self._callback_resources_dict[self._callback_resources_dict_id] = \
+            (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
         self._callback_resources_dict_id += 1
 
     def get_async_run_results(self, request_id, wait):
