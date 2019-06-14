@@ -83,9 +83,11 @@ WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
 RUN cd pytorch && \
     TORCH_CUDA_ARCH_LIST="5.2 6.0 6.1 7.0 7.5+PTX" \
-      CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
-      NO_DISTRIBUTED=1 NO_TEST=1 NO_MIOPEN=1 USE_NCCL=OFF USE_MKLDNN=0 USE_OPENCV=OFF USE_LEVELDB=OFF \
-      python setup.py install && python setup.py clean
+     CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
+     USE_DISTRIBUTED=0 USE_MIOPEN=0 USE_NCCL=0 \
+     USE_OPENCV=0 USE_LEVELDB=0 USE_LMDB=0 USE_REDIS=0 \
+     BUILD_TEST=0 \
+     pip install --no-cache-dir -v .
 
 ############################################################################
 ## Onnx Runtime stage: Build Onnx Runtime on CUDA 10, CUDNN 7
