@@ -37,22 +37,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-  namespace {
-
-  const TRTISTF_IO*
-  FindIOByName(const TRTISTF_IOList* ios, const std::string& name)
-  {
-    for (const TRTISTF_IOList* itr = ios; itr != nullptr; itr = itr->next_) {
-      if (itr->io_->name_ == name) {
-        return itr->io_;
-      }
-    }
-
-    return nullptr;
-  }
-
-  }  // namespace
-
 Status
 GraphDefBackend::Init(const std::string& path, const ModelConfig& config)
 {
@@ -103,80 +87,10 @@ GraphDefBackend::CreateTRTISTFModel(
 
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
-
-    const TRTISTF_IO* input = FindIOByName(inputs, io.name());
-    if (input == nullptr) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unexpected inference input '" + io.name() + "'");
-    }
-
-    // If a reshape is provided for the input then use that when
-    // validating that the TF model matches what is expected.
-    const DimsList& dims =
-        (io.has_reshape()) ? io.reshape().shape() : io.dims();
-
-    try {
-      if (input->shape_->rank_ != 0) {
-        RETURN_IF_ERROR(CompareDimsSupported(
-            Name(), io.name(), input->shape_, dims,
-            Config().max_batch_size() > 0));
-        }
-    }
-    catch (const std::exception& ex) {
-      continue;
-    }
-
-    if (input->data_type_ != TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
-      if (!CompareDataType(input->data_type_, io.data_type())) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unable to load model '" + Name() + "', input '" + io.name() +
-                "' data-type " +
-                DataType_Name(ConvertDataType(input->data_type_)) +
-                " doesn't match configuration data-type " +
-                DataType_Name(io.data_type()));
-        }
-    }
   }
 
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
-
-    const TRTISTF_IO* output = FindIOByName(outputs, io.name());
-    if (output == nullptr) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unexpected inference output '" + io.name() + "'");
-    }
-
-    // If a reshape is provided for the output then use that when
-    // validating that the TF model matches what is expected.
-    const DimsList& dims =
-        (io.has_reshape()) ? io.reshape().shape() : io.dims();
-
-    try {
-      if (output->shape_->rank_ != 0) {
-        RETURN_IF_ERROR(CompareDimsSupported(
-            Name(), io.name(), output->shape_, dims,
-            Config().max_batch_size() > 0));
-        }
-    }
-    catch (const std::exception& ex) {
-      continue;
-    }
-
-    if (output->data_type_ != TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
-      if (!CompareDataType(output->data_type_, io.data_type())) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unable to load model '" + Name() + "', output '" + io.name() +
-                "' data-type " +
-                DataType_Name(ConvertDataType(output->data_type_)) +
-                " doesn't match configuration data-type " +
-                DataType_Name(io.data_type()));
-      }
-    }
   }
 
   return Status::Success;
