@@ -192,10 +192,26 @@ ReadFile(const std::string& path, std::vector<char>* contents)
   }
 
   in.seekg(0, std::ios::end);
-  contents->resize(in.tellg());
-  in.seekg(0, std::ios::beg);
-  in.read(&(*contents)[0], contents->size());
+  
+  int file_size = in.tellg();
+  if (file_size > 0) {
+    contents->resize(file_size);
+    in.seekg(0, std::ios::beg);
+    in.read(&(*contents)[0], contents->size());
+  }
+
   in.close();
+
+  // If size is invalid, report after ifstream is closed
+  if (file_size < 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to get size for file '" + path + "'");
+  } else if (file_size == 0){
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "file '" + path + "' is empty");
+  }
 
   return nic::Error::Success;
 }
@@ -1724,12 +1740,11 @@ Usage(char** argv, const std::string& msg = std::string())
       << " Default is -1 to indicate no percentile will be used." << std::endl;
   std::cerr
       << "For --data-directory, it indicates that the perf client will use user"
-      << " provided data instead of synthetic data for model inputs. For each"
-      << " input, there must be a binary file in the way that its relative path"
-      << " within the data directory is the same as the name of the input."
-      << " And the file must contain data required for sending the input in"
-      << " a batch-1 request. The perf client will reuse the data to match"
-      << " the specified batch size." << std::endl;
+      << " provided data instead of synthetic data for model inputs. There must"
+      << " be a binary file for each input required by the model."
+      << " The file must be named the same as the input and must contain data"
+      << " required for sending the input in a batch-1 request. The perf client"
+      << " will reuse the data to match the specified batch size." << std::endl;
 
   exit(1);
 }
