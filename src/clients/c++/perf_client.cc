@@ -181,6 +181,41 @@ typedef struct PerformanceStatusStruct {
 
 enum ProtocolType { HTTP = 0, GRPC = 1 };
 
+nic::Error
+ReadFile(const std::string& path, std::vector<char>* contents)
+{
+  std::ifstream in(path, std::ios::in | std::ios::binary);
+  if (!in) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to open file '" + path + "'");
+  }
+
+  in.seekg(0, std::ios::end);
+  
+  int file_size = in.tellg();
+  if (file_size > 0) {
+    contents->resize(file_size);
+    in.seekg(0, std::ios::beg);
+    in.read(&(*contents)[0], contents->size());
+  }
+
+  in.close();
+
+  // If size is invalid, report after ifstream is closed
+  if (file_size < 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to get size for file '" + path + "'");
+  } else if (file_size == 0){
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "file '" + path + "' is empty");
+  }
+
+  return nic::Error::Success;
+}
+
 //==============================================================================
 /// ContextFactory is a helper class to create client contexts used
 /// in perf_client.
@@ -353,6 +388,7 @@ class ConcurrencyManager {
   static nic::Error Create(
       const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const bool zero_input,
+      const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<ConcurrencyManager>* manager);
 
@@ -448,6 +484,9 @@ class ConcurrencyManager {
 
   std::shared_ptr<ContextFactory> factory_;
 
+  // User provided input data, it will be preferred over synthetic data
+  std::unordered_map<std::string, std::vector<char>> input_data_;
+
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
   std::vector<std::shared_ptr<nic::Error>> threads_status_;
@@ -488,11 +527,26 @@ nic::Error
 ConcurrencyManager::Create(
     const int32_t batch_size, const size_t max_threads,
     const size_t sequence_length, const bool zero_input,
+    const std::string& data_directory,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<ConcurrencyManager>* manager)
 {
   manager->reset(new ConcurrencyManager(
       batch_size, max_threads, sequence_length, zero_input, factory));
+
+  // Read provided data
+  if (!data_directory.empty()) {
+    // Get all input names
+    std::unique_ptr<nic::InferContext> ctx;
+    RETURN_IF_ERROR((*manager)->factory_->CreateInferContext(&ctx));
+    for (const auto& input : ctx->Inputs()) {
+      const auto file_path = data_directory + "/" + input->Name();
+      auto it = (*manager)
+                    ->input_data_.emplace(input->Name(), std::vector<char>())
+                    .first;
+      RETURN_IF_ERROR(ReadFile(file_path, &it->second));
+    }
+  }
 
   return nic::Error::Success;
 }
@@ -648,13 +702,28 @@ ConcurrencyManager::PrepareInfer(
     input_buffer.swap(input_buf);
   }
 
-  // Initialize inputs to use random values...
+  // Initialize inputs
   for (const auto& input : (*ctx)->Inputs()) {
     RETURN_IF_ERROR(input->Reset());
 
+    size_t batch1_size = (size_t)input->ByteSize();
+    const uint8_t* data = &input_buffer[0];
+    // if available, use provided data instead
+    auto it = input_data_.find(input->Name());
+    if (it != input_data_.end()) {
+      if (batch1_size > it->second.size()) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() + "' requires " +
+                std::to_string(batch1_size) +
+                " bytes for each batch, but provided data only has " +
+                std::to_string(it->second.size()) + " bytes");
+      }
+      data = (const uint8_t*)&(it->second)[0];
+    }
+
     for (size_t i = 0; i < batch_size_; ++i) {
-      RETURN_IF_ERROR(
-          input->SetRaw(&input_buffer[0], (size_t)input->ByteSize()));
+      RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
     }
   }
 
@@ -1607,6 +1676,7 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--percentile <percentile>" << std::endl;
+  std::cerr << "\t--data-directory <path>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "The -d flag enables dynamic concurrent request count where the number"
@@ -1665,10 +1735,16 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::endl;
   std::cerr
       << "For --percentile, it indicates that the specified percentile in terms"
-      << " of latency will be reported and used to detemine if the measurement"
-      << " is stable instead of average latency."
-      << " Default is -1 to indicate no percentile will be used or reported."
-      << std::endl;
+      << " of latency will also be reported and used to detemine if the"
+      << " measurement is stable instead of average latency."
+      << " Default is -1 to indicate no percentile will be used." << std::endl;
+  std::cerr
+      << "For --data-directory, it indicates that the perf client will use user"
+      << " provided data instead of synthetic data for model inputs. There must"
+      << " be a binary file for each input required by the model."
+      << " The file must be named the same as the input and must contain data"
+      << " required for sending the input in a batch-1 request. The perf client"
+      << " will reuse the data to match the specified batch size." << std::endl;
 
   exit(1);
 }
@@ -1698,14 +1774,14 @@ main(int argc, char** argv)
   int64_t model_version = -1;
   std::string url("localhost:8000");
   std::string filename("");
+  std::string data_directory("");
   ProtocolType protocol = ProtocolType::HTTP;
 
   // {name, has_arg, *flag, val}
-  static struct option long_options[] = {{"streaming", 0, 0, 0},
-                                         {"max-threads", 1, 0, 1},
-                                         {"sequence-length", 1, 0, 2},
-                                         {"percentile", 1, 0, 3},
-                                         {0, 0, 0, 0}};
+  static struct option long_options[] = {
+      {"streaming", 0, 0, 0},       {"max-threads", 1, 0, 1},
+      {"sequence-length", 1, 0, 2}, {"percentile", 1, 0, 3},
+      {"data-directory", 1, 0, 4},  {0, 0, 0, 0}};
 
   // Parse commandline...
   int opt;
@@ -1724,6 +1800,9 @@ main(int argc, char** argv)
         break;
       case 3:
         percentile = std::atoi(optarg);
+        break;
+      case 4:
+        data_directory = optarg;
         break;
       case 'v':
         verbose = true;
@@ -1810,6 +1889,9 @@ main(int argc, char** argv)
   if (percentile != -1 && (percentile > 99 || percentile < 1)) {
     Usage(argv, "percentile must be -1 for not reporting or in range (0, 100)");
   }
+  if (zero_input && !data_directory.empty()) {
+    Usage(argv, "zero input can't be set when data directory is provided");
+  }
 
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
@@ -1825,7 +1907,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = ConcurrencyManager::Create(
-      batch_size, max_threads, sequence_length, zero_input, factory, &manager);
+      batch_size, max_threads, sequence_length, zero_input, data_directory,
+      factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
