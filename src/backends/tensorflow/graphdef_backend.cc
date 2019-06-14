@@ -27,7 +27,6 @@
 #include "src/backends/tensorflow/graphdef_backend.h"
 
 #include <set>
-#include <exception>
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/backends/tensorflow/tf_utils.h"
 #include "src/core/constants.h"
@@ -88,7 +87,6 @@ GraphDefBackend::CreateTRTISTFModel(
   for (const auto& io : Config().input()) {
     RETURN_IF_ERROR(CheckAllowedModelInput(io, potential_inputs));
   }
-
   for (const auto& io : Config().output()) {
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, potential_outputs));
   }

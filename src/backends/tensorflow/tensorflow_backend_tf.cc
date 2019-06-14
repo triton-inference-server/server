@@ -595,7 +595,7 @@ TRTISTF_ModelCreateFromGraphDef(
   tensorflow::GraphDef graph_def;
   RETURN_IF_TF_ERROR(tensorflow::ReadBinaryProto(
       tensorflow::Env::Default(), model_path, &graph_def));
-    if (graph_def.node_size() == 0) {
+  if (graph_def.node_size() == 0) {
     return TRTISTF_ErrorNew(
         "model " + std::string(model_name) + " has an empty network");
   }
@@ -625,61 +625,9 @@ TRTISTF_ModelCreateFromGraphDef(
     if (node.op() == "Placeholder") {
       potential_inputs =
           TRTISTF_IOListNew(node.name().c_str(), nullptr, potential_inputs);
-
-      TRTISTF_IO* io = potential_inputs->io_;
-
-      TRTISTF_DataType dt;
-      tensorflow::DataType tf_dt;
-      std::vector<int64_t> tensor_shape;
-      auto attr_map = node.attr();
-      for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
-          auto key = it->first;
-          auto value = it->second;
-          if (key == "dtype") {
-              dt = ConvertDataType(value.type());
-              tf_dt = value.type();
-          }
-          if (value.has_shape()) {
-              auto shape = value.shape();
-              for (int i=0; i<shape.dim_size(); ++i) {
-                  auto dim = shape.dim(i);
-                  auto dim_size = dim.size();
-                  tensor_shape.push_back(dim_size);
-              }
-          }
-      }
-
-      io->data_type_ = dt;
-      io->shape_ = TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
     } else {
       potential_outputs =
           TRTISTF_IOListNew(node.name().c_str(), nullptr, potential_outputs);
-
-      TRTISTF_IO* io = potential_outputs->io_;
-
-      TRTISTF_DataType dt;
-      tensorflow::DataType tf_dt;
-      std::vector<int64_t> tensor_shape;
-      auto attr_map = node.attr();
-      for (auto it=attr_map.begin(); it != attr_map.end(); it++) {
-          auto key = it->first;
-          auto value = it->second;
-          if (key == "dtype") {
-              dt = ConvertDataType(value.type());
-              tf_dt = value.type();
-          }
-          if (value.has_shape()) {
-              auto shape = value.shape();
-              for (int i=0; i<shape.dim_size(); ++i) {
-                  auto dim = shape.dim(i);
-                  auto dim_size = dim.size();
-                  tensor_shape.push_back(dim_size);
-              }
-          }
-      }
-
-      io->data_type_ = dt;
-      io->shape_ = TRTISTF_ShapeNew(tensor_shape.size(), tensor_shape.data());
     }
   }
 

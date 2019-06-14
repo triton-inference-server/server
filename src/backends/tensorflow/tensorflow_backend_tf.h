@@ -27,7 +27,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <string>
 
 // To avoid namespace and protobuf collision between TRTIS and
 // TensorFlow, we keep TensorFlow interface isolated to

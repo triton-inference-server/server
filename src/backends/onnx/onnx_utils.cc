@@ -274,7 +274,7 @@ CompareDimsSupported(
     const int max_batch_size)
 {
   // If the model configuration expects batching support in the model,
-  // then the tensorflow shape first dimension must be -1.
+  // then the onnx shape first dimension must be -1.
   const bool supports_batching = (max_batch_size > 0);
   if (supports_batching &&
       ((model_shape.size() == 0) || (model_shape[0] != -1))) {
