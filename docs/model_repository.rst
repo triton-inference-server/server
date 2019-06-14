@@ -351,7 +351,7 @@ Example Custom Backend
 ^^^^^^^^^^^^^^^^^^^^^^
 
 An example of a custom backend can be found in the `addsub backend
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/addsub/addsub.cc>`_. You
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/addsub/addsub.cu>`_. You
 can see the custom backend being used as part of CI testing in
 `L0_infer
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/qa/L0_infer>`_.
