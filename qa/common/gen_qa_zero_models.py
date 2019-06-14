@@ -359,7 +359,7 @@ def create_onnx_modelfile(
                                    io_cnt, dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = [] if max_batch == 0 else [max_batch]
+    batch_dim = [] if max_batch == 0 else [None]
 
     onnx_nodes = []
     onnx_inputs = []

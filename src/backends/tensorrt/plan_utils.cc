@@ -29,7 +29,7 @@
 namespace nvidia { namespace inferenceserver {
 
 DataType
-ConvertDatatype(nvinfer1::DataType trt_type)
+ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
 {
   switch (trt_type) {
     case nvinfer1::DataType::kFLOAT:
@@ -43,6 +43,29 @@ ConvertDatatype(nvinfer1::DataType trt_type)
   }
 
   return TYPE_INVALID;
+}
+
+std::pair<bool, nvinfer1::DataType>
+ConvertDataTypeToTrtType(const DataType& dtype)
+{
+  nvinfer1::DataType trt_type = nvinfer1::DataType::kFLOAT;
+  switch (dtype) {
+    case TYPE_FP32:
+      trt_type = nvinfer1::DataType::kFLOAT;
+      break;
+    case TYPE_FP16:
+      trt_type = nvinfer1::DataType::kHALF;
+      break;
+    case TYPE_INT8:
+      trt_type = nvinfer1::DataType::kINT8;
+      break;
+    case TYPE_INT32:
+      trt_type = nvinfer1::DataType::kINT32;
+      break;
+    default:
+      return std::make_pair(false, trt_type);
+  }
+  return std::make_pair(true, trt_type);
 }
 
 bool

@@ -735,7 +735,7 @@ TRTISTF_ModelCreateFromSavedModel(
     if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return TRTISTF_ErrorNew(
           "unable to process input '" + std::string(io->name_) + "' for '" +
-          std::string(model_name) + "', unsupported data-type '" +
+          std::string(model_name) + "', unsupported datatype '" +
           tensorflow::DataType_Name(sin.second.dtype()) + "'");
     }
 
@@ -761,7 +761,7 @@ TRTISTF_ModelCreateFromSavedModel(
     if (dt == TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
       return TRTISTF_ErrorNew(
           "unable to process output '" + std::string(io->name_) + "' for '" +
-          std::string(model_name) + "', unsupported data-type '" +
+          std::string(model_name) + "', unsupported datatype '" +
           tensorflow::DataType_Name(sout.second.dtype()) + "'");
     }
 
