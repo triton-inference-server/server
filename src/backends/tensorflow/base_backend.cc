@@ -167,11 +167,49 @@ BaseBackend::CreateExecutionContext(
   auto graphdef_backend_config =
       std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
+  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
+
   RETURN_IF_ERROR(CreateTRTISTFModel(
       graphdef_backend_config, gpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_));
+
+  return Status::Success;
+}
+
+Status
+BaseBackend::Context::ValidateInputs(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+{
+  for (const auto& io : ios) {
+    if (ConvertDataType(io.data_type()) ==
+        TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for input '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
+
+  return Status::Success;
+}
+
+
+Status
+BaseBackend::Context::ValidateOutputs(
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+{
+  for (const auto& io : ios) {
+    if (ConvertDataType(io.data_type()) ==
+        TRTISTF_DataType::TRTISTF_TYPE_INVALID) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for output '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
 
   return Status::Success;
 }
@@ -647,6 +685,26 @@ BaseBackend::Context::Run(
         batch1_element_cnt *= dim;
       }
       skip_element_cnt = false;
+    }
+
+    const DimsList& output_dims = (output_config->has_reshape())
+                                      ? output_config->reshape().shape()
+                                      : output_config->dims();
+
+    // verify shape of output matches shape from model config
+    const int batch_offset = ((max_batch_size_ == NO_BATCHING) ? 0 : 1);
+
+    for (int i = 0; i < output_dims.size(); i++) {
+      if (output_dims[i] != -1) {
+        if (output_dims[i] != shapevec[i + batch_offset]) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected shape for output '" + name +
+                  "', model configuration shape is " +
+                  DimsListToString(shapevec) + ", inference shape is " +
+                  DimsListToString(output_dims));
+        }
+      }
     }
 
     TRTISTF_DataType dtype = ConvertDataType(output_config->data_type());

@@ -717,7 +717,7 @@ def create_onnx_modelfile(
                                    input_dtype, output0_dtype, output1_dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = [] if max_batch == 0 else [max_batch]
+    batch_dim = [] if max_batch == 0 else [None]
 
     in0 = onnx.helper.make_tensor_value_info("INPUT0", onnx_input_dtype, batch_dim + onnx_input_shape)
     in1 = onnx.helper.make_tensor_value_info("INPUT1", onnx_input_dtype, batch_dim + onnx_input_shape)

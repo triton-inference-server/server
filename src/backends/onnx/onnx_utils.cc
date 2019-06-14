@@ -274,18 +274,10 @@ CompareDimsSupported(
     const int max_batch_size)
 {
   // If the model configuration expects batching support in the model,
-  // then the model shape first dimension must be either -1 (unbounded)
-  // or value that larger than max_batch_size.
+  // then the onnx shape first dimension must be -1.
   const bool supports_batching = (max_batch_size > 0);
-  bool valid_batch_dim = (model_shape.size() != 0);
-  if (valid_batch_dim) {
-    if (model_shape[0] != -1) {
-      if (model_shape[0] < max_batch_size) {
-        valid_batch_dim = false;
-      }
-    }
-  }
-  if (supports_batching && !valid_batch_dim) {
+  if (supports_batching &&
+      ((model_shape.size() == 0) || (model_shape[0] != -1))) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name +

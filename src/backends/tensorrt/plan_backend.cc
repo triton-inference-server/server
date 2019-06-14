@@ -257,6 +257,8 @@ PlanBackend::CreateExecutionContext(
     RETURN_IF_ERROR(CheckAllowedModelOutput(io, allowed_outputs));
   }
 
+  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
   // Initialize the inputs and outputs. Make sure the model matches
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
@@ -321,6 +323,39 @@ PlanBackend::CreateExecutionContext(
 }
 
 Status
+PlanBackend::Context::ValidateInputs(
+    const ::google::protobuf::RepeatedPtrField<ModelInput>& ios)
+{
+  for (const auto& io : ios) {
+    if (!ConvertDataTypeToTrtType(io.data_type()).first) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for input '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
+
+  return Status::Success;
+}
+
+
+Status
+PlanBackend::Context::ValidateOutputs(
+    const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios)
+{
+  for (const auto& io : ios) {
+    if (!ConvertDataTypeToTrtType(io.data_type()).first) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unsupported datatype " + DataType_Name(io.data_type()) +
+              " for output '" + io.name() + "' for model '" + name_ + "'");
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
 PlanBackend::Context::InitializeInputBinding(
     const std::string& input_name, const DataType input_datatype,
     const DimsList& model_config_dims)
@@ -346,7 +381,7 @@ PlanBackend::Context::InitializeInputBinding(
             name_);
   }
 
-  DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
+  DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
   if (dt != input_datatype) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -460,7 +495,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
               "' is expected to be an input in model for " + name_);
     }
 
-    DataType dt = ConvertDatatype(engine_->getBindingDataType(index));
+    DataType dt = ConvertTrtTypeToDataType(engine_->getBindingDataType(index));
     if (dt != io.data_type()) {
       return Status(
           RequestStatusCode::INVALID_ARG,

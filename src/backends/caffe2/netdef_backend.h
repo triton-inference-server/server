@@ -112,7 +112,7 @@ class NetDefBackend : public InferenceBackend {
     Status ReadFixedSizedOutputTensor(
         const std::string& name, const Caffe2Workspace::DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads);
+        std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
 
     // Name of the model instance
     std::string name_;
