@@ -248,7 +248,8 @@ class InferResponseProvider {
   // Get the address and byte-size of an output buffer. Error is
   // returned if the buffer is not already allocated.
   Status OutputBufferContents(
-      const std::string& name, void** content, size_t* content_byte_size) const;
+      const std::string& name, const void** content,
+      size_t* content_byte_size) const;
 
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
