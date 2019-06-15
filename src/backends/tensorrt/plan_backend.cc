@@ -386,7 +386,8 @@ PlanBackend::Context::InitializeInputBinding(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unexpected datatype " + DataType_Name(dt) + " for input '" +
-            input_name + "', expecting " + DataType_Name(input_datatype) + " for " + name_);
+            input_name + "', expecting " + DataType_Name(input_datatype) +
+            " for " + name_);
   }
 
   nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
@@ -396,7 +397,7 @@ PlanBackend::Context::InitializeInputBinding(
         "unexpected shape for input '" + input_name +
             "', model configuration shape is " +
             DimsListToString(model_config_dims) + ", inference shape is " +
-            DimsDebugString(engine_dims)+ " for " + name_);
+            DimsDebugString(engine_dims) + " for " + name_);
   }
 
   const int64_t byte_size = GetByteSize(max_batch_size_, dt, model_config_dims);
@@ -501,7 +502,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           RequestStatusCode::INVALID_ARG,
           "unexpected datatype " + DataType_Name(dt) +
               " for inference output '" + io.name() + "', expecting " +
-              DataType_Name(io.data_type())+ " for " + name_);
+              DataType_Name(io.data_type()) + " for " + name_);
     }
 
     const DimsList& model_config_dims =
@@ -514,7 +515,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           "unexpected shape for output '" + io.name() +
               "', model configuration shape is " +
               DimsListToString(model_config_dims) + ", inference shape is " +
-              DimsDebugString(engine_dims)+ " for " + name_);
+              DimsDebugString(engine_dims) + " for " + name_);
     }
 
     const int64_t byte_size =

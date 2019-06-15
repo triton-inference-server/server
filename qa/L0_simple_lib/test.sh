@@ -29,6 +29,8 @@ SIMPLE_CLIENT=./simple
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
+export CUDA_VISIBLE_DEVICES=0
+
 rm -f $CLIENT_LOG
 
 RET=0

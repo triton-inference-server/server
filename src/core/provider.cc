@@ -330,7 +330,8 @@ InferResponseProvider::RequiresOutput(const std::string& name)
 
 Status
 InferResponseProvider::OutputBufferContents(
-    const std::string& name, void** content, size_t* content_byte_size) const
+    const std::string& name, const void** content,
+    size_t* content_byte_size) const
 {
   for (const auto& output : outputs_) {
     if ((name == output.name_) && (output.cls_count_ == 0)) {
