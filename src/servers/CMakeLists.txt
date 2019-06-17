@@ -240,6 +240,15 @@ if(${TRTIS_ENABLE_METRICS})
   )
 endif() # TRTIS_ENABLE_METRICS
 
+if(${TRTIS_ENABLE_GCS})
+  find_package(storage_client REQUIRED)
+  message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
+  target_link_libraries(
+    trtserver
+    PRIVATE storage_client
+  )
+endif() # TRTIS_ENABLE_GCS
+
 if(${TRTIS_ENABLE_GPU})
 target_link_libraries(
   trtserver
