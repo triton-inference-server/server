@@ -90,8 +90,22 @@ DynamicBatchScheduler::Create(
   // each scheduler thread with a runner.
   const int nice = GetCpuNiceLevel(config);
   for (uint32_t c = 0; c < sched->scheduler_thread_cnt_; ++c) {
-    sched->scheduler_threads_.emplace_back(new std::thread(
-        [dyna_sched, c, nice]() { dyna_sched->SchedulerThread(c, nice); }));
+    std::promise<bool> init_state;
+    sched->scheduler_threads_.emplace_back(
+        new std::thread([dyna_sched, c, nice, &init_state]() {
+          dyna_sched->SchedulerThread(c, nice, &init_state);
+        }));
+    if (!init_state.get_future().get()) {
+      if (sched->scheduler_threads_.back()->joinable()) {
+        sched->scheduler_threads_.back()->join();
+      }
+      sched->scheduler_threads_.pop_back();
+    }
+  }
+  if (sched->scheduler_threads_.empty()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Initialization failed for all dynamic-batch scheduler threads");
   }
 
   scheduler->reset(sched.release());
@@ -143,7 +157,9 @@ DynamicBatchScheduler::Enqueue(
 }
 
 void
-DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
+DynamicBatchScheduler::SchedulerThread(
+    const uint32_t runner_id, const int nice,
+    std::promise<bool>* is_initialized)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting dynamic-batch scheduler thread " << runner_id
@@ -161,7 +177,10 @@ DynamicBatchScheduler::SchedulerThread(const uint32_t runner_id, const int nice)
   if (!init_status.IsOk()) {
     LOG_ERROR << "Initialization failed for dynamic-batch scheduler thread "
               << runner_id << ": " << init_status.Message();
+    is_initialized->set_value(false);
     return;
+  } else {
+    is_initialized->set_value(true);
   }
 
   // For debugging/testing, delay start of threads until the queue

@@ -77,15 +77,23 @@ SequenceBatchScheduler::Create(
   // SequenceBatch object has a thread that manages the batch of
   // requests.
   for (uint32_t c = 0; c < runner_cnt; ++c) {
+    std::promise<bool> init_state;
     std::shared_ptr<SequenceBatch> sb = std::make_shared<SequenceBatch>(
         sched.get(), c, batch_size, config, OnInit, OnSchedule, start, cont,
-        notready);
-    sched->batchers_.push_back(sb);
+        notready, &init_state);
 
-    // All slots in the batch are initially ready for a new sequence.
-    for (size_t b = 0; b < batch_size; ++b) {
-      sched->ready_batch_slots_.push(SequenceBatchScheduler::BatchSlot(c, b));
+    if (init_state.get_future().get()) {
+      sched->batchers_.push_back(sb);
+      // All slots in the batch are initially ready for a new sequence.
+      for (size_t b = 0; b < batch_size; ++b) {
+        sched->ready_batch_slots_.push(SequenceBatchScheduler::BatchSlot(c, b));
+      }
     }
+  }
+  if (sched->batchers_.empty()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Initialization failed for all sequence-batch scheduler threads");
   }
 
   // Create a reaper thread that watches for idle sequences. Run the
@@ -110,7 +118,9 @@ SequenceBatchScheduler::~SequenceBatchScheduler()
   }
 
   reaper_cv_.notify_one();
-  reaper_thread_->join();
+  if ((reaper_thread_ != nullptr) && reaper_thread_->joinable()) {
+    reaper_thread_->join();
+  }
 }
 
 Status
@@ -567,7 +577,8 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
         continue_input_overrides,
     const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-        notready_input_overrides)
+        notready_input_overrides,
+    std::promise<bool>* is_initialized)
     : OnInit_(OnInit), OnSchedule_(OnSchedule), base_(base),
       batcher_idx_(batcher_idx), scheduler_thread_exit_(false),
       scheduler_idle_(false), queues_(batch_size), max_active_slot_(-1),
@@ -579,8 +590,9 @@ SequenceBatchScheduler::SequenceBatch::SequenceBatch(
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued payloads.
   const int nice = GetCpuNiceLevel(config);
-  scheduler_thread_.reset(
-      new std::thread([this, nice]() { SchedulerThread(nice); }));
+  scheduler_thread_.reset(new std::thread([this, nice, is_initialized]() {
+    SchedulerThread(nice, is_initialized);
+  }));
 }
 
 SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
@@ -638,7 +650,8 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
 }
 
 void
-SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
+SequenceBatchScheduler::SequenceBatch::SchedulerThread(
+    const int nice, std::promise<bool>* is_initialized)
 {
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
     LOG_VERBOSE(1) << "Starting sequence-batch scheduler thread "
@@ -656,7 +669,10 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(const int nice)
   if (!init_status.IsOk()) {
     LOG_ERROR << "Initialization failed for sequence-batch scheduler thread "
               << batcher_idx_ << ": " << init_status.Message();
+    is_initialized->set_value(false);
     return;
+  } else {
+    is_initialized->set_value(true);
   }
 
   // For debugging and testing, delay start of thread until queues
