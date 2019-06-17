@@ -165,6 +165,20 @@ RUN apt-get update && \
             libssl-dev \
             libtool
 
+#libcurl4-openSSL-dev is needed for GCS
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl3-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl4-openssl-dev; \
+    else \
+        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        exit 1; \
+    fi
+
 # TensorFlow libraries
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
@@ -235,6 +249,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
+                  -DTRTIS_ENABLE_GCS=ON\
                   -DTRTIS_ENABLE_CUSTOM=ON \
                   -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=ON \
