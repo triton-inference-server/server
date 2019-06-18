@@ -29,6 +29,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <future>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -106,7 +107,8 @@ class SequenceBatchScheduler : public Scheduler {
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
             continue_input_overrides,
         const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
-            notready_input_overrides);
+            notready_input_overrides,
+        std::promise<bool>* is_initialized);
     ~SequenceBatch();
 
     // Enqueue a payload into the appropriate queue for the requested
@@ -120,7 +122,7 @@ class SequenceBatchScheduler : public Scheduler {
         std::function<void(Status)> OnComplete);
 
    private:
-    void SchedulerThread(const int nice);
+    void SchedulerThread(const int nice, std::promise<bool>* is_initialized);
 
     // Function the scheduler will call to initialize a runner.
     const StandardInitFunc OnInit_;

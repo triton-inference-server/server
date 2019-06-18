@@ -28,6 +28,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <deque>
+#include <future>
 #include <mutex>
 #include <thread>
 #include "src/core/api.pb.h"
@@ -60,7 +61,9 @@ class DynamicBatchScheduler : public Scheduler {
   DynamicBatchScheduler(
       const ModelConfig& config, const uint32_t runner_cnt,
       StandardInitFunc OnInit, StandardRunFunc OnSchedule);
-  void SchedulerThread(const uint32_t runner_id, const int nice);
+  void SchedulerThread(
+      const uint32_t runner_id, const int nice,
+      std::promise<bool>* is_initialized);
   void InitPendingShape(const InferRequestHeader& request);
   bool CompareWithPendingShape(const InferRequestHeader& request) const;
   uint64_t GetDynamicBatch();
