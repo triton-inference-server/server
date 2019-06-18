@@ -127,6 +127,36 @@ class LifeCycleTest(unittest.TestCase):
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
+    def test_init_error_modelfail(self):
+        # --strict-readiness=true so server is live but not ready
+
+        # Server was started but with models that fail to load
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                # one model uses sequence batcher while the other uses dynamic batcher
+                model_names = ["custom_sequence_int32", "custom_int32_int32_int32"]
+                for model_name in model_names:
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    uptime = ss.uptime_ns
+                    self.assertGreater(uptime, 0)
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
+
+                hctx = ServerHealthContext(pair[0], pair[1], True)
+                self.assertFalse(hctx.is_ready())
+                self.assertTrue(hctx.is_live())
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_parse_error_model_no_version(self):
         # --strict-readiness=true so server is live but not ready
         input_size = 16
