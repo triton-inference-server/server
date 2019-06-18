@@ -235,9 +235,10 @@ AutoFillOnnx::Create(
                                          "' due to no version directories");
   }
 
-  OrtSessionOptions* session_options = OrtCreateSessionOptions();
-  OrtSetSessionThreadPoolSize(session_options, 1);
-  OrtSetSessionGraphOptimizationLevel(session_options, 0);
+  OrtSessionOptions* session_options;
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
 
   OrtSession* session;
 

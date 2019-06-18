@@ -75,17 +75,18 @@ OnnxBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 OnnxBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& models)
 {
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
-  OrtSessionOptions* session_options = OrtCreateSessionOptions();
-  OrtSetSessionThreadPoolSize(session_options, 1);
+  OrtSessionOptions* session_options;
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
   // disable graph optimization
-  OrtSetSessionGraphOptimizationLevel(session_options, 0);
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
 
-  Status status = CreateExecutionContextsHelper(session_options, paths);
+  Status status = CreateExecutionContextsHelper(session_options, models);
 
   OrtReleaseSessionOptions(session_options);
   RETURN_IF_ERROR(status);
@@ -98,7 +99,7 @@ OnnxBackend::CreateExecutionContexts(
 Status
 OnnxBackend::CreateExecutionContextsHelper(
     OrtSessionOptions* session_options,
-    const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& models)
 {
   uint32_t total_context_cnt = 0;
 
@@ -109,7 +110,7 @@ OnnxBackend::CreateExecutionContextsHelper(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, session_options, paths));
+            instance_name, Context::NO_GPU_DEVICE, session_options, models));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -117,7 +118,7 @@ OnnxBackend::CreateExecutionContextsHelper(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, session_options, paths));
+              instance_name, gpu_device, session_options, models));
           total_context_cnt++;
         }
       }
@@ -142,7 +143,7 @@ Status
 OnnxBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     OrtSessionOptions* base_session_options,
-    const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& models)
 {
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
@@ -171,8 +172,8 @@ OnnxBackend::CreateExecutionContext(
 #endif  // TRTIS_ENABLE_GPU
   }
 
-  const auto& op_itr = paths.find(cc_model_filename);
-  if (op_itr == paths.end()) {
+  const auto& op_itr = models.find(cc_model_filename);
+  if (op_itr == models.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to find model '" + cc_model_filename + "' for " + Name());
@@ -194,7 +195,9 @@ OnnxBackend::CreateExecutionContext(
   Context* context = contexts_.back().get();
 
   // Set Onnx session option with proper device
-  OrtSessionOptions* options = OrtCloneSessionOptions(base_session_options);
+  OrtSessionOptions* options;
+  RETURN_IF_ORT_ERROR(OrtCloneSessionOptions(base_session_options, &options));
+
   if (gpu_device != Context::NO_GPU_DEVICE) {
 #ifdef TRTIS_ENABLE_GPU
     OrtStatus* onnx_status =
@@ -577,10 +580,12 @@ OnnxBackend::Context::SetInputTensor(
   SetInputBuffer(name, expected_byte_sizes, payloads, buffer);
 
   if (data_type != TYPE_STRING) {
+    const OrtAllocatorInfo* allocator_info;
+    RETURN_IF_ORT_ERROR(OrtAllocatorGetInfo(allocator_, &allocator_info));
     RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
-        OrtAllocatorGetInfo(allocator_), (void*)input_buffers->back().get(),
-        total_byte_size, input_dims.data(), input_dims.size(),
-        ConvertToOnnxDataType(data_type), &input_tensors_.back()));
+        allocator_info, (void*)input_buffers->back().get(), total_byte_size,
+        input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
+        &input_tensors_.back()));
   } else {
     std::vector<const char*> string_data;
     // Onnx String tensor is created by passing array of C strings,
@@ -747,16 +752,21 @@ OnnxBackend::Context::ReadOutputTensors(
     // Get output type and shape
     OrtTypeInfo* typeinfo;
     RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, &typeinfo));
-    const OrtTensorTypeAndShapeInfo* type_and_shape =
-        OrtCastTypeInfoToTensorInfo(typeinfo);
+    const OrtTensorTypeAndShapeInfo* type_and_shape;
+    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
     std::vector<int64_t> content_shape;
-    content_shape.resize(OrtGetNumOfDimensions(type_and_shape));
-    OrtGetDimensions(
-        type_and_shape, content_shape.data(), content_shape.size());
+
+    size_t num_dims;
+    RETURN_IF_ORT_ERROR(OrtGetDimensionsCount(type_and_shape, &num_dims));
+
+    content_shape.resize(num_dims);
+    RETURN_IF_ORT_ERROR(OrtGetDimensions(
+        type_and_shape, content_shape.data(), content_shape.size()));
     const size_t element_count = GetElementCount(content_shape);
 
-    ONNXTensorElementDataType type = OrtGetTensorElementType(type_and_shape);
+    ONNXTensorElementDataType type;
+    RETURN_IF_ORT_ERROR(OrtGetTensorElementType(type_and_shape, &type));
 
     OrtReleaseTypeInfo(typeinfo);
 

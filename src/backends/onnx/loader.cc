@@ -88,7 +88,7 @@ OnnxLoader::Stop()
 
 Status
 OnnxLoader::LoadSession(
-    const std::string& model_path, const OrtSessionOptions* session_options,
+    const std::string& model_data, const OrtSessionOptions* session_options,
     OrtSession** session)
 {
   if (loader != nullptr) {
@@ -106,8 +106,8 @@ OnnxLoader::LoadSession(
     // on Onnx Runtime is resolved
     // https://github.com/microsoft/onnxruntime/issues/1034
     auto res = std::async(
-        std::launch::async, &OrtCreateSession, loader->env_, model_path.c_str(),
-        session_options, session);
+        std::launch::async, &OrtCreateSessionFromArray, loader->env_,
+        model_data.c_str(), model_data.size(), session_options, session);
     OrtStatus* status = res.get();
 
     if (status != nullptr) {
