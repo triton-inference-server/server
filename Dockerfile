@@ -55,8 +55,9 @@ RUN sha1sum -c /tmp/trtis/tools/patch/tensorflow/checksums && \
           /opt/tensorflow/bazel_build.sh
 
 # Copy tensorflow_backend_tf into TensorFlow so it builds into the
-# libtensorflow_cc library. We want tensorflow_backend_tf to build
-# against the TensorFlow protobuf since it interfaces with that code.
+# monolithic libtensorflow_cc library. We want tensorflow_backend_tf
+# to build against the TensorFlow protobuf since it interfaces with
+# that code.
 COPY src/backends/tensorflow/tensorflow_backend_tf.* \
      /opt/tensorflow/tensorflow/
 
@@ -170,7 +171,7 @@ RUN apt-get update && \
             libssl-dev \
             libtool
 
-#libcurl4-openSSL-dev is needed for GCS
+# libcurl4-openSSL-dev is needed for GCS
 RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
@@ -184,9 +185,15 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-# TensorFlow libraries
+# TensorFlow libraries. Install the monolithic libtensorflow_cc and
+# create a link libtensorflow_framework.so -> libtensorflow_cc.so so
+# that custom tensorflow operations work correctly. Custom TF
+# operations link against libtensorflow_framework.so so it must be
+# present (and its functionality is provided by libtensorflow_cc.so).
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
+RUN cd /opt/tensorrtserver/lib && \
+    ln -s libtensorflow_cc.so libtensorflow_framework.so
 
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
@@ -217,7 +224,8 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/includ
      /opt/tensorrtserver/include/torch
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so.1 \
       /opt/tensorrtserver/lib/
-RUN ln -s /opt/tensorrtserver/lib/libtorch.so.1 /opt/tensorrtserver/lib/libtorch.so
+RUN cd /opt/tensorrtserver/lib && \
+    ln -s libtorch.so.1 libtorch.so
 
 # Onnx Runtime headers and library
 ARG ONNX_RUNTIME_VERSION=0.4.0
@@ -225,8 +233,8 @@ COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tensorrtserver/lib/
-RUN ln -s /opt/tensorrtserver/lib/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
-    /opt/tensorrtserver/lib/libonnxruntime.so
+RUN cd /opt/tensorrtserver/lib && \
+    ln -s libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
