@@ -1396,7 +1396,11 @@ InferenceProfiler::SummarizeLatency(
 
   // retrieve other interesting percentile
   summary.client_percentile_latency_ns.clear();
-  std::set<size_t> percentiles{50, 90, 95, 99, percentile_};
+  std::set<size_t> percentiles{50, 90, 95, 99};
+  if (extra_percentile_) {
+    percentiles.emplace(percentile_);
+  }
+  
   for (const auto percentile : percentiles) {
     size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
     summary.client_percentile_latency_ns.emplace(percentile, latencies[index]);
