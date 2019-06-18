@@ -262,8 +262,8 @@ additional requirements for enabling a backend.
   your library path or you must add the path to TRTIS_EXTRA_LIB_PATHS.
 
 * **TRTIS_ENABLE_ONNXRUNTIME**: Use -DTRTIS_ENABLE_ONNXRUNTIME=ON to
-  enable the OnnxRuntime backend. The library libonnxruntime.so must be
-  built as described above and must be on your library path or you
+  enable the OnnxRuntime backend. The library libonnxruntime.so must
+  be built as described above and must be on your library path or you
   must add the path to TRTIS_EXTRA_LIB_PATHS.
 
 * **TRTIS_ENABLE_PYTORCH**: Use -DTRTIS_ENABLE_PYTORCH=ON to enable
