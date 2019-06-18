@@ -160,10 +160,8 @@ typedef struct PerformanceStatusStruct {
   uint64_t client_sequence_count;
   uint64_t client_duration_ns;
   uint64_t client_avg_latency_ns;
-  // The additional percentile that are requested to be reported
-  uint64_t client_requested_percentile_latency_ns;
-  // a vector of percentiles to be reported (<percentile, value> pair)
-  std::vector<std::pair<size_t, uint64_t>> client_percentile_latency_ns;
+  // a ordered map of percentiles to be reported (<percentile, value> pair)
+  std::map<size_t, uint64_t> client_percentile_latency_ns;
   // Using usec to avoid square of large number (large in nsec)
   uint64_t std_us;
   uint64_t client_avg_request_time_ns;
@@ -192,7 +190,7 @@ ReadFile(const std::string& path, std::vector<char>* contents)
   }
 
   in.seekg(0, std::ios::end);
-  
+
   int file_size = in.tellg();
   if (file_size > 0) {
     contents->resize(file_size);
@@ -207,10 +205,9 @@ ReadFile(const std::string& path, std::vector<char>* contents)
     return nic::Error(
         ni::RequestStatusCode::INVALID_ARG,
         "failed to get size for file '" + path + "'");
-  } else if (file_size == 0){
+  } else if (file_size == 0) {
     return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "file '" + path + "' is empty");
+        ni::RequestStatusCode::INVALID_ARG, "file '" + path + "' is empty");
   }
 
   return nic::Error::Success;
@@ -1173,7 +1170,9 @@ InferenceProfiler::Profile(
                 << "] throughput: " << infer_per_sec.back() << " infer/sec. ";
       if (extra_percentile_) {
         std::cout << "p" << percentile_ << " latency: "
-                  << (status_summary.client_requested_percentile_latency_ns /
+                  << (status_summary.client_percentile_latency_ns
+                          .find(percentile_)
+                          ->second /
                       1000)
                   << " usec" << std::endl;
       } else {
@@ -1395,23 +1394,19 @@ InferenceProfiler::SummarizeLatency(
 
   summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
 
-  if (extra_percentile_) {
-    // Round to nearest integer index by + 0.5
-    size_t index = (percentile_ / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_requested_percentile_latency_ns = latencies[index];
-    summary.stabilizing_latency_ns =
-        summary.client_requested_percentile_latency_ns;
-  } else {
-    summary.stabilizing_latency_ns = summary.client_avg_latency_ns;
-  }
-
   // retrieve other interesting percentile
   summary.client_percentile_latency_ns.clear();
-  std::vector<size_t> percentiles{50, 90, 95, 99};
+  std::set<size_t> percentiles{50, 90, 95, 99, percentile_};
   for (const auto percentile : percentiles) {
     size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_percentile_latency_ns.emplace_back(
-        percentile, latencies[index]);
+    summary.client_percentile_latency_ns.emplace(percentile, latencies[index]);
+  }
+
+  if (extra_percentile_) {
+    summary.stabilizing_latency_ns =
+        summary.client_percentile_latency_ns.find(percentile_)->second;
+  } else {
+    summary.stabilizing_latency_ns = summary.client_avg_latency_ns;
   }
 
   // calculate standard deviation
@@ -1562,8 +1557,6 @@ Report(
                                 : 0;
 
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
-  const uint64_t requested_percentile_latency_us =
-      summary.client_requested_percentile_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
   const uint64_t avg_request_time_us =
@@ -1619,11 +1612,7 @@ Report(
   }
   std::cout << "    Throughput: " << summary.client_infer_per_sec
             << " infer/sec" << std::endl;
-  if (percentile != -1) {
-    std::cout << "    p" << percentile
-              << " latency: " << requested_percentile_latency_us << " usec"
-              << std::endl;
-  } else {
+  if (percentile == -1) {
     std::cout << "    Avg latency: " << avg_latency_us << " usec"
               << " (standard deviation " << std_us << " usec)" << std::endl;
   }
@@ -1999,9 +1988,6 @@ main(int argc, char** argv)
       for (const auto& percentile : summary[0].client_percentile_latency_ns) {
         ofs << ",p" << percentile.first << " latency";
       }
-      if (percentile != -1) {
-        ofs << ",p" << percentile << " latency";
-      }
       ofs << std::endl;
 
       // Sort summary results in order of increasing infer/sec.
@@ -2027,9 +2013,6 @@ main(int argc, char** argv)
             << (status.client_avg_receive_time_ns / 1000);
         for (const auto& percentile : status.client_percentile_latency_ns) {
           ofs << "," << (percentile.second / 1000);
-        }
-        if (percentile != -1) {
-          ofs << "," << (status.client_requested_percentile_latency_ns / 1000);
         }
         ofs << std::endl;
       }
