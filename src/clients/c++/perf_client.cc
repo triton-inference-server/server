@@ -2002,9 +2002,16 @@ main(int argc, char** argv)
             status.server_queue_time_ns / status.server_request_count;
         uint64_t avg_compute_ns =
             status.server_compute_time_ns / status.server_request_count;
+        uint64_t avg_client_wait_ns = status.client_avg_latency_ns -
+                                      status.client_avg_send_time_ns -
+                                      status.client_avg_receive_time_ns;
+        // Network misc is calculated by subtracting data from different
+        // measurements (server v.s. client), so the result needs to be capped
+        // at 0
         uint64_t avg_network_misc_ns =
-            status.client_avg_latency_ns - avg_queue_ns - avg_compute_ns -
-            status.client_avg_send_time_ns - status.client_avg_receive_time_ns;
+            avg_client_wait_ns > (avg_queue_ns + avg_compute_ns)
+                ? avg_client_wait_ns - (avg_queue_ns + avg_compute_ns)
+                : 0;
 
         ofs << status.concurrency << "," << status.client_infer_per_sec << ","
             << (status.client_avg_send_time_ns / 1000) << ","
