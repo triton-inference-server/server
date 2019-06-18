@@ -348,6 +348,8 @@ def create_netdef_modelfile(
     model.net.Sub(["READY", "READY"], "zeros")
     model.net.NE(["READY", "zeros"], "compare")
     model.net.Where(["compare", "add", "zeros"], "OUTPUT")
+    predict_net, _ = c2model_helper.ExtractPredictorNet(model.Proto(), \
+        input_blobs = ["INPUT", "START","READY"], output_blobs = ["OUTPUT"])
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -357,7 +359,7 @@ def create_netdef_modelfile(
         pass # ignore existing dir
 
     with open(model_version_dir + "/model.netdef", "wb") as f:
-        f.write(model.Proto().SerializeToString())
+        f.write(predict_net.Proto().SerializeToString())
     with open(model_version_dir + "/init_model.netdef", "wb") as f:
         f.write(model.InitProto().SerializeToString())
 
