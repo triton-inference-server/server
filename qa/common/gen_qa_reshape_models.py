@@ -331,6 +331,9 @@ def create_netdef_modelfile(
                 old_shape = [-1] + input_shapes[io_num]
                 model.net.Reshape(["INPUT{}".format(io_num)], ["OUTPUT{}".format(io_num), 'old_shape'],
                                   shape=([-1] + output_shapes[io_num]))
+    predict_net, _ = c2model_helper.ExtractPredictorNet(model.Proto(), \
+        input_blobs = ["INPUT{}".format(i) for i in range(io_cnt)], \
+        output_blobs = ["OUTPUT{}".format(i) for i in range(io_cnt)])
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -340,7 +343,7 @@ def create_netdef_modelfile(
         pass # ignore existing dir
 
     with open(model_version_dir + "/model.netdef", "wb") as f:
-        f.write(model.Proto().SerializeToString())
+        f.write(predict_net.Proto().SerializeToString())
     with open(model_version_dir + "/init_model.netdef", "wb") as f:
         f.write(model.InitProto().SerializeToString())
 
