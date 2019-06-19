@@ -71,6 +71,14 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
 
   if (config->max_batch_size() == 0) {
     config->set_max_batch_size(max_batch_size_);
+  } else if (config->max_batch_size() > max_batch_size_) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name_ +
+            "', configuration specified max-batch " +
+            std::to_string(config->max_batch_size()) +
+            " but TensorRT engine only supports max-batch " +
+            std::to_string(max_batch_size_));
   }
 
   // Inputs
