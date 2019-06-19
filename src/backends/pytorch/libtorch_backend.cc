@@ -235,7 +235,7 @@ LibTorchBackend::CreateExecutionContext(
   }
 
   try {
-    // lp_itr->second is the torch model string
+    // lp_itr->second is the torch model serialized to string
     std::istringstream model_stream(lp_itr->second);
     context->torch_model_ = torch::jit::load(model_stream, context->device_);
   }
