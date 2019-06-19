@@ -405,7 +405,12 @@ latency over a time window, and then repeats the measurements until it
 gets stable results. The perf\_client then increases the load level
 and measures again. This repeats until the perf\_client reaches one of
 the specified limits: either the maximum latency value is reached or
-the maximum concurrency value is reached.
+the maximum concurrency value is reached. To determine stable results
+perf\_client uses average request latency unless the --percentile flag
+is specified. If the --percentile flag is specified, perf\_client will
+stabilize the results based on that confidence level. For example,
+if --percentile=99 is used the results will be stabilized using the
+99-th percentile request latency.
 
 To use perf\_client you must first have a running inference server
 that is serving one or more models. The perf\_client application works
@@ -436,6 +441,10 @@ inference requests to the inference server::
     Client:
       Request count: 624
       Throughput: 208 infer/sec
+      p50 latency: 19985 usec
+      p90 latency: 22524 usec
+      p95 latency: 23401 usec
+      p99 latency: 24866 usec
       Avg latency: 19252 usec (standard deviation 841 usec)
       Avg HTTP time: 19224 usec (send 714 usec + response wait 18486 usec + receive 24 usec)
     Server:
@@ -504,10 +513,11 @@ You can then import the CSV file into a spreadsheet to help visualize
 the latency vs inferences/second tradeoff as well as see some
 components of the latency. Follow these steps:
 
-- Open `this spreadsheet <https://docs.google.com/spreadsheets/d/1zszgmbSNHHXy0DVEU_4lrL4Md-6dUKwy_mLVmcseUrE>`_
+- Open `this spreadsheet
+  <https://docs.google.com/spreadsheets/d/1IsdW78x_F-jLLG4lTV0L-rruk0VEBRL7Mnb-80RGLL4>`_
 - Make a copy from the File menu "Make a copy..."
 - Open the copy
-- Select the A2 cell
+- Select the A1 cell on the "Raw Data" tab
 - From the File menu select "Import..."
 - Select "Upload" and upload the file
 - Select "Replace data at selected cell" and then select the "Import data" button
