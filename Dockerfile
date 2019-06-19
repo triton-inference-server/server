@@ -103,6 +103,8 @@ ARG ONNX_RUNTIME_VERSION=0.4.0
 # Get release version of Onnx Runtime
 WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends git
+
+# Check out master until new release to support cloud-based filesystems
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime
 
 ENV PATH="/opt/cmake/bin:${PATH}"

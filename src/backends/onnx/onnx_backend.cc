@@ -80,15 +80,16 @@ OnnxBackend::CreateExecutionContexts(
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
-  OrtSessionOptions* session_options;
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
+      &OrtReleaseSessionOptions);
+  OrtSessionOptions** options_addr = options_wrapper.get_resource_address();
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(options_addr));
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(*options_addr, 1));
   // disable graph optimization
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(*options_addr, 0));
 
-  Status status = CreateExecutionContextsHelper(session_options, models);
+  Status status = CreateExecutionContextsHelper(*options_addr, models);
 
-  OrtReleaseSessionOptions(session_options);
   RETURN_IF_ERROR(status);
 
   LOG_VERBOSE(1) << "onnx backend for " << Name() << std::endl << *this;
@@ -195,26 +196,24 @@ OnnxBackend::CreateExecutionContext(
   Context* context = contexts_.back().get();
 
   // Set Onnx session option with proper device
-  OrtSessionOptions* options;
-  RETURN_IF_ORT_ERROR(OrtCloneSessionOptions(base_session_options, &options));
+  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
+      &OrtReleaseSessionOptions);
+  OrtSessionOptions** options_addr = options_wrapper.get_resource_address();
+  RETURN_IF_ORT_ERROR(
+      OrtCloneSessionOptions(base_session_options, options_addr));
 
   if (gpu_device != Context::NO_GPU_DEVICE) {
 #ifdef TRTIS_ENABLE_GPU
-    OrtStatus* onnx_status =
-        OrtSessionOptionsAppendExecutionProvider_CUDA(options, gpu_device);
-    if (onnx_status != nullptr) {
-      OrtReleaseSessionOptions(options);
-      RETURN_IF_ORT_ERROR(onnx_status);
-    }
+    RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
+        *options_addr, gpu_device));
 #else
     return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
   // Create Onnx session
-  Status status =
-      OnnxLoader::LoadSession(op_itr->second, options, &context->session_);
-  OrtReleaseSessionOptions(options);
+  Status status = OnnxLoader::LoadSession(
+      op_itr->second, *options_addr, &context->session_);
   RETURN_IF_ERROR(status);
   RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&context->allocator_));
 
@@ -750,10 +749,12 @@ OnnxBackend::Context::ReadOutputTensors(
     }
 
     // Get output type and shape
-    OrtTypeInfo* typeinfo;
-    RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, &typeinfo));
+    OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(&OrtReleaseTypeInfo);
+    OrtTypeInfo** typeinfo_addr = typeinfo_wrapper.get_resource_address();
+    RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, typeinfo_addr));
     const OrtTensorTypeAndShapeInfo* type_and_shape;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
+    RETURN_IF_ORT_ERROR(
+        OrtCastTypeInfoToTensorInfo(*typeinfo_addr, &type_and_shape));
 
     std::vector<int64_t> content_shape;
 
@@ -767,8 +768,6 @@ OnnxBackend::Context::ReadOutputTensors(
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(OrtGetTensorElementType(type_and_shape, &type));
-
-    OrtReleaseTypeInfo(typeinfo);
 
     if (type == ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING) {
       const size_t batch1_element_cnt = element_count / total_batch_size;

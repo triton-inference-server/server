@@ -90,15 +90,19 @@ InputOutputInfos(
           OrtSessionGetOutputName(session, i, allocator, &name));
     }
 
-    OrtTypeInfo* typeinfo;
+    OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(&OrtReleaseTypeInfo);
+    OrtTypeInfo** typeinfo_addr = typeinfo_wrapper.get_resource_address();
     if (is_input) {
-      RETURN_IF_ORT_ERROR(OrtSessionGetInputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(
+          OrtSessionGetInputTypeInfo(session, i, typeinfo_addr));
     } else {
-      RETURN_IF_ORT_ERROR(OrtSessionGetOutputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(
+          OrtSessionGetOutputTypeInfo(session, i, typeinfo_addr));
     }
 
     const OrtTensorTypeAndShapeInfo* tensor_info;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &tensor_info));
+    RETURN_IF_ORT_ERROR(
+        OrtCastTypeInfoToTensorInfo(*typeinfo_addr, &tensor_info));
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(OrtGetTensorElementType(tensor_info, &type));
@@ -111,8 +115,6 @@ InputOutputInfos(
         OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims));
 
     infos.emplace(name, OnnxTensorInfo(type, dims));
-
-    OrtReleaseTypeInfo(typeinfo);
   }
 
   return Status::Success;

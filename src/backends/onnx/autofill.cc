@@ -235,10 +235,14 @@ AutoFillOnnx::Create(
                                          "' due to no version directories");
   }
 
-  OrtSessionOptions* session_options;
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  // Create resource wrapper to manage release of resource
+  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
+      &OrtReleaseSessionOptions);
+  OrtSessionOptions** options_addr = options_wrapper.get_resource_address();
+
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(options_addr));
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(*options_addr, 1));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(*options_addr, 0));
 
   OrtSession* session;
 
@@ -264,7 +268,7 @@ AutoFillOnnx::Create(
     const auto onnx_path = JoinPath({version_path, onnx_file});
 
     // Load session
-    status = OnnxLoader::LoadSession(onnx_path, session_options, &session);
+    status = OnnxLoader::LoadSession(onnx_path, *options_addr, &session);
 
     if (status.IsOk()) {
       local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
@@ -277,8 +281,6 @@ AutoFillOnnx::Create(
     }
   }
 
-  OrtReleaseSessionOptions(session_options);
-
   // If it is due to unsupported opset, return success with limited autofill
   // capability
   if (!status.IsOk() && unsupported_opset) {
@@ -290,12 +292,12 @@ AutoFillOnnx::Create(
   // due to reasons other than unsupported opset
   RETURN_IF_ERROR(status);
 
-  OrtStatus* ort_status;
-  OrtAllocator* allocator;
-  ort_status = OrtCreateDefaultAllocator(&allocator);
+  OrtResourceWrapper<OrtAllocator*> allocator_wrapper(&OrtReleaseAllocator);
+  OrtAllocator** allocator_addr = allocator_wrapper.get_resource_address();
+
+  OrtStatus* ort_status = OrtCreateDefaultAllocator(allocator_addr);
   if (ort_status == nullptr) {
-    status = local_autofill->SetConfigFromOrtSession(session, allocator);
-    OrtReleaseAllocator(allocator);
+    status = local_autofill->SetConfigFromOrtSession(session, *allocator_addr);
   }
   OnnxLoader::UnloadSession(session);
 

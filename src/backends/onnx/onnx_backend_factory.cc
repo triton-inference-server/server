@@ -78,7 +78,7 @@ OnnxBackendFactory::CreateBackend(
     RETURN_IF_ERROR(ReadTextFile(onnx_path, &model_data_str));
     models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(model_data_str));
+        std::make_tuple(std::move(model_data_str)));
   }
 
   // Create the backend for the model and all the execution contexts
