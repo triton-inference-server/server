@@ -103,11 +103,14 @@ ARG ONNX_RUNTIME_VERSION=0.4.0
 # Get release version of Onnx Runtime
 WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends git
-RUN git clone -b rel-${ONNX_RUNTIME_VERSION} --recursive https://github.com/Microsoft/onnxruntime
+
+# Check out master until new release to support cloud-based filesystems
+RUN git clone --recursive https://github.com/Microsoft/onnxruntime
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
-RUN ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
+RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
+    ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
 
 # Allow configure to pick up GDK and CuDNN where it expects it.
 # (Note: $CUDNN_VERSION is defined by NVidia's base image)

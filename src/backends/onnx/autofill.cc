@@ -242,9 +242,15 @@ AutoFillOnnx::Create(
                                          "' due to no version directories");
   }
 
-  OrtSessionOptions* session_options = OrtCreateSessionOptions();
-  OrtSetSessionThreadPoolSize(session_options, 1);
-  OrtSetSessionGraphOptimizationLevel(session_options, 0);
+  // Create resource wrapper to manage release of resource
+  OrtSessionOptions* session_options;
+
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+
+  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
+      session_options, &OrtReleaseSessionOptions);
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
 
   OrtSession* session;
 
@@ -283,8 +289,6 @@ AutoFillOnnx::Create(
     }
   }
 
-  OrtReleaseSessionOptions(session_options);
-
   // If it is due to unsupported opset, return success with limited autofill
   // capability
   if (!status.IsOk() && unsupported_opset) {
@@ -296,12 +300,13 @@ AutoFillOnnx::Create(
   // due to reasons other than unsupported opset
   RETURN_IF_ERROR(status);
 
-  OrtStatus* ort_status;
   OrtAllocator* allocator;
-  ort_status = OrtCreateDefaultAllocator(&allocator);
+  OrtStatus* ort_status = OrtCreateDefaultAllocator(&allocator);
+  OrtResourceWrapper<OrtAllocator*> allocator_wrapper(
+      allocator, &OrtReleaseAllocator);
+
   if (ort_status == nullptr) {
     status = local_autofill->SetConfigFromOrtSession(session, allocator);
-    OrtReleaseAllocator(allocator);
   }
   OnnxLoader::UnloadSession(session);
 
