@@ -133,8 +133,22 @@ SavedModelBackend::CreateTRTISTFModel(
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
-    RETURN_IF_ERROR(CompareDimsSupported(
-        Name(), io.name(), input->shape_, dims, Config().max_batch_size() > 0));
+    if (input->shape_->rank_ != 0) {
+      RETURN_IF_ERROR(CompareDimsSupported(
+          Name(), io.name(), input->shape_, dims,
+          Config().max_batch_size() > 0));
+    } else {
+      // The savedmodel doesn't specify a shape for the input so use the shape
+      // from the model configuration
+      bool supports_batching = Config().max_batch_size() > 0;
+      input->shape_->rank_ =
+          (size_t)(dims.size() + (supports_batching ? 1 : 0));
+      input->shape_->dims_ =
+          (int64_t*)malloc(input->shape_->rank_ * sizeof(int64_t));
+      for (int i = 0; i < dims.size(); ++i) {
+        input->shape_->dims_[i + (supports_batching ? 1 : 0)] = dims[i];
+      }
+    }
 
     if (!CompareDataType(input->data_type_, io.data_type())) {
       return Status(
@@ -162,9 +176,22 @@ SavedModelBackend::CreateTRTISTFModel(
     const DimsList& dims =
         (io.has_reshape()) ? io.reshape().shape() : io.dims();
 
-    RETURN_IF_ERROR(CompareDimsSupported(
-        Name(), io.name(), output->shape_, dims,
-        Config().max_batch_size() > 0));
+    if (output->shape_->rank_ != 0) {
+      RETURN_IF_ERROR(CompareDimsSupported(
+          Name(), io.name(), output->shape_, dims,
+          Config().max_batch_size() > 0));
+    } else {
+      // The savedmodel doesn't specify a shape for the output so use the shape
+      // from the model configuration
+      bool supports_batching = Config().max_batch_size() > 0;
+      output->shape_->rank_ =
+          (size_t)(dims.size() + (supports_batching ? 1 : 0));
+      output->shape_->dims_ =
+          (int64_t*)malloc(output->shape_->rank_ * sizeof(int64_t));
+      for (int i = 0; i < dims.size(); ++i) {
+        output->shape_->dims_[i + (supports_batching ? 1 : 0)] = dims[i];
+      }
+    }
 
     if (!CompareDataType(output->data_type_, io.data_type())) {
       return Status(
