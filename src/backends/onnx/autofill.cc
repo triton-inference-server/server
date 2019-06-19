@@ -134,6 +134,13 @@ AutoFillOnnxImpl::Fix(ModelConfig* config)
   }
   if (config->max_batch_size() == 0) {
     config->set_max_batch_size(config_.max_batch_size());
+  } else if (config_.max_batch_size() == 0) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name_ +
+            "', configuration specified max-batch " +
+            std::to_string(config->max_batch_size()) +
+            " but model session does not support batching");
   }
 
   // Validate and fill inputs
