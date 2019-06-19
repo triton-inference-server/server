@@ -113,6 +113,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_sequence_batcher/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_savedmodel_shape/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perflab_nomodel/.
 
 # Generating the docs requires the docs source and the source code so
