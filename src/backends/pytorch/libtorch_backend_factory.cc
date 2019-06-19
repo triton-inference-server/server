@@ -60,17 +60,19 @@ LibTorchBackendFactory::CreateBackend(
   std::set<std::string> torch_files;
   RETURN_IF_ERROR(GetDirectoryFiles(path, &torch_files));
 
-  std::unordered_map<std::string, std::string> torch_paths;
+  std::unordered_map<std::string, std::string> torch_models;
   for (const auto& filename : torch_files) {
     const auto torch_path = JoinPath({path, filename});
-    torch_paths.emplace(filename, std::move(torch_path));
+    std::string model_data_str;
+    RETURN_IF_ERROR(ReadTextFile(torch_path, &model_data_str));
+    torch_models.emplace(filename, std::move(model_data_str));
   }
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<LibTorchBackend> local_backend(new LibTorchBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(torch_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(torch_models));
 
   *backend = std::move(local_backend);
   return Status::Success;
