@@ -236,13 +236,14 @@ AutoFillOnnx::Create(
   }
 
   // Create resource wrapper to manage release of resource
-  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      &OrtReleaseSessionOptions);
-  OrtSessionOptions** options_addr = options_wrapper.get_resource_address();
+  OrtSessionOptions* session_options;
 
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(options_addr));
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(*options_addr, 1));
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(*options_addr, 0));
+  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+
+  OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
+      session_options, &OrtReleaseSessionOptions);
+  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
 
   OrtSession* session;
 
@@ -268,7 +269,7 @@ AutoFillOnnx::Create(
     const auto onnx_path = JoinPath({version_path, onnx_file});
 
     // Load session
-    status = OnnxLoader::LoadSession(onnx_path, *options_addr, &session);
+    status = OnnxLoader::LoadSession(onnx_path, session_options, &session);
 
     if (status.IsOk()) {
       local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
@@ -292,12 +293,13 @@ AutoFillOnnx::Create(
   // due to reasons other than unsupported opset
   RETURN_IF_ERROR(status);
 
-  OrtResourceWrapper<OrtAllocator*> allocator_wrapper(&OrtReleaseAllocator);
-  OrtAllocator** allocator_addr = allocator_wrapper.get_resource_address();
+  OrtAllocator* allocator;
+  OrtStatus* ort_status = OrtCreateDefaultAllocator(&allocator);
+  OrtResourceWrapper<OrtAllocator*> allocator_wrapper(
+      allocator, &OrtReleaseAllocator);
 
-  OrtStatus* ort_status = OrtCreateDefaultAllocator(allocator_addr);
   if (ort_status == nullptr) {
-    status = local_autofill->SetConfigFromOrtSession(session, *allocator_addr);
+    status = local_autofill->SetConfigFromOrtSession(session, allocator);
   }
   OnnxLoader::UnloadSession(session);
 

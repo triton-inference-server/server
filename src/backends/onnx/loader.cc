@@ -102,9 +102,6 @@ OnnxLoader::LoadSession(
       }
     }
 
-    // Workaround for creating session on multiple GPUs until the issue
-    // on Onnx Runtime is resolved
-    // https://github.com/microsoft/onnxruntime/issues/1034
     OrtStatus* status = OrtCreateSessionFromArray(
         loader->env_, model_data.c_str(), model_data.size(), session_options,
         session);

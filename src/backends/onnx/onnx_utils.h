@@ -60,11 +60,11 @@ struct OnnxTensorInfo {
 template <class T>
 class OrtResourceWrapper {
  public:
-  OrtResourceWrapper(void (*ReleaseFunction)(T)) : ReleaseFunc_(ReleaseFunction)
+  OrtResourceWrapper(T ort_resource, void (*ReleaseFunction)(T))
+      : resource_(ort_resource), ReleaseFunc_(ReleaseFunction)
   {
   }
   ~OrtResourceWrapper() { ReleaseFunc_(resource_); }
-  T* get_resource_address() { return &resource_; }
 
  private:
   T resource_;
