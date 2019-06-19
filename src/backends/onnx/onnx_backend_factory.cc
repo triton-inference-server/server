@@ -70,19 +70,22 @@ OnnxBackendFactory::CreateBackend(
   std::set<std::string> onnx_files;
   RETURN_IF_ERROR(GetDirectoryFiles(path, &onnx_files));
 
-  std::unordered_map<std::string, std::string> onnx_paths;
+  std::unordered_map<std::string, std::string> models;
   for (const auto& filename : onnx_files) {
     const auto onnx_path = JoinPath({path, filename});
-    onnx_paths.emplace(
+    std::string model_data_str;
+
+    RETURN_IF_ERROR(ReadTextFile(onnx_path, &model_data_str));
+    models.emplace(
         std::piecewise_construct, std::make_tuple(filename),
-        std::make_tuple(onnx_path));
+        std::make_tuple(std::move(model_data_str)));
   }
 
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<OnnxBackend> local_backend(new OnnxBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(onnx_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(models));
 
   *backend = std::move(local_backend);
   return Status::Success;

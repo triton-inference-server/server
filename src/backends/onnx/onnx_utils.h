@@ -56,6 +56,21 @@ struct OnnxTensorInfo {
   std::vector<int64_t> dims_;
 };
 
+// Wrapper class for ORT resources. Mainly used for destruction
+template <class T>
+class OrtResourceWrapper {
+ public:
+  OrtResourceWrapper(T ort_resource, void (*ReleaseFunction)(T))
+      : resource_(ort_resource), ReleaseFunc_(ReleaseFunction)
+  {
+  }
+  ~OrtResourceWrapper() { ReleaseFunc_(resource_); }
+
+ private:
+  T resource_;
+  void (*ReleaseFunc_)(T);
+};
+
 using OnnxTensorInfoMap = std::unordered_map<std::string, OnnxTensorInfo>;
 
 std::string OnnxDataTypeName(ONNXTensorElementDataType onnx_type);
