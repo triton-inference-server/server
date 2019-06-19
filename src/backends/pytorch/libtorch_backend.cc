@@ -134,7 +134,7 @@ LibTorchBackend::Init(const std::string& path, const ModelConfig& config)
 
 Status
 LibTorchBackend::CreateExecutionContexts(
-    const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& models)
 {
   uint32_t total_context_cnt = 0;
 
@@ -145,7 +145,7 @@ LibTorchBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, paths));
+            instance_name, Context::NO_GPU_DEVICE, models));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -153,7 +153,7 @@ LibTorchBackend::CreateExecutionContexts(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(
-              CreateExecutionContext(instance_name, gpu_device, paths));
+              CreateExecutionContext(instance_name, gpu_device, models));
           total_context_cnt++;
         }
       }
@@ -177,7 +177,7 @@ LibTorchBackend::CreateExecutionContexts(
 Status
 LibTorchBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
-    const std::unordered_map<std::string, std::string>& paths)
+    const std::unordered_map<std::string, std::string>& models)
 {
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
@@ -206,8 +206,8 @@ LibTorchBackend::CreateExecutionContext(
 #endif  // TRTIS_ENABLE_GPU
   }
 
-  const auto& lp_itr = paths.find(cc_model_filename);
-  if (lp_itr == paths.end()) {
+  const auto& lp_itr = models.find(cc_model_filename);
+  if (lp_itr == models.end()) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to find LibTorch model '" +
                                          cc_model_filename + "' for " + Name());
@@ -235,8 +235,9 @@ LibTorchBackend::CreateExecutionContext(
   }
 
   try {
-    // lp_itr->second is the torch model path
-    context->torch_model_ = torch::jit::load(lp_itr->second, context->device_);
+    // lp_itr->second is the torch model serialized to string
+    std::istringstream model_stream(lp_itr->second);
+    context->torch_model_ = torch::jit::load(model_stream, context->device_);
   }
   catch (const std::exception& ex) {
     return Status(
