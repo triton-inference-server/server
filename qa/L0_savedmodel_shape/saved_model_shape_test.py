@@ -41,7 +41,7 @@ np_dtype_string = np.dtype(object)
 class SavedModelShapeTest(unittest.TestCase):
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
                     output0_raw, output1_raw, swap):
-        def _infer_exact_helper(tester, pf="savedmodel", tensor_shape, batch_size,
+        def _infer_exact_helper(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
@@ -51,7 +51,7 @@ class SavedModelShapeTest(unittest.TestCase):
             for bs in (1, batch_size):
                 # model that does not support batching
                 if bs == 1:
-                    iu.infer_exact(tester, pf + "_nobatch", tensor_shape, bs,
+                    iu.infer_exact(tester, "savedmodel_nobatch", tensor_shape, bs,
                                     input_dtype, output0_dtype, output1_dtype,
                                     output0_raw, output1_raw,
                                     model_version, swap,
@@ -59,7 +59,7 @@ class SavedModelShapeTest(unittest.TestCase):
                                     skip_request_id_check, use_streaming,
                                     correlation_id)
                 # model that supports batching
-                iu.infer_exact(tester, pf, tensor_shape, bs,
+                iu.infer_exact(tester, "savedmodel", tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,
@@ -70,7 +70,7 @@ class SavedModelShapeTest(unittest.TestCase):
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
-            _infer_exact_helper(self, prefix + pf, (input_size,), 8,
+            _infer_exact_helper(self, "savedmodel", (input_size,), 8,
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 

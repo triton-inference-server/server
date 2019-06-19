@@ -44,7 +44,7 @@ SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
 CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
 rm -fr models && \
-    cp -r ../tf_saved_model_shape models
+    cp -r /data/inferenceserver/tf_saved_model_shape models
 
 create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 

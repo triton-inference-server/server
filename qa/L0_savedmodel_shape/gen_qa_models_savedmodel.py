@@ -103,7 +103,7 @@ def create_savedmodel_modelfile(
         in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]), "TENSOR_INPUT0")
         in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape([]), "TENSOR_INPUT0")
+        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape([]), "TENSOR_INPUT0")
         in1 = tf.placeholder(tf_input_dtype, [None,] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
 
     # If the input is a string, then convert each string to the
