@@ -1,0 +1,1 @@
+unable to load model 'bad_input_dims', tensor 'INPUT0' shape expected by framework \[16\] doesn't match model configuration shape \[16,1\]

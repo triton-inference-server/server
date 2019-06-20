@@ -1,1 +1,0 @@
-Invalid argument: in ensemble inconsistent_data_type, ensemble tensor data: inconsistent data type: 11 is inferred from model inconsistent_data_type while 8 is inferred from model int32_dim1_batch4
