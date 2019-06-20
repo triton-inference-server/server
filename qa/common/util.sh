@@ -63,14 +63,20 @@ function wait_for_file_str() {
 # Wait until server health endpoint show ready. Sets WAIT_RET to 0 on
 # success, 1 on failure
 function wait_for_server_ready() {
+    local spid="$1"; shift
     local wait_time_secs="${1:-30}"; shift
 
     WAIT_RET=0
 
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
-        sleep 1;
+        if ! kill -0 $spid; then
+            echo "=== Server not running."
+            WAIT_RET=1
+            return
+        fi
 
+        sleep 1;
 
         set +e
         code=`curl -s -w %{http_code} localhost:8000/api/health/ready`
@@ -89,14 +95,20 @@ function wait_for_server_ready() {
 # Wait until server health endpoint show live. Sets WAIT_RET to 0 on
 # success, 1 on failure
 function wait_for_server_live() {
+    local spid="$1"; shift
     local wait_time_secs="${1:-30}"; shift
 
     WAIT_RET=0
 
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
-        sleep 1;
+        if ! kill -0 $spid; then
+            echo "=== Server not running."
+            WAIT_RET=1
+            return
+        fi
 
+        sleep 1;
 
         set +e
         code=`curl -s -w %{http_code} localhost:8000/api/health/live`
@@ -152,7 +164,7 @@ function run_server () {
     $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
-    wait_for_server_ready $SERVER_TIMEOUT
+    wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         kill $SERVER_PID || true
         SERVER_PID=0
@@ -173,7 +185,7 @@ function run_server_tolive () {
     $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
-    wait_for_server_live $SERVER_TIMEOUT
+    wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         kill $SERVER_PID || true
         SERVER_PID=0
