@@ -27,6 +27,7 @@
 
 CLIENT_LOG="./client.log"
 ZERO_OUT_TEST=zero_out_test.py
+CUDA_OP_TEST=cuda_op_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-store=/data/inferenceserver/qa_custom_ops"
@@ -37,7 +38,8 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libzeroout.so
+export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libzeroout.so:/data/inferenceserver/qa_custom_ops/libcudaop.so
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -56,6 +58,20 @@ if [ $? -ne 0 ]; then
 fi
 
 python $ZERO_OUT_TEST -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -m graphdef_cudaop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
