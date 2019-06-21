@@ -36,8 +36,6 @@ import test_util as tu
 from tensorrtserver.api import *
 import os
 
-CPU_ONLY = (os.environ.get('TENSORRT_SERVER_CPU_ONLY') is not None)
-
 np_dtype_string = np.dtype(object)
 
 class InferTest(unittest.TestCase):
@@ -61,30 +59,25 @@ class InferTest(unittest.TestCase):
 
         input_size = 16
 
-        ensemble_prefix = [""]
-
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
-            for prefix in ensemble_prefix:
-                for pf in ["graphdef", "savedmodel"]:
-                    _infer_exact_helper(self, prefix + pf, (input_size,), 8,
-                                    input_dtype, output0_dtype, output1_dtype,
-                                    output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            for pf in ["graphdef", "savedmodel"]:
+                _infer_exact_helper(self, pf, (input_size,), 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
 
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
-            for prefix in ensemble_prefix:
-                _infer_exact_helper(self, prefix + 'netdef', (input_size,), 8,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            _infer_exact_helper(self, 'netdef', (input_size,), 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
-        if not CPU_ONLY and tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+        if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,1,1), (input_size,1,1), (input_size,1,1)):
-            for prefix in ensemble_prefix:
-                _infer_exact_helper(self, prefix + 'plan', (input_size, 1, 1), 8,
-                                input_dtype, output0_dtype, output1_dtype,
-                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            _infer_exact_helper(self, 'plan', (input_size, 1, 1), 8,
+                            input_dtype, output0_dtype, output1_dtype,
+                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
@@ -109,33 +102,6 @@ class InferTest(unittest.TestCase):
     def test_class_fff(self):
         self._full_exact(np.float32, np.float32, np.float32,
                          output0_raw=False, output1_raw=False, swap=True)
-
-    def test_raw_version_specific_1_3(self):
-        input_size = 16
-
-        # There are 3 versions of *_float32_float32_float32 but only
-        # versions 1 and 3 should be available.
-        for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
-            if platform == 'plan' and CPU_ONLY:
-                continue
-            tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version=1, swap=False)
-
-            try:
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float32, np.float32, np.float32,
-                               model_version=2, swap=True)
-            except InferenceServerException as ex:
-                self.assertEqual("inference:0", ex.server_id())
-                self.assertTrue(
-                    ex.message().startswith("Inference request for unknown model"))
-
-            iu.infer_exact(self, platform, tensor_shape, 1,
-                           np.float32, np.float32, np.float32,
-                           model_version=3, swap=True)
-
 
 if __name__ == '__main__':
     unittest.main()

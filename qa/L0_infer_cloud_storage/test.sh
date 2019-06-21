@@ -28,59 +28,31 @@
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
-# Google cloud variables (SET WHEN TESTING GCS)
+# Google cloud variables (Point to bucket when testing GCS)
 # NOTES: 
 #  - This folder MUST exist otherwise the GCS test will fail
 #  - If this variable doesn't end in a slash gsutil-m cp becomes slow
 
-# DATA_URL="gs://$BUCKET_NAME/models/"
+DATA_URL="gs://path/to/gcs/bucket/models/"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_TIMEOUT=1200
+SERVER_TIMEOUT=360
 
-# Allow more time to exit. Ensemble brings in too many models
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
-
-RET=1
-
-if [ -z "$DATA_URL" ]; then
-    echo -e "\n***\n*** Test failed to run: Data directory not set\n***"
-    exit $RET
-fi
+SERVER_LOG=$SERVER_LOG_BASE.log
+CLIENT_LOG=$CLIENT_LOG_BASE.log
     
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
 
-# Verify the flag is set only on CPU-only device
-if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
-    gpu_count=`nvidia-smi -L | grep GPU | wc -l`
-    if [ "$gpu_count" -ne 0 ]; then
-    echo -e "\n***\n*** Running on a device with GPU\n***"
-    echo -e "\n***\n*** Test Failed To Run\n***"
-    exit 1
-    fi
-fi
-
-    
 SERVER_ARGS="--model-store=$DATA_URL --exit-timeout-secs=120"
-
-if [ "$TENSORRT_SERVER_CPU_ONLY" == "1" ]; then
-    echo -e "Skip GPU testing on CPU-only device"
-    continue
-    # set strict readiness=false on CPU-only device to allow
-    # unsuccessful load of TensorRT plans, which require GPU.
-    SERVER_ARGS="--model-store=$DATA_URL --exit-timeout-secs=120 --strict-readiness=false"
-fi
-
-SERVER_LOG=$SERVER_LOG_BASE.log
-CLIENT_LOG=$CLIENT_LOG_BASE.log
 
 # Construct model repository
 
-KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
+KIND="KIND_GPU"
 
 # copy models in model directory
 rm -rf models && mkdir -p models
