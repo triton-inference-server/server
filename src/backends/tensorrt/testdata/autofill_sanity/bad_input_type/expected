@@ -1,1 +1,0 @@
-Invalid argument: input 'INPUT0' datatype is TYPE_FP16, model specifies TYPE_FP32 for bad_input_type_0_gpu0
