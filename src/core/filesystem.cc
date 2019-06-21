@@ -37,8 +37,6 @@
 #include <fstream>
 #include "src/core/constants.h"
 
-namespace gcs = google::cloud::storage;
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -213,6 +211,8 @@ LocalFileSystem::WriteTextFile(
 }
 
 #ifdef TRTIS_ENABLE_GCS
+
+namespace gcs = google::cloud::storage;
 
 class GCSFileSystem : public FileSystem {
  public:
