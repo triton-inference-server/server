@@ -46,52 +46,32 @@ To make the custom layers available to the server, the TensorRT custom
 layer implementations must be compiled into one or more shared
 libraries which are then loaded into the inference server using
 LD_PRELOAD. For example, assuming your TensorRT custom layers are
-compiled into trtcustom.so, starting the inference server with the
+compiled into libtrtcustom.so, starting the inference server with the
 following command makes those custom layers available to all TensorRT
 models loaded into the server::
 
-  $ LD_PRELOAD=trtcustom.so trtserver --model-store=/tmp/models ...
+  $ LD_PRELOAD=libtrtcustom.so trtserver --model-store=/tmp/models ...
 
 A limitation of this approach is that the custom layers must be
-managed separately from the model store itself. And more seriously, if
-there are custom layer name conflicts across multiple shared libraries
-there is now way to handle it.
+managed separately from the model repository itself. And more
+seriously, if there are custom layer name conflicts across multiple
+shared libraries there is currently no way to handle it.
 
 TensorFlow
 ----------
 
 Tensorflow allows users to `add custom operations
 <https://www.tensorflow.org/guide/extend/op>`_ which can then be used
-in TensorFlow models. Currently, the only way for the inference server
-to support custom operations is to build them into the inference
-server.
+in TensorFlow models. By using LD_PRELOAD you can load your custom
+TensorFlow operations into the inference server.  For example,
+assuming your TensorFlow custom operations are compiled into
+libtfcustom.so, starting the inference server with the following
+command makes those operations available to all TensorFlow models
+loaded into the server::
 
-To build a TensorFlow custom operation into the inference server, the
-source code for the custom operation must be placed in
-`src/operations/tensorflow
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/master/src/operations/tensorflow>`_
-and the `BUILD
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/operations/tensorflow/BUILD>`_
-file updated.
+  $ LD_PRELOAD=libtfcustom.so trtserver --model-store=/tmp/models ...
 
-An example operation called TRTISExampleAddSub is included in the
-directory in files `trtis_example_addsub_op.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/operations/tensorflow/trtis_example_addsub_op.cc>`_
-and `trtis_example_addsub_op.cu.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/operations/tensorflow/trtis_example_addsub_op.cu.cc>`_. The
-build rule for the TRTISExampleAddSub operation is placed in `BUILD
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/operations/tensorflow/BUILD>`_::
-
-  tf_kernel_library(
-    name = "trtis_example_addsub_op",
-    srcs = ["trtis_example_addsub_op.cc"],
-    gpu_srcs = ["trtis_example_addsub_op.cu.cc"],
-  )
-
-The **all_custom_ops** entry in BUILD is updated to include
-*trtis_example_addsub_op*. When adding a new custom operation similar
-modifications must be made to BUILD.
-
-After making these changes, :ref:`build the server
-<section-building>` and the custom operations will be
-available to every TensorFlow model loaded into the server.
+A limitation of this approach is that the custom operations must be
+managed separately from the model repository itself. And more
+seriously, if there are custom layer name conflicts across multiple
+shared libraries there is currently no way to handle it.
