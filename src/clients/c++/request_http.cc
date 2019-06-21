@@ -128,8 +128,8 @@ ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_easy_cleanup(curl);
@@ -241,8 +241,8 @@ ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_easy_cleanup(curl);
@@ -409,8 +409,8 @@ ProfileHttpContextImpl::SendCommand(const std::string& cmd_str)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_easy_cleanup(curl);
@@ -728,8 +728,8 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
         "HTTP client failed: " + std::string(curl_easy_strerror(http_status_)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(easy_handle_, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list_);
