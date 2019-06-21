@@ -140,16 +140,18 @@ class SequenceBatcherTest(unittest.TestCase):
                         results = ctx.run(
                             { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
                             batch_size=batch_size, flags=flags)
+                        OUTPUT = "OUTPUT"
                     else:
                         results = ctx.run(
                             { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
                             batch_size=batch_size, flags=flags)
+                        OUTPUT = "OUTPUT__0"
 
                     end_ms = int(round(time.time() * 1000))
 
                     self.assertEqual(len(results), 1)
-                    self.assertTrue("OUTPUT" in results)
-                    result = results["OUTPUT"][0][0]
+                    self.assertTrue(OUTPUT in results)
+                    result = results[OUTPUT][0][0]
                     print("{}: {}".format(sequence_name, result))
 
                     if thresholds is not None:
@@ -253,18 +255,20 @@ class SequenceBatcherTest(unittest.TestCase):
                         result_ids.append(ctx.async_run(
                             { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
                             batch_size=batch_size, flags=flags))
+                        OUTPUT = "OUTPUT"
                     else:
                         result_ids.append(ctx.async_run(
                             { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
                             batch_size=batch_size, flags=flags))
+                        OUTPUT = "OUTPUT__0"
 
                 # Wait for the results in the order sent
                 result = None
                 for id in result_ids:
                     results = ctx.get_async_run_results(id, True)
                     self.assertEqual(len(results), 1)
-                    self.assertTrue("OUTPUT" in results)
-                    result = results["OUTPUT"][0][0]
+                    self.assertTrue(OUTPUT in results)
+                    result = results[OUTPUT][0][0]
                     print("{}: {}".format(sequence_name, result))
 
                 seq_end_ms = int(round(time.time() * 1000))

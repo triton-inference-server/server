@@ -88,7 +88,7 @@ class BatcherTest(unittest.TestCase):
                 tensor_shape = (input_size,)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
-                               model_version=1, outputs=("OUTPUT__0", "OUTPUT__1"),
+                               model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
                                use_streaming=False)
             else:
