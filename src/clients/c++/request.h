@@ -717,7 +717,7 @@ InferContext::Result::GetRawAtCursor(size_t batch_idx, T* out)
   }
 
   std::copy(buf, buf + sizeof(T), reinterpret_cast<uint8_t*>(out));
-  return Error::Success;
+  return err;
 }
 
 }}}  // namespace nvidia::inferenceserver::client
