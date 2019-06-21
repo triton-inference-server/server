@@ -500,7 +500,7 @@ ReadStringOutputTensor(
 
 }  // namespace
 
-void
+Status
 BaseBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
@@ -532,6 +532,13 @@ BaseBackend::Context::SetInput(
   TRTISTF_Tensor* tensor = TRTISTF_TensorNew(
       input_tensor_name->c_str(), dtype, shape.size(),
       (shape.size() == 0) ? nullptr : &shape[0]);
+  if (tensor == nullptr) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to create input tensor '" + name + "' with shape " +
+            DimsListToString(shape) + " and data type " +
+            DataType_Name(datatype) + " for '" + name_ + "'");
+  }
 
   TRTISTF_TensorList* tlink = TRTISTF_TensorListNew(tensor, *input_tensors);
   *input_tensors = tlink;
@@ -543,6 +550,8 @@ BaseBackend::Context::SetInput(
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
+
+  return Status::Success;
 }
 
 Status
@@ -593,6 +602,8 @@ BaseBackend::Context::Run(
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
   // into the corresponding tensor.
+  // [TODO] should be responsible for calling TRTISTF_TensorListDelete
+  //        if there is error and returning before calling TRTISTF_ModelRun
   TRTISTF_TensorList* input_tensors = nullptr;
 
   // Inputs from the request...
@@ -602,9 +613,9 @@ BaseBackend::Context::Run(
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
-    SetInput(
+    RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_tensors);
+        payloads, &input_tensors));
   }
 
   // Additional inputs added to the provider...
@@ -615,9 +626,9 @@ BaseBackend::Context::Run(
       const std::string& name = pr.first;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      SetInput(
+      RETURN_IF_ERROR(SetInput(
           name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &input_tensors);
+          payloads, &input_tensors));
     }
   }
 
