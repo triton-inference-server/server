@@ -1,1 +1,1 @@
-unable to load model 'bad_input_type', input 'INPUT1' data-type TYPE_INT32 doesn't match configuration data-type TYPE_FP32
+unable to load model 'bad_input_type, unexpected datatype TYPE_INT32 for input 'INPUT1', expecting TYPE_FP32

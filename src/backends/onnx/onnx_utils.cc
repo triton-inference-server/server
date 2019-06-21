@@ -301,7 +301,7 @@ CompareDimsSupported(
   }
 
   // Tensor rank in configuration must match what framework expects.
-  if (model_shape.size() != (size_t)(dims.size() + nonbatch_start_idx)) {
+  if (debatched_model_shape.size() != (size_t)dims.size()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "unable to load model '" + model_name + "', tensor '" + tensor_name +
@@ -312,7 +312,7 @@ CompareDimsSupported(
   }
 
   for (int i = 0; i < dims.size(); ++i) {
-    int64_t model_dim = model_shape[i + nonbatch_start_idx];
+    int64_t model_dim = debatched_model_shape[i];
     if (model_dim == -1) {
       continue;
     }

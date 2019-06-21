@@ -86,7 +86,18 @@ AutoFillPyTorch::Create(
   }
 
   const std::string pt_file = *(pytorch_files.begin());
-  const auto pt_path = JoinPath({version_path, pt_file});
+
+  // If find model file named with the default libtorch name then
+  // assume it is a libtorch model. In the future we can be smarter
+  // here and try to parse to see if it really is a libtorch, and then
+  // try to derive more of the configuration...
+  if (pt_file != kPyTorchLibTorchFilename) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to autofill for '" + model_name +
+            "', unable to find PyTorch file named '" +
+            kPyTorchLibTorchFilename + "'");
+  }
 
   autofill->reset(new AutoFillPyTorchImpl(model_name));
   return Status::Success;

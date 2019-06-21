@@ -135,6 +135,7 @@ AutoFill::Create(
     }
     Status status = AutoFillSavedModel::Create(
         model_name, backend_config, model_path, &afsm);
+    LOG_VERBOSE(1) << "TensorFlow SavedModel autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afsm);
       return Status::Success;
@@ -145,6 +146,7 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afgd;
     Status status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
+    LOG_VERBOSE(1) << "TensorFlow GraphDef autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afgd);
       return Status::Success;
@@ -157,6 +159,7 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afpt;
     Status status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
+    LOG_VERBOSE(1) << "PyTorch autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afpt);
       return Status::Success;
@@ -169,6 +172,7 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afnd;
     Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
+    LOG_VERBOSE(1) << "Caffe2 NetDef autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afnd);
       return Status::Success;
@@ -191,6 +195,7 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afox;
     Status status = AutoFillOnnx::Create(model_name, model_path, &afox);
+    LOG_VERBOSE(1) << "ONNX autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afox);
       return Status::Success;
@@ -203,6 +208,7 @@ AutoFill::Create(
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afp;
     Status status = AutoFillPlan::Create(model_name, model_path, &afp);
+    LOG_VERBOSE(1) << "TensorRT autofill: " << status.AsString();
     if (status.IsOk()) {
       *autofill = std::move(afp);
       return Status::Success;
