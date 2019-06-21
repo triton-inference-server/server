@@ -49,7 +49,6 @@ class InferTest(unittest.TestCase):
                 skip_request_id_check=False, use_streaming=True,
                 correlation_id=0):
             for bs in (1, batch_size):
-                # model that supports batching
                 iu.infer_exact(tester, pf, tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
@@ -81,14 +80,12 @@ class InferTest(unittest.TestCase):
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
-            # No basic ensemble models are created against onnx models for now [TODO]
             _infer_exact_helper(self, 'onnx', (input_size,), 8,
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
             
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
-            # No basic ensemble models are created wuth libtorch models for now [TODO]
             _infer_exact_helper(self, 'libtorch', (input_size,), 8,
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
