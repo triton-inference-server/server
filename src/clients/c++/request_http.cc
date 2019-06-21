@@ -30,6 +30,11 @@
 #include <google/protobuf/text_format.h>
 #include "src/clients/c++/request_common.h"
 
+// MSVC equivalent of POSIX call
+#ifdef _MSC_VER
+#define strncasecmp _strnicmp
+#endif
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
@@ -1044,7 +1049,8 @@ InferHttpContextImpl::ResponseHandler(
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   size_t result_bytes = 0;
 
-  if (request->Timer().receive_start_.tv_sec == 0) {
+  static auto unset_timepoint = RequestTimers::TimePoint();
+  if (request->Timer().receive_start_ == unset_timepoint) {
     request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
   }
 
