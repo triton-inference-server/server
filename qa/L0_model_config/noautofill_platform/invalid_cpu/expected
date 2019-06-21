@@ -1,0 +1,1 @@
+instance group invalid_cpu_0 of model invalid_cpu has kind KIND_CPU but specifies one or more GPU

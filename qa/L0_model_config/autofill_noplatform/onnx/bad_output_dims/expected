@@ -1,0 +1,1 @@
+unable to load model 'bad_output_dims', tensor 'OUTPUT1' shape expected by framework \[16\] doesn't match model configuration shape \[1\]

@@ -1,1 +1,0 @@
-Invalid argument: instance group invalid_gpu_0 of model invalid_gpu specifies invalid GPU id 42, valid GPUs are 0 -
