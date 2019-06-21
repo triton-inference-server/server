@@ -30,19 +30,19 @@ cmake_minimum_required (VERSION 3.5)
 # librequest.so
 #
 find_package(CURL REQUIRED)
-add_library(
-  request SHARED
-  request.cc request.h
-  request_common.cc request_common.h
-  request_http.cc request_grpc.cc
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
-  $<TARGET_OBJECTS:grpc-library>
-)
-target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
 
 # use different syntax for Windows
 if(WIN32)
+  add_library(
+    request STATIC
+    request.cc request.h
+    request_common.cc request_common.h
+    request_http.cc request_grpc.cc
+    $<TARGET_OBJECTS:model-config-library>
+    $<TARGET_OBJECTS:proto-library>
+    $<TARGET_OBJECTS:grpc-library>
+  )
+
   target_link_libraries(
     request
     PRIVATE gRPC::grpc++
@@ -50,6 +50,15 @@ if(WIN32)
     PUBLIC ${CURL_LIBRARY_RELEASE}
   )
 else()
+  add_library(
+    request SHARED
+    request.cc request.h
+    request_common.cc request_common.h
+    request_http.cc request_grpc.cc
+    $<TARGET_OBJECTS:model-config-library>
+    $<TARGET_OBJECTS:proto-library>
+    $<TARGET_OBJECTS:grpc-library>
+  )
   target_link_libraries(
     request
     PRIVATE gRPC::grpc++
@@ -58,6 +67,9 @@ else()
     PUBLIC -lpthread
   )
 endif()
+target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
+
+
 install(
   TARGETS request
   LIBRARY DESTINATION lib
@@ -76,48 +88,6 @@ install(
 )
 
 #
-# ensemble_image_client
-#
-add_executable(ensemble_image_client ensemble_image_client.cc)
-target_link_libraries(
-  ensemble_image_client
-  PRIVATE request
-)
-install(
-  TARGETS ensemble_image_client
-  RUNTIME DESTINATION bin
-)
-
-#
-# image_client
-#
-find_package(OpenCV REQUIRED)
-add_executable(image_client image_client.cc)
-target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(
-  image_client
-  PRIVATE request
-  PRIVATE ${OpenCV_LIBS}
-)
-install(
-  TARGETS image_client
-  RUNTIME DESTINATION bin
-)
-
-#
-# perf_client
-#
-add_executable(perf_client perf_client.cc)
-target_link_libraries(
-  perf_client
-  PRIVATE request
-)
-install(
-  TARGETS perf_client
-  RUNTIME DESTINATION bin
-)
-
-#
 # simple_client
 #
 add_executable(simple_client simple_client.cc)
@@ -127,44 +97,5 @@ target_link_libraries(
 )
 install(
   TARGETS simple_client
-  RUNTIME DESTINATION bin
-)
-
-#
-# simple_callback_client
-#
-add_executable(simple_callback_client simple_callback_client.cc)
-target_link_libraries(
-  simple_callback_client
-  PRIVATE request
-)
-install(
-  TARGETS simple_callback_client
-  RUNTIME DESTINATION bin
-)
-
-#
-# simple_sequence_client
-#
-add_executable(simple_sequence_client simple_sequence_client.cc)
-target_link_libraries(
-  simple_sequence_client
-  PRIVATE request
-)
-install(
-  TARGETS simple_sequence_client
-  RUNTIME DESTINATION bin
-)
-
-#
-# simple_string_client
-#
-add_executable(simple_string_client simple_string_client.cc)
-target_link_libraries(
-  simple_string_client
-  PRIVATE request
-)
-install(
-  TARGETS simple_string_client
   RUNTIME DESTINATION bin
 )
