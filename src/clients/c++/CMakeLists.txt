@@ -40,13 +40,24 @@ add_library(
   $<TARGET_OBJECTS:grpc-library>
 )
 target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
-target_link_libraries(
-  request
-  PRIVATE gRPC::grpc++
-  PRIVATE gRPC::grpc
-  PUBLIC -lcurl
-  PUBLIC -lpthread
-)
+
+# use different syntax for Windows
+if(WIN32)
+  target_link_libraries(
+    request
+    PRIVATE gRPC::grpc++
+    PRIVATE gRPC::grpc
+    PUBLIC ${CURL_LIBRARY_RELEASE}
+  )
+else()
+  target_link_libraries(
+    request
+    PRIVATE gRPC::grpc++
+    PRIVATE gRPC::grpc
+    PUBLIC -lcurl
+    PUBLIC -lpthread
+  )
+endif()
 install(
   TARGETS request
   LIBRARY DESTINATION lib

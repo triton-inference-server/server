@@ -31,7 +31,15 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  message("Using MSVC as compiler, default target on Windows 10. "
+		  "If the target system is not Windows 10, please update _WIN32_WINNT "
+		  "to corresponding value.")
+  set(CMAKE_CXX_FLAGS "/Wall /D_WIN32_WINNT=0x0A00")
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+else()
+  set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror")
+endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_CXX_STANDARD 11)
