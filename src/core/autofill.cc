@@ -156,13 +156,25 @@ AutoFill::Create(
   if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
       (platform == Platform::PLATFORM_UNKNOWN)) {
     std::unique_ptr<AutoFill> afpt;
-    Status status = AutoFillNetDef::Create(model_name, model_path, &afpt);
+    Status status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
     if (status.IsOk()) {
       *autofill = std::move(afpt);
       return Status::Success;
     }
   }
 #endif  // TRTIS_ENABLE_PYTORCH
+
+#ifdef TRTIS_ENABLE_CAFFE2
+  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
+      (platform == Platform::PLATFORM_UNKNOWN)) {
+    std::unique_ptr<AutoFill> afnd;
+    Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
+    if (status.IsOk()) {
+      *autofill = std::move(afnd);
+      return Status::Success;
+    }
+  }
+#endif  // TRTIS_ENABLE_CAFFE2
 
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
   // Check for ONNX model must be done before check for TensorRT plan
@@ -197,18 +209,6 @@ AutoFill::Create(
     }
   }
 #endif  // TRTIS_ENABLE_TENSORRT
-
-#ifdef TRTIS_ENABLE_CAFFE2
-  if ((platform == Platform::PLATFORM_CAFFE2_NETDEF) ||
-      (platform == Platform::PLATFORM_UNKNOWN)) {
-    std::unique_ptr<AutoFill> afnd;
-    Status status = AutoFillNetDef::Create(model_name, model_path, &afnd);
-    if (status.IsOk()) {
-      *autofill = std::move(afnd);
-      return Status::Success;
-    }
-  }
-#endif  // TRTIS_ENABLE_CAFFE2
 
   // Unable to determine the platform so just use the simple autofill,
   // or null if that fails.
