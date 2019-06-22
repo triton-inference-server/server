@@ -33,6 +33,7 @@ find_package(CURL REQUIRED)
 
 # use different syntax for Windows
 if(WIN32)
+  # using static so that linker does not complain on unresolved external symbol
   add_library(
     request STATIC
     request.cc request.h
@@ -87,6 +88,53 @@ install(
   DESTINATION include
 )
 
+if(WIN32)
+  message("Currently, CMake will only build client library and skip example "
+          "clients in Windows. Because the examples use functionalities that "
+		  "are UNIX specific.")
+else()
+#
+# ensemble_image_client
+#
+add_executable(ensemble_image_client ensemble_image_client.cc)
+target_link_libraries(
+  ensemble_image_client
+  PRIVATE request
+)
+install(
+  TARGETS ensemble_image_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# image_client
+#
+find_package(OpenCV REQUIRED)
+add_executable(image_client image_client.cc)
+target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(
+  image_client
+  PRIVATE request
+  PRIVATE ${OpenCV_LIBS}
+)
+install(
+  TARGETS image_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# perf_client
+#
+add_executable(perf_client perf_client.cc)
+target_link_libraries(
+  perf_client
+  PRIVATE request
+)
+install(
+  TARGETS perf_client
+  RUNTIME DESTINATION bin
+)
+
 #
 # simple_client
 #
@@ -99,3 +147,43 @@ install(
   TARGETS simple_client
   RUNTIME DESTINATION bin
 )
+
+#
+# simple_callback_client
+#
+add_executable(simple_callback_client simple_callback_client.cc)
+target_link_libraries(
+  simple_callback_client
+  PRIVATE request
+)
+install(
+  TARGETS simple_callback_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# simple_sequence_client
+#
+add_executable(simple_sequence_client simple_sequence_client.cc)
+target_link_libraries(
+  simple_sequence_client
+  PRIVATE request
+)
+install(
+  TARGETS simple_sequence_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# simple_string_client
+#
+add_executable(simple_string_client simple_string_client.cc)
+target_link_libraries(
+  simple_string_client
+  PRIVATE request
+)
+install(
+  TARGETS simple_string_client
+  RUNTIME DESTINATION bin
+)
+endif()
