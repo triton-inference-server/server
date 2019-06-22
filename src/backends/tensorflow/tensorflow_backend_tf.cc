@@ -515,12 +515,14 @@ TRTISTF_TensorNew(
   ConvertShape(shape, &tfshape);
 
   TensorImpl* tensor = new TensorImpl(name, dtype, shape, tfshape);
-  // If data type is non-string, make sure TensorImpl contains
-  // valid TF tensor
-  if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING &&
-      tensor->Base() == nullptr) {
-    delete tensor;
-    return nullptr;
+  // If data type is non-string, make sure TensorImpl contains valid TF tensor
+  if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
+    // tensor's byte size is set to value required and it is independent to
+    // the data pointer. So make sure data is not nullptr if byte size > 0
+    if ((tensor->ByteSize() != 0) && (tensor->Base() == nullptr)) {
+      delete tensor;
+      return nullptr;
+    }
   }
   return reinterpret_cast<TRTISTF_Tensor*>(tensor);
 }
