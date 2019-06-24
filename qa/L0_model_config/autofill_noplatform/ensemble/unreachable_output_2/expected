@@ -1,1 +1,1 @@
-no data will be written to ensemble output prob_2 for ensemble unreachable_output_2
+output 'prob_2' for ensemble 'unreachable_output_2' is not written

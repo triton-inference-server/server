@@ -29,7 +29,7 @@ CLIENT_LOG="./client.log"
 CLIENT=model_config_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_TIMEOUT=30
+SERVER_TIMEOUT=20
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 
@@ -54,6 +54,47 @@ for modelpath in \
     cp /data/inferenceserver/qa_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
 done
+
+# The tests in autofill_noplatform/ensemble_norun cannot be run until
+# DLIS-519 is resolved. Once that issue is resolve the tests should be
+# moved into autofill_noplatform/ensemble and the following
+# initialization should be uncommented.
+rm -fr autofill_noplatform/ensemble_norun
+#for modelpath in \
+#    autofill_noplatform/ensemble/invalid_input_map/invalid_input_map/1 \
+#        autofill_noplatform/ensemble/invalid_input_map/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/invalid_input_map/fp32_dim1_batch4_input4/1 \
+#        autofill_noplatform/ensemble/invalid_input_map/fp32_dim1_batch4_output3/1 \
+#        autofill_noplatform/ensemble/invalid_output_map/invalid_output_map/1 \
+#        autofill_noplatform/ensemble/invalid_output_map/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/invalid_output_map/fp32_dim1_batch4_input4/1 \
+#        autofill_noplatform/ensemble/invalid_output_map/fp32_dim1_batch4_output3/1 \
+#        autofill_noplatform/ensemble/invalid_batch_size/invalid_batch_size/1 \
+#        autofill_noplatform/ensemble/invalid_batch_size/invalid_batch_size/1 \
+#        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch2/1 \
+#        autofill_noplatform/ensemble/invalid_batch_size/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/inconsistent_shape/inconsistent_shape/1 \
+#        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/inconsistent_shape/fp32_dim3_batch4/1 \
+#        autofill_noplatform/ensemble/inconsistent_data_type/inconsistent_data_type/1 \
+#        autofill_noplatform/ensemble/inconsistent_data_type/fp32_dim1_batch2/1 \
+#        autofill_noplatform/ensemble/inconsistent_data_type/int32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/embedded_ensemble/ensemble/1 \
+#        autofill_noplatform/ensemble/embedded_ensemble/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/embedded_ensemble/inner_ensemble/1 \
+#        autofill_noplatform/ensemble/non_existing_model/non_existing_model/1 \
+#        autofill_noplatform/ensemble/non_existing_model/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/non_existing_model/fp32_dim1_batch4_output3/1 \
+#        autofill_noplatform/ensemble/self_circular_dependency/self_circular_dependency/1 \
+#        autofill_noplatform/ensemble/self_circular_dependency/fp32_dim1_batch4/1 \
+#        autofill_noplatform/ensemble/self_circular_dependency/fp32_dim1_batch4_input4/1 \
+#        autofill_noplatform/ensemble/self_circular_dependency/fp32_dim1_batch4_output3/1 \
+#        autofill_noplatform/ensemble/circular_dependency/circular_dependency/1 \
+#        autofill_noplatform/ensemble/circular_dependency/circular_dependency_2/1 ; do
+#    mkdir -p $modelpath
+#    cp ./libidentity.so $modelpath/libcustom.so
+#done
+
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0

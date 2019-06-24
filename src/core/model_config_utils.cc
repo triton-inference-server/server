@@ -532,25 +532,27 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
   if (config.platform() != kEnsemblePlatform) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "ensemble scheduling can not be set for model " + config.name() +
-            " whose platform is not " + kEnsemblePlatform);
+        "ensemble scheduling cannot be set for model '" + config.name() +
+            "' whose platform is not " + kEnsemblePlatform);
   }
   if (config.instance_group().size() != 0) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "instance group should not be specified for ensemble " + config.name());
+        "instance group should not be specified for ensemble '" +
+            config.name() + "'");
   }
   if (config.has_optimization()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "optimization should not be specified for ensemble " + config.name());
+        "optimization should not be specified for ensemble '" + config.name() +
+            "'");
   }
 
   // Make sure step is not empty and all fields are set
   if (config.ensemble_scheduling().step_size() == 0) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "must specify 'step' for ensemble " + config.name());
+        "must specify 'step' for ensemble '" + config.name() + "'");
   }
 
   std::unordered_map<std::string, EnsembleTensor> tensors;
@@ -563,9 +565,9 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     auto it = tensors.find(input.name());
     if (it == tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "must map ensemble input " +
-                                              input.name() + " for ensemble " +
-                                              config.name());
+          RequestStatusCode::INVALID_ARG, "ensemble input '" + input.name() +
+                                              "' for ensemble " +
+                                              config.name() + "' is not used");
     }
     it->second.ready = true;
     ready_queue.push_back(&(it->second));
@@ -595,38 +597,31 @@ ValidateEnsembleSchedulingConfig(const ModelConfig& config)
     auto it = tensors.find(output.name());
     if (it == tensors.end()) {
       return Status(
-          RequestStatusCode::INVALID_ARG, "must map ensemble output " +
-                                              output.name() + " for ensemble " +
-                                              config.name());
+          RequestStatusCode::INVALID_ARG, "ensemble output '" + output.name() +
+                                              "' for ensemble " +
+                                              config.name() + "' is not used");
     }
     if (!it->second.ready) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "no data will be written to ensemble output " + output.name() +
-              " for ensemble " + config.name());
+          "output '" + output.name() + "' for ensemble '" + config.name() +
+              "' is not written");
     } else {
       outputs.insert(it->first);
     }
   }
   // Check redundant ensemble tensors
   for (const auto& tensor : tensors) {
-    // skip ensemble outputs as they have been check and can have no next nodes
+    // skip ensemble outputs as they have been checked and can have no
+    // next nodes
     if (outputs.find(tensor.first) != outputs.end()) {
       continue;
     }
-    if (!tensor.second.ready) {
+    if (!tensor.second.ready || (tensor.second.next_nodes.size() == 0)) {
       return Status(
-          RequestStatusCode::INVALID_ARG,
-          "ensemble tensor " + tensor.first +
-              " is redundant as no data will be written to it for ensemble " +
-              config.name());
-    } else if (tensor.second.next_nodes.size() == 0) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "ensemble tensor " + tensor.first +
-              " is redundant as it will not be used in any models for "
-              "ensemble " +
-              config.name());
+          RequestStatusCode::INVALID_ARG, "ensemble tensor '" + tensor.first +
+                                              "' is unused in ensemble '" +
+                                              config.name() + "'");
     }
   }
   return Status::Success;
@@ -638,23 +633,25 @@ BuildEnsembleGraph(
     std::unordered_map<std::string, EnsembleTensor>& keyed_ensemble_graph)
 {
   keyed_ensemble_graph.clear();
+  size_t step_idx = 0;
   for (const auto& element : config.ensemble_scheduling().step()) {
     if (element.model_name().empty()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "must specify 'model_name' in step of ensemble " + config.name());
+          "must specify 'model_name' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
     }
     if (element.input_map().size() == 0) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "must specify one or more 'input_map' in step of ensemble " +
-              config.name());
+          "must specify 'input_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
     }
     if (element.output_map().size() == 0) {
       return Status(
           RequestStatusCode::INVALID_ARG,
-          "must specify one or more 'output_map' in step of ensemble " +
-              config.name());
+          "must specify 'output_map' in step " + std::to_string(step_idx) +
+              " of ensemble '" + config.name() + "'");
     }
 
     // Link ensemble tensors
@@ -665,9 +662,9 @@ BuildEnsembleGraph(
         if (it->second.isOutput) {
           return Status(
               RequestStatusCode::INVALID_ARG,
-              "ensemble tensor " + it->first +
-                  " can appear in an output map only once for ensemble " +
-                  config.name());
+              "ensemble tensor '" + it->first +
+                  "' can appear in an output map only once for ensemble '" +
+                  config.name() + "' step " + std::to_string(step_idx));
         } else {
           it->second.isOutput = true;
         }
@@ -685,10 +682,10 @@ BuildEnsembleGraph(
       if (model_inputs.find(input_map.first) != model_inputs.end()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            "input " + input_map.first + " in model " + element.model_name() +
-                " is mapped to multiple ensemble tensors in one step for "
-                "ensemble " +
-                config.name());
+            "input '" + input_map.first + "' in model '" +
+                element.model_name() +
+                "' is mapped to multiple ensemble tensors for ensemble '" +
+                config.name() + "' step " + std::to_string(step_idx));
       } else {
         model_inputs.emplace(input_map.first);
       }
@@ -704,6 +701,8 @@ BuildEnsembleGraph(
         it->second.next_nodes.push_back(output);
       }
     }
+
+    step_idx++;
   }
 
   return Status::Success;
