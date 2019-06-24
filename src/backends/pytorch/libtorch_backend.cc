@@ -689,12 +689,31 @@ LibTorchBackend::Context::Run(
         total_batch_size, payloads, &input_buffers));
   }
 
+  std::string deliminator = "__";
+  int ip_index;
+
   if (input_override_map != nullptr) {
     for (const auto& pr : *input_override_map) {
       const std::string& name = pr.first;
+      LOG_VERBOSE(1) << "Processing extra input: " << name;
       const std::shared_ptr<InferRequestProvider::InputOverride>& override =
           pr.second;
-      int ip_index = input_index_map_[name];
+      try {
+        int start_pos = name.find(deliminator);
+        if (start_pos == -1) {
+          throw std::invalid_argument(
+              "Input '" + name +
+              "' does not follow naming convention i.e. <name>__<index>.");
+        }
+        ip_index = std::atoi(name.substr(start_pos + 2).c_str());
+      }
+      catch (std::exception& ex) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "Input '" + name +
+                "' does not follow naming convention i.e. <name>__<index>.");
+      }
+      input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
           total_batch_size, payloads, &input_buffers));

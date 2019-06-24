@@ -226,6 +226,8 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/li
       /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
     ln -s libtorch.so.1 libtorch.so
+COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libthnvrtc.so \
+      /opt/tensorrtserver/lib/
 
 # Onnx Runtime headers and library
 ARG ONNX_RUNTIME_VERSION=0.4.0
