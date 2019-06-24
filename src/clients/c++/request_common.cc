@@ -886,7 +886,7 @@ InferContextImpl::UpdateStat(const RequestTimers& timer)
     return Error(
         RequestStatusCode::INVALID_ARG,
         "Timer not set correctly." +
-            ((timer.request_start_ > timer.request_end_)
+            ((request_start_ns > request_end_ns)
                  ? (" Request time from " + std::to_string(request_start_ns) +
                     " to " + std::to_string(request_end_ns) + ".")
                  : "") +
