@@ -39,7 +39,7 @@
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
 ## /tmp/qa_variable_model_repository, /tmp/qa_zero_model_repository,
-## /tmp/qa_reshape_model_repository,
+## /tmp/qa_reshape_model_repository, /tmp/qa_noshape_model_repository,
 ## /tmp/qa_sequence_model_repository, and
 ## /tmp/qa_variable_sequence_model_repository directories containing
 ## all the models needed for CI testing.
@@ -89,6 +89,7 @@ mkdir -p $HOST_SRCDIR
 cp ./gen_qa_models.py $HOST_SRCDIR/.
 cp ./gen_qa_zero_models.py $HOST_SRCDIR/.
 cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
+cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
