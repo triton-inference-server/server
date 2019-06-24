@@ -602,9 +602,15 @@ BaseBackend::Context::Run(
   // Create a tensor for each input sized correctly for the total
   // payload batch size. Concatenate input values from each payload
   // into the corresponding tensor.
-  // [TODO] should be responsible for calling TRTISTF_TensorListDelete
-  //        if there is error and returning before calling TRTISTF_ModelRun
-  TRTISTF_TensorList* input_tensors = nullptr;
+
+  // Smart pointer is TensorList** as the pointer to input head (TensorList*)
+  // will be updated in SetInput()
+  TRTISTF_TensorList* input_head_ptr = nullptr;
+  static auto input_deleter = [](TRTISTF_TensorList** list) {
+    TRTISTF_TensorListDelete(*list);
+  };
+  std::unique_ptr<TRTISTF_TensorList*, decltype(input_deleter)> input_tensors(
+      &input_head_ptr, input_deleter);
 
   // Inputs from the request...
   for (const auto& input : input_request_provider->RequestHeader().input()) {
@@ -615,7 +621,7 @@ BaseBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_tensors));
+        payloads, input_tensors.get()));
   }
 
   // Additional inputs added to the provider...
@@ -628,7 +634,7 @@ BaseBackend::Context::Run(
           pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &input_tensors));
+          payloads, input_tensors.get()));
     }
   }
 
@@ -668,8 +674,8 @@ BaseBackend::Context::Run(
   {
     TRTISTF_TensorList* rtl;
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelRun(
-        trtistf_model_.get(), input_tensors, required_outputs.size(),
-        output_names_cstr, &rtl));
+        trtistf_model_.get(), *(input_tensors.release()),
+        required_outputs.size(), output_names_cstr, &rtl));
     output_tensors.reset(rtl);
   }
 
