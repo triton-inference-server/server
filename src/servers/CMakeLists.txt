@@ -284,6 +284,15 @@ if(${TRTIS_ENABLE_GCS})
   )
 endif() # TRTIS_ENABLE_GCS
 
+if(${TRTIS_ENABLE_S3})
+  find_package(AWSSDK REQUIRED COMPONENTS s3)
+  message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
+  target_link_libraries(
+    trtserver
+    PRIVATE ${AWS_LINK_LIBRARIES}
+  )
+endif() # TRTIS_ENABLE_S3
+
 if(${TRTIS_ENABLE_GPU})
 target_link_libraries(
   trtserver

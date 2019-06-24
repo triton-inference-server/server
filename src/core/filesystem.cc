@@ -27,9 +27,15 @@
 #include "src/core/filesystem.h"
 
 #include <dirent.h>
+
 #ifdef TRTIS_ENABLE_GCS
 #include <google/cloud/storage/client.h>
 #endif  // TRTIS_ENABLE_GCS
+
+#ifdef TRTIS_ENABLE_S3
+#include <aws/s3/S3Client.h>
+#endif // TRTIS_ENABLE_S3
+
 #include <google/protobuf/text_format.h>
 #include <sys/stat.h>
 #include <unistd.h>

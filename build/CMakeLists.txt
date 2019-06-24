@@ -45,6 +45,7 @@ option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 
 # Cloud storage
 option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
+option(TRTIS_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 
 # Multiple paths may be specified by separating them with semicolon
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
@@ -258,6 +259,24 @@ ExternalProject_Add(google-cloud-cpp
 )
 
 #
+# Build AWS sdk for S3 support
+#
+ExternalProject_Add(aws-sdk-cpp
+  PREFIX aws-sdk-cpp
+  GIT_REPOSITORY "https://github.com/aws/aws-sdk-cpp.git"
+  GIT_TAG "1.7.129"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/src/aws-sdk-cpp"
+  CMAKE_CACHE_ARGS
+    -DBUILD_ONLY:STRING=s3
+    -DBUILD_SHARED_LIBS:BOOL=OFF
+    -DFORCE_SHARED_CRT:BOOL=OFF
+    -DMINIMIZE_SIZE:BOOL=ON
+    -DENABLE_TESTING:BOOL=OFF
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
+    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install
+)
+
+#
 # Build TRTIS test utilities
 #
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
@@ -355,6 +374,11 @@ if(${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
 endif() # TRTIS_ENABLE_METRICS
 
+if(${TRTIS_ENABLE_S3})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
+endif() # TRTIS_ENABLE_S3
+
+
 ExternalProject_Add(trtis
   PREFIX trtis
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis"
@@ -371,6 +395,7 @@ ExternalProject_Add(trtis
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
+    -DAWSSDK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/AWSSDK
     -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
     -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
@@ -382,6 +407,7 @@ ExternalProject_Add(trtis
     -DTRTIS_MIN_COMPUTE_CAPABILITY:STRING=${TRTIS_MIN_COMPUTE_CAPABILITY}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_GCS:BOOL=${TRTIS_ENABLE_GCS}
+    -DTRTIS_ENABLE_S3:BOOL=${TRTIS_ENABLE_S3}
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}
     -DTRTIS_ENABLE_TENSORRT:BOOL=${TRTIS_ENABLE_TENSORRT}
     -DTRTIS_ENABLE_CAFFE2:BOOL=${TRTIS_ENABLE_CAFFE2}
