@@ -41,9 +41,9 @@ from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
 if os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef", "custom")
+    _trials = ("savedmodel", "graphdef", "netdef", "custom", "libtorch")
 else:
-    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom")
+    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch")
 
 _max_queue_delay_ms = 10000
 _check_exception = None
@@ -78,6 +78,13 @@ class BatcherTest(unittest.TestCase):
                                use_grpc=False, skip_request_id_check=True,
                                use_streaming=False)
             elif trial == "custom":
+                tensor_shape = (input_size,)
+                iu.infer_exact(self, trial, tensor_shape, bs,
+                               np.float32, np.float32, np.float32, swap=False,
+                               model_version=1, outputs=requested_outputs,
+                               use_grpc=False, skip_request_id_check=True,
+                               use_streaming=False)
+            elif trial == "libtorch":
                 tensor_shape = (input_size,)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,

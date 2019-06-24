@@ -201,6 +201,7 @@ if(${TRTIS_ENABLE_PYTORCH})
     trtserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltorch
+    PUBLIC -lthnvrtc
   )
 endif() # TRTIS_ENABLE_PYTORCH
 

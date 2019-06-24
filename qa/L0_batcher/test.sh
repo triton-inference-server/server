@@ -46,6 +46,7 @@ for m in \
         $DATADIR/qa_model_repository/graphdef_float32_float32_float32 \
         $DATADIR/qa_model_repository/netdef_float32_float32_float32 \
         $DATADIR/qa_model_repository/plan_float32_float32_float32 \
+        $DATADIR/qa_model_repository/libtorch_float32_float32_float32 \
         ../custom_models/custom_float32_float32_float32 ; do
     cp -r $m models/. &&
         (cd models/$(basename $m) && \
@@ -61,6 +62,7 @@ for m in \
         $DATADIR/qa_variable_model_repository/graphdef_float32_float32_float32 \
         $DATADIR/qa_variable_model_repository/netdef_float32_float32_float32 \
         $DATADIR/qa_variable_model_repository/plan_float32_float32_float32 \
+        $DATADIR/qa_variable_model_repository/libtorch_float32_float32_float32 \
         ../custom_models/custom_float32_float32_float32 ; do
     cp -r $m var_models/. && \
         (cd var_models/$(basename $m) && \
