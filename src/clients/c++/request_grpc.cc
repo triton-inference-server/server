@@ -27,6 +27,7 @@
 #include "src/clients/c++/request_grpc.h"
 
 #include <grpcpp/grpcpp.h>
+#include <cstdint>
 #include <iostream>
 #include "src/clients/c++/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
@@ -533,7 +534,10 @@ InferGrpcContextImpl::Run(ResultMap* results)
   sync_request->Timer().Reset();
   // Use send timer to measure time for marshalling infer request
   sync_request->Timer().Record(RequestTimers::Kind::SEND_START);
-  PreRunProcessing(sync_request_);
+  Error err = PreRunProcessing(sync_request_);
+  if (!err.IsOk()) {
+    return err;
+  }
   sync_request->Timer().Record(RequestTimers::Kind::SEND_END);
 
   sync_request->Timer().Record(RequestTimers::Kind::REQUEST_START);
@@ -546,7 +550,7 @@ InferGrpcContextImpl::Run(ResultMap* results)
   Error request_status = sync_request->GetResults(*this, results);
   sync_request->Timer().Record(RequestTimers::Kind::RECEIVE_END);
 
-  Error err = UpdateStat(sync_request->Timer());
+  err = UpdateStat(sync_request->Timer());
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }
@@ -596,7 +600,11 @@ InferGrpcContextImpl::AsyncRun(
 
   current_context->Timer().Reset();
   current_context->Timer().Record(RequestTimers::Kind::SEND_START);
-  PreRunProcessing(*async_request);
+  Error err = PreRunProcessing(*async_request);
+  if (!err.IsOk()) {
+    ongoing_async_requests_.erase(current_context->Id());
+    return err;
+  }
   current_context->Timer().Record(RequestTimers::Kind::SEND_END);
 
   current_context->Timer().Record(RequestTimers::Kind::REQUEST_START);
@@ -685,6 +693,16 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
           reinterpret_cast<const char*>(data_ptr), data_byte_size);
     }
     input_pos_idx++;
+  }
+
+  if (request_.ByteSizeLong() > INT_MAX) {
+    size_t request_size = request_.ByteSizeLong();
+    request_.Clear();
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "Request has byte size " + std::to_string(request_size) +
+            " which exceed gRPC's byte size limit " + std::to_string(INT_MAX) +
+            ".");
   }
 
   return Error::Success;
@@ -859,7 +877,11 @@ InferGrpcStreamContextImpl::AsyncRun(
 
   current_context->Timer().Reset();
   current_context->Timer().Record(RequestTimers::Kind::SEND_START);
-  PreRunProcessing(*async_request);
+  Error err = PreRunProcessing(*async_request);
+  if (!err.IsOk()) {
+    ongoing_async_requests_.erase(current_context->Id());
+    return err;
+  }
   current_context->Timer().Record(RequestTimers::Kind::SEND_END);
 
   current_context->Timer().Record(RequestTimers::Kind::REQUEST_START);
