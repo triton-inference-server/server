@@ -32,6 +32,9 @@ namespace nvidia { namespace inferenceserver {
 // Logger for TensorRT API
 class TensorRTLogger : public nvinfer1::ILogger {
   void log(Severity severity, const char* msg) override;
+
+ public:
+  nvinfer1::ILogger& getTRTLogger();
 };
 
 extern TensorRTLogger tensorrt_logger;

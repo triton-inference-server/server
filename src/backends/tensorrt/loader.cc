@@ -26,8 +26,11 @@
 
 #include "src/backends/tensorrt/loader.h"
 
+#include <NvInferPlugin.h>
 #include <NvOnnxParserRuntime.h>
+#include <mutex>
 #include "src/backends/tensorrt/logging.h"
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -38,6 +41,23 @@ LoadPlan(
 {
   *engine = nullptr;
   *runtime = nullptr;
+
+  // Register all the default plugins that come with TensorRT: RPROI_TRT
+  // Normalize_TRT, PriorBox_TRT, GridAnchor_TRT, NMS_TRT, LReLU_TRT, Reorg_TRT,
+  // Region_TRT and Clip_TRT
+  std::once_flag onceFlag;
+  {
+    std::call_once(onceFlag, [] {
+      bool success = initLibNvInferPlugins(&tensorrt_logger.getTRTLogger(), "");
+      if (!success) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to register default TensorRT Plugins");
+      }
+      LOG_VERBOSE(1) << "Registered TensorRT Plugins successfully.";
+      return Status::Success;
+    });
+  }
 
   // Create plugin factory to provide onnx plugins. This should be
   // generalized based on what the model requires [DLIS-54]
