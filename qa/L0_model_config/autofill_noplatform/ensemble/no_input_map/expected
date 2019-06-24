@@ -1,1 +1,1 @@
-must specify one or more 'input_map' in step of ensemble no_input_map
+must specify 'input_map' in step 1 of ensemble 'no_input_map'

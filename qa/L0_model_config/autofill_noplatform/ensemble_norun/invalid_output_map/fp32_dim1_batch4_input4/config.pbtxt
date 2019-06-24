@@ -1,0 +1,52 @@
+name: "fp32_dim1_batch4_input4"
+max_batch_size: 4
+platform: "custom"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT2"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT3"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT2"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT3"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]

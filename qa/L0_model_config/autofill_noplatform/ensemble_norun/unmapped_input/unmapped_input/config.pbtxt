@@ -1,0 +1,67 @@
+name: "unmapped_input"
+max_batch_size: 2
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "fp32_dim1_batch4_output3"
+      input_map {
+        key: "INPUT0"
+        value: "data"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "data"
+      }
+      input_map {
+        key: "INPUT2"
+        value: "data"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "temp_tensor_2"
+      }
+      output_map {
+        key: "OUTPUT1"
+        value: "temp_tensor_3"
+      }
+      output_map {
+        key: "OUTPUT2"
+        value: "temp_tensor_4"
+      }
+    },
+    {
+      model_name: "fp32_dim1_batch4_input4"
+      input_map {
+        key: "INPUT1"
+        value: "temp_tensor_2"
+      }
+      input_map {
+        key: "INPUT2"
+        value: "temp_tensor_3"
+      }
+      input_map {
+        key: "INPUT3"
+        value: "temp_tensor_4"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "prob"
+      }
+    }
+  ]
+}
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
