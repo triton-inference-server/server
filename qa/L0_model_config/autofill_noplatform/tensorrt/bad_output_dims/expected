@@ -1,1 +1,1 @@
-output 'OUTPUT1' dims \[16,1,1\] don't match configuration dims \[7\] for bad_output_dims_0_gpu0
+unexpected shape for output 'OUTPUT1', model configuration shape is \[7\], inference shape is \[16,1,1\]
