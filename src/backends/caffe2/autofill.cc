@@ -92,11 +92,7 @@ AutoFillNetDef::Create(
   }
 
   const std::string netdef0_file = *(netdef_files.begin());
-  const auto netdef0_path = JoinPath({version_path, netdef0_file});
-
   const std::string netdef1_file = *(std::next(netdef_files.begin()));
-  const auto netdef1_path = JoinPath({version_path, netdef1_file});
-
 
   // If find both files named with the default netdef names then
   // assume it is a netdef. In the future we can be smarter here and

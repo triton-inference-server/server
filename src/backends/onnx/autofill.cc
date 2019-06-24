@@ -276,7 +276,10 @@ AutoFillOnnx::Create(
     const auto onnx_path = JoinPath({version_path, onnx_file});
 
     // Load session
-    status = OnnxLoader::LoadSession(onnx_path, session_options, &session);
+    std::string onnx_file_content;
+    RETURN_IF_ERROR(ReadTextFile(onnx_path, &onnx_file_content));
+    status =
+        OnnxLoader::LoadSession(onnx_file_content, session_options, &session);
 
     if (status.IsOk()) {
       local_autofill.reset(new AutoFillOnnxImpl(model_name, onnx_file));
