@@ -1,1 +1,1 @@
-must map ensemble output prob_2 for ensemble unreachable_output
+ensemble output 'prob_2' for ensemble unreachable_output' is not used

@@ -49,7 +49,7 @@ struct TensorNode {
   std::vector<TensorNode*> next_nodes;
 };
 
-/// Validate if the data type and the shap of two TensorNode object are
+/// Validate if the data type and the shape of two TensorNode object are
 /// consistent.
 /// \param lhs One of the TensorNode object to be validated.
 /// \param rhs Another TensorNode object to be validated.

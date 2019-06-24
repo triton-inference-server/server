@@ -1,1 +1,1 @@
-instance group should not be specified for ensemble instance_group_set
+instance group should not be specified for ensemble 'instance_group_set'

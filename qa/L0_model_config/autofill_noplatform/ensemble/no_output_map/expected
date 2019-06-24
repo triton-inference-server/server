@@ -1,1 +1,1 @@
-must specify one or more 'output_map' in step of ensemble no_output_map
+must specify 'output_map' in step 1 of ensemble 'no_output_map'
