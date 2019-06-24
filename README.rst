@@ -37,9 +37,9 @@ NVIDIA TensorRT Inference Server
 
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
-    latest release of the TensorRT Inference Server is 1.2.0 and
-    is available on branch** `r19.05
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.05>`_.
+    latest release of the TensorRT Inference Server is 1.3.0 and
+    is available on branch** `r19.06
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.06>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -53,10 +53,10 @@ inference server provides the following features:
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#framework-model-definition>`_. The
   server can manage any number and mix of models (limited by system
   disk and memory resources). Supports TensorRT, TensorFlow GraphDef,
-  TensorFlow SavedModel and Caffe2 NetDef model formats. Also supports
-  TensorFlow-TensorRT integrated models. Variable-size input and
-  output tensors are allowed if supported by the framework. See
-  `Capabilities
+  TensorFlow SavedModel, ONNX, PyTorch, and Caffe2 NetDef model
+  formats. Also supports TensorFlow-TensorRT integrated
+  models. Variable-size input and output tensors are allowed if
+  supported by the framework. See `Capabilities
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/capabilities.html#capabilities>`_
   for detailed support information for each framework.
 
@@ -115,16 +115,16 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 1.2.0 and
-corresponds to the 19.05 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 1.3.0 and
+corresponds to the 19.06 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r19.05
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.05>`_.
+this release is `r19.06
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.06>`_.
 
 Backwards Compatibility
 -----------------------
 
-Continuing in version 1.2.0 the following interfaces maintain
+Continuing in version 1.3.0 the following interfaces maintain
 backwards compatibilty with the 1.0.0 release. If you have model
 configuration files, custom backends, or clients that use the
 inference server HTTP or GRPC APIs (either directly or through the

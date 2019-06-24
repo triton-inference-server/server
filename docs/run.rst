@@ -57,7 +57,7 @@ sure to checkout the release version of the branch that corresponds to
 the server you are using (or the master branch if you are using a
 server build from master)::
 
-  $ git checkout r19.05
+  $ git checkout r19.06
   $ cd docs/examples
   $ ./fetch_models.sh
 
@@ -98,7 +98,7 @@ you pulled from NGC or built locally::
   $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
 
 Where *<tensorrtserver image name>* will be something like
-**nvcr.io/nvidia/tensorrtserver:19.05-py3** if you :ref:`pulled the
+**nvcr.io/nvidia/tensorrtserver:19.06-py3** if you :ref:`pulled the
 container from the NGC registry
 <section-installing-prebuilt-containers>`, or **tensorrtserver** if
 you :ref:`built it from source <section-building>`.
