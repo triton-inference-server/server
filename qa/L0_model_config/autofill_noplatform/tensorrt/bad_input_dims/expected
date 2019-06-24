@@ -1,1 +1,1 @@
-input 'INPUT1' dims \[16,1,1\] don't match configuration dims \[16,1\] for bad_input_dims_0_gpu0
+unexpected shape for input 'INPUT1', model configuration shape is \[16,1\], inference shape is \[16,1,1\]
