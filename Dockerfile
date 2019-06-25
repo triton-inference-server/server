@@ -222,10 +222,8 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/libmkl_vml_def.so /opt/tensorrtserve
 # LibTorch headers and library
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/include \
      /opt/tensorrtserver/include/torch
-COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so.1 \
+COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
       /opt/tensorrtserver/lib/
-RUN cd /opt/tensorrtserver/lib && \
-    ln -s libtorch.so.1 libtorch.so
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libthnvrtc.so \
       /opt/tensorrtserver/lib/
 
