@@ -711,8 +711,8 @@ def create_onnx_modelfile(
     onnx_output1_dtype = np_to_onnx_dtype(output1_dtype)
 
     onnx_input_shape, idx = tu.shape_to_onnx_shape(input_shape, 0)
-    onnx_output0_shape, idx = tu.shape_to_onnx_shape(output0_shape, idx)
-    onnx_output1_shape, idx = tu.shape_to_onnx_shape(output1_shape, idx)
+    onnx_output0_shape, idx = tu.shape_to_onnx_shape(input_shape, idx)
+    onnx_output1_shape, idx = tu.shape_to_onnx_shape(input_shape, idx)
 
     # Create the model
     model_name = tu.get_model_name("onnx_nobatch" if max_batch == 0 else "onnx",
