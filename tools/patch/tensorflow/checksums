@@ -1,6 +1,5 @@
-8e1307417d57caca270ff21dc0f8909de87f638b  /opt/tensorflow/tensorflow/cc/saved_model/loader.cc
-cac059d40d52b562cccb4d9aadc28f707ff1d3fa  /opt/tensorflow/tensorflow/BUILD
-f21dcd47b5a493442749cff0ab20c2d17b3c8a7f  /opt/tensorflow/tensorflow/tf_version_script.lds
-162ae7cb6b4a80d59f3ef1132032c3d7283024e8  /opt/tensorflow/nvbuild.sh
-eb8f397dbcfb8aad758765fc134ca6e5bfe9a706  /opt/tensorflow/bazel_build.sh
+8e1307417d57caca270ff21dc0f8909de87f638b  /opt/tensorflow/tensorflow-source/tensorflow/cc/saved_model/loader.cc
+cac059d40d52b562cccb4d9aadc28f707ff1d3fa  /opt/tensorflow/tensorflow-source/tensorflow/BUILD
+f21dcd47b5a493442749cff0ab20c2d17b3c8a7f  /opt/tensorflow/tensorflow-source/tensorflow/tf_version_script.lds
+f8e0f5cead38c854c738efcc773426cae7c9288c  /opt/tensorflow/nvbuild.sh
 bc67c9d5ce461f4ae9873eb19f1c8811197ea11b  /opt/tensorflow/nvbuildopts
