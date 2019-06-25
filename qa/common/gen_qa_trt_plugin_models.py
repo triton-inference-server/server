@@ -73,11 +73,12 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
-def get_trt_plugin(plugin_name):
+def get_trt_lrelu_plugin(plugin_name):
         plugin = None
         for plugin_creator in PLUGIN_CREATORS:
             if plugin_creator.name == plugin_name:
-                lrelu_slope_field = trt.PluginField("neg_slope", np.array([0.1], dtype=np.float32), trt.PluginFieldType.FLOAT32)
+                lrelu_slope_field = trt.PluginField("neg_slope", np.array([0.1],\
+                    dtype=np.float32), trt.PluginFieldType.FLOAT32)
                 field_collection = trt.PluginFieldCollection([lrelu_slope_field])
                 plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
         return plugin
@@ -100,7 +101,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version,
         builder.set_max_batch_size(max(1, max_batch))
         builder.set_max_workspace_size(1 << 20)
         input_layer = network.add_input(name="INPUT0", dtype=trt_input_dtype, shape=input_shape)
-        lrelu = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_plugin("LReLU_TRT"))
+        lrelu = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_lrelu_plugin("LReLU_TRT"))
         lrelu.get_output(0).name = "OUTPUT0"
         network.mark_output(lrelu.get_output(0))
 
