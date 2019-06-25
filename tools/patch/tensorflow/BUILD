@@ -1,10 +1,10 @@
 diff --git a/tensorflow/BUILD b/tensorflow/BUILD
-index 823ad8f..b7f835f 100644
+index a04ddf9..28f1db3 100644
 --- a/tensorflow/BUILD
 +++ b/tensorflow/BUILD
-@@ -486,6 +486,20 @@ tf_cc_shared_object(
-     ],
- )
+@@ -531,6 +531,20 @@ tf_cc_shared_object(
+ # an "-exported_symbols_list" command.  -z defs disallows undefined
+ # symbols in object files.
  
 +cc_library(
 +    name = "trtis_tf",
@@ -21,18 +21,15 @@ index 823ad8f..b7f835f 100644
 +)
 +
  tf_cc_shared_object(
-     name = "libtensorflow_cc.so",
+     name = "tensorflow",
      linkopts = select({
-@@ -502,6 +516,12 @@ tf_cc_shared_object(
+@@ -585,6 +599,9 @@ tf_cc_shared_object(
+         "//conditions:default": None,
      }),
-     visibility = ["//visibility:public"],
      deps = [
 +        ":trtis_tf",
 +        "//tensorflow/contrib:contrib_kernels",
 +        "//tensorflow/contrib:contrib_ops_op_lib",
-+        "//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
-+        "//tensorflow/contrib/tensorrt:trt_engine_op_kernel",
-+        "//tensorflow/contrib/tensorrt:trt_shape_function",
          "//tensorflow:tf_exported_symbols.lds",
          "//tensorflow:tf_version_script.lds",
          "//tensorflow/c:c_api",
