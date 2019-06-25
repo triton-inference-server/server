@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,23 +25,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_LOG="./client_trt_plugin.log"
+CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
 
-DATADIR=`pwd`/models
+DATADIR=/data/inferenceserver/qa_trt_plugin_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-# Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120"
-SERVER_LOG="./server_trt_plugin.log"
+SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
-
-rm -fr models && \
-    cp -r /data/inferenceserver/trt_plugin_models models
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

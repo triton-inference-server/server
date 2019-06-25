@@ -61,7 +61,7 @@ HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
 HOST_ENSEMBLEDESTDIR=/tmp/qa_ensemble_model_repository
 HOST_NOSHAPEDESTDIR=/tmp/qa_noshape_model_repository
-HOST_PLGDESTDIR=/tmp/trt_plugin_models
+HOST_PLGDESTDIR=/tmp/qa_trt_plugin_model_repository
 
 rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_ZERODESTDIR $HOST_RESHAPEDESTDIR
@@ -95,7 +95,7 @@ cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
-cp ./gen_plugin_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 
 C2SCRIPT=c2_gen.cmds

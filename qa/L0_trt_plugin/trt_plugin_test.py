@@ -41,16 +41,19 @@ class PluginModelTest(unittest.TestCase):
             in0 = np.random.randn(16,1,1).astype(input_dtype)
             input_list.append(in0)
 
-        config = ("localhost:8000", ProtocolType.HTTP, False)
-        ctx = InferContext(config[0], config[1], model_name,
-                           correlation_id=0, streaming=config[2],
-                           verbose=True)
+        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name,
+                           correlation_id=0, streaming=False, verbose=True)
         results = ctx.run(
             { "INPUT0" : input_list }, { "OUTPUT0" : InferContext.ResultFormat.RAW},
             batch_size=batch_size)
 
         self.assertEqual(len(results), 1)
         self.assertTrue("OUTPUT0" in results)
+        result = results["OUTPUT0"]
+        # verify values of Leaky RELU (it uses 0.1 instead of the default 0.01)
+        for b in range(batch_size):
+            test_input = np.where(input_list[b] > 0, input_list[b], input_list[b] * 0.1)
+            self.assertTrue(all(np.isclose(result[b], test_input)))
 
     def test_raw_fff(self):
         # model that supports batching

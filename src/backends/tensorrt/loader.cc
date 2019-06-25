@@ -42,9 +42,7 @@ LoadPlan(
   *engine = nullptr;
   *runtime = nullptr;
 
-  // Register all the default plugins that come with TensorRT: RPROI_TRT
-  // Normalize_TRT, PriorBox_TRT, GridAnchor_TRT, NMS_TRT, LReLU_TRT, Reorg_TRT,
-  // Region_TRT and Clip_TRT
+  // Register all the default plugins that come with TensorRT
   std::once_flag onceFlag;
   {
     std::call_once(onceFlag, [] {
