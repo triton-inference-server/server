@@ -53,6 +53,7 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
     cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
     (cd models/custom_zero_1_float32 && \
             echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
 
 # Restart server before every test to make sure server state
