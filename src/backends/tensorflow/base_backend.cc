@@ -607,7 +607,9 @@ BaseBackend::Context::Run(
   // will be updated in SetInput()
   TRTISTF_TensorList* input_head_ptr = nullptr;
   static auto input_deleter = [](TRTISTF_TensorList** list) {
-    TRTISTF_TensorListDelete(*list);
+    if (list != nullptr) {
+      TRTISTF_TensorListDelete(*list);
+    }
   };
   std::unique_ptr<TRTISTF_TensorList*, decltype(input_deleter)> input_tensors(
       &input_head_ptr, input_deleter);
