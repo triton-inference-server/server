@@ -145,6 +145,30 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+def np_to_torch_dtype(np_dtype):
+    if np_dtype == np.bool:
+        return torch.bool
+    elif np_dtype == np.int8:
+        return torch.int8
+    elif np_dtype == np.int16:
+        return torch.int16
+    elif np_dtype == np.int32:
+        return torch.int
+    elif np_dtype == np.int64:
+        return torch.long
+    elif np_dtype == np.uint8:
+        return torch.uint8
+    elif np_dtype == np.uint16:
+        return None # Not supported in Torch
+    elif np_dtype == np.float16:
+        return None
+    elif np_dtype == np.float32:
+        return torch.float
+    elif np_dtype == np.float64:
+        return torch.double
+    elif np_dtype == np_dtype_string:
+        return None # Not supported in Torch
+
 def create_tf_modelfile(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
 
@@ -415,6 +439,107 @@ def create_onnx_modelconfig(
         cfile.write(config)
 
 
+def create_libtorch_modelfile(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+
+    model_name = tu.get_zero_model_name("libtorch_nobatch" if max_batch == 0 else "libtorch",
+                                   io_cnt, dtype)
+    # handle for -1 (when variable) since can't create tensor with shape of [-1]
+    torch_shape = [abs(s) for s in shape]
+    # Create the model
+    if io_cnt == 1:
+        class IdentityNet(nn.Module):
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+            def forward(self, input0):
+                return input0
+    elif io_cnt == 2:
+        class IdentityNet(nn.Module):
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+            def forward(self, input0, input1):
+                return input0, input1
+    elif io_cnt == 3:
+        class IdentityNet(nn.Module):
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+            def forward(self, input0, input1, input2):
+                return input0, input1, input2
+    elif io_cnt == 4:
+        class IdentityNet(nn.Module):
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+            def forward(self, input0, input1, input2, input3):
+                return input0, input1, input2, input3
+    identityModel = IdentityNet()
+    example_inputs = [torch.zeros(torch_shape, dtype=torch_dtype) for i in range(io_cnt)]
+    traced = torch.jit.trace(identityModel, tuple(example_inputs[i] for i in range(io_cnt)))
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_libtorch_modelconfig(
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    # Unpack version policy
+    version_policy_str = "{ latest { num_versions: 1 }}"
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_zero_model_name("libtorch_nobatch" if max_batch == 0 else "libtorch",
+                                   io_cnt, dtype)
+    shape_str = tu.shape_to_dims_str(shape)
+
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "pytorch_libtorch"
+max_batch_size: {}
+version_policy: {}
+'''.format(model_name, max_batch, version_policy_str)
+
+    for io_num in range(io_cnt):
+        config += '''
+input [
+  {{
+    name: "INPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+'''.format(io_num, np_to_model_dtype(dtype), shape_str,
+           io_num, np_to_model_dtype(dtype), shape_str)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
@@ -446,6 +571,13 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_onnx_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
             create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
 
+    if FLAGS.libtorch:
+        create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        if no_batch:
+            create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_libtorch_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
         create_ensemble_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
@@ -467,6 +599,8 @@ if __name__ == '__main__':
                         help='Generate NetDef models')
     parser.add_argument('--onnx', required=False, action='store_true',
                         help='Generate Onnx Runtime Onnx models')
+    parser.add_argument('--libtorch', required=False, action='store_true',
+                        help='Generate Pytorch LibTorch models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -479,6 +613,9 @@ if __name__ == '__main__':
         from tensorflow.python.framework import graph_io, graph_util
     if FLAGS.onnx:
         import onnx
+    if FLAGS.libtorch:
+        import torch
+        from torch import nn
 
     import test_util as tu
 

@@ -38,7 +38,7 @@
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
-## /tmp/qa_variable_model_repository, /tmp/qa_zero_model_repository,
+## /tmp/qa_variable_model_repository, /tmp/qa_identity_model_repository,
 ## /tmp/qa_reshape_model_repository, /tmp/qa_noshape_model_repository,
 ## /tmp/qa_sequence_model_repository, and
 ## /tmp/qa_variable_sequence_model_repository directories containing
@@ -55,7 +55,7 @@ CUDA_DEVICE=0
 HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/qa_model_repository
 HOST_VARDESTDIR=/tmp/qa_variable_model_repository
-HOST_ZERODESTDIR=/tmp/qa_zero_model_repository
+HOST_IDENTITYDESTDIR=/tmp/qa_identity_model_repository
 HOST_RESHAPEDESTDIR=/tmp/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
@@ -63,12 +63,12 @@ HOST_ENSEMBLEDESTDIR=/tmp/qa_ensemble_model_repository
 HOST_NOSHAPEDESTDIR=/tmp/qa_noshape_model_repository
 
 rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
-rm -fr $HOST_ZERODESTDIR $HOST_RESHAPEDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
-mkdir -p $HOST_ZERODESTDIR
+mkdir -p $HOST_IDENTITYDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
@@ -78,7 +78,7 @@ mkdir -p $HOST_NOSHAPEDESTDIR
 # are proper model stores
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_model_repository
-mkdir -p $HOST_ENSEMBLEDESTDIR/qa_zero_model_repository
+mkdir -p $HOST_ENSEMBLEDESTDIR/qa_identity_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_reshape_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_sequence_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
@@ -87,7 +87,7 @@ rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
 cp ./gen_qa_models.py $HOST_SRCDIR/.
-cp ./gen_qa_zero_models.py $HOST_SRCDIR/.
+cp ./gen_qa_identity_models.py $HOST_SRCDIR/.
 cp ./gen_qa_reshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
@@ -101,7 +101,7 @@ TRTSCRIPT=trt_gen.cmds
 SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
-ZERODESTDIR=/tmp/zeromodels
+IDENTITYDESTDIR=/tmp/zeromodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
@@ -118,8 +118,8 @@ python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --models_dir=$DESTDI
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_zero_models.py --onnx --netdef --models_dir=$ZERODESTDIR
-chown -R $(id -u):$(id -g) $ZERODESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --onnx --netdef --models_dir=$IDENTITYDESTDIR
+chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --libtorch --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --libtorch --models_dir=$SEQDESTDIR
@@ -139,7 +139,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$C2SCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
-       --mount type=bind,source=$HOST_ZERODESTDIR,target=$ZERODESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
@@ -159,8 +159,8 @@ python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_zero_models.py --graphdef --savedmodel --models_dir=$ZERODESTDIR
-chown -R $(id -u):$(id -g) $ZERODESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$IDENTITYDESTDIR
+chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
@@ -172,7 +172,7 @@ chown -R $(id -u):$(id -g) $NOSHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_model_repository
 python3 $SRCDIR/gen_qa_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_model_repository
 python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_reshape_model_repository
-python3 $SRCDIR/gen_qa_zero_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_zero_model_repository
+python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
 chown -R $(id -u):$(id -g) $ENSEMBLEDESTDIR
@@ -189,7 +189,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
-       --mount type=bind,source=$HOST_ZERODESTDIR,target=$ZERODESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
