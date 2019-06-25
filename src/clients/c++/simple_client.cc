@@ -56,9 +56,13 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
+  std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
+      << std::endl;
+  std::cerr
+      << "For -H, header must be 'Header:Value'. May be given multiple times."
       << std::endl;
 
   exit(1);
@@ -72,10 +76,11 @@ main(int argc, char** argv)
   bool verbose = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
+  std::map<std::string, std::string> http_headers;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:H:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -86,6 +91,12 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
       case '?':
         Usage(argv);
         break;
@@ -100,14 +111,76 @@ main(int argc, char** argv)
   // the element-wise difference.
   std::string model_name = "simple";
 
+  // Create a health context and get the ready and live state of the
+  // server.
+  std::unique_ptr<nic::ServerHealthContext> health_ctx;
+  if (protocol == "http") {
+    err = nic::ServerHealthHttpContext::Create(
+        &health_ctx, url, http_headers, verbose);
+  } else if (protocol == "grpc") {
+    err = nic::ServerHealthGrpcContext::Create(&health_ctx, url, verbose);
+  } else {
+    Usage(argv, "unknown protocol '" + protocol + "'");
+  }
+
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to create health context: " << err << std::endl;
+    exit(1);
+  }
+
+  bool live, ready;
+  err = health_ctx->GetLive(&live);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to get server liveness: " << err << std::endl;
+    exit(1);
+  }
+
+  err = health_ctx->GetReady(&ready);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to get server readiness: " << err << std::endl;
+    exit(1);
+  }
+
+  std::cout << "Health for model " << model_name << ":" << std::endl;
+  std::cout << "Live: " << live << std::endl;
+  std::cout << "Ready: " << ready << std::endl;
+
+  // Create a status context and get the status of the model.
+  std::unique_ptr<nic::ServerStatusContext> status_ctx;
+  if (protocol == "http") {
+    err = nic::ServerStatusHttpContext::Create(
+        &status_ctx, url, http_headers, model_name, verbose);
+  } else if (protocol == "grpc") {
+    err = nic::ServerStatusGrpcContext::Create(
+        &status_ctx, url, model_name, verbose);
+  } else {
+    Usage(argv, "unknown protocol '" + protocol + "'");
+  }
+
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to create status context: " << err << std::endl;
+    exit(1);
+  }
+
+  ni::ServerStatus server_status;
+  err = status_ctx->GetServerStatus(&server_status);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to get status: " << err << std::endl;
+    exit(1);
+  }
+
+  std::cout << "Status for model " << model_name << ":" << std::endl;
+  std::cout << server_status.DebugString() << std::endl;
+
   // Create the inference context for the model.
-  std::unique_ptr<nic::InferContext> ctx;
+  std::unique_ptr<nic::InferContext> infer_ctx;
   if (protocol == "http") {
     err = nic::InferHttpContext::Create(
-        &ctx, url, model_name, -1 /* model_version */, verbose);
+        &infer_ctx, url, http_headers, model_name, -1 /* model_version */,
+        verbose);
   } else if (protocol == "grpc") {
     err = nic::InferGrpcContext::Create(
-        &ctx, url, model_name, -1 /* model_version */, verbose);
+        &infer_ctx, url, model_name, -1 /* model_version */, verbose);
   } else {
     Usage(argv, "unknown protocol '" + protocol + "'");
   }
@@ -126,11 +199,12 @@ main(int argc, char** argv)
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  for (const auto& output : ctx->Outputs()) {
+  for (const auto& output : infer_ctx->Outputs()) {
     options->AddRawResult(output);
   }
 
-  FAIL_IF_ERR(ctx->SetRunOptions(*options), "unable to set inference options");
+  FAIL_IF_ERR(
+      infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
@@ -143,8 +217,8 @@ main(int argc, char** argv)
 
   // Initialize the inputs with the data.
   std::shared_ptr<nic::InferContext::Input> input0, input1;
-  FAIL_IF_ERR(ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
-  FAIL_IF_ERR(ctx->GetInput("INPUT1", &input1), "unable to get INPUT1");
+  FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
+  FAIL_IF_ERR(infer_ctx->GetInput("INPUT1", &input1), "unable to get INPUT1");
 
   FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
   FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
@@ -162,7 +236,7 @@ main(int argc, char** argv)
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  FAIL_IF_ERR(ctx->Run(&results), "unable to run model");
+  FAIL_IF_ERR(infer_ctx->Run(&results), "unable to run model");
 
   // We expect there to be 2 results. Walk over all 16 result elements
   // and print the sum and difference calculated by the model.
