@@ -61,7 +61,7 @@ COPY src/backends/tensorflow/tensorflow_backend_tf.* \
 
 # Build TensorFlow library for TRTIS
 WORKDIR /opt/tensorflow
-RUN ./nvbuild.sh --python3.5
+RUN ./nvbuild.sh --python3.6
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch

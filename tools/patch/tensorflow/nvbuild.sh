@@ -1,5 +1,5 @@
 diff --git a/nvbuild.sh b/nvbuild.sh
-index 7e9055c..3f293f3 100755
+index e54d9d2..3f0f7e0 100755
 --- a/nvbuild.sh
 +++ b/nvbuild.sh
 @@ -64,7 +64,7 @@ export CC_OPT_FLAGS="-march=sandybridge -mtune=broadwell"
