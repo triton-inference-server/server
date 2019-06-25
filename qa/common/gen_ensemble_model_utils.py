@@ -883,7 +883,7 @@ def create_general_modelconfig(model_name, platform, max_batch,
 name: "{}"
 platform: "{}"
 max_batch_size: {}
-version_policy : {}
+version_policy: {}
 {}
 {}
 '''.format(model_name, platform, max_batch,
