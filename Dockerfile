@@ -61,7 +61,7 @@ COPY src/backends/tensorflow/tensorflow_backend_tf.* \
 
 # Build TensorFlow library for TRTIS
 WORKDIR /opt/tensorflow
-RUN ./nvbuild.sh --python3.5
+RUN ./nvbuild.sh --python3.6
 
 ############################################################################
 ## PyTorch stage: Use PyTorch container for Caffe2 and libtorch
@@ -193,7 +193,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
-    ln -s libtensorflow_cc.so libtensorflow_framework.so
+    ln -s libtensorflow_cc.so libtensorflow_framework.so && \
+    ln -s libtensorflow_cc.so libtensorflow_cc.so.1
 
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
