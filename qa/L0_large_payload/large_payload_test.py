@@ -100,6 +100,26 @@ class LargePayLoadTest(unittest.TestCase):
             ctx = InferContext(url, protocol, model_name, None, True)
             self._test_helper(ctx, tensor_shape, small_tensor_shape)
 
+    def test_libtorch(self):
+        tensor_shape = (self.input_size_,)
+        small_tensor_shape = (1,)
+
+        # libtorch_nobatch_zero_1_float32 is identity model with input shape [-1]
+        for protocol, url in self.protocols_:
+            model_name = tu.get_zero_model_name("libtorch_nobatch", 1, self.data_type_)
+            ctx = InferContext(url, protocol, model_name, None, True)
+            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+
+    def test_custom(self):
+        tensor_shape = (self.input_size_,)
+        small_tensor_shape = (1,)
+
+        # custom_zero_1_float32 is identity model with input shape [-1]
+        for protocol, url in self.protocols_:
+            model_name = tu.get_zero_model_name("custom", 1, self.data_type_)
+            ctx = InferContext(url, protocol, model_name, None, True)
+            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+
 
 if __name__ == '__main__':
     unittest.main()

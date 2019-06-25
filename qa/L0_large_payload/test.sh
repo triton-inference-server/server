@@ -29,7 +29,7 @@ LARGE_PAYLOAD_TEST_PY=large_payload_test.py
 
 CLIENT_LOG_BASE="./client.log"
 
-DATADIR=/data/inferenceserver/qa_zero_model_repository
+DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=$DATADIR
@@ -40,11 +40,28 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
 
+MODEL_SUFFIX=nobatch_zero_1_float32
+rm -fr models && \
+    mkdir models && \
+    cp -r /data/inferenceserver/qa_identity_model_repository/graphdef_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/qa_identity_model_repository/netdef_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/qa_identity_model_repository/onnx_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/qa_identity_model_repository/libtorch_$MODEL_SUFFIX models/. 
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
+    (cd models/custom_zero_1_float32 && \
+            echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt)
+
 # Restart server before every test to make sure server state
 # is invariant to previous test
 #
-# [TODO] add LibTorch model and Plan model
-for TARGET in graphdef savedmodel netdef onnx; do
+# Skipping TensorRT Plan model for now as it only supports fixed size
+# tensor and it fails to generate layer with large dimension size
+# [TODO] Revisit this once TensorRT supports variable size tensor
+for TARGET in graphdef savedmodel netdef onnx libtorch custom; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 

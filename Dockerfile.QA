@@ -115,7 +115,9 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
-        qa/L0_perflab_nomodel/.
+        qa/L0_perflab_nomodel/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_large_payload/.
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.
