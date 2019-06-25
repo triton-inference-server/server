@@ -54,10 +54,4 @@ TensorRTLogger::log(Severity severity, const char* msg)
   }
 }
 
-nvinfer1::ILogger&
-TensorRTLogger::getTRTLogger()
-{
-  return *this;
-}
-
 }}  // namespace nvidia::inferenceserver

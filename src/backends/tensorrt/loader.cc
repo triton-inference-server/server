@@ -43,18 +43,18 @@ LoadPlan(
   *runtime = nullptr;
 
   // Register all the default plugins that come with TensorRT
+  bool success = false;
   std::once_flag onceFlag;
   {
-    std::call_once(onceFlag, [] {
-      bool success = initLibNvInferPlugins(&tensorrt_logger.getTRTLogger(), "");
-      if (!success) {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to register default TensorRT Plugins");
-      }
+    std::call_once(onceFlag, [&success] {
+      success = initLibNvInferPlugins(&tensorrt_logger, "");
       LOG_VERBOSE(1) << "Registered TensorRT Plugins successfully.";
-      return Status::Success;
     });
+  }
+  if (!success) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to register default TensorRT Plugins");
   }
 
   // Create plugin factory to provide onnx plugins. This should be
