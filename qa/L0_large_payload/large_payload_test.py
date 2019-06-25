@@ -40,25 +40,26 @@ class LargePayLoadTest(unittest.TestCase):
         self.protocols_ = ((ProtocolType.HTTP, 'localhost:8000'),
                         (ProtocolType.GRPC, 'localhost:8001'))
 
-    def _test_helper(self, ctx, tensor_shape, small_tensor_shape):
+    def _test_helper(self, ctx, tensor_shape, small_tensor_shape,
+                     input_name='INPUT0', output_name='OUTPUT0'):
         try:
             in0 = np.random.random(tensor_shape).astype(self.data_type_)
-            results = ctx.run({ 'INPUT0' : (in0,)},
-                            { 'OUTPUT0' : InferContext.ResultFormat.RAW},
+            results = ctx.run({ input_name : (in0,)},
+                            { output_name : InferContext.ResultFormat.RAW},
                             1)
             # if the inference is completed, examine results to ensure that
             # the framework and protocol do support large payload
-            self.assertTrue(np.array_equal(in0, results['OUTPUT0'][0]), "output is different from input")
+            self.assertTrue(np.array_equal(in0, results[output_name][0]), "output is different from input")
 
         except InferenceServerException as ex:
             # if the inference failed, inference server should return error
             # gracefully. In addition to this, send a small payload to
             # verify if the server is still functional
             sin0 = np.random.random(small_tensor_shape).astype(self.data_type_)
-            results = ctx.run({ 'INPUT0' : (sin0,)},
-                            { 'OUTPUT0' : InferContext.ResultFormat.RAW},
+            results = ctx.run({ input_name : (sin0,)},
+                            { output_name : InferContext.ResultFormat.RAW},
                             1)
-            self.assertTrue(np.array_equal(sin0, results['OUTPUT0'][0]), "output is different from input")
+            self.assertTrue(np.array_equal(sin0, results[output_name][0]), "output is different from input")
 
     def test_graphdef(self):
         tensor_shape = (self.input_size_,)
@@ -108,7 +109,8 @@ class LargePayLoadTest(unittest.TestCase):
         for protocol, url in self.protocols_:
             model_name = tu.get_zero_model_name("libtorch_nobatch", 1, self.data_type_)
             ctx = InferContext(url, protocol, model_name, None, True)
-            self._test_helper(ctx, tensor_shape, small_tensor_shape)
+            self._test_helper(ctx, tensor_shape, small_tensor_shape,
+                              'INPUT__0', 'OUTPUT__0')
 
     def test_custom(self):
         tensor_shape = (self.input_size_,)
