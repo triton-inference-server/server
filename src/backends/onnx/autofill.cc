@@ -227,11 +227,6 @@ AutoFillOnnxImpl::FixInputConfig(ModelConfig* config)
       const auto it = input_infos_.find(io.name());
       if (it != input_infos_.end()) {
         SetIOConfig(it->first, it->second, model_support_batching_, &io);
-      } else {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to autofill for '" + model_name_ + "', input tensor '" +
-                io.name() + "' is not found in model session");
       }
     }
   }
@@ -253,11 +248,6 @@ AutoFillOnnxImpl::FixOutputConfig(ModelConfig* config)
       const auto it = output_infos_.find(io.name());
       if (it != output_infos_.end()) {
         SetIOConfig(it->first, it->second, model_support_batching_, &io);
-      } else {
-        return Status(
-            RequestStatusCode::INTERNAL,
-            "unable to autofill for '" + model_name_ + "', output tensor '" +
-                io.name() + "' is not found in model session");
       }
     }
   }
