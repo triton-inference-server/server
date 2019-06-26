@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <numeric>
 #include "src/core/provider.h"
 
 #include "src/core/backend.h"
@@ -279,7 +280,7 @@ AddClassResults(
   std::vector<size_t> idx(entry_cnt);
 
   for (size_t i = 0; i < batch_size; ++i) {
-    iota(idx.begin(), idx.end(), 0);
+    std::iota(idx.begin(), idx.end(), 0);
     sort(idx.begin(), idx.end(), [&probs](size_t i1, size_t i2) {
       return probs[i1] > probs[i2];
     });

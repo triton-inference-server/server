@@ -57,4 +57,6 @@ add_dependencies(tensorrt-backend-library proto-library)
 
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(tensorrt-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(tensorrt-backend-library PRIVATE "/usr/include/aarch64-linux-gpu")
+  target_link_directories(tensorrt-backend-library PRIVATE "/usr/lib/aarch64-linux-gnu")
 endif() # TRTIS_ENABLE_GPU

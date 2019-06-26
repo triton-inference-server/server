@@ -303,6 +303,8 @@ PlanBackend::CreateExecutionContext(
   // sizes. Graphs are most likely to help for small batch sizes so by
   // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16. If any
   // build fails don't attempt for any larger batch sizes.
+// Cuda graph is not supported in CUDA 10.0
+#ifdef CUDA_1001
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
     if (context->BuildCudaGraph(1)) {
@@ -315,6 +317,7 @@ PlanBackend::CreateExecutionContext(
       }
     }
   }
+#endif
 
   LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
            << " (" << cc << ") with stream priority " << cuda_stream_priority;
@@ -576,6 +579,8 @@ PlanBackend::Run(
   OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(payloads));
 }
 
+// Cuda graph is not supported in CUDA 10.0
+#ifdef CUDA_1001
 bool
 PlanBackend::Context::BuildCudaGraph(const int batch_size)
 {
@@ -617,6 +622,7 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
 
   return captured;
 }
+#endif
 
 Status
 PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
