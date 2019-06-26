@@ -50,10 +50,10 @@ class AutoFillPlanImpl : public AutoFill {
   Status Fix(ModelConfig* config) override;
 
  private:
-  template<class ModelIO>
+  template <class ModelIO>
   using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
 
-  template<class IO>
+  template <class IO>
   Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
 
   const std::string plan_filename_;
@@ -96,9 +96,10 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
   return Status::Success;
 }
 
-template<class IO>
+template <class IO>
 Status
-AutoFillPlanImpl::FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list)
+AutoFillPlanImpl::FixIO(
+    const IOList<IO>& reference_list, IOList<IO>* mutable_list)
 {
   if (mutable_list->size() == 0) {
     mutable_list->CopyFrom(reference_list);
