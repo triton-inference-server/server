@@ -72,7 +72,8 @@ _crequest_error_requestid.argtypes = [c_void_p]
 
 _crequest_health_ctx_new = _crequest.ServerHealthContextNew
 _crequest_health_ctx_new.restype = c_void_p
-_crequest_health_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, c_bool]
+_crequest_health_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+                                     POINTER(c_char_p), c_int, c_bool]
 _crequest_health_ctx_del = _crequest.ServerHealthContextDelete
 _crequest_health_ctx_del.argtypes = [c_void_p]
 _crequest_health_ctx_ready = _crequest.ServerHealthContextGetReady
@@ -84,7 +85,8 @@ _crequest_health_ctx_live.argtypes = [c_void_p, POINTER(c_bool)]
 
 _crequest_status_ctx_new = _crequest.ServerStatusContextNew
 _crequest_status_ctx_new.restype = c_void_p
-_crequest_status_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_bool]
+_crequest_status_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+                                     POINTER(c_char_p), c_int, _utf8, c_bool]
 _crequest_status_ctx_del = _crequest.ServerStatusContextDelete
 _crequest_status_ctx_del.argtypes = [c_void_p]
 _crequest_status_ctx_get = _crequest.ServerStatusContextGetServerStatus
@@ -93,7 +95,9 @@ _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
-_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, _utf8, c_int64, c_uint64, c_bool, c_bool]
+_crequest_infer_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+                                    POINTER(c_char_p), c_int, _utf8, c_int64,
+                                    c_uint64, c_bool, c_bool]
 _crequest_infer_ctx_del = _crequest.InferContextDelete
 _crequest_infer_ctx_del.argtypes = [c_void_p]
 _crequest_infer_ctx_set_options = _crequest.InferContextSetOptions
@@ -315,14 +319,26 @@ class ServerHealthContext:
     verbose : bool
         If True generate verbose output.
 
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
+
     """
-    def __init__(self, url, protocol, verbose=False):
+    def __init__(self, url, protocol, verbose=False, http_headers=[]):
         self._last_request_id = 0
         self._ctx = c_void_p()
+
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
+
         _raise_if_error(
             c_void_p(
                 _crequest_health_ctx_new(
-                    byref(self._ctx), url, int(protocol), verbose)))
+                    byref(self._ctx), url, int(protocol),
+                    http_headers_arr, len(http_headers), verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -425,14 +441,26 @@ class ServerStatusContext:
     verbose : bool
         If True generate verbose output.
 
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
+
     """
-    def __init__(self, url, protocol, model_name=None, verbose=False):
+    def __init__(self, url, protocol, model_name=None, verbose=False, http_headers=[]):
         self._last_request_id = 0
         self._ctx = c_void_p()
+
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
+
         _raise_if_error(
             c_void_p(
                 _crequest_status_ctx_new(
-                    byref(self._ctx), url, int(protocol), model_name, verbose)))
+                    byref(self._ctx), url, int(protocol), http_headers_arr, len(http_headers),
+                    model_name, verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
@@ -519,6 +547,9 @@ class InferContext:
         or None to indicate that the latest (i.e. highest version number)
         version should be used.
 
+    verbose : bool
+        If True generate verbose output.
+
     correlation_id : int
         The correlation ID for the inference. If not specified (or if
         specified as 0), the inference will have no correlation ID.
@@ -527,8 +558,9 @@ class InferContext:
         If True create streaming context. Streaming is only allowed with
         gRPC protocol.
 
-    verbose : bool
-        If True generate verbose output.
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
 
     """
     class ResultFormat:
@@ -547,7 +579,7 @@ class InferContext:
         CLASS = 2
 
     def __init__(self, url, protocol, model_name, model_version=None,
-                 verbose=False, correlation_id=0, streaming=False):
+                 verbose=False, correlation_id=0, streaming=False, http_headers=[]):
         self._correlation_id = correlation_id
         self._last_request_id = None
         self._last_request_model_name = None
@@ -559,11 +591,18 @@ class InferContext:
         self._callback_resources_dict_id = 0
         self._ctx = c_void_p()
 
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
+
         imodel_version = -1 if model_version is None else model_version
         _raise_if_error(
             c_void_p(
                 _crequest_infer_ctx_new(
                     byref(self._ctx), url, int(protocol),
+                    http_headers_arr, len(http_headers),
                     model_name, imodel_version, correlation_id,
                     streaming, verbose)))
 
@@ -908,7 +947,7 @@ class InferContext:
     def async_run(self, inputs, outputs, batch_size=1, flags=0):
         """DEPRECATED: This function is deprecated and will be removed in
         a future version of this API. Instead use async_run_with_cb().
-  
+
         Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1107,7 +1146,7 @@ class InferContext:
         """DEPRECATED: This function is deprecated and will be removed in
         a future version of this API. This function is only useful with
         the deprecated version of async_run(). Instead use async_run_with_cb().
-        
+
         Get the request ID of an async_run() request that has completed but
         not yet had results read with get_async_run_results().
 
