@@ -35,6 +35,8 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
+#include "src/backends/tensorrt/logging.h"
+#include <NvInferPlugin.h>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -44,6 +46,21 @@ PlanBackendFactory::Create(
     std::unique_ptr<PlanBackendFactory>* factory)
 {
   LOG_VERBOSE(1) << "Create PlanBackendFactory";
+
+  // Register all the default plugins that come with TensorRT
+  bool success = true;
+  std::once_flag onceFlag;
+  {
+    std::call_once(onceFlag, [&success] {
+      LOG_VERBOSE(1) << "Registering TensorRT Plugins";
+      success = initLibNvInferPlugins(&tensorrt_logger, "");
+    });
+  }
+  if (!success) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to register default TensorRT Plugins");
+  }
 
   auto plan_backend_config = std::static_pointer_cast<Config>(backend_config);
   factory->reset(new PlanBackendFactory(plan_backend_config));

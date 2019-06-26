@@ -42,21 +42,6 @@ LoadPlan(
   *engine = nullptr;
   *runtime = nullptr;
 
-  // Register all the default plugins that come with TensorRT
-  bool success = false;
-  std::once_flag onceFlag;
-  {
-    std::call_once(onceFlag, [&success] {
-      success = initLibNvInferPlugins(&tensorrt_logger, "");
-      LOG_VERBOSE(1) << "Registered TensorRT Plugins successfully.";
-    });
-  }
-  if (!success) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unable to register default TensorRT Plugins");
-  }
-
   // Create plugin factory to provide onnx plugins. This should be
   // generalized based on what the model requires [DLIS-54]
   nvonnxparser::IPluginFactory* onnx_plugin_factory =
