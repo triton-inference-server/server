@@ -26,8 +26,11 @@
 
 #include "src/backends/tensorrt/loader.h"
 
+#include <NvInferPlugin.h>
 #include <NvOnnxParserRuntime.h>
+#include <mutex>
 #include "src/backends/tensorrt/logging.h"
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
