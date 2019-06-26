@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.06-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.06-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.06-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.07-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.07-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.07-py3
 
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container to build

@@ -76,7 +76,7 @@ build the under-development version). The branch you use for the
 client build should match the version of the inference server you are
 using::
 
-  $ git checkout r19.06
+  $ git checkout r19.07
 
 Then, issue the following command to build the C++ client library, C++
 and Python examples, and a Python wheel file for the Python client
@@ -121,7 +121,7 @@ directory to the root of the repo and checkout the release version of
 the branch that you want to build (or the master branch if you want to
 build the under-development version)::
 
-  $ git checkout r19.06
+  $ git checkout r19.07
 
 Then change to the build/ directory and run the following to configure
 and build::
