@@ -46,18 +46,25 @@ SetIOConfig(
     ModelIO* config_io)
 {
   config_io->set_name(name);
-  config_io->set_data_type(ConvertFromOnnxDataType(info.type_));
-  // Skip batching dimension
-  size_t idx = (batching) ? 1 : 0;
-  for (; idx < info.dims_.size(); ++idx) {
-    config_io->mutable_dims()->Add(info.dims_[idx]);
+
+  // only set type and shape if they are not set
+  if (config_io->data_type() == DataType::TYPE_INVALID) {
+    config_io->set_data_type(ConvertFromOnnxDataType(info.type_));
   }
 
-  // If tensor dims are empty then must use a reshape for the
-  // tensor, since 'dims' is not allowed to be empty.
   if (config_io->dims_size() == 0) {
-    config_io->mutable_dims()->Add(1);
-    config_io->mutable_reshape();
+    // Skip batching dimension
+    size_t idx = (batching) ? 1 : 0;
+    for (; idx < info.dims_.size(); ++idx) {
+      config_io->mutable_dims()->Add(info.dims_[idx]);
+    }
+
+    // If tensor dims are empty then must use a reshape for the
+    // tensor, since 'dims' is not allowed to be empty.
+    if (config_io->dims_size() == 0) {
+      config_io->mutable_dims()->Add(1);
+      config_io->mutable_reshape();
+    }
   }
 }
 
@@ -94,14 +101,16 @@ class AutoFillOnnxImpl : public AutoFill {
   Status SetConfigFromOrtSession(OrtSession* session, OrtAllocator* allocator);
 
  private:
+  Status FixBatchingSupport(ModelConfig* config);
+  Status FixInputConfig(ModelConfig* config);
+  Status FixOutputConfig(ModelConfig* config);
+
   Status SetBatchingSupport();
-  Status SetInputConfig();
-  Status SetOutputConfig();
 
   const std::string onnx_filename_;
+  bool model_support_batching_;
   OnnxTensorInfoMap input_infos_;
   OnnxTensorInfoMap output_infos_;
-  ModelConfig config_;
 };
 
 Status
@@ -118,23 +127,24 @@ AutoFillOnnxImpl::Fix(ModelConfig* config)
     config->set_default_model_filename(onnx_filename_);
   }
 
-  // If autofill is required for input/output, then must make sure
-  // the assumption regarding the max batch size holds
-  // If max-batch-size is explicitly set to non-zero but the model
-  // signature doesn't support batching then can't autofill.
-  if ((config->input().size() == 0) || (config->output().size() == 0)) {
-    if ((config_.max_batch_size() == 0) && (config->max_batch_size() > 0)) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to autofill for '" + model_name_ +
-              "', configuration specified max-batch " +
-              std::to_string(config->max_batch_size()) +
-              " but model signature does not support batching");
-    }
-  }
-  if (config->max_batch_size() == 0) {
-    config->set_max_batch_size(config_.max_batch_size());
-  } else if (config_.max_batch_size() == 0) {
+  // Validate and fill 'max_batch_size' based on model info and config hint
+  RETURN_IF_ERROR(FixBatchingSupport(config));
+
+  // Validate and fill inputs
+  RETURN_IF_ERROR(ValidateIOInfoType(model_name_, input_infos_));
+  RETURN_IF_ERROR(FixInputConfig(config));
+
+  // Validate and fill outputs
+  RETURN_IF_ERROR(ValidateIOInfoType(model_name_, output_infos_));
+  RETURN_IF_ERROR(FixOutputConfig(config));
+
+  return Status::Success;
+}
+
+Status
+AutoFillOnnxImpl::FixBatchingSupport(ModelConfig* config)
+{
+  if (!model_support_batching_ && (config->max_batch_size() > 0)) {
     return Status(
         RequestStatusCode::INTERNAL,
         "unable to autofill for '" + model_name_ +
@@ -143,18 +153,114 @@ AutoFillOnnxImpl::Fix(ModelConfig* config)
             " but model session does not support batching");
   }
 
-  // Validate and fill inputs
-  if (config->input().size() == 0) {
-    RETURN_IF_ERROR(ValidateIOInfoType(model_name_, input_infos_));
-    config->mutable_input()->CopyFrom(config_.input());
+  // 'model_support_batching' is set to be true when all model inputs have
+  // variable size first dimension, but it is not necessary to be the case
+  // (i.e. non-batch model with variable size tensors). As 'max_batch_size == 0'
+  // from existing config is also ambiguous, it can be either unspecified or
+  // no-batch, autofill will check specified input/output (if any) for hint.
+  if (model_support_batching_ && (config->max_batch_size() == 0)) {
+    bool config_batch_hint = false;
+    if ((config->input_size() != 0) || (config->output_size() != 0)) {
+      for (const auto& io : config->input()) {
+        if (!io.dims().empty()) {
+          // look up corresponding io info from model
+          const auto it = input_infos_.find(io.name());
+          if (it != input_infos_.end()) {
+            bool should_batch =
+                (static_cast<int>(it->second.dims_.size()) ==
+                 (io.dims_size() + 1));
+            // inconsistent hint
+            if (config_batch_hint &&
+                (model_support_batching_ != should_batch)) {
+              return Status(
+                  RequestStatusCode::INTERNAL,
+                  "unable to autofill for '" + model_name_ +
+                      "', model tensor configurations are contradicting " +
+                      "each other in terms of whether batching is supported");
+            }
+            config_batch_hint = true;
+            model_support_batching_ = should_batch;
+          }
+        }
+      }
+      for (const auto& io : config->output()) {
+        if (!io.dims().empty()) {
+          // look up corresponding io info from model
+          const auto it = output_infos_.find(io.name());
+          if (it != output_infos_.end()) {
+            bool should_batch =
+                (static_cast<int>(it->second.dims_.size()) ==
+                 (io.dims_size() + 1));
+            // inconsistent hint
+            if (config_batch_hint &&
+                (model_support_batching_ != should_batch)) {
+              return Status(
+                  RequestStatusCode::INTERNAL,
+                  "unable to autofill for '" + model_name_ +
+                      "', model tensor configurations are contradicting " +
+                      "each other in terms of whether batching is supported");
+            }
+            config_batch_hint = true;
+            model_support_batching_ = should_batch;
+          }
+        }
+      }
+    }
   }
 
-  // Validate and fill outputs
-  if (config->output().size() == 0) {
-    RETURN_IF_ERROR(ValidateIOInfoType(model_name_, output_infos_));
-    config->mutable_output()->CopyFrom(config_.output());
-  }
+  config->set_max_batch_size(model_support_batching_ ? 1 : 0);
+  return Status::Success;
+}
 
+Status
+AutoFillOnnxImpl::FixInputConfig(ModelConfig* config)
+{
+  if (config->input_size() == 0) {
+    // fill all corresponding i/o tensors
+    for (const auto& io_info : input_infos_) {
+      ModelInput* config_io = config->add_input();
+      SetIOConfig(
+          io_info.first, io_info.second, model_support_batching_, config_io);
+    }
+  } else {
+    for (auto& io : *(config->mutable_input())) {
+      const auto it = input_infos_.find(io.name());
+      if (it != input_infos_.end()) {
+        SetIOConfig(it->first, it->second, model_support_batching_, &io);
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to autofill for '" + model_name_ + "', input tensor '" +
+                io.name() + "' is not found in model session");
+      }
+    }
+  }
+  return Status::Success;
+}
+
+Status
+AutoFillOnnxImpl::FixOutputConfig(ModelConfig* config)
+{
+  if (config->output_size() == 0) {
+    // fill all corresponding i/o tensors
+    for (const auto& io_info : output_infos_) {
+      ModelOutput* config_io = config->add_output();
+      SetIOConfig(
+          io_info.first, io_info.second, model_support_batching_, config_io);
+    }
+  } else {
+    for (auto& io : *(config->mutable_output())) {
+      const auto it = output_infos_.find(io.name());
+      if (it != output_infos_.end()) {
+        SetIOConfig(it->first, it->second, model_support_batching_, &io);
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "unable to autofill for '" + model_name_ + "', output tensor '" +
+                io.name() + "' is not found in model session");
+      }
+    }
+  }
   return Status::Success;
 }
 
@@ -166,22 +272,19 @@ AutoFillOnnxImpl::SetConfigFromOrtSession(
   RETURN_IF_ERROR(OutputInfos(session, allocator, output_infos_));
 
   RETURN_IF_ERROR(SetBatchingSupport());
-  RETURN_IF_ERROR(SetInputConfig());
-  RETURN_IF_ERROR(SetOutputConfig());
   return Status::Success;
 }
 
 Status
 AutoFillOnnxImpl::SetBatchingSupport()
 {
-  config_.set_max_batch_size(0);
-  bool support_batching = true;
+  model_support_batching_ = true;
 
   // iterate over all input tensors
   for (const auto& io_info : input_infos_) {
     const auto& dims = io_info.second.dims_;
     if ((dims.size() == 0) || (dims[0] != -1)) {
-      support_batching = false;
+      model_support_batching_ = false;
     }
   }
 
@@ -189,40 +292,10 @@ AutoFillOnnxImpl::SetBatchingSupport()
   for (const auto& io_info : output_infos_) {
     const auto& dims = io_info.second.dims_;
     if ((dims.size() == 0) || (dims[0] != -1)) {
-      support_batching = false;
+      model_support_batching_ = false;
     }
   }
 
-  if (support_batching) {
-    config_.set_max_batch_size(1);
-  }
-
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::SetInputConfig()
-{
-  // iterate over all i/o tensors
-  for (const auto& io_info : input_infos_) {
-    ModelInput* config_io = config_.add_input();
-    SetIOConfig(
-        io_info.first, io_info.second, (config_.max_batch_size() != 0),
-        config_io);
-  }
-  return Status::Success;
-}
-
-Status
-AutoFillOnnxImpl::SetOutputConfig()
-{
-  // iterate over all i/o tensors
-  for (const auto& io_info : output_infos_) {
-    ModelOutput* config_io = config_.add_output();
-    SetIOConfig(
-        io_info.first, io_info.second, (config_.max_batch_size() != 0),
-        config_io);
-  }
   return Status::Success;
 }
 
