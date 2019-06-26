@@ -184,6 +184,7 @@ if(${TRTIS_ENABLE_TENSORRT})
   target_link_libraries(
     trtserver
     PUBLIC -lnvinfer
+    PUBLIC -lnvinfer_plugin
     PUBLIC -lnvonnxparser_runtime
   )
 endif() # TRTIS_ENABLE_TENSORRT
