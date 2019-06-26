@@ -137,6 +137,7 @@ TRTISTF_EXPORT void TRTISTF_TensorListDelete(TRTISTF_TensorList* list);
 
 // Create a new tensor with a given name, type and shape. 'shape_dims'
 // must be nullptr if shape_rank is 0.
+// Return nullptr if failed to create the tensor.
 TRTISTF_EXPORT TRTISTF_Tensor* TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
     int64_t* shape_dims);

@@ -88,7 +88,7 @@ class BaseBackend : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
     // Set an input tensor data from payloads.
-    void SetInput(
+    Status SetInput(
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,

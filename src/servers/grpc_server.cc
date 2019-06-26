@@ -26,6 +26,7 @@
 
 #include "src/servers/grpc_server.h"
 
+#include <cstdint>
 #include <map>
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
@@ -142,6 +143,14 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         infer_stats,
         [this, execution_context, id, request_status, &response, infer_stats,
          timer]() mutable {
+          if (response.ByteSizeLong() > INT_MAX) {
+            request_status->set_code(RequestStatusCode::INVALID_ARG);
+            request_status->set_msg(
+                "Response has byte size " +
+                std::to_string(response.ByteSizeLong()) +
+                " which exceed gRPC's byte size limit " +
+                std::to_string(INT_MAX) + ".");
+          }
           // If the response is an error then clear the meta-data
           // and raw output as they may be partially or
           // un-initialized.
