@@ -50,6 +50,12 @@ class AutoFillPlanImpl : public AutoFill {
   Status Fix(ModelConfig* config) override;
 
  private:
+  template <class ModelIO>
+  using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
+
+  template <class IO>
+  Status FixIO(const IOList<IO>& reference_list, IOList<IO>* mutable_list);
+
   const std::string plan_filename_;
   const int32_t max_batch_size_;
   const ModelConfig config_;
@@ -82,15 +88,40 @@ AutoFillPlanImpl::Fix(ModelConfig* config)
   }
 
   // Inputs
-  if (config->input().size() == 0) {
-    config->mutable_input()->CopyFrom(config_.input());
-  }
+  RETURN_IF_ERROR(FixIO(config_.input(), config->mutable_input()));
 
   // Outputs
-  if (config->output().size() == 0) {
-    config->mutable_output()->CopyFrom(config_.output());
-  }
+  RETURN_IF_ERROR(FixIO(config_.output(), config->mutable_output()));
 
+  return Status::Success;
+}
+
+template <class IO>
+Status
+AutoFillPlanImpl::FixIO(
+    const IOList<IO>& reference_list, IOList<IO>* mutable_list)
+{
+  if (mutable_list->size() == 0) {
+    mutable_list->CopyFrom(reference_list);
+  } else {
+    for (auto& io : *mutable_list) {
+      for (const auto& io_ref : reference_list) {
+        if (io.name() == io_ref.name()) {
+          // only set type and shape if they are not set
+          if (io.data_type() == DataType::TYPE_INVALID) {
+            io.set_data_type(io_ref.data_type());
+          }
+          if (io.dims_size() == 0) {
+            io.mutable_dims()->CopyFrom(io_ref.dims());
+            if (io_ref.has_reshape()) {
+              io.mutable_reshape()->CopyFrom(io_ref.reshape());
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
   return Status::Success;
 }
 
