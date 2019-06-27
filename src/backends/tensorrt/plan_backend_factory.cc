@@ -30,13 +30,13 @@
 #include <string>
 #include <vector>
 
+#include <NvInferPlugin.h>
+#include "src/backends/tensorrt/logging.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
-#include "src/backends/tensorrt/logging.h"
-#include <NvInferPlugin.h>
 
 namespace nvidia { namespace inferenceserver {
 

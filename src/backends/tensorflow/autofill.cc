@@ -54,7 +54,7 @@ class AutoFillSavedModelImpl : public AutoFill {
  private:
   template <class ModelIO>
   using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
-  
+
   template <class IO>
   Status FixIOConfig(
       const TRTISTF_IOList* reference_list, IOList<IO>* mutable_list);
