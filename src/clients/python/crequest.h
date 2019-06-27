@@ -51,7 +51,7 @@ uint64_t ErrorRequestId(nic::Error* ctx);
 typedef struct ServerHealthContextCtx ServerHealthContextCtx;
 nic::Error* ServerHealthContextNew(
     ServerHealthContextCtx** ctx, const char* url, int protocol_int,
-    bool verbose);
+    const char** headers, int num_headers, bool verbose);
 void ServerHealthContextDelete(ServerHealthContextCtx* ctx);
 nic::Error* ServerHealthContextGetReady(
     ServerHealthContextCtx* ctx, bool* ready);
@@ -62,7 +62,8 @@ nic::Error* ServerHealthContextGetLive(ServerHealthContextCtx* ctx, bool* live);
 typedef struct ServerStatusContextCtx ServerStatusContextCtx;
 nic::Error* ServerStatusContextNew(
     ServerStatusContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, bool verbose);
+    const char** headers, int num_headers, const char* model_name,
+    bool verbose);
 void ServerStatusContextDelete(ServerStatusContextCtx* ctx);
 nic::Error* ServerStatusContextGetServerStatus(
     ServerStatusContextCtx* ctx, char** status, uint32_t* status_len);
@@ -72,8 +73,9 @@ nic::Error* ServerStatusContextGetServerStatus(
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int64_t model_version,
-    ni::CorrelationID correlation_id, bool streaming, bool verbose);
+    const char** headers, int num_headers, const char* model_name,
+    int64_t model_version, ni::CorrelationID correlation_id, bool streaming,
+    bool verbose);
 void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);

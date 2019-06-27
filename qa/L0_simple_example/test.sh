@@ -28,14 +28,12 @@
 SIMPLE_CLIENT=../clients/simple_client
 SIMPLE_CLIENT_PY=../clients/simple_client.py
 
-CLIENT_LOG="./client.log"
-
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $CLIENT_LOG $SERVER_LOG
+rm -f *.log
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -48,13 +46,74 @@ RET=0
 
 set +e
 
-$SIMPLE_CLIENT -v >>$CLIENT_LOG 2>&1
+# Run with default host header...
+$SIMPLE_CLIENT -v >>client_c++.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python $SIMPLE_CLIENT_PY -v >>$CLIENT_LOG 2>&1
+if [ `grep -c "localhost:8000" client_c++.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 Host:localhost:8000 headers for C++ client\n***"
+    RET=1
+fi
+
+python $SIMPLE_CLIENT_PY -v >>client_py.log 2>&1
 if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c "localhost:8000" client_py.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 Host:localhost:8000 headers for Python client\n***"
+    RET=1
+fi
+
+# Run with custom host header...
+$SIMPLE_CLIENT -v -H"Host:my_host_" >>client_c++_host.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c my_host_ client_c++_host.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 Host:my_host_ headers for C++ client\n***"
+    RET=1
+fi
+
+python $SIMPLE_CLIENT_PY -v -H"Host:my_host_" >>client_py_host.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c my_host_ client_py_host.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 Host:my_host_ headers for Python client\n***"
+    RET=1
+fi
+
+# Run with multiple headers...
+$SIMPLE_CLIENT -v -H"abc:xyz" -H"123:456" >>client_c++_multi.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c "abc: xyz" client_c++_multi.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 abc:xyz headers for C++ client\n***"
+    RET=1
+fi
+if [ `grep -c "123: 456" client_c++_multi.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 123:456 headers for C++ client\n***"
+    RET=1
+fi
+
+python $SIMPLE_CLIENT_PY -v -H"abc:xyz" -H"123:456" >>client_py_multi.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c "abc: xyz" client_py_multi.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 abc:xyz headers for Python client\n***"
+    RET=1
+fi
+if [ `grep -c "123: 456" client_py_multi.log` != "5" ]; then
+    echo -e "\n***\n*** Failed. Expected 5 123:456 headers for Python client\n***"
     RET=1
 fi
 
@@ -64,9 +123,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

@@ -46,6 +46,18 @@ class ServerHealthHttpContext {
   static Error Create(
       std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
       bool verbose = false);
+
+  /// Create a context that returns health information.
+  /// \param ctx Returns a new ServerHealthHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the health
+  /// request. The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers, bool verbose = false);
 };
 
 //==============================================================================
@@ -66,6 +78,20 @@ class ServerStatusHttpContext {
       bool verbose = false);
 
   /// Create a context that returns information about an inference
+  /// server and all models on the server using HTTP protocol with
+  /// custom headers.
+  /// \param ctx Returns a new ServerStatusHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the status
+  /// request. The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers, bool verbose = false);
+
+  /// Create a context that returns information about an inference
   /// server and one model on the sever using HTTP protocol.
   /// \param ctx Returns a new ServerStatusHttpContext object.
   /// \param server_url The inference server name and port.
@@ -75,6 +101,22 @@ class ServerStatusHttpContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      const std::string& model_name, bool verbose = false);
+
+  /// Create a context that returns information about an inference
+  /// server and one model on the sever using HTTP protocol with
+  /// custom headers.
+  /// \param ctx Returns a new ServerStatusHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the status
+  /// request. The map key/value indicates the header name/value.
+  /// \param model_name The name of the model to get status for.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers,
       const std::string& model_name, bool verbose = false);
 };
 
@@ -117,6 +159,26 @@ class InferHttpContext {
       const std::string& model_name, int64_t model_version = -1,
       bool verbose = false);
 
+  /// Create context that performs inference for a non-sequence model
+  /// using HTTP protocol and custom headers.
+  ///
+  /// \param ctx Returns a new InferHttpContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the inference
+  /// request. The map key/value indicates the header name/value.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers,
+      const std::string& model_name, int64_t model_version = -1,
+      bool verbose = false);
+
   /// Create context that performs inference for a sequence model
   /// using a given correlation ID and the HTTP protocol.
   ///
@@ -136,6 +198,31 @@ class InferHttpContext {
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
+
+  /// Create context that performs inference for a sequence model
+  /// using a given correlation ID and the HTTP protocol using custom
+  /// headers.
+  ///
+  /// \param ctx Returns a new InferHttpContext object.
+  /// \param correlation_id The correlation ID to use for all
+  /// inferences performed with this context. A value of 0 (zero)
+  /// indicates that no correlation ID should be used.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the inference
+  /// request. The map key/value indicates the header name/value.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+      const std::string& server_url,
+      const std::map<std::string, std::string>& headers,
+      const std::string& model_name, int64_t model_version = -1,
+      bool verbose = false);
 };
 
 }}}  // namespace nvidia::inferenceserver::client
