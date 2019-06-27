@@ -164,7 +164,7 @@ class InferHttpContext {
   ///
   /// \param ctx Returns a new InferHttpContext object.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the status
+  /// \param headers Map of HTTP headers to use with the inference
   /// request. The map key/value indicates the header name/value.
   /// \param model_name The name of the model to get status for.
   /// \param model_version The version of the model to use for inference,
@@ -208,7 +208,7 @@ class InferHttpContext {
   /// inferences performed with this context. A value of 0 (zero)
   /// indicates that no correlation ID should be used.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the status
+  /// \param headers Map of HTTP headers to use with the inference
   /// request. The map key/value indicates the header name/value.
   /// \param model_name The name of the model to get status for.
   /// \param model_version The version of the model to use for inference,

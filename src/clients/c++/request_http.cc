@@ -918,6 +918,14 @@ InferHttpContextImpl::~InferHttpContextImpl()
 Error
 InferHttpContextImpl::InitHttp(const std::string& server_url)
 {
+  // Don't let user override the request header.
+  if (headers_.find(kInferRequestHTTPHeader) != headers_.end()) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "HTTP header '" + std::string(kInferRequestHTTPHeader) +
+            "' cannot be set");
+  }
+
   std::unique_ptr<ServerStatusContext> sctx;
   Error err = ServerStatusHttpContext::Create(
       &sctx, server_url, headers_, model_name_, verbose_);

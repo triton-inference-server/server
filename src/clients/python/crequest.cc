@@ -120,29 +120,28 @@ ServerHealthContextNew(
     const char** headers, int num_headers, bool verbose)
 {
   nic::Error err;
-
-  std::map<std::string, std::string> http_headers;
-  err = ParseHttpHeaders(&http_headers, headers, num_headers);
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
-    ProtocolType protocol;
-    err = ParseProtocol(&protocol, protocol_int);
-    if (err.IsOk()) {
-      ServerHealthContextCtx* lctx = new ServerHealthContextCtx;
-      if (protocol == ProtocolType::HTTP) {
+    ServerHealthContextCtx* lctx = new ServerHealthContextCtx;
+    if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
         err = nic::ServerHealthHttpContext::Create(
             &(lctx->ctx), std::string(url), http_headers, verbose);
-      } else {
-        err = nic::ServerHealthGrpcContext::Create(
-            &(lctx->ctx), std::string(url), verbose);
       }
-
-      if (err.IsOk()) {
-        *ctx = lctx;
-        return nullptr;
-      }
-
-      delete lctx;
+    } else {
+      err = nic::ServerHealthGrpcContext::Create(
+          &(lctx->ctx), std::string(url), verbose);
     }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
   }
 
   *ctx = nullptr;
@@ -189,40 +188,43 @@ ServerStatusContextNew(
     const char** headers, int num_headers, const char* model_name, bool verbose)
 {
   nic::Error err;
-
-  std::map<std::string, std::string> http_headers;
-  err = ParseHttpHeaders(&http_headers, headers, num_headers);
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
-    ProtocolType protocol;
-    err = ParseProtocol(&protocol, protocol_int);
-    if (err.IsOk()) {
-      ServerStatusContextCtx* lctx = new ServerStatusContextCtx;
-      if (model_name == nullptr) {
-        if (protocol == ProtocolType::HTTP) {
+    ServerStatusContextCtx* lctx = new ServerStatusContextCtx;
+    if (model_name == nullptr) {
+      if (protocol == ProtocolType::HTTP) {
+        std::map<std::string, std::string> http_headers;
+        err = ParseHttpHeaders(&http_headers, headers, num_headers);
+        if (err.IsOk()) {
           err = nic::ServerStatusHttpContext::Create(
               &(lctx->ctx), std::string(url), http_headers, verbose);
-        } else {
-          err = nic::ServerStatusGrpcContext::Create(
-              &(lctx->ctx), std::string(url), verbose);
         }
       } else {
-        if (protocol == ProtocolType::HTTP) {
+        err = nic::ServerStatusGrpcContext::Create(
+            &(lctx->ctx), std::string(url), verbose);
+      }
+    } else {
+      if (protocol == ProtocolType::HTTP) {
+        std::map<std::string, std::string> http_headers;
+        err = ParseHttpHeaders(&http_headers, headers, num_headers);
+        if (err.IsOk()) {
           err = nic::ServerStatusHttpContext::Create(
               &(lctx->ctx), std::string(url), http_headers,
               std::string(model_name), verbose);
-        } else {
-          err = nic::ServerStatusGrpcContext::Create(
-              &(lctx->ctx), std::string(url), std::string(model_name), verbose);
         }
+      } else {
+        err = nic::ServerStatusGrpcContext::Create(
+            &(lctx->ctx), std::string(url), std::string(model_name), verbose);
       }
-
-      if (err.IsOk()) {
-        *ctx = lctx;
-        return nullptr;
-      }
-
-      delete lctx;
     }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
   }
 
   *ctx = nullptr;
@@ -273,39 +275,38 @@ InferContextNew(
     bool verbose)
 {
   nic::Error err;
-
-  std::map<std::string, std::string> http_headers;
-  err = ParseHttpHeaders(&http_headers, headers, num_headers);
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
-    ProtocolType protocol;
-    err = ParseProtocol(&protocol, protocol_int);
-    if (err.IsOk()) {
-      if (streaming && protocol != ProtocolType::GRPC) {
-        return new nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "Streaming is only allowed with gRPC protocol");
-      }
-      InferContextCtx* lctx = new InferContextCtx;
-      if (streaming) {
-        err = nic::InferGrpcStreamContext::Create(
-            &(lctx->ctx), correlation_id, std::string(url),
-            std::string(model_name), model_version, verbose);
-      } else if (protocol == ProtocolType::HTTP) {
+    if (streaming && protocol != ProtocolType::GRPC) {
+      return new nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "Streaming is only allowed with gRPC protocol");
+    }
+    InferContextCtx* lctx = new InferContextCtx;
+    if (streaming) {
+      err = nic::InferGrpcStreamContext::Create(
+          &(lctx->ctx), correlation_id, std::string(url),
+          std::string(model_name), model_version, verbose);
+    } else if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
         err = nic::InferHttpContext::Create(
             &(lctx->ctx), correlation_id, std::string(url), http_headers,
             std::string(model_name), model_version, verbose);
-      } else {
-        err = nic::InferGrpcContext::Create(
-            &(lctx->ctx), correlation_id, std::string(url),
-            std::string(model_name), model_version, verbose);
       }
-
-      if (err.IsOk()) {
-        *ctx = lctx;
-        return nullptr;
-      }
-      delete lctx;
+    } else {
+      err = nic::InferGrpcContext::Create(
+          &(lctx->ctx), correlation_id, std::string(url),
+          std::string(model_name), model_version, verbose);
     }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+    delete lctx;
   }
 
   *ctx = nullptr;
