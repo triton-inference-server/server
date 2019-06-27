@@ -330,6 +330,20 @@ RUN apt-get update && \
             libgoogle-glog0v5 \
             libre2-1v5
 
+# libcurl is needed for GCS
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl3-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libcurl4-openssl-dev; \
+    else \
+        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        exit 1; \
+    fi
+
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
