@@ -430,7 +430,9 @@ ServerStatusHttpContext::Create(
 
 class ProfileHttpContextImpl : public ProfileContext {
  public:
-  ProfileHttpContextImpl(const std::string& url, bool verbose);
+  ProfileHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
   Error StartProfile() override;
   Error StopProfile() override;
 
@@ -441,6 +443,9 @@ class ProfileHttpContextImpl : public ProfileContext {
   // URL for profile endpoint on inference server.
   const std::string url_;
 
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
+
   // RequestStatus received in server response
   RequestStatus request_status_;
 
@@ -449,8 +454,10 @@ class ProfileHttpContextImpl : public ProfileContext {
 };
 
 ProfileHttpContextImpl::ProfileHttpContextImpl(
-    const std::string& url, bool verbose)
-    : url_(url + "/" + kProfileRESTEndpoint), verbose_(verbose)
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kProfileRESTEndpoint), headers_(headers),
+      verbose_(verbose)
 {
 }
 
@@ -493,8 +500,20 @@ ProfileHttpContextImpl::SendCommand(const std::string& cmd_str)
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
 
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
     curl_easy_cleanup(curl);
     return Error(
         RequestStatusCode::INTERNAL,
@@ -505,6 +524,7 @@ ProfileHttpContextImpl::SendCommand(const std::string& cmd_str)
   int64_t http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
+  curl_slist_free_all(header_list);
   curl_easy_cleanup(curl);
 
   // Should have a request status, if not then create an error status.
@@ -549,10 +569,10 @@ ProfileHttpContextImpl::ResponseHeaderHandler(
 Error
 ProfileHttpContext::Create(
     std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose)
+    const std::map<std::string, std::string>& headers, bool verbose)
 {
   ctx->reset(static_cast<ProfileContext*>(
-      new ProfileHttpContextImpl(server_url, verbose)));
+      new ProfileHttpContextImpl(server_url, headers, verbose)));
   return Error::Success;
 }
 
