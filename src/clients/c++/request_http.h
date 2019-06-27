@@ -129,12 +129,14 @@ class ProfileHttpContext {
   /// protocol.
   /// \param ctx Returns the new ProfileContext object.
   /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the profile
+  /// request. The map key/value indicates the header name/value.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-      bool verbose = false);
+      const std::map<std::string, std::string>& headers, bool verbose = false);
 };
 
 //==============================================================================

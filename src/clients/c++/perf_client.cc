@@ -223,6 +223,8 @@ class ContextFactory {
   /// contexts that is directly related to the specified model.
   /// \param url The inference server name and port.
   /// \param protocol The protocol type used.
+  /// \param http_headers Map of HTTP headers. The map key/value
+  /// indicates the header name/value.
   /// \param streaming Whether to use streaming API.
   /// \param model_name The name of the model.
   /// \param model_version The version of the model to use for inference,
@@ -231,9 +233,10 @@ class ContextFactory {
   /// \param factory Returns a new ContextFactory object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const std::string& url, const ProtocolType protocol, const bool streaming,
-      const std::string& model_name, const int64_t model_version,
-      std::shared_ptr<ContextFactory>* factory);
+      const std::string& url, const ProtocolType protocol,
+      const std::map<std::string, std::string>& http_headers,
+      const bool streaming, const std::string& model_name,
+      const int64_t model_version, std::shared_ptr<ContextFactory>* factory);
 
   /// Create a ProfileContext.
   /// \param ctx Returns a new ProfileContext object.
@@ -259,19 +262,22 @@ class ContextFactory {
 
  private:
   ContextFactory(
-      const std::string& url, const ProtocolType protocol, const bool streaming,
-      const std::string& model_name, const int64_t model_version)
-      : url_(url), protocol_(protocol), streaming_(streaming),
-        model_name_(model_name), model_version_(model_version),
-        current_correlation_id_(0)
+      const std::string& url, const ProtocolType protocol,
+      const std::map<std::string, std::string>& http_headers,
+      const bool streaming, const std::string& model_name,
+      const int64_t model_version)
+      : url_(url), protocol_(protocol), http_headers_(http_headers),
+        streaming_(streaming), model_name_(model_name),
+        model_version_(model_version), current_correlation_id_(0)
   {
   }
 
-  std::string url_;
-  ProtocolType protocol_;
-  bool streaming_;
-  std::string model_name_;
-  int64_t model_version_;
+  const std::string url_;
+  const ProtocolType protocol_;
+  const std::map<std::string, std::string> http_headers_;
+  const bool streaming_;
+  const std::string model_name_;
+  const int64_t model_version_;
 
   bool is_sequence_model_;
   ni::CorrelationID current_correlation_id_;
@@ -280,12 +286,13 @@ class ContextFactory {
 
 nic::Error
 ContextFactory::Create(
-    const std::string& url, const ProtocolType protocol, const bool streaming,
-    const std::string& model_name, const int64_t model_version,
-    std::shared_ptr<ContextFactory>* factory)
+    const std::string& url, const ProtocolType protocol,
+    const std::map<std::string, std::string>& http_headers,
+    const bool streaming, const std::string& model_name,
+    const int64_t model_version, std::shared_ptr<ContextFactory>* factory)
 {
-  factory->reset(
-      new ContextFactory(url, protocol, streaming, model_name, model_version));
+  factory->reset(new ContextFactory(
+      url, protocol, http_headers, streaming, model_name, model_version));
 
   ni::ServerStatus server_status;
   std::unique_ptr<nic::ServerStatusContext> ctx;
@@ -307,7 +314,7 @@ ContextFactory::CreateProfileContext(std::unique_ptr<nic::ProfileContext>* ctx)
 {
   nic::Error err;
   if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ProfileHttpContext::Create(ctx, url_, false);
+    err = nic::ProfileHttpContext::Create(ctx, url_, http_headers_, false);
   } else {
     err = nic::ProfileGrpcContext::Create(ctx, url_, false);
   }
@@ -320,7 +327,8 @@ ContextFactory::CreateServerStatusContext(
 {
   nic::Error err;
   if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ServerStatusHttpContext::Create(ctx, url_, model_name_, false);
+    err = nic::ServerStatusHttpContext::Create(
+        ctx, url_, http_headers_, model_name_, false);
   } else {
     err = nic::ServerStatusGrpcContext::Create(ctx, url_, model_name_, false);
   }
@@ -346,7 +354,8 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
         ctx, correlation_id, url_, model_name_, model_version_, false);
   } else if (protocol_ == ProtocolType::HTTP) {
     err = nic::InferHttpContext::Create(
-        ctx, correlation_id, url_, model_name_, model_version_, false);
+        ctx, correlation_id, url_, http_headers_, model_name_, model_version_,
+        false);
   } else {
     err = nic::InferGrpcContext::Create(
         ctx, correlation_id, url_, model_name_, model_version_, false);
@@ -1667,6 +1676,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
+  std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--percentile <percentile>" << std::endl;
   std::cerr << "\t--data-directory <path>" << std::endl;
@@ -1717,6 +1727,11 @@ Usage(char** argv, const std::string& msg = std::string())
       << "numbered version) of the model will be used." << std::endl;
   std::cerr << "For -i, available protocols are gRPC and HTTP. Default is HTTP."
             << std::endl;
+  std::cerr
+      << "For -H, the header will be added to HTTP requests (ignored for GRPC "
+         "requests). The header must be specified as 'Header:Value'. -H may be "
+         "specified multiple times to add multiple headers."
+      << std::endl;
   std::cerr << "The -z flag causes input tensors to be initialized with zeros "
                "instead of random data"
             << std::endl;
@@ -1769,6 +1784,7 @@ main(int argc, char** argv)
   std::string filename("");
   std::string data_directory("");
   ProtocolType protocol = ProtocolType::HTTP;
+  std::map<std::string, std::string> http_headers;
 
   // {name, has_arg, *flag, val}
   static struct option long_options[] = {
@@ -1779,7 +1795,7 @@ main(int argc, char** argv)
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vndazc:u:m:x:b:t:p:i:l:r:s:f:", long_options,
+              argc, argv, "vndazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
               NULL)) != -1) {
     switch (opt) {
       case 0:
@@ -1830,6 +1846,12 @@ main(int argc, char** argv)
       case 'i':
         protocol = ParseProtocol(optarg);
         break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
       case 'l':
         latency_threshold_ms = std::atoi(optarg);
         break;
@@ -1867,8 +1889,13 @@ main(int argc, char** argv)
   if (concurrent_request_count <= 0) {
     Usage(argv, "concurrent request count must be > 0");
   }
-  if (streaming && protocol != ProtocolType::GRPC) {
+  if (streaming && (protocol != ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
+  }
+  if (!http_headers.empty() && (protocol != ProtocolType::HTTP)) {
+    std::cerr << "WARNING: HTTP headers specified with -H are ignored when "
+                 "using non-HTTP protocol."
+              << std::endl;
   }
   if (max_threads == 0) {
     Usage(argv, "maximum number of threads must be > 0");
@@ -1894,7 +1921,8 @@ main(int argc, char** argv)
   std::unique_ptr<ConcurrencyManager> manager;
   std::unique_ptr<InferenceProfiler> profiler;
   err = ContextFactory::Create(
-      url, protocol, streaming, model_name, model_version, &factory);
+      url, protocol, http_headers, streaming, model_name, model_version,
+      &factory);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
