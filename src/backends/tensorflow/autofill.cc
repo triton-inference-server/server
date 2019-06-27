@@ -52,8 +52,18 @@ class AutoFillSavedModelImpl : public AutoFill {
   Status Fix(ModelConfig* config) override;
 
  private:
+  template <class ModelIO>
+  using IOList = ::google::protobuf::RepeatedPtrField<ModelIO>;
+  
+  template <class IO>
+  Status FixIOConfig(
+      const TRTISTF_IOList* reference_list, IOList<IO>* mutable_list);
+
+  Status FixBatchingSupport(ModelConfig* config);
+
   const std::string savedmodel_dirname_;
   std::unique_ptr<TRTISTF_Model, decltype(&TRTISTF_ModelDelete)> trtistf_model_;
+  bool model_support_batching_;
 };
 
 Status
@@ -69,6 +79,23 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
     config->set_default_model_filename(savedmodel_dirname_);
   }
 
+  // Validate and fill 'max_batch_size' based on model signature and config hint
+  RETURN_IF_ERROR(FixBatchingSupport(config));
+
+  // Inputs
+  const TRTISTF_IOList* inputs = TRTISTF_ModelInputs(trtistf_model_.get());
+  RETURN_IF_ERROR(FixIOConfig(inputs, config->mutable_input()));
+
+  // Outputs
+  const TRTISTF_IOList* outputs = TRTISTF_ModelOutputs(trtistf_model_.get());
+  RETURN_IF_ERROR(FixIOConfig(outputs, config->mutable_output()));
+
+  return Status::Success;
+}
+
+Status
+AutoFillSavedModelImpl::FixBatchingSupport(ModelConfig* config)
+{
   const TRTISTF_IOList* inputs = TRTISTF_ModelInputs(trtistf_model_.get());
   const TRTISTF_IOList* outputs = TRTISTF_ModelOutputs(trtistf_model_.get());
 
@@ -99,59 +126,119 @@ AutoFillSavedModelImpl::Fix(ModelConfig* config)
             " but model signature does not support batching");
   }
 
-  // Set max-batch-size to 1 if the model signature supports it and it
-  // is not already set.
-  if (sig_supports_batch && (config->max_batch_size() == 0)) {
-    config->set_max_batch_size(1);
-  }
-
-  // Inputs
-  if (config->input().size() == 0) {
-    for (const TRTISTF_IOList* itr = inputs; itr != nullptr; itr = itr->next_) {
-      TRTISTF_IO* io = itr->io_;
-      ModelInput* config_input = config->add_input();
-      config_input->set_name(io->name_);
-      config_input->set_data_type(ConvertDataType(io->data_type_));
-
-      // The model signature supports batching then the first
-      // dimension is -1 and should not appear in the model
-      // configuration 'dims' that we are creating.
-      for (size_t i = (sig_supports_batch ? 1 : 0); i < io->shape_->rank_;
-           ++i) {
-        config_input->mutable_dims()->Add(io->shape_->dims_[i]);
+  // 'model_support_batching_' is set to be true when all model inputs have
+  // variable size first dimension, but it is not necessary to be the case
+  // (i.e. non-batch model with variable size tensors). As 'max_batch_size == 0'
+  // from existing config is also ambiguous, it can be either unspecified or
+  // no-batch, autofill will check specified input/output (if any) for hint.
+  model_support_batching_ = sig_supports_batch;
+  if (model_support_batching_ && (config->max_batch_size() == 0)) {
+    bool config_batch_hint = false;
+    if ((config->input_size() != 0) || (config->output_size() != 0)) {
+      for (const auto& config_io : config->input()) {
+        if (!config_io.dims().empty()) {
+          // look up corresponding io info from model
+          for (const TRTISTF_IOList* itr = inputs; itr != nullptr;
+               itr = itr->next_) {
+            TRTISTF_IO* io = itr->io_;
+            if (config_io.name() == io->name_) {
+              bool should_batch =
+                  (static_cast<int>(io->shape_->rank_) ==
+                   (config_io.dims_size() + 1));
+              // inconsistent hint
+              if (config_batch_hint &&
+                  (model_support_batching_ != should_batch)) {
+                return Status(
+                    RequestStatusCode::INTERNAL,
+                    "unable to autofill for '" + model_name_ +
+                        "', model tensor configurations are contradicting " +
+                        "each other in terms of whether batching is supported");
+              }
+              config_batch_hint = true;
+              model_support_batching_ = should_batch;
+            }
+          }
+        }
       }
-
-      // If input dims are empty then must use a reshape for the
-      // input, since 'dims' is not allowed to be empty.
-      if (config_input->dims_size() == 0) {
-        config_input->mutable_dims()->Add(1);
-        config_input->mutable_reshape();
+      for (const auto& config_io : config->output()) {
+        if (!config_io.dims().empty()) {
+          // look up corresponding io info from model
+          for (const TRTISTF_IOList* itr = outputs; itr != nullptr;
+               itr = itr->next_) {
+            TRTISTF_IO* io = itr->io_;
+            if (config_io.name() == io->name_) {
+              bool should_batch =
+                  (static_cast<int>(io->shape_->rank_) ==
+                   (config_io.dims_size() + 1));
+              // inconsistent hint
+              if (config_batch_hint &&
+                  (model_support_batching_ != should_batch)) {
+                return Status(
+                    RequestStatusCode::INTERNAL,
+                    "unable to autofill for '" + model_name_ +
+                        "', model tensor configurations are contradicting " +
+                        "each other in terms of whether batching is supported");
+              }
+              config_batch_hint = true;
+              model_support_batching_ = should_batch;
+            }
+          }
+        }
       }
     }
   }
 
-  // Outputs
-  if (config->output().size() == 0) {
-    for (const TRTISTF_IOList* itr = outputs; itr != nullptr;
-         itr = itr->next_) {
-      TRTISTF_IO* io = itr->io_;
-      ModelOutput* config_output = config->add_output();
-      config_output->set_name(io->name_);
-      config_output->set_data_type(ConvertDataType(io->data_type_));
+  // Set max-batch-size to 1 if the model signature and config hint agree
+  config->set_max_batch_size(model_support_batching_ ? 1 : 0);
+  return Status::Success;
+}
 
+template <class IO>
+Status
+AutoFillSavedModelImpl::FixIOConfig(
+    const TRTISTF_IOList* reference_list, IOList<IO>* mutable_list)
+{
+  bool config_io_specified = (mutable_list->size() > 0);
+  for (const TRTISTF_IOList* itr = reference_list; itr != nullptr;
+       itr = itr->next_) {
+    TRTISTF_IO* io = itr->io_;
+
+    // Add new IO or find corresponding IO in config to be filled
+    IO* config_io = nullptr;
+    if (config_io_specified) {
+      for (auto& mutable_io : *mutable_list) {
+        if (mutable_io.name() == io->name_) {
+          config_io = &mutable_io;
+          break;
+        }
+      }
+    } else {
+      config_io = mutable_list->Add();
+    }
+    if (config_io == nullptr) {
+      continue;
+    }
+
+    config_io->set_name(io->name_);
+
+    // only set type and shape if they are not set
+    if (config_io->data_type() == DataType::TYPE_INVALID) {
+      config_io->set_data_type(ConvertDataType(io->data_type_));
+    }
+    if (config_io->dims_size() == 0) {
       // The model signature supports batching then the first
       // dimension is -1 and should not appear in the model
       // configuration 'dims' that we are creating.
-      for (size_t i = (sig_supports_batch ? 1 : 0); i < io->shape_->rank_;
+      for (size_t i = (model_support_batching_ ? 1 : 0); i < io->shape_->rank_;
            ++i) {
-        config_output->mutable_dims()->Add(io->shape_->dims_[i]);
+        config_io->mutable_dims()->Add(io->shape_->dims_[i]);
       }
 
-      // If output dims are empty then must use a reshape for the
-      // output, since 'dims' is not allowed to be empty.
-      if (config_output->dims_size() == 0) {
-        config_output->mutable_dims()->Add(1);
-        config_output->mutable_reshape();
+      // If io dims are empty then must use a reshape for the
+      // io, since 'dims' is not allowed to be empty.
+      if (config_io->dims_size() == 0) {
+        config_io->mutable_dims()->Add(1);
+        config_io->mutable_reshape();
       }
     }
   }
