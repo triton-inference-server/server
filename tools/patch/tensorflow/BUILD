@@ -1,5 +1,5 @@
 diff --git a/tensorflow/BUILD b/tensorflow/BUILD
-index 823ad8f..9968f27 100644
+index 823ad8f..b7f835f 100644
 --- a/tensorflow/BUILD
 +++ b/tensorflow/BUILD
 @@ -486,6 +486,20 @@ tf_cc_shared_object(
@@ -23,11 +23,13 @@ index 823ad8f..9968f27 100644
  tf_cc_shared_object(
      name = "libtensorflow_cc.so",
      linkopts = select({
-@@ -502,6 +516,10 @@ tf_cc_shared_object(
+@@ -502,6 +516,12 @@ tf_cc_shared_object(
      }),
      visibility = ["//visibility:public"],
      deps = [
 +        ":trtis_tf",
++        "//tensorflow/contrib:contrib_kernels",
++        "//tensorflow/contrib:contrib_ops_op_lib",
 +        "//tensorflow/contrib/tensorrt:trt_engine_op_op_lib",
 +        "//tensorflow/contrib/tensorrt:trt_engine_op_kernel",
 +        "//tensorflow/contrib/tensorrt:trt_shape_function",
