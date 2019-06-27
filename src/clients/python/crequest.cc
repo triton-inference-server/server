@@ -93,6 +93,20 @@ ParseProtocol(ProtocolType* protocol, const int protocol_int)
       "unexpected protocol integer, expecting 0 for HTTP or 1 for gRPC");
 }
 
+nic::Error
+ParseHttpHeaders(
+    std::map<std::string, std::string>* http_headers, const char** headers,
+    int num_headers)
+{
+  for (int i = 0; i < num_headers; ++i) {
+    std::string full(headers[i]);
+    std::string header = full.substr(0, full.find(":"));
+    (*http_headers)[header] = full.substr(header.size() + 1);
+  }
+
+  return nic::Error::Success;
+}
+
 }  // namespace
 
 //==============================================================================
@@ -103,7 +117,7 @@ struct ServerHealthContextCtx {
 nic::Error*
 ServerHealthContextNew(
     ServerHealthContextCtx** ctx, const char* url, int protocol_int,
-    bool verbose)
+    const char** headers, int num_headers, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -111,8 +125,12 @@ ServerHealthContextNew(
   if (err.IsOk()) {
     ServerHealthContextCtx* lctx = new ServerHealthContextCtx;
     if (protocol == ProtocolType::HTTP) {
-      err = nic::ServerHealthHttpContext::Create(
-          &(lctx->ctx), std::string(url), verbose);
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::ServerHealthHttpContext::Create(
+            &(lctx->ctx), std::string(url), http_headers, verbose);
+      }
     } else {
       err = nic::ServerHealthGrpcContext::Create(
           &(lctx->ctx), std::string(url), verbose);
@@ -167,7 +185,7 @@ struct ServerStatusContextCtx {
 nic::Error*
 ServerStatusContextNew(
     ServerStatusContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, bool verbose)
+    const char** headers, int num_headers, const char* model_name, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -176,16 +194,25 @@ ServerStatusContextNew(
     ServerStatusContextCtx* lctx = new ServerStatusContextCtx;
     if (model_name == nullptr) {
       if (protocol == ProtocolType::HTTP) {
-        err = nic::ServerStatusHttpContext::Create(
-            &(lctx->ctx), std::string(url), verbose);
+        std::map<std::string, std::string> http_headers;
+        err = ParseHttpHeaders(&http_headers, headers, num_headers);
+        if (err.IsOk()) {
+          err = nic::ServerStatusHttpContext::Create(
+              &(lctx->ctx), std::string(url), http_headers, verbose);
+        }
       } else {
         err = nic::ServerStatusGrpcContext::Create(
             &(lctx->ctx), std::string(url), verbose);
       }
     } else {
       if (protocol == ProtocolType::HTTP) {
-        err = nic::ServerStatusHttpContext::Create(
-            &(lctx->ctx), std::string(url), std::string(model_name), verbose);
+        std::map<std::string, std::string> http_headers;
+        err = ParseHttpHeaders(&http_headers, headers, num_headers);
+        if (err.IsOk()) {
+          err = nic::ServerStatusHttpContext::Create(
+              &(lctx->ctx), std::string(url), http_headers,
+              std::string(model_name), verbose);
+        }
       } else {
         err = nic::ServerStatusGrpcContext::Create(
             &(lctx->ctx), std::string(url), std::string(model_name), verbose);
@@ -243,8 +270,9 @@ struct InferContextCtx {
 nic::Error*
 InferContextNew(
     InferContextCtx** ctx, const char* url, int protocol_int,
-    const char* model_name, int64_t model_version,
-    ni::CorrelationID correlation_id, bool streaming, bool verbose)
+    const char** headers, int num_headers, const char* model_name,
+    int64_t model_version, ni::CorrelationID correlation_id, bool streaming,
+    bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
@@ -261,9 +289,13 @@ InferContextNew(
           &(lctx->ctx), correlation_id, std::string(url),
           std::string(model_name), model_version, verbose);
     } else if (protocol == ProtocolType::HTTP) {
-      err = nic::InferHttpContext::Create(
-          &(lctx->ctx), correlation_id, std::string(url),
-          std::string(model_name), model_version, verbose);
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::InferHttpContext::Create(
+            &(lctx->ctx), correlation_id, std::string(url), http_headers,
+            std::string(model_name), model_version, verbose);
+      }
     } else {
       err = nic::InferGrpcContext::Create(
           &(lctx->ctx), correlation_id, std::string(url),

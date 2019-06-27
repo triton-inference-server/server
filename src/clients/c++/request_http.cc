@@ -76,6 +76,9 @@ static CurlGlobal curl_global;
 class ServerHealthHttpContextImpl : public ServerHealthContext {
  public:
   ServerHealthHttpContextImpl(const std::string& url, bool verbose);
+  ServerHealthHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
 
   Error GetReady(bool* ready) override;
   Error GetLive(bool* live) override;
@@ -86,6 +89,9 @@ class ServerHealthHttpContextImpl : public ServerHealthContext {
   // URL for health endpoint on inference server.
   const std::string url_;
 
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
+
   // Enable verbose output
   const bool verbose_;
 };
@@ -93,6 +99,14 @@ class ServerHealthHttpContextImpl : public ServerHealthContext {
 ServerHealthHttpContextImpl::ServerHealthHttpContextImpl(
     const std::string& url, bool verbose)
     : url_(url + "/" + kHealthRESTEndpoint), verbose_(verbose)
+{
+}
+
+ServerHealthHttpContextImpl::ServerHealthHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kHealthRESTEndpoint), headers_(headers),
+      verbose_(verbose)
 {
 }
 
@@ -115,8 +129,20 @@ ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
     curl_easy_cleanup(curl);
     return Error(
         RequestStatusCode::INTERNAL,
@@ -127,6 +153,7 @@ ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
   int64_t http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
+  curl_slist_free_all(header_list);
   curl_easy_cleanup(curl);
 
   *health = (http_code == 200) ? true : false;
@@ -156,13 +183,30 @@ ServerHealthHttpContext::Create(
   return Error::Success;
 }
 
+Error
+ServerHealthHttpContext::Create(
+    std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers, bool verbose)
+{
+  ctx->reset(static_cast<ServerHealthContext*>(
+      new ServerHealthHttpContextImpl(server_url, headers, verbose)));
+  return Error::Success;
+}
+
 //==============================================================================
 
 class ServerStatusHttpContextImpl : public ServerStatusContext {
  public:
   ServerStatusHttpContextImpl(const std::string& url, bool verbose);
   ServerStatusHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
+  ServerStatusHttpContextImpl(
       const std::string& url, const std::string& model_name, bool verbose);
+  ServerStatusHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      const std::string& model_name, bool verbose);
+
   Error GetServerStatus(ServerStatus* status) override;
 
  private:
@@ -171,6 +215,9 @@ class ServerStatusHttpContextImpl : public ServerStatusContext {
 
   // URL for status endpoint on inference server.
   const std::string url_;
+
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
 
   // Enable verbose output
   const bool verbose_;
@@ -189,9 +236,25 @@ ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
 }
 
 ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kStatusRESTEndpoint), headers_(headers),
+      verbose_(verbose)
+{
+}
+
+ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
     const std::string& url, const std::string& model_name, bool verbose)
     : url_(url + "/" + kStatusRESTEndpoint + "/" + model_name),
       verbose_(verbose)
+{
+}
+
+ServerStatusHttpContextImpl::ServerStatusHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    const std::string& model_name, bool verbose)
+    : url_(url + "/" + kStatusRESTEndpoint + "/" + model_name),
+      headers_(headers), verbose_(verbose)
 {
 }
 
@@ -212,7 +275,7 @@ ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
-  // Want binary representation of the status.
+  // Request binary representation of the status.
   std::string full_url = url_ + "?format=binary";
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
@@ -220,16 +283,28 @@ ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
-  // response headers handled by ResponseHeaderHandler()
+  // Response headers handled by ResponseHeaderHandler()
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
 
-  // response data handled by ResponseHandler()
+  // Response data handled by ResponseHandler()
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
 
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
     curl_easy_cleanup(curl);
     return Error(
         RequestStatusCode::INTERNAL,
@@ -240,6 +315,7 @@ ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
   int64_t http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
+  curl_slist_free_all(header_list);
   curl_easy_cleanup(curl);
 
   // Should have a request status, if not then create an error status.
@@ -322,10 +398,31 @@ ServerStatusHttpContext::Create(
 Error
 ServerStatusHttpContext::Create(
     std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers, bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(
+      new ServerStatusHttpContextImpl(server_url, headers, verbose)));
+  return Error::Success;
+}
+
+Error
+ServerStatusHttpContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
     const std::string& model_name, bool verbose)
 {
   ctx->reset(static_cast<ServerStatusContext*>(
       new ServerStatusHttpContextImpl(server_url, model_name, verbose)));
+  return Error::Success;
+}
+
+Error
+ServerStatusHttpContext::Create(
+    std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers,
+    const std::string& model_name, bool verbose)
+{
+  ctx->reset(static_cast<ServerStatusContext*>(new ServerStatusHttpContextImpl(
+      server_url, headers, model_name, verbose)));
   return Error::Success;
 }
 
@@ -538,7 +635,8 @@ class HttpRequestImpl : public RequestImpl {
 class InferHttpContextImpl : public InferContextImpl {
  public:
   InferHttpContextImpl(
-      const std::string&, const std::string&, int64_t, CorrelationID, bool);
+      const std::string&, const std::map<std::string, std::string>&,
+      const std::string&, int64_t, CorrelationID, bool);
   virtual ~InferHttpContextImpl();
 
   Error InitHttp(const std::string& server_url);
@@ -560,6 +658,9 @@ class InferHttpContextImpl : public InferContextImpl {
 
   void AsyncTransfer();
   Error PreRunProcessing(std::shared_ptr<Request>& request);
+
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
 
   // curl multi handle for processing asynchronous requests
   CURLM* multi_handle_;
@@ -777,10 +878,12 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
 //==============================================================================
 
 InferHttpContextImpl::InferHttpContextImpl(
-    const std::string& server_url, const std::string& model_name,
-    int64_t model_version, CorrelationID correlation_id, bool verbose)
+    const std::string& server_url,
+    const std::map<std::string, std::string>& headers,
+    const std::string& model_name, int64_t model_version,
+    CorrelationID correlation_id, bool verbose)
     : InferContextImpl(model_name, model_version, correlation_id, verbose),
-      multi_handle_(curl_multi_init())
+      headers_(headers), multi_handle_(curl_multi_init())
 {
   // Process url for HTTP request
   // URL doesn't contain the version portion if using the latest version.
@@ -815,9 +918,17 @@ InferHttpContextImpl::~InferHttpContextImpl()
 Error
 InferHttpContextImpl::InitHttp(const std::string& server_url)
 {
+  // Don't let user override the request header.
+  if (headers_.find(kInferRequestHTTPHeader) != headers_.end()) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "HTTP header '" + std::string(kInferRequestHTTPHeader) +
+            "' cannot be set");
+  }
+
   std::unique_ptr<ServerStatusContext> sctx;
-  Error err =
-      ServerStatusHttpContext::Create(&sctx, server_url, model_name_, verbose_);
+  Error err = ServerStatusHttpContext::Create(
+      &sctx, server_url, headers_, model_name_, verbose_);
   if (err.IsOk()) {
     err = Init(std::move(sctx));
     if (err.IsOk()) {
@@ -1130,6 +1241,10 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   list = curl_slist_append(list, "Expect:");
   list = curl_slist_append(list, "Content-Type: application/octet-stream");
   list = curl_slist_append(list, infer_request_str_.c_str());
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    list = curl_slist_append(list, hdr.c_str());
+  }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 
   // The list should be freed after the request
@@ -1213,9 +1328,21 @@ InferHttpContext::Create(
     std::unique_ptr<InferContext>* ctx, const std::string& server_url,
     const std::string& model_name, int64_t model_version, bool verbose)
 {
+  std::map<std::string, std::string> headers;
   return Create(
-      ctx, 0 /* correlation_id */, server_url, model_name, model_version,
-      verbose);
+      ctx, 0 /* correlation_id */, server_url, headers, model_name,
+      model_version, verbose);
+}
+
+Error
+InferHttpContext::Create(
+    std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers,
+    const std::string& model_name, int64_t model_version, bool verbose)
+{
+  return Create(
+      ctx, 0 /* correlation_id */, server_url, headers, model_name,
+      model_version, verbose);
 }
 
 Error
@@ -1224,8 +1351,21 @@ InferHttpContext::Create(
     const std::string& server_url, const std::string& model_name,
     int64_t model_version, bool verbose)
 {
+  std::map<std::string, std::string> headers;
+  return Create(
+      ctx, correlation_id, server_url, headers, model_name, model_version,
+      verbose);
+}
+
+Error
+InferHttpContext::Create(
+    std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
+    const std::string& server_url,
+    const std::map<std::string, std::string>& headers,
+    const std::string& model_name, int64_t model_version, bool verbose)
+{
   InferHttpContextImpl* ctx_ptr = new InferHttpContextImpl(
-      server_url, model_name, model_version, correlation_id, verbose);
+      server_url, headers, model_name, model_version, correlation_id, verbose);
   ctx->reset(static_cast<InferContext*>(ctx_ptr));
 
   Error err = ctx_ptr->InitHttp(server_url);

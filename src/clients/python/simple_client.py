@@ -43,6 +43,10 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
                         help='Protocol ("http"/"grpc") used to ' +
                         'communicate with inference service. Default is "http".')
+    parser.add_argument('-H', dest='http_headers', metavar="HTTP_HEADER",
+                        required=False, action='append',
+                        help='HTTP headers to add to inference server requests. ' +
+                        'Format is -H"Header:Value".')
 
     FLAGS = parser.parse_args()
     protocol = ProtocolType.from_str(FLAGS.protocol)
@@ -55,8 +59,22 @@ if __name__ == '__main__':
     model_version = -1
     batch_size = 1
 
+    # Create a health context, get the ready and live state of server.
+    health_ctx = ServerHealthContext(FLAGS.url, protocol,
+                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    print("Health for model {}".format(model_name))
+    print("Live: {}".format(health_ctx.is_live()))
+    print("Ready: {}".format(health_ctx.is_ready()))
+
+    # Create a status context and get server status
+    status_ctx = ServerStatusContext(FLAGS.url, protocol, model_name,
+                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    print("Status for model {}".format(model_name))
+    print(status_ctx.get_server_status())
+
     # Create the inference context for the model.
-    ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
+    infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
+                             http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -65,11 +83,11 @@ if __name__ == '__main__':
 
     # Send inference request to the inference server. Get results for
     # both output tensors.
-    result = ctx.run({ 'INPUT0' : (input0_data,),
-                       'INPUT1' : (input1_data,) },
-                     { 'OUTPUT0' : InferContext.ResultFormat.RAW,
-                       'OUTPUT1' : InferContext.ResultFormat.RAW },
-                     batch_size)
+    result = infer_ctx.run({ 'INPUT0' : (input0_data,),
+                             'INPUT1' : (input1_data,) },
+                           { 'OUTPUT0' : InferContext.ResultFormat.RAW,
+                             'OUTPUT1' : InferContext.ResultFormat.RAW },
+                           batch_size)
 
     # We expect there to be 2 results (each with batch-size 1). Walk
     # over all 16 result elements and print the sum and difference
