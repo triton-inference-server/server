@@ -48,6 +48,9 @@ add_custom_command(
   COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.sh"
   ARGS "${CMAKE_CURRENT_BINARY_DIR}"
   DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/VERSION
+    ${CMAKE_CURRENT_BINARY_DIR}/__init__.py
+    ${CMAKE_CURRENT_BINARY_DIR}/setup.py
     crequest
     proto-py-library
     grpc-py-library
