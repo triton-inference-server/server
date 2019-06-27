@@ -45,6 +45,7 @@ target_link_libraries(
   request
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
+  PUBLIC protobuf::libprotobuf
   PUBLIC ${CURL_LIBRARY}
 )
 # use different syntax for Windows
