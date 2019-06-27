@@ -32,29 +32,25 @@ cmake_minimum_required (VERSION 3.5)
 find_package(CURL REQUIRED)
 
 add_library(
-    request SHARED
-    request.cc request.h
-    request_common.cc request_common.h
-    request_http.cc request_grpc.cc
-    $<TARGET_OBJECTS:model-config-library>
-    $<TARGET_OBJECTS:proto-library>
-    $<TARGET_OBJECTS:grpc-library>
-  )
+  request SHARED
+  request.cc request.h
+  request_common.cc request_common.h
+  request_http.cc request_grpc.cc
+  $<TARGET_OBJECTS:model-config-library>
+  $<TARGET_OBJECTS:proto-library>
+  $<TARGET_OBJECTS:grpc-library>
+)
 
+target_link_libraries(
+  request
+  PRIVATE gRPC::grpc++
+  PRIVATE gRPC::grpc
+  PUBLIC ${CURL_LIBRARY}
+)
 # use different syntax for Windows
-if(WIN32)
+if(NOT WIN32)
   target_link_libraries(
     request
-    PRIVATE gRPC::grpc++
-    PRIVATE gRPC::grpc
-    PUBLIC ${CURL_LIBRARY_RELEASE}
-  )
-else()
-  target_link_libraries(
-    request
-    PRIVATE gRPC::grpc++
-    PRIVATE gRPC::grpc
-    PUBLIC -lcurl
     PUBLIC -lpthread
   )
 endif()
