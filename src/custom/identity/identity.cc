@@ -30,6 +30,7 @@
 #include "src/backends/custom/custom.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -46,11 +47,8 @@ namespace identity {
 
 // Integer error codes. TRTIS requires that success must be 0. All
 // other codes are interpreted by TRTIS as failures.
-enum ErrorCodes {
-  kSuccess,
-  kUnknown,
-  kInvalidModelConfig,
-  kGpuNotSupported,
+enum ContextErrorCodes : int {
+  kGpuNotSupported = kNumErrorCodes,
   kInputOutput,
   kInputOutputName,
   kInputOutputDataType,
@@ -61,29 +59,14 @@ enum ErrorCodes {
 };
 
 // Context object. All state must be kept in this object.
-class Context {
+class Context : public CustomInstance {
  public:
   Context(
       const std::string& instance_name, const ModelConfig& config,
       const int gpu_device);
-  ~Context();
-
-  // Initialize the context. Validate that the model configuration,
-  // etc. is something that we can handle.
-  int Init();
-
-  // Perform custom execution on the payloads.
-  int Execute(
-      const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+  ~Context() = default;
 
  private:
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
   // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
   // execute on CPU.
   const int gpu_device_;
@@ -96,20 +79,28 @@ class Context {
   // Map from output name to information needed to copy input into
   // that output.
   std::unordered_map<std::string, CopyInfo> copy_map_;
+
+  // Validate the model configuration for the derived backend instance
+  int InitContext() override;
+
+  // Perform custom execution on a single payload
+  void ExecutePayload(
+      CustomPayload& payload, CustomGetNextInputFn_t input_fn,
+      CustomGetOutputFn_t output_fn) override;
+
+  // An overridable method to add error strings for additional custom errors
+  const char* CustomErrorString(int errcode) override;
 };
 
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : instance_name_(instance_name), model_config_(model_config),
-      gpu_device_(gpu_device)
+    : CustomInstance(instance_name, model_config), gpu_device_(gpu_device)
 {
 }
 
-Context::~Context() {}
-
 int
-Context::Init()
+Context::InitContext()
 {
   // Execution on GPUs not supported since only a trivial amount of
   // computation is required.
@@ -154,138 +145,88 @@ Context::Init()
   return kSuccess;
 }
 
-int
-Context::Execute(
-    const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+void
+Context::ExecutePayload(
+    CustomPayload& payload, CustomGetNextInputFn_t input_fn,
+    CustomGetOutputFn_t output_fn)
 {
-  for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
-    CustomPayload& payload = payloads[pidx];
+  for (uint32_t output_idx = 0; output_idx < payload.output_cnt; ++output_idx) {
+    if (payload.error_code != 0) {
+      break;
+    }
 
-    for (uint32_t output_idx = 0; output_idx < payload.output_cnt;
-         ++output_idx) {
-      if (payload.error_code != 0) {
+    const char* output_cname = payload.required_output_names[output_idx];
+    const auto itr = copy_map_.find(output_cname);
+    if (itr == copy_map_.end()) {
+      payload.error_code = kRequestOutput;
+      break;
+    }
+
+    const std::string& input_name = itr->second.input_name_;
+    const DataType datatype = itr->second.datatype_;
+
+    std::vector<int64_t> shape;
+    if (model_config_.max_batch_size() != 0) {
+      shape.push_back(payload.batch_size);
+    }
+    for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
+      if (!strcmp(payload.input_names[input_idx], input_name.c_str())) {
+        shape.insert(
+            shape.end(), payload.input_shape_dims[input_idx],
+            payload.input_shape_dims[input_idx] +
+                payload.input_shape_dim_cnts[input_idx]);
         break;
-      }
-
-      const char* output_cname = payload.required_output_names[output_idx];
-      const auto itr = copy_map_.find(output_cname);
-      if (itr == copy_map_.end()) {
-        payload.error_code = kRequestOutput;
-        break;
-      }
-
-      const std::string& input_name = itr->second.input_name_;
-      const DataType datatype = itr->second.datatype_;
-
-      std::vector<int64_t> shape;
-      if (model_config_.max_batch_size() != 0) {
-        shape.push_back(payload.batch_size);
-      }
-      for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
-        if (!strcmp(payload.input_names[input_idx], input_name.c_str())) {
-          shape.insert(
-              shape.end(), payload.input_shape_dims[input_idx],
-              payload.input_shape_dims[input_idx] +
-                  payload.input_shape_dim_cnts[input_idx]);
-          break;
-        }
-      }
-
-      const int64_t batchn_byte_size = GetByteSize(datatype, shape);
-      if (batchn_byte_size < 0) {
-        payload.error_code = kOutputBuffer;
-        break;
-      }
-
-      void* obuffer;
-      if (!output_fn(
-              payload.output_context, output_cname, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer)) {
-        payload.error_code = kOutputBuffer;
-        break;
-      }
-
-      // If no error but the 'obuffer' is returned as nullptr, then
-      // skip writing this output.
-      if (obuffer == nullptr) {
-        continue;
-      }
-
-      char* output_buffer = reinterpret_cast<char*>(obuffer);
-
-      uint64_t total_byte_size = 0;
-      while (true) {
-        const void* content;
-        uint64_t content_byte_size = 128 * 1024;
-        if (!input_fn(
-                payload.input_context, input_name.c_str(), &content,
-                &content_byte_size)) {
-          payload.error_code = kInputContents;
-          break;
-        }
-
-        // If 'content' returns nullptr we have all the input.
-        if (content == nullptr) {
-          break;
-        }
-
-        memcpy(output_buffer + total_byte_size, content, content_byte_size);
-        total_byte_size += content_byte_size;
       }
     }
+
+    const int64_t batchn_byte_size = GetByteSize(datatype, shape);
+    if (batchn_byte_size < 0) {
+      payload.error_code = kOutputBuffer;
+      break;
+    }
+
+    void* obuffer;
+    if (!output_fn(
+            payload.output_context, output_cname, shape.size(), &shape[0],
+            batchn_byte_size, &obuffer)) {
+      payload.error_code = kOutputBuffer;
+      break;
+    }
+
+    // If no error but the 'obuffer' is returned as nullptr, then
+    // skip writing this output.
+    if (obuffer == nullptr) {
+      continue;
+    }
+
+    char* output_buffer = reinterpret_cast<char*>(obuffer);
+
+    uint64_t total_byte_size = 0;
+    while (true) {
+      const void* content;
+      uint64_t content_byte_size = 128 * 1024;
+      if (!input_fn(
+              payload.input_context, input_name.c_str(), &content,
+              &content_byte_size)) {
+        payload.error_code = kInputContents;
+        break;
+      }
+
+      // If 'content' returns nullptr we have all the input.
+      if (content == nullptr) {
+        break;
+      }
+
+      memcpy(output_buffer + total_byte_size, content, content_byte_size);
+      total_byte_size += content_byte_size;
+    }
   }
-
-  return kSuccess;
-}
-
-/////////////
-
-extern "C" {
-
-int
-CustomInitialize(const CustomInitializeData* data, void** custom_context)
-{
-  // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
-  if (!model_config.ParseFromString(std::string(
-          data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
-  }
-
-  // Create the context and validate that the model configuration is
-  // something that we can handle.
-  Context* context = new Context(
-      std::string(data->instance_name), model_config, data->gpu_device_id);
-  int err = context->Init();
-  if (err != kSuccess) {
-    return err;
-  }
-
-  *custom_context = static_cast<void*>(context);
-
-  return kSuccess;
-}
-
-int
-CustomFinalize(void* custom_context)
-{
-  if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
-    delete context;
-  }
-
-  return kSuccess;
 }
 
 const char*
-CustomErrorString(void* custom_context, int errcode)
+Context::CustomErrorString(int errcode)
 {
   switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
     case kGpuNotSupported:
       return "execution on GPU not supported";
     case kInputOutput:
@@ -309,19 +250,15 @@ CustomErrorString(void* custom_context, int errcode)
   return "unknown error";
 }
 
-int
-CustomExecute(
-    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  if (custom_context == nullptr) {
-    return kUnknown;
-  }
+}  // namespace identity
 
-  Context* context = static_cast<Context*>(custom_context);
-  return context->Execute(payload_cnt, payloads, input_fn, output_fn);
+// Creates a new Indentiy context instance
+CustomInstance*
+CustomInstance::Create(
+    const CustomInitializeData* data, const ModelConfig& model_config)
+{
+  return new identity::Context(
+      std::string(data->instance_name), model_config, data->gpu_device_id);
 }
 
-}  // extern "C"
-
-}}}}  // namespace nvidia::inferenceserver::custom::identity
+}}}  // namespace nvidia::inferenceserver::custom

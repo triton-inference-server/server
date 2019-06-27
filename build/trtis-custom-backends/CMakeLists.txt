@@ -69,7 +69,7 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 
 add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/custom src/custom)
+add_subdirectory(../../src/custom/sdk src/custom/sdk)
 add_subdirectory(../../src/custom/addsub src/custom/addsub)
 add_subdirectory(../../src/custom/identity src/custom/identity)
 add_subdirectory(../../src/custom/image_preprocess src/custom/image_preprocess)

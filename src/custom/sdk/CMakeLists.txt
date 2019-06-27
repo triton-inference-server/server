@@ -33,6 +33,8 @@ configure_file(combine.sh combine.sh COPYONLY)
 
 add_library(
   custombackendparts STATIC
+  custom_instance.cc
+  custom_instance.h
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
 )
@@ -62,12 +64,12 @@ install(
 # backend
 install(
   FILES
-    ../core/model_config.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/model_config.pb.h
+    ../../core/model_config.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
   DESTINATION include/src/core
 )
 install(
-  FILES ../backends/custom/custom.h
+  FILES ../../backends/custom/custom.h
   DESTINATION include/src/backends/custom
 )
 install(
@@ -77,6 +79,6 @@ install(
 
 # Install the param custom backend source as an example
 install(
-  FILES param/param.cc
+  FILES ../param/param.cc
   DESTINATION src
 )
