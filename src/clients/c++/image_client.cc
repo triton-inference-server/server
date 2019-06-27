@@ -231,6 +231,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-u <URL for inference service>" << std::endl;
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
+  std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << std::endl;
   std::cerr << "If -a is specified then asynchronous client API will be used. "
             << "Default is to use the synchronous API." << std::endl;
@@ -261,6 +262,11 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "For -u, the default server URL is localhost:8000." << std::endl;
   std::cerr << "For -i, available protocols are gRPC and HTTP. Default is HTTP."
             << std::endl;
+  std::cerr
+      << "For -H, the header will be added to HTTP requests (ignored for GRPC "
+         "requests). The header must be specified as 'Header:Value'. -H may be "
+         "specified multiple times to add multiple headers."
+      << std::endl;
   std::cerr << std::endl;
 
   exit(1);
@@ -495,13 +501,14 @@ main(int argc, char** argv)
   int64_t model_version = -1;
   std::string url("localhost:8000");
   ProtocolType protocol = ProtocolType::HTTP;
+  std::map<std::string, std::string> http_headers;
 
   static struct option long_options[] = {{"streaming", 0, 0, 0}, {0, 0, 0, 0}};
 
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vau:m:x:b:c:s:p:i:", long_options, NULL)) != -1) {
+              argc, argv, "vau:m:x:b:c:s:p:i:H:", long_options, NULL)) != -1) {
     switch (opt) {
       case 0:
         streaming = true;
@@ -536,6 +543,12 @@ main(int argc, char** argv)
       case 'i':
         protocol = ParseProtocol(optarg);
         break;
+      case 'H': {
+        std::string arg = optarg;
+        std::string header = arg.substr(0, arg.find(":"));
+        http_headers[header] = arg.substr(header.size() + 1);
+        break;
+      }
       case '?':
         Usage(argv);
         break;
@@ -554,8 +567,13 @@ main(int argc, char** argv)
   if (optind >= argc) {
     Usage(argv, "image file or image folder must be specified");
   }
-  if (streaming && protocol != ProtocolType::GRPC) {
+  if (streaming && (protocol != ProtocolType::GRPC)) {
     Usage(argv, "Streaming is only allowed with gRPC protocol");
+  }
+  if (!http_headers.empty() && (protocol != ProtocolType::HTTP)) {
+    std::cerr << "WARNING: HTTP headers specified with -H are ignored when "
+                 "using non-HTTP protocol."
+              << std::endl;
   }
 
   // Create the context for inference of the specified model. From it
@@ -568,7 +586,7 @@ main(int argc, char** argv)
         &ctx, url, model_name, model_version, verbose);
   } else if (protocol == ProtocolType::HTTP) {
     err = nic::InferHttpContext::Create(
-        &ctx, url, model_name, model_version, verbose);
+        &ctx, url, http_headers, model_name, model_version, verbose);
   } else {
     err = nic::InferGrpcContext::Create(
         &ctx, url, model_name, model_version, verbose);
