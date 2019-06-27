@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#define DLL_EXPORTING
+
 #include "src/clients/c++/request.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
