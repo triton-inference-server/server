@@ -24,11 +24,18 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#define DLL_EXPORTING
+
 #include "src/clients/c++/request_http.h"
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
 #include "src/clients/c++/request_common.h"
+
+// MSVC equivalent of POSIX call
+#ifdef _MSC_VER
+#define strncasecmp _strnicmp
+#endif
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
@@ -149,8 +156,8 @@ ServerHealthHttpContextImpl::GetHealth(const std::string& url, bool* health)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list);
@@ -311,8 +318,8 @@ ServerStatusHttpContextImpl::GetServerStatus(ServerStatus* server_status)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list);
@@ -520,8 +527,8 @@ ProfileHttpContextImpl::SendCommand(const std::string& cmd_str)
         "HTTP client failed: " + std::string(curl_easy_strerror(res)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list);
@@ -844,8 +851,8 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
         "HTTP client failed: " + std::string(curl_easy_strerror(http_status_)));
   }
 
-  // Must use 64-bit integer with curl_easy_getinfo
-  int64_t http_code;
+  // Must use long with curl_easy_getinfo
+  long http_code;
   curl_easy_getinfo(easy_handle_, CURLINFO_RESPONSE_CODE, &http_code);
 
   curl_slist_free_all(header_list_);
@@ -1175,7 +1182,8 @@ InferHttpContextImpl::ResponseHandler(
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   size_t result_bytes = 0;
 
-  if (request->Timer().receive_start_.tv_sec == 0) {
+  static auto unset_timepoint = RequestTimers::TimePoint();
+  if (request->Timer().receive_start_ == unset_timepoint) {
     request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
   }
 

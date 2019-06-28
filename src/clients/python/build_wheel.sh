@@ -52,10 +52,18 @@ function main() {
   cp ../../core/*_grpc.py \
     "${WHLDIR}/tensorrtserver/api/."
 
-  cp libcrequest.so \
-    "${WHLDIR}/tensorrtserver/api/."
-  cp ../c++/librequest.so \
-    "${WHLDIR}/tensorrtserver/api/."
+  # library are compiled in different location and extension based on OS
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    cp libcrequest.so \
+      "${WHLDIR}/tensorrtserver/api/."
+    cp ../c++/librequest.so \
+      "${WHLDIR}/tensorrtserver/api/."
+  else
+    cp Release/crequest.dll \
+      "${WHLDIR}/tensorrtserver/api/."
+    cp ../c++/Release/request.dll \
+      "${WHLDIR}/tensorrtserver/api/."
+  fi
 
   cp __init__.py \
     "${WHLDIR}/tensorrtserver/api/."
