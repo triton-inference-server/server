@@ -30,6 +30,7 @@ cmake_minimum_required (VERSION 3.5)
 # librequest.so
 #
 find_package(CURL REQUIRED)
+
 add_library(
   request SHARED
   request.cc request.h
@@ -39,14 +40,24 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
 )
-target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
+
 target_link_libraries(
   request
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
-  PUBLIC -lcurl
-  PUBLIC -lpthread
+  PUBLIC protobuf::libprotobuf
+  PUBLIC ${CURL_LIBRARY}
 )
+# use different syntax for Windows
+if(NOT WIN32)
+  target_link_libraries(
+    request
+    PUBLIC -lpthread
+  )
+endif()
+target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
+
+
 install(
   TARGETS request
   LIBRARY DESTINATION lib
@@ -64,6 +75,11 @@ install(
   DESTINATION include
 )
 
+if(WIN32)
+  message("Currently, CMake will only build client library and skip example "
+          "clients in Windows. Because the examples use functionalities that "
+		  "are UNIX specific.")
+else()
 #
 # ensemble_image_client
 #
@@ -157,3 +173,4 @@ install(
   TARGETS simple_string_client
   RUNTIME DESTINATION bin
 )
+endif()
