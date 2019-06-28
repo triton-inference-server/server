@@ -69,15 +69,15 @@ RUN ./nvbuild.sh --python3.6
 FROM ${PYTORCH_IMAGE} AS trtserver_caffe2
 
 # Copy netdef_backend_c2 into Caffe2 core so it builds into the
-# libcaffe2 library. We want netdef_backend_c2 to build against the
+# libtorch library. We want netdef_backend_c2 to build against the
 # Caffe2 protobuf since it interfaces with that code.
 COPY src/backends/caffe2/netdef_backend_c2.* \
      /opt/pytorch/pytorch/caffe2/core/
 
 # Build same as in pytorch container... except for the NO_DISTRIBUTED
-# line where we turn off features not needed for trtserver
-# This will build both the caffe2 libraries needed by the Caffe2 NetDef backend
-# and the LibTorch library needed by the PyTorch backend.
+# line where we turn off features not needed for trtserver This will
+# build the libraries needed by the Caffe2 NetDef backend and the
+# PyTorch libtorch backend.
 WORKDIR /opt/pytorch
 RUN pip uninstall -y torch
 RUN cd pytorch && \
@@ -196,12 +196,6 @@ RUN cd /opt/tensorrtserver/lib && \
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_detectron_ops_gpu.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2.so \
-     /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 \
-     /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_gpu.so \
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_caffe2 \
      /opt/conda/lib/python3.6/site-packages/torch/lib/libc10.so \

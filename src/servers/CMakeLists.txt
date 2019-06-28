@@ -197,22 +197,13 @@ if(${TRTIS_ENABLE_TENSORFLOW})
   )
 endif() # TRTIS_ENABLE_TENSORFLOW
 
-if(${TRTIS_ENABLE_PYTORCH})
+if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
   target_link_libraries(
     trtserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltorch
     PUBLIC -lthnvrtc
-  )
-endif() # TRTIS_ENABLE_PYTORCH
-
-if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
-  target_link_libraries(
-    trtserver
-    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
-    PUBLIC -lcaffe2
     PUBLIC -lcaffe2_detectron_ops_gpu
-    PUBLIC -lcaffe2_gpu
     PUBLIC -lc10
     PUBLIC -lc10_cuda
     PUBLIC -lmkl_core
