@@ -27,6 +27,16 @@
 
 /// \file
 
+#ifdef _MSC_VER
+#ifdef DLL_EXPORTING
+#define DECLSPEC __declspec(dllexport)
+#else
+#define DECLSPEC __declspec(dllimport)
+#endif
+#else
+#define DECLSPEC
+#endif
+
 #include <functional>
 #include <string>
 #include <vector>
@@ -48,7 +58,7 @@ namespace nvidia { namespace inferenceserver { namespace client {
 //==============================================================================
 /// Error status reported by client API.
 ///
-class Error {
+class DECLSPEC Error {
  public:
   /// Create an error from a RequestStatus.
   /// \param status The RequestStatus object
