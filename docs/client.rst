@@ -130,10 +130,22 @@ and build::
   $ cmake -DCMAKE_BUILD_TYPE=Release
   $ make -j8 trtis-clients
 
+If you are building client for Windows, as there are no default build system
+available, you will need to specify the generator for CMake to match the build
+system you are using. For instance, if you are using toolkit comes with
+Microsoft Visual Studio, you should do the following::
+
+  > cd build
+  > cmake -G"Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release
+  > MSBuild.exe trtis-clients.vcxproj -p:Configuration=Release
+
 The first build attempt may fail with a "protobuf_generate_cpp"
 error. If that happens simply run the make command again and the build
 should succeed. When the build completes the libraries and examples
-can be found in trtis-clients/install.
+can be found in trtis-clients/install. For windows, the C++ client examples
+will not be generated as those examples utilize UNIX functionalities and thus
+they are incompatible on Windows. However, you can use the Python examples
+to test if the build is successful.
 
 .. build-client-end-marker-do-not-remove
 
