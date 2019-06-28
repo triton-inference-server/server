@@ -1,0 +1,10 @@
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+  },
+  {
+    name: "INPUT1"
+    dims: [ 16, 1, 1 ]
+  }
+]
