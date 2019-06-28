@@ -49,7 +49,9 @@ for modelpath in \
         autofill_noplatform/tensorrt/unknown_output/1 \
         autofill_noplatform_success/tensorrt/no_name_platform/1 \
         autofill_noplatform_success/tensorrt/empty_config/1     \
-        autofill_noplatform_success/tensorrt/no_config/1 ; do
+        autofill_noplatform_success/tensorrt/no_config/1 \
+        autofill_noplatform_success/tensorrt/incomplete_input/1 \
+        autofill_noplatform_success/tensorrt/incomplete_output/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/qa_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
