@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#define DLL_EXPORTING
+
 #include "src/clients/c++/request_common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
@@ -33,18 +35,12 @@ namespace nvidia { namespace inferenceserver { namespace client {
 Error
 RequestTimers::Reset()
 {
-  request_start_.tv_sec = 0;
-  request_end_.tv_sec = 0;
-  send_start_.tv_sec = 0;
-  send_end_.tv_sec = 0;
-  receive_start_.tv_sec = 0;
-  receive_end_.tv_sec = 0;
-  request_start_.tv_nsec = 0;
-  request_end_.tv_nsec = 0;
-  send_start_.tv_nsec = 0;
-  send_end_.tv_nsec = 0;
-  receive_start_.tv_nsec = 0;
-  receive_end_.tv_nsec = 0;
+  request_start_ = TimePoint();
+  request_end_ = TimePoint();
+  send_start_ = TimePoint();
+  send_end_ = TimePoint();
+  receive_start_ = TimePoint();
+  receive_end_ = TimePoint();
   return Error::Success;
 }
 
@@ -53,22 +49,22 @@ RequestTimers::Record(Kind kind)
 {
   switch (kind) {
     case Kind::REQUEST_START:
-      clock_gettime(CLOCK_MONOTONIC, &request_start_);
+      request_start_ = ClockType::now();
       break;
     case Kind::REQUEST_END:
-      clock_gettime(CLOCK_MONOTONIC, &request_end_);
+      request_end_ = ClockType::now();
       break;
     case Kind::SEND_START:
-      clock_gettime(CLOCK_MONOTONIC, &send_start_);
+      send_start_ = ClockType::now();
       break;
     case Kind::SEND_END:
-      clock_gettime(CLOCK_MONOTONIC, &send_end_);
+      send_end_ = ClockType::now();
       break;
     case Kind::RECEIVE_START:
-      clock_gettime(CLOCK_MONOTONIC, &receive_start_);
+      receive_start_ = ClockType::now();
       break;
     case Kind::RECEIVE_END:
-      clock_gettime(CLOCK_MONOTONIC, &receive_end_);
+      receive_end_ = ClockType::now();
       break;
   }
 
@@ -873,20 +869,22 @@ InferContextImpl::GetStat(Stat* stat) const
 Error
 InferContextImpl::UpdateStat(const RequestTimers& timer)
 {
-  uint64_t request_start_ns = timer.request_start_.tv_sec * NANOS_PER_SECOND +
-                              timer.request_start_.tv_nsec;
-  uint64_t request_end_ns =
-      timer.request_end_.tv_sec * NANOS_PER_SECOND + timer.request_end_.tv_nsec;
-  uint64_t send_start_ns =
-      timer.send_start_.tv_sec * NANOS_PER_SECOND + timer.send_start_.tv_nsec;
-  uint64_t send_end_ns =
-      timer.send_end_.tv_sec * NANOS_PER_SECOND + timer.send_end_.tv_nsec;
-  uint64_t receive_start_ns = timer.receive_start_.tv_sec * NANOS_PER_SECOND +
-                              timer.receive_start_.tv_nsec;
-  uint64_t receive_end_ns =
-      timer.receive_end_.tv_sec * NANOS_PER_SECOND + timer.receive_end_.tv_nsec;
-  if ((request_start_ns > request_end_ns) || (send_start_ns > send_end_ns) ||
-      (receive_start_ns > receive_end_ns)) {
+  if ((timer.request_start_ > timer.request_end_) ||
+      (timer.send_start_ > timer.send_end_) ||
+      (timer.receive_start_ > timer.receive_end_)) {
+    auto zero_time_point = RequestTimers::TimePoint();
+    auto request_start_ns =
+        RequestTimers::Duration(timer.request_start_, zero_time_point);
+    auto request_end_ns =
+        RequestTimers::Duration(timer.request_end_, zero_time_point);
+    auto send_start_ns =
+        RequestTimers::Duration(timer.send_start_, zero_time_point);
+    auto send_end_ns =
+        RequestTimers::Duration(timer.send_end_, zero_time_point);
+    auto receive_start_ns =
+        RequestTimers::Duration(timer.receive_start_, zero_time_point);
+    auto receive_end_ns =
+        RequestTimers::Duration(timer.receive_end_, zero_time_point);
     return Error(
         RequestStatusCode::INVALID_ARG,
         "Timer not set correctly." +
@@ -904,9 +902,12 @@ InferContextImpl::UpdateStat(const RequestTimers& timer)
                  : ""));
   }
 
-  uint64_t request_time_ns = request_end_ns - request_start_ns;
-  uint64_t send_time_ns = send_end_ns - send_start_ns;
-  uint64_t receive_time_ns = receive_end_ns - receive_start_ns;
+  uint64_t request_time_ns =
+      RequestTimers::Duration(timer.request_start_, timer.request_end_);
+  uint64_t send_time_ns =
+      RequestTimers::Duration(timer.send_start_, timer.send_end_);
+  uint64_t receive_time_ns =
+      RequestTimers::Duration(timer.receive_start_, timer.receive_end_);
 
   context_stat_.completed_request_count++;
   context_stat_.cumulative_total_request_time_ns += request_time_ns;

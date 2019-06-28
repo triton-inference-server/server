@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <list>
@@ -43,6 +44,20 @@ namespace nvidia { namespace inferenceserver { namespace client {
 // handling.
 class RequestTimers {
  public:
+  using ClockType = std::chrono::steady_clock;
+  using TimePoint = ClockType::time_point;
+
+  /// Return the duration between start time point and end timepoint
+  /// in nanosecond.
+  /// \param start The start time point.
+  /// \param end The end time point.
+  /// \return Duration in nanosecond.
+  static uint64_t Duration(const TimePoint& start, const TimePoint& end)
+  {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+        .count();
+  }
+
   /// The kind of the timer.
   enum Kind {
     /// The start of request handling.
@@ -74,12 +89,12 @@ class RequestTimers {
   /// \return Error object indicating success or failure.
   Error Record(Kind kind);
 
-  struct timespec request_start_;
-  struct timespec request_end_;
-  struct timespec send_start_;
-  struct timespec send_end_;
-  struct timespec receive_start_;
-  struct timespec receive_end_;
+  TimePoint request_start_;
+  TimePoint request_end_;
+  TimePoint send_start_;
+  TimePoint send_end_;
+  TimePoint receive_start_;
+  TimePoint receive_end_;
 };
 
 //==============================================================================

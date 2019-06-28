@@ -27,6 +27,7 @@
 
 /// \file
 
+#include <functional>
 #include <string>
 #include <vector>
 #include "src/core/api.pb.h"

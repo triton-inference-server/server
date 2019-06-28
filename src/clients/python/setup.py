@@ -54,6 +54,11 @@ try:
 except ImportError:
     bdist_wheel = None
 
+if os.name == 'nt':
+    platform_package_data = [ 'crequest.dll', 'request.dll', ]
+else:
+    platform_package_data = [ 'libcrequest.so', 'librequest.so', ]
+
 setup(
     name='tensorrtserver',
     version=VERSION,
@@ -66,7 +71,7 @@ setup(
     packages=find_packages(),
     install_requires=REQUIRED,
     package_data={
-        '': [ 'libcrequest.so', 'librequest.so', ],
+        '': platform_package_data,
     },
     zip_safe=False,
     cmdclass={'bdist_wheel': bdist_wheel},
