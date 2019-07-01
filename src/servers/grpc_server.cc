@@ -257,7 +257,7 @@ GRPCServer::~GRPCServer()
   Stop();
 }
 
-Status
+TRTSERVER_Error*
 GRPCServer::Create(
     InferenceServer* server, int32_t port, int infer_thread_cnt,
     int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
@@ -296,10 +296,10 @@ GRPCServer::Create(
   (*grpc_server)->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
       &GRPCService::AsyncService::RequestHealth);
 
-  return Status::Success;
+  return nullptr;
 }
 
-Status
+TRTSERVER_Error*
 GRPCServer::Start()
 {
   if (!running_) {
@@ -317,23 +317,24 @@ GRPCServer::Start()
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
 
     AsyncRun();
-    return Status::Success;
+    return nullptr;
   }
 
-  return Status(
-      RequestStatusCode::ALREADY_EXISTS, "GRPC server is already running.");
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_ALREADY_EXISTS, "GRPC server is already running.");
 }
 
-Status
+TRTSERVER_Error*
 GRPCServer::Stop()
 {
   if (running_) {
     running_ = false;
     Shutdown();
-    return Status::Success;
+    return nullptr;
   }
 
-  return Status(RequestStatusCode::UNAVAILABLE, "GRPC server is not running.");
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
 }
 
 }}  // namespace nvidia::inferenceserver

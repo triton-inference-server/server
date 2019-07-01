@@ -29,56 +29,94 @@ cmake_minimum_required (VERSION 3.5)
 #
 # grpc endpoint
 #
-set(
-  GRPC_ENDPOINT_SRCS
-  grpc_server.cc
-)
+set(GRPC_ENDPOINT_OBJECTS "")
+set(GRPC_ENDPOINT_LIBRARIES "")
 
-set(
-  GRPC_ENDPOINT_HDRS
-  grpc_server.h
-)
+if(${TRTIS_ENABLE_GRPC})
+  set(
+    GRPC_ENDPOINT_SRCS
+    grpc_server.cc
+  )
 
-add_library(
-  grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
-  ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
-)
-add_dependencies(grpc-endpoint-library grpc-library proto-library)
+  set(
+    GRPC_ENDPOINT_HDRS
+    grpc_server.h
+  )
+
+  add_library(
+    grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
+    ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
+  )
+  add_dependencies(grpc-endpoint-library grpc-library proto-library)
+
+  set(
+    GRPC_ENDPOINT_OBJECTS
+    $<TARGET_OBJECTS:grpc-endpoint-library>
+    $<TARGET_OBJECTS:grpc-library>
+    $<TARGET_OBJECTS:nvrpc-library>
+    $<TARGET_OBJECTS:proto-library>
+  )
+  set(
+    GRPC_ENDPOINT_LIBRARIES
+    PRIVATE gRPC::grpc++
+    PRIVATE gRPC::grpc
+    PRIVATE protobuf::libprotobuf
+  )
+endif() # TRTIS_ENABLE_GRPC
 
 #
 # http endpoint
 #
-find_package(libevhtp CONFIG REQUIRED)
-message(STATUS "Using libevhtp ${libevhtp_VERSION}")
+set(HTTP_ENDPOINT_OBJECTS "")
+set(HTTP_ENDPOINT_LIBRARIES "")
 
-set(
-  HTTP_ENDPOINT_SRCS
-  http_server.cc
-)
+if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
+  find_package(libevhtp CONFIG REQUIRED)
+  message(STATUS "Using libevhtp ${libevhtp_VERSION}")
 
-set(
-  HTTP_ENDPOINT_HDRS
-  http_server.h
-)
+  set(
+    HTTP_ENDPOINT_SRCS
+    http_server.cc
+  )
 
-add_library(
-  http-endpoint-library EXCLUDE_FROM_ALL OBJECT
-  ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
-)
-add_dependencies(http-endpoint-library proto-library)
-target_include_directories(
-  http-endpoint-library
-  PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
-)
-# Needs to include header files for prometheus to build successfully
-if(${TRTIS_ENABLE_METRICS})
-  find_package(prometheus-cpp CONFIG REQUIRED)
-  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
+  set(
+    HTTP_ENDPOINT_HDRS
+    http_server.h
+  )
+
+  add_library(
+    http-endpoint-library EXCLUDE_FROM_ALL OBJECT
+    ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
+  )
+  add_dependencies(http-endpoint-library proto-library)
   target_include_directories(
     http-endpoint-library
-    PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
-endif() # TRTIS_ENABLE_METRICS
+
+  # Needs to include header files for prometheus to build successfully
+  if(${TRTIS_ENABLE_METRICS})
+    find_package(prometheus-cpp CONFIG REQUIRED)
+    message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
+    target_include_directories(
+      http-endpoint-library
+      PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+  endif() # TRTIS_ENABLE_METRICS
+
+  set(
+    HTTP_ENDPOINT_OBJECTS
+    $<TARGET_OBJECTS:http-endpoint-library>
+    $<TARGET_OBJECTS:proto-library>
+  )
+  set(
+    HTTP_ENDPOINT_LIBRARIES
+    PRIVATE ${LIBEVENT_LIBRARIES}
+    PRIVATE libevhtp::evhtp
+    PRIVATE protobuf::libprotobuf
+    PRIVATE -lre2
+  )
+endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
 # trtserver
@@ -91,10 +129,14 @@ set(
 add_executable(
   main
   ${TRTSERVER_SRCS}
+  ${HTTP_ENDPOINT_OBJECTS}
+  ${GRPC_ENDPOINT_OBJECTS}
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
 target_link_libraries(
   main
+  ${HTTP_ENDPOINT_LIBRARIES}
+  ${GRPC_ENDPOINT_LIBRARIES}
   PRIVATE trtserver
 )
 install(
@@ -155,10 +197,6 @@ add_library(
   $<TARGET_OBJECTS:server-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
-  $<TARGET_OBJECTS:grpc-library>
-  $<TARGET_OBJECTS:grpc-endpoint-library>
-  $<TARGET_OBJECTS:http-endpoint-library>
-  $<TARGET_OBJECTS:nvrpc-library>
   ${CUDA_OBJS}
   ${BACKEND_OBJS}
 )
@@ -173,11 +211,8 @@ set_target_properties(
 target_link_libraries(
   trtserver
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
-  PRIVATE gRPC::grpc++
-  PRIVATE gRPC::grpc
-  PRIVATE ${LIBEVENT_LIBRARIES}
-  PRIVATE libevhtp::evhtp
-  PRIVATE -lre2
+  PRIVATE protobuf::libprotobuf
+  PRIVATE ${LIBEVENT_LIBRARIES}   # FIXME remove after TRTSERVER API finalized
 )
 
 if(${TRTIS_ENABLE_TENSORRT})

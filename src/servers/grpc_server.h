@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
+#include "src/core/trtserver.h"
 #include "src/nvrpc/Interfaces.h"
 #include "src/nvrpc/Server.h"
 
@@ -37,11 +37,11 @@ class ServerStatus;
 
 class GRPCServer : private nvrpc::Server {
  public:
-  static Status Create(
+  static TRTSERVER_Error* Create(
       InferenceServer* server, int32_t port, int infer_thread_cnt,
       int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_servers);
-  Status Start();
-  Status Stop();
+  TRTSERVER_Error* Start();
+  TRTSERVER_Error* Stop();
 
   ~GRPCServer();
 

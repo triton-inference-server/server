@@ -64,6 +64,12 @@ typedef enum trtserver_errorcode_enum {
   TRTSERVER_ERROR_ALREADY_EXISTS
 } TRTSERVER_Error_Code;
 
+// Create a new error object. The caller takes ownership of the
+// TRTSERVER_Error object and must call TRTSERVER_ErrorDelete to
+// release the object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ErrorNew(
+    TRTSERVER_Error_Code code, const char* msg);
+
 // Delete an error object.
 TRTSERVER_EXPORT void TRTSERVER_ErrorDelete(TRTSERVER_Error* error);
 

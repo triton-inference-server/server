@@ -34,9 +34,15 @@
 
 #include "src/core/logging.h"
 #include "src/core/server.h"
-#include "src/core/status.h"
-#include "src/servers/grpc_server.h"
+#include "src/core/trtserver.h"
+
+#if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
+#endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+
+#ifdef TRTIS_ENABLE_GRPC
+#include "src/servers/grpc_server.h"
+#endif  // TRTIS_ENABLE_GRPC
 
 namespace {
 
@@ -59,50 +65,45 @@ std::condition_variable exit_cv_;
 // exit if even one model fails to load).
 bool exit_on_failed_init_ = true;
 
-// The HTTP, GRPC and metrics service/s
+// The HTTP, GRPC and metrics service/s and ports. Initialized to
+// default values and modifyied based on command-line args. Set to -1
+// to indicate the protocol is disabled.
+#ifdef TRTIS_ENABLE_HTTP
 std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>
     http_services_;
-std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
-
-// The HTTP and GRPC ports. Initialized to default values and
-// modifyied based on command-line args. Set to -1 to indicate the
-// protocol is disabled.
 bool allow_http_ = true;
-bool allow_grpc_ = true;
 int32_t http_port_ = 8000;
-int32_t grpc_port_ = 8001;
-
-// Unique port for health requests on HTTP server
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-
-// The metric port. Initialized to default values and modifyied based
-// on command-line args. Set to -1 to indicate the protocol is
-// disabled.
-#ifdef TRTIS_ENABLE_METRICS
-bool allow_metrics_ = true;
-int32_t metrics_port_ = 8002;
-#else
-bool allow_metrics_ = false;
-int32_t metrics_port_ = -1;
-#endif  // TRTIS_ENABLE_METRICS
-
-// endpoint names for http/gRPC
 std::vector<std::string> endpoint_names = {"status", "health", "profile",
                                            "infer"};
+#endif  // TRTIS_ENABLE_HTTP
 
-// Should GPU metrics be reported.
+#ifdef TRTIS_ENABLE_GRPC
+std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
+bool allow_grpc_ = true;
+int32_t grpc_port_ = 8001;
+#endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_METRICS
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
+bool allow_metrics_ = true;
 bool allow_gpu_metrics_ = false;
+int32_t metrics_port_ = 8002;
+#endif  // TRTIS_ENABLE_METRICS
 
+#ifdef TRTIS_ENABLE_GRPC
 // The number of threads to initialize for handling GRPC infer requests.
 int grpc_infer_thread_cnt_ = 1000;
 
 // The number of threads to initialize for handling GRPC stream infer requests.
 int grpc_stream_infer_thread_cnt_ = 1000;
+#endif  // TRTIS_ENABLE_GRPC
 
+#ifdef TRTIS_ENABLE_HTTP
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
+#endif  // TRTIS_ENABLE_HTTP
 
 // Command-line options
 enum OptionId {
@@ -117,17 +118,23 @@ enum OptionId {
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
   OPTION_ALLOW_PROFILING,
-  OPTION_ALLOW_GRPC,
+#ifdef TRTIS_ENABLE_HTTP
   OPTION_ALLOW_HTTP,
-  OPTION_ALLOW_METRICS,
-  OPTION_ALLOW_GPU_METRICS,
-  OPTION_GRPC_PORT,
   OPTION_HTTP_PORT,
   OPTION_HTTP_HEALTH_PORT,
-  OPTION_METRICS_PORT,
+  OPTION_HTTP_THREAD_COUNT,
+#endif  // TRTIS_ENABLE_HTTP
+#ifdef TRTIS_ENABLE_GRPC
+  OPTION_ALLOW_GRPC,
+  OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
-  OPTION_HTTP_THREAD_COUNT,
+#endif  // TRTIS_ENABLE_GRPC
+#ifdef TRTIS_ENABLE_METRICS
+  OPTION_ALLOW_METRICS,
+  OPTION_ALLOW_GPU_METRICS,
+  OPTION_METRICS_PORT,
+#endif  // TRTIS_ENABLE_METRICS
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
   OPTION_EXIT_TIMEOUT_SECS,
@@ -176,29 +183,35 @@ std::vector<Option> options_{
      "/api/health/ready endpoint indicates ready if server is responsive "
      "even if some/all models are unavailable."},
     {OPTION_ALLOW_PROFILING, "allow-profiling", "Allow server profiling."},
-    {OPTION_ALLOW_GRPC, "allow-grpc",
-     "Allow the server to listen for GRPC requests."},
+#ifdef TRTIS_ENABLE_HTTP
     {OPTION_ALLOW_HTTP, "allow-http",
      "Allow the server to listen for HTTP requests."},
+    {OPTION_HTTP_PORT, "http-port",
+     "The port for the server to listen on for HTTP requests."},
+    {OPTION_HTTP_HEALTH_PORT, "http-health-port",
+     "The port for the server to listen on for HTTP Health requests."},
+    {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
+     "Number of threads handling HTTP requests."},
+#endif  // TRTIS_ENABLE_HTTP
+#ifdef TRTIS_ENABLE_GRPC
+    {OPTION_ALLOW_GRPC, "allow-grpc",
+     "Allow the server to listen for GRPC requests."},
+    {OPTION_GRPC_PORT, "grpc-port",
+     "The port for the server to listen on for GRPC requests."},
+    {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
+     "Number of threads handling GRPC inference requests."},
+    {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
+     "Number of threads handling GRPC stream inference requests."},
+#endif  // TRTIS_ENABLE_GRPC
+#ifdef TRTIS_ENABLE_METRICS
     {OPTION_ALLOW_METRICS, "allow-metrics",
      "Allow the server to provide prometheus metrics."},
     {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics",
      "Allow the server to provide GPU metrics. Ignored unless --allow-metrics "
      "is true."},
-    {OPTION_GRPC_PORT, "grpc-port",
-     "The port for the server to listen on for GRPC requests."},
-    {OPTION_HTTP_PORT, "http-port",
-     "The port for the server to listen on for HTTP requests."},
-    {OPTION_HTTP_HEALTH_PORT, "http-health-port",
-     "The port for the server to listen on for HTTP Health requests."},
     {OPTION_METRICS_PORT, "metrics-port",
      "The port reporting prometheus metrics."},
-    {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
-     "Number of threads handling GRPC inference requests."},
-    {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
-     "Number of threads handling GRPC stream inference requests."},
-    {OPTION_HTTP_THREAD_COUNT, "http-thread-count",
-     "Number of threads handling HTTP requests."},
+#endif  // TRTIS_ENABLE_METRICS
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
      "Poll the model repository to detect changes. The poll rate is "
      "controlled by 'repository-poll-secs'."},
@@ -243,6 +256,7 @@ SignalHandler(int signum)
 bool
 CheckPortCollision()
 {
+#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_GRPC)
   // Check if HTTP and GRPC have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), grpc_port_) !=
        http_ports_.end()) &&
@@ -251,7 +265,9 @@ CheckPortCollision()
               << "and gRPC requests at the same port";
     return true;
   }
+#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
 
+#if defined(TRTIS_ENABLE_GRPC) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and GRPC have shared ports
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
@@ -259,7 +275,9 @@ CheckPortCollision()
               << "gRPC requests";
     return true;
   }
+#endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
 
+#if defined(TRTIS_ENABLE_HTTP) && defined(TRTIS_ENABLE_METRICS)
   // Check if Metric and HTTP have shared ports
   if ((std::find(http_ports_.begin(), http_ports_.end(), metrics_port_) !=
        http_ports_.end()) &&
@@ -268,118 +286,133 @@ CheckPortCollision()
               << "HTTP requests";
     return true;
   }
+#endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_METRICS
+
   return false;
 }
 
-std::unique_ptr<nvidia::inferenceserver::GRPCServer>
-StartGrpcService(nvidia::inferenceserver::InferenceServer* server)
+#ifdef TRTIS_ENABLE_GRPC
+TRTSERVER_Error*
+StartGrpcService(
+    std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
+    nvidia::inferenceserver::InferenceServer* server)
 {
-  std::unique_ptr<nvidia::inferenceserver::GRPCServer> service;
-  nvidia::inferenceserver::Status status =
-      nvidia::inferenceserver::GRPCServer::Create(
-          server, grpc_port_, grpc_infer_thread_cnt_,
-          grpc_stream_infer_thread_cnt_, &service);
-  if (status.IsOk()) {
-    status = service->Start();
+  TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
+      server, grpc_port_, grpc_infer_thread_cnt_, grpc_stream_infer_thread_cnt_,
+      service);
+  if (err == nullptr) {
+    err = (*service)->Start();
   }
 
-  if (!status.IsOk()) {
-    LOG_ERROR << status.Message();
-    service.reset();
+  if (err != nullptr) {
+    service->reset();
   }
 
-  return std::move(service);
+  return err;
 }
+#endif  // TRTIS_ENABLE_GRPC
 
-nvidia::inferenceserver::Status
+#ifdef TRTIS_ENABLE_HTTP
+TRTSERVER_Error*
 StartHttpService(
+    std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
     nvidia::inferenceserver::InferenceServer* server,
     const std::map<int32_t, std::vector<std::string>>& port_map)
 {
-  nvidia::inferenceserver::Status status =
-      nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-          server, port_map, http_thread_cnt_, &http_services_);
-  if (status.IsOk()) {
-    for (auto& http_eps : http_services_) {
+  TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServer::CreateAPIServer(
+      server, port_map, http_thread_cnt_, services);
+  if (err == nullptr) {
+    for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
-        status = http_eps->Start();
+        err = http_eps->Start();
       }
     }
   }
 
-  if (!status.IsOk()) {
-    LOG_ERROR << status.Message();
-    for (auto& http_eps : http_services_) {
+  if (err != nullptr) {
+    for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
         http_eps.reset();
       }
     }
   }
 
-  return status;
+  return err;
 }
+#endif  // TRTIS_ENABLE_HTTP
 
-std::unique_ptr<nvidia::inferenceserver::HTTPServer>
-StartMetricsService()
+#ifdef TRTIS_ENABLE_METRICS
+TRTSERVER_Error*
+StartMetricsService(
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service)
 {
-  std::unique_ptr<nvidia::inferenceserver::HTTPServer> service;
-  nvidia::inferenceserver::Status status =
+  TRTSERVER_Error* err =
       nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
           metrics_port_, 1 /* HTTP thread count */, allow_gpu_metrics_,
-          &service);
-  if (status.IsOk()) {
-    status = service->Start();
+          service);
+  if (err == nullptr) {
+    err = (*service)->Start();
   }
-  if (!status.IsOk()) {
-    LOG_ERROR << status.Message();
-    service.reset();
+  if (err != nullptr) {
+    service->reset();
   }
 
-  return std::move(service);
+  return err;
 }
+#endif  // TRTIS_ENABLE_METRICS
 
 bool
 StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
 {
-  size_t i;
-  nvidia::inferenceserver::Status create_status;
   LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
 
+#ifdef TRTIS_ENABLE_GRPC
   // Enable gRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
-    grpc_service_ = StartGrpcService(server);
-    if (grpc_service_ == nullptr) {
-      LOG_ERROR << "Failed to start gRPC service";
+    TRTSERVER_Error* err = StartGrpcService(&grpc_service_, server);
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to start GRPC service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
       return false;
     }
   }
+#endif  // TRTIS_ENABLE_GRPC
 
+#ifdef TRTIS_ENABLE_HTTP
   // Enable HTTP endpoints if requested...
   if (allow_http_) {
     std::map<int32_t, std::vector<std::string>> port_map;
 
     // Group by port numbers
-    for (i = 0; i < http_ports_.size(); i++) {
+    for (size_t i = 0; i < http_ports_.size(); i++) {
       if (http_ports_[i] != -1) {
         port_map[http_ports_[i]].push_back(endpoint_names[i]);
       }
     }
 
-    create_status = StartHttpService(server, port_map);
-    if (!create_status.IsOk()) {
-      LOG_ERROR << "Failed to start HTTP service";
+    TRTSERVER_Error* err = StartHttpService(&http_services_, server, port_map);
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to start HTTP service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
       return false;
     }
   }
+#endif  // TRTIS_ENABLE_HTTP
 
+#ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    metrics_service_ = StartMetricsService();
-    if (metrics_service_ == nullptr) {
-      LOG_ERROR << "Failed to start Metrics service";
+    TRTSERVER_Error* err = StartMetricsService(&metrics_service_);
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to start Metrics service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
       return false;
     }
   }
+#endif  // TRTIS_ENABLE_METRICS
 
   return true;
 }
@@ -437,15 +470,22 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
 
   bool exit_on_error = exit_on_failed_init_;
 
-  bool allow_gpu_metrics = true;
+#ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
+  int32_t http_thread_cnt = http_thread_cnt_;
+  int32_t http_health_port = http_port_;
+#endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_GRPC
   int32_t grpc_port = grpc_port_;
-  int32_t metrics_port = metrics_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
-  int32_t http_thread_cnt = http_thread_cnt_;
+#endif  // TRTIS_ENABLE_GRPC
 
-  int32_t http_health_port = http_port_;
+#ifdef TRTIS_ENABLE_METRICS
+  int32_t metrics_port = metrics_port_;
+  bool allow_gpu_metrics = true;
+#endif  // TRTIS_ENABLE_METRICS
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
 
@@ -501,20 +541,10 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
       case OPTION_ALLOW_PROFILING:
         allow_profiling = ParseBoolOption(optarg);
         break;
-      case OPTION_ALLOW_GRPC:
-        allow_grpc_ = ParseBoolOption(optarg);
-        break;
+
+#ifdef TRTIS_ENABLE_HTTP
       case OPTION_ALLOW_HTTP:
         allow_http_ = ParseBoolOption(optarg);
-        break;
-      case OPTION_ALLOW_METRICS:
-        allow_metrics_ = ParseBoolOption(optarg);
-        break;
-      case OPTION_ALLOW_GPU_METRICS:
-        allow_gpu_metrics = ParseBoolOption(optarg);
-        break;
-      case OPTION_GRPC_PORT:
-        grpc_port = ParseIntOption(optarg);
         break;
       case OPTION_HTTP_PORT:
         http_port = ParseIntOption(optarg);
@@ -523,20 +553,38 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
       case OPTION_HTTP_HEALTH_PORT:
         http_health_port = ParseIntOption(optarg);
         break;
-
-      case OPTION_METRICS_PORT:
-        metrics_port = ParseIntOption(optarg);
+      case OPTION_HTTP_THREAD_COUNT:
+        http_thread_cnt = ParseIntOption(optarg);
         break;
+#endif  // TRTIS_ENABLE_HTTP
 
+#ifdef TRTIS_ENABLE_GRPC
+      case OPTION_ALLOW_GRPC:
+        allow_grpc_ = ParseBoolOption(optarg);
+        break;
+      case OPTION_GRPC_PORT:
+        grpc_port = ParseIntOption(optarg);
+        break;
       case OPTION_GRPC_INFER_THREAD_COUNT:
         grpc_infer_thread_cnt = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_STREAM_INFER_THREAD_COUNT:
         grpc_stream_infer_thread_cnt = ParseIntOption(optarg);
         break;
-      case OPTION_HTTP_THREAD_COUNT:
-        http_thread_cnt = ParseIntOption(optarg);
+#endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_METRICS
+      case OPTION_ALLOW_METRICS:
+        allow_metrics_ = ParseBoolOption(optarg);
         break;
+      case OPTION_ALLOW_GPU_METRICS:
+        allow_gpu_metrics = ParseBoolOption(optarg);
+        break;
+      case OPTION_METRICS_PORT:
+        metrics_port = ParseIntOption(optarg);
+        break;
+#endif  // TRTIS_ENABLE_METRICS
+
       case OPTION_ALLOW_POLL_REPO:
         allow_poll_model_repository = ParseBoolOption(optarg);
         break;
@@ -567,31 +615,29 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
 
-
-  if (!allow_http_ && !allow_grpc_) {
-    LOG_ERROR << "At least one of the following options must be true: "
-              << "--allow-http, --allow-grpc";
-
-    return false;
-  }
-
   exit_on_failed_init_ = exit_on_error;
 
+#ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
-  grpc_port_ = grpc_port;
   http_health_port_ = http_health_port;
-
-  metrics_port_ = allow_metrics_ ? metrics_port : -1;
   http_ports_ = {http_port_, http_health_port_, http_port_, http_port_};
+  http_thread_cnt_ = http_thread_cnt;
+#endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_GRPC
+  grpc_port_ = grpc_port;
+  grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
+  grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
+#endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_METRICS
+  metrics_port_ = allow_metrics_ ? metrics_port : -1;
+  allow_gpu_metrics_ = allow_metrics_ ? allow_gpu_metrics : false;
+#endif  // TRTIS_ENABLE_METRICS
 
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision())
     return false;
-
-  allow_gpu_metrics_ = allow_metrics_ ? allow_gpu_metrics : false;
-  grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
-  grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
-  http_thread_cnt_ = http_thread_cnt;
 
   server->SetId(server_id);
   server->SetModelStorePath(model_store_path);
@@ -658,17 +704,25 @@ main(int argc, char** argv)
 
   bool stop_status = server_->Stop();
 
-  if (grpc_service_) {
-    grpc_service_->Stop();
-  }
+#ifdef TRTIS_ENABLE_HTTP
   for (auto& http_eps : http_services_) {
     if (http_eps != nullptr) {
       http_eps->Stop();
     }
   }
+#endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_GRPC
+  if (grpc_service_) {
+    grpc_service_->Stop();
+  }
+#endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_METRICS
   if (metrics_service_) {
     metrics_service_->Stop();
   }
+#endif  // TRTIS_ENABLE_METRICS
 
   return (stop_status) ? 0 : 1;
 }
