@@ -43,16 +43,19 @@ to perform image classification and to test performance:
   that uses the C++ or Python client library to execute image
   classification models on the TensorRT Inference Server.
 
-* Python version of *grpc\_image\_client*, an example application that
-  is functionally equivalent to *image\_client* but that uses GRPC
-  generated client code to communicate with the inference server
-  (instead of the client library).
-
 * C++ version of *perf\_client*, an example application that issues a
   large number of concurrent requests to the inference server to
   measure latency and throughput for a given model. You can use this
   to experiment with different model configuration settings for your
   models.
+
+You can also communicate with the inference server by using the
+`protoc compiler to generate the GRPC client stub
+<https://grpc.io/docs/guides/>`_ in a large number of programming
+languages. As an example, *grpc\_image\_client*, is a Python
+application that is functionally equivalent to *image\_client* but
+that uses a generated GRPC client stub to communicate with the
+inference server (instead of the client library).
 
 .. _section-getting-the-client-libraries-and-examples:
 
@@ -109,43 +112,54 @@ scripts is at /workspace/v<version>.clients.tar.gz.
 Build Using CMake
 ^^^^^^^^^^^^^^^^^
 
-The actual client build is performed using CMake. The build
-dependencies and requirements are shown in Dockerfile.client. To build
-without Docker you must first install those dependencies. The CMake
-build can also be targeted for other OSes and platforms. We welcome
-any updates that expand the build functionality and allow the clients
-to be built on additional platforms.
+The client build is performed using CMake. The build dependencies and
+requirements are shown in Dockerfile.client. To build without Docker
+you must first install those dependencies. This section describes the
+client build for Ubuntu 16.04, Ubuntu 18.04, and Windows 10
+systems. The CMake build can also be targeted for other OSes and
+platforms. We welcome any updates that expand the build functionality
+and allow the clients to be built on additional platforms.
 
-To build the libaries and examples using CMake, first change
-directory to the root of the repo and checkout the release version of
-the branch that you want to build (or the master branch if you want to
-build the under-development version)::
+To build the libaries and examples using CMake, first change directory
+to the root of the repo and checkout the release version of the branch
+that you want to build (or the master branch if you want to build the
+under-development version)::
 
   $ git checkout r19.06
 
-Then change to the build/ directory and run the following to configure
-and build::
+When following the build steps below, the first build attempt may fail
+with a "protobuf_generate_cpp" error. If that happens simply run the
+make/build command again and the build should succeed.
+
+Ubuntu 16.04 / Ubuntu 18.04
+...........................
+
+To build on Ubuntu, change to the build/ directory and run the
+following to configure and build::
 
   $ cd build
   $ cmake -DCMAKE_BUILD_TYPE=Release
   $ make -j8 trtis-clients
 
-If you are building client for Windows, as there are no default build system
-available, you will need to specify the generator for CMake to match the build
-system you are using. For instance, if you are using toolkit comes with
-Microsoft Visual Studio, you should do the following::
+When the build completes the libraries and examples can be found in
+trtis-clients/install.
+
+Windows 10
+..........
+
+If you are building the client for Windows, as there are no default
+build system available, you will need to specify the generator for
+CMake to match the build system you are using. For instance, if you
+are using Microsoft Visual Studio, you should do the following::
 
   > cd build
   > cmake -G"Visual Studio 16 2019" -DCMAKE_BUILD_TYPE=Release
   > MSBuild.exe trtis-clients.vcxproj -p:Configuration=Release
 
-The first build attempt may fail with a "protobuf_generate_cpp"
-error. If that happens simply run the make command again and the build
-should succeed. When the build completes the libraries and examples
-can be found in trtis-clients/install. For windows, the C++ client examples
-will not be generated as those examples utilize UNIX functionalities and thus
-they are incompatible on Windows. However, you can use the Python examples
-to test if the build is successful.
+When the build completes the libraries and examples can be found in
+trtis-clients/install. The C++ client examples will not be generated
+as those examples have not yet been ported to Windows. However, you
+can use the Python examples to test if the build is successful.
 
 .. build-client-end-marker-do-not-remove
 
