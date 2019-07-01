@@ -177,7 +177,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-                libcurl4-openssl-dev; \
+                libcurl4-openssl-dev \
+                zlib1g-dev; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
@@ -316,20 +317,19 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
     [ `id -g $TENSORRT_SERVER_USER` -eq 1000 ]
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-            libgoogle-glog0v5 \
-            libre2-1v5
-
 # libcurl is needed for GCS
 RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-                libcurl3-dev; \
+                libcurl3-dev \
+                libgoogle-glog0v5 \
+                libre2-1v5; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
-                libcurl4-openssl-dev; \
+                libcurl4-openssl-dev \
+                libgoogle-glog0v5 \
+                libre2-4; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \

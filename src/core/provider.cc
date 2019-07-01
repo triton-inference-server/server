@@ -26,6 +26,7 @@
 
 #include "src/core/provider.h"
 
+#include <numeric>
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"

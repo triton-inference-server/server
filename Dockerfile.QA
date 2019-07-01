@@ -40,6 +40,9 @@ ARG CLIENT_IMAGE=tensorrtserver_client
 ############################################################################
 FROM ${BUILD_IMAGE} AS build
 
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
 # image_preprocess custom backend requires opencv
 RUN apt-get update && apt-get install -y --no-install-recommends \
             libopencv-dev \
@@ -155,13 +158,29 @@ RUN (cd qa/L0_custom_backend && tar xzf /workspace/*.custombackend.tar.gz)
 ############################################################################
 FROM $BASE_IMAGE
 
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+# install platform specific packages
+RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libpng12-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libpng-dev; \
+    else \
+        echo "Ubuntu version must be either 16.04 or 18.04" && \
+        exit 1; \
+    fi
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
+                              curl \
                               jmeter \
                               jmeter-http \
-                              libcurl3 \
                               libopencv-dev \
                               libopencv-core-dev \
-                              libpng12-dev \
                               libzmq3-dev \
                               python \
                               python-protobuf \
