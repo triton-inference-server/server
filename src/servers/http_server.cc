@@ -38,6 +38,7 @@
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.h"
 #include "src/core/server.h"
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -53,8 +54,8 @@ class HTTPServerImpl : public HTTPServer {
 
   static void Dispatch(evhtp_request_t* req, void* arg);
 
-  Status Start() override;
-  Status Stop() override;
+  TRTSERVER_Error* Start() override;
+  TRTSERVER_Error* Stop() override;
 
  protected:
   virtual void Handle(evhtp_request_t* req) = 0;
@@ -71,7 +72,7 @@ class HTTPServerImpl : public HTTPServer {
   event* break_ev_;
 };
 
-Status
+TRTSERVER_Error*
 HTTPServerImpl::Start()
 {
   if (!worker_.joinable()) {
@@ -85,14 +86,14 @@ HTTPServerImpl::Start()
     break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
-    return Status::Success;
+    return nullptr;
   }
 
-  return Status(
-      RequestStatusCode::ALREADY_EXISTS, "HTTP server is already running.");
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_ALREADY_EXISTS, "HTTP server is already running.");
 }
 
-Status
+TRTSERVER_Error*
 HTTPServerImpl::Stop()
 {
   if (worker_.joinable()) {
@@ -105,10 +106,11 @@ HTTPServerImpl::Stop()
     evhtp_unbind_socket(htp_);
     evhtp_free(htp_);
     event_base_free(evbase_);
-    return Status::Success;
+    return nullptr;
   }
 
-  return Status(RequestStatusCode::UNAVAILABLE, "HTTP server is not running.");
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNAVAILABLE, "HTTP server is not running.");
 }
 
 void
@@ -611,15 +613,15 @@ HTTPAPIServer::InferRequest::FinalizeResponse()
              : EVHTP_RES_BADREQ;
 }
 
-Status
+TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
     InferenceServer* server,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
   if (port_map.empty()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
         "HTTP is enabled but none of the service endpoints have a valid port "
         "assignment");
   }
@@ -631,10 +633,10 @@ HTTPServer::CreateAPIServer(
         new HTTPAPIServer(server, ep_map.second, ep_map.first, thread_cnt));
   }
 
-  return Status::Success;
+  return nullptr;
 }
 
-Status
+TRTSERVER_Error*
 HTTPServer::CreateMetricsServer(
     const int32_t port, const int thread_cnt, const bool allow_gpu_metrics,
     std::unique_ptr<HTTPServer>* metrics_server)
@@ -643,7 +645,8 @@ HTTPServer::CreateMetricsServer(
   LOG_INFO << "Starting Metrics Service at " << addr;
 
 #ifndef TRTIS_ENABLE_METRICS
-  return Status(RequestStatusCode::UNAVAILABLE, "Metrics support is disabled");
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNAVAILABLE, "Metrics support is disabled");
 #endif  // !TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_METRICS
@@ -652,7 +655,7 @@ HTTPServer::CreateMetricsServer(
   }
   metrics_server->reset(new HTTPMetricsServer(port, thread_cnt));
 
-  return Status::Success;
+  return nullptr;
 #endif  // TRTIS_ENABLE_METRICS
 }
 

@@ -43,29 +43,44 @@ namespace {
 //
 class TrtServerError {
  public:
+  static TRTSERVER_Error* Create(TRTSERVER_Error_Code code, const char* msg);
   static TRTSERVER_Error* Create(
-      ni::RequestStatusCode code, const std::string& msg);
+      ni::RequestStatusCode status_code, const std::string& msg);
   static TRTSERVER_Error* Create(const ni::RequestStatus& status);
-  ni::RequestStatusCode Code() const { return code_; }
+
+  static ni::RequestStatusCode CodeToStatus(TRTSERVER_Error_Code code);
+  static TRTSERVER_Error_Code StatusToCode(ni::RequestStatusCode status);
+
+  ni::RequestStatusCode StatusCode() const { return status_code_; }
   const std::string& Message() const { return msg_; }
 
  private:
-  TrtServerError(ni::RequestStatusCode code, const std::string& msg);
+  TrtServerError(ni::RequestStatusCode status_code, const std::string& msg);
+  TrtServerError(ni::RequestStatusCode status_code, const char* msg);
 
-  ni::RequestStatusCode code_;
+  ni::RequestStatusCode status_code_;
   const std::string msg_;
 };
 
 TRTSERVER_Error*
-TrtServerError::Create(ni::RequestStatusCode code, const std::string& msg)
+TrtServerError::Create(TRTSERVER_Error_Code code, const char* msg)
 {
-  // If 'code' is success then return nullptr as that indicates
+  return reinterpret_cast<TRTSERVER_Error*>(
+      new TrtServerError(TrtServerError::CodeToStatus(code), msg));
+}
+
+TRTSERVER_Error*
+TrtServerError::Create(
+    ni::RequestStatusCode status_code, const std::string& msg)
+{
+  // If 'status_code' is success then return nullptr as that indicates
   // success
-  if (code == ni::RequestStatusCode::SUCCESS) {
+  if (status_code == ni::RequestStatusCode::SUCCESS) {
     return nullptr;
   }
 
-  return reinterpret_cast<TRTSERVER_Error*>(new TrtServerError(code, msg));
+  return reinterpret_cast<TRTSERVER_Error*>(
+      new TrtServerError(status_code, msg));
 }
 
 TRTSERVER_Error*
@@ -74,9 +89,67 @@ TrtServerError::Create(const ni::RequestStatus& status)
   return Create(status.code(), status.msg());
 }
 
+ni::RequestStatusCode
+TrtServerError::CodeToStatus(TRTSERVER_Error_Code code)
+{
+  switch (code) {
+    case TRTSERVER_ERROR_UNKNOWN:
+      return ni::RequestStatusCode::UNKNOWN;
+    case TRTSERVER_ERROR_INTERNAL:
+      return ni::RequestStatusCode::INTERNAL;
+    case TRTSERVER_ERROR_NOT_FOUND:
+      return ni::RequestStatusCode::NOT_FOUND;
+    case TRTSERVER_ERROR_INVALID_ARG:
+      return ni::RequestStatusCode::INVALID_ARG;
+    case TRTSERVER_ERROR_UNAVAILABLE:
+      return ni::RequestStatusCode::UNAVAILABLE;
+    case TRTSERVER_ERROR_UNSUPPORTED:
+      return ni::RequestStatusCode::UNSUPPORTED;
+    case TRTSERVER_ERROR_ALREADY_EXISTS:
+      return ni::RequestStatusCode::ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return ni::RequestStatusCode::UNKNOWN;
+}
+
+TRTSERVER_Error_Code
+TrtServerError::StatusToCode(ni::RequestStatusCode status_code)
+{
+  switch (status_code) {
+    case ni::RequestStatusCode::UNKNOWN:
+      return TRTSERVER_ERROR_UNKNOWN;
+    case ni::RequestStatusCode::INTERNAL:
+      return TRTSERVER_ERROR_INTERNAL;
+    case ni::RequestStatusCode::NOT_FOUND:
+      return TRTSERVER_ERROR_NOT_FOUND;
+    case ni::RequestStatusCode::INVALID_ARG:
+      return TRTSERVER_ERROR_INVALID_ARG;
+    case ni::RequestStatusCode::UNAVAILABLE:
+      return TRTSERVER_ERROR_UNAVAILABLE;
+    case ni::RequestStatusCode::UNSUPPORTED:
+      return TRTSERVER_ERROR_UNSUPPORTED;
+    case ni::RequestStatusCode::ALREADY_EXISTS:
+      return TRTSERVER_ERROR_ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return TRTSERVER_ERROR_UNKNOWN;
+}
+
 TrtServerError::TrtServerError(
-    ni::RequestStatusCode code, const std::string& msg)
-    : code_(code), msg_(msg)
+    ni::RequestStatusCode status_code, const std::string& msg)
+    : status_code_(status_code), msg_(msg)
+{
+}
+
+TrtServerError::TrtServerError(
+    ni::RequestStatusCode status_code, const char* msg)
+    : status_code_(status_code), msg_(msg)
 {
 }
 
@@ -245,6 +318,12 @@ extern "C" {
 //
 // TRTSERVER_Error
 //
+TRTSERVER_Error*
+TRTSERVER_ErrorNew(TRTSERVER_Error_Code code, const char* msg)
+{
+  return reinterpret_cast<TRTSERVER_Error*>(TrtServerError::Create(code, msg));
+}
+
 void
 TRTSERVER_ErrorDelete(TRTSERVER_Error* error)
 {
@@ -256,34 +335,14 @@ TRTSERVER_Error_Code
 TRTSERVER_ErrorCode(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
-  switch (lerror->Code()) {
-    case ni::RequestStatusCode::UNKNOWN:
-      return TRTSERVER_ERROR_UNKNOWN;
-    case ni::RequestStatusCode::INTERNAL:
-      return TRTSERVER_ERROR_INTERNAL;
-    case ni::RequestStatusCode::NOT_FOUND:
-      return TRTSERVER_ERROR_NOT_FOUND;
-    case ni::RequestStatusCode::INVALID_ARG:
-      return TRTSERVER_ERROR_INVALID_ARG;
-    case ni::RequestStatusCode::UNAVAILABLE:
-      return TRTSERVER_ERROR_UNAVAILABLE;
-    case ni::RequestStatusCode::UNSUPPORTED:
-      return TRTSERVER_ERROR_UNSUPPORTED;
-    case ni::RequestStatusCode::ALREADY_EXISTS:
-      return TRTSERVER_ERROR_ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return TRTSERVER_ERROR_UNKNOWN;
+  return TrtServerError::StatusToCode(lerror->StatusCode());
 }
 
 const char*
 TRTSERVER_ErrorCodeString(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
-  return ni::RequestStatusCode_Name(lerror->Code()).c_str();
+  return ni::RequestStatusCode_Name(lerror->StatusCode()).c_str();
 }
 
 const char*

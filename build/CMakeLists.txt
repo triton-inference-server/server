@@ -30,6 +30,7 @@ project (tensorrt-inference-server)
 include(CMakeDependentOption)
 include(ExternalProject)
 
+# Backends
 option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" OFF)
 option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" OFF)
@@ -37,21 +38,25 @@ option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" OFF)
 option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" OFF)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 
+# Endpoints
+option(TRTIS_ENABLE_HTTP "Include HTTP API in server" ON)
+option(TRTIS_ENABLE_GRPC "Include GRPC API in server" ON)
+option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
+
+# Cloud storage
+option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
+
 # Multiple paths may be specified by separating them with semicolon
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
 set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
-option(TRTIS_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
 
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
 endif()
-
-# Cloud storage support
-option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
@@ -220,11 +225,10 @@ ExternalProject_Add(crc32c
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c
 )
 
-
-# This is necessary because google-cloud-cpp 
-# does not pass protobuf_DIR and gRPC_DIR etc to its 
+# This is necessary because google-cloud-cpp
+# does not pass protobuf_DIR and gRPC_DIR etc to its
 # external projects but expects them in CMAKE_PREFIX_PATH
-set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} 
+set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
    ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
@@ -329,14 +333,19 @@ else()
   set(TRTIS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-set(TRTIS_DEPENDS protobuf grpc libevent libevhtp)
-if(${TRTIS_ENABLE_METRICS})
-  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
-endif() # TRTIS_ENABLE_METRICS
-
+set(TRTIS_DEPENDS protobuf)
 if(${TRTIS_ENABLE_GCS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} google-cloud-cpp)
 endif() # TRTIS_ENABLE_GCS
+if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} libevent libevhtp)
+endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
+if(${TRTIS_ENABLE_GRPC})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} grpc)
+endif() # TRTIS_ENABLE_GRPC
+if(${TRTIS_ENABLE_METRICS})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
+endif() # TRTIS_ENABLE_METRICS
 
 ExternalProject_Add(trtis
   PREFIX trtis
@@ -360,6 +369,8 @@ ExternalProject_Add(trtis
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
     -DTRTIS_ENABLE_ASAN:BOOL=${TRTIS_ENABLE_ASAN}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
+    -DTRTIS_ENABLE_HTTP:BOOL=${TRTIS_ENABLE_HTTP}
+    -DTRTIS_ENABLE_GRPC:BOOL=${TRTIS_ENABLE_GRPC}
     -DTRTIS_ENABLE_METRICS:BOOL=${TRTIS_ENABLE_METRICS}
     -DTRTIS_ENABLE_GCS:BOOL=${TRTIS_ENABLE_GCS}
     -DTRTIS_ENABLE_TENSORFLOW:BOOL=${TRTIS_ENABLE_TENSORFLOW}

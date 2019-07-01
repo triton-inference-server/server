@@ -49,6 +49,14 @@ if(${TRTIS_ENABLE_GPU})
   add_definitions(-DTRTIS_ENABLE_GPU=1)
 endif() # TRTIS_ENABLE_GPU
 
+if(${TRTIS_ENABLE_HTTP})
+  add_definitions(-DTRTIS_ENABLE_HTTP=1)
+endif() # TRTIS_ENABLE_HTTP
+
+if(${TRTIS_ENABLE_GRPC})
+  add_definitions(-DTRTIS_ENABLE_GRPC=1)
+endif() # TRTIS_ENABLE_GRPC
+
 if(${TRTIS_ENABLE_METRICS})
   add_definitions(-DTRTIS_ENABLE_METRICS=1)
 endif() # TRTIS_ENABLE_METRICS
