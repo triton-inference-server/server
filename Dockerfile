@@ -108,6 +108,13 @@ RUN git clone --recursive https://github.com/Microsoft/onnxruntime
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
+
+# Modify install dependencies to corresponding packages in Ubuntu 18.04
+RUN sed -i "s/libicu55/libicu60/" ${SCRIPT_DIR}/install_ubuntu.sh && \
+    sed -i "s/libpng16/libpng/" ${SCRIPT_DIR}/install_ubuntu.sh && \
+    sed -i "s/libprotobuf9v5/libprotobuf10/" ${SCRIPT_DIR}/install_ubuntu.sh && \
+    sed -i "s/libcurl3/libcurl4/" ${SCRIPT_DIR}/install_ubuntu.sh && \
+    sed -i "s/3\.5/3.6/" ${SCRIPT_DIR}/install_ubuntu.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
 
