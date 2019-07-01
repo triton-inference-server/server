@@ -26,6 +26,8 @@
 //
 #pragma once
 
+#include <functional>
+#include <map>
 #include <mutex>
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
