@@ -25,7 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/status.h"
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -33,18 +37,18 @@ class InferenceServer;
 
 class HTTPServer {
  public:
-  static Status CreateAPIServer(
+  static TRTSERVER_Error* CreateAPIServer(
       InferenceServer* server,
       const std::map<int32_t, std::vector<std::string>>& port_map,
       const int thread_cnt,
       std::vector<std::unique_ptr<HTTPServer>>* http_servers);
 
-  static Status CreateMetricsServer(
+  static TRTSERVER_Error* CreateMetricsServer(
       int32_t port, int thread_cnt, const bool allow_gpu_metrics,
       std::unique_ptr<HTTPServer>* metrics_server);
 
-  virtual Status Start() = 0;
-  virtual Status Stop() = 0;
+  virtual TRTSERVER_Error* Start() = 0;
+  virtual TRTSERVER_Error* Stop() = 0;
 };
 
 }}  // namespace nvidia::inferenceserver
