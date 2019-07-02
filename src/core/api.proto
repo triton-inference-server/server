@@ -94,6 +94,24 @@ message InferRequestHeader
     //@@       for tensors with a non-fixed-size datatype (like STRING).
     //@@
     uint64 batch_byte_size = 3;
+
+    //@@  .. cpp:var:: message SharedMemoryIO
+    //@@
+    //@@     Unique identity of the location in shared memory to read input
+    //@@     tensors. If present, do no provide the data directly in the request
+    //@@     payload, it will be ignored. User responsible for the creation,
+    //@@     deletion and writing to shared memory.
+    //@@
+    message SharedMemoryIO
+    {
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The unique key used to refer to a specific location in shared
+      //@@     memory. Optional for tensors. Required to read tensors from
+      //@@     shared memory. If provided, tensor data read from this location.
+      //@@
+      key_t shm_key = 1;
+    }
   }
 
   //@@  .. cpp:var:: message Output
@@ -132,6 +150,23 @@ message InferRequestHeader
     //@@       highest probabilities will be returned.
     //@@
     Class cls = 3;
+
+    //@@  .. cpp:var:: message SharedMemoryIO
+    //@@
+    //@@     Unique identity of the location in shared memory to write output
+    //@@     tensors. User responsible for the creation, deletion and reading
+    //@@     from shared memory.
+    //@@
+    message SharedMemoryIO
+    {
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The unique key used to refer to a specific location in shared
+      //@@     memory. Optional for tensors. Required to write tensors to
+      //@@     shared memory. If provided, tensor data read from this location.
+      //@@
+      key_t shm_key = 1;
+    }
   }
 
   //@@  .. cpp:var:: uint64 id
@@ -269,7 +304,8 @@ message InferResponseHeader
     //@@       If specified deliver results for this output as raw tensor data.
     //@@       The actual output data is delivered in the HTTP body for an HTTP
     //@@       request, or in the :cpp:var:`InferResponse` message for a gRPC
-    //@@       request. Only one of 'raw' and 'batch_classes' may be specified.
+    //@@       request. Only one of 'raw', 'batch_classes' and 'SharedMemoryIO'
+    //@@       may be specified.
     //@@
     Raw raw = 2;
 
@@ -277,10 +313,27 @@ message InferResponseHeader
     //@@
     //@@       If specified deliver results for this output as classifications.
     //@@       There is one :cpp:var:`Classes` object for each batch entry in
-    //@@       the output. Only one of 'raw' and 'batch_classes' may be
-    //@@       specified.
+    //@@       the output. Only one of 'raw', 'batch_classes' and
+    //@@       'SharedMemoryIO' may be specified.
     //@@
     repeated Classes batch_classes = 3;
+
+    //@@  .. cpp:var:: message SharedMemoryIO
+    //@@
+    //@@     Unique identity of the location in shared memory to write output
+    //@@     tensors. User responsible for the creation, deletion and reading
+    //@@     from shared memory.
+    //@@
+    message SharedMemoryIO
+    {
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The unique key used to refer to a specific location in shared
+      //@@     memory. Optional for tensors. Required to write tensors to
+      //@@     shared memory. If provided, tensor data read from this location.
+      //@@
+      key_t shm_key = 1;
+    }
   }
 
   //@@  .. cpp:var:: uint64 id
