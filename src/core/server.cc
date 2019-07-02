@@ -312,7 +312,7 @@ InferenceServer::HandleProfile(
 void
 InferenceServer::HandleInfer(
     RequestStatus* request_status,
-    const std::shared_ptr<InferBackendHandle>& backend,
+    const std::shared_ptr<InferenceBackend>& backend,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
@@ -338,7 +338,7 @@ InferenceServer::HandleInfer(
                                 infer_stats, inflight](Status status) mutable {
     if (status.IsOk()) {
       status =
-          response_provider->FinalizeResponse(*backend->GetInferenceBackend());
+          response_provider->FinalizeResponse(*backend);
       if (status.IsOk()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
@@ -356,8 +356,9 @@ InferenceServer::HandleInfer(
   // Need to set 'this' in each backend even though it is redundant after
   // the first time. Once we remove TFS dependency we can construct each backend
   // in a way that makes it directly aware of the inference server
-  backend->GetInferenceBackend()->SetInferenceServer(this);
-  backend->GetInferenceBackend()->Run(
+  // [TODO] remove this as it can be set on backend creation
+  backend->SetInferenceServer(this);
+  backend->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }
 
@@ -401,48 +402,6 @@ InferenceServer::UptimeNs() const
 
   uint64_t now_ns = now.tv_sec * NANOS_PER_SECOND + now.tv_nsec;
   return now_ns - start_time_ns_;
-}
-
-//
-// InferBackendHandle
-//
-class InferBackendHandleImpl : public InferenceServer::InferBackendHandle {
- public:
-  InferBackendHandleImpl() = default;
-  Status Init(
-      const std::string& model_name, const int64_t model_version,
-      ModelRepositoryManager* model_repository_manager);
-
-  InferenceBackend* GetInferenceBackend() override
-  {
-    return backend_handle_->GetInferenceBackend();
-  }
-
- private:
-  std::shared_ptr<ModelRepositoryManager::BackendHandle> backend_handle_;
-};
-
-Status
-InferBackendHandleImpl::Init(
-    const std::string& model_name, const int64_t model_version,
-    ModelRepositoryManager* model_repository_manager)
-{
-  return model_repository_manager->GetBackendHandle(
-      model_name, model_version, &backend_handle_);
-}
-
-Status
-InferenceServer::InferBackendHandle::Create(
-    const InferenceServer* server, const std::string& model_name,
-    const int64_t model_version, std::shared_ptr<InferBackendHandle>* handle)
-{
-  InferBackendHandleImpl* bh = new InferBackendHandleImpl();
-  Status status = bh->Init(model_name, model_version, server->ModelManager());
-  if (status.IsOk()) {
-    handle->reset(bh);
-  }
-
-  return status;
 }
 
 }}  // namespace nvidia::inferenceserver

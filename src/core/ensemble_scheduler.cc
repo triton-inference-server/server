@@ -43,7 +43,7 @@ namespace {
 struct Step {
   Step(size_t step_idx) : step_idx_(step_idx) {}
 
-  std::shared_ptr<InferenceServer::InferBackendHandle> backend_;
+  std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InternalInferResponseProvider> response_provider_;
   RequestStatus request_status_;
@@ -78,7 +78,7 @@ class EnsembleContext {
  private:
   using StepList = std::vector<std::shared_ptr<Step>>;
   using VersionMap = std::unordered_map<
-      int64_t, std::shared_ptr<InferenceServer::InferBackendHandle>>;
+      int64_t, std::shared_ptr<InferenceBackend>>;
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
@@ -171,9 +171,9 @@ EnsembleContext::EnsembleContext(
     }
     auto ver_it = it->second.find(step_info.model_version_);
     if (ver_it == it->second.end()) {
-      std::shared_ptr<InferenceServer::InferBackendHandle> backend = nullptr;
-      ensemble_status_ = InferenceServer::InferBackendHandle::Create(
-          is_, step_info.model_name_, step_info.model_version_, &backend);
+      std::shared_ptr<InferenceBackend> backend = nullptr;
+      ensemble_status_ = is_->GetInferenceBackend(
+          step_info.model_name_, step_info.model_version_, &backend);
       if (!ensemble_status_.IsOk()) {
         break;
       }
@@ -280,7 +280,7 @@ EnsembleContext::UpdateEnsembleState(
     } else {
       auto step_idx = completed_step->step_idx_;
       RETURN_IF_ERROR(completed_step->response_provider_->FinalizeResponse(
-          *(completed_step->backend_->GetInferenceBackend())));
+          *(completed_step->backend_)));
       const auto& response_header =
           completed_step->response_provider_->ResponseHeader();
       for (const auto& output : response_header.output()) {
@@ -389,7 +389,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
     request_header.add_output()->set_name(pair.first);
   }
   RETURN_IF_ERROR(
-      NormalizeRequestHeader(*backend->GetInferenceBackend(), request_header));
+      NormalizeRequestHeader(*backend, request_header));
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
@@ -400,9 +400,9 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
   RETURN_IF_ERROR(InternalInferResponseProvider::Create(
-      *((*step)->backend_->GetInferenceBackend()),
+      *((*step)->backend_),
       (*step)->request_provider_->RequestHeader(),
-      (*step)->backend_->GetInferenceBackend()->GetLabelProvider(),
+      (*step)->backend_->GetLabelProvider(),
       &((*step)->response_provider_)));
 
   return Status::Success;
@@ -489,14 +489,12 @@ EnsembleContext::ScheduleSteps(
     const std::shared_ptr<EnsembleContext>& context, const StepList& steps)
 {
   for (const auto& step : steps) {
-    InferenceBackend* backend = step->backend_->GetInferenceBackend();
-
     auto infer_stats = std::make_shared<ModelInferStats>(
-        context->is_->StatusManager(), backend->Name());
+        context->is_->StatusManager(), step->backend_->Name());
     auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
     infer_stats->StartRequestTimer(timer.get());
-    infer_stats->SetRequestedVersion(backend->Version());
-    infer_stats->SetMetricReporter(backend->MetricReporter());
+    infer_stats->SetRequestedVersion(step->backend_->Version());
+    infer_stats->SetMetricReporter(step->backend_->MetricReporter());
     infer_stats->SetBatchSize(
         step->request_provider_->RequestHeader().batch_size());
 

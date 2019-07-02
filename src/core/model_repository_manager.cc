@@ -199,46 +199,32 @@ IsModified(const std::string& path, int64_t* last_ns)
   return modified;
 }
 
-// The implementation of backend handle, which provides callback hooks that
-// will be triggered in different phase of the BackendHandle life cycle
-class BackendHandleImpl : public ModelRepositoryManager::BackendHandle {
- public:
-  BackendHandleImpl(
-      std::unique_ptr<InferenceBackend> is,
-      std::function<void(std::unique_ptr<InferenceBackend>)> OnDestroyBackend);
+// Use smart pointer with custom deleter so that model state will be updated
+// to UNAVAILABLE if all smart pointer copies are out of scope
+struct BackendDeleter {
+  BackendDeleter(std::function<void(InferenceBackend*)> OnDestroyBackend)
+   : OnDestroyBackend_(std::move(OnDestroyBackend)) {}
 
-  ~BackendHandleImpl();
+  void operator()(InferenceBackend* backend) {
+    // [TODO] verify if deferred release is still necessary, if still yes,
+    //        fix InferenceBackend destructor.
+    // The expectation is that the InferenceBackend can be released directly when
+    // BackendDeleter() is called. But in fact, it is not "ready" to be
+    // released if it just finished a request (Resource Deadlock error in
+    // Scheduler's destructor). Now we have to defer InferenceBackend destruction.
 
-  InferenceBackend* GetInferenceBackend() override { return is_.get(); }
-
- private:
-  std::unique_ptr<InferenceBackend> is_;
+    // Call callback with separate thread because the callback will try to acquire
+    // the mutex of the corresponding backend_info. And this destructor is likely
+    // to to be called within BackendLifeCycle class where the mutex is being hold
+    std::thread worker(std::move(OnDestroyBackend_), backend);
+    worker.detach();
+    // OnDestroyBackend_();
+    // delete backend;
+  }
 
   // Use to inform the BackendLifeCycle that the backend handle is destroyed
-  std::function<void(std::unique_ptr<InferenceBackend>)> OnDestroyBackend_;
+  std::function<void(InferenceBackend*)> OnDestroyBackend_;
 };
-
-BackendHandleImpl::BackendHandleImpl(
-    std::unique_ptr<InferenceBackend> is,
-    std::function<void(std::unique_ptr<InferenceBackend>)> OnDestroyBackend)
-    : is_(std::move(is)), OnDestroyBackend_(std::move(OnDestroyBackend))
-{
-}
-
-BackendHandleImpl::~BackendHandleImpl()
-{
-  // [TODO] fix InferenceBackend destructor
-  // The expectation is that the InferenceBackend can be released directly when
-  // ~BackendHandleImpl() is called. But in fact, it is not "ready" to be
-  // released if it just finished a request (Resource Deadlock error in
-  // Scheduler's destructor). Now we have to defer InferenceBackend destruction.
-
-  // Call callback with separate thread because the callback will try to acquire
-  // the mutex of the corresponding backend_info. And this destructor is likely
-  // to to be called within BackendLifeCycle class where the mutex is being hold
-  std::thread worker(std::move(OnDestroyBackend_), std::move(is_));
-  worker.detach();
-}
 
 }  // namespace
 
@@ -266,12 +252,12 @@ class ModelRepositoryManager::BackendLifeCycle {
       const std::string& model_name, const std::vector<int64_t>& versions,
       const ModelConfig& model_config, bool force_unload = true);
 
-  // Get specified model version's backend handle. Latest ready version will
+  // Get specified model version's backend. Latest ready version will
   // be retrieved if 'version' is -1. Return error if the version specified is
   // not found or it is not ready.
-  Status GetBackendHandle(
+  Status GetInferenceBackend(
       const std::string& model_name, const int64_t version,
-      std::shared_ptr<BackendHandle>* handle);
+      std::shared_ptr<InferenceBackend>* backend);
 
   // Get the ModelStateMap representation of the live backends. A backend is
   // live if at least one of the versions is not unknown nor unavailable.
@@ -300,7 +286,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     ActionType next_action_;
     ModelConfig model_config_;
 
-    std::shared_ptr<BackendHandle> handle_;
+    std::shared_ptr<InferenceBackend> backend_;
   };
 
   BackendLifeCycle(const std::string& repository_path);
@@ -315,7 +301,7 @@ class ModelRepositoryManager::BackendLifeCycle {
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
 
-  Status CreateBackendHandle(
+  Status CreateInferenceBackend(
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
 
@@ -330,11 +316,11 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  // Variables as workaround to issue mentioned in ~BackendHandleImpl()
+  // Variables as workaround to issue mentioned in BackendDeleter()
   bool exiting_;
   std::thread release_thread_;
   std::mutex release_queue_mtx_;
-  std::deque<std::unique_ptr<InferenceBackend>> release_queue_;
+  std::deque<InferenceBackend*> release_queue_;
 
   const std::string& repository_path_;
 #ifdef TRTIS_ENABLE_CAFFE2
@@ -365,21 +351,22 @@ ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
 {
   release_thread_ = std::thread([this]() {
     {
-      std::vector<std::unique_ptr<InferenceBackend>> releasing_backend;
+      std::vector<InferenceBackend*> releasing_backend;
       {
         std::lock_guard<std::mutex> lock(this->release_queue_mtx_);
         if (this->exiting_ && this->release_queue_.empty()) {
           return;
         }
         while (!this->release_queue_.empty()) {
-          releasing_backend.emplace_back(
-              std::move(this->release_queue_.front()));
+          releasing_backend.emplace_back(this->release_queue_.front());
           this->release_queue_.pop_front();
         }
       }
       // Give some time so that the backend should be "ready" to be released
       std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-      releasing_backend.clear();
+      for (auto& backend : releasing_backend) {
+        delete backend;
+      }
     }
   });
 }
@@ -515,11 +502,11 @@ ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::GetBackendHandle(
+ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     const std::string& model_name, const int64_t version,
-    std::shared_ptr<BackendHandle>* handle)
+    std::shared_ptr<InferenceBackend>* backend)
 {
-  LOG_VERBOSE(1) << "GetBackendHandle() '" << model_name << "' version "
+  LOG_VERBOSE(1) << "GetInferenceBackend() '" << model_name << "' version "
                  << version;
   std::lock_guard<std::mutex> map_lock(map_mtx_);
   auto mit = map_.find(model_name);
@@ -543,7 +530,7 @@ ModelRepositoryManager::BackendLifeCycle::GetBackendHandle(
             // at the moment to avoid edge case like the following:
             // "versions : 1 3 2", version 3 is latest but is requested
             // to be unloaded when the iterator is examining version 2.
-            *handle = version_backend.second->handle_;
+            *backend = version_backend.second->backend_;
           }
         }
       }
@@ -557,7 +544,7 @@ ModelRepositoryManager::BackendLifeCycle::GetBackendHandle(
   } else {
     std::lock_guard<std::mutex> lock(vit->second->mtx_);
     if (vit->second->state_ == ModelReadyState::MODEL_READY) {
-      *handle = vit->second->handle_;
+      *backend = vit->second->backend_;
     } else {
       return Status(
           RequestStatusCode::UNAVAILABLE,
@@ -634,7 +621,7 @@ ModelRepositoryManager::BackendLifeCycle::Load(
       backend_info->state_ = ModelReadyState::MODEL_LOADING;
       {
         std::thread worker(
-            &ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle,
+            &ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend,
             this, model_name, version, backend_info);
         worker.detach();
       }
@@ -658,7 +645,7 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
     case ModelReadyState::MODEL_READY:
       LOG_INFO << "unloading: " << model_name << ":" << version;
       backend_info->state_ = ModelReadyState::MODEL_UNLOADING;
-      backend_info->handle_.reset();
+      backend_info->backend_.reset();
       break;
     case ModelReadyState::MODEL_LOADING:
     case ModelReadyState::MODEL_UNLOADING:
@@ -677,11 +664,11 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
+ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
     const std::string& model_name, const int64_t version,
     BackendInfo* backend_info)
 {
-  LOG_VERBOSE(1) << "CreateBackendHandle() '" << model_name << "' version "
+  LOG_VERBOSE(1) << "CreateInferenceBackend() '" << model_name << "' version "
                  << version;
   const auto version_path =
       JoinPath({repository_path_, model_name, std::to_string(version)});
@@ -744,7 +731,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
   // Update backend state
   std::lock_guard<std::mutex> lock(backend_info->mtx_);
   // Sanity check
-  if (backend_info->handle_ != nullptr) {
+  if (backend_info->backend_ != nullptr) {
     LOG_ERROR << "trying to load model '" << model_name << "' version "
               << version << " while it is being served";
   } else {
@@ -753,9 +740,9 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
       // Unless the handle is nullptr, always reset handle out of the mutex,
       // otherwise the handle's destructor will try to acquire the mutex and
       // cause deadlock.
-      backend_info->handle_.reset(new BackendHandleImpl(
-          std::move(is), [this, model_name, version, backend_info](
-                             std::unique_ptr<InferenceBackend> is) mutable {
+      backend_info->backend_.reset(is.release(),
+            BackendDeleter([this, model_name, version, backend_info](
+                             InferenceBackend* backend) mutable {
             LOG_VERBOSE(1) << "OnDestroy callback() '" << model_name
                            << "' version " << version;
             LOG_INFO << "successfully unloaded '" << model_name << "' version "
@@ -767,10 +754,10 @@ ModelRepositoryManager::BackendLifeCycle::CreateBackendHandle(
               this->TriggerNextAction(model_name, version, backend_info);
             }
 
-            // workaround for issue mentioned in ~BackendHandle()
+            // workaround for issue mentioned in BackendDeleter()
             {
               std::lock_guard<std::mutex> lock(this->release_queue_mtx_);
-              this->release_queue_.emplace_back(std::move(is));
+              this->release_queue_.emplace_back(backend);
             }
           }));
       LOG_INFO << "successfully loaded '" << model_name << "' version "
@@ -996,14 +983,14 @@ ModelRepositoryManager::GetVersionStates(const std::string& model_name)
 }
 
 Status
-ModelRepositoryManager::GetBackendHandle(
+ModelRepositoryManager::GetInferenceBackend(
     const std::string& model_name, const int64_t model_version,
-    std::shared_ptr<BackendHandle>* handle)
+    std::shared_ptr<InferenceBackend>* backend)
 {
   Status status =
-      backend_life_cycle_->GetBackendHandle(model_name, model_version, handle);
+      backend_life_cycle_->GetInferenceBackend(model_name, model_version, backend);
   if (!status.IsOk()) {
-    handle->reset();
+    backend->reset();
     status = Status(
         RequestStatusCode::UNAVAILABLE,
         "Inference request for unknown model '" + model_name + "'");

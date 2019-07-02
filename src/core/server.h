@@ -42,11 +42,11 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceBackend;
+
 // Inference server information.
 class InferenceServer {
  public:
-  class InferBackendHandle;
-
   // Construct an inference server.
   InferenceServer();
 
@@ -72,7 +72,7 @@ class InferenceServer {
   // update RequestStatus object with the status of the inference.
   void HandleInfer(
       RequestStatus* request_status,
-      const std::shared_ptr<InferBackendHandle>& backend,
+      const std::shared_ptr<InferenceBackend>& backend,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
       std::shared_ptr<ModelInferStats> infer_stats,
@@ -140,22 +140,13 @@ class InferenceServer {
     return status_manager_;
   }
 
-  // Return the model repository manager for this server.
-  ModelRepositoryManager* ModelManager() const
+  // Return the requested InferenceBackend object.
+  Status GetInferenceBackend(const std::string& model_name,
+        const int64_t model_version, std::shared_ptr<InferenceBackend>* backend)
   {
-    return model_repository_manager_.get();
+    return model_repository_manager_->GetInferenceBackend(
+      model_name, model_version, backend);
   }
-
-  // A handle to a backend.
-  class InferBackendHandle {
-   public:
-    static Status Create(
-        const InferenceServer* server, const std::string& model_name,
-        const int64_t model_version,
-        std::shared_ptr<InferBackendHandle>* handle);
-
-    virtual InferenceBackend* GetInferenceBackend() = 0;
-  };
 
  private:
   // Return the uptime of the server in nanoseconds.

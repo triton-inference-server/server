@@ -110,16 +110,15 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
       InferRequest& request, InferResponse& response)
   {
-    std::shared_ptr<InferenceServer::InferBackendHandle> backend = nullptr;
-    RETURN_IF_ERROR(InferenceServer::InferBackendHandle::Create(
-        server, request.model_name(), request.model_version(), &backend));
+    std::shared_ptr<InferenceBackend> backend = nullptr;
+    RETURN_IF_ERROR(server->GetInferenceBackend(
+        request.model_name(), request.model_version(), &backend));
     infer_stats->SetMetricReporter(
-        backend->GetInferenceBackend()->MetricReporter());
+        backend->MetricReporter());
 
     std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
     InferRequestHeader request_header = request.meta_data();
-    RETURN_IF_ERROR(NormalizeRequestHeader(
-        *backend->GetInferenceBackend(), request_header));
+    RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
     RETURN_IF_ERROR(
         GRPCInferRequestToInputMap(request_header, request, input_map));
 
@@ -131,8 +130,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     infer_stats->SetBatchSize(request_header.batch_size());
 
     RETURN_IF_ERROR(GRPCInferResponseProvider::Create(
-        request.meta_data(), &response,
-        backend->GetInferenceBackend()->GetLabelProvider(),
+        request.meta_data(), &response, backend->GetLabelProvider(),
         &response_provider));
 
     RequestStatus* request_status = response.mutable_request_status();

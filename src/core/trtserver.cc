@@ -553,15 +553,14 @@ TRTSERVER_ServerInferAsync(
   infer_stats->SetRequestedVersion(lprovider->ModelVersion());
   infer_stats->SetFailed(true);
 
-  std::shared_ptr<ni::InferenceServer::InferBackendHandle> backend = nullptr;
-  RETURN_IF_STATUS_ERROR(ni::InferenceServer::InferBackendHandle::Create(
-      lserver, lprovider->ModelName(), lprovider->ModelVersion(), &backend));
+  std::shared_ptr<ni::InferenceBackend> backend = nullptr;
+  RETURN_IF_STATUS_ERROR(lserver->GetInferenceBackend(
+      lprovider->ModelName(), lprovider->ModelVersion(), &backend));
   infer_stats->SetMetricReporter(
-      backend->GetInferenceBackend()->MetricReporter());
+      backend->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
 
-  RETURN_IF_STATUS_ERROR(ni::NormalizeRequestHeader(
-      *backend->GetInferenceBackend(), *request_header));
+  RETURN_IF_STATUS_ERROR(ni::NormalizeRequestHeader(*backend, *request_header));
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
@@ -570,8 +569,7 @@ TRTSERVER_ServerInferAsync(
 
   std::shared_ptr<ni::DelegatingInferResponseProvider> infer_response_provider;
   RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
-      *request_header, backend->GetInferenceBackend()->GetLabelProvider(),
-      &infer_response_provider));
+      *request_header, backend->GetLabelProvider(), &infer_response_provider));
 
   auto request_status = std::make_shared<ni::RequestStatus>();
   lserver->HandleInfer(
