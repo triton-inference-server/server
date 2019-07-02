@@ -199,6 +199,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
+    ln -s libtensorflow_cc.so libtensorflow_framework.so.1 && \
     ln -s libtensorflow_cc.so libtensorflow_framework.so && \
     ln -s libtensorflow_cc.so libtensorflow_cc.so.1
 
