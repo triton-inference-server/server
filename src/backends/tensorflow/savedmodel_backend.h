@@ -39,7 +39,7 @@ class SavedModelBackend : public BaseBackend {
 
   Status CreateTRTISTFModel(
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-      const int gpu_device, const bool has_graph_level, const int graph_level,
+      const int device_id, const bool has_graph_level, const int graph_level,
       const std::string& model_path, TRTISTFModelHandle* trtistf_model,
       IONameMap* input_name_map, IONameMap* output_name_map) override;
 

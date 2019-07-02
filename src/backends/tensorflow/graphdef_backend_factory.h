@@ -45,6 +45,7 @@ class GraphDefBackendFactory {
     bool allow_gpu_memory_growth;
     float per_process_gpu_memory_fraction;
     bool allow_soft_placement;
+    std::vector<std::vector<float>> memory_limit_mb;
   };
 
   static Status Create(
@@ -66,6 +67,7 @@ class GraphDefBackendFactory {
   }
 
   const std::shared_ptr<Config> backend_config_;
+  std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
 };
 
 }}  // namespace nvidia::inferenceserver

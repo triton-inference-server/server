@@ -47,11 +47,13 @@ class BaseBackend : public InferenceBackend {
   // graphdef or savedmodel
   Status CreateExecutionContexts(
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-      const std::unordered_map<std::string, std::string>& paths);
+      const std::unordered_map<std::string, std::string>& paths,
+      std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-      const std::unordered_map<std::string, std::string>& paths);
+      const std::unordered_map<std::string, std::string>& paths,
+      std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids);
 
  protected:
   using TRTISTFModelHandle =

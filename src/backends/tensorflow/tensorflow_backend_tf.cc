@@ -165,14 +165,27 @@ NewSessionOptions(
     const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
+    const std::vector<std::vector<float>>& memory_limit_mb,
     tensorflow::SessionOptions* session_options)
 {
+  tensorflow::ConfigProto* conf = &(session_options->config);
+  (*conf->mutable_device_count())["GPU"] = memory_limit_mb.size();
+
   session_options->config.mutable_gpu_options()->set_allow_growth(
       allow_gpu_memory_growth);
   session_options->config.mutable_gpu_options()
       ->set_per_process_gpu_memory_fraction(per_process_gpu_memory_fraction);
   session_options->config.set_allow_soft_placement(allow_soft_placement);
 
+  // Create virtual devices
+  for (const auto& v : memory_limit_mb) {
+    auto virtual_devices = session_options->config.mutable_gpu_options()
+                               ->mutable_experimental()
+                               ->add_virtual_devices();
+    for (float mb : v) {
+      virtual_devices->add_memory_limit_mb(mb);
+    }
+  }
   // Enable/disable XLA based on the model config optimization
   // setting.
   tensorflow::OptimizerOptions::GlobalJitLevel xla =
@@ -515,15 +528,6 @@ TRTISTF_TensorNew(
   ConvertShape(shape, &tfshape);
 
   TensorImpl* tensor = new TensorImpl(name, dtype, shape, tfshape);
-  // If data type is non-string, make sure TensorImpl contains valid TF tensor
-  if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
-    // tensor's byte size is set to value required and it is independent to
-    // the data pointer. So make sure data is not nullptr if byte size > 0
-    if ((tensor->ByteSize() != 0) && (tensor->Base() == nullptr)) {
-      delete tensor;
-      return nullptr;
-    }
-  }
   return reinterpret_cast<TRTISTF_Tensor*>(tensor);
 }
 
@@ -588,15 +592,17 @@ TRTISTF_TensorSetString(TRTISTF_Tensor* tensor, size_t idx, const char* cstr)
 TRTISTF_Error*
 TRTISTF_ModelCreateFromGraphDef(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_path, const int gpu_device, const bool has_graph_level,
+    const char* model_path, const int device_id, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement)
+    const bool allow_soft_placement,
+    const std::vector<std::vector<float>>& memory_limit_mb)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
-      per_process_gpu_memory_fraction, allow_soft_placement, &session_options);
+      per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
+      &session_options);
 
   tensorflow::Session* session;
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
@@ -614,11 +620,11 @@ TRTISTF_ModelCreateFromGraphDef(
   // could specify a specific run location. But given that
   // visible_device_list doesn't work it seems like the only option we
   // have. [DLIS-43]
-  if (gpu_device == TRTISTF_NO_GPU_DEVICE) {
+  if (device_id == TRTISTF_NO_GPU_DEVICE) {
     tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
   } else {
     tensorflow::graph::SetDefaultDevice(
-        "/gpu:" + std::to_string(gpu_device), &graph_def);
+        "/gpu:" + std::to_string(device_id), &graph_def);
   }
 
   RETURN_IF_TF_ERROR(session->Create(graph_def));
@@ -650,15 +656,17 @@ TRTISTF_ModelCreateFromGraphDef(
 TRTISTF_Error*
 TRTISTF_ModelCreateFromSavedModel(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_path, const int gpu_device, const bool has_graph_level,
+    const char* model_path, const int device_id, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement)
+    const bool allow_soft_placement,
+    const std::vector<std::vector<float>>& memory_limit_mb)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
-      per_process_gpu_memory_fraction, allow_soft_placement, &session_options);
+      per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
+      &session_options);
 
   // Set the default device to control the CPU/GPU that the graph runs
   // on. This isn't foolproof since individual operations in the graph
@@ -671,12 +679,12 @@ TRTISTF_ModelCreateFromSavedModel(
   // visible_device_list in pass in the gpu_device we want and then
   // loader.cc (our modified version) will use that to
   // SetDefaultDevice appropriately.
-  if (gpu_device == TRTISTF_NO_GPU_DEVICE) {
+  if (device_id == TRTISTF_NO_GPU_DEVICE) {
     session_options.config.mutable_gpu_options()->set_visible_device_list(
         "/cpu:0");
   } else {
     session_options.config.mutable_gpu_options()->set_visible_device_list(
-        "/gpu:" + std::to_string(gpu_device));
+        "/gpu:" + std::to_string(device_id));
   }
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle(

@@ -69,10 +69,18 @@ GraphDefBackendFactory::CreateBackend(
         std::make_tuple(graphdef_path));
   }
 
+  // Initialize virtual device counter
+  for (size_t gpu_idx = 0; gpu_idx < backend_config_->memory_limit_mb.size();
+       gpu_idx++) {
+    virtual_device_ids_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(gpu_idx),
+        std::forward_as_tuple(0));
+  }
+
   std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));
-  RETURN_IF_ERROR(
-      local_backend->CreateExecutionContexts(backend_config_, graphdef_paths));
+  RETURN_IF_ERROR(local_backend->CreateExecutionContexts(
+      backend_config_, graphdef_paths, &virtual_device_ids_));
 
   *backend = std::move(local_backend);
   return Status::Success;

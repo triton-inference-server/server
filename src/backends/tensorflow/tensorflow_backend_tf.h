@@ -27,6 +27,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <vector>
 
 // To avoid namespace and protobuf collision between TRTIS and
 // TensorFlow, we keep TensorFlow interface isolated to
@@ -187,18 +188,20 @@ struct TRTISTF_Model;
 // Create a GraphDef model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromGraphDef(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_path, const int gpu_device, const bool has_graph_level,
+    const char* model_path, const int device_id, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement);
+    const bool allow_soft_placement,
+    const std::vector<std::vector<float>>& memory_limit_mb);
 
 // Create a SavedModel model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
     TRTISTF_Model** trtistf_model, const char* model_name,
-    const char* model_path, const int gpu_device, const bool has_graph_level,
+    const char* model_path, const int device_id, const bool has_graph_level,
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
-    const bool allow_soft_placement);
+    const bool allow_soft_placement,
+    const std::vector<std::vector<float>>& memory_limit_mb);
 
 // Delete a model.
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);
