@@ -52,6 +52,7 @@ rm -fr $HOST_SRCDIR
 mkdir -p $HOST_SRCDIR
 
 cp ./gen_qa_custom_ops_models.py $HOST_SRCDIR/.
+cp ./cuda_op_kernel.cu.cc.patch $HOST_SRCDIR/.
 
 TFSCRIPT=tf_gen.cmds
 
@@ -68,12 +69,15 @@ export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
 TF_CFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
 TF_LFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))')
 
+# No CUDA
 cd /tmp
-cp /opt/tensorflow/tensorflow/examples/adding_an_op/zero_out_op_kernel_1.cc .
+cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/zero_out_op_kernel_1.cc .
 g++ -std=c++11 -O2 -shared -fPIC zero_out_op_kernel_1.cc -o $DESTDIR/libzeroout.so \${TF_CFLAGS[@]} \${TF_LFLAGS[@]}
 
-cp /opt/tensorflow/tensorflow/examples/adding_an_op/cuda_op_kernel.cc .
-cp /opt/tensorflow/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc .
+# CUDA. Need to patch so that we can build it outside of bazel/TF
+cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cc .
+cp /opt/tensorflow/tensorflow-source/tensorflow/examples/adding_an_op/cuda_op_kernel.cu.cc .
+patch -i $SRCDIR/cuda_op_kernel.cu.cc.patch cuda_op_kernel.cu.cc
 nvcc -std=c++11 -O2 -c -o cuda_op_kernel.cu.o cuda_op_kernel.cu.cc \${TF_CFLAGS[@]} -D GOOGLE_CUDA=1 -x cu -Xcompiler -fPIC
 g++ -std=c++11 -shared -o $DESTDIR/libcudaop.so cuda_op_kernel.cc cuda_op_kernel.cu.o \${TF_CFLAGS[@]} -fPIC -L/usr/local/cuda/lib64 -lcudart \${TF_LFLAGS[@]}
 
