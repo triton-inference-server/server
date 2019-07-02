@@ -77,8 +77,8 @@ class EnsembleContext {
 
  private:
   using StepList = std::vector<std::shared_ptr<Step>>;
-  using VersionMap = std::unordered_map<
-      int64_t, std::shared_ptr<InferenceBackend>>;
+  using VersionMap =
+      std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
@@ -388,8 +388,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
   }
-  RETURN_IF_ERROR(
-      NormalizeRequestHeader(*backend, request_header));
+  RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
 
   step->reset(new Step(step_idx));
   (*step)->backend_ = backend;
@@ -400,10 +399,8 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
   RETURN_IF_ERROR(InternalInferResponseProvider::Create(
-      *((*step)->backend_),
-      (*step)->request_provider_->RequestHeader(),
-      (*step)->backend_->GetLabelProvider(),
-      &((*step)->response_provider_)));
+      *((*step)->backend_), (*step)->request_provider_->RequestHeader(),
+      (*step)->backend_->GetLabelProvider(), &((*step)->response_provider_)));
 
   return Status::Success;
 }

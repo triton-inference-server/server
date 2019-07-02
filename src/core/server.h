@@ -141,11 +141,12 @@ class InferenceServer {
   }
 
   // Return the requested InferenceBackend object.
-  Status GetInferenceBackend(const std::string& model_name,
-        const int64_t model_version, std::shared_ptr<InferenceBackend>* backend)
+  Status GetInferenceBackend(
+      const std::string& model_name, const int64_t model_version,
+      std::shared_ptr<InferenceBackend>* backend)
   {
     return model_repository_manager_->GetInferenceBackend(
-      model_name, model_version, backend);
+        model_name, model_version, backend);
   }
 
  private:

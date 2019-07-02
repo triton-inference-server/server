@@ -34,6 +34,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceServer;
 class InferenceBackend;
 class ServerStatusManager;
 
@@ -48,6 +49,7 @@ class ModelRepositoryManager {
   ~ModelRepositoryManager();
 
   /// Create a manager for a repository.
+  /// \param server The pointer to the inference server.
   /// \param server_version The version of the inference server.
   /// \param status_manager The status manager that the model repository manager
   /// will update model configuration and state to.
@@ -65,7 +67,7 @@ class ModelRepositoryManager {
   /// and PollAndUpdate() is not allowed.
   /// \return The error status.
   static Status Create(
-      const std::string& server_version,
+      InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
@@ -154,12 +156,6 @@ class ModelRepositoryManager {
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
   Status GetModelConfig(const std::string& name, ModelConfig* model_config);
-
-  /// Get the platform for a named model.
-  /// \param name The model name.
-  /// \param platform Returns the Platform.
-  /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelPlatform(const std::string& name, Platform* platform);
 
   /// Get the list of versions to be loaded for a named model based on version
   /// policy.

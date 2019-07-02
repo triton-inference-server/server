@@ -113,8 +113,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     std::shared_ptr<InferenceBackend> backend = nullptr;
     RETURN_IF_ERROR(server->GetInferenceBackend(
         request.model_name(), request.model_version(), &backend));
-    infer_stats->SetMetricReporter(
-        backend->MetricReporter());
+    infer_stats->SetMetricReporter(backend->MetricReporter());
 
     std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
     InferRequestHeader request_header = request.meta_data();

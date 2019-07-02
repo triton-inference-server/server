@@ -203,16 +203,20 @@ IsModified(const std::string& path, int64_t* last_ns)
 // to UNAVAILABLE if all smart pointer copies are out of scope
 struct BackendDeleter {
   BackendDeleter(std::function<void()> OnDestroyBackend)
-   : OnDestroyBackend_(std::move(OnDestroyBackend)) {}
+      : OnDestroyBackend_(std::move(OnDestroyBackend))
+  {
+  }
 
-  void operator()(InferenceBackend* backend) {
+  void operator()(InferenceBackend* backend)
+  {
     delete backend;
-    // Call callback with separate thread because the callback will try to acquire
-    // the mutex of the corresponding backend_info. And this deleter is likely
-    // to to be called within BackendLifeCycle class where the mutex is being hold
+    // [TODO] The design seems wrong if we need to handle recursive locking
+    // Call callback with separate thread because the callback will try to
+    // acquire the mutex of the corresponding backend_info. And this deleter is
+    // likely to to be called within BackendLifeCycle class where the mutex is
+    // being hold
     std::thread worker(std::move(OnDestroyBackend_));
     worker.detach();
-    
   }
 
   // Use to inform the BackendLifeCycle that the backend handle is destroyed
@@ -233,7 +237,8 @@ struct ModelRepositoryManager::ModelInfo {
 class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
-      const BackendConfigMap& backend_map, const std::string& repository_path,
+      InferenceServer* server, const BackendConfigMap& backend_map,
+      const std::string& repository_path,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
   ~BackendLifeCycle() = default;
@@ -282,7 +287,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(const std::string& repository_path);
+  BackendLifeCycle(InferenceServer* server, const std::string& repository_path);
 
   // Caller must obtain the mutex of 'backend_info' before calling this function
   Status Load(
@@ -309,6 +314,7 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
+  InferenceServer* server_;
   const std::string& repository_path_;
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
@@ -333,18 +339,19 @@ class ModelRepositoryManager::BackendLifeCycle {
 };
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
-    const std::string& repository_path)
-    : repository_path_(repository_path)
+    InferenceServer* server, const std::string& repository_path)
+    : server_(server), repository_path_(repository_path)
 {
 }
 
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
-    const BackendConfigMap& backend_map, const std::string& repository_path,
+    InferenceServer* server, const BackendConfigMap& backend_map,
+    const std::string& repository_path,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(repository_path));
+      new BackendLifeCycle(server, repository_path));
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
@@ -692,12 +699,14 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
               << version << " while it is being served";
   } else {
     if (status.IsOk()) {
+      is->SetInferenceServer(server_);
       backend_info->state_ = ModelReadyState::MODEL_READY;
       // Unless the handle is nullptr, always reset handle out of the mutex,
       // otherwise the handle's destructor will try to acquire the mutex and
       // cause deadlock.
-      backend_info->backend_.reset(is.release(),
-            BackendDeleter([this, model_name, version, backend_info]() mutable {
+      backend_info->backend_.reset(
+          is.release(),
+          BackendDeleter([this, model_name, version, backend_info]() mutable {
             LOG_VERBOSE(1) << "OnDestroy callback() '" << model_name
                            << "' version " << version;
             LOG_INFO << "successfully unloaded '" << model_name << "' version "
@@ -763,7 +772,7 @@ ModelRepositoryManager::~ModelRepositoryManager() {}
 
 Status
 ModelRepositoryManager::Create(
-    const std::string& server_version,
+    InferenceServer* server, const std::string& server_version,
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
@@ -787,7 +796,7 @@ ModelRepositoryManager::Create(
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      backend_config_map, repository_path, &life_cycle));
+      server, backend_config_map, repository_path, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
@@ -936,8 +945,8 @@ ModelRepositoryManager::GetInferenceBackend(
     const std::string& model_name, const int64_t model_version,
     std::shared_ptr<InferenceBackend>* backend)
 {
-  Status status =
-      backend_life_cycle_->GetInferenceBackend(model_name, model_version, backend);
+  Status status = backend_life_cycle_->GetInferenceBackend(
+      model_name, model_version, backend);
   if (!status.IsOk()) {
     backend->reset();
     status = Status(

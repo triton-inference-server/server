@@ -482,10 +482,9 @@ HTTPAPIServer::InferHelper(
     InferRequestHeader& request_header, evhtp_request_t* req)
 {
   std::shared_ptr<InferenceBackend> backend = nullptr;
-  RETURN_IF_ERROR(server_->GetInferenceBackend(
-      model_name, model_version, &backend));
-  infer_stats->SetMetricReporter(
-      backend->MetricReporter());
+  RETURN_IF_ERROR(
+      server_->GetInferenceBackend(model_name, model_version, &backend));
+  infer_stats->SetMetricReporter(backend->MetricReporter());
 
   std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
   RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));

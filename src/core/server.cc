@@ -128,7 +128,7 @@ InferenceServer::Init()
   // Create the global manager for the repository. For now, all models are
   // eagerly loaded below when the manager is created.
   status = ModelRepositoryManager::Create(
-      version_, status_manager_, model_store_path_, strict_model_config_,
+      this, version_, status_manager_, model_store_path_, strict_model_config_,
       tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
       repository_poll_secs_, true /* polling */, &model_repository_manager_);
   if (!status.IsOk()) {
@@ -337,8 +337,7 @@ InferenceServer::HandleInfer(
                                 response_provider, request_status, request_id,
                                 infer_stats, inflight](Status status) mutable {
     if (status.IsOk()) {
-      status =
-          response_provider->FinalizeResponse(*backend);
+      status = response_provider->FinalizeResponse(*backend);
       if (status.IsOk()) {
         RequestStatusFactory::Create(request_status, request_id, id_, status);
         OnCompleteInferRPC();
@@ -353,11 +352,6 @@ InferenceServer::HandleInfer(
     OnCompleteInferRPC();
   };
 
-  // Need to set 'this' in each backend even though it is redundant after
-  // the first time. Once we remove TFS dependency we can construct each backend
-  // in a way that makes it directly aware of the inference server
-  // [TODO] remove this as it can be set on backend creation
-  backend->SetInferenceServer(this);
   backend->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
 }

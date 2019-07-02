@@ -556,8 +556,7 @@ TRTSERVER_ServerInferAsync(
   std::shared_ptr<ni::InferenceBackend> backend = nullptr;
   RETURN_IF_STATUS_ERROR(lserver->GetInferenceBackend(
       lprovider->ModelName(), lprovider->ModelVersion(), &backend));
-  infer_stats->SetMetricReporter(
-      backend->MetricReporter());
+  infer_stats->SetMetricReporter(backend->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
 
   RETURN_IF_STATUS_ERROR(ni::NormalizeRequestHeader(*backend, *request_header));
