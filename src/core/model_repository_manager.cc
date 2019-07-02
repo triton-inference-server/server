@@ -202,28 +202,21 @@ IsModified(const std::string& path, int64_t* last_ns)
 // Use smart pointer with custom deleter so that model state will be updated
 // to UNAVAILABLE if all smart pointer copies are out of scope
 struct BackendDeleter {
-  BackendDeleter(std::function<void(InferenceBackend*)> OnDestroyBackend)
+  BackendDeleter(std::function<void()> OnDestroyBackend)
    : OnDestroyBackend_(std::move(OnDestroyBackend)) {}
 
   void operator()(InferenceBackend* backend) {
-    // [TODO] verify if deferred release is still necessary, if still yes,
-    //        fix InferenceBackend destructor.
-    // The expectation is that the InferenceBackend can be released directly when
-    // BackendDeleter() is called. But in fact, it is not "ready" to be
-    // released if it just finished a request (Resource Deadlock error in
-    // Scheduler's destructor). Now we have to defer InferenceBackend destruction.
-
+    delete backend;
     // Call callback with separate thread because the callback will try to acquire
-    // the mutex of the corresponding backend_info. And this destructor is likely
+    // the mutex of the corresponding backend_info. And this deleter is likely
     // to to be called within BackendLifeCycle class where the mutex is being hold
-    std::thread worker(std::move(OnDestroyBackend_), backend);
+    std::thread worker(std::move(OnDestroyBackend_));
     worker.detach();
-    // OnDestroyBackend_();
-    // delete backend;
+    
   }
 
   // Use to inform the BackendLifeCycle that the backend handle is destroyed
-  std::function<void(InferenceBackend*)> OnDestroyBackend_;
+  std::function<void()> OnDestroyBackend_;
 };
 
 }  // namespace
@@ -243,7 +236,7 @@ class ModelRepositoryManager::BackendLifeCycle {
       const BackendConfigMap& backend_map, const std::string& repository_path,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
-  ~BackendLifeCycle();
+  ~BackendLifeCycle() = default;
 
   // Start loading model backends with specified versions asynchronously.
   // If 'force_unload', all versions that are being served will
@@ -316,12 +309,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  // Variables as workaround to issue mentioned in BackendDeleter()
-  bool exiting_;
-  std::thread release_thread_;
-  std::mutex release_queue_mtx_;
-  std::deque<InferenceBackend*> release_queue_;
-
   const std::string& repository_path_;
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
@@ -347,39 +334,8 @@ class ModelRepositoryManager::BackendLifeCycle {
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
     const std::string& repository_path)
-    : exiting_(false), repository_path_(repository_path)
+    : repository_path_(repository_path)
 {
-  release_thread_ = std::thread([this]() {
-    {
-      std::vector<InferenceBackend*> releasing_backend;
-      {
-        std::lock_guard<std::mutex> lock(this->release_queue_mtx_);
-        if (this->exiting_ && this->release_queue_.empty()) {
-          return;
-        }
-        while (!this->release_queue_.empty()) {
-          releasing_backend.emplace_back(this->release_queue_.front());
-          this->release_queue_.pop_front();
-        }
-      }
-      // Give some time so that the backend should be "ready" to be released
-      std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-      for (auto& backend : releasing_backend) {
-        delete backend;
-      }
-    }
-  });
-}
-
-ModelRepositoryManager::BackendLifeCycle::~BackendLifeCycle()
-{
-  {
-    std::lock_guard<std::mutex> lock(release_queue_mtx_);
-    exiting_ = true;
-  }
-  if (release_thread_.joinable()) {
-    release_thread_.join();
-  }
 }
 
 Status
@@ -741,8 +697,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       // otherwise the handle's destructor will try to acquire the mutex and
       // cause deadlock.
       backend_info->backend_.reset(is.release(),
-            BackendDeleter([this, model_name, version, backend_info](
-                             InferenceBackend* backend) mutable {
+            BackendDeleter([this, model_name, version, backend_info]() mutable {
             LOG_VERBOSE(1) << "OnDestroy callback() '" << model_name
                            << "' version " << version;
             LOG_INFO << "successfully unloaded '" << model_name << "' version "
@@ -752,12 +707,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
               backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
               // Check if next action is requested
               this->TriggerNextAction(model_name, version, backend_info);
-            }
-
-            // workaround for issue mentioned in BackendDeleter()
-            {
-              std::lock_guard<std::mutex> lock(this->release_queue_mtx_);
-              this->release_queue_.emplace_back(backend);
             }
           }));
       LOG_INFO << "successfully loaded '" << model_name << "' version "
