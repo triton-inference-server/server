@@ -34,6 +34,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
+class InferenceServer;
 class InferenceBackend;
 class ServerStatusManager;
 
@@ -45,20 +46,10 @@ class ModelRepositoryManager {
 
   enum ActionType { NO_ACTION, LOAD, UNLOAD };
 
-  /// BackendHandle manages the lifetime of the encapsulated backend,
-  /// the backend is alive as long as the handle is alive.
-  ///
-  /// [TODO] Move BackendHandle in backend.h as interface, and implement it in
-  /// model_repository_manager.h
-  class BackendHandle {
-   public:
-    virtual ~BackendHandle() = default;
-    virtual InferenceBackend* GetInferenceBackend() = 0;
-  };
-
   ~ModelRepositoryManager();
 
   /// Create a manager for a repository.
+  /// \param server The pointer to the inference server.
   /// \param server_version The version of the inference server.
   /// \param status_manager The status manager that the model repository manager
   /// will update model configuration and state to.
@@ -76,7 +67,7 @@ class ModelRepositoryManager {
   /// and PollAndUpdate() is not allowed.
   /// \return The error status.
   static Status Create(
-      const std::string& server_version,
+      InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
@@ -117,14 +108,14 @@ class ModelRepositoryManager {
   /// publish the version state changes via that mirror function.
   const VersionStateMap GetVersionStates(const std::string& model_name);
 
-  /// Obtain the specified backend handle.
+  /// Obtain the specified backend.
   /// \param model_name The model name of the backend handle.
   /// \param model_version The model version of the backend handle.
-  /// \param handle Return the backend handle object.
+  /// \param backend Return the inference backend object.
   /// \return error status.
-  Status GetBackendHandle(
+  Status GetInferenceBackend(
       const std::string& model_name, const int64_t model_version,
-      std::shared_ptr<BackendHandle>* handle);
+      std::shared_ptr<InferenceBackend>* backend);
 
  private:
   struct ModelInfo;
@@ -165,12 +156,6 @@ class ModelRepositoryManager {
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
   Status GetModelConfig(const std::string& name, ModelConfig* model_config);
-
-  /// Get the platform for a named model.
-  /// \param name The model name.
-  /// \param platform Returns the Platform.
-  /// \return OK if found, NOT_FOUND otherwise.
-  Status GetModelPlatform(const std::string& name, Platform* platform);
 
   /// Get the list of versions to be loaded for a named model based on version
   /// policy.
