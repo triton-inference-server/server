@@ -194,11 +194,44 @@ TrtServerProtobuf::Serialize(const char** base, size_t* byte_size) const
 //
 class TrtServerOptions {
  public:
+  const std::string& ServerId() const { return server_id_; }
+  void SetServerId(const char* id) { server_id_ = id; }
+
   const std::string& ModelRepositoryPath() const { return repo_path_; }
-  void SetModelRepositoryPath(const char* path) { repo_path_ = path; }
+  void SetModelRepositoryPath(const char* p) { repo_path_ = p; }
+
+  bool ExitOnError() const { return exit_on_error_; }
+  void SetExitOnError(bool b) { exit_on_error_ = b; }
+
+  bool StrictModelConfig() const { return strict_model_config_; }
+  void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
+
+  bool StrictReadiness() const { return strict_readiness_; }
+  void SetStrictReadiness(bool b) { strict_readiness_ = b; }
+
+  bool Profiling() const { return profiling_; }
+  void SetProfiling(bool b) { profiling_ = b; }
+
+  unsigned int ExitTimeout() const { return exit_timeout_; }
+  void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
+
+  bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
+  void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
+
+  float TensorFlowGpuMemoryFraction() const { return tf_gpu_mem_fraction_; }
+  void SetTensorFlowGpuMemoryFraction(float f) { tf_gpu_mem_fraction_ = f; }
 
  private:
+  std::string server_id_;
   std::string repo_path_;
+  bool exit_on_error_;
+  bool strict_model_config_;
+  bool strict_readiness_;
+  bool profiling_;
+  unsigned int exit_timeout_;
+
+  bool tf_soft_placement_;
+  float tf_gpu_mem_fraction_;
 };
 
 //
@@ -498,11 +531,83 @@ TRTSERVER_ServerOptionsDelete(TRTSERVER_ServerOptions* options)
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetServerId(
+    TRTSERVER_ServerOptions* options, const char* server_id)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetServerId(server_id);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path)
 {
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
   loptions->SetModelRepositoryPath(model_repository_path);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetExitOnError(
+    TRTSERVER_ServerOptions* options, bool exit)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetExitOnError(exit);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetStrictModelConfig(
+    TRTSERVER_ServerOptions* options, bool strict)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetStrictModelConfig(strict);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetStrictReadiness(
+    TRTSERVER_ServerOptions* options, bool strict)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetStrictReadiness(strict);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetProfiling(
+    TRTSERVER_ServerOptions* options, bool profiling)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetProfiling(profiling);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetExitTimeout(
+    TRTSERVER_ServerOptions* options, unsigned int timeout)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetExitTimeout(timeout);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
+    TRTSERVER_ServerOptions* options, bool soft_placement)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetTensorFlowSoftPlacement(soft_placement);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
+    TRTSERVER_ServerOptions* options, float fraction)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetTensorFlowGpuMemoryFraction(fraction);
   return nullptr;  // Success
 }
 
@@ -515,12 +620,21 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   ni::InferenceServer* lserver = new ni::InferenceServer();
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
 
+  lserver->SetId(loptions->ServerId());
   lserver->SetModelStorePath(loptions->ModelRepositoryPath());
+  lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
+  lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
+  lserver->SetProfilingEnabled(loptions->Profiling());
+  lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
+  lserver->SetTensorFlowSoftPlacementEnabled(
+      loptions->TensorFlowSoftPlacement());
+  lserver->SetTensorFlowGPUMemoryFraction(
+      loptions->TensorFlowGpuMemoryFraction());
 
-  if (!lserver->Init()) {
+  if (!lserver->Init() && loptions->ExitOnError()) {
     delete lserver;
     return TrtServerError::Create(
-        ni::RequestStatusCode::INVALID_ARG,
+        ni::RequestStatusCode::INTERNAL,
         "failed to initialize inference server");
   }
 
@@ -536,6 +650,22 @@ TRTSERVER_ServerDelete(TRTSERVER_Server* server)
     lserver->Stop();
   }
   delete lserver;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerId(TRTSERVER_Server* server, const char** id)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  *id = lserver->Id().c_str();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerPollModelRepository(TRTSERVER_Server* server)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  RETURN_IF_STATUS_ERROR(lserver->PollModelRepository());
   return nullptr;  // Success
 }
 

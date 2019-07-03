@@ -90,6 +90,16 @@ extern Logger gLogger_;
   nvidia::inferenceserver::gLogger_.SetEnabled( \
       nvidia::inferenceserver::LogMessage::Level::kERROR, (E))
 
+#define LOG_INFO_IS_ON                         \
+  nvidia::inferenceserver::gLogger_.IsEnabled( \
+      nvidia::inferenceserver::LogMessage::Level::kINFO)
+#define LOG_WARNING_IS_ON                      \
+  nvidia::inferenceserver::gLogger_.IsEnabled( \
+      nvidia::inferenceserver::LogMessage::Level::kWARNING)
+#define LOG_ERROR_IS_ON                        \
+  nvidia::inferenceserver::gLogger_.IsEnabled( \
+      nvidia::inferenceserver::LogMessage::Level::kERROR)
+
 #define LOG_INFO                                              \
   if (nvidia::inferenceserver::gLogger_.IsEnabled(            \
           nvidia::inferenceserver::LogMessage::Level::kINFO)) \

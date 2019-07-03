@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -192,7 +193,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
 // Get the results data for a named output. The result data is
 // returned as the base pointer to the data and the size, in bytes, of
 // the data. The caller does not own the returned data and must not
-// modify or delete it.
+// modify or delete it. The lifetime of the returned data extends only
+// as long as 'response' and must not be accessed once 'response' is
+// deleted.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
     size_t* byte_size);
@@ -214,10 +217,48 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsNew(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsDelete(
     TRTSERVER_ServerOptions* options);
 
+// Set the textual ID for the server in a server options. The ID is a
+// name that identifies the server.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
+    TRTSERVER_ServerOptions* options, const char* server_id);
+
 // Set the model repository path in a server options. The path must be
 // the full absolute path to the model repository.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path);
+
+// Enable or disable strict model configuration handling in a server
+// options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictModelConfig(
+    TRTSERVER_ServerOptions* options, bool strict);
+
+// Enable or disable exit-on-error in a server options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitOnError(
+    TRTSERVER_ServerOptions* options, bool exit);
+
+// Enable or disable strict readiness handling in a server options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictReadiness(
+    TRTSERVER_ServerOptions* options, bool strict);
+
+// Enable or disable profiling in a server options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetProfiling(
+    TRTSERVER_ServerOptions* options, bool profiling);
+
+// Set the exit timeout, in seconds, for the server in a server
+// options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitTimeout(
+    TRTSERVER_ServerOptions* options, unsigned int timeout);
+
+// Enable or disable TensorFlow soft-placement of operators.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
+    TRTSERVER_ServerOptions* options, bool soft_placement);
+
+// Set the fraction of GPU dedicated to TensorFlow models on each GPU
+// visible to the inference server.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
+    TRTSERVER_ServerOptions* options, float fraction);
 
 //
 // TRTSERVER_Server
@@ -234,6 +275,18 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerNew(
 
 // Delete a server object.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerDelete(
+    TRTSERVER_Server* server);
+
+// Get the string identifier (i.e. name) of the server. The caller
+// does not own the returned string and must not modify or delete
+// it. The lifetime of the returned string extends only as long as
+// 'server' and must not be accessed once 'server' is deleted.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerId(
+    TRTSERVER_Server* server, const char** id);
+
+// Check the model repository for changes and update server state
+// based on those changes.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerPollModelRepository(
     TRTSERVER_Server* server);
 
 // Is the server live?

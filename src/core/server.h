@@ -111,11 +111,6 @@ class InferenceServer {
   bool ProfilingEnabled() const { return profiling_enabled_; }
   void SetProfilingEnabled(bool e) { profiling_enabled_ = e; }
 
-  // Get / set the rate of repository polling, in seconds. A value of
-  // 0 indicates no polling.
-  uint32_t RepositoryPollSeconds() const { return repository_poll_secs_; }
-  void SetRepositoryPollSeconds(uint32_t s) { repository_poll_secs_ = s; }
-
   // Get / set the server exit timeout, in seconds.
   int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
   void SetExitTimeoutSeconds(int32_t s) { exit_timeout_secs_ = std::max(0, s); }
@@ -164,7 +159,6 @@ class InferenceServer {
   bool strict_model_config_;
   bool strict_readiness_;
   bool profiling_enabled_;
-  uint32_t repository_poll_secs_;
   uint32_t exit_timeout_secs_;
 
   bool tf_soft_placement_enabled_;

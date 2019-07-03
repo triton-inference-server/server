@@ -58,24 +58,31 @@ namespace {
 class AsyncResources : public nvrpc::Resources {
  public:
   explicit AsyncResources(
-      InferenceServer* server, int infer_threads, int mgmt_threads)
-      : m_Server(server), m_MgmtThreadPool(mgmt_threads),
-        m_InferThreadPool(infer_threads)
+      const std::shared_ptr<TRTSERVER_Server>& server, int infer_threads,
+      int mgmt_threads)
+      : server_(server), mgmt_thread_pool_(mgmt_threads),
+        infer_thread_pool_(infer_threads)
   {
   }
 
-  InferenceServer* GetServer() { return m_Server; }
-  ThreadPool& GetMgmtThreadPool() { return m_MgmtThreadPool; }
-  ThreadPool& GetInferThreadPool() { return m_InferThreadPool; }
+  // FIXME
+  // TRTSERVER_Server* Server() const { return server_.get(); }
+  InferenceServer* Server() const
+  {
+    return reinterpret_cast<InferenceServer*>(server_.get());
+  }
+
+  ThreadPool& GetMgmtThreadPool() { return mgmt_thread_pool_; }
+  ThreadPool& GetInferThreadPool() { return infer_thread_pool_; }
 
  private:
-  InferenceServer* m_Server;
+  std::shared_ptr<TRTSERVER_Server> server_;
 
   // We can and should get specific on thread affinity.  It might not
   // be as important on the frontend, but the backend threadpool
   // should be aligned with the respective devices.
-  ThreadPool m_MgmtThreadPool;
-  ThreadPool m_InferThreadPool;
+  ThreadPool mgmt_thread_pool_;
+  ThreadPool infer_thread_pool_;
 };
 
 static std::shared_ptr<AsyncResources> g_Resources;
@@ -89,13 +96,13 @@ class StatusContext final
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
           ServerStatTimerScoped timer(
-              GetResources()->GetServer()->StatusManager(),
+              GetResources()->Server()->StatusManager(),
               ServerStatTimerScoped::Kind::STATUS);
 
           RequestStatus* request_status = response.mutable_request_status();
           ServerStatus* server_status = response.mutable_server_status();
 
-          GetResources()->GetServer()->HandleStatus(
+          GetResources()->Server()->HandleStatus(
               request_status, server_status, request.model_name());
           this->CompleteExecution(execution_context);
         });
@@ -166,7 +173,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
 
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
-    auto server = this->GetResources()->GetServer();
+    auto server = this->GetResources()->Server();
     auto infer_stats = std::make_shared<ModelInferStats>(
         server->StatusManager(), request.model_name());
     auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
@@ -210,7 +217,7 @@ class ProfileContext final
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
-          auto server = GetResources()->GetServer();
+          auto server = GetResources()->Server();
           ServerStatTimerScoped timer(
               server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
 
@@ -229,7 +236,7 @@ class HealthContext final
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
-          auto server = GetResources()->GetServer();
+          auto server = GetResources()->Server();
           ServerStatTimerScoped timer(
               server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
 
@@ -259,8 +266,9 @@ GRPCServer::~GRPCServer()
 
 TRTSERVER_Error*
 GRPCServer::Create(
-    InferenceServer* server, int32_t port, int infer_thread_cnt,
-    int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_server)
+    const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
+    int infer_thread_cnt, int stream_infer_thread_cnt,
+    std::unique_ptr<GRPCServer>* grpc_server)
 {
   g_Resources = std::make_shared<AsyncResources>(
       server, 1 /* infer threads */, 1 /* mgmt threads */);
