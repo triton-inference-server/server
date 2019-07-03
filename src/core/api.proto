@@ -30,6 +30,49 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
+//@@.. cpp:var:: message InferSharedMemoryBlock
+//@@
+//@@   The meta-data for the shared memory from which to read the input
+//@@   data and/or write the output data.
+//@@
+message InferSharedMemoryBlock
+{
+  //@@  .. cpp:var:: string shm_key
+  //@@
+  //@@     The name of the shared memory region that holds the input data
+  //@@     (or where the output data should be written).
+  //@@
+  string shm_key = 1;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     The offset from the start of the shared memory region.
+  //@@     block0 start = offset0, end = offset0 + size;
+  //@@
+  uint64 offset = 2;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the memory block, in bytes.
+  //@@
+  uint64 byte_size = 3;
+}
+
+//@@.. cpp:var:: message InferSharedMemory
+//@@
+//@@   Meta-data for I/O of batch from shared memory.
+//@@
+message InferSharedMemory
+{
+  //@@  .. cpp:var:: InferSharedMemoryBlock block (repeated)
+  //@@
+  //@@     One or more contiguous shared memory blocks that compose the
+  //@@     entire shared memory. The No. of memory blocks required is the
+  //@@     size of the batch.
+  //@@
+  repeated InferSharedMemoryBlock block = 1;
+}
+
 //@@
 //@@.. cpp:var:: message InferRequestHeader
 //@@
@@ -95,54 +138,13 @@ message InferRequestHeader
     //@@
     uint64 batch_byte_size = 3;
 
-    //@@      .. cpp:var:: message SharedMemoryElement
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
     //@@
-    //@@         The Meta-data for the Input shared memory to read element from.
+    //@@       It is the location in shared memory that contains the tensor data
+    //@@       for this input. Using shared memory is optional but if this
+    //@@       message is used, all fields are required.
     //@@
-    message SharedMemoryElement
-    {
-      //@@    .. cpp:var:: key_t shm_key
-      //@@
-      //@@     The unique key used to refer to a specific location in shared
-      //@@     memory. Optional for tensors. Required to read tensors from
-      //@@     shared memory. If provided, tensor data read from this location.
-      //@@
-      key_t shm_key = 1;
-
-      //@@    .. cpp:var:: uint64 offset
-      //@@
-      //@@     The offset for the each element.
-      //@@     element0 start = offset0, end = offset0 + size;
-      //@@
-      uint64 offset = 2;
-
-      //@@    .. cpp:var:: uint64 byte_size
-      //@@
-      //@@     Size of the element in the batch of the input tensor, in bytes.
-      //@@
-      uint64 byte_size = 3;
-    }
-
-    //@@    .. cpp:var:: message SharedMemoryIO
-    //@@
-    //@@       Meta-data for an input batch to be read from shared memory.
-    //@@
-    message SharedMemoryIO
-    {
-      //@@      .. cpp:var:: SharedMemoryElement element (repeated)
-      //@@
-      //@@         No. of elements required is number of elements in the batch.
-      //@@
-      repeated SharedMemoryElement element = 1;
-    }
-
-    //@@    .. cpp:var:: SharedMemoryIO shm_io
-    //@@
-    //@@       Unique identity of the location in shared memory to read input
-    //@@       tensors. User responsible for the creation, deletion and writing
-    //@@       to shared memory. If specified, input data is read from here.
-    //@@
-    SharedMemoryIO shm_io = 4;
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: message Output
@@ -182,54 +184,13 @@ message InferRequestHeader
     //@@
     Class cls = 3;
 
-    //@@      .. cpp:var:: message SharedMemoryElement
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
     //@@
-    //@@         The Meta-data for the Output shared memory to write element to.
+    //@@       It is the location in shared memory that the result tensor data
+    //@@       for this output will be written. Using shared memory is optional
+    //@@       but if this message is used, all fields are required.
     //@@
-    message SharedMemoryElement
-    {
-      //@@    .. cpp:var:: key_t shm_key
-      //@@
-      //@@     The unique key used to refer to a specific location in shared
-      //@@     memory. Optional for tensors. Required to write tensors to
-      //@@     shared memory. If provided, tensor data written to this location.
-      //@@
-      key_t shm_key = 1;
-
-      //@@    .. cpp:var:: uint64 offset
-      //@@
-      //@@     The offset for the each element.
-      //@@     element0 start = offset0, end = offset0 + size;
-      //@@
-      uint64 offset = 2;
-
-      //@@    .. cpp:var:: uint64 byte_size
-      //@@
-      //@@     Size of the element in the batch of the input tensor, in bytes.
-      //@@
-      uint64 byte_size = 3;
-    }
-
-    //@@    .. cpp:var:: message SharedMemoryIO
-    //@@
-    //@@       Meta-data for an output batch to be written to shared memory.
-    //@@
-    message SharedMemoryIO
-    {
-      //@@      .. cpp:var:: SharedMemoryElement element (repeated)
-      //@@
-      //@@         No. of elements required is number of elements in the batch.
-      //@@
-      repeated SharedMemoryElement element = 1;
-    }
-
-    //@@    .. cpp:var:: SharedMemoryIO shm_io
-    //@@
-    //@@       Unique identity of the location in shared memory to write output
-    //@@       tensors. User responsible for the creation, deletion and reading
-    //@@       from shared memory. If specified, output data is written to here.
-    //@@
-    SharedMemoryIO shm_io = 4;
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: uint64 id
@@ -367,9 +328,7 @@ message InferResponseHeader
     //@@       If specified deliver results for this output as raw tensor data.
     //@@       The actual output data is delivered in the HTTP body for an HTTP
     //@@       request, or in the :cpp:var:`InferResponse` message for a gRPC
-    //@@       request. Only one of 'raw' and 'batch_classes' may be
-    //@@       specified. If 'SharedMemoryIO' is present in request then
-    //@@       neither is specified.
+    //@@       request. Only one of 'raw' and 'batch_classes' may be specified.
     //@@
     Raw raw = 2;
 
@@ -378,8 +337,7 @@ message InferResponseHeader
     //@@       If specified deliver results for this output as classifications.
     //@@       There is one :cpp:var:`Classes` object for each batch entry in
     //@@       the output. Only one of 'raw' and 'batch_classes' may be
-    //@@       specified. If 'SharedMemoryIO' is present in request then
-    //@@       neither is specified.
+    //@@       specified.
     //@@
     repeated Classes batch_classes = 3;
   }
