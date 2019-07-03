@@ -40,11 +40,6 @@ class InferenceBackend;
 Status NormalizeRequestHeader(
     const InferenceBackend& is, InferRequestHeader& request_header);
 
-Status EVBufferToInputMap(
-    const std::string& model_name,
-    const InferRequestHeader& normalized_request_header, evbuffer* input_buffer,
-    std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& input_map);
-
 Status GRPCInferRequestToInputMap(
     const InferRequestHeader& normalized_request_header,
     const InferRequest& request,

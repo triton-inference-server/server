@@ -34,26 +34,9 @@
 #include "src/core/api.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
+#include "src/servers/common.h"
 
 namespace ni = nvidia::inferenceserver;
-
-#define FAIL(MSG)                                 \
-  do {                                            \
-    std::cerr << "error: " << (MSG) << std::endl; \
-    exit(1);                                      \
-  } while (false)
-
-#define FAIL_IF_ERR(X, MSG)                                  \
-  do {                                                       \
-    TRTSERVER_Error* err = (X);                              \
-    if (err != nullptr) {                                    \
-      std::cerr << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err) << std::endl; \
-      TRTSERVER_ErrorDelete(err);                            \
-      exit(1);                                               \
-    }                                                        \
-  } while (false)
 
 namespace {
 
@@ -243,7 +226,7 @@ main(int argc, char** argv)
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderNew(
-          &request_provider, model_name.c_str(), model_version,
+          &request_provider, server, model_name.c_str(), model_version,
           request_header_serialized.c_str(), request_header_serialized.size()),
       "creating inference request provider");
 
@@ -273,7 +256,8 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
-          server, request_provider, InferComplete, reinterpret_cast<void*>(p)),
+          server, request_provider, nullptr /* http_response_provider_hack */,
+          InferComplete, reinterpret_cast<void*>(p)),
       "running inference");
 
   // The request provider can be deleted immediately after the
