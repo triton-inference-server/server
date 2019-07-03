@@ -23,32 +23,35 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-#include "src/core/trtserver.h"
+#include "src/servers/common.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class HTTPServer {
- public:
-  static TRTSERVER_Error* CreateAPIServer(
-      const std::shared_ptr<TRTSERVER_Server>& server,
-      const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
-      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+RequestStatusCode
+CodeToStatus(TRTSERVER_Error_Code code)
+{
+  switch (code) {
+    case TRTSERVER_ERROR_UNKNOWN:
+      return RequestStatusCode::UNKNOWN;
+    case TRTSERVER_ERROR_INTERNAL:
+      return RequestStatusCode::INTERNAL;
+    case TRTSERVER_ERROR_NOT_FOUND:
+      return RequestStatusCode::NOT_FOUND;
+    case TRTSERVER_ERROR_INVALID_ARG:
+      return RequestStatusCode::INVALID_ARG;
+    case TRTSERVER_ERROR_UNAVAILABLE:
+      return RequestStatusCode::UNAVAILABLE;
+    case TRTSERVER_ERROR_UNSUPPORTED:
+      return RequestStatusCode::UNSUPPORTED;
+    case TRTSERVER_ERROR_ALREADY_EXISTS:
+      return RequestStatusCode::ALREADY_EXISTS;
 
-  static TRTSERVER_Error* CreateMetricsServer(
-      int32_t port, int thread_cnt, const bool allow_gpu_metrics,
-      std::unique_ptr<HTTPServer>* metrics_server);
+    default:
+      break;
+  }
 
-  virtual ~HTTPServer() = default;
-
-  virtual TRTSERVER_Error* Start() = 0;
-  virtual TRTSERVER_Error* Stop() = 0;
-};
+  return RequestStatusCode::UNKNOWN;
+}
 
 }}  // namespace nvidia::inferenceserver

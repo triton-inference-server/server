@@ -33,9 +33,9 @@
 #include <csignal>
 #include <iostream>
 #include <mutex>
-
 #include "src/core/logging.h"
 #include "src/core/trtserver.h"
+#include "src/servers/common.h"
 
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
@@ -224,24 +224,6 @@ std::vector<Option> options_{
      "value 0.0 indicates that TensorFlow should dynamically allocate "
      "memory as needed. Value of 1.0 indicates that TensorFlow should "
      "allocate all of GPU memory."}};
-
-#define FAIL(MSG)                                 \
-  do {                                            \
-    std::cerr << "error: " << (MSG) << std::endl; \
-    exit(1);                                      \
-  } while (false)
-
-#define FAIL_IF_ERR(X, MSG)                                  \
-  do {                                                       \
-    TRTSERVER_Error* err = (X);                              \
-    if (err != nullptr) {                                    \
-      std::cerr << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err) << std::endl; \
-      TRTSERVER_ErrorDelete(err);                            \
-      exit(1);                                               \
-    }                                                        \
-  } while (false)
 
 void
 SignalHandler(int signum)
@@ -447,6 +429,8 @@ StopEndpoints()
       }
     }
   }
+
+  http_services_.clear();
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
@@ -458,6 +442,8 @@ StopEndpoints()
       TRTSERVER_ErrorDelete(err);
       ret = false;
     }
+
+    grpc_service_.reset();
   }
 #endif  // TRTIS_ENABLE_GRPC
 
@@ -470,6 +456,8 @@ StopEndpoints()
       TRTSERVER_ErrorDelete(err);
       ret = false;
     }
+
+    metrics_service_.reset();
   }
 #endif  // TRTIS_ENABLE_METRICS
 

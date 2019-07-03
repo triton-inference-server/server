@@ -25,30 +25,39 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
+#include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class HTTPServer {
- public:
-  static TRTSERVER_Error* CreateAPIServer(
-      const std::shared_ptr<TRTSERVER_Server>& server,
-      const std::map<int32_t, std::vector<std::string>>& port_map,
-      const int thread_cnt,
-      std::vector<std::unique_ptr<HTTPServer>>* http_servers);
+#define FAIL(MSG)                                 \
+  do {                                            \
+    std::cerr << "error: " << (MSG) << std::endl; \
+    exit(1);                                      \
+  } while (false)
 
-  static TRTSERVER_Error* CreateMetricsServer(
-      int32_t port, int thread_cnt, const bool allow_gpu_metrics,
-      std::unique_ptr<HTTPServer>* metrics_server);
+#define FAIL_IF_ERR(X, MSG)                                  \
+  do {                                                       \
+    TRTSERVER_Error* err = (X);                              \
+    if (err != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                \
+                << TRTSERVER_ErrorCodeString(err) << " - "   \
+                << TRTSERVER_ErrorMessage(err) << std::endl; \
+      TRTSERVER_ErrorDelete(err);                            \
+      exit(1);                                               \
+    }                                                        \
+  } while (false)
 
-  virtual ~HTTPServer() = default;
+#define RETURN_IF_ERR(X)        \
+  do {                          \
+    TRTSERVER_Error* err = (X); \
+    if (err != nullptr) {       \
+      return err;               \
+    }                           \
+  } while (false)
 
-  virtual TRTSERVER_Error* Start() = 0;
-  virtual TRTSERVER_Error* Stop() = 0;
-};
+// Return the RequestStatusCode corresponding to a TRTSERVER error
+// code.
+RequestStatusCode CodeToStatus(TRTSERVER_Error_Code code);
 
 }}  // namespace nvidia::inferenceserver

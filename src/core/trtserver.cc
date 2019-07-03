@@ -31,6 +31,7 @@
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
+#include "src/core/server_status.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -244,10 +245,12 @@ class TrtServerRequestProvider {
   TrtServerRequestProvider(
       const char* model_name, int64_t model_version,
       const std::shared_ptr<ni::InferRequestHeader>& request_header);
+  TRTSERVER_Error* Init(ni::InferenceServer* server);
 
   const std::string& ModelName() const { return model_name_; }
   int64_t ModelVersion() const { return model_version_; }
   ni::InferRequestHeader* InferRequestHeader() const;
+  const std::shared_ptr<ni::InferenceBackend>& Backend() const;
   const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
   InputMap() const;
 
@@ -257,6 +260,7 @@ class TrtServerRequestProvider {
   const std::string model_name_;
   const int64_t model_version_;
   std::shared_ptr<ni::InferRequestHeader> request_header_;
+  std::shared_ptr<ni::InferenceBackend> backend_;
   std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>> input_map_;
 };
 
@@ -268,10 +272,30 @@ TrtServerRequestProvider::TrtServerRequestProvider(
 {
 }
 
+TRTSERVER_Error*
+TrtServerRequestProvider::Init(ni::InferenceServer* server)
+{
+  // Grab a handle to the backend that this request requires so that
+  // the backend doesn't get unloaded (also need the backend to
+  // normalize the request).
+  RETURN_IF_STATUS_ERROR(
+      server->GetInferenceBackend(model_name_, model_version_, &backend_));
+  RETURN_IF_STATUS_ERROR(
+      ni::NormalizeRequestHeader(*(backend_.get()), *(request_header_.get())));
+
+  return nullptr;  // Success
+}
+
 ni::InferRequestHeader*
 TrtServerRequestProvider::InferRequestHeader() const
 {
   return request_header_.get();
+}
+
+const std::shared_ptr<ni::InferenceBackend>&
+TrtServerRequestProvider::Backend() const
+{
+  return backend_;
 }
 
 const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
@@ -432,9 +456,11 @@ TRTSERVER_MemoryAllocatorDelete(TRTSERVER_MemoryAllocator* allocator)
 TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderNew(
     TRTSERVER_InferenceRequestProvider** request_provider,
-    const char* model_name, int64_t model_version,
+    TRTSERVER_Server* server, const char* model_name, int64_t model_version,
     const char* request_header_base, size_t request_header_byte_size)
 {
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
   std::shared_ptr<ni::InferRequestHeader> request_header =
       std::make_shared<ni::InferRequestHeader>();
   if (!request_header->ParseFromArray(
@@ -444,9 +470,17 @@ TRTSERVER_InferenceRequestProviderNew(
         "failed to parse InferRequestHeader");
   }
 
-  *request_provider = reinterpret_cast<TRTSERVER_InferenceRequestProvider*>(
-      new TrtServerRequestProvider(model_name, model_version, request_header));
-  return nullptr;  // Success
+  TrtServerRequestProvider* provider =
+      new TrtServerRequestProvider(model_name, model_version, request_header);
+  TRTSERVER_Error* err = provider->Init(lserver);
+  if (err == nullptr) {
+    *request_provider =
+        reinterpret_cast<TRTSERVER_InferenceRequestProvider*>(provider);
+  } else {
+    delete provider;
+  }
+
+  return err;
 }
 
 TRTSERVER_Error*
@@ -457,6 +491,30 @@ TRTSERVER_InferenceRequestProviderDelete(
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
   delete lprovider;
   return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+    TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
+    uint64_t* byte_size)
+{
+  TrtServerRequestProvider* lprovider =
+      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+
+  ni::InferRequestHeader* request_header = lprovider->InferRequestHeader();
+  for (const auto& io : request_header->input()) {
+    if (io.name() == std::string(name)) {
+      *byte_size = io.batch_byte_size();
+      return nullptr;  // Success
+    }
+  }
+
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_INVALID_ARG,
+      std::string(
+          "batch byte-size requested for unknown input tensor '" +
+          std::string(name) + "', in model '" + lprovider->ModelName() + "'")
+          .c_str());
 }
 
 TRTSERVER_Error*
@@ -674,6 +732,9 @@ TRTSERVER_ServerIsLive(TRTSERVER_Server* server, bool* live)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::HEALTH);
+
   ni::RequestStatus request_status;
   lserver->HandleHealth(&request_status, live, "live");
   return TrtServerError::Create(request_status.code(), request_status.msg());
@@ -684,6 +745,9 @@ TRTSERVER_ServerIsReady(TRTSERVER_Server* server, bool* ready)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::HEALTH);
+
   ni::RequestStatus request_status;
   lserver->HandleHealth(&request_status, ready, "ready");
   return TrtServerError::Create(request_status.code(), request_status.msg());
@@ -693,6 +757,9 @@ TRTSERVER_Error*
 TRTSERVER_ServerStatus(TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 
   ni::RequestStatus request_status;
   ni::ServerStatus server_status;
@@ -728,6 +795,7 @@ TRTSERVER_Error*
 TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
+    void* http_response_provider_hack,
     TRTSERVER_InferenceCompleteFn_t complete_fn, void* userp)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
@@ -740,28 +808,34 @@ TRTSERVER_ServerInferAsync(
   auto timer = std::make_shared<ni::ModelInferStats::ScopedTimer>();
   infer_stats->StartRequestTimer(timer.get());
   infer_stats->SetRequestedVersion(lprovider->ModelVersion());
-  infer_stats->SetFailed(true);
-
-  std::shared_ptr<ni::InferenceBackend> backend = nullptr;
-  RETURN_IF_STATUS_ERROR(lserver->GetInferenceBackend(
-      lprovider->ModelName(), lprovider->ModelVersion(), &backend));
-  infer_stats->SetMetricReporter(backend->MetricReporter());
+  infer_stats->SetMetricReporter(lprovider->Backend()->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
-
-  RETURN_IF_STATUS_ERROR(ni::NormalizeRequestHeader(*backend, *request_header));
+  infer_stats->SetFailed(true);
 
   std::shared_ptr<ni::InferRequestProvider> infer_request_provider;
   RETURN_IF_STATUS_ERROR(ni::InferRequestProvider::Create(
       lprovider->ModelName(), lprovider->ModelVersion(), *request_header,
       lprovider->InputMap(), &infer_request_provider));
 
-  std::shared_ptr<ni::DelegatingInferResponseProvider> infer_response_provider;
-  RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
-      *request_header, backend->GetLabelProvider(), &infer_response_provider));
+  std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
+  if (http_response_provider_hack != nullptr) {
+    std::shared_ptr<ni::HTTPInferResponseProvider> http_response_provider;
+    RETURN_IF_STATUS_ERROR(ni::HTTPInferResponseProvider::Create(
+        reinterpret_cast<evbuffer*>(http_response_provider_hack),
+        *(lprovider->Backend()), *request_header,
+        lprovider->Backend()->GetLabelProvider(), &http_response_provider));
+    infer_response_provider = http_response_provider;
+  } else {
+    std::shared_ptr<ni::DelegatingInferResponseProvider> del_response_provider;
+    RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
+        *request_header, lprovider->Backend()->GetLabelProvider(),
+        &del_response_provider));
+    infer_response_provider = del_response_provider;
+  }
 
   auto request_status = std::make_shared<ni::RequestStatus>();
   lserver->HandleInfer(
-      request_status.get(), backend, infer_request_provider,
+      request_status.get(), lprovider->Backend(), infer_request_provider,
       infer_response_provider, infer_stats,
       [infer_stats, timer, request_status, infer_response_provider, server,
        complete_fn, userp]() mutable {
