@@ -111,6 +111,16 @@ message InferRequestHeader
       //@@     shared memory. If provided, tensor data read from this location.
       //@@
       key_t shm_key = 1;
+
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The offset for the next element in the batch. Only required if
+      //@@     batch_size > 1. n-1 offsets required (we know first element has
+      //@@     offset of 0), where n is number of elements in the batch.
+      //@@     element0 start = 0, end = offset0;
+      //@@     element1 start = offset0, end = offset1; and so on.
+      //@@
+      repeated uint64 offset = 1;
     }
   }
 
@@ -166,6 +176,16 @@ message InferRequestHeader
       //@@     shared memory. If provided, tensor data read from this location.
       //@@
       key_t shm_key = 1;
+
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The offset for the next element in the batch. Only required if
+      //@@     batch_size > 1. n-1 offsets required (we know first element has
+      //@@     offset of 0), where n is number of elements in the batch.
+      //@@     element0 start = 0, end = offset0;
+      //@@     element1 start = offset0, end = offset1; and so on.
+      //@@
+      repeated uint64 offset = 1;
     }
   }
 
@@ -333,6 +353,16 @@ message InferResponseHeader
       //@@     shared memory. If provided, tensor data read from this location.
       //@@
       key_t shm_key = 1;
+
+      //@@    .. cpp:var:: key_t shm_key
+      //@@
+      //@@     The offset for the next element in the batch. Only required if
+      //@@     batch_size > 1. n-1 offsets required (we know first element has
+      //@@     offset of 0), where n is number of elements in the batch.
+      //@@     element0 start = 0, end = offset0;
+      //@@     element1 start = offset0, end = offset1; and so on.
+      //@@
+      repeated uint64 offset = 1;
     }
   }
 
