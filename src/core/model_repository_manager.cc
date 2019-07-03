@@ -210,13 +210,7 @@ struct BackendDeleter {
   void operator()(InferenceBackend* backend)
   {
     delete backend;
-    // [TODO] The design seems wrong if we need to handle recursive locking
-    // Call callback with separate thread because the callback will try to
-    // acquire the mutex of the corresponding backend_info. And this deleter is
-    // likely to to be called within BackendLifeCycle class where the mutex is
-    // being hold
-    std::thread worker(std::move(OnDestroyBackend_));
-    worker.detach();
+    OnDestroyBackend_();
   }
 
   // Use to inform the BackendLifeCycle that the backend handle is destroyed
@@ -276,7 +270,7 @@ class ModelRepositoryManager::BackendLifeCycle {
 
     Platform platform_;
 
-    std::mutex mtx_;
+    std::recursive_mutex mtx_;
     ModelReadyState state_;
     // next_action will be set in the case where a load / unload is requested
     // while the backend is already in loading / unloading state. Then the new
@@ -429,7 +423,7 @@ ModelRepositoryManager::BackendLifeCycle::GetLiveBackendStates()
     VersionStateMap version_map;
 
     for (auto& version_backend : model_version.second) {
-      std::lock_guard<std::mutex> lock(version_backend.second->mtx_);
+      std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
       // At lease one version is live (ready / loading / unloading)
       if ((version_backend.second->state_ != ModelReadyState::MODEL_UNKNOWN) &&
           (version_backend.second->state_ !=
@@ -456,7 +450,7 @@ ModelRepositoryManager::BackendLifeCycle::GetVersionStates(
   auto mit = map_.find(model_name);
   if (mit != map_.end()) {
     for (auto& version_backend : mit->second) {
-      std::lock_guard<std::mutex> lock(version_backend.second->mtx_);
+      std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
       version_map[version_backend.first] = version_backend.second->state_;
     }
   }
@@ -486,7 +480,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     if (version == -1) {
       for (auto& version_backend : mit->second) {
         if (version_backend.first > latest) {
-          std::lock_guard<std::mutex> lock(version_backend.second->mtx_);
+          std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
           if (version_backend.second->state_ == ModelReadyState::MODEL_READY) {
             latest = version_backend.first;
             // Tedious, but have to set handle for any "latest" version
@@ -505,7 +499,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
                                             " is not found");
     }
   } else {
-    std::lock_guard<std::mutex> lock(vit->second->mtx_);
+    std::lock_guard<std::recursive_mutex> lock(vit->second->mtx_);
     if (vit->second->state_ == ModelReadyState::MODEL_READY) {
       *backend = vit->second->backend_;
     } else {
@@ -532,7 +526,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
 
   if (force_unload) {
     for (auto& version_backend : it->second) {
-      std::lock_guard<std::mutex> lock(version_backend.second->mtx_);
+      std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
       Unload(model_name, version_backend.first, version_backend.second.get());
     }
   }
@@ -549,7 +543,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     }
 
     // Update model config and reload model if it is being served
-    std::lock_guard<std::mutex> lock(vit->second->mtx_);
+    std::lock_guard<std::recursive_mutex> lock(vit->second->mtx_);
     vit->second->model_config_ = model_config;
     Unload(model_name, version, vit->second.get());
     RETURN_IF_ERROR(Load(model_name, version, vit->second.get()));
@@ -639,7 +633,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   // is updated (another poll) during the creation of backend handle
   ModelConfig model_config;
   {
-    std::lock_guard<std::mutex> lock(backend_info->mtx_);
+    std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
     model_config = backend_info->model_config_;
   }
 
@@ -692,7 +686,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   }
 
   // Update backend state
-  std::lock_guard<std::mutex> lock(backend_info->mtx_);
+  std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
   // Sanity check
   if (backend_info->backend_ != nullptr) {
     LOG_ERROR << "trying to load model '" << model_name << "' version "
@@ -711,8 +705,13 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
                            << "' version " << version;
             LOG_INFO << "successfully unloaded '" << model_name << "' version "
                      << version;
+            // Use recursive mutex as this deleter is likely to to be called
+            // within BackendLifeCycle class where the same mutex is being hold.
+            // However, mutex acquisition is needed here for the case where
+            // the backend is requested to be unloaded while there are inflight
+            // requests, then the deleter will be called from the request thread
             {
-              std::lock_guard<std::mutex> lock(backend_info->mtx_);
+              std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
               backend_info->state_ = ModelReadyState::MODEL_UNAVAILABLE;
               // Check if next action is requested
               this->TriggerNextAction(model_name, version, backend_info);
