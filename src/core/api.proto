@@ -95,14 +95,11 @@ message InferRequestHeader
     //@@
     uint64 batch_byte_size = 3;
 
-    //@@  .. cpp:var:: message SharedMemoryIO
+    //@@      .. cpp:var:: message SharedMemoryElement
     //@@
-    //@@     Unique identity of the location in shared memory to read input
-    //@@     tensors. If present, do no provide the data directly in the request
-    //@@     payload, it will be ignored. User responsible for the creation,
-    //@@     deletion and writing to shared memory.
+    //@@         The Meta-data for the Input shared memory to read element from.
     //@@
-    message SharedMemoryIO
+    message SharedMemoryElement
     {
       //@@    .. cpp:var:: key_t shm_key
       //@@
@@ -112,16 +109,40 @@ message InferRequestHeader
       //@@
       key_t shm_key = 1;
 
-      //@@    .. cpp:var:: key_t shm_key
+      //@@    .. cpp:var:: uint64 offset
       //@@
-      //@@     The offset for the next element in the batch. Only required if
-      //@@     batch_size > 1. n-1 offsets required (we know first element has
-      //@@     offset of 0), where n is number of elements in the batch.
-      //@@     element0 start = 0, end = offset0;
-      //@@     element1 start = offset0, end = offset1; and so on.
+      //@@     The offset for the each element.
+      //@@     element0 start = offset0, end = offset0 + size;
       //@@
-      repeated uint64 offset = 1;
+      uint64 offset = 2;
+
+      //@@    .. cpp:var:: uint64 byte_size
+      //@@
+      //@@     Size of the element in the batch of the input tensor, in bytes.
+      //@@
+      uint64 byte_size = 3;
     }
+
+    //@@    .. cpp:var:: message SharedMemoryIO
+    //@@
+    //@@       Meta-data for an input batch to be read from shared memory.
+    //@@
+    message SharedMemoryIO
+    {
+      //@@      .. cpp:var:: SharedMemoryElement element (repeated)
+      //@@
+      //@@         No. of elements required is number of elements in the batch.
+      //@@
+      repeated SharedMemoryElement element = 1;
+    }
+
+    //@@    .. cpp:var:: SharedMemoryIO shm_io
+    //@@
+    //@@       Unique identity of the location in shared memory to read input
+    //@@       tensors. User responsible for the creation, deletion and writing
+    //@@       to shared memory. If specified, input data is read from here.
+    //@@
+    SharedMemoryIO shm_io = 4;
   }
 
   //@@  .. cpp:var:: message Output
@@ -161,32 +182,54 @@ message InferRequestHeader
     //@@
     Class cls = 3;
 
-    //@@  .. cpp:var:: message SharedMemoryIO
+    //@@      .. cpp:var:: message SharedMemoryElement
     //@@
-    //@@     Unique identity of the location in shared memory to write output
-    //@@     tensors. User responsible for the creation, deletion and reading
-    //@@     from shared memory.
+    //@@         The Meta-data for the Output shared memory to write element to.
     //@@
-    message SharedMemoryIO
+    message SharedMemoryElement
     {
       //@@    .. cpp:var:: key_t shm_key
       //@@
       //@@     The unique key used to refer to a specific location in shared
       //@@     memory. Optional for tensors. Required to write tensors to
-      //@@     shared memory. If provided, tensor data read from this location.
+      //@@     shared memory. If provided, tensor data written to this location.
       //@@
       key_t shm_key = 1;
 
-      //@@    .. cpp:var:: key_t shm_key
+      //@@    .. cpp:var:: uint64 offset
       //@@
-      //@@     The offset for the next element in the batch. Only required if
-      //@@     batch_size > 1. n-1 offsets required (we know first element has
-      //@@     offset of 0), where n is number of elements in the batch.
-      //@@     element0 start = 0, end = offset0;
-      //@@     element1 start = offset0, end = offset1; and so on.
+      //@@     The offset for the each element.
+      //@@     element0 start = offset0, end = offset0 + size;
       //@@
-      repeated uint64 offset = 1;
+      uint64 offset = 2;
+
+      //@@    .. cpp:var:: uint64 byte_size
+      //@@
+      //@@     Size of the element in the batch of the input tensor, in bytes.
+      //@@
+      uint64 byte_size = 3;
     }
+
+    //@@    .. cpp:var:: message SharedMemoryIO
+    //@@
+    //@@       Meta-data for an output batch to be written to shared memory.
+    //@@
+    message SharedMemoryIO
+    {
+      //@@      .. cpp:var:: SharedMemoryElement element (repeated)
+      //@@
+      //@@         No. of elements required is number of elements in the batch.
+      //@@
+      repeated SharedMemoryElement element = 1;
+    }
+
+    //@@    .. cpp:var:: SharedMemoryIO shm_io
+    //@@
+    //@@       Unique identity of the location in shared memory to write output
+    //@@       tensors. User responsible for the creation, deletion and reading
+    //@@       from shared memory. If specified, output data is written to here.
+    //@@
+    SharedMemoryIO shm_io = 4;
   }
 
   //@@  .. cpp:var:: uint64 id
@@ -324,8 +367,9 @@ message InferResponseHeader
     //@@       If specified deliver results for this output as raw tensor data.
     //@@       The actual output data is delivered in the HTTP body for an HTTP
     //@@       request, or in the :cpp:var:`InferResponse` message for a gRPC
-    //@@       request. Only one of 'raw', 'batch_classes' and 'SharedMemoryIO'
-    //@@       may be specified.
+    //@@       request. Only one of 'raw' and 'batch_classes' may be
+    //@@       specified. If 'SharedMemoryIO' is present in request then
+    //@@       neither is specified.
     //@@
     Raw raw = 2;
 
@@ -333,37 +377,11 @@ message InferResponseHeader
     //@@
     //@@       If specified deliver results for this output as classifications.
     //@@       There is one :cpp:var:`Classes` object for each batch entry in
-    //@@       the output. Only one of 'raw', 'batch_classes' and
-    //@@       'SharedMemoryIO' may be specified.
+    //@@       the output. Only one of 'raw' and 'batch_classes' may be
+    //@@       specified. If 'SharedMemoryIO' is present in request then
+    //@@       neither is specified.
     //@@
     repeated Classes batch_classes = 3;
-
-    //@@  .. cpp:var:: message SharedMemoryIO
-    //@@
-    //@@     Unique identity of the location in shared memory to write output
-    //@@     tensors. User responsible for the creation, deletion and reading
-    //@@     from shared memory.
-    //@@
-    message SharedMemoryIO
-    {
-      //@@    .. cpp:var:: key_t shm_key
-      //@@
-      //@@     The unique key used to refer to a specific location in shared
-      //@@     memory. Optional for tensors. Required to write tensors to
-      //@@     shared memory. If provided, tensor data read from this location.
-      //@@
-      key_t shm_key = 1;
-
-      //@@    .. cpp:var:: key_t shm_key
-      //@@
-      //@@     The offset for the next element in the batch. Only required if
-      //@@     batch_size > 1. n-1 offsets required (we know first element has
-      //@@     offset of 0), where n is number of elements in the batch.
-      //@@     element0 start = 0, end = offset0;
-      //@@     element1 start = offset0, end = offset1; and so on.
-      //@@
-      repeated uint64 offset = 1;
-    }
   }
 
   //@@  .. cpp:var:: uint64 id
