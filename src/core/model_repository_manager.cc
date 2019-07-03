@@ -283,23 +283,23 @@ class ModelRepositoryManager::BackendLifeCycle {
 
   BackendLifeCycle(InferenceServer* server, const std::string& repository_path);
 
+  // Function called after backend state / next action is updated.
   // Caller must obtain the mutex of 'backend_info' before calling this function
+  Status TriggerNextAction(
+      const std::string& model_name, const int64_t version,
+      BackendInfo* backend_info);
+
+  // Helper function called by TriggerNextAction()
   Status Load(
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
 
-  // Caller must obtain the mutex of 'backend_info' before calling this function
+  // Helper function called by TriggerNextAction()
   Status Unload(
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
 
   Status CreateInferenceBackend(
-      const std::string& model_name, const int64_t version,
-      BackendInfo* backend_info);
-
-  // Function called after model load / unload.
-  // Caller must obtain the mutex of 'backend_info' before calling this function
-  Status TriggerNextAction(
       const std::string& model_name, const int64_t version,
       BackendInfo* backend_info);
 
@@ -480,7 +480,8 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     if (version == -1) {
       for (auto& version_backend : mit->second) {
         if (version_backend.first > latest) {
-          std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
+          std::lock_guard<std::recursive_mutex> lock(
+              version_backend.second->mtx_);
           if (version_backend.second->state_ == ModelReadyState::MODEL_READY) {
             latest = version_backend.first;
             // Tedious, but have to set handle for any "latest" version
@@ -527,7 +528,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   if (force_unload) {
     for (auto& version_backend : it->second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
-      Unload(model_name, version_backend.first, version_backend.second.get());
+      version_backend.second->next_action_ = ActionType::UNLOAD;
+      TriggerNextAction(model_name, version_backend.first, version_backend.second.get());
     }
   }
 
@@ -545,8 +547,33 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     // Update model config and reload model if it is being served
     std::lock_guard<std::recursive_mutex> lock(vit->second->mtx_);
     vit->second->model_config_ = model_config;
-    Unload(model_name, version, vit->second.get());
-    RETURN_IF_ERROR(Load(model_name, version, vit->second.get()));
+    vit->second->next_action_ = ActionType::LOAD;
+    RETURN_IF_ERROR(TriggerNextAction(model_name, version, vit->second.get()));
+  }
+
+  return Status::Success;
+}
+
+Status
+ModelRepositoryManager::BackendLifeCycle::TriggerNextAction(
+    const std::string& model_name, const int64_t version,
+    BackendInfo* backend_info)
+{
+  LOG_VERBOSE(1) << "TriggerNextAction() '" << model_name << "' version "
+                 << version << ": "
+                 << std::to_string(backend_info->next_action_);
+  ActionType next_action = backend_info->next_action_;
+  backend_info->next_action_ = ActionType::NO_ACTION;
+  switch (next_action) {
+    case ActionType::LOAD:
+      Unload(model_name, version, backend_info);
+      RETURN_IF_ERROR(Load(model_name, version, backend_info));
+      break;
+    case ActionType::UNLOAD:
+      RETURN_IF_ERROR(Unload(model_name, version, backend_info));
+      break;
+    default:
+      break;
   }
 
   return Status::Success;
@@ -728,31 +755,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 
   // Check if next action is requested
   return TriggerNextAction(model_name, version, backend_info);
-}
-
-Status
-ModelRepositoryManager::BackendLifeCycle::TriggerNextAction(
-    const std::string& model_name, const int64_t version,
-    BackendInfo* backend_info)
-{
-  LOG_VERBOSE(1) << "TriggerNextAction() '" << model_name << "' version "
-                 << version << ": "
-                 << std::to_string(backend_info->next_action_);
-  ActionType next_action = backend_info->next_action_;
-  backend_info->next_action_ = ActionType::NO_ACTION;
-  switch (next_action) {
-    case ActionType::LOAD:
-      Unload(model_name, version, backend_info);
-      RETURN_IF_ERROR(Load(model_name, version, backend_info));
-      break;
-    case ActionType::UNLOAD:
-      RETURN_IF_ERROR(Unload(model_name, version, backend_info));
-      break;
-    default:
-      break;
-  }
-
-  return Status::Success;
 }
 
 ModelRepositoryManager::ModelRepositoryManager(
