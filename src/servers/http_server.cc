@@ -31,14 +31,14 @@
 #include <google/protobuf/text_format.h>
 #include <re2/re2.h>
 #include <algorithm>
-#include "src/core/backend.h"
+#include <thread>
+#include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
-#include "src/core/provider_utils.h"
-#include "src/core/request_status.h"
-#include "src/core/server.h"
+#include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
+#include "src/servers/common.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -174,45 +174,43 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), sserver_(server),
+      : HTTPServerImpl(port, thread_cnt), server_(server),
         endpoint_names_(endpoints),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
   {
-    // FIXME remove
-    server_ = reinterpret_cast<InferenceServer*>(sserver_.get());
+    TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
+    if (err != nullptr) {
+      server_id_ = "unknown:0";
+      TRTSERVER_ErrorDelete(err);
+    }
   }
 
   ~HTTPAPIServer() = default;
 
- private:
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
   // corresponding thread send back the reply
   class InferRequest {
    public:
     InferRequest(
-        evhtp_request_t* req, uint64_t id,
-        const std::shared_ptr<InferRequestProvider>& request_provider,
-        const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-        const std::shared_ptr<ModelInferStats>& infer_stats,
-        const std::shared_ptr<ModelInferStats::ScopedTimer>& timer);
+        evhtp_request_t* req, uint64_t request_id, const char* server_id);
+    ~InferRequest() = default;
 
-    evhtp_res FinalizeResponse();
+    static void InferComplete(
+        TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
+        void* userp);
+    evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
 
    private:
-    friend class HTTPAPIServer;
     evhtp_request_t* req_;
     evthr_t* thread_;
-    uint64_t id_;
-    RequestStatus request_status_;
-    std::shared_ptr<InferRequestProvider> request_provider_;
-    std::shared_ptr<HTTPInferResponseProvider> response_provider_;
-    std::shared_ptr<ModelInferStats> infer_stats_;
-    std::shared_ptr<ModelInferStats::ScopedTimer> timer_;
+    const uint64_t request_id_;
+    const char* const server_id_;
   };
 
+ private:
   void Handle(evhtp_request_t* req) override;
 
   void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
@@ -220,20 +218,16 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
 
-  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
-  Status InferHelper(
-      std::shared_ptr<ModelInferStats>& infer_stats,
-      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
-      const std::string& model_name, int64_t model_version,
-      InferRequestHeader& request_header, evhtp_request_t* req);
+  TRTSERVER_Error* EVBufferToInput(
+      const std::string& model_name, const InferRequestHeader& request_header,
+      evbuffer* input_buffer,
+      TRTSERVER_InferenceRequestProvider* request_provider);
 
-  void FinishInferResponse(const std::shared_ptr<InferRequest>& req);
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
-  // FIXME
-  std::shared_ptr<TRTSERVER_Server> sserver_;
-  InferenceServer* server_;
+  std::shared_ptr<TRTSERVER_Server> server_;
+  const char* server_id_;
 
   std::vector<std::string> endpoint_names_;
 
@@ -290,9 +284,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 void
 HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
 {
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
-
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -306,25 +297,45 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
     }
   }
 
+  TRTSERVER_Error* err = nullptr;
+  bool health = false;
+
+  if (mode == "live") {
+    err = TRTSERVER_ServerIsLive(server_.get(), &health);
+  } else if (mode == "ready") {
+    err = TRTSERVER_ServerIsReady(server_.get(), &health);
+  } else {
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNKNOWN,
+        std::string("unknown health mode '" + mode + "'").c_str());
+  }
+
+  // FIXME request status creating utility
   RequestStatus request_status;
-  bool health;
-  server_->HandleHealth(&request_status, &health, mode);
+  request_status.set_code(
+      (err == nullptr) ? RequestStatusCode::SUCCESS
+                       : CodeToStatus(TRTSERVER_ErrorCode(err)));
+  if (err != nullptr) {
+    request_status.set_msg(TRTSERVER_ErrorMessage(err));
+  }
+  request_status.set_server_id(server_id_);
+  request_status.set_request_id(0);  // FIXME
 
   evhtp_headers_add_header(
       req->headers_out,
       evhtp_header_new(
           kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
 
-  evhtp_send_reply(req, (health) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+  evhtp_send_reply(
+      req, (health && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
 }
 
 void
 HTTPAPIServer::HandleProfile(
     evhtp_request_t* req, const std::string& profile_uri)
 {
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
-
   if (req->method != htp_method_GET) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -341,8 +352,13 @@ HTTPAPIServer::HandleProfile(
     cmd = std::string(cmd_c_str);
   }
 
+  // For now profile is a nop...
+
+  // FIXME request status creating utility
   RequestStatus request_status;
-  server_->HandleProfile(&request_status, cmd);
+  request_status.set_code(RequestStatusCode::SUCCESS);
+  request_status.set_server_id(server_id_);
+  request_status.set_request_id(0);  // FIXME
 
   evhtp_headers_add_header(
       req->headers_out,
@@ -353,6 +369,159 @@ HTTPAPIServer::HandleProfile(
       req, (request_status.code() == RequestStatusCode::SUCCESS)
                ? EVHTP_RES_OK
                : EVHTP_RES_BADREQ);
+}
+
+void
+HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  std::string model_name;
+  if (!status_uri.empty()) {
+    if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
+    }
+  }
+
+  TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+  TRTSERVER_Error* err =
+      TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
+  if (err == nullptr) {
+    const char* status_buffer;
+    size_t status_byte_size;
+    err = TRTSERVER_ProtobufSerialize(
+        server_status_protobuf, &status_buffer, &status_byte_size);
+    if (err == nullptr) {
+      // Request text or binary format for status?
+      std::string format;
+      const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+      if (format_c_str != NULL) {
+        format = std::string(format_c_str);
+      } else {
+        format = "text";
+      }
+
+      if (format == "binary") {
+        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+      } else {
+        ServerStatus server_status;
+        if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        } else {
+          std::string server_status_str = server_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, server_status_str.c_str(),
+              server_status_str.size());
+        }
+      }
+    }
+  }
+
+  TRTSERVER_ProtobufDelete(server_status_protobuf);
+
+  // FIXME request status creating utility
+  RequestStatus request_status;
+  request_status.set_code(
+      (err == nullptr) ? RequestStatusCode::SUCCESS
+                       : CodeToStatus(TRTSERVER_ErrorCode(err)));
+  if (err != nullptr) {
+    request_status.set_msg(TRTSERVER_ErrorMessage(err));
+  }
+  request_status.set_server_id(server_id_);
+  request_status.set_request_id(0);  // FIXME
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+TRTSERVER_Error*
+HTTPAPIServer::EVBufferToInput(
+    const std::string& model_name, const InferRequestHeader& request_header,
+    evbuffer* input_buffer,
+    TRTSERVER_InferenceRequestProvider* request_provider)
+{
+  // Extract individual input data from HTTP body and register in
+  // 'request_provider'. The input data from HTTP body is not
+  // necessarily contiguous so may need to register multiple input
+  // "blocks" for a given input.
+  //
+  // Get the addr and size of each chunk of input data from the
+  // evbuffer.
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+
+  int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
+    }
+  }
+
+  // Get the byte-size for each input and from that get the blocks
+  // holding the data for that input
+  for (const auto& io : request_header.input()) {
+    uint64_t byte_size = 0;
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+        request_provider, io.name().c_str(), &byte_size));
+
+    while ((byte_size > 0) && (v_idx < n)) {
+      char* base = static_cast<char*>(v[v_idx].iov_base);
+      size_t base_size;
+      if (v[v_idx].iov_len > byte_size) {
+        base_size = byte_size;
+        v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+        v[v_idx].iov_len -= byte_size;
+        byte_size = 0;
+      } else {
+        base_size = v[v_idx].iov_len;
+        byte_size -= v[v_idx].iov_len;
+        v_idx++;
+      }
+
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+          request_provider, io.name().c_str(), base, base_size));
+    }
+
+    if (byte_size != 0) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "unexpected size for input '" + io.name() + "', expecting " +
+              std::to_string(byte_size) + " bytes for model '" + model_name +
+              "'")
+              .c_str());
+    }
+  }
+
+  if (v_idx != n) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected additional input data for model '" + model_name + "'")
+            .c_str());
+  }
+
+  return nullptr;  // success
 }
 
 void
@@ -377,24 +546,58 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
     model_version = std::atoll(model_version_str.c_str());
   }
 
-  auto infer_stats =
-      std::make_shared<ModelInferStats>(server_->StatusManager(), model_name);
-  auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
-  infer_stats->StartRequestTimer(timer.get());
-  infer_stats->SetRequestedVersion(model_version);
-
   std::string infer_request_header(
       evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
 
   InferRequestHeader request_header;
-  google::protobuf::TextFormat::ParseFromString(
-      infer_request_header, &request_header);
+  if (!google::protobuf::TextFormat::ParseFromString(
+          infer_request_header, &request_header)) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
 
-  Status status = InferHelper(
-      infer_stats, timer, model_name, model_version, request_header, req);
+  std::string request_header_serialized;
+  if (!request_header.SerializeToString(&request_header_serialized)) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
 
-  if (!status.IsOk()) {
+  // Create the inference request provider which provides all the
+  // input information needed for an inference.
+  TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
+  TRTSERVER_Error* err = TRTSERVER_InferenceRequestProviderNew(
+      &request_provider, server_.get(), model_name.c_str(), model_version,
+      request_header_serialized.c_str(), request_header_serialized.size());
+  if (err == nullptr) {
+    err = EVBufferToInput(
+        model_name, request_header, req->buffer_in, request_provider);
+    if (err == nullptr) {
+      InferRequest* infer_request =
+          new InferRequest(req, request_header.id(), server_id_);
+
+      err = TRTSERVER_ServerInferAsync(
+          server_.get(), request_provider,
+          req->buffer_out /* http_response_provider_hack */,
+          InferRequest::InferComplete, reinterpret_cast<void*>(infer_request));
+      if (err != nullptr) {
+        delete infer_request;
+        infer_request = nullptr;
+      }
+
+      // The request provider can be deleted immediately after the
+      // ServerInferAsync call returns.
+      TRTSERVER_InferenceRequestProviderDelete(request_provider);
+    }
+  }
+
+  if (err != nullptr) {
+    // FIXME request status creating utility
     RequestStatus request_status;
+    request_status.set_code(CodeToStatus(TRTSERVER_ErrorCode(err)));
+    request_status.set_msg(TRTSERVER_ErrorMessage(err));
+    request_status.set_server_id(server_id_);
+    request_status.set_request_id(0);  // FIXME
+
     InferResponseHeader response_header;
     response_header.set_id(request_header.id());
     evhtp_headers_add_header(
@@ -402,12 +605,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         evhtp_header_new(
             kInferResponseHTTPHeader,
             response_header.ShortDebugString().c_str(), 1, 1));
-    LOG_VERBOSE(1) << "Infer failed: " << status.Message();
-    infer_stats->SetFailed(true);
-    RequestStatusFactory::Create(
-        &request_status, 0 /* request_id */, server_->Id(), status);
+    LOG_VERBOSE(1) << "Infer failed: " << request_status.msg();
 
-    // this part still needs to be implemented in the completer
     evhtp_headers_add_header(
         req->headers_out, evhtp_header_new(
                               kStatusHTTPHeader,
@@ -421,103 +620,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
                  ? EVHTP_RES_OK
                  : EVHTP_RES_BADREQ);
   }
-}
 
-void
-HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
-{
-  ServerStatTimerScoped timer(
-      server_->StatusManager(), ServerStatTimerScoped::Kind::STATUS);
-
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  std::string model_name;
-  if (!status_uri.empty()) {
-    if (!RE2::FullMatch(status_uri, status_regex_, &model_name)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
-  }
-
-  RequestStatus request_status;
-  ServerStatus server_status;
-  server_->HandleStatus(&request_status, &server_status, model_name);
-
-  // If got status successfully then send it...
-  if (request_status.code() == RequestStatusCode::SUCCESS) {
-    std::string format;
-    const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
-    if (format_c_str != NULL) {
-      format = std::string(format_c_str);
-    } else {
-      format = "text";
-    }
-
-    std::string server_status_str;
-    if (format == "binary") {
-      server_status.SerializeToString(&server_status_str);
-      evbuffer_add(
-          req->buffer_out, server_status_str.c_str(), server_status_str.size());
-      evhtp_headers_add_header(
-          req->headers_out,
-          evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
-    } else {
-      server_status_str = server_status.DebugString();
-      evbuffer_add(
-          req->buffer_out, server_status_str.c_str(), server_status_str.size());
-    }
-  }
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-}
-
-Status
-HTTPAPIServer::InferHelper(
-    std::shared_ptr<ModelInferStats>& infer_stats,
-    std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
-    const std::string& model_name, int64_t model_version,
-    InferRequestHeader& request_header, evhtp_request_t* req)
-{
-  std::shared_ptr<InferenceBackend> backend = nullptr;
-  RETURN_IF_ERROR(
-      server_->GetInferenceBackend(model_name, model_version, &backend));
-  infer_stats->SetMetricReporter(backend->MetricReporter());
-
-  std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
-  RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
-  RETURN_IF_ERROR(EVBufferToInputMap(
-      model_name, request_header, req->buffer_in, input_map));
-
-  std::shared_ptr<InferRequestProvider> request_provider;
-  RETURN_IF_ERROR(InferRequestProvider::Create(
-      model_name, model_version, request_header, input_map, &request_provider));
-  infer_stats->SetBatchSize(request_provider->RequestHeader().batch_size());
-
-  std::shared_ptr<HTTPInferResponseProvider> response_provider;
-  RETURN_IF_ERROR(HTTPInferResponseProvider::Create(
-      req->buffer_out, *backend, request_provider->RequestHeader(),
-      backend->GetLabelProvider(), &response_provider));
-
-  std::shared_ptr<InferRequest> request(new InferRequest(
-      req, request_header.id(), request_provider, response_provider,
-      infer_stats, timer));
-  server_->HandleInfer(
-      &(request->request_status_), backend, request->request_provider_,
-      request->response_provider_, infer_stats,
-      [this, request]() mutable { this->FinishInferResponse(request); });
-
-  return Status::Success;
+  TRTSERVER_ErrorDelete(err);
 }
 
 void
@@ -536,37 +640,58 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 }
 
-void
-HTTPAPIServer::FinishInferResponse(const std::shared_ptr<InferRequest>& req)
-{
-  if (req->FinalizeResponse() == EVHTP_RES_OK) {
-    evthr_defer(req->thread_, OKReplyCallback, req->req_);
-  } else {
-    evthr_defer(req->thread_, BADReplyCallback, req->req_);
-  }
-}
-
 HTTPAPIServer::InferRequest::InferRequest(
-    evhtp_request_t* req, uint64_t id,
-    const std::shared_ptr<InferRequestProvider>& request_provider,
-    const std::shared_ptr<HTTPInferResponseProvider>& response_provider,
-    const std::shared_ptr<ModelInferStats>& infer_stats,
-    const std::shared_ptr<ModelInferStats::ScopedTimer>& timer)
-    : req_(req), id_(id), request_provider_(request_provider),
-      response_provider_(response_provider), infer_stats_(infer_stats),
-      timer_(timer)
+    evhtp_request_t* req, uint64_t request_id, const char* server_id)
+    : req_(req), request_id_(request_id), server_id_(server_id)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
   evhtp_request_pause(req);
 }
 
-evhtp_res
-HTTPAPIServer::InferRequest::FinalizeResponse()
+void
+HTTPAPIServer::InferRequest::InferComplete(
+    TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
+    void* userp)
 {
-  InferResponseHeader* response_header =
-      response_provider_->MutableResponseHeader();
-  if (request_status_.code() == RequestStatusCode::SUCCESS) {
+  HTTPAPIServer::InferRequest* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
+  if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
+    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request->req_);
+  } else {
+    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request->req_);
+  }
+}
+
+evhtp_res
+HTTPAPIServer::InferRequest::FinalizeResponse(
+    TRTSERVER_InferenceResponse* response)
+{
+  InferResponseHeader response_header;
+
+  TRTSERVER_Error* response_status =
+      TRTSERVER_InferenceResponseStatus(response);
+  if (response_status == nullptr) {
+    TRTSERVER_Protobuf* response_protobuf = nullptr;
+    response_status =
+        TRTSERVER_InferenceResponseHeader(response, &response_protobuf);
+    if (response_status == nullptr) {
+      const char* buffer;
+      size_t byte_size;
+      response_status =
+          TRTSERVER_ProtobufSerialize(response_protobuf, &buffer, &byte_size);
+      if (response_status == nullptr) {
+        if (!response_header.ParseFromArray(buffer, byte_size)) {
+          response_status = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
+        }
+      }
+
+      TRTSERVER_ProtobufDelete(response_protobuf);
+    }
+  }
+
+  if (response_status == nullptr) {
     std::string format;
     const char* format_c_str = evhtp_kv_find(req_->uri->query, "format");
     if (format_c_str != NULL) {
@@ -575,46 +700,53 @@ HTTPAPIServer::InferRequest::FinalizeResponse()
       format = "text";
     }
 
-    // The description of the raw outputs needs to go in
-    // the kInferResponseHTTPHeader since it is needed to
-    // interpret the body. The entire response (including
-    // classifications) is serialized at the end of the
-    // body.
-    response_header->set_id(id_);
+    // The description of the raw outputs needs to go in the
+    // kInferResponseHTTPHeader since it is needed to interpret the
+    // body. The entire response (including classifications) is
+    // serialized at the end of the body.
+    response_header.set_id(request_id_);
 
     std::string rstr;
     if (format == "binary") {
-      response_header->SerializeToString(&rstr);
+      response_header.SerializeToString(&rstr);
     } else {
-      rstr = response_header->DebugString();
+      rstr = response_header.DebugString();
     }
-    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
 
-    // We do this in destructive manner since we are the
-    // last one to use response header from the provider.
-    for (int i = 0; i < response_header->output_size(); ++i) {
-      InferResponseHeader::Output* output = response_header->mutable_output(i);
-      output->clear_batch_classes();
-    }
+    evbuffer_add(req_->buffer_out, rstr.c_str(), rstr.size());
   } else {
     evbuffer_drain(req_->buffer_out, -1);
-    response_header->Clear();
-    response_header->set_id(id_);
+    response_header.Clear();
+    response_header.set_id(request_id_);
   }
+
+  // FIXME request status creating utility
+  RequestStatus request_status;
+  request_status.set_code(
+      (response_status == nullptr)
+          ? RequestStatusCode::SUCCESS
+          : CodeToStatus(TRTSERVER_ErrorCode(response_status)));
+  if (response_status != nullptr) {
+    request_status.set_msg(TRTSERVER_ErrorMessage(response_status));
+  }
+  request_status.set_server_id(server_id_);
+  request_status.set_request_id(0);  // FIXME
+
+  evhtp_headers_add_header(
+      req_->headers_out, evhtp_header_new(
+                             kInferResponseHTTPHeader,
+                             response_header.ShortDebugString().c_str(), 1, 1));
   evhtp_headers_add_header(
       req_->headers_out,
       evhtp_header_new(
-          kInferResponseHTTPHeader, response_header->ShortDebugString().c_str(),
-          1, 1));
-  evhtp_headers_add_header(
-      req_->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status_.ShortDebugString().c_str(), 1, 1));
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
   evhtp_headers_add_header(
       req_->headers_out,
       evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
 
-  return (request_status_.code() == RequestStatusCode::SUCCESS)
+  TRTSERVER_ErrorDelete(response_status);
+
+  return (request_status.code() == RequestStatusCode::SUCCESS)
              ? EVHTP_RES_OK
              : EVHTP_RES_BADREQ;
 }

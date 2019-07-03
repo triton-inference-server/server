@@ -40,10 +40,11 @@ class GRPCServer : private nvrpc::Server {
       const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
       int infer_thread_cnt, int stream_infer_thread_cnt,
       std::unique_ptr<GRPCServer>* grpc_servers);
-  TRTSERVER_Error* Start();
-  TRTSERVER_Error* Stop();
 
   ~GRPCServer();
+
+  TRTSERVER_Error* Start();
+  TRTSERVER_Error* Stop();
 
  private:
   GRPCServer(

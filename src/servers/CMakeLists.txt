@@ -123,12 +123,18 @@ endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 #
 set(
   TRTSERVER_SRCS
-  main.cc
+  main.cc common.cc
+)
+
+set(
+  TRTSERVER_HDRS
+  common.h
 )
 
 add_executable(
   main
   ${TRTSERVER_SRCS}
+  ${TRTSERVER_HDRS}
   ${HTTP_ENDPOINT_OBJECTS}
   ${GRPC_ENDPOINT_OBJECTS}
 )
