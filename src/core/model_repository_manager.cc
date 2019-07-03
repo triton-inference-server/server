@@ -529,7 +529,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     for (auto& version_backend : it->second) {
       std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
       version_backend.second->next_action_ = ActionType::UNLOAD;
-      TriggerNextAction(model_name, version_backend.first, version_backend.second.get());
+      TriggerNextAction(
+          model_name, version_backend.first, version_backend.second.get());
     }
   }
 
@@ -777,7 +778,7 @@ ModelRepositoryManager::Create(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const uint32_t repository_poll_secs, const bool polling_enabled,
+    const bool polling_enabled,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {
   // The rest only matters if repository path is valid directory

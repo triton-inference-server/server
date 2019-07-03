@@ -27,13 +27,14 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <csignal>
+#include <iostream>
 #include <mutex>
 
 #include "src/core/logging.h"
-#include "src/core/server.h"
 #include "src/core/trtserver.h"
 
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
@@ -46,24 +47,15 @@
 
 namespace {
 
-// The inference server object. Once this server is successfully
-// created it does *not* transition back to a nullptr value and it is
-// *not* explicitly destructed. Thus we assume that 'server_' can
-// always be dereferenced.
-nvidia::inferenceserver::InferenceServer* server_ = nullptr;
-
 // Exit mutex and cv used to signal the main thread that it should
 // close the server and exit.
 volatile bool exiting_ = false;
 std::mutex exit_mu_;
 std::condition_variable exit_cv_;
 
-// If true then exit if the inference-server fails to initialize
-// completely but is still in an operational state (i.e. one or more
-// models fail to load but the server is otherwise ok). If false then
-// exit if inference-server doesn't completely initialize (e.g. will
-// exit if even one model fails to load).
-bool exit_on_failed_init_ = true;
+// Interval, in seconds, when the model repository is polled for
+// changes.
+int32_t repository_poll_secs_ = 15;
 
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
@@ -88,7 +80,7 @@ int32_t grpc_port_ = 8001;
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
-bool allow_gpu_metrics_ = false;
+bool allow_gpu_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
 
@@ -233,6 +225,23 @@ std::vector<Option> options_{
      "memory as needed. Value of 1.0 indicates that TensorFlow should "
      "allocate all of GPU memory."}};
 
+#define FAIL(MSG)                                 \
+  do {                                            \
+    std::cerr << "error: " << (MSG) << std::endl; \
+    exit(1);                                      \
+  } while (false)
+
+#define FAIL_IF_ERR(X, MSG)                                  \
+  do {                                                       \
+    TRTSERVER_Error* err = (X);                              \
+    if (err != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                \
+                << TRTSERVER_ErrorCodeString(err) << " - "   \
+                << TRTSERVER_ErrorMessage(err) << std::endl; \
+      TRTSERVER_ErrorDelete(err);                            \
+      exit(1);                                               \
+    }                                                        \
+  } while (false)
 
 void
 SignalHandler(int signum)
@@ -295,7 +304,7 @@ CheckPortCollision()
 TRTSERVER_Error*
 StartGrpcService(
     std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
-    nvidia::inferenceserver::InferenceServer* server)
+    const std::shared_ptr<TRTSERVER_Server>& server)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, grpc_port_, grpc_infer_thread_cnt_, grpc_stream_infer_thread_cnt_,
@@ -316,7 +325,7 @@ StartGrpcService(
 TRTSERVER_Error*
 StartHttpService(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
-    nvidia::inferenceserver::InferenceServer* server,
+    const std::shared_ptr<TRTSERVER_Server>& server,
     const std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServer::CreateAPIServer(
@@ -362,9 +371,13 @@ StartMetricsService(
 #endif  // TRTIS_ENABLE_METRICS
 
 bool
-StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
+StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
 {
-  LOG_INFO << "Starting endpoints, '" << server->Id() << "' listening on";
+  if (LOG_INFO_IS_ON) {
+    const char* id;
+    FAIL_IF_ERR(TRTSERVER_ServerId(server.get(), &id), "getting server ID");
+    LOG_INFO << "Starting endpoints, '" << id << "' listening on";
+  }
 
 #ifdef TRTIS_ENABLE_GRPC
   // Enable gRPC endpoints if requested...
@@ -417,6 +430,52 @@ StartEndpoints(nvidia::inferenceserver::InferenceServer* server)
   return true;
 }
 
+bool
+StopEndpoints()
+{
+  bool ret = true;
+
+#ifdef TRTIS_ENABLE_HTTP
+  for (auto& http_eps : http_services_) {
+    if (http_eps != nullptr) {
+      TRTSERVER_Error* err = http_eps->Stop();
+      if (err != nullptr) {
+        LOG_ERROR << "Failed to stop HTTP service: "
+                  << TRTSERVER_ErrorMessage(err);
+        TRTSERVER_ErrorDelete(err);
+        ret = false;
+      }
+    }
+  }
+#endif  // TRTIS_ENABLE_HTTP
+
+#ifdef TRTIS_ENABLE_GRPC
+  if (grpc_service_) {
+    TRTSERVER_Error* err = grpc_service_->Stop();
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to stop GRPC service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
+      ret = false;
+    }
+  }
+#endif  // TRTIS_ENABLE_GRPC
+
+#ifdef TRTIS_ENABLE_METRICS
+  if (metrics_service_) {
+    TRTSERVER_Error* err = metrics_service_->Stop();
+    if (err != nullptr) {
+      LOG_ERROR << "Failed to stop Metrics service: "
+                << TRTSERVER_ErrorMessage(err);
+      TRTSERVER_ErrorDelete(err);
+      ret = false;
+    }
+  }
+#endif  // TRTIS_ENABLE_METRICS
+
+  return ret;
+}
+
 std::string
 Usage()
 {
@@ -456,19 +515,19 @@ ParseFloatOption(const std::string arg)
 }
 
 bool
-Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
+Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 {
-  std::string server_id(server->Id());
-  std::string model_store_path(server->ModelStorePath());
-  bool strict_model_config = server->StrictModelConfigEnabled();
-  bool strict_readiness = server->StrictReadinessEnabled();
-  bool allow_profiling = server->ProfilingEnabled();
-  bool tf_allow_soft_placement = server->TensorFlowSoftPlacementEnabled();
-  float tf_gpu_memory_fraction = server->TensorFlowGPUMemoryFraction();
-  int32_t exit_timeout_secs = server->ExitTimeoutSeconds();
-  int32_t repository_poll_secs = server->RepositoryPollSeconds();
+  std::string server_id("inference:0");
+  std::string model_store_path;
+  bool exit_on_error = true;
+  bool strict_model_config = true;
+  bool strict_readiness = true;
+  bool allow_profiling = false;
+  bool tf_allow_soft_placement = true;
+  float tf_gpu_memory_fraction = 0.0;
+  int32_t exit_timeout_secs = 30;
 
-  bool exit_on_error = exit_on_failed_init_;
+  int32_t repository_poll_secs = repository_poll_secs_;
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
@@ -484,7 +543,7 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
-  bool allow_gpu_metrics = true;
+  bool allow_gpu_metrics = allow_gpu_metrics_;
 #endif  // TRTIS_ENABLE_METRICS
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
@@ -615,7 +674,8 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
 
-  exit_on_failed_init_ = exit_on_error;
+  repository_poll_secs_ =
+      (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
 
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
@@ -639,18 +699,40 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
   if (CheckPortCollision())
     return false;
 
-  server->SetId(server_id);
-  server->SetModelStorePath(model_store_path);
-  server->SetStrictModelConfigEnabled(strict_model_config);
-  server->SetStrictReadinessEnabled(strict_readiness);
-  server->SetProfilingEnabled(allow_profiling);
-  server->SetExitTimeoutSeconds(exit_timeout_secs);
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetServerId(server_options, server_id.c_str()),
+      "setting server ID");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetModelRepositoryPath(
+          server_options, model_store_path.c_str()),
+      "setting model repository path");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
+      "setting exit on error");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetStrictModelConfig(
+          server_options, strict_model_config),
+      "setting strict model configuration");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetStrictReadiness(
+          server_options, strict_readiness),
+      "setting strict readiness");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetProfiling(server_options, allow_profiling),
+      "setting profiling");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetExitTimeout(
+          server_options, std::max(0, exit_timeout_secs)),
+      "setting exit timeout");
 
-  server->SetRepositoryPollSeconds(
-      (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0);
-
-  server->SetTensorFlowSoftPlacementEnabled(tf_allow_soft_placement);
-  server->SetTensorFlowGPUMemoryFraction(tf_gpu_memory_fraction);
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
+          server_options, tf_allow_soft_placement),
+      "setting tensorflow soft placement");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
+          server_options, tf_gpu_memory_fraction),
+      "setting tensorflow GPU memory fraction");
 
   return true;
 }
@@ -659,22 +741,27 @@ Parse(nvidia::inferenceserver::InferenceServer* server, int argc, char** argv)
 int
 main(int argc, char** argv)
 {
-  // Create the inference server
-  server_ = new nvidia::inferenceserver::InferenceServer();
+  // Parse command-line to create the options for the inference
+  // server.
+  TRTSERVER_ServerOptions* server_options = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsNew(&server_options), "creating server options");
 
-  // Parse command-line using defaults provided by the inference
-  // server. Update inference server options appropriately.
-  if (!Parse(server_, argc, argv)) {
+  if (!Parse(server_options, argc, argv)) {
     exit(1);
   }
+
+  // Create the server...
+  TRTSERVER_Server* server_ptr = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_ServerNew(&server_ptr, server_options), "creating server");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsDelete(server_options), "deleting server options");
+
+  std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
 
   // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server_)) {
-    exit(1);
-  }
-
-  // Initialize the inference server
-  if (!server_->Init() && exit_on_failed_init_) {
+  if (!StartEndpoints(server)) {
     exit(1);
   }
 
@@ -684,45 +771,25 @@ main(int argc, char** argv)
 
   // Wait until a signal terminates the server...
   while (!exiting_) {
-    uint32_t poll_secs = server_->RepositoryPollSeconds();
-
     // If enabled, poll the model repository to see if there have been
     // any changes.
-    if (poll_secs > 0) {
-      nvidia::inferenceserver::Status status = server_->PollModelRepository();
-      if (!status.IsOk()) {
-        LOG_ERROR << "Failed to poll model repository: " << status.Message();
+    if (repository_poll_secs_ > 0) {
+      TRTSERVER_Error* err = TRTSERVER_ServerPollModelRepository(server.get());
+      if (err != nullptr) {
+        LOG_ERROR << "Failed to poll model repository: "
+                  << TRTSERVER_ErrorMessage(err);
+        TRTSERVER_ErrorDelete(err);
       }
     }
 
     // Wait for the polling interval (or a long time if polling is not
     // enabled). Will be woken if the server is exiting.
     std::unique_lock<std::mutex> lock(exit_mu_);
-    std::chrono::seconds wait_timeout((poll_secs == 0) ? 3600 : poll_secs);
+    std::chrono::seconds wait_timeout(
+        (repository_poll_secs_ == 0) ? 3600 : repository_poll_secs_);
     exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  bool stop_status = server_->Stop();
-
-#ifdef TRTIS_ENABLE_HTTP
-  for (auto& http_eps : http_services_) {
-    if (http_eps != nullptr) {
-      http_eps->Stop();
-    }
-  }
-#endif  // TRTIS_ENABLE_HTTP
-
-#ifdef TRTIS_ENABLE_GRPC
-  if (grpc_service_) {
-    grpc_service_->Stop();
-  }
-#endif  // TRTIS_ENABLE_GRPC
-
-#ifdef TRTIS_ENABLE_METRICS
-  if (metrics_service_) {
-    metrics_service_->Stop();
-  }
-#endif  // TRTIS_ENABLE_METRICS
-
-  return (stop_status) ? 0 : 1;
+  // Stop the HTTP, GRPC, and metrics endpoints.
+  StopEndpoints();
 }

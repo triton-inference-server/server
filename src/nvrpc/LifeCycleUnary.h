@@ -137,7 +137,8 @@ LifeCycleUnary<Request, Response>::Reset()
       new ::grpc::ServerAsyncResponseWriter<ResponseType>(m_Context.get()));
   m_NextState = &LifeCycleUnary<RequestType, ResponseType>::StateRequestDone;
   m_QueuingFunc(
-      m_Context.get(), m_Request.get(), m_ResponseWriter.get(), IContext::Tag());
+      m_Context.get(), m_Request.get(), m_ResponseWriter.get(),
+      IContext::Tag());
 }
 
 template <class Request, class Response>

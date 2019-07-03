@@ -60,8 +60,6 @@ class ModelRepositoryManager {
   /// for TensorFlow models.
   /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
   /// implementation of an operation when a GPU implementation is not available
-  /// \param repository_poll_secs Interval in seconds between each poll of
-  /// the model repository to check for changes.
   /// \param polling_enabled If true, then PollAndUpdate() is allowed and
   /// LoadUnloadModel() is not allowed. If false, LoadUnloadModel() is allowed
   /// and PollAndUpdate() is not allowed.
@@ -71,7 +69,7 @@ class ModelRepositoryManager {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-      const uint32_t repository_poll_secs, const bool polling_enabled,
+      const bool polling_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 
   /// Poll the model repository to determine the new set of models and
