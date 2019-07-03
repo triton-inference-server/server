@@ -31,15 +31,15 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceServer;
 class RequestStatus;
 class ServerStatus;
 
 class GRPCServer : private nvrpc::Server {
  public:
   static TRTSERVER_Error* Create(
-      InferenceServer* server, int32_t port, int infer_thread_cnt,
-      int stream_infer_thread_cnt, std::unique_ptr<GRPCServer>* grpc_servers);
+      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
+      int infer_thread_cnt, int stream_infer_thread_cnt,
+      std::unique_ptr<GRPCServer>* grpc_servers);
   TRTSERVER_Error* Start();
   TRTSERVER_Error* Stop();
 

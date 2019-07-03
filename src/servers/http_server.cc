@@ -171,14 +171,17 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
 class HTTPAPIServer : public HTTPServerImpl {
  public:
   explicit HTTPAPIServer(
-      InferenceServer* server, const std::vector<std::string>& endpoints,
-      const int32_t port, const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), server_(server),
+      const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::vector<std::string>& endpoints, const int32_t port,
+      const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), sserver_(server),
         endpoint_names_(endpoints),
         api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
   {
+    // FIXME remove
+    server_ = reinterpret_cast<InferenceServer*>(sserver_.get());
   }
 
   ~HTTPAPIServer() = default;
@@ -228,7 +231,10 @@ class HTTPAPIServer : public HTTPServerImpl {
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
 
+  // FIXME
+  std::shared_ptr<TRTSERVER_Server> sserver_;
   InferenceServer* server_;
+
   std::vector<std::string> endpoint_names_;
 
   re2::RE2 api_regex_;
@@ -615,7 +621,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse()
 
 TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
-    InferenceServer* server,
+    const std::shared_ptr<TRTSERVER_Server>& server,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {

@@ -91,7 +91,6 @@ InferenceServer::InferenceServer()
   strict_readiness_ = true;
   profiling_enabled_ = false;
   exit_timeout_secs_ = 30;
-  repository_poll_secs_ = 15;
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
@@ -129,16 +128,16 @@ InferenceServer::Init()
   // eagerly loaded below when the manager is created.
   status = ModelRepositoryManager::Create(
       this, version_, status_manager_, model_store_path_, strict_model_config_,
-      tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
-      repository_poll_secs_, true /* polling */, &model_repository_manager_);
+      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, true /* polling */,
+      &model_repository_manager_);
   if (!status.IsOk()) {
     LOG_ERROR << status.Message();
     if (model_repository_manager_ == nullptr) {
       ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     } else {
-      // If error is returned while the manager is set, we assume the failure
-      // is due to a model not loading correctly so we just continue
-      // if not exiting on error.
+      // If error is returned while the manager is set, we assume the
+      // failure is due to a model not loading correctly so we just
+      // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
     }
     return false;
