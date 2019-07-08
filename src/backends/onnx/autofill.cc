@@ -299,10 +299,6 @@ AutoFillOnnx::Create(
   std::set<std::string> version_dirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
-  // There must be at least one version directory that we can inspect to
-  // attempt to determine the platform. For now we allow multiple versions
-  // and only inspect the first verison directory to ensure it is valid.
-  // We can add more aggressive checks later.
   if (version_dirs.size() == 0) {
     return Status(
         RequestStatusCode::INTERNAL, "unable to autofill for '" + model_name +
