@@ -30,12 +30,12 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
-//@@.. cpp:var:: message InferSharedMemoryBlock
+//@@.. cpp:var:: message InferSharedMemory
 //@@
 //@@   The meta-data for the shared memory from which to read the input
 //@@   data and/or write the output data.
 //@@
-message InferSharedMemoryBlock
+message InferSharedMemory
 {
   //@@  .. cpp:var:: string shm_key
   //@@
@@ -47,7 +47,7 @@ message InferSharedMemoryBlock
   //@@  .. cpp:var:: uint64 offset
   //@@
   //@@     The offset from the start of the shared memory region.
-  //@@     block0 start = offset0, end = offset0 + size;
+  //@@     start = offset, end = offset + size;
   //@@
   uint64 offset = 2;
 
@@ -56,21 +56,6 @@ message InferSharedMemoryBlock
   //@@     Size of the memory block, in bytes.
   //@@
   uint64 byte_size = 3;
-}
-
-//@@.. cpp:var:: message InferSharedMemory
-//@@
-//@@   Meta-data for I/O of batch from shared memory.
-//@@
-message InferSharedMemory
-{
-  //@@  .. cpp:var:: InferSharedMemoryBlock block (repeated)
-  //@@
-  //@@     One or more contiguous shared memory blocks that compose the
-  //@@     entire shared memory. The No. of memory blocks required is the
-  //@@     size of the batch.
-  //@@
-  repeated InferSharedMemoryBlock block = 1;
 }
 
 //@@
