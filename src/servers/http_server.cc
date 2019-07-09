@@ -195,7 +195,8 @@ class HTTPAPIServer : public HTTPServerImpl {
   class InferRequest {
    public:
     InferRequest(
-        evhtp_request_t* req, uint64_t request_id, const char* server_id);
+        evhtp_request_t* req, uint64_t request_id, const char* server_id,
+        uint64_t unique_id);
     ~InferRequest() = default;
 
     static void InferComplete(
@@ -208,6 +209,7 @@ class HTTPAPIServer : public HTTPServerImpl {
     evthr_t* thread_;
     const uint64_t request_id_;
     const char* const server_id_;
+    const uint64_t unique_id_;
   };
 
  private:
@@ -310,16 +312,10 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
         std::string("unknown health mode '" + mode + "'").c_str());
   }
 
-  // FIXME request status creating utility
   RequestStatus request_status;
-  request_status.set_code(
-      (err == nullptr) ? RequestStatusCode::SUCCESS
-                       : CodeToStatus(TRTSERVER_ErrorCode(err)));
-  if (err != nullptr) {
-    request_status.set_msg(TRTSERVER_ErrorMessage(err));
-  }
-  request_status.set_server_id(server_id_);
-  request_status.set_request_id(0);  // FIXME
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
 
   evhtp_headers_add_header(
       req->headers_out,
@@ -354,11 +350,10 @@ HTTPAPIServer::HandleProfile(
 
   // For now profile is a nop...
 
-  // FIXME request status creating utility
   RequestStatus request_status;
-  request_status.set_code(RequestStatusCode::SUCCESS);
-  request_status.set_server_id(server_id_);
-  request_status.set_request_id(0);  // FIXME
+  RequestStatusUtil::Create(
+      &request_status, nullptr /* err */,
+      RequestStatusUtil::NextUniqueRequestId(), server_id_);
 
   evhtp_headers_add_header(
       req->headers_out,
@@ -427,16 +422,10 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
 
   TRTSERVER_ProtobufDelete(server_status_protobuf);
 
-  // FIXME request status creating utility
   RequestStatus request_status;
-  request_status.set_code(
-      (err == nullptr) ? RequestStatusCode::SUCCESS
-                       : CodeToStatus(TRTSERVER_ErrorCode(err)));
-  if (err != nullptr) {
-    request_status.set_msg(TRTSERVER_ErrorMessage(err));
-  }
-  request_status.set_server_id(server_id_);
-  request_status.set_request_id(0);  // FIXME
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
 
   evhtp_headers_add_header(
       req->headers_out,
@@ -562,6 +551,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
     return;
   }
 
+  uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
+
   // Create the inference request provider which provides all the
   // input information needed for an inference.
   TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
@@ -573,7 +564,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         model_name, request_header, req->buffer_in, request_provider);
     if (err == nullptr) {
       InferRequest* infer_request =
-          new InferRequest(req, request_header.id(), server_id_);
+          new InferRequest(req, request_header.id(), server_id_, unique_id);
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider,
@@ -592,12 +583,8 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   }
 
   if (err != nullptr) {
-    // FIXME request status creating utility
     RequestStatus request_status;
-    request_status.set_code(CodeToStatus(TRTSERVER_ErrorCode(err)));
-    request_status.set_msg(TRTSERVER_ErrorMessage(err));
-    request_status.set_server_id(server_id_);
-    request_status.set_request_id(0);  // FIXME
+    RequestStatusUtil::Create(&request_status, err, unique_id, server_id_);
 
     InferResponseHeader response_header;
     response_header.set_id(request_header.id());
@@ -642,8 +629,10 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 }
 
 HTTPAPIServer::InferRequest::InferRequest(
-    evhtp_request_t* req, uint64_t request_id, const char* server_id)
-    : req_(req), request_id_(request_id), server_id_(server_id)
+    evhtp_request_t* req, uint64_t request_id, const char* server_id,
+    uint64_t unique_id)
+    : req_(req), request_id_(request_id), server_id_(server_id),
+      unique_id_(unique_id)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
@@ -721,17 +710,9 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
     response_header.set_id(request_id_);
   }
 
-  // FIXME request status creating utility
   RequestStatus request_status;
-  request_status.set_code(
-      (response_status == nullptr)
-          ? RequestStatusCode::SUCCESS
-          : CodeToStatus(TRTSERVER_ErrorCode(response_status)));
-  if (response_status != nullptr) {
-    request_status.set_msg(TRTSERVER_ErrorMessage(response_status));
-  }
-  request_status.set_server_id(server_id_);
-  request_status.set_request_id(0);  // FIXME
+  RequestStatusUtil::Create(
+      &request_status, response_status, unique_id_, server_id_);
 
   evhtp_headers_add_header(
       req_->headers_out, evhtp_header_new(

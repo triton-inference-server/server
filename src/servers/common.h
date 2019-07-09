@@ -56,8 +56,30 @@ namespace nvidia { namespace inferenceserver {
     }                           \
   } while (false)
 
-// Return the RequestStatusCode corresponding to a TRTSERVER error
-// code.
-RequestStatusCode CodeToStatus(TRTSERVER_Error_Code code);
+//
+// RequestStatusUtil
+//
+// Utilities for creating and using RequestStatus
+//
+class RequestStatusUtil {
+ public:
+  // Create RequestStatus from a TRTSERVER error.
+  static void Create(
+      RequestStatus* status, TRTSERVER_Error* err, uint64_t request_id,
+      const std::string& server_id);
+  // Create a RequestStatus object from a code and optional message.
+  static void Create(
+      RequestStatus* status, uint64_t request_id, const std::string& server_id,
+      RequestStatusCode code, const std::string& msg);
+  static void Create(
+      RequestStatus* status, uint64_t request_id, const std::string& server_id,
+      RequestStatusCode code);
+
+  // Return the RequestStatusCode for a TRTSERVER error code.
+  static RequestStatusCode CodeToStatus(TRTSERVER_Error_Code code);
+
+  // Return a unique request ID
+  static uint64_t NextUniqueRequestId();
+};
 
 }}  // namespace nvidia::inferenceserver
