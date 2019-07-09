@@ -99,7 +99,11 @@ class StatusContext final
 
       TRTSERVER_Protobuf* server_status_protobuf = nullptr;
       TRTSERVER_Error* err =
-          TRTSERVER_ServerStatus(server, &server_status_protobuf);
+          (request.model_name().empty())
+              ? TRTSERVER_ServerStatus(server, &server_status_protobuf)
+              : TRTSERVER_ServerModelStatus(
+                    server, &server_status_protobuf,
+                    request.model_name().c_str());
       if (err == nullptr) {
         const char* status_buffer;
         size_t status_byte_size;
