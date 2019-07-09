@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "src/backends/tensorflow/graphdef_backend.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -68,6 +69,8 @@ GraphDefBackendFactory::CreateBackend(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(graphdef_path));
   }
+
+  VirtualDeviceTracker::Init(backend_config_->memory_limit_mb);
 
   std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));

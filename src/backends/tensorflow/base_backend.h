@@ -27,7 +27,6 @@
 
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
-#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"

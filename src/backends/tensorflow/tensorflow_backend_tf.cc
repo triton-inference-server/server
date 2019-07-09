@@ -175,14 +175,16 @@ NewSessionOptions(
   session_options->config.set_allow_soft_placement(allow_soft_placement);
 
   // Create virtual devices
-  (*(session_options->config.mutable_device_count()))["GPU"] =
-      memory_limit_mb.size();
-  for (const auto& v : memory_limit_mb) {
-    auto virtual_devices = session_options->config.mutable_gpu_options()
-                               ->mutable_experimental()
-                               ->add_virtual_devices();
-    for (float mb : v) {
-      virtual_devices->add_memory_limit_mb(mb);
+  if (!memory_limit_mb.empty()) {
+    (*(session_options->config.mutable_device_count()))["GPU"] =
+        memory_limit_mb.size();
+    for (const auto& v : memory_limit_mb) {
+      auto virtual_devices = session_options->config.mutable_gpu_options()
+                                 ->mutable_experimental()
+                                 ->add_virtual_devices();
+      for (float mb : v) {
+        virtual_devices->add_memory_limit_mb(mb);
+      }
     }
   }
 

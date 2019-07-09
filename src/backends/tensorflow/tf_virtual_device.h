@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,33 +25,30 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/constants.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
 class VirtualDeviceTracker {
  public:
-  static Status Create(
-      const std::vector<std::vector<float>>& memory_limit_mb,
-      VirtualDeviceTracker** device_tracker);
+  static Status Init(const std::vector<std::vector<float>>& memory_limit_mb);
 
-  Status GetNextDeviceId(const int gpu_device, int* vgpu_device);
+  static Status GetNextVirtualDevice(const int gpu_device, int* vgpu_device);
 
   ~VirtualDeviceTracker() = default;
 
  private:
-  VirtualDeviceTracker(const std::vector<std::vector<float>>& memory_limit_mb)
-      : per_device_memory_(memory_limit_mb)
-  {
-    // Initialize virtual device counter
-    for (size_t gpu_idx = 0; gpu_idx < memory_limit_mb.size(); gpu_idx++) {
-      virtual_device_ids_.emplace(
-          std::piecewise_construct, std::forward_as_tuple(gpu_idx),
-          std::forward_as_tuple(0));
-    }
-  }
+  DISALLOW_COPY_AND_ASSIGN(VirtualDeviceTracker);
+
+  static VirtualDeviceTracker* GetInstance();
+
+  int NextDeviceId(const int gpu_device);
+
+  VirtualDeviceTracker() {}
+
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
-  const std::vector<std::vector<float>>& per_device_memory_;
+  std::vector<int> num_virtual_per_physical_;
 };
 
 }}  // namespace nvidia::inferenceserver

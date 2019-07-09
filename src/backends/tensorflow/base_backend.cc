@@ -28,6 +28,7 @@
 
 #include <set>
 #include "src/backends/tensorflow/tf_utils.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
@@ -148,11 +149,10 @@ BaseBackend::CreateExecutionContext(
                             : cc_itr->second;
 
     // Get virtual device tracker instance, and get next device id
-    VirtualDeviceTracker* device_tracker;
-    RETURN_IF_ERROR(VirtualDeviceTracker::Create(
-        graphdef_backend_config->memory_limit_mb, &device_tracker));
-
-    RETURN_IF_ERROR(device_tracker->GetNextDeviceId(gpu_device, &vgpu_device));
+    if (!graphdef_backend_config->memory_limit_mb.empty()) {
+      RETURN_IF_ERROR(
+          VirtualDeviceTracker::GetNextVirtualDevice(gpu_device, &vgpu_device));
+    }
 
     LOG_INFO << "Creating instance " << instance_name << " on GPU "
              << vgpu_device << " (" << cc << ") using " << cc_model_filename;
