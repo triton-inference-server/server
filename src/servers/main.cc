@@ -780,4 +780,11 @@ main(int argc, char** argv)
 
   // Stop the HTTP, GRPC, and metrics endpoints.
   StopEndpoints();
+
+  // FIXME. TF backend aborts if we attempt cleanup...
+  std::shared_ptr<TRTSERVER_Server>* keep_alive =
+      new std::shared_ptr<TRTSERVER_Server>(server);
+  if (keep_alive == nullptr) {
+    return 1;
+  }
 }

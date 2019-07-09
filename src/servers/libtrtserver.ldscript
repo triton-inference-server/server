@@ -28,16 +28,6 @@
     TRTSERVER_*;
     *nvidia15inferenceserver10Log*;
     *nvidia15inferenceserver8gLogger*;
-    *nvidia15inferenceserver15InferenceServer*;
-    *nvidia15inferenceserver21ServerStatTimerScoped*;
-    *nvidia15inferenceserver15ModelInferStats*;
-    *nvidia15inferenceserver20RequestStatusFactory*;
-    *nvidia15inferenceserver22NormalizeRequestHeader*;
-    *nvidia15inferenceserver26GRPCInferRequestToInputMap*;
-    *nvidia15inferenceserver20InferRequestProvider*;
-    *nvidia15inferenceserver25GRPCInferResponseProvider*;
-    *nvidia15inferenceserver6Status*;
     *nvidia15inferenceserver7Metrics*;
-    *nvidia15inferenceserver22ModelRepositoryManager*;
   local: *;
 };

@@ -34,18 +34,16 @@
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "grpc/grpc.h"
-#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/logging.h"
-#include "src/core/provider_utils.h"
-#include "src/core/request_status.h"
-#include "src/core/server.h"
+#include "src/core/trtserver.h"
 #include "src/nvrpc/Context.h"
 #include "src/nvrpc/Executor.h"
 #include "src/nvrpc/Resources.h"
 #include "src/nvrpc/Service.h"
 #include "src/nvrpc/ThreadPool.h"
+#include "src/servers/common.h"
 
 using nvrpc::BaseContext;
 using nvrpc::BidirectionalStreamingLifeCycle;
@@ -63,20 +61,22 @@ class AsyncResources : public nvrpc::Resources {
       : server_(server), mgmt_thread_pool_(mgmt_threads),
         infer_thread_pool_(infer_threads)
   {
+    TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
+    if (err != nullptr) {
+      server_id_ = "unknown:0";
+      TRTSERVER_ErrorDelete(err);
+    }
   }
 
-  // FIXME
-  // TRTSERVER_Server* Server() const { return server_.get(); }
-  InferenceServer* Server() const
-  {
-    return reinterpret_cast<InferenceServer*>(server_.get());
-  }
+  TRTSERVER_Server* Server() const { return server_.get(); }
+  const char* ServerId() const { return server_id_; }
 
   ThreadPool& GetMgmtThreadPool() { return mgmt_thread_pool_; }
   ThreadPool& GetInferThreadPool() { return infer_thread_pool_; }
 
  private:
   std::shared_ptr<TRTSERVER_Server> server_;
+  const char* server_id_;
 
   // We can and should get specific on thread affinity.  It might not
   // be as important on the frontend, but the backend threadpool
@@ -95,15 +95,39 @@ class StatusContext final
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
-          ServerStatTimerScoped timer(
-              GetResources()->Server()->StatusManager(),
-              ServerStatTimerScoped::Kind::STATUS);
+          TRTSERVER_Server* server = GetResources()->Server();
 
+          TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+          TRTSERVER_Error* err =
+              TRTSERVER_ServerStatus(server, &server_status_protobuf);
+          if (err == nullptr) {
+            const char* status_buffer;
+            size_t status_byte_size;
+            err = TRTSERVER_ProtobufSerialize(
+                server_status_protobuf, &status_buffer, &status_byte_size);
+            if (err == nullptr) {
+              if (!response.mutable_server_status()->ParseFromArray(
+                      status_buffer, status_byte_size)) {
+                err = TRTSERVER_ErrorNew(
+                    TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+              }
+            }
+          }
+
+          TRTSERVER_ProtobufDelete(server_status_protobuf);
+
+          // FIXME request status creating utility
           RequestStatus* request_status = response.mutable_request_status();
-          ServerStatus* server_status = response.mutable_server_status();
+          request_status->set_code(
+              (err == nullptr) ? RequestStatusCode::SUCCESS
+                               : CodeToStatus(TRTSERVER_ErrorCode(err)));
+          if (err != nullptr) {
+            request_status->set_msg(TRTSERVER_ErrorMessage(err));
+          }
+          request_status->set_server_id(GetResources()->ServerId());
+          request_status->set_request_id(0);  // FIXME
 
-          GetResources()->Server()->HandleStatus(
-              request_status, server_status, request.model_name());
+          TRTSERVER_ErrorDelete(err);
           this->CompleteExecution(execution_context);
         });
   }
@@ -111,86 +135,195 @@ class StatusContext final
 
 template <class LifeCycle>
 class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
-  // Helper function that utilizes RETURN_IF_ERROR to avoid nested 'if'
-  Status InferHelper(
-      InferenceServer* server, std::shared_ptr<ModelInferStats>& infer_stats,
-      std::shared_ptr<ModelInferStats::ScopedTimer>& timer,
-      InferRequest& request, InferResponse& response)
-  {
-    std::shared_ptr<InferenceBackend> backend = nullptr;
-    RETURN_IF_ERROR(server->GetInferenceBackend(
-        request.model_name(), request.model_version(), &backend));
-    infer_stats->SetMetricReporter(backend->MetricReporter());
+  class GRPCInferRequest {
+   public:
+    GRPCInferRequest(
+        InferBaseContext<LifeCycle>* ctx, InferResponse& response,
+        uint64_t request_id, const char* server_id)
+        : ctx_(ctx), response_(response), request_id_(request_id),
+          server_id_(server_id)
+    {
+    }
 
-    std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
-    InferRequestHeader request_header = request.meta_data();
-    RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
-    RETURN_IF_ERROR(
-        GRPCInferRequestToInputMap(request_header, request, input_map));
+    static void InferComplete(
+        TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
+        void* userp)
+    {
+      GRPCInferRequest* grpc_infer_request =
+          reinterpret_cast<GRPCInferRequest*>(userp);
 
-    std::shared_ptr<InferRequestProvider> request_provider;
-    std::shared_ptr<GRPCInferResponseProvider> response_provider;
-    RETURN_IF_ERROR(InferRequestProvider::Create(
-        request.model_name(), request.model_version(), request_header,
-        input_map, &request_provider));
-    infer_stats->SetBatchSize(request_header.batch_size());
-
-    RETURN_IF_ERROR(GRPCInferResponseProvider::Create(
-        request.meta_data(), &response, backend->GetLabelProvider(),
-        &response_provider));
-
-    RequestStatus* request_status = response.mutable_request_status();
-    uint64_t id = request.meta_data().id();
-    uintptr_t execution_context = this->GetExecutionContext();
-    server->HandleInfer(
-        request_status, backend, request_provider, response_provider,
-        infer_stats,
-        [this, execution_context, id, request_status, &response, infer_stats,
-         timer]() mutable {
-          if (response.ByteSizeLong() > INT_MAX) {
-            request_status->set_code(RequestStatusCode::INVALID_ARG);
-            request_status->set_msg(
+      TRTSERVER_Error* response_status =
+          TRTSERVER_InferenceResponseStatus(response);
+      if ((response_status == nullptr) &&
+          (grpc_infer_request->response_.ByteSizeLong() > INT_MAX)) {
+        response_status = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
                 "Response has byte size " +
-                std::to_string(response.ByteSizeLong()) +
+                std::to_string(grpc_infer_request->response_.ByteSizeLong()) +
                 " which exceed gRPC's byte size limit " +
-                std::to_string(INT_MAX) + ".");
-          }
-          // If the response is an error then clear the meta-data
-          // and raw output as they may be partially or
-          // un-initialized.
-          if (request_status->code() != RequestStatusCode::SUCCESS) {
-            response.mutable_meta_data()->Clear();
-            response.mutable_raw_output()->Clear();
+                std::to_string(INT_MAX) + ".")
+                .c_str());
+      }
+
+      if (response_status == nullptr) {
+        TRTSERVER_Protobuf* response_protobuf = nullptr;
+        response_status =
+            TRTSERVER_InferenceResponseHeader(response, &response_protobuf);
+        if (response_status == nullptr) {
+          const char* buffer;
+          size_t byte_size;
+          response_status = TRTSERVER_ProtobufSerialize(
+              response_protobuf, &buffer, &byte_size);
+          if (response_status == nullptr) {
+            if (!grpc_infer_request->response_.mutable_meta_data()
+                     ->ParseFromArray(buffer, byte_size)) {
+              response_status = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_INTERNAL, "failed to parse response header");
+            }
           }
 
-          response.mutable_meta_data()->set_id(id);
-          this->CompleteExecution(execution_context);
-          timer.reset();
-        });
+          TRTSERVER_ProtobufDelete(response_protobuf);
+        }
+      }
 
-    return Status::Success;
+      // If the response is an error then clear the meta-data
+      // and raw output as they may be partially or
+      // un-initialized.
+      if (response_status != nullptr) {
+        grpc_infer_request->response_.mutable_meta_data()->Clear();
+        grpc_infer_request->response_.mutable_raw_output()->Clear();
+      }
+
+      // FIXME request status creating utility
+      RequestStatus* request_status =
+          grpc_infer_request->response_.mutable_request_status();
+      request_status->set_code(
+          (response_status == nullptr)
+              ? RequestStatusCode::SUCCESS
+              : CodeToStatus(TRTSERVER_ErrorCode(response_status)));
+      if (response_status != nullptr) {
+        request_status->set_msg(TRTSERVER_ErrorMessage(response_status));
+      }
+      request_status->set_server_id(grpc_infer_request->server_id_);
+      request_status->set_request_id(0);  // FIXME
+
+      TRTSERVER_ErrorDelete(response_status);
+
+      grpc_infer_request->response_.mutable_meta_data()->set_id(
+          grpc_infer_request->request_id_);
+      grpc_infer_request->ctx_->CompleteExecution(
+          grpc_infer_request->ctx_->GetExecutionContext());
+    }
+
+   private:
+    InferBaseContext<LifeCycle>* ctx_;
+    InferResponse& response_;
+    const uint64_t request_id_;
+    const char* const server_id_;
+  };
+
+  TRTSERVER_Error* GRPCToInput(
+      const InferRequestHeader& request_header, const InferRequest& request,
+      TRTSERVER_InferenceRequestProvider* request_provider)
+  {
+    // Make sure that the request is providing the same number of raw
+    // input tensor data.
+    if (request_header.input_size() != request.raw_input_size()) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "expected tensor data for " +
+              std::to_string(request_header.input_size()) + " inputs but got " +
+              std::to_string(request.raw_input_size()) +
+              " sets of data for model '" + request.model_name() + "'")
+              .c_str());
+    }
+
+    // Verify that the batch-byte-size of each input matches the size of
+    // the provided raw tensor data.
+    size_t idx = 0;
+    for (const auto& io : request_header.input()) {
+      uint64_t byte_size = 0;
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+          request_provider, io.name().c_str(), &byte_size));
+
+      if (byte_size != request.raw_input(idx).size()) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unexpected size " +
+                std::to_string(request.raw_input(idx).size()) + " for input '" +
+                io.name() + "', expecting " +
+                std::to_string(io.batch_byte_size()) + " for model '" +
+                request.model_name() + "'")
+                .c_str());
+      }
+
+      const std::string& raw = request.raw_input(idx++);
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+          request_provider, io.name().c_str(), raw.c_str(), raw.size()));
+    }
+
+    return nullptr;  // success
   }
 
   void ExecuteRPC(InferRequest& request, InferResponse& response) final override
   {
     auto server = this->GetResources()->Server();
-    auto infer_stats = std::make_shared<ModelInferStats>(
-        server->StatusManager(), request.model_name());
-    auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
-    infer_stats->StartRequestTimer(timer.get());
-    infer_stats->SetRequestedVersion(request.model_version());
+    auto server_id = this->GetResources()->ServerId();
+    TRTSERVER_Error* err = nullptr;
 
-    Status status = InferHelper(server, infer_stats, timer, request, response);
+    std::string request_header_serialized;
+    if (!request.meta_data().SerializeToString(&request_header_serialized)) {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNKNOWN, "failed to serialize request header");
+    } else {
+      // Create the inference request provider which provides all the
+      // input information needed for an inference.
+      TRTSERVER_InferenceRequestProvider* request_provider = nullptr;
+      err = TRTSERVER_InferenceRequestProviderNew(
+          &request_provider, server, request.model_name().c_str(),
+          request.model_version(), request_header_serialized.c_str(),
+          request_header_serialized.size());
+      if (err == nullptr) {
+        err = GRPCToInput(request.meta_data(), request, request_provider);
+        if (err == nullptr) {
+          GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
+              this, response, request.meta_data().id(), server_id);
 
-    if (!status.IsOk()) {
-      LOG_VERBOSE(1) << "Infer failed: " << status.Message();
-      infer_stats->SetFailed(true);
-      RequestStatusFactory::Create(
-          response.mutable_request_status(), 0 /* request_id */, server->Id(),
-          status);
+          err = TRTSERVER_ServerInferAsync(
+              server, request_provider,
+              nullptr /* http_response_provider_hack */,
+              &response /* grpc_response_provider_hack */,
+              GRPCInferRequest::InferComplete,
+              reinterpret_cast<void*>(grpc_infer_request));
+          if (err != nullptr) {
+            delete grpc_infer_request;
+            grpc_infer_request = nullptr;
+          }
 
-      // If the response is an error then clear the meta-data and raw
-      // output as they may be partially or un-initialized.
+          // The request provider can be deleted immediately after the
+          // ServerInferAsync call returns.
+          TRTSERVER_InferenceRequestProviderDelete(request_provider);
+        }
+      }
+    }
+
+    if (err != nullptr) {
+      // FIXME request status creating utility
+      RequestStatus* request_status = response.mutable_request_status();
+      request_status->set_code(CodeToStatus(TRTSERVER_ErrorCode(err)));
+      request_status->set_msg(TRTSERVER_ErrorMessage(err));
+      request_status->set_server_id(server_id);
+      request_status->set_request_id(0);  // FIXME
+
+      TRTSERVER_ErrorDelete(err);
+
+      LOG_VERBOSE(1) << "Infer failed: " << request_status->msg();
+
+      // Clear the meta-data and raw output as they may be partially
+      // or un-initialized.
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
@@ -217,12 +350,14 @@ class ProfileContext final
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
-          auto server = GetResources()->Server();
-          ServerStatTimerScoped timer(
-              server->StatusManager(), ServerStatTimerScoped::Kind::PROFILE);
+          // For now profile is a nop...
 
+          // FIXME request status creating utility
           RequestStatus* request_status = response.mutable_request_status();
-          server->HandleProfile(request_status, request.cmd());
+          request_status->set_code(RequestStatusCode::SUCCESS);
+          request_status->set_server_id(GetResources()->ServerId());
+          request_status->set_request_id(0);  // FIXME
+
           this->CompleteExecution(execution_context);
         });
   }
@@ -236,19 +371,41 @@ class HealthContext final
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue(
         [this, execution_context, &request, &response] {
-          auto server = GetResources()->Server();
-          ServerStatTimerScoped timer(
-              server->StatusManager(), ServerStatTimerScoped::Kind::HEALTH);
+          TRTSERVER_Server* server = GetResources()->Server();
 
+          TRTSERVER_Error* err = nullptr;
+          bool health = false;
+
+          if (request.mode() == "live") {
+            err = TRTSERVER_ServerIsLive(server, &health);
+          } else if (request.mode() == "ready") {
+            err = TRTSERVER_ServerIsReady(server, &health);
+          } else {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN,
+                std::string("unknown health mode '" + request.mode() + "'")
+                    .c_str());
+          }
+
+          response.set_health((err == nullptr) && health);
+
+          // FIXME request status creating utility
           RequestStatus* request_status = response.mutable_request_status();
-          bool health;
+          request_status->set_code(
+              (err == nullptr) ? RequestStatusCode::SUCCESS
+                               : CodeToStatus(TRTSERVER_ErrorCode(err)));
+          if (err != nullptr) {
+            request_status->set_msg(TRTSERVER_ErrorMessage(err));
+          }
+          request_status->set_server_id(GetResources()->ServerId());
+          request_status->set_request_id(0);  // FIXME
 
-          server->HandleHealth(request_status, &health, request.mode());
-          response.set_health(health);
+          TRTSERVER_ErrorDelete(err);
           this->CompleteExecution(execution_context);
         });
   }
 };
+
 }  // namespace
 
 GRPCServer::GRPCServer(
@@ -280,27 +437,27 @@ GRPCServer::Create(
 
   (*grpc_server)->GetBuilder().SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
 
-  LOG_INFO << "Register TensorRT GRPCService";
+  LOG_VERBOSE(1) << "Register TensorRT GRPCService";
   auto inferenceService = (*grpc_server)->RegisterAsyncService<GRPCService>();
 
-  LOG_INFO << "Register Infer RPC";
+  LOG_VERBOSE(1) << "Register Infer RPC";
   (*grpc_server)->rpcInfer_ = inferenceService->RegisterRPC<InferContext>(
       &GRPCService::AsyncService::RequestInfer);
 
-  LOG_INFO << "Register StreamInfer RPC";
+  LOG_VERBOSE(1) << "Register StreamInfer RPC";
   (*grpc_server)->rpcStreamInfer_ =
       inferenceService->RegisterRPC<StreamInferContext>(
           &GRPCService::AsyncService::RequestStreamInfer);
 
-  LOG_INFO << "Register Status RPC";
+  LOG_VERBOSE(1) << "Register Status RPC";
   (*grpc_server)->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
 
-  LOG_INFO << "Register Profile RPC";
+  LOG_VERBOSE(1) << "Register Profile RPC";
   (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
       &GRPCService::AsyncService::RequestProfile);
 
-  LOG_INFO << "Register Health RPC";
+  LOG_VERBOSE(1) << "Register Health RPC";
   (*grpc_server)->rpcHealth_ = inferenceService->RegisterRPC<HealthContext>(
       &GRPCService::AsyncService::RequestHealth);
 
@@ -312,7 +469,7 @@ GRPCServer::Start()
 {
   if (!running_) {
     running_ = true;
-    LOG_INFO << "Register Executor";
+    LOG_VERBOSE(1) << "Register Executor";
     auto executor = RegisterExecutor(new ::nvrpc::Executor(1));
 
     // You can register RPC execution contexts from any registered RPC on any

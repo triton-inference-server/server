@@ -318,7 +318,7 @@ InferResponseProvider::InferResponseProvider(
   // Create a map from output name to the InferRequestHeader::Output
   // object for that output.
   for (const InferRequestHeader::Output& output : request_header.output()) {
-    output_map_.emplace(std::make_pair(output.name(), &output));
+    output_map_.emplace(std::make_pair(output.name(), output));
   }
 }
 
@@ -365,8 +365,8 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
 
-  if (pr->second->has_cls()) {
-    loutput->cls_count_ = pr->second->cls().count();
+  if (pr->second.has_cls()) {
+    loutput->cls_count_ = pr->second.cls().count();
     char* buffer = new char[content_byte_size];
     *content = static_cast<void*>(buffer);
     loutput->ptr_ = static_cast<void*>(buffer);

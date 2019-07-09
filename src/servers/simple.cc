@@ -257,7 +257,8 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
           server, request_provider, nullptr /* http_response_provider_hack */,
-          InferComplete, reinterpret_cast<void*>(p)),
+          nullptr /* grpc_response_provider_hack */, InferComplete,
+          reinterpret_cast<void*>(p)),
       "running inference");
 
   // The request provider can be deleted immediately after the

@@ -578,6 +578,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider,
           req->buffer_out /* http_response_provider_hack */,
+          nullptr /* grpc_response_provider_hack */,
           InferRequest::InferComplete, reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
         delete infer_request;
