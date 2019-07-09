@@ -47,7 +47,7 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
   ModelConfig model_config;
   if (!model_config.ParseFromString(std::string(
           data->serialized_model_config, data->serialized_model_config_size))) {
-    return ErrorCodes::kInvalidModelConfig;
+    return ErrorCodes::InvalidModelConfig;
   }
 
   // Create the instance and validate that the model configuration is
@@ -57,17 +57,17 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
       &instance, std::string(data->instance_name), model_config,
       data->gpu_device_id, data);
   
-  if (ErrorCodes::kSuccess != err) {
+  if (ErrorCodes::Success != err) {
     return err;
   }
 
   if (instance == nullptr) {
-    return ErrorCodes::kCreationFailure;
+    return ErrorCodes::CreationFailure;
   }
 
   *custom_instance = static_cast<void*>(instance);
 
-  return ErrorCodes::kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -78,7 +78,7 @@ CustomFinalize(void* custom_instance)
     delete instance;
   }
 
-  return ErrorCodes::kSuccess;
+  return ErrorCodes::Success;
 }
 
 const char*
@@ -95,7 +95,7 @@ CustomExecute(
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
   if (custom_instance == nullptr) {
-    return ErrorCodes::kUnknown;
+    return ErrorCodes::Unknown;
   }
 
   CustomInstance* instance = static_cast<CustomInstance*>(custom_instance);

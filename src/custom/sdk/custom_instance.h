@@ -53,14 +53,20 @@ class CustomInstance {
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
 
-  inline const char* ErrorString(uint32_t error) const {
-    return errors_.ErrorString(error).c_str();
+  inline const char* ErrorString(uint32_t error) const
+  {
+    return errors_.ErrorString(error);
   }
 
  protected:
   CustomInstance(
       const std::string& instance_name, const ModelConfig& model_config,
       int gpu_device);
+
+  inline int RegisterError(const std::string& error_message)
+  {
+    return errors_.RegisterError(error_message);
+  }
 
   // The name of this backend instance
   const std::string instance_name_;
@@ -72,12 +78,9 @@ class CustomInstance {
   // execute on CPU.
   const int gpu_device_;
 
+ private:
   // Error code manager
   ErrorCodes errors_;
-
- private:
-  // An overridable method to add error strings for additional custom errors
-  virtual const char* CustomErrorString(int errcode);
 };
 
 }}}  // namespace nvidia::inferenceserver::custom

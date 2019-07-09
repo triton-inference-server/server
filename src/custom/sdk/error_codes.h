@@ -36,20 +36,20 @@ namespace nvidia { namespace inferenceserver { namespace custom {
 class ErrorCodes {
  public:
   // Default error codes
-  static const uint32_t kSuccess = 0;
-  static const uint32_t kUnknown = 1;
-  static const uint32_t kCreationFailure = 2;
-  static const uint32_t kInvalidModelConfig = 3;
+  static const int Success = 0;
+  static const int Unknown = 1;
+  static const int CreationFailure = 2;
+  static const int InvalidModelConfig = 3;
 
   ErrorCodes();
   ~ErrorCodes() = default;
 
   // Return the registered error message for a specific error code
-  const std::string & ErrorString(uint32_t error) const;
+  const char * ErrorString(int error) const;
 
   // Register a new error message.
   // Returns error code for the new error mesage
-  uint32_t RegisterError(const std::string& error_string);
+  int RegisterError(const std::string& error_string);
 
  private:
   std::vector<std::string> err_names_;

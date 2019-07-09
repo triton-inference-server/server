@@ -35,21 +35,21 @@ ErrorCodes::ErrorCodes() {
   RegisterError("invalid model configuration");
 }
 
-const std::string&
-ErrorCodes::ErrorString(uint32_t error) const
+const char *
+ErrorCodes::ErrorString(int error) const
 {
-    if (error < err_names_.size()) {
-      return err_names_[error];
+    if (error < 0 || error >= static_cast<int>(err_names_.size())) {
+      return err_names_[error].c_str();
     }
 
-    return err_names_[kUnknown];
+    return err_names_[Unknown].c_str();
 }
 
-uint32_t
+int
 ErrorCodes::RegisterError(const std::string& error_string)
 {
   err_names_.push_back(error_string);
-  return err_names_.size() - 1;
+  return static_cast<int>(err_names_.size() - 1);
 }
 
 }}}  // namespace nvidia::inferenceserver::custom

@@ -71,16 +71,22 @@ class Context : public CustomInstance {
   std::unordered_map<std::string, CopyInfo> copy_map_;
 
   // local Error Codes
-  uint32_t kGpuNotSupported;
-  uint32_t kInputOutput;
-  uint32_t kInputOutputName;
-  uint32_t kInputOutputDataType;
-  uint32_t kInputContents;
-  uint32_t kInputSize;
-  uint32_t kRequestOutput;
-  uint32_t kOutputBuffer;
-
-  void RegisterErrorStrings();
+  const int kGpuNotSupported =
+      RegisterError("execution on GPU not supported");
+  const int kInputOutput = RegisterError(
+      "model must have equal input/output pairs with matching shape");
+  const int kInputOutputName = RegisterError(
+      "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'");
+  const int kInputOutputDataType = RegisterError(
+      "model input/output pairs must have same data-type");
+  const int kInputContents =
+      RegisterError("unable to get input tensor values");
+  const int kInputSize =
+      RegisterError("unexpected size for input tensor");
+  const int kRequestOutput =
+      RegisterError("inference request for unknown output");
+  const int kOutputBuffer =
+      RegisterError("unable to get buffer for output tensor values");
 };
 
 Context::Context(
@@ -133,7 +139,7 @@ Context::Init()
         model_config_.input(i).name(), model_config_.output(i).data_type()};
   }
 
-  return ErrorCodes::kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -218,25 +224,7 @@ Context::Execute(
     }
   }
 
-  return ErrorCodes::kSuccess;
-}
-
-void
-Context::RegisterErrorStrings()
-{
-  kGpuNotSupported = errors_.RegisterError("execution on GPU not supported");
-  kInputOutput = errors_.RegisterError(
-      "model must have equal input/output pairs with matching shape");
-  kInputOutputName = errors_.RegisterError(
-      "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'");
-  kInputOutputDataType = errors_.RegisterError(
-      "model input/output pairs must have same data-type");
-  kInputContents = errors_.RegisterError("unable to get input tensor values");
-  kInputSize = errors_.RegisterError("unexpected size for input tensor");
-  kRequestOutput =
-      errors_.RegisterError("inference request for unknown output");
-  kOutputBuffer =
-      errors_.RegisterError("unable to get buffer for output tensor values");
+  return ErrorCodes::Success;
 }
 
 }  // namespace identity
@@ -254,7 +242,7 @@ CustomInstance::Create(
   *instance = ctx;
 
   if (ctx == nullptr) {
-    return ErrorCodes::kCreationFailure;
+    return ErrorCodes::CreationFailure;
   }
 
   return ctx->Init();
