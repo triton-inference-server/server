@@ -40,9 +40,4 @@ class InferenceBackend;
 Status NormalizeRequestHeader(
     const InferenceBackend& is, InferRequestHeader& request_header);
 
-Status GRPCInferRequestToInputMap(
-    const InferRequestHeader& normalized_request_header,
-    const InferRequest& request,
-    std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& input_map);
-
 }}  // namespace nvidia::inferenceserver

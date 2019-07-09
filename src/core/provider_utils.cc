@@ -175,43 +175,4 @@ NormalizeRequestHeader(
   return Status::Success;
 }
 
-Status
-GRPCInferRequestToInputMap(
-    const InferRequestHeader& request_header, const InferRequest& request,
-    std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& input_map)
-{
-  // Make sure that the request is providing the same number of raw
-  // input tensor data.
-  if (request_header.input_size() != request.raw_input_size()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "expected tensor data for " +
-            std::to_string(request_header.input_size()) + " inputs but got " +
-            std::to_string(request.raw_input_size()) +
-            " sets of data for model '" + request.model_name() + "'");
-  }
-
-  // Verify that the batch-byte-size of each input matches the size of
-  // the provided raw tensor data.
-  size_t idx = 0;
-  for (const auto& io : request_header.input()) {
-    auto memory_ref = std::make_shared<SystemMemoryReference>();
-    input_map.emplace(std::make_pair(
-        io.name(), std::static_pointer_cast<SystemMemory>(memory_ref)));
-
-    if (io.batch_byte_size() != request.raw_input(idx).size()) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          "unexpected size " + std::to_string(request.raw_input(idx).size()) +
-              " for input '" + io.name() + "', expecting " +
-              std::to_string(io.batch_byte_size()) + " for model '" +
-              request.model_name() + "'");
-    }
-
-    const std::string& raw = request.raw_input(idx++);
-    memory_ref->AddBuffer(raw.c_str(), raw.size());
-  }
-  return Status::Success;
-}
-
 }}  // namespace nvidia::inferenceserver
