@@ -135,10 +135,11 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   class GRPCInferRequest {
    public:
     GRPCInferRequest(
-        InferBaseContext<LifeCycle>* ctx, InferResponse& response,
-        uint64_t request_id, const char* server_id, uint64_t unique_id)
-        : ctx_(ctx), response_(response), request_id_(request_id),
-          server_id_(server_id), unique_id_(unique_id)
+        InferBaseContext<LifeCycle>* ctx, uintptr_t exec_ctx,
+        InferResponse& response, uint64_t request_id, const char* server_id,
+        uint64_t unique_id)
+        : ctx_(ctx), exec_ctx_(exec_ctx), response_(response),
+          request_id_(request_id), server_id_(server_id), unique_id_(unique_id)
     {
     }
 
@@ -202,11 +203,12 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       grpc_infer_request->response_.mutable_meta_data()->set_id(
           grpc_infer_request->request_id_);
       grpc_infer_request->ctx_->CompleteExecution(
-          grpc_infer_request->ctx_->GetExecutionContext());
+          grpc_infer_request->exec_ctx_);
     }
 
    private:
     InferBaseContext<LifeCycle>* ctx_;
+    uintptr_t exec_ctx_;
     InferResponse& response_;
     const uint64_t request_id_;
     const char* const server_id_;
@@ -262,6 +264,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   {
     auto server = this->GetResources()->Server();
     auto server_id = this->GetResources()->ServerId();
+    uintptr_t execution_context = this->GetExecutionContext();
     uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
 
     TRTSERVER_Error* err = nullptr;
@@ -282,7 +285,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         err = GRPCToInput(request.meta_data(), request, request_provider);
         if (err == nullptr) {
           GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
-              this, response, request.meta_data().id(), server_id, unique_id);
+              this, execution_context, response, request.meta_data().id(),
+              server_id, unique_id);
 
           err = TRTSERVER_ServerInferAsync(
               server, request_provider,
@@ -315,7 +319,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       response.mutable_raw_output()->Clear();
 
       response.mutable_meta_data()->set_id(request.meta_data().id());
-      this->CompleteExecution(this->GetExecutionContext());
+      this->CompleteExecution(execution_context);
     }
   }
 };
