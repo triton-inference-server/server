@@ -111,6 +111,23 @@ install(
 
 
 #
+# image_shm_client
+#
+find_package(OpenCV REQUIRED)
+add_executable(image_shm_client image_shm_client.cc)
+target_include_directories(image_shm_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(
+  image_shm_client
+  PRIVATE request
+  PRIVATE ${OpenCV_LIBS}
+  rt
+)
+install(
+  TARGETS image_shm_client
+  RUNTIME DESTINATION bin
+)
+
+#
 # perf_client
 #
 set(

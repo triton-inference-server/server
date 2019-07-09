@@ -329,6 +329,13 @@ class InferContext {
     /// \param input The vector holding tensor string values.
     /// \return Error object indicating success or failure.
     virtual Error SetFromString(const std::vector<std::string>& input) = 0;
+
+    // Set the shard memory object for the batch tensor input
+    /// \param shm_key The shared memory location holding the input tensors.
+    /// \param offset The offset for the batch input tensor.
+    /// \param byte_size The byte size of the batch input tensor.
+    /// \return Error object indicating success or failure.
+    virtual Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
@@ -347,6 +354,13 @@ class InferContext {
     /// model configuration. Variable-size dimensions are reported as
     /// -1.
     virtual const DimsList& Dims() const = 0;
+
+    // Set the shard memory object for the batch tensor output
+    /// \param shm_key The shared memory location holding the output tensors.
+    /// \param offset The offset for the batch output tensor.
+    /// \param byte_size The byte size of the batch output tensor.
+    /// \return Error object indicating success or failure.
+    virtual Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) = 0;
   };
 
   //==============

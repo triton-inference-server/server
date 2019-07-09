@@ -161,6 +161,7 @@ class InputImpl : public InferContext::Input {
   Error Reset() override;
   Error SetRaw(const std::vector<uint8_t>& input) override;
   Error SetRaw(const uint8_t* input, size_t input_byte_size) override;
+  Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) override;
   Error SetFromString(const std::vector<std::string>& input) override;
 
   // Copy into 'buf' up to 'size' bytes of this input's data. Return
@@ -220,6 +221,7 @@ class OutputImpl : public InferContext::Output {
     result_format_ = result_format;
   }
 
+  Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) override;
  private:
   const ModelOutput mio_;
   InferContext::Result::ResultFormat result_format_;

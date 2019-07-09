@@ -218,14 +218,14 @@ Error
 InputImpl::SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size)
 {
   // TODO Add Logic
-  return Error:Success;
+  return Error::Success;
 }
 
 Error
 OutputImpl::SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size)
 {
   // TODO Add Logic
-  return Error:Success;
+  return Error::Success;
 }
 
 Error
