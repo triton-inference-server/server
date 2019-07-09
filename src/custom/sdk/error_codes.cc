@@ -24,60 +24,32 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <string>
-#include <unordered_map>
-
-#include "src/backends/custom/custom.h"
-#include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
 #include "src/custom/sdk/error_codes.h"
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
-// Base class for custom backend instances
-// Responsible for the state of the instance and used to provide a
-// C++ wrapper around the C-API
-class CustomInstance {
- public:
-  static int Create(
-      CustomInstance** instance, const std::string& name,
-      const ModelConfig& model_config, int gpu_device,
-      const CustomInitializeData* data);
+ErrorCodes::ErrorCodes() {
+  RegisterError("success");
+  RegisterError("unknown error");
+  RegisterError("failed to create instance");
+  RegisterError("invalid model configuration");
+}
 
-  virtual ~CustomInstance() = default;
+const std::string&
+ErrorCodes::ErrorString(uint32_t error) const
+{
+    if (error < err_names_.size()) {
+      return err_names_[error];
+    }
 
-  // Perform custom execution on the payloads
-  virtual int Execute(
-      const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
+    return err_names_[kUnknown];
+}
 
-  inline const char* ErrorString(uint32_t error) const {
-    return errors_.ErrorString(error).c_str();
-  }
-
- protected:
-  CustomInstance(
-      const std::string& instance_name, const ModelConfig& model_config,
-      int gpu_device);
-
-  // The name of this backend instance
-  const std::string instance_name_;
-
-  // The model configuration
-  const ModelConfig model_config_;
-
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
-  const int gpu_device_;
-
-  // Error code manager
-  ErrorCodes errors_;
-
- private:
-  // An overridable method to add error strings for additional custom errors
-  virtual const char* CustomErrorString(int errcode);
-};
+uint32_t
+ErrorCodes::RegisterError(const std::string& error_string)
+{
+  err_names_.push_back(error_string);
+  return err_names_.size() - 1;
+}
 
 }}}  // namespace nvidia::inferenceserver::custom

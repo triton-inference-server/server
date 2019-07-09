@@ -27,57 +27,32 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
-
-#include "src/backends/custom/custom.h"
-#include "src/core/model_config.h"
-#include "src/core/model_config.pb.h"
-#include "src/custom/sdk/error_codes.h"
+#include <vector>
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
-// Base class for custom backend instances
-// Responsible for the state of the instance and used to provide a
-// C++ wrapper around the C-API
-class CustomInstance {
+// Integer error codes. TRTIS requires that success must be 0. All
+// other codes are interpreted by TRTIS as failures.
+class ErrorCodes {
  public:
-  static int Create(
-      CustomInstance** instance, const std::string& name,
-      const ModelConfig& model_config, int gpu_device,
-      const CustomInitializeData* data);
+  // Default error codes
+  static const uint32_t kSuccess = 0;
+  static const uint32_t kUnknown = 1;
+  static const uint32_t kCreationFailure = 2;
+  static const uint32_t kInvalidModelConfig = 3;
 
-  virtual ~CustomInstance() = default;
+  ErrorCodes();
+  ~ErrorCodes() = default;
 
-  // Perform custom execution on the payloads
-  virtual int Execute(
-      const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
+  // Return the registered error message for a specific error code
+  const std::string & ErrorString(uint32_t error) const;
 
-  inline const char* ErrorString(uint32_t error) const {
-    return errors_.ErrorString(error).c_str();
-  }
-
- protected:
-  CustomInstance(
-      const std::string& instance_name, const ModelConfig& model_config,
-      int gpu_device);
-
-  // The name of this backend instance
-  const std::string instance_name_;
-
-  // The model configuration
-  const ModelConfig model_config_;
-
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
-  const int gpu_device_;
-
-  // Error code manager
-  ErrorCodes errors_;
+  // Register a new error message.
+  // Returns error code for the new error mesage
+  uint32_t RegisterError(const std::string& error_string);
 
  private:
-  // An overridable method to add error strings for additional custom errors
-  virtual const char* CustomErrorString(int errcode);
+  std::vector<std::string> err_names_;
 };
 
 }}}  // namespace nvidia::inferenceserver::custom

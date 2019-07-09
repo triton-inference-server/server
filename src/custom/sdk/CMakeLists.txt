@@ -34,7 +34,9 @@ configure_file(combine.sh combine.sh COPYONLY)
 add_library(
   custombackendparts STATIC
   custom_instance.cc
+  error_codes.cc
   custom_instance.h
+  error_codes.h
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
 )
@@ -62,7 +64,9 @@ install(
 install(
   FILES
     custom_instance.cc 
-    custom_instance.h 
+    custom_instance.h
+    error_codes.cc
+    error_codes.h 
   DESTINATION include/src/custom/sdk
 )
 

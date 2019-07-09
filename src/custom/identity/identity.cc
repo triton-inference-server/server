@@ -45,19 +45,6 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace identity {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
-enum ContextErrorCodes : int {
-  kGpuNotSupported = kNumErrorCodes,
-  kInputOutput,
-  kInputOutputName,
-  kInputOutputDataType,
-  kInputContents,
-  kInputSize,
-  kRequestOutput,
-  kOutputBuffer
-};
-
 // Context object. All state must be kept in this object.
 class Context : public CustomInstance {
  public:
@@ -83,8 +70,17 @@ class Context : public CustomInstance {
   // that output.
   std::unordered_map<std::string, CopyInfo> copy_map_;
 
-  // An overridable method to add error strings for additional custom errors
-  const char* CustomErrorString(int errcode) override;
+  // local Error Codes
+  uint32_t kGpuNotSupported;
+  uint32_t kInputOutput;
+  uint32_t kInputOutputName;
+  uint32_t kInputOutputDataType;
+  uint32_t kInputContents;
+  uint32_t kInputSize;
+  uint32_t kRequestOutput;
+  uint32_t kOutputBuffer;
+
+  void RegisterErrorStrings();
 };
 
 Context::Context(
@@ -137,7 +133,7 @@ Context::Init()
         model_config_.input(i).name(), model_config_.output(i).data_type()};
   }
 
-  return kSuccess;
+  return ErrorCodes::kSuccess;
 }
 
 int
@@ -222,34 +218,25 @@ Context::Execute(
     }
   }
 
-  return kSuccess;
+  return ErrorCodes::kSuccess;
 }
 
-const char*
-Context::CustomErrorString(int errcode)
+void
+Context::RegisterErrorStrings()
 {
-  switch (errcode) {
-    case kGpuNotSupported:
-      return "execution on GPU not supported";
-    case kInputOutput:
-      return "model must have equal input/output pairs with matching shape";
-    case kInputOutputName:
-      return "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'";
-    case kInputOutputDataType:
-      return "model input/output pairs must have same data-type";
-    case kInputContents:
-      return "unable to get input tensor values";
-    case kInputSize:
-      return "unexpected size for input tensor";
-    case kRequestOutput:
-      return "inference request for unknown output";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    default:
-      break;
-  }
-
-  return "unknown error";
+  kGpuNotSupported = errors_.RegisterError("execution on GPU not supported");
+  kInputOutput = errors_.RegisterError(
+      "model must have equal input/output pairs with matching shape");
+  kInputOutputName = errors_.RegisterError(
+      "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'");
+  kInputOutputDataType = errors_.RegisterError(
+      "model input/output pairs must have same data-type");
+  kInputContents = errors_.RegisterError("unable to get input tensor values");
+  kInputSize = errors_.RegisterError("unexpected size for input tensor");
+  kRequestOutput =
+      errors_.RegisterError("inference request for unknown output");
+  kOutputBuffer =
+      errors_.RegisterError("unable to get buffer for output tensor values");
 }
 
 }  // namespace identity
@@ -267,7 +254,7 @@ CustomInstance::Create(
   *instance = ctx;
 
   if (ctx == nullptr) {
-    return kCreationFailure;
+    return ErrorCodes::kCreationFailure;
   }
 
   return ctx->Init();

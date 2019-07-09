@@ -36,35 +36,6 @@ CustomInstance::CustomInstance(
 {
 }
 
-const char*
-CustomInstance::ErrorString(int errcode)
-{
-  if (errcode >= kNumErrorCodes) {
-    return CustomErrorString(errcode);
-  }
-
-  switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kCreationFailure:
-      return "failed to create instance";
-    case kGpuNotSupported:
-      return "execution on GPU not supported";
-    default:
-      break;
-  }
-
-  return "unknown error";
-}
-
-const char*
-CustomInstance::CustomErrorString(int errcode)
-{
-  return "unknown error";
-}
-
 /////////////
 
 extern "C" {
@@ -76,7 +47,7 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
   ModelConfig model_config;
   if (!model_config.ParseFromString(std::string(
           data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
+    return ErrorCodes::kInvalidModelConfig;
   }
 
   // Create the instance and validate that the model configuration is
@@ -86,17 +57,17 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
       &instance, std::string(data->instance_name), model_config,
       data->gpu_device_id, data);
   
-  if (kSuccess != err) {
+  if (ErrorCodes::kSuccess != err) {
     return err;
   }
 
   if (instance == nullptr) {
-    return kCreationFailure;
+    return ErrorCodes::kCreationFailure;
   }
 
   *custom_instance = static_cast<void*>(instance);
 
-  return kSuccess;
+  return ErrorCodes::kSuccess;
 }
 
 int
@@ -107,7 +78,7 @@ CustomFinalize(void* custom_instance)
     delete instance;
   }
 
-  return kSuccess;
+  return ErrorCodes::kSuccess;
 }
 
 const char*
@@ -124,7 +95,7 @@ CustomExecute(
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
   if (custom_instance == nullptr) {
-    return kUnknown;
+    return ErrorCodes::kUnknown;
   }
 
   CustomInstance* instance = static_cast<CustomInstance*>(custom_instance);
