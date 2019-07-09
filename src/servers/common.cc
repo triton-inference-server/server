@@ -28,8 +28,49 @@
 
 namespace nvidia { namespace inferenceserver {
 
+void
+RequestStatusUtil::Create(
+    RequestStatus* status, TRTSERVER_Error* err, uint64_t request_id,
+    const std::string& server_id)
+{
+  status->set_code(
+      (err == nullptr)
+          ? RequestStatusCode::SUCCESS
+          : RequestStatusUtil::CodeToStatus(TRTSERVER_ErrorCode(err)));
+
+  if (err != nullptr) {
+    status->set_msg(TRTSERVER_ErrorMessage(err));
+  }
+
+  status->set_server_id(server_id);
+  status->set_request_id(request_id);
+}
+
+void
+RequestStatusUtil::Create(
+    RequestStatus* status, uint64_t request_id, const std::string& server_id,
+    RequestStatusCode code, const std::string& msg)
+{
+  status->Clear();
+  status->set_code(code);
+  status->set_msg(msg);
+  status->set_server_id(server_id);
+  status->set_request_id(request_id);
+}
+
+void
+RequestStatusUtil::Create(
+    RequestStatus* status, uint64_t request_id, const std::string& server_id,
+    RequestStatusCode code)
+{
+  status->Clear();
+  status->set_code(code);
+  status->set_server_id(server_id);
+  status->set_request_id(request_id);
+}
+
 RequestStatusCode
-CodeToStatus(TRTSERVER_Error_Code code)
+RequestStatusUtil::CodeToStatus(TRTSERVER_Error_Code code)
 {
   switch (code) {
     case TRTSERVER_ERROR_UNKNOWN:
@@ -52,6 +93,13 @@ CodeToStatus(TRTSERVER_Error_Code code)
   }
 
   return RequestStatusCode::UNKNOWN;
+}
+
+uint64_t
+RequestStatusUtil::NextUniqueRequestId()
+{
+  static std::atomic<uint64_t> id(0);
+  return ++id;
 }
 
 }}  // namespace nvidia::inferenceserver

@@ -93,43 +93,36 @@ class StatusContext final
       StatusRequest& request, StatusResponse& response) final override
   {
     uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          TRTSERVER_Server* server = GetResources()->Server();
+    GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
+                                                 &request, &response] {
+      TRTSERVER_Server* server = GetResources()->Server();
 
-          TRTSERVER_Protobuf* server_status_protobuf = nullptr;
-          TRTSERVER_Error* err =
-              TRTSERVER_ServerStatus(server, &server_status_protobuf);
-          if (err == nullptr) {
-            const char* status_buffer;
-            size_t status_byte_size;
-            err = TRTSERVER_ProtobufSerialize(
-                server_status_protobuf, &status_buffer, &status_byte_size);
-            if (err == nullptr) {
-              if (!response.mutable_server_status()->ParseFromArray(
-                      status_buffer, status_byte_size)) {
-                err = TRTSERVER_ErrorNew(
-                    TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
-              }
-            }
+      TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+      TRTSERVER_Error* err =
+          TRTSERVER_ServerStatus(server, &server_status_protobuf);
+      if (err == nullptr) {
+        const char* status_buffer;
+        size_t status_byte_size;
+        err = TRTSERVER_ProtobufSerialize(
+            server_status_protobuf, &status_buffer, &status_byte_size);
+        if (err == nullptr) {
+          if (!response.mutable_server_status()->ParseFromArray(
+                  status_buffer, status_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
           }
+        }
+      }
 
-          TRTSERVER_ProtobufDelete(server_status_protobuf);
+      TRTSERVER_ProtobufDelete(server_status_protobuf);
 
-          // FIXME request status creating utility
-          RequestStatus* request_status = response.mutable_request_status();
-          request_status->set_code(
-              (err == nullptr) ? RequestStatusCode::SUCCESS
-                               : CodeToStatus(TRTSERVER_ErrorCode(err)));
-          if (err != nullptr) {
-            request_status->set_msg(TRTSERVER_ErrorMessage(err));
-          }
-          request_status->set_server_id(GetResources()->ServerId());
-          request_status->set_request_id(0);  // FIXME
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), err,
+          RequestStatusUtil::NextUniqueRequestId(), GetResources()->ServerId());
 
-          TRTSERVER_ErrorDelete(err);
-          this->CompleteExecution(execution_context);
-        });
+      TRTSERVER_ErrorDelete(err);
+      this->CompleteExecution(execution_context);
+    });
   }
 };
 
@@ -139,9 +132,9 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
    public:
     GRPCInferRequest(
         InferBaseContext<LifeCycle>* ctx, InferResponse& response,
-        uint64_t request_id, const char* server_id)
+        uint64_t request_id, const char* server_id, uint64_t unique_id)
         : ctx_(ctx), response_(response), request_id_(request_id),
-          server_id_(server_id)
+          server_id_(server_id), unique_id_(unique_id)
     {
     }
 
@@ -195,18 +188,10 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         grpc_infer_request->response_.mutable_raw_output()->Clear();
       }
 
-      // FIXME request status creating utility
-      RequestStatus* request_status =
-          grpc_infer_request->response_.mutable_request_status();
-      request_status->set_code(
-          (response_status == nullptr)
-              ? RequestStatusCode::SUCCESS
-              : CodeToStatus(TRTSERVER_ErrorCode(response_status)));
-      if (response_status != nullptr) {
-        request_status->set_msg(TRTSERVER_ErrorMessage(response_status));
-      }
-      request_status->set_server_id(grpc_infer_request->server_id_);
-      request_status->set_request_id(0);  // FIXME
+      RequestStatusUtil::Create(
+          grpc_infer_request->response_.mutable_request_status(),
+          response_status, grpc_infer_request->unique_id_,
+          grpc_infer_request->server_id_);
 
       TRTSERVER_ErrorDelete(response_status);
 
@@ -221,6 +206,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     InferResponse& response_;
     const uint64_t request_id_;
     const char* const server_id_;
+    const uint64_t unique_id_;
   };
 
   TRTSERVER_Error* GRPCToInput(
@@ -272,6 +258,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   {
     auto server = this->GetResources()->Server();
     auto server_id = this->GetResources()->ServerId();
+    uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
+
     TRTSERVER_Error* err = nullptr;
 
     std::string request_header_serialized;
@@ -290,7 +278,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         err = GRPCToInput(request.meta_data(), request, request_provider);
         if (err == nullptr) {
           GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
-              this, response, request.meta_data().id(), server_id);
+              this, response, request.meta_data().id(), server_id, unique_id);
 
           err = TRTSERVER_ServerInferAsync(
               server, request_provider,
@@ -311,16 +299,11 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     }
 
     if (err != nullptr) {
-      // FIXME request status creating utility
-      RequestStatus* request_status = response.mutable_request_status();
-      request_status->set_code(CodeToStatus(TRTSERVER_ErrorCode(err)));
-      request_status->set_msg(TRTSERVER_ErrorMessage(err));
-      request_status->set_server_id(server_id);
-      request_status->set_request_id(0);  // FIXME
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), err, unique_id, server_id);
 
+      LOG_VERBOSE(1) << "Infer failed: " << TRTSERVER_ErrorMessage(err);
       TRTSERVER_ErrorDelete(err);
-
-      LOG_VERBOSE(1) << "Infer failed: " << request_status->msg();
 
       // Clear the meta-data and raw output as they may be partially
       // or un-initialized.
@@ -348,18 +331,16 @@ class ProfileContext final
       ProfileRequest& request, ProfileResponse& response) final override
   {
     uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          // For now profile is a nop...
+    GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
+                                                 &request, &response] {
+      // For now profile is a nop...
 
-          // FIXME request status creating utility
-          RequestStatus* request_status = response.mutable_request_status();
-          request_status->set_code(RequestStatusCode::SUCCESS);
-          request_status->set_server_id(GetResources()->ServerId());
-          request_status->set_request_id(0);  // FIXME
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), nullptr /* err */,
+          RequestStatusUtil::NextUniqueRequestId(), GetResources()->ServerId());
 
-          this->CompleteExecution(execution_context);
-        });
+      this->CompleteExecution(execution_context);
+    });
   }
 };
 
@@ -369,40 +350,33 @@ class HealthContext final
       HealthRequest& request, HealthResponse& response) final override
   {
     uintptr_t execution_context = this->GetExecutionContext();
-    GetResources()->GetMgmtThreadPool().enqueue(
-        [this, execution_context, &request, &response] {
-          TRTSERVER_Server* server = GetResources()->Server();
+    GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
+                                                 &request, &response] {
+      TRTSERVER_Server* server = GetResources()->Server();
 
-          TRTSERVER_Error* err = nullptr;
-          bool health = false;
+      TRTSERVER_Error* err = nullptr;
+      bool health = false;
 
-          if (request.mode() == "live") {
-            err = TRTSERVER_ServerIsLive(server, &health);
-          } else if (request.mode() == "ready") {
-            err = TRTSERVER_ServerIsReady(server, &health);
-          } else {
-            err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
-                std::string("unknown health mode '" + request.mode() + "'")
-                    .c_str());
-          }
+      if (request.mode() == "live") {
+        err = TRTSERVER_ServerIsLive(server, &health);
+      } else if (request.mode() == "ready") {
+        err = TRTSERVER_ServerIsReady(server, &health);
+      } else {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_UNKNOWN,
+            std::string("unknown health mode '" + request.mode() + "'")
+                .c_str());
+      }
 
-          response.set_health((err == nullptr) && health);
+      response.set_health((err == nullptr) && health);
 
-          // FIXME request status creating utility
-          RequestStatus* request_status = response.mutable_request_status();
-          request_status->set_code(
-              (err == nullptr) ? RequestStatusCode::SUCCESS
-                               : CodeToStatus(TRTSERVER_ErrorCode(err)));
-          if (err != nullptr) {
-            request_status->set_msg(TRTSERVER_ErrorMessage(err));
-          }
-          request_status->set_server_id(GetResources()->ServerId());
-          request_status->set_request_id(0);  // FIXME
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), err,
+          RequestStatusUtil::NextUniqueRequestId(), GetResources()->ServerId());
 
-          TRTSERVER_ErrorDelete(err);
-          this->CompleteExecution(execution_context);
-        });
+      TRTSERVER_ErrorDelete(err);
+      this->CompleteExecution(execution_context);
+    });
   }
 };
 
