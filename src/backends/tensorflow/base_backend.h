@@ -27,6 +27,7 @@
 
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/backend.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
@@ -47,13 +48,11 @@ class BaseBackend : public InferenceBackend {
   // graphdef or savedmodel
   Status CreateExecutionContexts(
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-      const std::unordered_map<std::string, std::string>& paths,
-      std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids);
+      const std::unordered_map<std::string, std::string>& paths);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-      const std::unordered_map<std::string, std::string>& paths,
-      std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids);
+      const std::unordered_map<std::string, std::string>& paths);
 
  protected:
   using TRTISTFModelHandle =

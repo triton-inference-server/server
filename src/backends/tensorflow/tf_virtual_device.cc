@@ -23,50 +23,34 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/core/constants.h"
-#include "src/core/model_config.h"
-#include "src/core/status.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
+
+#include <unordered_map>
+#include <vector>
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+Status
+VirtualDeviceTracker::Create(
+    const std::vector<std::vector<float>>& memory_limit_mb,
+    VirtualDeviceTracker** device_tracker)
+{
+  // Instantiate tracker object
+  static VirtualDeviceTracker virtual_device_tracker(memory_limit_mb);
 
-// Adapter that converts storage paths pointing to GraphDef files into
-// the corresponding graphdef backend.
-class GraphDefBackendFactory {
- public:
-  struct Config : public BackendConfig {
-    // Autofill missing required model configuration settings based on
-    // model definition file.
-    bool autofill;
+  // Point caller to object
+  *device_tracker = &virtual_device_tracker;
+  return Status::Success;
+}
 
-    bool allow_gpu_memory_growth;
-    float per_process_gpu_memory_fraction;
-    bool allow_soft_placement;
-    std::vector<std::vector<float>> memory_limit_mb;
-  };
-
-  static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
-      std::unique_ptr<GraphDefBackendFactory>* factory);
-
-  Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
-      std::unique_ptr<InferenceBackend>* backend);
-
-  ~GraphDefBackendFactory() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
-
-  GraphDefBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
-  {
-  }
-
-  const std::shared_ptr<Config> backend_config_;
-};
+Status
+VirtualDeviceTracker::GetNextDeviceId(const int gpu_device, int* vgpu_device)
+{
+  // Read and atomically increment virtual device id to use for creating model
+  int num_vgpus_on_device = per_device_memory_[gpu_device].size();
+  *vgpu_device = (virtual_device_ids_[gpu_device]++) % num_vgpus_on_device;
+  return Status::Success;
+}
 
 }}  // namespace nvidia::inferenceserver

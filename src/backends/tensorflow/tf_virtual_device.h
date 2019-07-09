@@ -25,48 +25,33 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/constants.h"
-#include "src/core/model_config.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
-
-// Adapter that converts storage paths pointing to GraphDef files into
-// the corresponding graphdef backend.
-class GraphDefBackendFactory {
+class VirtualDeviceTracker {
  public:
-  struct Config : public BackendConfig {
-    // Autofill missing required model configuration settings based on
-    // model definition file.
-    bool autofill;
-
-    bool allow_gpu_memory_growth;
-    float per_process_gpu_memory_fraction;
-    bool allow_soft_placement;
-    std::vector<std::vector<float>> memory_limit_mb;
-  };
-
   static Status Create(
-      const std::shared_ptr<BackendConfig>& backend_config,
-      std::unique_ptr<GraphDefBackendFactory>* factory);
+      const std::vector<std::vector<float>>& memory_limit_mb,
+      VirtualDeviceTracker** device_tracker);
 
-  Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
-      std::unique_ptr<InferenceBackend>* backend);
+  Status GetNextDeviceId(const int gpu_device, int* vgpu_device);
 
-  ~GraphDefBackendFactory() = default;
+  ~VirtualDeviceTracker() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(GraphDefBackendFactory);
-
-  GraphDefBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  VirtualDeviceTracker(const std::vector<std::vector<float>>& memory_limit_mb)
+      : per_device_memory_(memory_limit_mb)
   {
+    // Initialize virtual device counter
+    for (size_t gpu_idx = 0; gpu_idx < memory_limit_mb.size(); gpu_idx++) {
+      virtual_device_ids_.emplace(
+          std::piecewise_construct, std::forward_as_tuple(gpu_idx),
+          std::forward_as_tuple(0));
+    }
   }
-
-  const std::shared_ptr<Config> backend_config_;
+  std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
+  const std::vector<std::vector<float>>& per_device_memory_;
 };
 
 }}  // namespace nvidia::inferenceserver

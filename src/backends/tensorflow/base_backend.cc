@@ -63,8 +63,7 @@ BaseBackend::Init(const std::string& path, const ModelConfig& config)
 Status
 BaseBackend::CreateExecutionContexts(
     const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    const std::unordered_map<std::string, std::string>& paths,
-    std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   if (LOG_VERBOSE_IS_ON(1)) {
     LOG_INFO << "Creating execution contexts for:";
@@ -81,8 +80,7 @@ BaseBackend::CreateExecutionContexts(
         const std::string instance_name =
             group.name() + "_" + std::to_string(c) + "_cpu";
         RETURN_IF_ERROR(CreateExecutionContext(
-            instance_name, Context::NO_GPU_DEVICE, backend_config, paths,
-            virtual_device_ids));
+            instance_name, Context::NO_GPU_DEVICE, backend_config, paths));
         total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
@@ -90,8 +88,7 @@ BaseBackend::CreateExecutionContexts(
                                             std::to_string(c) + "_gpu" +
                                             std::to_string(gpu_device);
           RETURN_IF_ERROR(CreateExecutionContext(
-              instance_name, gpu_device, backend_config, paths,
-              virtual_device_ids));
+              instance_name, gpu_device, backend_config, paths));
           total_context_cnt++;
         }
       }
@@ -118,12 +115,15 @@ Status
 BaseBackend::CreateExecutionContext(
     const std::string& instance_name, const int gpu_device,
     const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
-    const std::unordered_map<std::string, std::string>& paths,
-    std::unordered_map<int, std::atomic<size_t>>* virtual_device_ids)
+    const std::unordered_map<std::string, std::string>& paths)
 {
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
   std::string cc_model_filename;
+  int vgpu_device = gpu_device;
+  auto graphdef_backend_config =
+      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
+
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
 
@@ -147,8 +147,15 @@ BaseBackend::CreateExecutionContext(
                             ? Config().default_model_filename()
                             : cc_itr->second;
 
+    // Get virtual device tracker instance, and get next device id
+    VirtualDeviceTracker* device_tracker;
+    RETURN_IF_ERROR(VirtualDeviceTracker::Create(
+        graphdef_backend_config->memory_limit_mb, &device_tracker));
+
+    RETURN_IF_ERROR(device_tracker->GetNextDeviceId(gpu_device, &vgpu_device));
+
     LOG_INFO << "Creating instance " << instance_name << " on GPU "
-             << gpu_device << " (" << cc << ") using " << cc_model_filename;
+             << vgpu_device << " (" << cc << ") using " << cc_model_filename;
 #else
     return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
@@ -168,22 +175,11 @@ BaseBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
-  auto graphdef_backend_config =
-      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
-
-  // Read and atomically increment virtual device id to use for creating model
-  // instance
-  int num_virtual_devices_on_device =
-      graphdef_backend_config->memory_limit_mb[gpu_device].size();
-  int virtual_device =
-      ((*virtual_device_ids)[gpu_device]++) % num_virtual_devices_on_device;
-
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
-      graphdef_backend_config, virtual_device,
-      Config().optimization().has_graph(),
+      graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_));

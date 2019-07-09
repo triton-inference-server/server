@@ -42,6 +42,7 @@ set(
   savedmodel_backend.cc
   savedmodel_backend_factory.cc
   tf_utils.cc
+  tf_virtual_device.cc
 )
 
 set(
@@ -54,6 +55,7 @@ set(
   savedmodel_backend_factory.h
   tensorflow_backend_tf.h
   tf_utils.h
+  tf_virtual_device.h
 )
 
 add_library(

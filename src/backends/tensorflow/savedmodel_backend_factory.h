@@ -54,7 +54,6 @@ class SavedModelBackendFactory {
   }
 
   const std::shared_ptr<GraphDefBackendFactory::Config> backend_config_;
-  std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -168,9 +168,6 @@ NewSessionOptions(
     const std::vector<std::vector<float>>& memory_limit_mb,
     tensorflow::SessionOptions* session_options)
 {
-  tensorflow::ConfigProto* conf = &(session_options->config);
-  (*conf->mutable_device_count())["GPU"] = memory_limit_mb.size();
-
   session_options->config.mutable_gpu_options()->set_allow_growth(
       allow_gpu_memory_growth);
   session_options->config.mutable_gpu_options()
@@ -178,6 +175,8 @@ NewSessionOptions(
   session_options->config.set_allow_soft_placement(allow_soft_placement);
 
   // Create virtual devices
+  (*(session_options->config.mutable_device_count()))["GPU"] =
+      memory_limit_mb.size();
   for (const auto& v : memory_limit_mb) {
     auto virtual_devices = session_options->config.mutable_gpu_options()
                                ->mutable_experimental()
@@ -186,6 +185,7 @@ NewSessionOptions(
       virtual_devices->add_memory_limit_mb(mb);
     }
   }
+
   // Enable/disable XLA based on the model config optimization
   // setting.
   tensorflow::OptimizerOptions::GlobalJitLevel xla =
@@ -528,7 +528,7 @@ TRTISTF_TensorNew(
   ConvertShape(shape, &tfshape);
 
   TensorImpl* tensor = new TensorImpl(name, dtype, shape, tfshape);
-    // If data type is non-string, make sure TensorImpl contains valid TF tensor
+  // If data type is non-string, make sure TensorImpl contains valid TF tensor
   if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
     // tensor's byte size is set to value required and it is independent to
     // the data pointer. So make sure data is not nullptr if byte size > 0
