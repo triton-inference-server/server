@@ -279,12 +279,11 @@ class InferResponseProvider {
       const std::vector<int64_t>& content_shape, Output** output);
 
  protected:
-  const InferRequestHeader& request_header_;
+  InferRequestHeader request_header_;
 
   // Map from output name to the InferRequestHeader output information
   // for that output.
-  std::unordered_map<std::string, const InferRequestHeader::Output*>
-      output_map_;
+  std::unordered_map<std::string, const InferRequestHeader::Output> output_map_;
 
   // Information about each output.
   struct Output {

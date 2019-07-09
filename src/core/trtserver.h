@@ -347,7 +347,7 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    void* http_response_provider_hack,
+    void* http_response_provider_hack, void* grpc_response_provider_hack,
     TRTSERVER_InferenceCompleteFn_t complete_fn, void* userp);
 
 #ifdef __cplusplus
