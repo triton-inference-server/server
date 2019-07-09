@@ -384,7 +384,10 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
 
   TRTSERVER_Protobuf* server_status_protobuf = nullptr;
   TRTSERVER_Error* err =
-      TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf);
+      (model_name.empty())
+          ? TRTSERVER_ServerStatus(server_.get(), &server_status_protobuf)
+          : TRTSERVER_ServerModelStatus(
+                server_.get(), &server_status_protobuf, model_name.c_str());
   if (err == nullptr) {
     const char* status_buffer;
     size_t status_byte_size;
