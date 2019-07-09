@@ -40,7 +40,9 @@ namespace nvidia { namespace inferenceserver { namespace custom {
 enum ErrorCodes : int {
   kSuccess = 0,
   kUnknown,
+  kCreationFailure,
   kInvalidModelConfig,
+  kGpuNotSupported,
   kNumErrorCodes
 };
 
@@ -49,24 +51,27 @@ enum ErrorCodes : int {
 // C++ wrapper around the C-API
 class CustomInstance {
  public:
-  static CustomInstance* Create(
-      const CustomInitializeData* data, const ModelConfig& model_config);
+  static int Create(
+      CustomInstance** instance, const std::string& name,
+      const ModelConfig& model_config, int gpu_device,
+      const CustomInitializeData* data);
 
   virtual ~CustomInstance() = default;
 
-  // Initialize context and validate the model configuration
-  int Init();
-
   // Perform custom execution on the payloads
-  int Execute(
+  virtual int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
+
+  // Get any error code that may have occured for this instance
+  int GetErrorCode() const { return error_code_; }
 
   const char* ErrorString(int errocode);
 
  protected:
   CustomInstance(
-      const std::string& instance_name, const ModelConfig& model_config);
+      const std::string& instance_name, const ModelConfig& model_config,
+      int gpu_device);
 
   // The name of this backend instance
   const std::string instance_name_;
@@ -74,15 +79,13 @@ class CustomInstance {
   // The model configuration
   const ModelConfig model_config_;
 
+  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
+  // execute on CPU.
+  const int gpu_device_;
+
+  int error_code_ = kSuccess;
+
  private:
-  // Validate the model configuration for the derived backend instance
-  virtual int InitContext() = 0;
-
-  // Perform custom execution on a single payload
-  virtual void ExecutePayload(
-      CustomPayload& payload, CustomGetNextInputFn_t input_fn,
-      CustomGetOutputFn_t output_fn) = 0;
-
   // An overridable method to add error strings for additional custom errors
   virtual const char* CustomErrorString(int errcode);
 };

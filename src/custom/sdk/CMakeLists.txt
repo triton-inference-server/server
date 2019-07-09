@@ -59,6 +59,12 @@ install(
   PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/libcustombackend.a
   DESTINATION lib
 )
+install(
+  FILES
+    custom_instance.cc 
+    custom_instance.h 
+  DESTINATION include/src/custom/sdk
+)
 
 # Install the TRTIS and protobuf headers needed to build a custom
 # backend

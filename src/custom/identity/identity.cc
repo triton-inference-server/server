@@ -66,11 +66,14 @@ class Context : public CustomInstance {
       const int gpu_device);
   ~Context() = default;
 
- private:
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
-  const int gpu_device_;
+  // Validate the model configuration for the derived backend instance
+  int Init();
 
+  int Execute(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) override;
+
+ private:
   struct CopyInfo {
     std::string input_name_;
     DataType datatype_;
@@ -80,14 +83,6 @@ class Context : public CustomInstance {
   // that output.
   std::unordered_map<std::string, CopyInfo> copy_map_;
 
-  // Validate the model configuration for the derived backend instance
-  int InitContext() override;
-
-  // Perform custom execution on a single payload
-  void ExecutePayload(
-      CustomPayload& payload, CustomGetNextInputFn_t input_fn,
-      CustomGetOutputFn_t output_fn) override;
-
   // An overridable method to add error strings for additional custom errors
   const char* CustomErrorString(int errcode) override;
 };
@@ -95,12 +90,12 @@ class Context : public CustomInstance {
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : CustomInstance(instance_name, model_config), gpu_device_(gpu_device)
+    : CustomInstance(instance_name, model_config, gpu_device)
 {
 }
 
 int
-Context::InitContext()
+Context::Init()
 {
   // Execution on GPUs not supported since only a trivial amount of
   // computation is required.
@@ -145,82 +140,89 @@ Context::InitContext()
   return kSuccess;
 }
 
-void
-Context::ExecutePayload(
-    CustomPayload& payload, CustomGetNextInputFn_t input_fn,
-    CustomGetOutputFn_t output_fn)
+int
+Context::Execute(
+    const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
-  for (uint32_t output_idx = 0; output_idx < payload.output_cnt; ++output_idx) {
-    if (payload.error_code != 0) {
-      break;
-    }
+  for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
+    CustomPayload& payload = payloads[pidx];
 
-    const char* output_cname = payload.required_output_names[output_idx];
-    const auto itr = copy_map_.find(output_cname);
-    if (itr == copy_map_.end()) {
-      payload.error_code = kRequestOutput;
-      break;
-    }
-
-    const std::string& input_name = itr->second.input_name_;
-    const DataType datatype = itr->second.datatype_;
-
-    std::vector<int64_t> shape;
-    if (model_config_.max_batch_size() != 0) {
-      shape.push_back(payload.batch_size);
-    }
-    for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
-      if (!strcmp(payload.input_names[input_idx], input_name.c_str())) {
-        shape.insert(
-            shape.end(), payload.input_shape_dims[input_idx],
-            payload.input_shape_dims[input_idx] +
-                payload.input_shape_dim_cnts[input_idx]);
-        break;
-      }
-    }
-
-    const int64_t batchn_byte_size = GetByteSize(datatype, shape);
-    if (batchn_byte_size < 0) {
-      payload.error_code = kOutputBuffer;
-      break;
-    }
-
-    void* obuffer;
-    if (!output_fn(
-            payload.output_context, output_cname, shape.size(), &shape[0],
-            batchn_byte_size, &obuffer)) {
-      payload.error_code = kOutputBuffer;
-      break;
-    }
-
-    // If no error but the 'obuffer' is returned as nullptr, then
-    // skip writing this output.
-    if (obuffer == nullptr) {
-      continue;
-    }
-
-    char* output_buffer = reinterpret_cast<char*>(obuffer);
-
-    uint64_t total_byte_size = 0;
-    while (true) {
-      const void* content;
-      uint64_t content_byte_size = 128 * 1024;
-      if (!input_fn(
-              payload.input_context, input_name.c_str(), &content,
-              &content_byte_size)) {
-        payload.error_code = kInputContents;
+    for (uint32_t output_idx = 0; output_idx < payload.output_cnt;
+         ++output_idx) {
+      if (payload.error_code != 0) {
         break;
       }
 
-      // If 'content' returns nullptr we have all the input.
-      if (content == nullptr) {
+      const char* output_cname = payload.required_output_names[output_idx];
+      const auto itr = copy_map_.find(output_cname);
+      if (itr == copy_map_.end()) {
+        payload.error_code = kRequestOutput;
         break;
       }
 
-      memcpy(output_buffer + total_byte_size, content, content_byte_size);
-      total_byte_size += content_byte_size;
+      const std::string& input_name = itr->second.input_name_;
+      const DataType datatype = itr->second.datatype_;
+
+      std::vector<int64_t> shape;
+      if (model_config_.max_batch_size() != 0) {
+        shape.push_back(payload.batch_size);
+      }
+      for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
+        if (!strcmp(payload.input_names[input_idx], input_name.c_str())) {
+          shape.insert(
+              shape.end(), payload.input_shape_dims[input_idx],
+              payload.input_shape_dims[input_idx] +
+                  payload.input_shape_dim_cnts[input_idx]);
+          break;
+        }
+      }
+
+      const int64_t batchn_byte_size = GetByteSize(datatype, shape);
+      if (batchn_byte_size < 0) {
+        payload.error_code = kOutputBuffer;
+        break;
+      }
+
+      void* obuffer;
+      if (!output_fn(
+              payload.output_context, output_cname, shape.size(), &shape[0],
+              batchn_byte_size, &obuffer)) {
+        payload.error_code = kOutputBuffer;
+        break;
+      }
+
+      // If no error but the 'obuffer' is returned as nullptr, then
+      // skip writing this output.
+      if (obuffer == nullptr) {
+        continue;
+      }
+
+      char* output_buffer = reinterpret_cast<char*>(obuffer);
+
+      uint64_t total_byte_size = 0;
+      while (true) {
+        const void* content;
+        uint64_t content_byte_size = 128 * 1024;
+        if (!input_fn(
+                payload.input_context, input_name.c_str(), &content,
+                &content_byte_size)) {
+          payload.error_code = kInputContents;
+          break;
+        }
+
+        // If 'content' returns nullptr we have all the input.
+        if (content == nullptr) {
+          break;
+        }
+
+        memcpy(output_buffer + total_byte_size, content, content_byte_size);
+        total_byte_size += content_byte_size;
+      }
     }
   }
+
+  return kSuccess;
 }
 
 const char*
@@ -253,12 +255,22 @@ Context::CustomErrorString(int errcode)
 }  // namespace identity
 
 // Creates a new Indentiy context instance
-CustomInstance*
+int
 CustomInstance::Create(
-    const CustomInitializeData* data, const ModelConfig& model_config)
+    CustomInstance** instance, const std::string& name,
+    const ModelConfig& model_config, int gpu_device,
+    const CustomInitializeData* data)
 {
-  return new identity::Context(
-      std::string(data->instance_name), model_config, data->gpu_device_id);
+  identity::Context* ctx =
+      new identity::Context(name, model_config, gpu_device);
+
+  *instance = ctx;
+
+  if (ctx == nullptr) {
+    return kCreationFailure;
+  }
+
+  return ctx->Init();
 }
 
 }}}  // namespace nvidia::inferenceserver::custom

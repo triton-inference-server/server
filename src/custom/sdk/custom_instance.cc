@@ -29,29 +29,11 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 
 CustomInstance::CustomInstance(
-    const std::string& instance_name, const ModelConfig& model_config)
-    : instance_name_(instance_name), model_config_(model_config)
+    const std::string& instance_name, const ModelConfig& model_config,
+    int gpu_device)
+    : instance_name_(instance_name), model_config_(model_config),
+      gpu_device_(gpu_device)
 {
-}
-
-int
-CustomInstance::Init()
-{
-  // Add common initailization here
-
-  return InitContext();
-}
-
-int
-CustomInstance::Execute(
-    const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
-    ExecutePayload(payloads[pidx], input_fn, output_fn);
-  }
-
-  return kSuccess;
 }
 
 const char*
@@ -66,6 +48,10 @@ CustomInstance::ErrorString(int errcode)
       return "success";
     case kInvalidModelConfig:
       return "invalid model configuration";
+    case kCreationFailure:
+      return "failed to create instance";
+    case kGpuNotSupported:
+      return "execution on GPU not supported";
     default:
       break;
   }
@@ -95,12 +81,17 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
 
   // Create the instance and validate that the model configuration is
   // something that we can handle.
-  CustomInstance* instance = CustomInstance::Create(data, model_config);
-  // new CustomInstance(
-  //     std::string(data->instance_name), model_config, data->gpu_device_id);
-  int err = instance->Init();
-  if (err != kSuccess) {
+  CustomInstance* instance = nullptr;
+  int err = CustomInstance::Create(
+      &instance, std::string(data->instance_name), model_config,
+      data->gpu_device_id, data);
+  
+  if (kSuccess != err) {
     return err;
+  }
+
+  if (instance == nullptr) {
+    return kCreationFailure;
   }
 
   *custom_instance = static_cast<void*>(instance);
