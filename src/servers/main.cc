@@ -762,12 +762,9 @@ main(int argc, char** argv)
     // If enabled, poll the model repository to see if there have been
     // any changes.
     if (repository_poll_secs_ > 0) {
-      TRTSERVER_Error* err = TRTSERVER_ServerPollModelRepository(server.get());
-      if (err != nullptr) {
-        LOG_ERROR << "Failed to poll model repository: "
-                  << TRTSERVER_ErrorMessage(err);
-        TRTSERVER_ErrorDelete(err);
-      }
+      LOG_IF_ERR(
+          TRTSERVER_ServerPollModelRepository(server.get()),
+          "failed to poll model repository");
     }
 
     // Wait for the polling interval (or a long time if polling is not
@@ -777,6 +774,8 @@ main(int argc, char** argv)
         (repository_poll_secs_ == 0) ? 3600 : repository_poll_secs_);
     exit_cv_.wait_for(lock, wait_timeout);
   }
+
+  LOG_IF_ERR(TRTSERVER_ServerStop(server.get()), "failed to stop server");
 
   // Stop the HTTP, GRPC, and metrics endpoints.
   StopEndpoints();

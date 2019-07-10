@@ -293,8 +293,14 @@ TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerNew(
     TRTSERVER_Server** server, TRTSERVER_ServerOptions* options);
 
-// Delete a server object.
+// Delete a server object. If server is not already stopped it is
+// stopped before being deleted.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerDelete(
+    TRTSERVER_Server* server);
+
+// Stop a server object. A server can't be restarted once it is
+// stopped.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStop(
     TRTSERVER_Server* server);
 
 // Get the string identifier (i.e. name) of the server. The caller
