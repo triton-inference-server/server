@@ -50,6 +50,9 @@ GraphDefBackendFactory::Create(
   auto graphdef_backend_config =
       std::static_pointer_cast<Config>(backend_config);
   factory->reset(new GraphDefBackendFactory(graphdef_backend_config));
+
+  VirtualDeviceTracker::Init(graphdef_backend_config->memory_limit_mb);
+
   return Status::Success;
 }
 
@@ -69,8 +72,6 @@ GraphDefBackendFactory::CreateBackend(
         std::piecewise_construct, std::make_tuple(filename),
         std::make_tuple(graphdef_path));
   }
-
-  VirtualDeviceTracker::Init(backend_config_->memory_limit_mb);
 
   std::unique_ptr<GraphDefBackend> local_backend(new GraphDefBackend);
   RETURN_IF_ERROR(local_backend->Init(path, model_config));

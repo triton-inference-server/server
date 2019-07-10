@@ -122,8 +122,6 @@ BaseBackend::CreateExecutionContext(
   // compute capability. CPU always uses the default model file.
   std::string cc_model_filename;
   int vgpu_device = gpu_device;
-  auto graphdef_backend_config =
-      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
@@ -149,7 +147,7 @@ BaseBackend::CreateExecutionContext(
                             : cc_itr->second;
 
     // Get virtual device tracker instance, and get next device id
-    if (!graphdef_backend_config->memory_limit_mb.empty()) {
+    if (VirtualDeviceTracker::HasVirtualDevice()) {
       RETURN_IF_ERROR(
           VirtualDeviceTracker::GetNextVirtualDevice(gpu_device, &vgpu_device));
     }
@@ -174,6 +172,9 @@ BaseBackend::CreateExecutionContext(
 
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
+
+  auto graphdef_backend_config =
+      std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));

@@ -32,9 +32,19 @@ namespace nvidia { namespace inferenceserver {
 
 class VirtualDeviceTracker {
  public:
+  // Initializes the device tracker with the number of virtual gpus
+  // for each physical gpu. Creates the VirtualDeviceTracker and records the
+  // a pointer to it.
   static Status Init(const std::vector<std::vector<float>>& memory_limit_mb);
 
+  // Gets the device ID of the next available (currently Round robin) virtual
+  // device on the physical device indexed by gpu_device. Updates internal state
+  // of device id counter. Returns an error status if gpu_device is out of
+  // bounds or if no VirtualDeviceTracker has been initialized
   static Status GetNextVirtualDevice(const int gpu_device, int* vgpu_device);
+
+  // Returns True if the VirtualDevice Tracker has been initialized, else false.
+  static bool HasVirtualDevice();
 
   ~VirtualDeviceTracker() = default;
 
@@ -45,10 +55,23 @@ class VirtualDeviceTracker {
 
   int NextDeviceId(const int gpu_device);
 
-  VirtualDeviceTracker() {}
+  VirtualDeviceTracker(const std::vector<std::vector<float>>& memory_limit_mb)
+  {
+    // Initialize virtual device counter
+    for (size_t gpu_idx = 0; gpu_idx < memory_limit_mb.size(); gpu_idx++) {
+      num_virtual_per_physical_.push_back(memory_limit_mb[gpu_idx].size());
+      virtual_device_ids_.emplace(
+          std::piecewise_construct, std::forward_as_tuple(gpu_idx),
+          std::forward_as_tuple(0));
+    }
+
+    // Record instance pointer
+    instance_ = this;
+  }
 
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
   std::vector<int> num_virtual_per_physical_;
+  static VirtualDeviceTracker* instance_;
 };
 
 }}  // namespace nvidia::inferenceserver
