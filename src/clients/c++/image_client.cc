@@ -43,10 +43,17 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#elif CV_MAJOR_VERSION >= 3
+#define GET_TRANSFORMATION_CODE(x) CV_##x
+#elif CV_MAJOR_VERSION == 3
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#define GET_TRANSFORMATION_CODE(x) CV_##x
+#elif CV_MAJOR_VERSION == 4
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#define GET_TRANSFORMATION_CODE(x) cv::COLOR_##x
 #endif
 
 namespace ni = nvidia::inferenceserver;
@@ -69,44 +76,22 @@ Preprocess(
   // orderings (like RGB, BGR). We are going to assume that RGB is the
   // most likely ordering and so change the channels to that ordering.
 
-#if CV_MAJOR_VERSION < 4
   cv::Mat sample;
   if ((img.channels() == 3) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, CV_BGR2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2GRAY));
   } else if ((img.channels() == 4) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, CV_BGRA2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2GRAY));
   } else if ((img.channels() == 3) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_BGR2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2RGB));
   } else if ((img.channels() == 4) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_BGRA2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2RGB));
   } else if ((img.channels() == 1) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_GRAY2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(GRAY2RGB));
   } else {
     std::cerr << "unexpected number of channels in input image or model"
               << std::endl;
     exit(1);
   }
-#elif CV_MAJOR_VERSION == 4
-  cv::Mat sample;
-  if ((img.channels() == 3) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, cv::COLOR_BGR2GRAY);
-  } else if ((img.channels() == 4) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, cv::COLOR_BGRA2GRAY);
-  } else if ((img.channels() == 3) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, cv::COLOR_BGR2RGB);
-  } else if ((img.channels() == 4) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, cv::COLOR_BGRA2RGB);
-  } else if ((img.channels() == 1) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, cv::COLOR_GRAY2RGB);
-  } else {
-    std::cerr << "unexpected number of channels in input image or model"
-              << std::endl;
-    exit(1);
-  }
-#else
-  std::cerr << "The installed openCV version is not supported yet" << std::endl;
-  exit(1);
-#endif
 
   cv::Mat sample_resized;
   if (sample.size() != img_size) {
