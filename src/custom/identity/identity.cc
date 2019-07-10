@@ -27,7 +27,7 @@
 #include <chrono>
 #include <string>
 #include <thread>
-#include "src/backends/custom/custom.h"
+
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/custom/sdk/custom_instance.h"
@@ -71,18 +71,15 @@ class Context : public CustomInstance {
   std::unordered_map<std::string, CopyInfo> copy_map_;
 
   // local Error Codes
-  const int kGpuNotSupported =
-      RegisterError("execution on GPU not supported");
+  const int kGpuNotSupported = RegisterError("execution on GPU not supported");
   const int kInputOutput = RegisterError(
       "model must have equal input/output pairs with matching shape");
   const int kInputOutputName = RegisterError(
       "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'");
-  const int kInputOutputDataType = RegisterError(
-      "model input/output pairs must have same data-type");
-  const int kInputContents =
-      RegisterError("unable to get input tensor values");
-  const int kInputSize =
-      RegisterError("unexpected size for input tensor");
+  const int kInputOutputDataType =
+      RegisterError("model input/output pairs must have same data-type");
+  const int kInputContents = RegisterError("unable to get input tensor values");
+  const int kInputSize = RegisterError("unexpected size for input tensor");
   const int kRequestOutput =
       RegisterError("inference request for unknown output");
   const int kOutputBuffer =
