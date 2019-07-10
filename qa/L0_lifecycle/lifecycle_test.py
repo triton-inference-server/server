@@ -751,5 +751,84 @@ class LifeCycleTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_dynamic_file_delete(self):
+        input_size = 16
+        models_base = ('savedmodel')
+        models_shape = ((input_size,))
+        models = list()
+        for m in models_base:
+            models.append(tu.get_model_name(m, np.float32, np.float32, np.float32))
+
+        # Make sure savedmodel and plan are in the status
+        for model_name in models:
+            try:
+                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        # Only version 1 and 3 are loaded
+                        self.assertTrue(k in (1,3))
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on the model, both versions 1 and 3
+        for version in (1, 3):
+            for model_name, model_shape in zip(models_base, models_shape):
+                try:
+                    iu.infer_exact(self, model_name, model_shape, 1,
+                                   np.float32, np.float32, np.float32, swap=(version == 3),
+                                   model_version=version)
+                except InferenceServerException as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Delete model configuration, which cause model to be re-loaded and use autofilled config
+        for model_name in models:
+            shutil.rmtree("models/" + model_name + "/config.pbtxt")
+
+        time.sleep(5) # wait for models to reload
+        for model_name in models:
+            try:
+                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    self.assertTrue(1 in ss.model_status[model_name].version_status,
+                                    "expected status for version 1 of model " + model_name)
+                    self.assertTrue(2 in ss.model_status[model_name].version_status,
+                                    "expected status for version 2 of model " + model_name)
+                    self.assertTrue(3 in ss.model_status[model_name].version_status,
+                                    "expected status for version 3 of model " + model_name)
+                    self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
+                                     server_status.MODEL_READY)
+                    self.assertEqual(ss.model_status[model_name].version_status[2].ready_state,
+                                     server_status.MODEL_READY)
+                    self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
+                                     server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Version 1, 2, 3 should work...
+        for version in (1, 2, 3):
+            for model_name, model_shape in zip(models_base, models_shape):
+                try:
+                    iu.infer_exact(self, model_name, model_shape, 1,
+                                np.float32, np.float32, np.float32, swap=(version != 1),
+                                model_version=version)
+                except InferenceServerException as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
 if __name__ == '__main__':
     unittest.main()
