@@ -476,22 +476,30 @@ HTTPAPIServer::EVBufferToInput(
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
         request_provider, io.name().c_str(), &byte_size));
 
-    while ((byte_size > 0) && (v_idx < n)) {
-      char* base = static_cast<char*>(v[v_idx].iov_base);
-      size_t base_size;
-      if (v[v_idx].iov_len > byte_size) {
-        base_size = byte_size;
-        v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-        v[v_idx].iov_len -= byte_size;
-        byte_size = 0;
-      } else {
-        base_size = v[v_idx].iov_len;
-        byte_size -= v[v_idx].iov_len;
-        v_idx++;
-      }
-
+    // If 'byte_size' is zero then need to add an empty input data
+    // block... the provider expects at least one data block for every
+    // input.
+    if (byte_size == 0) {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), base, base_size));
+          request_provider, io.name().c_str(), nullptr, 0 /* byte_size */));
+    } else {
+      while ((byte_size > 0) && (v_idx < n)) {
+        char* base = static_cast<char*>(v[v_idx].iov_base);
+        size_t base_size;
+        if (v[v_idx].iov_len > byte_size) {
+          base_size = byte_size;
+          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+          v[v_idx].iov_len -= byte_size;
+          byte_size = 0;
+        } else {
+          base_size = v[v_idx].iov_len;
+          byte_size -= v[v_idx].iov_len;
+          v_idx++;
+        }
+
+        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+            request_provider, io.name().c_str(), base, base_size));
+      }
     }
 
     if (byte_size != 0) {
