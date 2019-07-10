@@ -161,7 +161,8 @@ class InputImpl : public InferContext::Input {
   Error Reset() override;
   Error SetRaw(const std::vector<uint8_t>& input) override;
   Error SetRaw(const uint8_t* input, size_t input_byte_size) override;
-  Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) override;
+  Error SetSharedMemory(
+      const std::string& shm_key, size_t offset, size_t byte_size) override;
   Error SetFromString(const std::vector<std::string>& input) override;
 
   // Copy into 'buf' up to 'size' bytes of this input's data. Return
@@ -196,6 +197,12 @@ class InputImpl : public InferContext::Input {
   // reallocs that could invalidate the pointer references into the
   // std::string objects.
   std::list<std::string> str_bufs_;
+
+  // Used only if working with Shared Memory
+  bool use_shm_;
+  std::string shm_key_;
+  size_t offset_;
+  size_t shm_byte_size_;
 };
 
 //==============================================================================
@@ -221,10 +228,18 @@ class OutputImpl : public InferContext::Output {
     result_format_ = result_format;
   }
 
-  Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) override;
+  Error SetSharedMemory(
+      const std::string& shm_key, size_t offset, size_t byte_size) override;
+
  private:
   const ModelOutput mio_;
   InferContext::Result::ResultFormat result_format_;
+
+  // Used only if working with Shared Memory
+  bool use_shm_;
+  std::string shm_key_;
+  size_t offset_;
+  size_t shm_byte_size_;
 };
 
 //==============================================================================

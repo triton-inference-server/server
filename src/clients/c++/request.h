@@ -330,12 +330,22 @@ class InferContext {
     /// \return Error object indicating success or failure.
     virtual Error SetFromString(const std::vector<std::string>& input) = 0;
 
-    // Set the shard memory object for the batch tensor input
-    /// \param shm_key The shared memory location holding the input tensors.
-    /// \param offset The offset for the batch input tensor.
-    /// \param byte_size The byte size of the batch input tensor.
+    /// Set tensor values for this input by reference into a shared memory
+    /// region. The values are not copied and so it must not be modified or
+    /// destroyed until this input is no longer needed (that is until the Run()
+    //// call(s) that use the input have completed). For batched inputs this
+    /// function must be called batch-size times to provide all tensor values
+    /// for a batch of this input.
+    /// \param shm_key The identifier for the shared memory object that is used
+    /// to get the region in shared memory where the tensor values for this
+    /// input are stored.
+    /// \param offset The offset into the shared memory to the start of the
+    /// input tensor values.
+    /// \param byte_size The size, in bytes of the input tensor data. Must
+    /// match the size expected by the input.
     /// \return Error object indicating success or failure.
-    virtual Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) = 0;
+    virtual Error SetSharedMemory(
+        const std::string& shm_key, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
@@ -355,12 +365,22 @@ class InferContext {
     /// -1.
     virtual const DimsList& Dims() const = 0;
 
-    // Set the shard memory object for the batch tensor output
-    /// \param shm_key The shared memory location holding the output tensors.
-    /// \param offset The offset for the batch output tensor.
-    /// \param byte_size The byte size of the batch output tensor.
+    /// Set tensor values for this output by reference into a shared memory
+    /// region. The values are not copied and so it must not be modified or
+    /// destroyed until this output is ready (that is until after the Run()
+    //// call(s) have written the input completely). For batched outputs this
+    /// function must be called batch-size times to write all tensor values
+    /// for a batch of this output.
+    /// \param shm_key The identifier for the shared memory object that is used
+    /// to get the region in shared memory where the tensor values for this
+    /// output should be stored.
+    /// \param offset The offset into the shared memory to the start of the
+    /// output tensor values.
+    /// \param byte_size The size, in bytes of the output tensor data. Must
+    /// match the size expected by the outp.
     /// \return Error object indicating success or failure.
-    virtual Error SetSharedMemoryObject(const std::string &shm_key, size_t offset, size_t byte_size) = 0;
+    virtual Error SetSharedMemory(
+        const std::string& shm_key, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
