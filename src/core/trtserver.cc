@@ -314,8 +314,10 @@ TrtServerRequestProvider::SetInputData(
     smem.reset(new ni::SystemMemoryReference());
   }
 
-  std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
-      static_cast<const char*>(base), byte_size);
+  if (byte_size > 0) {
+    std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
+        static_cast<const char*>(base), byte_size);
+  }
 }
 
 //
