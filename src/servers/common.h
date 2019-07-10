@@ -48,6 +48,17 @@ namespace nvidia { namespace inferenceserver {
     }                                                        \
   } while (false)
 
+#define LOG_IF_ERR(X, MSG)                                   \
+  do {                                                       \
+    TRTSERVER_Error* err = (X);                              \
+    if (err != nullptr) {                                    \
+      std::cerr << "error: " << (MSG) << ": "                \
+                << TRTSERVER_ErrorCodeString(err) << " - "   \
+                << TRTSERVER_ErrorMessage(err) << std::endl; \
+      TRTSERVER_ErrorDelete(err);                            \
+    }                                                        \
+  } while (false)
+
 #define RETURN_IF_ERR(X)        \
   do {                          \
     TRTSERVER_Error* err = (X); \

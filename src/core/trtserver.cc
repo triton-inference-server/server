@@ -714,6 +714,16 @@ TRTSERVER_ServerDelete(TRTSERVER_Server* server)
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerStop(TRTSERVER_Server* server)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  if (lserver != nullptr) {
+    lserver->Stop();
+  }
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerId(TRTSERVER_Server* server, const char** id)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
