@@ -31,28 +31,57 @@
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
+//==============================================================================
+/// ErrorCodes manages the detailed error description strings for each error
+/// code. ErrorCodes also enable custom codes by providing a unique error code
+/// for each description string.
+///
 class ErrorCodes {
  public:
-  // Default error codes
+  /// Error code for success
   static const int Success = 0;
-  static const int Unknown = 1;
-  static const int CreationFailure = 2;
-  static const int InvalidModelConfig = 3;
+
+  /// Error code for creation failure.
+  static const int CreationFailure = 1;
+
+  /// Error code when instance failed to load the model configuration.
+  static const int InvalidModelConfig = 2;
+
+  /// Error code for an unknown error.
+  static const int Unknown = 3;
 
   ErrorCodes();
   ~ErrorCodes() = default;
 
-  // Return the registered error message for a specific error code
-  const char * ErrorString(int error) const;
+  /// Get the string for an error code.
+  ///
+  /// /param error Error code returned by a CustomInstance function
+  /// /return Descriptive error message for a specific error code.
+  const char* ErrorString(int error) const;
 
-  // Register a new error message.
-  // Returns error code for the new error mesage
+  /// Register a custom error and error message.
+  ///
+  /// \param error_message A descriptive error message string
+  /// \return The unique error code registered to this error message
   int RegisterError(const std::string& error_string);
 
  private:
-  std::vector<std::string> err_names_;
+  /// List of error messages indexed by the error codes
+  std::vector<std::string> err_messages_{Unknown + 1};
+
+  /// Register a specific error. This is use for internal class registration
+  /// only.
+  ///
+  /// \param error The error code
+  /// \param error_string The error message
+  void RegisterError(int error, const std::string& error_string);
+
+  /// \param error Error code.
+  /// \return True if error code is registered
+  inline bool ErrorIsRegistered(int error) const
+  {
+    return (error > 0) && (error < static_cast<int>(err_messages_.size()));
+  }
 };
 
 }}}  // namespace nvidia::inferenceserver::custom

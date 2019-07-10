@@ -56,7 +56,7 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
   int err = CustomInstance::Create(
       &instance, std::string(data->instance_name), model_config,
       data->gpu_device_id, data);
-  
+
   if (ErrorCodes::Success != err) {
     return err;
   }

@@ -28,28 +28,37 @@
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
-ErrorCodes::ErrorCodes() {
-  RegisterError("success");
-  RegisterError("unknown error");
-  RegisterError("failed to create instance");
-  RegisterError("invalid model configuration");
+ErrorCodes::ErrorCodes()
+{
+  RegisterError(Success, "success");
+  RegisterError(CreationFailure, "failed to create instance");
+  RegisterError(InvalidModelConfig, "invalid model configuration");
+  RegisterError(Unknown, "Unknown Error");
 }
 
-const char *
+const char*
 ErrorCodes::ErrorString(int error) const
 {
-    if (error < 0 || error >= static_cast<int>(err_names_.size())) {
-      return err_names_[error].c_str();
-    }
+  if (ErrorIsRegistered(error)) {
+    return err_messages_[error].c_str();
+  }
 
-    return err_names_[Unknown].c_str();
+  return err_messages_[Unknown].c_str();
 }
 
 int
 ErrorCodes::RegisterError(const std::string& error_string)
 {
-  err_names_.push_back(error_string);
-  return static_cast<int>(err_names_.size() - 1);
+  err_messages_.push_back(error_string);
+  return static_cast<int>(err_messages_.size() - 1);
+}
+
+void
+ErrorCodes::RegisterError(int error, const std::string& error_string)
+{
+  if (ErrorIsRegistered(error)) {
+    err_messages_[error] = error_string;
+  }
 }
 
 }}}  // namespace nvidia::inferenceserver::custom

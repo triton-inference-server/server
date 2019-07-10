@@ -36,11 +36,24 @@
 
 namespace nvidia { namespace inferenceserver { namespace custom {
 
-// Base class for custom backend instances
-// Responsible for the state of the instance and used to provide a
-// C++ wrapper around the C-API
+//==============================================================================
+/// Base class for custom backend instances. CustomInstance is responsible for
+/// the state of the instance, provide a C++ wrapper around the C-API, and
+/// provide common helper functions that can be used for initialization and
+/// execution.
+///
 class CustomInstance {
  public:
+  /// Create a custom backend. This static method is declared here, but must be
+  /// defined in the child custom class. This create method is used
+  /// CustomInitialization C-API method.
+  ///
+  /// \param instance A return pointer for the custom instance object created by
+  /// this method
+  /// \param name The name of the custom instance
+  /// \param model_config The model configuration
+  /// \param gpu_device The GPU device ID
+  /// \return Error code indicating success or the type of failure
   static int Create(
       CustomInstance** instance, const std::string& name,
       const ModelConfig& model_config, int gpu_device,
@@ -48,39 +61,60 @@ class CustomInstance {
 
   virtual ~CustomInstance() = default;
 
-  // Perform custom execution on the payloads
+  /// Execute the custom instance
+  ///
+  /// \param payload_cnt The number of payloads to execute.
+  /// \param payloads The payloads to execute.
+  /// \param input_fn The callback function to get tensor input (see
+  /// CustomGetNextInputFn_t).
+  /// \param output_fn The callback function to get buffer for tensor
+  /// output (see CustomGetOutputFn_t).
   virtual int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
 
+  /// Get the string for an error code.
+  ///
+  /// /param error Error code returned by a CustomInstance function
+  /// /return Descriptive error message for a specific error code.
   inline const char* ErrorString(uint32_t error) const
   {
     return errors_.ErrorString(error);
   }
 
  protected:
+  /// Base constructor for CustomInstance
+  ///
+  /// \param name The name of the custom instance
+  /// \param model_config The model configuration
+  /// \param gpu_device The GPU device ID
+  /// \return Error code indicating success or the type of failure
   CustomInstance(
       const std::string& instance_name, const ModelConfig& model_config,
       int gpu_device);
 
+  /// Register a custom error and error message.
+  ///
+  /// \param error_message A descriptive error message string
+  /// \return The unique error code registered to this error message
   inline int RegisterError(const std::string& error_message)
   {
     return errors_.RegisterError(error_message);
   }
 
-  // The name of this backend instance
+  /// The name of this backend instance
   const std::string instance_name_;
 
-  // The model configuration
+  /// The model configuration
   const ModelConfig model_config_;
 
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
+  /// The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
+  /// execute on CPU.
   const int gpu_device_;
 
  private:
-  // Error code manager
-  ErrorCodes errors_;
+  /// Error code manager.
+  ErrorCodes errors_{};
 };
 
 }}}  // namespace nvidia::inferenceserver::custom
