@@ -49,7 +49,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #define GET_TRANSFORMATION_CODE(x) CV_##x
-#elif CV_MAJOR_VERSION == 4
+#elif CV_MAJOR_VERSION >= 4
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -88,7 +88,8 @@ Preprocess(
   } else if ((img.channels() == 1) && (img_channels == 3)) {
     cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(GRAY2RGB));
   } else {
-    std::cerr << "unexpected number of channels in input image or model"
+    std::cerr << "unexpected number of channels " << img.channels()
+              << " in input image, model expects " << img_channels << "."
               << std::endl;
     exit(1);
   }
