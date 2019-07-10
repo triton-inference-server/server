@@ -43,17 +43,16 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#define GET_TRANSFORMATION_CODE(x) CV_##x
-#elif CV_MAJOR_VERSION == 3
+#elif CV_MAJOR_VERSION >= 3
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#define GET_TRANSFORMATION_CODE(x) CV_##x
-#elif CV_MAJOR_VERSION >= 4
-#include <opencv2/core.hpp>
-#include <opencv2/highgui.hpp>
-#include <opencv2/imgproc.hpp>
+#endif
+
+#if CV_MAJOR_VERSION == 4
 #define GET_TRANSFORMATION_CODE(x) cv::COLOR_##x
+#else
+#define GET_TRANSFORMATION_CODE(x) CV_##x
 #endif
 
 namespace ni = nvidia::inferenceserver;
