@@ -33,12 +33,20 @@ namespace nvidia { namespace inferenceserver {
 
 VirtualDeviceTracker* VirtualDeviceTracker::instance_ = nullptr;
 
+std::once_flag instance_initialized;
+
 Status
 VirtualDeviceTracker::Init(
     const std::vector<std::vector<float>>& memory_limit_mb)
 {
   // Create object once
   static VirtualDeviceTracker virtual_device_tracker(memory_limit_mb);
+
+  // Initialize it once
+  std::call_once(
+      instance_initialized,
+      [](VirtualDeviceTracker* tracker) { instance_ = tracker; },
+      &virtual_device_tracker);
 
   return Status::Success;
 }

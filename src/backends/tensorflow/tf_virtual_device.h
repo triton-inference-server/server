@@ -64,9 +64,6 @@ class VirtualDeviceTracker {
           std::piecewise_construct, std::forward_as_tuple(gpu_idx),
           std::forward_as_tuple(0));
     }
-
-    // Record instance pointer
-    instance_ = this;
   }
 
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
