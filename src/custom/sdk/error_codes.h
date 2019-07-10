@@ -80,7 +80,7 @@ class ErrorCodes {
   /// \return True if error code is registered
   inline bool ErrorIsRegistered(int error) const
   {
-    return (error > 0) && (error < static_cast<int>(err_messages_.size()));
+    return (error >= 0) && (error < static_cast<int>(err_messages_.size()));
   }
 };
 

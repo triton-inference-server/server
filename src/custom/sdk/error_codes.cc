@@ -33,7 +33,7 @@ ErrorCodes::ErrorCodes()
   RegisterError(Success, "success");
   RegisterError(CreationFailure, "failed to create instance");
   RegisterError(InvalidModelConfig, "invalid model configuration");
-  RegisterError(Unknown, "Unknown Error");
+  RegisterError(Unknown, "unknown error");
 }
 
 const char*
