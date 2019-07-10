@@ -68,7 +68,7 @@ class VirtualDeviceTracker {
 
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
   std::vector<int> num_virtual_per_physical_;
-  static VirtualDeviceTracker* instance_;
+  static std::unique_ptr<VirtualDeviceTracker> instance_;
 };
 
 }}  // namespace nvidia::inferenceserver

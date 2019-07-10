@@ -31,7 +31,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-VirtualDeviceTracker* VirtualDeviceTracker::instance_ = nullptr;
+std::unique_ptr<VirtualDeviceTracker> VirtualDeviceTracker::instance_;
 
 std::once_flag instance_initialized;
 
@@ -39,14 +39,13 @@ Status
 VirtualDeviceTracker::Init(
     const std::vector<std::vector<float>>& memory_limit_mb)
 {
-  // Create object once
-  static VirtualDeviceTracker virtual_device_tracker(memory_limit_mb);
-
   // Initialize it once
   std::call_once(
       instance_initialized,
-      [](VirtualDeviceTracker* tracker) { instance_ = tracker; },
-      &virtual_device_tracker);
+      [](const std::vector<std::vector<float>>& memory_limit_mb) {
+        instance_.reset(new VirtualDeviceTracker(memory_limit_mb));
+      },
+      memory_limit_mb);
 
   return Status::Success;
 }
@@ -56,7 +55,7 @@ VirtualDeviceTracker::GetNextVirtualDevice(
     const int gpu_device, int* vgpu_device)
 {
   // Check for instantiation
-  if (instance_ == nullptr) {
+  if (!instance_) {
     return Status(
         RequestStatusCode::INTERNAL, "Device tracker has not been initialized");
   }
