@@ -43,10 +43,16 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#elif CV_MAJOR_VERSION == 3
+#elif CV_MAJOR_VERSION >= 3
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#endif
+
+#if CV_MAJOR_VERSION == 4
+#define GET_TRANSFORMATION_CODE(x) cv::COLOR_##x
+#else
+#define GET_TRANSFORMATION_CODE(x) CV_##x
 #endif
 
 namespace ni = nvidia::inferenceserver;
@@ -71,17 +77,18 @@ Preprocess(
 
   cv::Mat sample;
   if ((img.channels() == 3) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, CV_BGR2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2GRAY));
   } else if ((img.channels() == 4) && (img_channels == 1)) {
-    cv::cvtColor(img, sample, CV_BGRA2GRAY);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2GRAY));
   } else if ((img.channels() == 3) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_BGR2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGR2RGB));
   } else if ((img.channels() == 4) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_BGRA2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(BGRA2RGB));
   } else if ((img.channels() == 1) && (img_channels == 3)) {
-    cv::cvtColor(img, sample, CV_GRAY2RGB);
+    cv::cvtColor(img, sample, GET_TRANSFORMATION_CODE(GRAY2RGB));
   } else {
-    std::cerr << "unexpected number of channels in input image or model"
+    std::cerr << "unexpected number of channels " << img.channels()
+              << " in input image, model expects " << img_channels << "."
               << std::endl;
     exit(1);
   }
