@@ -33,6 +33,10 @@ configure_file(combine.sh combine.sh COPYONLY)
 
 add_library(
   custombackendparts STATIC
+  custom_instance.cc
+  error_codes.cc
+  custom_instance.h
+  error_codes.h
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
 )
@@ -57,17 +61,25 @@ install(
   PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/libcustombackend.a
   DESTINATION lib
 )
+install(
+  FILES
+    custom_instance.cc 
+    custom_instance.h
+    error_codes.cc
+    error_codes.h 
+  DESTINATION include/src/custom/sdk
+)
 
 # Install the TRTIS and protobuf headers needed to build a custom
 # backend
 install(
   FILES
-    ../core/model_config.h
-    ${CMAKE_CURRENT_BINARY_DIR}/../core/model_config.pb.h
+    ../../core/model_config.h
+    ${CMAKE_CURRENT_BINARY_DIR}/../../core/model_config.pb.h
   DESTINATION include/src/core
 )
 install(
-  FILES ../backends/custom/custom.h
+  FILES ../../backends/custom/custom.h
   DESTINATION include/src/backends/custom
 )
 install(
@@ -77,6 +89,6 @@ install(
 
 # Install the param custom backend source as an example
 install(
-  FILES param/param.cc
+  FILES ../param/param.cc
   DESTINATION src
 )

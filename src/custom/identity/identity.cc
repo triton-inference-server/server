@@ -27,9 +27,10 @@
 #include <chrono>
 #include <string>
 #include <thread>
-#include "src/backends/custom/custom.h"
+
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -44,50 +45,22 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace identity {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
-enum ErrorCodes {
-  kSuccess,
-  kUnknown,
-  kInvalidModelConfig,
-  kGpuNotSupported,
-  kInputOutput,
-  kInputOutputName,
-  kInputOutputDataType,
-  kInputContents,
-  kInputSize,
-  kRequestOutput,
-  kOutputBuffer
-};
-
 // Context object. All state must be kept in this object.
-class Context {
+class Context : public CustomInstance {
  public:
   Context(
       const std::string& instance_name, const ModelConfig& config,
       const int gpu_device);
-  ~Context();
+  ~Context() = default;
 
-  // Initialize the context. Validate that the model configuration,
-  // etc. is something that we can handle.
+  // Validate the model configuration for the derived backend instance
   int Init();
 
-  // Perform custom execution on the payloads.
   int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) override;
 
  private:
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
-  const int gpu_device_;
-
   struct CopyInfo {
     std::string input_name_;
     DataType datatype_;
@@ -96,17 +69,29 @@ class Context {
   // Map from output name to information needed to copy input into
   // that output.
   std::unordered_map<std::string, CopyInfo> copy_map_;
+
+  // local Error Codes
+  const int kGpuNotSupported = RegisterError("execution on GPU not supported");
+  const int kInputOutput = RegisterError(
+      "model must have equal input/output pairs with matching shape");
+  const int kInputOutputName = RegisterError(
+      "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'");
+  const int kInputOutputDataType =
+      RegisterError("model input/output pairs must have same data-type");
+  const int kInputContents = RegisterError("unable to get input tensor values");
+  const int kInputSize = RegisterError("unexpected size for input tensor");
+  const int kRequestOutput =
+      RegisterError("inference request for unknown output");
+  const int kOutputBuffer =
+      RegisterError("unable to get buffer for output tensor values");
 };
 
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : instance_name_(instance_name), model_config_(model_config),
-      gpu_device_(gpu_device)
+    : CustomInstance(instance_name, model_config, gpu_device)
 {
 }
-
-Context::~Context() {}
 
 int
 Context::Init()
@@ -151,7 +136,7 @@ Context::Init()
         model_config_.input(i).name(), model_config_.output(i).data_type()};
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -236,92 +221,28 @@ Context::Execute(
     }
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
-/////////////
+}  // namespace identity
 
-extern "C" {
-
+// Creates a new Indentiy context instance
 int
-CustomInitialize(const CustomInitializeData* data, void** custom_context)
+CustomInstance::Create(
+    CustomInstance** instance, const std::string& name,
+    const ModelConfig& model_config, int gpu_device,
+    const CustomInitializeData* data)
 {
-  // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
-  if (!model_config.ParseFromString(std::string(
-          data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
+  identity::Context* ctx =
+      new identity::Context(name, model_config, gpu_device);
+
+  *instance = ctx;
+
+  if (ctx == nullptr) {
+    return ErrorCodes::CreationFailure;
   }
 
-  // Create the context and validate that the model configuration is
-  // something that we can handle.
-  Context* context = new Context(
-      std::string(data->instance_name), model_config, data->gpu_device_id);
-  int err = context->Init();
-  if (err != kSuccess) {
-    return err;
-  }
-
-  *custom_context = static_cast<void*>(context);
-
-  return kSuccess;
+  return ctx->Init();
 }
 
-int
-CustomFinalize(void* custom_context)
-{
-  if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
-    delete context;
-  }
-
-  return kSuccess;
-}
-
-const char*
-CustomErrorString(void* custom_context, int errcode)
-{
-  switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kGpuNotSupported:
-      return "execution on GPU not supported";
-    case kInputOutput:
-      return "model must have equal input/output pairs with matching shape";
-    case kInputOutputName:
-      return "model input/output pairs must be named 'INPUTn' and 'OUTPUTn'";
-    case kInputOutputDataType:
-      return "model input/output pairs must have same data-type";
-    case kInputContents:
-      return "unable to get input tensor values";
-    case kInputSize:
-      return "unexpected size for input tensor";
-    case kRequestOutput:
-      return "inference request for unknown output";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    default:
-      break;
-  }
-
-  return "unknown error";
-}
-
-int
-CustomExecute(
-    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  if (custom_context == nullptr) {
-    return kUnknown;
-  }
-
-  Context* context = static_cast<Context*>(custom_context);
-  return context->Execute(payload_cnt, payloads, input_fn, output_fn);
-}
-
-}  // extern "C"
-
-}}}}  // namespace nvidia::inferenceserver::custom::identity
+}}}  // namespace nvidia::inferenceserver::custom
