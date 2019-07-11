@@ -1,1 +1,1 @@
-ensemble tensor temp_tensor_5 is redundant as it will not be used in any models for ensemble tensor_to_input_overmapped
+ensemble tensor 'temp_tensor_5' is unused in ensemble 'tensor_to_input_overmapped'
