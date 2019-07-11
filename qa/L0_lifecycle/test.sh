@@ -345,6 +345,34 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1)) 
 
+# LifeCycleTest.test_dynamic_file_delete
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/.
+
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_dynamic_file_delete >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1)) 
+
+
 # Send HTTP request to invalid endpoints
 rm -fr models
 mkdir models
