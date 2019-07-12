@@ -378,6 +378,10 @@ if(${TRTIS_ENABLE_S3})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
 endif() # TRTIS_ENABLE_S3
 
+set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
+    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib
+    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-s3
+    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-core)
 
 ExternalProject_Add(trtis
   PREFIX trtis
@@ -416,6 +420,7 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_INSTALL_PREFIX}
+    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
   DEPENDS ${TRTIS_DEPENDS}
 )
 
