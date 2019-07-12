@@ -339,7 +339,7 @@ Context::Execute(
 
 }  // namespace sequence
 
-// Creates a new Indentiy context instance
+// Creates a new sequence context instance
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,

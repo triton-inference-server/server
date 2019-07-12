@@ -246,7 +246,7 @@ Context::Execute(
 
 }  // namespace param
 
-// Creates a new Indentiy context instance
+// Creates a new param context instance
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
