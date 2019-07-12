@@ -27,9 +27,10 @@
 #include <chrono>
 #include <string>
 #include <thread>
-#include "src/backends/custom/custom.h"
+
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -52,28 +53,8 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace sequence {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
-enum ErrorCodes {
-  kSuccess,
-  kUnknown,
-  kInvalidModelConfig,
-  kGpuNotSupported,
-  kSequenceBatcher,
-  kModelControl,
-  kInputOutput,
-  kInputName,
-  kOutputName,
-  kInputOutputDataType,
-  kInputContents,
-  kInputSize,
-  kOutputBuffer,
-  kBatchTooBig,
-  kTimesteps
-};
-
 // Context object. All state must be kept in this object.
-class Context {
+class Context : public CustomInstance {
  public:
   Context(
       const std::string& instance_name, const ModelConfig& config,
@@ -94,28 +75,39 @@ class Context {
       CustomGetNextInputFn_t input_fn, void* input_context, const char* name,
       const size_t expected_byte_size, std::vector<uint8_t>* input);
 
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
-  // The GPU device ID to execute on or CUSTOM_NO_GPU_DEVICE if should
-  // execute on CPU.
-  const int gpu_device_;
-
   // Delay to introduce into execution, in milliseconds.
-  int execute_delay_ms_;
+  int execute_delay_ms_ = 0;
 
   // Accumulators maintained by this context, one for each batch slot.
   std::vector<int32_t> accumulator_;
+
+  // Local error codes
+  const int kGpuNotSupported = RegisterError("execution on GPU not supported");
+  const int kSequenceBatcher =
+      RegisterError("model configuration must configure sequence batcher");
+  const int kModelControl = RegisterError(
+      "'START' and 'READY' must be configured as the control inputs");
+  const int kInputOutput =
+      RegisterError("model must have two inputs and one output with shape [1]");
+  const int kInputName =
+      RegisterError("model inputs must be named 'INPUT0' and 'INPUT1'");
+  const int kOutputName = RegisterError("model output must be named 'OUTPUT'");
+  const int kInputOutputDataType =
+      RegisterError("model inputs and output must have TYPE_INT32 data-type");
+  const int kInputContents = RegisterError("unable to get input tensor values");
+  const int kInputSize = RegisterError("unexpected size for input tensor");
+  const int kOutputBuffer =
+      RegisterError("unable to get buffer for output tensor values");
+  const int kBatchTooBig =
+      RegisterError("unable to execute batch larger than max-batch-size");
+  const int kTimesteps =
+      RegisterError("unable to execute more than 1 timestep at a time");
 };
 
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : instance_name_(instance_name), model_config_(model_config),
-      gpu_device_(gpu_device), execute_delay_ms_(0)
+    : CustomInstance(instance_name, model_config, gpu_device)
 {
   if (model_config_.parameters_size() > 0) {
     const auto itr = model_config_.parameters().find("execute_delay_ms");
@@ -187,7 +179,7 @@ Context::Init()
     return kOutputName;
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -233,7 +225,7 @@ Context::GetInputTensor(
     return kInputSize;
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -273,7 +265,7 @@ Context::Execute(
     err = GetInputTensor(
         input_fn, payload.input_context, "START", batch1_byte_size,
         &start_buffer);
-    if (err != kSuccess) {
+    if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;
     }
@@ -281,7 +273,7 @@ Context::Execute(
     err = GetInputTensor(
         input_fn, payload.input_context, "READY", batch1_byte_size,
         &ready_buffer);
-    if (err != kSuccess) {
+    if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;
     }
@@ -289,7 +281,7 @@ Context::Execute(
     err = GetInputTensor(
         input_fn, payload.input_context, "INPUT", batch1_byte_size,
         &input_buffer);
-    if (err != kSuccess) {
+    if (err != ErrorCodes::Success) {
       payload.error_code = err;
       continue;
     }
@@ -342,100 +334,28 @@ Context::Execute(
     }
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
-/////////////
+}  // namespace sequence
 
-extern "C" {
-
+// Creates a new Indentiy context instance
 int
-CustomInitialize(const CustomInitializeData* data, void** custom_context)
+CustomInstance::Create(
+    CustomInstance** instance, const std::string& name,
+    const ModelConfig& model_config, int gpu_device,
+    const CustomInitializeData* data)
 {
-  // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
-  if (!model_config.ParseFromString(std::string(
-          data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
+  sequence::Context* context =
+      new sequence::Context(name, model_config, gpu_device);
+
+  *instance = context;
+
+  if (context == nullptr) {
+    return ErrorCodes::CreationFailure;
   }
 
-  // Create the context and validate that the model configuration is
-  // something that we can handle.
-  Context* context = new Context(
-      std::string(data->instance_name), model_config, data->gpu_device_id);
-  int err = context->Init();
-  if (err != kSuccess) {
-    return err;
-  }
-
-  *custom_context = static_cast<void*>(context);
-
-  return kSuccess;
+  return context->Init();
 }
 
-int
-CustomFinalize(void* custom_context)
-{
-  if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
-    delete context;
-  }
-
-  return kSuccess;
-}
-
-const char*
-CustomErrorString(void* custom_context, int errcode)
-{
-  switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kGpuNotSupported:
-      return "execution on GPU not supported";
-    case kSequenceBatcher:
-      return "model configuration must configure sequence batcher";
-    case kModelControl:
-      return "'START' and 'READY' must be configured as the control inputs";
-    case kInputOutput:
-      return "model must have two inputs and one output with shape [1]";
-    case kInputName:
-      return "model inputs must be named 'INPUT0' and 'INPUT1'";
-    case kOutputName:
-      return "model output must be named 'OUTPUT'";
-    case kInputOutputDataType:
-      return "model inputs and output must have TYPE_INT32 data-type";
-    case kInputContents:
-      return "unable to get input tensor values";
-    case kInputSize:
-      return "unexpected size for input tensor";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    case kBatchTooBig:
-      return "unable to execute batch larger than max-batch-size";
-    case kTimesteps:
-      return "unable to execute more than 1 timestep at a time";
-    default:
-      break;
-  }
-
-  return "unknown error";
-}
-
-int
-CustomExecute(
-    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  if (custom_context == nullptr) {
-    return kUnknown;
-  }
-
-  Context* context = static_cast<Context*>(custom_context);
-  return context->Execute(payload_cnt, payloads, input_fn, output_fn);
-}
-
-}  // extern "C"
-
-}}}}  // namespace nvidia::inferenceserver::custom::sequence
+}}}  // namespace nvidia::inferenceserver::custom
