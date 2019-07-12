@@ -1,0 +1,33 @@
+name: "embedded_ensemble"
+max_batch_size: 2
+platform: "ensemble"
+ensemble_scheduling {
+  step [
+    {
+      model_name: "inner_ensemble"
+      model_version: -1
+      input_map {
+        key: "data"
+        value: "data"
+      }
+      output_map {
+        key: "prob"
+        value: "prob"
+      }
+    }
+  ]
+}
+input [
+  {
+    name: "data"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "prob"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]

@@ -1,1 +1,0 @@
-in ensemble inconsistent_shape, ensemble tensor temp_tensor: inconsistent shape: [16,16,16] is inferred from model fp32_dim3_batch4 while [16] is inferred from model fp32_dim1_batch4

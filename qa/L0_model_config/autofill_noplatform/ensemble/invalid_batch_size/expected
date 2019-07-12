@@ -1,0 +1,1 @@
+ensemble invalid_batch_size allows maximum batch size 3, but it contains model fp32_dim1_batch2 which only allows maximum batch size to be 2
