@@ -680,9 +680,24 @@ def create_ensemble_modelconfig(
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
         return
 
+    # No reason to reshape ensemble inputs / outputs to empty as the inner models
+    # have to have non-empty shapes for inputs / outputs.
+    input_model_shapes_list = []
+    output_model_shapes_list = []
+    for idx in range(len(input_shapes)):
+        if len(input_model_shapes[idx]) == 0:
+            input_model_shapes_list.append(input_shapes[idx])
+        else:
+            input_model_shapes_list.append(input_model_shapes[idx])
+        if len(output_model_shapes[idx]) == 0:
+            output_model_shapes_list.append(output_shapes[idx])
+        else:
+            output_model_shapes_list.append(output_model_shapes[idx])
+
     emu.create_identity_ensemble_modelconfig(
         "reshape", models_dir, model_version, max_batch, dtype,
-        input_shapes, input_model_shapes, output_shapes, output_model_shapes)
+        input_shapes, tuple(input_model_shapes_list),
+        output_shapes, tuple(output_model_shapes_list))
 
 
 def create_onnx_modelfile(
