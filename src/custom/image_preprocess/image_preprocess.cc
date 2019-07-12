@@ -72,12 +72,6 @@ class Context : public CustomInstance {
 
   bool ParseType(const DataType& dtype, int* type1, int* type3);
 
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
   // The format of the preprocessed image
   ModelInput::Format format_;
 
