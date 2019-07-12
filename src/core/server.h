@@ -28,9 +28,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <atomic>
+#include <map>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 #include "src/core/api.pb.h"
@@ -129,12 +129,13 @@ class InferenceServer {
   void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
 
   // Get / set Tensorflow vGPU memory limits
-  std::vector<std::vector<float>> TensorFlowVGPUMemoryLimits() const
+  std::map<int, std::vector<float>> TensorFlowVGPUMemoryLimits() const
   {
     return tf_vgpu_memory_limits_;
   }
-  void SetTensoflowVGPUMemoryLimits(
-      const std::vector<std::vector<float>>& memory_limits)
+
+  void SetTensorFlowVGPUMemoryLimits(
+      const std::map<int, std::vector<float>>& memory_limits)
   {
     tf_vgpu_memory_limits_ = memory_limits;
   }
@@ -171,7 +172,7 @@ class InferenceServer {
   // Tensorflow options
   bool tf_soft_placement_enabled_;
   float tf_gpu_memory_fraction_;
-  std::vector<std::vector<float>> tf_vgpu_memory_limits_;
+  std::map<int, std::vector<float>> tf_vgpu_memory_limits_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;

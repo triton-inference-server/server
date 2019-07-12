@@ -27,6 +27,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <map>
 #include <vector>
 
 // To avoid namespace and protobuf collision between TRTIS and
@@ -192,7 +193,7 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromGraphDef(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::vector<std::vector<float>>& memory_limit_mb);
+    const std::map<int, std::vector<float>>& memory_limit_mb);
 
 // Create a SavedModel model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
@@ -201,7 +202,7 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::vector<std::vector<float>>& memory_limit_mb);
+    const std::map<int, std::vector<float>>& memory_limit_mb);
 
 // Delete a model.
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);

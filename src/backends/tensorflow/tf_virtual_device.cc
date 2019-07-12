@@ -33,16 +33,34 @@ namespace nvidia { namespace inferenceserver {
 
 std::unique_ptr<VirtualDeviceTracker> VirtualDeviceTracker::instance_;
 
-std::once_flag instance_initialized;
+VirtualDeviceTracker::VirtualDeviceTracker(
+    const std::map<int, std::vector<float>>& memory_limit_mb)
+{
+  // Initialize virtual device counter
+  for (auto const& allocation : memory_limit_mb) {
+    int gpu_idx = allocation.first;
+    auto mem_limits_for_device = allocation.second;
+    num_virtual_per_physical_[gpu_idx] = (mem_limits_for_device.size());
+    virtual_device_ids_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(gpu_idx),
+        std::forward_as_tuple(0));
+  }
+}
 
 Status
 VirtualDeviceTracker::Init(
-    const std::vector<std::vector<float>>& memory_limit_mb)
+    const std::map<int, std::vector<float>>& memory_limit_mb)
 {
+  if (memory_limit_mb.empty()) {
+    return Status::Success;
+  }
+
   // Initialize it once
+  static std::once_flag instance_initialized;
+
   std::call_once(
       instance_initialized,
-      [](const std::vector<std::vector<float>>& memory_limit_mb) {
+      [](const std::map<int, std::vector<float>>& memory_limit_mb) {
         instance_.reset(new VirtualDeviceTracker(memory_limit_mb));
       },
       memory_limit_mb);
@@ -57,12 +75,13 @@ VirtualDeviceTracker::GetNextVirtualDevice(
   // Check for instantiation
   if (!instance_) {
     return Status(
-        RequestStatusCode::INTERNAL, "Device tracker has not been initialized");
+        RequestStatusCode::INTERNAL,
+        "VirtualDeviceTracker has not been initialized");
   }
 
-  // Check physical device index
-  if ((gpu_device < 0) || (static_cast<unsigned int>(gpu_device) >=
-                           instance_->num_virtual_per_physical_.size())) {
+  // Check if physical device index has a mapping
+  if (instance_->virtual_device_ids_.find(gpu_device) ==
+      instance_->virtual_device_ids_.end()) {
     return Status(
         RequestStatusCode::INTERNAL, "Invalid physical device ID " +
                                          std::to_string(gpu_device) +

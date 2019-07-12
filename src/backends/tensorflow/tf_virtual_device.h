@@ -30,16 +30,24 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// This is a singleton class responsible for maintaining device ids
+// in the creation of tensorflow virtual devices. This class should
+// be initialized with a mapping from physical gpus to the number of
+// virtual devices required on that physical gpu. Instantiation check
+// can be done via HasVirtualDevice(). After initialization, the id
+// of the next device to set as a default for a model instance can
+// be obtained with GetNextVirtualDevice.
+
 class VirtualDeviceTracker {
  public:
+  // Creates the VirtualDeviceTracker and records a pointer to it.
   // Initializes the device tracker with the number of virtual gpus
-  // for each physical gpu. Creates the VirtualDeviceTracker and records the
-  // a pointer to it.
-  static Status Init(const std::vector<std::vector<float>>& memory_limit_mb);
+  // for each physical gpu.
+  static Status Init(const std::map<int, std::vector<float>>& memory_limit_mb);
 
-  // Gets the device ID of the next available (currently Round robin) virtual
-  // device on the physical device indexed by gpu_device. Updates internal state
-  // of device id counter. Returns an error status if gpu_device is out of
+  // Gets the device ID of the next available virtual device on the physical
+  // device indexed by gpu_device (currently round robin). Updates internal
+  // state of device id counter. Returns an error status if gpu_device is out of
   // bounds or if no VirtualDeviceTracker has been initialized
   static Status GetNextVirtualDevice(const int gpu_device, int* vgpu_device);
 
@@ -51,23 +59,15 @@ class VirtualDeviceTracker {
  private:
   DISALLOW_COPY_AND_ASSIGN(VirtualDeviceTracker);
 
-  static VirtualDeviceTracker* GetInstance();
-
+  // Currently just implements round robin id generation
+  // but can potentially be replaced with something smarter
   int NextDeviceId(const int gpu_device);
 
-  VirtualDeviceTracker(const std::vector<std::vector<float>>& memory_limit_mb)
-  {
-    // Initialize virtual device counter
-    for (size_t gpu_idx = 0; gpu_idx < memory_limit_mb.size(); gpu_idx++) {
-      num_virtual_per_physical_.push_back(memory_limit_mb[gpu_idx].size());
-      virtual_device_ids_.emplace(
-          std::piecewise_construct, std::forward_as_tuple(gpu_idx),
-          std::forward_as_tuple(0));
-    }
-  }
+  VirtualDeviceTracker(
+      const std::map<int, std::vector<float>>& memory_limit_mb);
 
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
-  std::vector<int> num_virtual_per_physical_;
+  std::unordered_map<int, size_t> num_virtual_per_physical_;
   static std::unique_ptr<VirtualDeviceTracker> instance_;
 };
 

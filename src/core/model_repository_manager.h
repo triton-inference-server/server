@@ -87,7 +87,7 @@ class ModelRepositoryManager {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-      const std::vector<std::vector<float>> tf_memory_limit_mb,
+      const std::map<int, std::vector<float>> tf_memory_limit_mb,
       const bool polling_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 

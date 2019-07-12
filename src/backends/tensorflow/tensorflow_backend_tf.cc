@@ -165,7 +165,7 @@ NewSessionOptions(
     const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::vector<std::vector<float>>& memory_limit_mb,
+    const std::map<int, std::vector<float>>& memory_limit_mb,
     tensorflow::SessionOptions* session_options)
 {
   session_options->config.mutable_gpu_options()->set_allow_growth(
@@ -182,7 +182,7 @@ NewSessionOptions(
       auto virtual_devices = session_options->config.mutable_gpu_options()
                                  ->mutable_experimental()
                                  ->add_virtual_devices();
-      for (float mb : v) {
+      for (float mb : v.second) {
         virtual_devices->add_memory_limit_mb(mb);
       }
     }
@@ -607,7 +607,7 @@ TRTISTF_ModelCreateFromGraphDef(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::vector<std::vector<float>>& memory_limit_mb)
+    const std::map<int, std::vector<float>>& memory_limit_mb)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
@@ -671,7 +671,7 @@ TRTISTF_ModelCreateFromSavedModel(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::vector<std::vector<float>>& memory_limit_mb)
+    const std::map<int, std::vector<float>>& memory_limit_mb)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
