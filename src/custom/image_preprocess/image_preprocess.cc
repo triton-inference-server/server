@@ -449,6 +449,7 @@ Context::ParseType(const DataType& dtype, int* type1, int* type3)
 
 }  // namespace image_preprocess
 
+// Creates a new image_preprocess instance
 int
 CustomInstance::Create(
     CustomInstance** instance, const std::string& name,
