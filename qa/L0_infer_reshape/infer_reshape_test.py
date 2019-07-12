@@ -135,19 +135,6 @@ class InferReshapeTest(unittest.TestCase):
         self._trt_reshape(np.float32, input_shapes=([4,4],[2],[2,2,3],[1]),
                           output_shapes=([2,2,4],[1,2,1],[3,2,2],[1,1,1]))
 
-    def test_ensemble_zero_dimension_reshape(self):
-        for shapes in [([1],), ([1],[8])]:
-            for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
-                # model that supports batching
-                for bs in (1, 8):
-                    try:
-                        iu.infer_zero(self, name, bs, np.float32, shapes, shapes)
-                        self.assertTrue(False, "Unexpected success in infer")
-                    except InferenceServerException as ex:
-                        self.assertEqual("inference:0", ex.server_id())
-                        self.assertTrue(
-                            "but model configuration specifies shape []" in ex.message())
-
 
 if __name__ == '__main__':
     unittest.main()

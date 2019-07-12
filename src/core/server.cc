@@ -233,6 +233,7 @@ InferenceServer::HandleHealth(
   if (mode == "live") {
     *health =
         ((ready_state_ != ServerReadyState::SERVER_INVALID) &&
+         (ready_state_ != ServerReadyState::SERVER_INITIALIZING) &&
          (ready_state_ != ServerReadyState::SERVER_FAILED_TO_INITIALIZE));
     RequestStatusFactory::Create(
         request_status, request_id, id_, RequestStatusCode::SUCCESS);
