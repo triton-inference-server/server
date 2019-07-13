@@ -135,14 +135,21 @@ using TimestampVector =
 namespace {
 
 volatile bool early_exit = false;
+// The flag is set when there are no in-flight inferences to complete.
+volatile bool finished_inferencing = false;
 
 void
 SignalHandler(int signum)
 {
   std::cout << "Interrupt signal (" << signum << ") received." << std::endl
             << "Waiting for in-flight inferences to complete." << std::endl;
-
-  early_exit = true;
+  // Upon invoking the SignalHandler for the first time early_exit flag is
+  // invoked. On the subsequent invocations, if there are no in-flight inference
+  // requests, the program exits.
+  if (!early_exit)
+    early_exit = true;
+  else if (finished_inferencing)
+    exit(0);
 }
 
 typedef struct PerformanceStatusStruct {
@@ -1991,9 +1998,13 @@ main(int argc, char** argv)
       }
     }
   }
+  finished_inferencing = true;
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
-    return 1;
+    // In the case of early_exit, the thread doesn't returns to continue
+    // reporting the summary.
+    if (!early_exit)
+      return 1;
   }
   if (summary.size()) {
     // Can print more depending on verbose, but it seems too much information
