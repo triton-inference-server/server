@@ -139,17 +139,15 @@ volatile bool early_exit = false;
 void
 SignalHandler(int signum)
 {
+  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
   // Upon invoking the SignalHandler for the first time early_exit flag is
-  // invoked. On the second invocation, the program exits immediately.
+  // invoked and client waits for in-flight inferences to complete before
+  // exiting. On the second invocation, the program exits immediately.
   if (!early_exit) {
-    std::cout << "Interrupt signal (" << signum << ") received." << std::endl
-              << "Initializing early exit..." << std::endl;
+    std::cout << "Waiting for in-flight inferences to complete." << std::endl;
     early_exit = true;
   } else {
-    std::cout << "Second Interrupt signal (" << signum << ") received."
-              << std::endl
-              << "Exiting immediately..."
-              << std::endl;
+    std::cout << "Exiting immediately..." << std::endl;
     exit(0);
   }
 }
@@ -2003,8 +2001,8 @@ main(int argc, char** argv)
 
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
-    // In the case of early_exit, the thread doesn't returns to continue
-    // reporting the summary.
+    // In the case of early_exit, the thread does not return and continues to
+    // report the summary
     if (!early_exit) {
       return 1;
     }
