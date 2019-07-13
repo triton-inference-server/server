@@ -141,15 +141,24 @@ volatile bool finished_inferencing = false;
 void
 SignalHandler(int signum)
 {
-  std::cout << "Interrupt signal (" << signum << ") received." << std::endl
-            << "Waiting for in-flight inferences to complete." << std::endl;
   // Upon invoking the SignalHandler for the first time early_exit flag is
   // invoked. On the subsequent invocations, if there are no in-flight inference
   // requests, the program exits.
-  if (!early_exit)
+  if (!early_exit) {
+    std::cout << "Interrupt signal (" << signum << ") received." << std::endl
+              << "Initializing early exit..." << std::endl;
     early_exit = true;
-  else if (finished_inferencing)
+  } else if (finished_inferencing) {
+    std::cout << "Another Interrupt signal (" << signum << ") received."
+              << std::endl
+              << "No in-flight inferences. Exitting immediately..."
+              << std::endl;
     exit(0);
+  } else {
+    std::cout << "Interrupt signal (" << signum << ") received." << std::endl
+              << "Still waiting for in-flight inferences to complete."
+              << std::endl;
+  }
 }
 
 typedef struct PerformanceStatusStruct {
@@ -590,7 +599,7 @@ ConcurrencyManager::ChangeConcurrencyLevel(
         new std::vector<nic::InferContext::Stat>());
     threads_concurrency_.emplace_back(new size_t(0));
 
-    // Worker maintians concurrency in different ways.
+    // Worker maintains concurrency in different ways.
     // For sequence models, multiple contexts must be created for multiple
     // concurrent sequences.
     // For non-sequence models, one context can send out multiple requests
