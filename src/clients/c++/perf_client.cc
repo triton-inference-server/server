@@ -2012,8 +2012,9 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread doesn't returns to continue
     // reporting the summary.
-    if (!early_exit)
+    if (!early_exit) {
       return 1;
+    }
   }
   if (summary.size()) {
     // Can print more depending on verbose, but it seems too much information
