@@ -135,29 +135,22 @@ using TimestampVector =
 namespace {
 
 volatile bool early_exit = false;
-// The flag is set when there are no in-flight inferences to complete.
-volatile bool finished_inferencing = false;
 
 void
 SignalHandler(int signum)
 {
   // Upon invoking the SignalHandler for the first time early_exit flag is
-  // invoked. On the subsequent invocations, if there are no in-flight inference
-  // requests, the program exits.
+  // invoked. On the second invocation, the program exits immediately.
   if (!early_exit) {
     std::cout << "Interrupt signal (" << signum << ") received." << std::endl
               << "Initializing early exit..." << std::endl;
     early_exit = true;
-  } else if (finished_inferencing) {
-    std::cout << "Another Interrupt signal (" << signum << ") received."
+  } else {
+    std::cout << "Second Interrupt signal (" << signum << ") received."
               << std::endl
-              << "No in-flight inferences. Exitting immediately..."
+              << "Exiting immediately..."
               << std::endl;
     exit(0);
-  } else {
-    std::cout << "Interrupt signal (" << signum << ") received." << std::endl
-              << "Still waiting for in-flight inferences to complete."
-              << std::endl;
   }
 }
 
@@ -2007,7 +2000,7 @@ main(int argc, char** argv)
       }
     }
   }
-  finished_inferencing = true;
+
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread doesn't returns to continue
