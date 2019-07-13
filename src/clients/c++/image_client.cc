@@ -392,7 +392,7 @@ void
 ParseModel(
     const std::unique_ptr<nic::InferContext>& ctx, const size_t batch_size,
     size_t* c, size_t* h, size_t* w, ni::ModelInput::Format* format, int* type1,
-    int* type3, bool verbose = false)
+    int* type3, size_t* op_size, bool verbose = false)
 {
   if (ctx->Inputs().size() != 1) {
     std::cerr << "expecting 1 input, model \"" << ctx->ModelName() << "\" has "
@@ -430,6 +430,7 @@ ParseModel(
 
     if (dim > 1) {
       non_one_cnt++;
+      *op_size = dim;
       if (non_one_cnt > 1) {
         std::cerr << "expecting model output to be a vector" << std::endl;
         exit(1);
@@ -677,18 +678,17 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  size_t c, h, w;
+  size_t c, h, w, op_size;
   ni::ModelInput::Format format;
   int type1, type3;
-  ParseModel(ctx, batch_size, &c, &h, &w, &format, &type1, &type3, verbose);
+  ParseModel(ctx, batch_size, &c, &h, &w, &format, &type1, &type3, &op_size, verbose);
 
   // Collect the names of the image(s) and their sizes (for shared memory).
   std::vector<std::string> image_filenames;
 
   size_t byte_size = c * h * w * sizeof(float);
   int num_batches = ceil(image_filenames.size()*1.0/batch_size);
-  // Assume output shape is [1000] for now
-  size_t output_byte_size = sizeof(float) * 1000;
+  size_t output_byte_size = sizeof(float) * op_size;
   std::string shm_key;
   int shm_fd_ip;
   void* shm_addr_ip;
@@ -955,7 +955,6 @@ main(int argc, char** argv)
   }
 
   // Post-process the results to make prediction(s)
-  output_byte_size = sizeof(float) * 1000;
   for (size_t idx = 0; idx < results.size(); idx++) {
     std::cout << "Request " << idx << ", batch size " << batch_size
               << std::endl;
