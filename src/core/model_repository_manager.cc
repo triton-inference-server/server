@@ -1105,9 +1105,10 @@ ModelRepositoryManager::VersionsToLoad(
 
       if (subdir.length() > 1 && subdir.front() == '0') {
         return Status(
-          RequestStatusCode::INVALID_ARG,
-            "model '" + name + "' has at least one version with "
-            "leading zeros in its directory name which is not allowed");
+            RequestStatusCode::INVALID_ARG,
+            "model '" + name +
+                "' has at least one version with "
+                "leading zeros in its directory name which is not allowed");
       }
 
       existing_versions.insert(version);
