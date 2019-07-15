@@ -291,6 +291,7 @@ if(${TRTIS_ENABLE_S3})
     trtserver
     PRIVATE ${AWS_LINK_LIBRARIES}
   )
+
 endif() # TRTIS_ENABLE_S3
 
 if(${TRTIS_ENABLE_GPU})
