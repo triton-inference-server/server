@@ -113,12 +113,12 @@ endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 #
 set(
   TRTSERVER_SRCS
-  main.cc common.cc
+  main.cc common.cc ../core/logging.cc
 )
 
 set(
   TRTSERVER_HDRS
-  common.h
+  common.h ../core/logging.h
 )
 
 add_executable(
@@ -143,9 +143,20 @@ install(
 #
 # simple
 #
+set(
+  SIMPLE_SRCS
+  simple.cc common.cc ../core/logging.cc
+)
+
+set(
+  SIMPLE_HDRS
+  common.h ../core/logging.h
+)
+
 add_executable(
   simple
-  simple.cc
+  ${SIMPLE_SRCS}
+  ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
 )
 target_link_libraries(

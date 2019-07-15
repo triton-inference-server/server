@@ -26,7 +26,5 @@
 {
   global:
     TRTSERVER_*;
-    *nvidia15inferenceserver10Log*;
-    *nvidia15inferenceserver8gLogger*;
   local: *;
 };

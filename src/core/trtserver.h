@@ -302,6 +302,22 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetProfiling(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitTimeout(
     TRTSERVER_ServerOptions* options, unsigned int timeout);
 
+// Enable or disable info level logging.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogInfo(
+    TRTSERVER_ServerOptions* options, bool log);
+
+// Enable or disable warning level logging.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogWarn(
+    TRTSERVER_ServerOptions* options, bool log);
+
+// Enable or disable error level logging.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogError(
+    TRTSERVER_ServerOptions* options, bool log);
+
+// Set verbose logging level. Level zero disables verbose logging.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogVerbose(
+    TRTSERVER_ServerOptions* options, int level);
+
 // Enable or disable metrics collection in a server options.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetMetrics(
     TRTSERVER_ServerOptions* options, bool metrics);

@@ -38,7 +38,6 @@
 #include <sanitizer/lsan_interface.h>
 #endif  // TRTIS_ENABLE_ASAN
 
-#include "src/core/logging.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 
@@ -257,7 +256,7 @@ CheckPortCollision()
        http_ports_.end()) &&
       (grpc_port_ != -1) && allow_http_ && allow_grpc_) {
     LOG_ERROR << "The server cannot listen to HTTP requests "
-              << "and gRPC requests at the same port";
+              << "and GRPC requests at the same port";
     return true;
   }
 #endif  // TRTIS_ENABLE_HTTP && TRTIS_ENABLE_GRPC
@@ -267,7 +266,7 @@ CheckPortCollision()
   if ((grpc_port_ == metrics_port_) && (metrics_port_ != -1) && allow_grpc_ &&
       allow_metrics_) {
     LOG_ERROR << "The server cannot provide metrics on same port used for "
-              << "gRPC requests";
+              << "GRPC requests";
     return true;
   }
 #endif  // TRTIS_ENABLE_GRPC && TRTIS_ENABLE_METRICS
@@ -366,7 +365,7 @@ StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
   }
 
 #ifdef TRTIS_ENABLE_GRPC
-  // Enable gRPC endpoints if requested...
+  // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
     TRTSERVER_Error* err = StartGrpcService(&grpc_service_, server);
     if (err != nullptr) {
@@ -716,6 +715,19 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       TRTSERVER_ServerOptionsSetExitTimeout(
           server_options, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
+
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogInfo(server_options, log_info),
+      "setting log info enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogWarn(server_options, log_warn),
+      "setting log warn enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogError(server_options, log_error),
+      "setting log error enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogVerbose(server_options, log_verbose),
+      "setting log verbose level");
 
 #ifdef TRTIS_ENABLE_METRICS
   FAIL_IF_ERR(
