@@ -1103,7 +1103,7 @@ ModelRepositoryManager::VersionsToLoad(
     try {
       int64_t version = std::stoll(subdir);
 
-      if (subdir.length() > 1 && subdir.front() == '0') {
+      if ((subdir.length() > 1) && (subdir.front() == '0')) {
         return Status(
             RequestStatusCode::INVALID_ARG,
             "model '" + name +
