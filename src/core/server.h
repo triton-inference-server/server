@@ -35,7 +35,6 @@
 #include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
-#include "src/core/request_status.pb.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
@@ -51,39 +50,31 @@ class InferenceServer {
   InferenceServer();
 
   // Initialize the server. Return true on success, false otherwise.
-  bool Init();
+  Status Init();
 
   // Stop the server.  Return true if all models are unloaded, false
   // if exit timeout occurs.
-  bool Stop();
+  Status Stop();
 
   // Check the model repository for changes and update server state
   // based on those changes.
   Status PollModelRepository();
 
-  // Run health check indicated by 'mode'
-  void HandleHealth(
-      RequestStatus* request_status, bool* health, const std::string& mode);
+  // Run health check
+  Status IsLive(bool* live);
+  Status IsReady(bool* ready);
 
-  // Run profile 'cmd' for profiling all the all GPU devices
-  void HandleProfile(RequestStatus* request_status, const std::string& cmd);
-
-  // Perform inference on the given input for specified model and
-  // update RequestStatus object with the status of the inference.
-  void HandleInfer(
-      RequestStatus* request_status,
+  // Perform inference on the given input for specified model.
+  Status Infer(
       const std::shared_ptr<InferenceBackend>& backend,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
       std::shared_ptr<ModelInferStats> infer_stats,
-      std::function<void()> OnCompleteInferRPC);
+      std::function<void(const Status&)> OnCompleteInferRPC);
 
-  // Update the RequestStatus object and ServerStatus object with the
-  // status of the model. If 'model_name' is empty, update with the
-  // status of all models.
-  void HandleStatus(
-      RequestStatus* request_status, ServerStatus* server_status,
-      const std::string& model_name);
+  // Update the ServerStatus object with the status of the model. If
+  // 'model_name' is empty, update with the status of all models.
+  Status GetStatus(ServerStatus* server_status, const std::string& model_name);
 
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
@@ -148,9 +139,6 @@ class InferenceServer {
   // Return the uptime of the server in nanoseconds.
   uint64_t UptimeNs() const;
 
-  // Return the next request ID for this server.
-  uint64_t NextRequestId() { return next_request_id_++; }
-
   std::string version_;
   std::string id_;
   uint64_t start_time_ns_;
@@ -166,9 +154,6 @@ class InferenceServer {
 
   // Current state of the inference server.
   ServerReadyState ready_state_;
-
-  // Each request is assigned a unique id.
-  std::atomic<uint64_t> next_request_id_;
 
   // Number of in-flight requests. During shutdown we attempt to wait
   // for all in-flight requests to complete before exiting.

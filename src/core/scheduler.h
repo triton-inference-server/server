@@ -57,7 +57,7 @@ class Scheduler {
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
-        const std::function<void(Status)> complete_function)
+        const std::function<void(const Status&)> complete_function)
         : queue_timer_(std::move(queue_timer)), stats_(stats),
           request_provider_(request_provider),
           response_provider_(response_provider),
@@ -69,7 +69,7 @@ class Scheduler {
     std::shared_ptr<ModelInferStats> stats_;
     std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<InferResponseProvider> response_provider_;
-    std::function<void(Status)> complete_function_;
+    std::function<void(const Status&)> complete_function_;
     Status status_;
   };
 
@@ -92,14 +92,14 @@ class Scheduler {
   // single request in 'payloads' it will be reported in that payload.
   using StandardRunFunc = std::function<void(
       uint32_t runner_idx, std::vector<Payload>* payloads,
-      std::function<void(Status)> OnRunComplete)>;
+      std::function<void(const Status&)> OnRunComplete)>;
 
   // Enqueue a request with the scheduler.
   virtual void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(Status)> OnComplete) = 0;
+      std::function<void(const Status&)> OnComplete) = 0;
 };
 
 }}  // namespace nvidia::inferenceserver

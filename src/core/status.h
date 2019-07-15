@@ -66,22 +66,22 @@ class Status {
 };
 
 // If status is non-OK, exit.
-#define CHECK_IF_ERROR(S)                                \
-  do {                                                   \
-    const Status& status__ = (S);                        \
-    if (status__.Code() != RequestStatusCode::SUCCESS) { \
-      std::cerr << status__.AsString() << std::endl;     \
-      exit(1);                                           \
-    }                                                    \
+#define CHECK_IF_ERROR(S)                            \
+  do {                                               \
+    const Status& status__ = (S);                    \
+    if (!status__.IsOk()) {                          \
+      std::cerr << status__.AsString() << std::endl; \
+      exit(1);                                       \
+    }                                                \
   } while (false)
 
 // If status is non-OK, return the Status.
-#define RETURN_IF_ERROR(S)                               \
-  do {                                                   \
-    const Status& status__ = (S);                        \
-    if (status__.Code() != RequestStatusCode::SUCCESS) { \
-      return status__;                                   \
-    }                                                    \
+#define RETURN_IF_ERROR(S)        \
+  do {                            \
+    const Status& status__ = (S); \
+    if (!status__.IsOk()) {       \
+      return status__;            \
+    }                             \
   } while (false)
 
 }}  // namespace nvidia::inferenceserver

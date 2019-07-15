@@ -132,7 +132,6 @@ set(
   profile.cc
   provider.cc
   provider_utils.cc
-  request_status.cc
   sequence_batch_scheduler.cc
   server.cc
   server_status.cc
@@ -158,7 +157,6 @@ set(
   profile.h
   provider.h
   provider_utils.h
-  request_status.h
   scheduler.h
   sequence_batch_scheduler.h
   server.h
