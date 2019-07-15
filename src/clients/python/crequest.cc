@@ -564,7 +564,8 @@ InferContextInputSetRaw(
 
 nic::Error*
 InferContextInputSetSharedMemory(
-    InferContextInputCtx* ctx, const char* shm_key, size_t offset, size_t byte_size)
+    InferContextInputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size)
 {
   nic::Error err =
       ctx->input->SetSharedMemory(std::string(shm_key), offset, byte_size);
@@ -578,7 +579,8 @@ struct InferContextOutputCtx {
 
 nic::Error*
 InferContextOutputSetSharedMemory(
-    InferContextOutputCtx* ctx, const char* shm_key, size_t offset, size_t byte_size)
+    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size)
 {
   nic::Error err =
       ctx->output->SetSharedMemory(std::string(shm_key), offset, byte_size);

@@ -124,13 +124,15 @@ nic::Error* InferContextInputSetShape(
 nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 nic::Error* InferContextInputSetSharedMemory(
-    InferContextInputCtx* ctx, const char* shm_key, size_t offset, size_t byte_size);
+    InferContextInputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size);
 
 //==============================================================================
 // InferContext::Output
 typedef struct InferContextOutputCtx InferContextOutputCtx;
 nic::Error* InferContextOutputSetSharedMemory(
-    InferContextOutputCtx* ctx, const char* shm_key, size_t offset, size_t byte_size);
+    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size);
 
 //==============================================================================
 // InferContext::Result

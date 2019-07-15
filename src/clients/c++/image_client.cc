@@ -176,7 +176,8 @@ Postprocess(
     const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>&
         results,
     const std::vector<std::string>& filenames, const size_t batch_size,
-    const std::string& shm_key, size_t offset, const size_t& byte_size, bool use_shm)
+    const std::string& shm_key, size_t offset, const size_t& byte_size,
+    bool use_shm)
 {
   if (results.size() != 1) {
     std::cerr << "expected 1 result, got " << results.size() << std::endl;
@@ -190,7 +191,7 @@ Postprocess(
   }
 
   if (use_shm) {
-    float output_data[byte_size/sizeof(float)];
+    float output_data[byte_size / sizeof(float)];
     void* shm_addr;
     int res;
     int shm_fd;
@@ -201,8 +202,8 @@ Postprocess(
       exit(1);
     }
     // map shared memory to process address space
-    shm_addr =
-        mmap(NULL, batch_size * byte_size, PROT_READ, MAP_SHARED, shm_fd, offset);
+    shm_addr = mmap(
+        NULL, batch_size * byte_size, PROT_READ, MAP_SHARED, shm_fd, offset);
     if (shm_addr == MAP_FAILED) {
       std::cerr << "error: unable to process address space";
       exit(1);
@@ -248,10 +249,12 @@ Postprocess(
         nic::InferContext::Result::ClassResult cls;
         nic::Error err = result->GetClassAtCursor(b, &cls);
         if (!err.IsOk()) {
-          std::cerr << "failed reading class count for batch " << b << ": " << err << std::endl;
+          std::cerr << "failed reading class count for batch " << b << ": "
+                    << err << std::endl;
           exit(1);
         }
-        std::cout << "    " << cls.idx << " (" << cls.label << ") = " << cls.value << std::endl;
+        std::cout << "    " << cls.idx << " (" << cls.label
+                  << ") = " << cls.value << std::endl;
       }
     }
   }
@@ -314,8 +317,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << "For -H, the header will be added to HTTP requests (ignored for GRPC "
          "requests). The header must be specified as 'Header:Value'. -H may be "
-         "specified multiple times to add multiple headers."
-      << std::endl;
+         "specified multiple times to add multiple headers.";
+  std::cerr << "If -S is specified, the Shared Memory API will be used to make "
+            << "the request." << std::endl;
   std::cerr << std::endl;
 
   exit(1);
@@ -681,13 +685,14 @@ main(int argc, char** argv)
   size_t c, h, w, op_size;
   ni::ModelInput::Format format;
   int type1, type3;
-  ParseModel(ctx, batch_size, &c, &h, &w, &format, &type1, &type3, &op_size, verbose);
+  ParseModel(
+      ctx, batch_size, &c, &h, &w, &format, &type1, &type3, &op_size, verbose);
 
   // Collect the names of the image(s) and their sizes (for shared memory).
   std::vector<std::string> image_filenames;
 
   size_t byte_size = c * h * w * sizeof(float);
-  int num_batches = ceil(image_filenames.size()*1.0/batch_size);
+  int num_batches = ceil(image_filenames.size() * 1.0 / batch_size);
   size_t output_byte_size = sizeof(float) * op_size;
   std::string shm_key;
   int shm_fd_ip;
@@ -701,11 +706,12 @@ main(int argc, char** argv)
   if (use_shm) {
     size_t offset = 0;  // start
 
-    for (int batch_i = 0; batch_i < num_batches ; batch_i++) {
+    for (int batch_i = 0; batch_i < num_batches; batch_i++) {
       // For INPUT
       // get shared memory file descriptor (NOT a file)
       shm_key = "/input_batch_" + std::to_string(batch_i);
-      shm_fd_ip = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      shm_fd_ip =
+          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       if (shm_fd_ip == -1) {
         std::cerr << "error: unable to get input shared memory descriptor";
         exit(1);
@@ -728,7 +734,8 @@ main(int argc, char** argv)
       // For OUTPUT
       // get shared memory file descriptor (NOT a file)
       shm_key = "/output_batch_" + std::to_string(batch_i);
-      shm_fd_op = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      shm_fd_op =
+          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       if (shm_fd_op == -1) {
         std::cerr << "error: unable to get output shared memory descriptor";
         exit(1);
@@ -785,7 +792,7 @@ main(int argc, char** argv)
     image_i++;
     image_data.emplace_back();
     size_t byte_size = 0;
-    batch_i = ceil(image_i*1.0/batch_size);
+    batch_i = ceil(image_i * 1.0 / batch_size);
     shm_key = "/input_batch_" + std::to_string(batch_i);
     FileToInputData(
         fn, c, h, w, format, type1, type3, scale, &(image_data.back()),
@@ -927,7 +934,8 @@ main(int argc, char** argv)
     // CLEANUP input (after sending request - if needed)
     for (size_t idx = 0; idx < results.size(); idx++) {
       shm_key = "/input_batch_" + std::to_string(idx);
-      shm_fd_ip = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+      shm_fd_ip =
+          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
       if (shm_fd_ip == -1) {
         std::cerr << "error: unable to get input shared memory descriptor";
         exit(1);
@@ -960,7 +968,8 @@ main(int argc, char** argv)
               << std::endl;
     Postprocess(
         results[idx], result_filenames[idx], batch_size,
-        "/output_batch_" + std::to_string(idx), /*offset=*/0, output_byte_size, use_shm);
+        "/output_batch_" + std::to_string(idx), /*offset=*/0, output_byte_size,
+        use_shm);
   }
 
   return 0;
