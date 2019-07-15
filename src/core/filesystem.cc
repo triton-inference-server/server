@@ -528,9 +528,8 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #ifndef TRTIS_ENABLE_GCS
     return Status(
         RequestStatusCode::INTERNAL,
-        "trtis has detected a Google Cloud Storage address but has not been "
-        "compiled"
-        "with support for GCS. Build with TRTIS_ENABLE_GCS=ON.");
+        "gs:// file-system not supported. To enable build with "
+        "-DTRTIS_ENABLE_GCS=ON.");
 #else
     static GCSFileSystem gcs_fs;
     RETURN_IF_ERROR(gcs_fs.CheckClient());
@@ -538,6 +537,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
     return Status::Success;
 #endif  // TRTIS_ENABLE_GCS
   }
+
   // For now assume all paths are local...
   static LocalFileSystem local_fs;
   *file_system = &local_fs;
