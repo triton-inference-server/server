@@ -189,7 +189,9 @@ AutoFillSavedModelImpl::FixBatchingSupport(ModelConfig* config)
   }
 
   // Set max-batch-size to 1 if the model signature and config hint agree
-  config->set_max_batch_size(model_support_batching_ ? 1 : 0);
+  if (config->max_batch_size() == 0) {
+    config->set_max_batch_size(model_support_batching_ ? 1 : 0);
+  }
   return Status::Success;
 }
 
