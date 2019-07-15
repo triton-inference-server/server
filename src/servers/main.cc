@@ -85,7 +85,6 @@ int32_t grpc_port_ = 8001;
 #ifdef TRTIS_ENABLE_METRICS
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
-bool allow_gpu_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
 
@@ -340,12 +339,12 @@ StartHttpService(
 #ifdef TRTIS_ENABLE_METRICS
 TRTSERVER_Error*
 StartMetricsService(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service)
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    const std::shared_ptr<TRTSERVER_Server>& server)
 {
   TRTSERVER_Error* err =
       nvidia::inferenceserver::HTTPServer::CreateMetricsServer(
-          metrics_port_, 1 /* HTTP thread count */, allow_gpu_metrics_,
-          service);
+          server, metrics_port_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -404,7 +403,7 @@ StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
 #ifdef TRTIS_ENABLE_METRICS
   // Enable metrics endpoint if requested...
   if (metrics_port_ != -1) {
-    TRTSERVER_Error* err = StartMetricsService(&metrics_service_);
+    TRTSERVER_Error* err = StartMetricsService(&metrics_service_, server);
     if (err != nullptr) {
       LOG_ERROR << "Failed to start Metrics service: "
                 << TRTSERVER_ErrorMessage(err);
@@ -536,7 +535,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
 #ifdef TRTIS_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
-  bool allow_gpu_metrics = allow_gpu_metrics_;
+  bool allow_gpu_metrics = true;
 #endif  // TRTIS_ENABLE_METRICS
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
@@ -685,7 +684,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
 #ifdef TRTIS_ENABLE_METRICS
   metrics_port_ = allow_metrics_ ? metrics_port : -1;
-  allow_gpu_metrics_ = allow_metrics_ ? allow_gpu_metrics : false;
+  allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
 #endif  // TRTIS_ENABLE_METRICS
 
   // Check if HTTP, GRPC and metrics port clash
@@ -712,11 +711,18 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       "setting strict readiness");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetProfiling(server_options, allow_profiling),
-      "setting profiling");
+      "setting profiling enable");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitTimeout(
           server_options, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
+
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetMetrics(server_options, allow_metrics_),
+      "setting metrics enable");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetGpuMetrics(server_options, allow_gpu_metrics),
+      "setting GPU metrics enable");
 
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(

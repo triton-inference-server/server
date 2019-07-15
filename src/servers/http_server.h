@@ -42,8 +42,8 @@ class HTTPServer {
       std::vector<std::unique_ptr<HTTPServer>>* http_servers);
 
   static TRTSERVER_Error* CreateMetricsServer(
-      int32_t port, int thread_cnt, const bool allow_gpu_metrics,
-      std::unique_ptr<HTTPServer>* metrics_server);
+      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
+      int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server);
 
   virtual ~HTTPServer() = default;
 

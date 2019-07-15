@@ -41,12 +41,13 @@ extern "C" {
 #define TRTSERVER_EXPORT
 #endif
 
-struct TRTSERVER_Server;
-struct TRTSERVER_ServerOptions;
+struct TRTSERVER_Error;
 struct TRTSERVER_InferenceRequestProvider;
 struct TRTSERVER_InferenceResponse;
+struct TRTSERVER_Metrics;
 struct TRTSERVER_Protobuf;
-struct TRTSERVER_Error;
+struct TRTSERVER_Server;
+struct TRTSERVER_ServerOptions;
 
 //
 // TRTSERVER_Error
@@ -113,6 +114,37 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufDelete(
 // 'protobuf' and must not be accessed once 'protobuf' is deleted.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufSerialize(
     TRTSERVER_Protobuf* protobuf, const char** base, size_t* byte_size);
+
+//
+// TRTSERVER_Metrics
+//
+// Object representing metrics.
+//
+
+// Metric format types
+typedef enum trtserver_metricformat_enum {
+  TRTSERVER_METRIC_PROMETHEUS
+} TRTSERVER_Metric_Format;
+
+// Delete a metrics object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsDelete(
+    TRTSERVER_Metrics* metrics);
+
+// Get a buffer containing the metrics in the specified format. For
+// each format the buffer contains the following:
+//
+//   TRTSERVER_METRIC_PROMETHEUS: 'base' points to a single multiline
+//   string (char*) that gives a text representation of the metrics in
+//   prometheus format. 'byte_size' returns the length of the string
+//   in bytes.
+//
+// The buffer is owned by the TRTSERVER_Metrics object and should not
+// be modified or freed by the caller. The lifetime of the buffer
+// extends only as long as 'metrics' and must not be accessed once
+// 'metrics' is deleted.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsFormatted(
+    TRTSERVER_Metrics* metrics, TRTSERVER_Metric_Format format,
+    const char** base, size_t* byte_size);
 
 //
 // TRTSERVER_MemoryAllocator
@@ -270,6 +302,16 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetProfiling(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitTimeout(
     TRTSERVER_ServerOptions* options, unsigned int timeout);
 
+// Enable or disable metrics collection in a server options.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetMetrics(
+    TRTSERVER_ServerOptions* options, bool metrics);
+
+// Enable or disable GPU metrics collection in a server options. GPU
+// metrics are collected if both this option and
+// TRTSERVER_ServerOptionsSetMetrics are true.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetGpuMetrics(
+    TRTSERVER_ServerOptions* options, bool gpu_metrics);
+
 // Enable or disable TensorFlow soft-placement of operators.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
@@ -335,6 +377,12 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStatus(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
     const char* model_name);
+
+// Get the current metrics for the server. The caller takes ownership
+// of the metrics object and must call TRTSERVER_MetricsDelete to
+// release the object.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
+    TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
 
 // Type for inference completion callback function. The callback
 // function takes ownership of the TRTSERVER_InferenceResponse object

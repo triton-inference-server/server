@@ -35,7 +35,6 @@
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#include "src/core/metrics.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
@@ -131,8 +130,11 @@ HTTPServerImpl::Dispatch(evhtp_request_t* req, void* arg)
 // Handle HTTP requests to obtain prometheus metrics
 class HTTPMetricsServer : public HTTPServerImpl {
  public:
-  explicit HTTPMetricsServer(const int32_t port, const int thread_cnt)
-      : HTTPServerImpl(port, thread_cnt), api_regex_(R"(/metrics/?)")
+  explicit HTTPMetricsServer(
+      const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
+      const int thread_cnt)
+      : HTTPServerImpl(port, thread_cnt), server_(server),
+        api_regex_(R"(/metrics/?)")
   {
   }
 
@@ -141,6 +143,7 @@ class HTTPMetricsServer : public HTTPServerImpl {
  private:
   void Handle(evhtp_request_t* req) override;
 
+  std::shared_ptr<TRTSERVER_Server> server_;
   re2::RE2 api_regex_;
 };
 
@@ -155,14 +158,28 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
     return;
   }
 
-  // Call to prometheus endpoints should not have any trailing string
+  evhtp_res res = EVHTP_RES_BADREQ;
+
+  // Call to metric endpoint should not have any trailing string
   if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
-    const std::string metrics = Metrics::SerializedMetrics();
-    evbuffer_add(req->buffer_out, metrics.c_str(), metrics.size());
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRTSERVER_Metrics* metrics = nullptr;
+    TRTSERVER_Error* err = TRTSERVER_ServerMetrics(server_.get(), &metrics);
+    if (err == nullptr) {
+      const char* base;
+      size_t byte_size;
+      err = TRTSERVER_MetricsFormatted(
+          metrics, TRTSERVER_METRIC_PROMETHEUS, &base, &byte_size);
+      if (err == nullptr) {
+        res = EVHTP_RES_OK;
+        evbuffer_add(req->buffer_out, base, byte_size);
+      }
+    }
+
+    TRTSERVER_MetricsDelete(metrics);
+    TRTSERVER_ErrorDelete(err);
   }
+
+  evhtp_send_reply(req, res);
 }
 
 #endif  // TRTIS_ENABLE_METRICS
@@ -769,8 +786,8 @@ HTTPServer::CreateAPIServer(
 
 TRTSERVER_Error*
 HTTPServer::CreateMetricsServer(
-    const int32_t port, const int thread_cnt, const bool allow_gpu_metrics,
-    std::unique_ptr<HTTPServer>* metrics_server)
+    const std::shared_ptr<TRTSERVER_Server>& server, const int32_t port,
+    const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
 {
   std::string addr = "0.0.0.0:" + std::to_string(port);
   LOG_INFO << "Starting Metrics Service at " << addr;
@@ -781,11 +798,7 @@ HTTPServer::CreateMetricsServer(
 #endif  // !TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_METRICS
-  if (allow_gpu_metrics) {
-    Metrics::EnableGPUMetrics();
-  }
-  metrics_server->reset(new HTTPMetricsServer(port, thread_cnt));
-
+  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
   return nullptr;
 #endif  // TRTIS_ENABLE_METRICS
 }
