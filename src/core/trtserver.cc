@@ -923,6 +923,27 @@ TRTSERVER_ServerModelStatus(
   return nullptr;  // success
 }
 
+TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::RequestStatus request_status;
+  lserver->HandleControl(&request_status, std::string(model_name), true);
+
+  return TrtServerError::Create(request_status.code(), request_status.msg());
+}
+
+TRTSERVER_Error*
+TRTSERVER_UnloadModel(TRTSERVER_Server* server, const char* model_name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::RequestStatus request_status;
+  lserver->HandleControl(&request_status, std::string(model_name), false);
+
+  return TrtServerError::Create(request_status.code(), request_status.msg());
+}
+
 TRTSERVER_Error*
 TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 {

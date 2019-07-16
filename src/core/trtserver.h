@@ -378,6 +378,14 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
     const char* model_name);
 
+// Load the requested model.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
+    TRTSERVER_Server* server, const char* model_name);
+
+// Unload the requested model.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_UnloadModel(
+    TRTSERVER_Server* server, const char* model_name);
+
 // Get the current metrics for the server. The caller takes ownership
 // of the metrics object and must call TRTSERVER_MetricsDelete to
 // release the object.

@@ -344,6 +344,32 @@ InferenceServer::GetStatus(
   return Status::Success;
 }
 
+void
+InferenceServer::HandleControl(
+    RequestStatus* request_status, const std::string& model_name, bool is_load)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    RequestStatusFactory::Create(
+        request_status, 0, id_, RequestStatusCode::UNAVAILABLE,
+        "Server not ready");
+    return;
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+  const uint64_t request_id = NextRequestId();
+
+  ModelRepositoryManager::ActionType action_type;
+  if (is_load) {
+    action_type = ModelRepositoryManager::ActionType::LOAD;
+  } else {
+    action_type = ModelRepositoryManager::ActionType::UNLOAD;
+  }
+  Status status =
+      model_repository_manager_->LoadUnloadModel(model_name, action_type);
+  RequestStatusFactory::Create(request_status, request_id, id_, status);
+  return;
+}
+
 uint64_t
 InferenceServer::UptimeNs() const
 {
