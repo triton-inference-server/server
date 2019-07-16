@@ -152,6 +152,7 @@ class InputImpl : public InferContext::Input {
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
+  bool IsSharedMemory() { return use_shm_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
 
@@ -173,6 +174,10 @@ class InputImpl : public InferContext::Input {
 
   // Copy the pointer of the raw buffer at 'batch_idx' into 'buf'
   Error GetRaw(size_t batch_idx, const uint8_t** buf, size_t* byte_size) const;
+
+  // Copy the shared memory key, offset and batch_byte_size
+  Error GetSharedMemory(
+      std::string* shm_key, size_t* offset, size_t* batch_byte_size);
 
   // Prepare to send this input as part of a request.
   Error PrepareForRequest();
@@ -218,6 +223,7 @@ class OutputImpl : public InferContext::Output {
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
+  bool IsSharedMemory() { return use_shm_; }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {

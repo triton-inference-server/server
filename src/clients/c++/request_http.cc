@@ -1011,6 +1011,7 @@ class InferHttpContextImpl : public InferContextImpl {
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
+  bool HasSharedMemory(std::string output_name) const;
 
  private:
   Error AsyncRun(
@@ -1164,13 +1165,16 @@ HttpRequestImpl::CreateResult(
     return err;
   }
 
-  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
-  result->SetBatch1Shape(output.raw().dims());
-  if (IsFixedSizeDataType(infer_output->DType())) {
-    result->SetBatchnByteSize(output.raw().batch_byte_size());
-  }
+  if (ctx.HasSharedMemory(output.name())) {
+    std::unique_ptr<ResultImpl> result(
+        new ResultImpl(infer_output, batch_size));
+    result->SetBatch1Shape(output.raw().dims());
+    if (IsFixedSizeDataType(infer_output->DType())) {
+      result->SetBatchnByteSize(output.raw().batch_byte_size());
+    }
 
-  ordered_results_.emplace_back(std::move(result));
+    ordered_results_.emplace_back(std::move(result));
+  }
 
   return Error::Success;
 }
@@ -1686,6 +1690,20 @@ InferHttpContextImpl::AsyncTransfer()
       request_ptr->callback_(this, std::move(request));
     }
   } while (!exiting_);
+}
+
+bool
+InferHttpContextImpl::HasSharedMemory(std::string output_name) const
+{
+  size_t output_pos_idx = 0;
+  while (output_pos_idx < outputs_.size()) {
+    InputImpl* io =
+        reinterpret_cast<InputImpl*>(outputs_[output_pos_idx].get());
+    if (io->Name() == output_name) {
+      return io->IsSharedMemory();
+    }
+  }
+  return false;
 }
 
 Error

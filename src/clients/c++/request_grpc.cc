@@ -534,6 +534,7 @@ class InferGrpcContextImpl : public InferContextImpl {
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
+  bool HasSharedMemory(std::string output_name) const;
 
  protected:
   virtual Error AsyncRun(
@@ -638,14 +639,15 @@ GrpcRequestImpl::GetResults(
 
     std::unique_ptr<GrpcResultImpl> result(
         new GrpcResultImpl(grpc_response_, infer_output));
-    err = InitResult(infer_output, output, idx, result.get());
-    if (!err.IsOk()) {
-      results->clear();
-      return err;
+    if (ctx.HasSharedMemory(output.name())) {
+      err = InitResult(infer_output, output, idx, result.get());
+      if (!err.IsOk()) {
+        results->clear();
+        return err;
+      }
+      results->insert(std::make_pair(output.name(), std::move(result)));
+      ++idx;
     }
-
-    results->insert(std::make_pair(output.name(), std::move(result)));
-    ++idx;
   }
 
   Error err = PostRunProcessing(response_header, results);
@@ -866,13 +868,15 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
     std::string* new_input = request_.add_raw_input();
 
-    // Append all batches of one input together
-    for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
-      const uint8_t* data_ptr;
-      size_t data_byte_size;
-      io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
-      new_input->append(
-          reinterpret_cast<const char*>(data_ptr), data_byte_size);
+    // Append all batches of one input together (skip if using shared memory)
+    if (!io->IsSharedMemory()) {
+      for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
+        const uint8_t* data_ptr;
+        size_t data_byte_size;
+        io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
+        new_input->append(
+            reinterpret_cast<const char*>(data_ptr), data_byte_size);
+      }
     }
     input_pos_idx++;
   }
@@ -979,6 +983,20 @@ InferGrpcContext::Create(
   }
 
   return err;
+}
+
+bool
+InferGrpcContextImpl::HasSharedMemory(std::string output_name) const
+{
+  size_t output_pos_idx = 0;
+  while (output_pos_idx < outputs_.size()) {
+    InputImpl* io =
+        reinterpret_cast<InputImpl*>(outputs_[output_pos_idx].get());
+    if (io->Name() == output_name) {
+      return io->IsSharedMemory();
+    }
+  }
+  return false;
 }
 
 //==============================================================================
