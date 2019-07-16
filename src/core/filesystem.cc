@@ -265,19 +265,21 @@ GCSFileSystem::ParsePath(
     const std::string& path, std::string* bucket, std::string* object)
 {
   // Get the bucket name and the object path. Return error if input is malformed
-  size_t bucket_start = path.find("gs://") + 5;
-  size_t bucket_end = path.find("/", bucket_start);
-  *bucket = path.substr(bucket_start, bucket_end - bucket_start);
-  *object = path.substr(bucket_end + 1);
+  int bucket_start = path.find("gs://") + 5;
+  int bucket_end = path.find("/", bucket_start);
+
+  // If there isn't a second slash, the address has only the bucket
+  if (bucket_end > bucket_start) {
+    *bucket = path.substr(bucket_start, bucket_end - bucket_start);
+    *object = path.substr(bucket_end + 1);
+  } else {
+    *bucket = path.substr(bucket_start);
+    *object = "";
+  }
 
   if (bucket->empty()) {
     return Status(
         RequestStatusCode::INTERNAL, "No bucket name found in path: " + path);
-  }
-
-  if (object->empty()) {
-    return Status(
-        RequestStatusCode::INTERNAL, "No file name found in path: " + path);
   }
 
   return Status::Success;
@@ -287,14 +289,11 @@ GCSFileSystem::ParsePath(
 std::string
 AppendSlash(const std::string& name)
 {
-  if (name.empty()) {
-    return "/";
+  if (name.empty() || (name.back() == '/')) {
+    return name;
   }
 
-  if (name.back() != '/') {
-    return (name + "/");
-  }
-  return name;
+  return (name + "/");
 }
 
 Status
@@ -333,8 +332,7 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
         "Could not get MetaData for bucket with name " + bucket);
   }
 
-
-  // Check if whether it has children. If at least one child, it is a directory
+  // Check whether it has children. If at least one child, it is a directory
   for (auto&& object_metadata :
        client_->ListObjects(bucket, gcs::Prefix(AppendSlash(object_path)))) {
     if (object_metadata) {
@@ -386,7 +384,6 @@ GCSFileSystem::GetDirectoryContents(
 {
   std::string bucket, dir_path;
   RETURN_IF_ERROR(ParsePath(path, &bucket, &dir_path));
-
   // Append a slash to make it easier to list contents
   std::string full_dir = AppendSlash(dir_path);
 
@@ -406,8 +403,8 @@ GCSFileSystem::GetDirectoryContents(
 
     // We have to make sure that subdirectory contents do not appear here
     std::string name = object_metadata->name();
-    size_t item_start = name.find(full_dir) + full_dir.size();
-    size_t item_end = name.find(
+    int item_start = name.find(full_dir) + full_dir.size();
+    int item_end = name.find(
         "/", item_start);  // GCS response prepends parent directory name
 
     // Let set take care of subdirectory contents
