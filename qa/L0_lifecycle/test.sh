@@ -373,6 +373,45 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1)) 
 
 
+# Send HTTP request to control endpoint
+rm -fr models config.pbtxt.*
+mkdir models
+for i in graphdef savedmodel netdef plan ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
+
+# polling enabled (default), control API should not work
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+code=`curl -s -w %{http_code} localhost:8000/api/control/unload/graphdef_float32_float32_float32`
+set -e
+if [ "$code" != "400" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# the model should not be unloaded
+set +e
+unavailable_count=`curl -s localhost:8000/api/status/graphdef_float32_float32_float32 | grep "MODEL_UNAVAILABLE" | wc -l`
+set -e
+if [ "$unavailable_count" != "0" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1)) 
+
 # Send HTTP request to invalid endpoints
 rm -fr models
 mkdir models
