@@ -865,6 +865,10 @@ ModelRepositoryManager::PollAndUpdate()
   if (!polling_enabled_) {
     return Status(RequestStatusCode::INVALID, "polling is disabled");
   }
+
+  // Serialize all operations that change model state
+  std::lock_guard<std::mutex> lock(poll_mu_);
+
   std::set<std::string> added, deleted, modified, unmodified;
   RETURN_IF_ERROR(Poll(&added, &deleted, &modified, &unmodified));
   // Nothing to do if no model adds, deletes or modifies.
@@ -987,17 +991,101 @@ ModelRepositoryManager::LoadModelByDependency()
 
 Status
 ModelRepositoryManager::LoadUnloadModel(
-    const std::string& model_name, ActionType type,
-    std::function<void(Status)> OnCompleteUpdate)
+    const std::string& model_name, ActionType type)
 {
   if (polling_enabled_) {
     return Status(
         RequestStatusCode::INVALID,
         "explicit model load / unload is not allowed if polling is enabled");
   }
-  Status status = Status(RequestStatusCode::UNSUPPORTED, "not implemented");
-  OnCompleteUpdate(status);
-  return status;
+
+  // Serialize all operations that change model state
+  std::lock_guard<std::mutex> lock(poll_mu_);
+
+  // Update ModelInfo related to file system accordingly
+  std::set<std::string> added, deleted, modified;
+  {
+    std::lock_guard<std::mutex> lk(infos_mu_);
+    if (type == ActionType::UNLOAD) {
+      size_t erased_cnt = infos_.erase(model_name);
+      if (erased_cnt == 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "model '" + model_name + "' is not loaded");
+      }
+      deleted.insert(model_name);
+    } else {
+      const auto full_path = JoinPath({repository_path_, model_name});
+
+      int64_t mtime_ns = GetModifiedTime(std::string(full_path));
+      if (mtime_ns == 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "failed to stat directory for model '" + model_name + "'");
+      }
+
+      bool need_load = false;
+      auto iitr = infos_.find(model_name);
+      if (iitr == infos_.end()) {
+        added.insert(model_name);
+        need_load = true;
+      } else {
+        if (mtime_ns > iitr->second->mtime_nsec_) {
+          modified.insert(model_name);
+          need_load = true;
+        }
+      }
+
+      if (need_load) {
+        std::unique_ptr<ModelInfo> model_info(new ModelInfo());
+        ModelConfig& model_config = model_info->model_config_;
+        model_info->mtime_nsec_ = mtime_ns;
+
+        // If enabled, try to automatically generate missing parts of
+        // the model configuration (autofill) from the model
+        // definition. In all cases normalize and validate the config.
+        RETURN_IF_ERROR(GetNormalizedModelConfig(
+            full_path, backend_config_map_, autofill_, &model_config));
+        RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
+
+        model_info->platform_ = GetPlatform(model_config.platform());
+
+        // Make sure the name of the model matches the name of the
+        // directory. This is a somewhat arbitrary requirement but seems
+        // like good practice to require it of the user. It also acts as a
+        // check to make sure we don't have two different models with the
+        // same name.
+        if (model_config.name() != model_name) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected directory name '" + model_name + "' for model '" +
+                  model_config.name() +
+                  "', directory name must equal model name");
+        }
+
+        // Only update the infos when all validation is completed
+        if (iitr == infos_.end()) {
+          iitr = infos_.emplace(model_name, nullptr).first;
+        }
+        iitr->second = std::move(model_info);
+      }
+    }
+  }
+
+  // Update dependency graph and load
+  Update(added, deleted, modified);
+
+  for (const auto& name : deleted) {
+    ModelConfig model_config;
+    std::set<int64_t> versions;
+    // Utilize "force_unload" of AsyncLoad()
+    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+  }
+
+  // model loading / unloading error will be printed but ignored
+  LoadModelByDependency();
+
+  return Status::Success;
 }
 
 Status
@@ -1052,9 +1140,6 @@ ModelRepositoryManager::Poll(
     std::set<std::string>* added, std::set<std::string>* deleted,
     std::set<std::string>* modified, std::set<std::string>* unmodified)
 {
-  // Serialize all polling operation...
-  std::lock_guard<std::mutex> lock(poll_mu_);
-
   added->clear();
   deleted->clear();
   modified->clear();
