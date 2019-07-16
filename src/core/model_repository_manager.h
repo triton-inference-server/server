@@ -46,6 +46,24 @@ class ModelRepositoryManager {
 
   enum ActionType { NO_ACTION, LOAD, UNLOAD };
 
+  /// A basic unit in dependency graph that records the models seen by the model
+  /// repository manager.
+  struct DependencyNode {
+    DependencyNode(const std::string& model_name)
+        : model_name_(model_name), status_(Status::Success), checked_(false)
+    {
+    }
+
+    std::string model_name_;
+    Status status_;
+    bool checked_;
+    ModelConfig model_config_;
+    std::set<int64_t> loaded_versions_;
+    std::set<DependencyNode*> missing_upstreams_;
+    std::unordered_map<DependencyNode*, int64_t> upstreams_;
+    std::set<DependencyNode*> downstreams_;
+  };
+
   ~ModelRepositoryManager();
 
   /// Create a manager for a repository.
@@ -123,6 +141,9 @@ class ModelRepositoryManager {
   using ModelInfoMap =
       std::unordered_map<std::string, std::unique_ptr<ModelInfo>>;
 
+  // Set of DependencyNode
+  using NodeSet = std::set<DependencyNode*>;
+
   ModelRepositoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
@@ -143,17 +164,65 @@ class ModelRepositoryManager {
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
-  /// Update the configuration of newly added / modified model and serve
-  /// the model based on its version policy.
-  /// \param model_name The name of the model to be updated.
-  /// \param is_added If the model is being added to the model repository.
-  Status Update(const std::string& model_name, bool is_added);
+  /// Update the configurations of newly added / modified model and their
+  /// information shown in server status
+  /// \param added The names of the models added to the repository.
+  /// \param deleted The names of the models removed from the repository.
+  /// \param modified The names of the models remaining in the
+  /// repository that have been changed.
+  /// \return The error status.
+  Status Update(
+      const std::set<std::string>& added, const std::set<std::string>& deleted,
+      const std::set<std::string>& modified);
+
+  /// Load models based on the dependency graph. The function will iteratively
+  /// load models that all the models they depend on has been loaded, and unload
+  /// models if their dependencies are no longer satisfied.
+  /// \return The error status.
+  Status LoadModelByDependency();
+
+  /// Helper function to update the dependency graph based on the poll result
+  /// \param added The names of the models added to the repository.
+  /// \param deleted The names of the models removed from the repository.
+  /// \param modified The names of the models remaining in the
+  /// repository that have been changed.
+  /// \return The error status.
+  Status UpdateDependencyGraph(
+      const std::set<std::string>& added, const std::set<std::string>& deleted,
+      const std::set<std::string>& modified);
+
+  /// Helper function to uncheck the nodes because the model that they depends
+  /// on has changed. The unchecked nodes will be validated again.
+  /// The function will be call recursively to uncheck all downstreams.
+  /// \param downstreams The nodes to be unchecked.
+  /// \param updated_nodes Return the nodes that have been unchecked
+  void UncheckDownstream(NodeSet* downstreams, NodeSet* updated_nodes);
+
+  /// Helper function to construct the edges between nodes in dependency graph.
+  /// \param updated_node The node that is newly added or modified.
+  /// \return True if the node represents an ensemble model. False otherwise.
+  bool ConnectDependencyGraph(DependencyNode* updated_node);
 
   /// Get the configuration for a named model.
   /// \param name The model name.
   /// \param model_config Returns the model configuration.
   /// \return OK if found, NOT_FOUND otherwise.
   Status GetModelConfig(const std::string& name, ModelConfig* model_config);
+
+  /// Get the models to be loaded / unloaded based on the model loaded in
+  /// previous iteration.
+  /// \param loaded_models The models loaded / unloaded in previous iteration.
+  /// Unloaded models will be represented as models with no loaded versions.
+  /// \return A pair of node set containing models to be loaded and models to be
+  /// unloaded for the next iteration.
+  std::pair<NodeSet, NodeSet> ModelsToLoadUnload(const NodeSet& loaded_models);
+
+  /// Check if the node is ready for the next iteration. A node is ready if the
+  /// node is invalid (containing invalid model config or its depdencies failed
+  /// to load) or all of its dependencies are satisfied.
+  /// \param node The node to be checked.
+  /// \return True if the node is ready. False otherwise.
+  bool CheckNode(DependencyNode* node);
 
   /// Get the list of versions to be loaded for a named model based on version
   /// policy.
@@ -163,7 +232,7 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status VersionsToLoad(
       const std::string& name, const ModelConfig& model_config,
-      std::vector<int64_t>& versions);
+      std::set<int64_t>& versions);
 
   const std::string repository_path_;
   const BackendConfigMap backend_config_map_;
@@ -173,6 +242,11 @@ class ModelRepositoryManager {
   std::mutex poll_mu_;
   std::mutex infos_mu_;
   ModelInfoMap infos_;
+
+  std::unordered_map<std::string, std::unique_ptr<DependencyNode>>
+      dependency_graph_;
+  std::unordered_map<std::string, std::unique_ptr<DependencyNode>>
+      missing_nodes_;
 
   std::shared_ptr<ServerStatusManager> status_manager_;
 
