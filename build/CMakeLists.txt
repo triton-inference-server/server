@@ -58,6 +58,10 @@ if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
 endif()
 
+if(TRTIS_ENABLE_ASAN AND TRTIS_ENABLE_GPU)
+  message(FATAL_ERROR "TRTIS_ENABLE_ASAN=ON requires TRTIS_ENABLE_GPU=OFF")
+endif()
+
 # If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
 # projects with OpenSSL dependency.
 set(_CMAKE_ARGS_OPENSSL_ROOT_DIR "")

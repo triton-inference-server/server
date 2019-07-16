@@ -147,8 +147,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
         void* userp)
     {
-      GRPCInferRequest* grpc_infer_request =
-          reinterpret_cast<GRPCInferRequest*>(userp);
+      std::unique_ptr<GRPCInferRequest> grpc_infer_request(
+          reinterpret_cast<GRPCInferRequest*>(userp));
 
       TRTSERVER_Error* response_status =
           TRTSERVER_InferenceResponseStatus(response);
