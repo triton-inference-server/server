@@ -96,10 +96,6 @@ class InferReshapeTest(unittest.TestCase):
         for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
             if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
                                         input_shapes[0], input_shapes[0], input_shapes[0]):
-                if len(input_shapes) <=2:
-                    # Skip cases that reshape to zero-sized tensors
-                    # (know from qa/common/gen_qa_reshape_model.py)
-                    return
                 # model that supports batching
                 for bs in (1, 8):
                     iu.infer_zero(self, name, bs, dtype, input_shapes, output_shapes)

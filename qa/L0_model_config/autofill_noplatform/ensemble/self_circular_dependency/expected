@@ -1,0 +1,1 @@
+ensemble self_circular_dependency depends on self_circular_dependency which contains invalid model config
