@@ -103,8 +103,10 @@ ARG ONNX_RUNTIME_VERSION=0.4.0
 WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends git
 
-# Check out master until new release to support cloud-based filesystems
-RUN git clone --recursive https://github.com/Microsoft/onnxruntime
+# Check out stable commit on master until new release
+# to support cloud-based filesystems
+RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
+    (cd onnxruntime && git checkout 2f698bd54b713bb87dbd0bbb913e94bcf7fd480c)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
