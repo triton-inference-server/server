@@ -794,7 +794,8 @@ TRTSERVER_ServerModelStatus(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::STATUS);
 
   ni::ServerStatus server_status;
-  lserver->GetStatus(&server_status, std::string(model_name));
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetStatus(&server_status, std::string(model_name)));
 
   TrtServerProtobuf* protobuf = new TrtServerProtobuf(server_status);
   *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);

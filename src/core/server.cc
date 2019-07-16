@@ -278,16 +278,17 @@ InferenceServer::IsReady(bool* ready)
   return Status::Success;
 }
 
-Status
+void
 InferenceServer::Infer(
     const std::shared_ptr<InferenceBackend>& backend,
     std::shared_ptr<InferRequestProvider> request_provider,
     std::shared_ptr<InferResponseProvider> response_provider,
     std::shared_ptr<ModelInferStats> infer_stats,
-    std::function<void(const Status&)> OnCompleteInferRPC)
+    std::function<void(const Status&)> OnCompleteInfer)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server exiting");
+    OnCompleteInfer(Status(RequestStatusCode::UNAVAILABLE, "Server not ready"));
+    return;
   }
 
   std::shared_ptr<ScopedAtomicIncrement> inflight(
@@ -296,14 +297,14 @@ InferenceServer::Infer(
   // Need to capture 'backend' to keep it alive... it goes away when
   // it goes out of scope which can cause the model to be unloaded,
   // and we don't want that to happen when a request is in flight.
-  auto OnCompleteHandleInfer = [this, OnCompleteInferRPC, backend,
+  auto OnCompleteHandleInfer = [this, OnCompleteInfer, backend,
                                 response_provider, infer_stats,
                                 inflight](const Status& status) mutable {
     Status fstatus = status;
     if (fstatus.IsOk()) {
       fstatus = response_provider->FinalizeResponse(*backend);
       if (fstatus.IsOk()) {
-        OnCompleteInferRPC(fstatus);
+        OnCompleteInfer(fstatus);
         return;
       }
     }
@@ -311,13 +312,11 @@ InferenceServer::Infer(
     // Report only stats that are relevant for a failed inference run.
     infer_stats->SetFailed(true);
     LOG_VERBOSE(1) << "Infer failed: " << fstatus.Message();
-    OnCompleteInferRPC(fstatus);
+    OnCompleteInfer(fstatus);
   };
 
   backend->Run(
       infer_stats, request_provider, response_provider, OnCompleteHandleInfer);
-
-  return Status::Success;
 }
 
 Status
