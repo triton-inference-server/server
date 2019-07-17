@@ -50,7 +50,9 @@ RUN sha1sum -c /tmp/trtis/tools/patch/tensorflow/checksums && \
     patch -i /tmp/trtis/tools/patch/tensorflow/nvbuild.sh \
           /opt/tensorflow/nvbuild.sh && \
     patch -i /tmp/trtis/tools/patch/tensorflow/nvbuildopts \
-          /opt/tensorflow/nvbuildopts
+          /opt/tensorflow/nvbuildopts && \
+    patch -i /tmp/trtis/tools/patch/tensorflow/bazel_build.sh \
+          /opt/tensorflow/bazel_build.sh
 
 # Copy tensorflow_backend_tf into TensorFlow so it builds into the
 # monolithic libtensorflow_cc library. We want tensorflow_backend_tf
