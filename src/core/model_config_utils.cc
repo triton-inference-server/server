@@ -296,7 +296,6 @@ GetNormalizedModelConfig(
       group->set_name(config->name());
     }
 
-    int device_cnt = 0;
     // Creates a set of supported GPU device ids
     std::set<int> supported_gpus;
 #ifdef TRTIS_ENABLE_GPU
@@ -322,11 +321,11 @@ GetNormalizedModelConfig(
       // For KIND_AUTO... if there are no GPUs or if any of the listed
       // 'gpu's are not present, then use KIND_CPU.
       if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-        if (device_cnt == 0) {
+        if (supported_gpus.empty()) {
           group.set_kind(ModelInstanceGroup::KIND_CPU);
         } else {
           for (const int32_t gid : group.gpus()) {
-            if ((gid < 0) || (gid >= device_cnt)) {
+            if (supported_gpus.find(gid) == supported_gpus.end()) {
               group.set_kind(ModelInstanceGroup::KIND_CPU);
               break;
             }
@@ -951,18 +950,10 @@ GetSupportedGPUs(std::set<int>& supported_gpus)
     Status status = CheckGPUCompatibility(gpu_id);
     if (status.IsOk()) {
       supported_gpus.insert(gpu_id);
-    } else {
-      LOG_WARNING << status.AsString();
     }
   }
+  return Status::Success;
 
-  if (!supported_gpus.empty()) {
-    return Status::Success;
-  } else {
-    return Status(
-        RequestStatusCode::UNSUPPORTED,
-        "There are no supported GPUs in the machine");
-  }
 }
 
 #endif
