@@ -235,16 +235,6 @@ For the PyTorch backend you must also provide the path to the PyTorch
 headers using the -DTRTIS_PYTORCH_INCLUDE_PATHS option. Multiple paths
 can be specified by separating them with a semicolon.
 
-<<<<<<< HEAD
-Hardware Support
-................
-
-Currently, TRTIS officially supports GPUs with compute capability of 6.0
-or higher. If user wants to build TRTIS with support for earlier compute
-capability, for example 5.0, then they can set -DTRTIS_MIN_COMPUTE_CAPABILITY="5.0".
-
-=======
->>>>>>> Checks whether the compute capapbility of a gpu is supported before loading model
 Configure Inference Server
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
