@@ -234,7 +234,7 @@ COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime \
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
-    ln -s libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
+    ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
