@@ -73,6 +73,37 @@ Usage(char** argv, const std::string& msg = std::string())
 }  // namespace
 
 int
+create_shared_region(std::string shm_key, size_t batch_byte_size)
+{
+  // get shared memory region descriptor
+  int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    std::cerr << "error: unable to get input shared memory descriptor";
+    exit(1);
+  }
+  // extend shared memory object as by default it's initialized with size 0
+  int res = ftruncate(shm_fd, batch_byte_size);
+  if (res == -1) {
+    std::cerr << "error: unable to get initialize size";
+    exit(1);
+  }
+  return shm_fd;
+}
+
+void*
+get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
+{
+  // map shared memory to process address space
+  void* shm_addr =
+      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  if (shm_addr == MAP_FAILED) {
+    std::cerr << "error: unable to process address space";
+    exit(1);
+  }
+  return shm_addr;
+}
+
+int
 main(int argc, char** argv)
 {
   bool verbose = false;
@@ -193,33 +224,17 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Set the context options to do batch-size 1 requests. Also request
-  // that all output tensors be returned.
+  // Set the context options to do batch-size 1 requests. Also request that
+  // all output tensors be returned.
   std::unique_ptr<nic::InferContext::Options> options;
   FAIL_IF_ERR(
       nic::InferContext::Options::Create(&options),
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  for (const auto& output : infer_ctx->Outputs()) {
-    options->AddRawResult(output);
-  }
-
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create the data for the two input tensors. Initialize the first
-  // to unique integers and the second to all ones.
-  std::vector<int32_t> input0_data(16);
-  std::vector<int32_t> input1_data(16);
-  std::vector<int32_t> output0_data(16);
-  std::vector<int32_t> output1_data(16);
-  for (size_t i = 0; i < 16; ++i) {
-    input0_data[i] = i;
-    input1_data[i] = 1;
-  }
-
-  // Initialize the inputs with the data.
   std::shared_ptr<nic::InferContext::Input> input0, input1;
   std::shared_ptr<nic::InferContext::Output> output0, output1;
   FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
@@ -234,97 +249,47 @@ main(int argc, char** argv)
 
   size_t input_byte_size = 16 * sizeof(int32_t);
   size_t output_byte_size = 16 * sizeof(int32_t);
-  std::string shm_key;
-  int shm_fd, res;
-  void* shm_addr;
 
-  // Create  Input0 and Input1 in Shared Memory
-  // get shared memory file descriptor (NOT a file)
-  for (size_t n = 0; n < 2; n++) {
-    shm_key = "/input" + std::to_string(n) + "_simple";
-    shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get input shared memory descriptor";
-      exit(1);
-    }
-    // extend shared memory object as by default it's initialized with size 0
-    res = ftruncate(shm_fd, input_byte_size);
-    if (res == -1) {
-      std::cerr << "error: unable to get initialize size";
-      exit(1);
-    }
-    // map shared memory to process address space
-    shm_addr = mmap(NULL, input_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
+  // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
+  // integers and Input1 to all ones.
+  std::string shm_key = "/input_simple";
+  int shm_fd = create_shared_region(shm_key, input_byte_size * 2);
+  int* input0_shm = (int*)(get_shm_addr(shm_fd, 0, input_byte_size * 2));
+  int* input1_shm = (int*)(input0_shm + 16);
+  for (size_t i = 0; i < 16; ++i) {
+    *(input0_shm + i) = i;
+    *(input1_shm + i) = 1;
   }
 
-  // Create  Output0 and Output1 in Shared Memory
-  // get shared memory file descriptor (NOT a file)
-  for (size_t n = 0; n < 2; n++) {
-    shm_key = "/output" + std::to_string(n) + "_simple";
-    shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get output shared memory descriptor";
-      exit(1);
-    }
-    // extend shared memory object as by default it's initialized with size 0
-    res = ftruncate(shm_fd, output_byte_size);
-    if (res == -1) {
-      std::cerr << "error: unable to get initialize size";
-      exit(1);
-    }
-    // map shared memory to process address space
-    shm_addr = mmap(NULL, output_byte_size, PROT_READ, MAP_SHARED, shm_fd, 0);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
-  }
+  // Create Output0 and Output1 in Shared Memory
+  shm_key = "/output_simple";
+  shm_fd = create_shared_region(shm_key, output_byte_size * 2);
+  int* output0_shm = (int*)(get_shm_addr(shm_fd, 0, output_byte_size * 2));
+  int* output1_shm = (int*)(output0_shm + 16);
 
-  // Write Input0 and Input1 to shared memory
-  for (size_t n = 0; n < 2; n++) {
-    shm_key = "/input" + std::to_string(n) + "_simple";
-    shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get shared memory descriptor";
-      exit(1);
-    }
-    shm_addr = mmap(NULL, input_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, 0);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
-    if (n == 0)
-      memcpy(shm_addr, &input0_data[0], input_byte_size);
-    else
-      memcpy(shm_addr, &input1_data[0], input_byte_size);
-  }
-
-  err = input0->SetSharedMemory("/input0_simple", 0, input_byte_size);
+  err = input0->SetSharedMemory("/input_simple", 0, input_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
-  err = input1->SetSharedMemory("/input1_simple", 0, input_byte_size);
+  err = input1->SetSharedMemory(
+      "/input_simple", input_byte_size, input_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
 
-  err = output0->SetSharedMemory("/output0_simple", 0, output_byte_size);
+  err = output0->SetSharedMemory("/output_simple", 0, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
   }
-  err = output1->SetSharedMemory("/output1_simple", 0, output_byte_size);
+  err = output1->SetSharedMemory(
+      "/output_simple", output_byte_size, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
   }
-
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
@@ -333,38 +298,17 @@ main(int argc, char** argv)
   // We expect there to be 2 results and them to be written by TRTIS into the
   // corresponding shared memory location provided. The 16 result elements
   // in both outputs are the sum and difference calculated by the model.
-  for (size_t n = 0; n < 2; n++) {
-    shm_key = "/output" + std::to_string(n) + "_simple";
-    shm_fd = shm_open(shm_key.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get shared memory descriptor";
-      exit(1);
-    }
-    shm_addr = mmap(NULL, output_byte_size, PROT_READ, MAP_SHARED, shm_fd, 0);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
-
-    // read output from memory
-    if (n == 0)
-      memcpy(&output0_data[0], (float*)(shm_addr), output_byte_size);
-    else
-      memcpy(&output1_data[0], (float*)(shm_addr), output_byte_size);
-  }
-
-  // Validate result from model
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
-              << output0_data[i] << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
-              << output1_data[i] << std::endl;
+    std::cout << input0_shm[i] << " + " << input1_shm[i] << " = "
+              << output0_shm[i] << std::endl;
+    std::cout << input0_shm[i] << " - " << input1_shm[i] << " = "
+              << output1_shm[i] << std::endl;
 
-    if ((input0_data[i] + input1_data[i]) != output0_data[i]) {
+    if ((input0_shm[i] + input1_shm[i]) != output0_shm[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_data[i] - input1_data[i]) != output1_data[i]) {
+    if ((input0_shm[i] - input1_shm[i]) != output1_shm[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
