@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "src/core/logging.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
 
@@ -32,7 +33,7 @@ namespace nvidia { namespace inferenceserver {
 
 #define FAIL(MSG)                                 \
   do {                                            \
-    std::cerr << "error: " << (MSG) << std::endl; \
+    LOG_ERROR << "error: " << (MSG); \
     exit(1);                                      \
   } while (false)
 
@@ -40,9 +41,9 @@ namespace nvidia { namespace inferenceserver {
   do {                                                       \
     TRTSERVER_Error* err = (X);                              \
     if (err != nullptr) {                                    \
-      std::cerr << "error: " << (MSG) << ": "                \
+      LOG_ERROR << "error: " << (MSG) << ": "                \
                 << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err) << std::endl; \
+                << TRTSERVER_ErrorMessage(err); \
       TRTSERVER_ErrorDelete(err);                            \
       exit(1);                                               \
     }                                                        \
@@ -52,9 +53,9 @@ namespace nvidia { namespace inferenceserver {
   do {                                                       \
     TRTSERVER_Error* err = (X);                              \
     if (err != nullptr) {                                    \
-      std::cerr << "error: " << (MSG) << ": "                \
+      LOG_ERROR << "error: " << (MSG) << ": "                \
                 << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err) << std::endl; \
+                << TRTSERVER_ErrorMessage(err); \
       TRTSERVER_ErrorDelete(err);                            \
     }                                                        \
   } while (false)
