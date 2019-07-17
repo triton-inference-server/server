@@ -297,7 +297,10 @@ GetNormalizedModelConfig(
     }
 
     int device_cnt = 0;
+    // Creates a set of supported GPU device ids
+    std::set<int> supported_gpus;
 #ifdef TRTIS_ENABLE_GPU
+    // Get the total number of GPUs from the runtime library.
     cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
     if (cuerr == cudaErrorNoDevice) {
       device_cnt = 0;
@@ -307,6 +310,16 @@ GetNormalizedModelConfig(
           "unable to get number of CUDA devices for " + config->name() + ": " +
               cudaGetErrorString(cuerr));
     }
+
+    // populates supported_gpus
+    for (int gpu_id = 0; gpu_id < device_cnt; gpu_id++) {
+      if (CheckGPUCompatibility(gpu_id).IsOk()) {
+        supported_gpus.insert(gpu_id);
+      }
+    }
+    // Update the new device count
+    device_cnt = supported_gpus.size();
+
 #endif  // TRTIS_ENABLE_GPU
 
     // Assign default name, kind and count to each instance group that
@@ -347,7 +360,7 @@ GetNormalizedModelConfig(
       // GPUs
       if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
           (group.gpus().size() == 0)) {
-        for (int d = 0; d < device_cnt; d++) {
+        for (auto d : supported_gpus) {
           group.add_gpus(d);
         }
       }
@@ -505,6 +518,7 @@ ValidateModelConfig(
                     std::to_string(gid) + ", valid GPUs are 0 - " +
                     std::to_string(dcnt - 1));
           }
+          RETURN_IF_ERROR(CheckGPUCompatibility(gid));
         }
 #endif  // !TRTIS_ENABLE_GPU
       } else if (group.kind() == ModelInstanceGroup::KIND_CPU) {
@@ -904,5 +918,76 @@ CheckAllowedModelOutput(
 
   return Status::Success;
 }
+
+#ifdef TRTIS_ENABLE_GPU
+Status
+CheckGPUCompatibility(const int gpu_id)
+{
+  // Query the compute capability from the device
+  cudaDeviceProp cuprops;
+  cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_id);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to get CUDA device properties for GPU ID" +
+            std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
+  }
+
+  // A pair of integers to store the major and the minor of minimum supported
+  // gpu compute capability.
+  std::pair<int, int> min_compute_capability;
+  // Validates and populates the minimum supported Compute Capability by the
+  // Server.
+  Status status = ParseMinComputeCapability(min_compute_capability);
+  if (!status.IsOk()) {
+    return status;
+  }
+
+  if ((cuprops.major > min_compute_capability.first) ||
+      ((cuprops.major == min_compute_capability.first) &&
+       (cuprops.minor >= min_compute_capability.second))) {
+    return Status::Success;
+  } else {
+    return Status(
+        RequestStatusCode::UNSUPPORTED,
+        "The compute capability of gpu id " + std::to_string(gpu_id) + " is '" +
+            std::to_string(cuprops.major) + "." +
+            std::to_string(cuprops.minor) +
+            "' which is lesser than the minimum supported of '" +
+            TRTIS_MIN_COMPUTE_CAPABILITY + "' by TRTIS.");
+  }
+}
+
+Status
+ParseMinComputeCapability(std::pair<int, int>& min_compute_capability)
+{
+  // Extract the major and minor numbers
+  int nums[2] = {0, 0};
+  std::string version_str = TRTIS_MIN_COMPUTE_CAPABILITY;
+  int index = 0;
+
+  for (char const& c : version_str) {
+    if (c == '.') {
+      index++;
+      if (index > 1) {
+        break;
+      }
+    } else {
+      if (std::isdigit(c)) {
+        nums[index] = 10 * nums[index] + (c - '0');
+      }
+    }
+  }
+
+  if (nums[0] == 0) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "The TRTIS_MIN_COMPUTE_CAPABILITY should be specified in "
+        "<Major>.<Minor> format.");
+  }
+  min_compute_capability = std::make_pair(nums[0], nums[1]);
+  return Status::Success;
+}
+#endif
 
 }}  // namespace nvidia::inferenceserver
