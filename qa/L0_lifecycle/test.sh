@@ -372,6 +372,43 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1)) 
 
+# disable model polling, no model in the repository should be loaded
+rm -fr models config.pbtxt.*
+mkdir models
+for i in graphdef savedmodel netdef plan ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
+
+SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+code=`curl -s -w %{http_code} localhost:8000/api/health/ready`
+set -e
+if [ "$code" != "200" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# no model should be unloaded
+set +e
+model_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`
+set -e
+if [ "$model_count" != "0" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1)) 
 
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*
