@@ -391,7 +391,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-code=`curl -s -w %{http_code} localhost:8000/api/control/unload/graphdef_float32_float32_float32`
+code=`curl -s -w %{http_code} -X POST localhost:8000/api/control/unload/graphdef_float32_float32_float32`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
