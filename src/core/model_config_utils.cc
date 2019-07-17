@@ -932,12 +932,7 @@ CheckGPUCompatibility(const int gpu_id)
         "unable to get CUDA device properties for GPU ID" +
             std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
   }
-  float compute_compability = cuprops.major + (cuprops.minor / 10.0);
-  std::cout << "Hey there!!! " << compute_compability << std::endl;
-  std::cout << "String there!!! " << (TRTIS_MIN_COMPUTE_CAPABILITY)
-            << std::endl;
-  std::cout << "Yo there!!! " << std::stof(TRTIS_MIN_COMPUTE_CAPABILITY)
-            << std::endl;
+  float compute_compability = cuprops.major + (cuprops.minor/10.0);
   if (compute_compability >= std::stof(TRTIS_MIN_COMPUTE_CAPABILITY)) {
     return Status::Success;
   } else {
