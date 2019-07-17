@@ -31,14 +31,12 @@ CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
 # Google cloud variables (Point to bucket when testing GCS)
-# NOTE:
-#   - Run this test twice, once with a '/' at the end of DATA_URL and once without.
 
-DATA_URL="gs://path/to/gcs/bucket/"
+BUCKET_URL="gs://bucket"
 
-# Append Slash if needed
-FULL_URL=$DATA_URL
-[[ "${FULL_URL}" != */ ]] && FULL_URL="${FULL_URL}/"
+# Remove Slash in BUCKET_URL
+BUCKET_URL=${BUCKET_URL%/}
+BUCKET_URL_SLASH="${BUCKET_URL}/"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_TIMEOUT=360
@@ -57,83 +55,17 @@ RET=0
 
 KIND="KIND_GPU"
 
-# copy models in model directory
-rm -rf models && mkdir -p models
+for MAYBE_SLASH in "" "/"; do
 
-# perform empty repo tests
+    ROOT_REPO="$BUCKET_URL$MAYBE_SLASH"
+    MODEL_REPO="${BUCKET_URL_SLASH}models${MAYBE_SLASH}"
 
-SERVER_ARGS="--model-store=$DATA_URL --exit-timeout-secs=120"
+    # copy models in model directory
+    rm -rf models && mkdir -p models
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+    # perform empty repo tests
 
-set +e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-# run with a non-root empty model repo
-touch models/dummy
-gsutil cp -r models/ "$FULL_URL"
-
-SERVER_ARGS="--model-store=${FULL_URL}models/ --exit-timeout-secs=120"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-gsutil -m rm "${FULL_URL}**"
-
-# Now start model tests
-
-for FW in graphdef savedmodel netdef onnx libtorch plan; do
-    cp -r /data/inferenceserver/qa_model_repository/${FW}_float32_float32_float32/ models/
-done
-
-# Copy models with string inputs and remove nobatch (bs=1) models
-cp -r /data/inferenceserver/qa_model_repository/*_object_object_object/ models/
-rm -rf models/*nobatch*
-
-for FW in graphdef savedmodel netdef onnx libtorch plan; do
-    for MC in `ls models/${FW}*/config.pbtxt`; do
-        echo "instance_group [ { kind: ${KIND} }]" >> $MC
-    done
-done
-
-# now traverse the tree and create empty version directories that gsutil skips
-for dir in `ls models/`; do
-    for subdir in `ls models/$dir`; do
-        if [ -d models/$dir/$subdir ] && [ -z "$(ls models/$dir/$subdir)" ]; then
-            touch models/$dir/$subdir/$subdir
-        fi
-    done
-done
-
-# Perform test with model repository variants
-for repo in "models" "models/**"; do
-
-    # copy contents of /models into GCS bucket.
-    gsutil -m cp -r $repo $FULL_URL
-
-    if [ "$repo" == "models" ]; then
-        # set server arguments
-        SERVER_ARGS="--model-store=${FULL_URL}models/ --exit-timeout-secs=120"
-    else
-        # set server arguments
-        SERVER_ARGS="--model-store=$DATA_URL --exit-timeout-secs=120"
-    fi
+    SERVER_ARGS="--model-store=$ROOT_REPO --exit-timeout-secs=120"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -142,33 +74,102 @@ for repo in "models" "models/**"; do
         exit 1
     fi
 
-    set +e
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-    # python unittest seems to swallow ImportError and still return 0
-    # exit code. So need to explicitly check CLIENT_LOG to make sure
-    # we see some running tests
-    python $INFER_TEST >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
+    # run with a non-root empty model repo
+    touch models/dummy
+    gsutil cp -r models/ "$BUCKET_URL_SLASH"
+
+    SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
     fi
-
-    grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed To Run\n***"
-        RET=1
-    fi
-
-    set -e
 
     kill $SERVER_PID
     wait $SERVER_PID
 
-    # Clean up bucket
-    gsutil -m rm "${FULL_URL}**"
+    gsutil -m rm "${BUCKET_URL_SLASH}**"
+    rm models/dummy
 
+    # Now start model tests
+
+    for FW in graphdef savedmodel netdef onnx libtorch plan; do
+        cp -r /data/inferenceserver/qa_model_repository/${FW}_float32_float32_float32/ models/
+    done
+
+    # Copy models with string inputs and remove nobatch (bs=1) models
+    cp -r /data/inferenceserver/qa_model_repository/*_object_object_object/ models/
+    rm -rf models/*nobatch*
+
+    for FW in graphdef savedmodel netdef onnx libtorch plan; do
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+    done
+
+    # now traverse the tree and create empty version directories that gsutil skips
+    for dir in `ls models/`; do
+        for subdir in `ls models/$dir`; do
+            if [ -d models/$dir/$subdir ] && [ -z "$(ls models/$dir/$subdir)" ]; then
+                touch models/$dir/$subdir/$subdir
+            fi
+        done
+    done
+
+    # Perform test with model repository variants
+    for repo in "models/**" "models" ; do
+
+        # copy contents of /models into GCS bucket.
+        gsutil -m cp -r $repo $BUCKET_URL_SLASH
+
+        if [ "$repo" == "models" ]; then
+            # set server arguments
+            SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
+        else
+            # set server arguments
+            SERVER_ARGS="--model-store=$ROOT_REPO --exit-timeout-secs=120"
+        fi
+
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        set +e
+
+        # python unittest seems to swallow ImportError and still return 0
+        # exit code. So need to explicitly check CLIENT_LOG to make sure
+        # we see some running tests
+        python $INFER_TEST >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        grep -c "HTTP/1.1 200 OK" $CLIENT_LOG
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed To Run\n***"
+            RET=1
+        fi
+
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+
+        # Clean up bucket
+        gsutil -m rm "${BUCKET_URL_SLASH}**"
+
+    done
 done 
 
 if [ $RET -eq 0 ]; then
