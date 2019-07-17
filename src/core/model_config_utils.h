@@ -137,12 +137,6 @@ Status CheckAllowedModelOutput(
 /// \return The error status. A non-OK status means the target GPU is
 /// \ not supported
 Status CheckGPUCompatibility(const int gpu_id);
-
-/// Parses Minimum supported GPU compute capability.
-/// \param A reference to a pair of two integers (major and minor capability)
-/// \returns The error status. A non-OK  status means the compute compatibility
-/// was not specified in correct format.
-Status ParseMinComputeCapability(std::pair<int, int>& min_compute_capability);
 #endif
 
 }}  // namespace nvidia::inferenceserver

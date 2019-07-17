@@ -932,20 +932,13 @@ CheckGPUCompatibility(const int gpu_id)
         "unable to get CUDA device properties for GPU ID" +
             std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
   }
-
-  // A pair of integers to store the major and the minor of minimum supported
-  // gpu compute capability.
-  std::pair<int, int> min_compute_capability;
-  // Validates and populates the minimum supported Compute Capability by the
-  // Server.
-  Status status = ParseMinComputeCapability(min_compute_capability);
-  if (!status.IsOk()) {
-    return status;
-  }
-
-  if ((cuprops.major > min_compute_capability.first) ||
-      ((cuprops.major == min_compute_capability.first) &&
-       (cuprops.minor >= min_compute_capability.second))) {
+  float compute_compability = cuprops.major + (cuprops.minor / 10.0);
+  std::cout << "Hey there!!! " << compute_compability << std::endl;
+  std::cout << "String there!!! " << (TRTIS_MIN_COMPUTE_CAPABILITY)
+            << std::endl;
+  std::cout << "Yo there!!! " << std::stof(TRTIS_MIN_COMPUTE_CAPABILITY)
+            << std::endl;
+  if (compute_compability >= std::stof(TRTIS_MIN_COMPUTE_CAPABILITY)) {
     return Status::Success;
   } else {
     return Status(
@@ -956,37 +949,6 @@ CheckGPUCompatibility(const int gpu_id)
             "' which is lesser than the minimum supported of '" +
             TRTIS_MIN_COMPUTE_CAPABILITY + "' by TRTIS.");
   }
-}
-
-Status
-ParseMinComputeCapability(std::pair<int, int>& min_compute_capability)
-{
-  // Extract the major and minor numbers
-  int nums[2] = {0, 0};
-  std::string version_str = TRTIS_MIN_COMPUTE_CAPABILITY;
-  int index = 0;
-
-  for (char const& c : version_str) {
-    if (c == '.') {
-      index++;
-      if (index > 1) {
-        break;
-      }
-    } else {
-      if (std::isdigit(c)) {
-        nums[index] = 10 * nums[index] + (c - '0');
-      }
-    }
-  }
-
-  if (nums[0] == 0) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "The TRTIS_MIN_COMPUTE_CAPABILITY should be specified in "
-        "<Major>.<Minor> format.");
-  }
-  min_compute_capability = std::make_pair(nums[0], nums[1]);
-  return Status::Success;
 }
 #endif
 
