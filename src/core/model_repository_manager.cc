@@ -854,17 +854,20 @@ ModelRepositoryManager::Create(
   if (polling_enabled) {
     RETURN_IF_ERROR(
         local_manager->Poll(&added, &deleted, &modified, &unmodified));
-  }
-  if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Unexpected initial state for model repository");
-  }
 
-  RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
+    if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "Unexpected initial state for model repository");
+    }
 
-  // model loading / unloading error will be printed but ignored
-  local_manager->LoadModelByDependency();
+    RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
+
+    // [TODO] fix this. On init, should return loading error and let
+    //        server decides whether to exit
+    // model loading / unloading error will be printed but ignored
+    local_manager->LoadModelByDependency();
+  }
 
   *model_repository_manager = std::move(local_manager);
 
