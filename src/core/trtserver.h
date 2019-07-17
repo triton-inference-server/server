@@ -314,6 +314,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path);
 
+/// Enable or disable periodic polling on model repository in a server
+/// options.
+/// \param options The server options object.
+/// \param polling True to enable periodic polling on model repository,
+/// false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelPolling(
+    TRTSERVER_ServerOptions* options, bool polling);
+
 /// Enable or disable strict model configuration handling in a server
 /// options.
 /// \param options The server options object.

@@ -234,6 +234,9 @@ class TrtServerOptions {
   const std::string& ModelRepositoryPath() const { return repo_path_; }
   void SetModelRepositoryPath(const char* p) { repo_path_ = p; }
 
+  bool ModelPolling() const { return model_polling_; }
+  void SetModelPolling(bool b) { model_polling_ = b; }
+
   bool ExitOnError() const { return exit_on_error_; }
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
@@ -276,6 +279,7 @@ class TrtServerOptions {
  private:
   std::string server_id_;
   std::string repo_path_;
+  bool model_polling_;
   bool exit_on_error_;
   bool strict_model_config_;
   bool strict_readiness_;
@@ -687,6 +691,15 @@ TRTSERVER_ServerOptionsSetModelRepositoryPath(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetModelPolling(
+    TRTSERVER_ServerOptions* options, bool poll)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetModelPolling(poll);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetExitOnError(
     TRTSERVER_ServerOptions* options, bool exit)
 {
@@ -841,6 +854,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelStorePath(loptions->ModelRepositoryPath());
+  lserver->SetModelPollingEnabled(loptions->ModelPolling());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetProfilingEnabled(loptions->Profiling());

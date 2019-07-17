@@ -782,6 +782,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
           server_options, model_store_path.c_str()),
       "setting model repository path");
   FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetModelPolling(server_options, allow_poll_model_repository),
+      "setting allow polling model repository");
+  FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
       "setting exit on error");
   FAIL_IF_ERR(

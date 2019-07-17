@@ -98,6 +98,10 @@ class InferenceServer {
   const std::string& ModelStorePath() const { return model_store_path_; }
   void SetModelStorePath(const std::string& p) { model_store_path_ = p; }
 
+  // Get / set model polling enable.
+  bool ModelPollingEnabled() const { return polling_enabled_; }
+  void SetModelPollingEnabled(bool e) { polling_enabled_ = e; }
+
   // Get / set strict model configuration enable.
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
   void SetStrictModelConfigEnabled(bool e) { strict_model_config_ = e; }
@@ -165,6 +169,7 @@ class InferenceServer {
   uint64_t start_time_ns_;
 
   std::string model_store_path_;
+  bool polling_enabled_;
   bool strict_model_config_;
   bool strict_readiness_;
   bool profiling_enabled_;
