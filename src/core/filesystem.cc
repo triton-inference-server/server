@@ -332,6 +332,12 @@ GCSFileSystem::IsDirectory(const std::string& path, bool* is_dir)
         "Could not get MetaData for bucket with name " + bucket);
   }
 
+  // Root case - bucket exists and object path is empty
+  if (object_path.empty()) {
+    *is_dir = true;
+    return Status::Success;
+  }
+
   // Check whether it has children. If at least one child, it is a directory
   for (auto&& object_metadata :
        client_->ListObjects(bucket, gcs::Prefix(AppendSlash(object_path)))) {
