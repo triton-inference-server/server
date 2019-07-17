@@ -235,6 +235,7 @@ For the PyTorch backend you must also provide the path to the PyTorch
 headers using the -DTRTIS_PYTORCH_INCLUDE_PATHS option. Multiple paths
 can be specified by separating them with a semicolon.
 
+<<<<<<< HEAD
 Hardware Support
 ................
 
@@ -242,6 +243,8 @@ Currently, TRTIS officially supports GPUs with compute capability of 6.0
 or higher. If user wants to build TRTIS with support for earlier compute
 capability, for example 5.0, then they can set -DTRTIS_MIN_COMPUTE_CAPABILITY="5.0".
 
+=======
+>>>>>>> Checks whether the compute capapbility of a gpu is supported before loading model
 Configure Inference Server
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -300,10 +303,11 @@ These additional options may be specified:
   when possible<section-running-the-inference-server-without-gpu>`.
 
 * **TRTIS_MIN_COMPUTE_CAPABILITY**: By default, the inference server
-  requires NVIDIA GPUs with atleast 6.0 compute capability. The support
-  for earlier compute capability can be added by setting the
-  -DTRTIS_MIN_COMPUTE_CAPABILITY appropriately. The setting is ignored if
-  -DTRTIS_ENABLE_GPU=OFF.
+  supports NVIDIA GPUs with CUDA compute capability 6.0 or higher. If
+  all framework backends included in the inference server are built to
+  support a lower compute capability, then TRTIS can be built to support
+  that lower compute capability by setting -DTRTIS_MIN_COMPUTE_CAPABILITY
+  appropriately. The setting is ignored if -DTRTIS_ENABLE_GPU=OFF.
  
 Build Inference Server
 ^^^^^^^^^^^^^^^^^^^^^^

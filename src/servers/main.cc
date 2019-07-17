@@ -42,6 +42,12 @@
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 
+#ifdef TRTIS_ENABLE_GPU
+static_assert(
+    TRTIS_MIN_COMPUTE_CAPABILITY >= 1.0,
+    "Invalid TRTIS_MIN_COMPUTE_CAPABILITY specified");
+#endif  // TRTIS_ENABLE_GPU
+
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
@@ -469,31 +475,6 @@ StopEndpoints()
   return ret;
 }
 
-#ifdef TRTIS_ENABLE_GPU
-bool
-ValidateMinComputeCapability()
-{
-  bool flag = true;
-  std::string version_str = TRTIS_MIN_COMPUTE_CAPABILITY;
-  int index = 0;
-  for (char const& c : version_str) {
-    if (c == '.') {
-      index++;
-      if (index > 1) {
-        flag = false;
-        break;
-      }
-    } else {
-      if (!std::isdigit(c)) {
-        flag = false;
-        break;
-      }
-    }
-  }
-  return flag;
-}
-#endif
-
 std::string
 Usage()
 {
@@ -759,15 +740,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 int
 main(int argc, char** argv)
 {
-#ifdef TRTIS_ENABLE_GPU
-  // Validate the format of specified minimum supported GPU compute capability
-  if (!ValidateMinComputeCapability()) {
-    LOG_ERROR << "TRTIS_MIN_COMPUTE_CAPABILITY should be specified in the "
-                 "format <int>.<int>";
-    exit(0);
-  }
-#endif
-
   // Parse command-line to create the options for the inference
   // server.
   TRTSERVER_ServerOptions* server_options = nullptr;

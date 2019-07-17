@@ -137,6 +137,13 @@ Status CheckAllowedModelOutput(
 /// \return The error status. A non-OK status means the target GPU is
 /// \ not supported
 Status CheckGPUCompatibility(const int gpu_id);
+
+/// Obtains a set of gpu ids that is supported by TRTIS.
+/// \param The set of integers which is populated by ids of
+///  supported GPUS
+/// \return The error status. A non-ok status means there were
+/// errors encountered while querying GPU devices.
+Status GetSupportedGPUs(std::set<int>& supported_gpus);
 #endif
 
 }}  // namespace nvidia::inferenceserver

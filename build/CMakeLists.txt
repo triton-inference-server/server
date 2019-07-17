@@ -50,10 +50,11 @@ option(TRTIS_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
 set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
-set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING "The minimum compute capability supported by TRTIS" )
 
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
+set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
+    "The minimum CUDA compute capability supported by TRTIS" )
 
 if(TRTIS_ENABLE_TENSORRT AND NOT TRTIS_ENABLE_GPU)
   message(FATAL_ERROR "TRTIS_ENABLE_TENSORRT=ON requires TRTIS_ENABLE_GPU=ON")
