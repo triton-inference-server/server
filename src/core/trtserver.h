@@ -378,11 +378,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
     const char* model_name);
 
-// Load the requested model.
+// Load the requested model, or reload the model if it has been loaded.
+// The function does not return until the model is loaded or fails to load.
+// Returned error indicates if model loaded successfully or not.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
     TRTSERVER_Server* server, const char* model_name);
 
 // Unload the requested model.
+// The function does not return until the model is unloaded or fails to unload.
+// Returned error indicates if model unloaded successfully or not.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_UnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 

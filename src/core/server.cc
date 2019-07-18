@@ -344,30 +344,30 @@ InferenceServer::GetStatus(
   return Status::Success;
 }
 
-void
-InferenceServer::HandleControl(
-    RequestStatus* request_status, const std::string& model_name, bool is_load)
+Status
+InferenceServer::LoadModel(const std::string& model_name)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
-    RequestStatusFactory::Create(
-        request_status, 0, id_, RequestStatusCode::UNAVAILABLE,
-        "Server not ready");
-    return;
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
   }
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
-  const uint64_t request_id = NextRequestId();
 
-  ModelRepositoryManager::ActionType action_type;
-  if (is_load) {
-    action_type = ModelRepositoryManager::ActionType::LOAD;
-  } else {
-    action_type = ModelRepositoryManager::ActionType::UNLOAD;
+  auto action_type = ModelRepositoryManager::ActionType::LOAD;
+  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+}
+
+Status
+InferenceServer::UnloadModel(const std::string& model_name)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
   }
-  Status status =
-      model_repository_manager_->LoadUnloadModel(model_name, action_type);
-  RequestStatusFactory::Create(request_status, request_id, id_, status);
-  return;
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
+  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
 }
 
 uint64_t
