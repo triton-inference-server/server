@@ -923,6 +923,7 @@ TRTSERVER_ServerModelStatus(
   return nullptr;  // success
 }
 
+TRTSERVER_Error*
 TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
