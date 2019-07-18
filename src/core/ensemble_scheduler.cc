@@ -486,11 +486,17 @@ EnsembleContext::ScheduleSteps(
     infer_stats->SetMetricReporter(step->backend_->MetricReporter());
     infer_stats->SetBatchSize(
         step->request_provider_->RequestHeader().batch_size());
+    infer_stats->SetFailed(true);
 
     context->is_->Infer(
         step->backend_, step->request_provider_, step->response_provider_,
         infer_stats,
         [context, step, infer_stats, timer](const Status& status) mutable {
+          infer_stats->SetFailed(!status.IsOk());
+          if (!status.IsOk()) {
+            LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
+          }
+
           timer.reset();
           infer_stats.reset();
           step->infer_status_ = status;
