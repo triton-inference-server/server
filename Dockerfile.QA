@@ -47,7 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /workspace
 RUN cd builddir && \
-    (make -j16 trtis-test-utils trtis-custom-backends || true) && \
     make -j16 trtis-test-utils trtis-custom-backends
 
 # Update the qa/ directory with test executables, models, etc.

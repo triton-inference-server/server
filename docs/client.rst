@@ -127,10 +127,6 @@ under-development version)::
 
   $ git checkout r19.06
 
-When following the build steps below, the first build attempt may fail
-with a "protobuf_generate_cpp" error. If that happens simply run the
-make/build command again and the build should succeed.
-
 Ubuntu 16.04 / Ubuntu 18.04
 ...........................
 

@@ -248,10 +248,6 @@ COPY . .
 # - Need to find CUDA stubs if they are available since some backends
 # may need to link against them. This is identical to the login in TF
 # container nvbuild.sh
-#
-# - The build can fail the first time due to a protobuf_generate_cpp
-# error that doesn't repeat on subsequent builds, which is why there
-# are 2 make invocations below.
 RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
     if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
@@ -273,7 +269,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tensorrtserver/include/torch" \
                   -DTRTIS_EXTRA_LIB_PATHS="/opt/tensorrtserver/lib" \
                   ../build && \
-            (make -j16 trtis || true) && \
             make -j16 trtis && \
             mkdir -p /opt/tensorrtserver/include && \
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
