@@ -334,7 +334,7 @@ uses an ensemble of an image-preprocessing model implemented as a
 custom backend and a Caffe2 ResNet50 model. This ensemble allows you
 to send the raw image binaries in the request and receive
 classification results without preprocessing the images on the
-client. The image preprocessor model and Resnet50 models are just models in the model repository and you can even access them directly as you can with any model. The ensemble model just provides a way to access a pipeline of those two models. The ensemble itself doesn't have a backend. Executing the ensemble means that each of those individual models is executed using the framework/backend of the individual models. The ensemble image classification example that uses the C++
+client. The ensemble image classification example that uses the C++
 client API is available at `src/clients/c++/ensemble\_image\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
