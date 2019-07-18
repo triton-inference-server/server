@@ -212,7 +212,7 @@ message ControlRequest
     //@@
     UNLOAD = 0;
 
-    //@@    .. cpp:enumerator:: Type::LOAD = 1 << 0
+    //@@    .. cpp:enumerator:: Type::LOAD = 1
     //@@
     //@@       To load the specified model. If the model has been loaded,
     //@@       it will be reloaded to fetch the latest change.
