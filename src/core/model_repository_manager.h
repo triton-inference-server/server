@@ -228,7 +228,7 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status VersionsToLoad(
       const std::string& name, const ModelConfig& model_config,
-      std::set<int64_t>& versions);
+      std::set<int64_t>* versions);
 
   const std::string repository_path_;
   const BackendConfigMap backend_config_map_;

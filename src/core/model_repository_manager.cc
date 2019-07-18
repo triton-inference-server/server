@@ -950,7 +950,7 @@ ModelRepositoryManager::LoadModelByDependency()
       std::set<int64_t> versions;
       Status status;
       status = VersionsToLoad(
-          valid_model->model_name_, valid_model->model_config_, versions);
+          valid_model->model_name_, valid_model->model_config_, &versions);
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
             valid_model->model_name_, versions, valid_model->model_config_,
@@ -1084,6 +1084,44 @@ ModelRepositoryManager::LoadUnloadModel(
 
   // model loading / unloading error will be printed but ignored
   LoadModelByDependency();
+
+  // Check if model is loaded / unloaded properly
+  const auto version_states = GetVersionStates(model_name);
+  if (type == ActionType::LOAD) {
+    const auto& config =
+        dependency_graph_.find(model_name)->second->model_config_;
+    std::set<int64_t> expected_versions;
+    RETURN_IF_ERROR(VersionsToLoad(model_name, config, &expected_versions));
+    
+    std::string not_ready_version_str;
+    for (const auto version : expected_versions) {
+      const auto it = version_states.find(version);
+      if ((it == version_states.end()) || (it->second != ModelReadyState::MODEL_READY)) {
+        not_ready_version_str += std::to_string(version);
+        not_ready_version_str += ",";
+      }
+    }
+    if (!not_ready_version_str.empty()) {
+      not_ready_version_str.pop_back();
+      return Status(RequestStatusCode::INTERNAL,
+          "failed to load '" + model_name +
+          "', versions that are not available: " + not_ready_version_str);
+    }
+  } else {
+    std::string ready_version_str;
+    for (const auto& version_state : version_states) {
+      if (version_state.second == ModelReadyState::MODEL_READY) {
+        ready_version_str += std::to_string(version_state.first);
+        ready_version_str += ",";
+      }
+    }
+    if (!ready_version_str.empty()) {
+      ready_version_str.pop_back();
+      return Status(RequestStatusCode::INTERNAL,
+          "failed to unload '" + model_name +
+          "', versions that are still available: " + ready_version_str);
+    }
+  }
 
   return Status::Success;
 }
@@ -1492,9 +1530,9 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 Status
 ModelRepositoryManager::VersionsToLoad(
     const std::string& name, const ModelConfig& model_config,
-    std::set<int64_t>& versions)
+    std::set<int64_t>* versions)
 {
-  versions.clear();
+  versions->clear();
 
   // Get integral number of the version directory
   const auto model_path = JoinPath({repository_path_, name});
@@ -1526,7 +1564,7 @@ ModelRepositoryManager::VersionsToLoad(
       // Only load the specific versions that are presented in model directory
       bool version_not_exist = existing_versions.insert(v).second;
       if (!version_not_exist) {
-        versions.emplace(v);
+        versions->emplace(v);
       } else {
         LOG_ERROR << "version " << v << " is specified for model '" << name
                   << "', but the version directory is not present";
@@ -1536,19 +1574,19 @@ ModelRepositoryManager::VersionsToLoad(
     if (model_config.version_policy().has_latest()) {
       // std::set is sorted with std::greater
       for (const auto& v : existing_versions) {
-        if (versions.size() >=
+        if (versions->size() >=
             model_config.version_policy().latest().num_versions()) {
           break;
         }
-        versions.emplace(v);
+        versions->emplace(v);
       }
     } else {
       // all
-      versions.insert(existing_versions.begin(), existing_versions.end());
+      versions->insert(existing_versions.begin(), existing_versions.end());
     }
   }
 
-  if (versions.empty()) {
+  if (versions->empty()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "at least one version must be available under the version policy of "
