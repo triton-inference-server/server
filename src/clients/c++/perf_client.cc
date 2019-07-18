@@ -139,10 +139,17 @@ volatile bool early_exit = false;
 void
 SignalHandler(int signum)
 {
-  std::cout << "Interrupt signal (" << signum << ") received." << std::endl
-            << "Waiting for in-flight inferences to complete." << std::endl;
-
-  early_exit = true;
+  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
+  // Upon invoking the SignalHandler for the first time early_exit flag is
+  // invoked and client waits for in-flight inferences to complete before
+  // exiting. On the second invocation, the program exits immediately.
+  if (!early_exit) {
+    std::cout << "Waiting for in-flight inferences to complete." << std::endl;
+    early_exit = true;
+  } else {
+    std::cout << "Exiting immediately..." << std::endl;
+    exit(0);
+  }
 }
 
 typedef struct PerformanceStatusStruct {
@@ -583,7 +590,7 @@ ConcurrencyManager::ChangeConcurrencyLevel(
         new std::vector<nic::InferContext::Stat>());
     threads_concurrency_.emplace_back(new size_t(0));
 
-    // Worker maintians concurrency in different ways.
+    // Worker maintains concurrency in different ways.
     // For sequence models, multiple contexts must be created for multiple
     // concurrent sequences.
     // For non-sequence models, one context can send out multiple requests
@@ -1991,9 +1998,14 @@ main(int argc, char** argv)
       }
     }
   }
+
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
-    return 1;
+    // In the case of early_exit, the thread does not return and continues to
+    // report the summary
+    if (!early_exit) {
+      return 1;
+    }
   }
   if (summary.size()) {
     // Can print more depending on verbose, but it seems too much information
