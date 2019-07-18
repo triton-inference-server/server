@@ -932,7 +932,8 @@ ModelRepositoryManager::LoadModelByDependency()
       ModelConfig model_config;
       std::set<int64_t> versions;
       // Utilize "force_unload" of AsyncLoad()
-      backend_life_cycle_->AsyncLoad(invalid_model->model_name_, versions, model_config);
+      backend_life_cycle_->AsyncLoad(
+          invalid_model->model_name_, versions, model_config);
       LOG_ERROR << invalid_model->status_.AsString();
       invalid_model->loaded_versions_ = std::set<int64_t>();
       loaded_models.emplace(invalid_model);
@@ -944,10 +945,12 @@ ModelRepositoryManager::LoadModelByDependency()
       auto model_state = model_states.back().get();
       std::set<int64_t> versions;
       Status status;
-      status = VersionsToLoad(valid_model->model_name_, valid_model->model_config_, versions);
+      status = VersionsToLoad(
+          valid_model->model_name_, valid_model->model_config_, versions);
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
-            valid_model->model_name_, versions, valid_model->model_config_, true,
+            valid_model->model_name_, versions, valid_model->model_config_,
+            true,
             [model_state](
                 int64_t version, ModelReadyState state,
                 size_t total_version_cnt) {
@@ -1382,8 +1385,7 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
         node->status_ = Status(
             RequestStatusCode::INVALID_ARG,
             "ensemble '" + node->model_name_ + "' depends on '" +
-                upstream.first->model_name_ +
-                "' which has no loaded version");
+                upstream.first->model_name_ + "' which has no loaded version");
       } else if (upstream.second != -1) {
         auto it = upstream.first->loaded_versions_.find(upstream.second);
         if (it == upstream.first->loaded_versions_.end()) {
