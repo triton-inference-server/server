@@ -298,21 +298,13 @@ InferenceServer::Infer(
   // it goes out of scope which can cause the model to be unloaded,
   // and we don't want that to happen when a request is in flight.
   auto OnCompleteHandleInfer = [this, OnCompleteInfer, backend,
-                                response_provider, infer_stats,
+                                response_provider,
                                 inflight](const Status& status) mutable {
-    Status fstatus = status;
-    if (fstatus.IsOk()) {
-      fstatus = response_provider->FinalizeResponse(*backend);
-      if (fstatus.IsOk()) {
-        OnCompleteInfer(fstatus);
-        return;
-      }
+    if (status.IsOk()) {
+      OnCompleteInfer(response_provider->FinalizeResponse(*backend));
+    } else {
+      OnCompleteInfer(status);
     }
-
-    // Report only stats that are relevant for a failed inference run.
-    infer_stats->SetFailed(true);
-    LOG_VERBOSE(1) << "Infer failed: " << fstatus.Message();
-    OnCompleteInfer(fstatus);
   };
 
   backend->Run(

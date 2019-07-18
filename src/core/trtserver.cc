@@ -1027,7 +1027,11 @@ TRTSERVER_ServerInferAsync(
       infer_stats,
       [infer_stats, timer, infer_response_provider, server, complete_fn,
        userp](const ni::Status& status) mutable {
-        infer_stats->SetFailed(false);
+        infer_stats->SetFailed(!status.IsOk());
+        if (!status.IsOk()) {
+          LOG_VERBOSE(1) << "Infer failed: " << status.Message();
+        }
+
         timer.reset();
 
         TrtServerResponse* response =
