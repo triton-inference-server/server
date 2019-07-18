@@ -31,33 +31,33 @@
 
 namespace nvidia { namespace inferenceserver {
 
-#define FAIL(MSG)                                 \
-  do {                                            \
+#define FAIL(MSG)                    \
+  do {                               \
     LOG_ERROR << "error: " << (MSG); \
-    exit(1);                                      \
+    exit(1);                         \
   } while (false)
 
-#define FAIL_IF_ERR(X, MSG)                                  \
-  do {                                                       \
-    TRTSERVER_Error* err = (X);                              \
-    if (err != nullptr) {                                    \
-      LOG_ERROR << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err); \
-      TRTSERVER_ErrorDelete(err);                            \
-      exit(1);                                               \
-    }                                                        \
+#define FAIL_IF_ERR(X, MSG)                                \
+  do {                                                     \
+    TRTSERVER_Error* err = (X);                            \
+    if (err != nullptr) {                                  \
+      LOG_ERROR << "error: " << (MSG) << ": "              \
+                << TRTSERVER_ErrorCodeString(err) << " - " \
+                << TRTSERVER_ErrorMessage(err);            \
+      TRTSERVER_ErrorDelete(err);                          \
+      exit(1);                                             \
+    }                                                      \
   } while (false)
 
-#define LOG_IF_ERR(X, MSG)                                   \
-  do {                                                       \
-    TRTSERVER_Error* err = (X);                              \
-    if (err != nullptr) {                                    \
-      LOG_ERROR << "error: " << (MSG) << ": "                \
-                << TRTSERVER_ErrorCodeString(err) << " - "   \
-                << TRTSERVER_ErrorMessage(err); \
-      TRTSERVER_ErrorDelete(err);                            \
-    }                                                        \
+#define LOG_IF_ERR(X, MSG)                                 \
+  do {                                                     \
+    TRTSERVER_Error* err = (X);                            \
+    if (err != nullptr) {                                  \
+      LOG_ERROR << "error: " << (MSG) << ": "              \
+                << TRTSERVER_ErrorCodeString(err) << " - " \
+                << TRTSERVER_ErrorMessage(err);            \
+      TRTSERVER_ErrorDelete(err);                          \
+    }                                                      \
   } while (false)
 
 #define RETURN_IF_ERR(X)        \
