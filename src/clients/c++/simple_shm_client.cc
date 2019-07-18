@@ -103,6 +103,16 @@ get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
   return shm_addr;
 }
 
+void
+shm_cleanup(std::string shm_key)
+{
+  int shm_fd = shm_unlink(shm_key.c_str());
+  if (shm_fd == -1) {
+    std::cerr << "error: unable to unlink shared memory for " << shm_key;
+    exit(1);
+  }
+}
+
 int
 main(int argc, char** argv)
 {
@@ -313,6 +323,9 @@ main(int argc, char** argv)
       exit(1);
     }
   }
+
+  shm_cleanup("/input_simple");
+  shm_cleanup("/output_simple");
 
   return 0;
 }
