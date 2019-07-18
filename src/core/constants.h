@@ -37,6 +37,7 @@ constexpr char kInferRESTEndpoint[] = "api/infer";
 constexpr char kStatusRESTEndpoint[] = "api/status";
 constexpr char kProfileRESTEndpoint[] = "api/profile";
 constexpr char kHealthRESTEndpoint[] = "api/health";
+constexpr char kControlRESTEndpoint[] = "api/control";
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
 constexpr char kTensorFlowGraphDefPlatform[] = "tensorflow_graphdef";
