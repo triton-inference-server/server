@@ -132,7 +132,7 @@ DynamicBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(Status)> OnComplete)
+    std::function<void(const Status&)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
   std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
@@ -259,7 +259,7 @@ DynamicBatchScheduler::SchedulerThread(
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [payloads](Status status) {
+      auto OnCompleteQueuedPayloads = [payloads](const Status& status) {
         bool found_success = false;
         for (auto& payload : *payloads) {
           Status final_status = status.IsOk() ? payload.status_ : status;

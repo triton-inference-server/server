@@ -76,7 +76,7 @@ class EnsembleScheduler : public Scheduler {
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(Status)> OnComplete) override;
+      std::function<void(const Status&)> OnComplete) override;
 
   // Set the inference server that the scheduler is communicating with
   Status SetInferenceServer(void* inference_server)
