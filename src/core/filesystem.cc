@@ -618,8 +618,8 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
   // Construct request for object metadata
   s3::S3Client client_;
   s3::Model::HeadObjectRequest head_request;
-  head_request.SetBucket(bucket);
-  head_request.SetKey(object);
+  head_request.SetBucket(bucket.c_str());
+  head_request.SetKey(object.c_str());
 
   auto head_object_outcome = client_.HeadObject(head_request);
   if (head_object_outcome.IsSuccess()) {

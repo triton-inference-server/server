@@ -289,7 +289,7 @@ if(${TRTIS_ENABLE_S3})
   message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
   target_link_libraries(
     trtserver
-    PRIVATE ${AWS_LINK_LIBRARIES}
+    PRIVATE aws-cpp-sdk-s3
   )
 
 endif() # TRTIS_ENABLE_S3
