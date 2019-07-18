@@ -927,7 +927,9 @@ TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  // [TODO] add scoped timer, see TRTSERVER_ServerStatus
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+
   RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
 
   return nullptr; // success
@@ -938,7 +940,9 @@ TRTSERVER_UnloadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  // [TODO] add scoped timer, see TRTSERVER_ServerStatus
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
 
   return nullptr; // success
