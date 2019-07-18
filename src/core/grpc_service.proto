@@ -214,8 +214,8 @@ message ControlRequest
 
     //@@    .. cpp:enumerator:: Type::LOAD = 1 << 0
     //@@
-    //@@       To load the specified model. Or to reload if the model has
-    //@@       been loaded.
+    //@@       To load the specified model. If the model has been loaded,
+    //@@       it will be reloaded to fetch the latest change.
     //@@
     LOAD = 1;
   }
@@ -223,7 +223,7 @@ message ControlRequest
   //@@
   //@@  .. cpp:var:: string model_name
   //@@
-  //@@     The target model.
+  //@@     The target model name.
   //@@
   string model_name = 1;
 
