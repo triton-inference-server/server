@@ -396,7 +396,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-# no model should be unloaded
+# no model should be loaded
 set +e
 model_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`
 set -e
