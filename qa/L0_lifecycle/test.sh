@@ -381,7 +381,7 @@ for i in graphdef savedmodel netdef plan ; do
 done
 
 # polling enabled (default), control API should not work
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -390,6 +390,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+# unload API should return bad request
 set +e
 code=`curl -s -w %{http_code} -X POST localhost:8000/api/control/unload/graphdef_float32_float32_float32`
 set -e
@@ -399,6 +400,27 @@ if [ "$code" != "400" ]; then
 fi
 
 # the model should not be unloaded
+set +e
+unavailable_count=`curl -s localhost:8000/api/status/graphdef_float32_float32_float32 | grep "MODEL_UNAVAILABLE" | wc -l`
+set -e
+if [ "$unavailable_count" != "0" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# remove model file so that if reload is triggered, model will become unavailable
+rm models/graphdef_float32_float32_float32/*/*
+
+# load API should return bad request
+set +e
+code=`curl -s -w %{http_code} -X POST localhost:8000/api/control/load/graphdef_float32_float32_float32`
+set -e
+if [ "$code" != "400" ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# the model should still be available
 set +e
 unavailable_count=`curl -s localhost:8000/api/status/graphdef_float32_float32_float32 | grep "MODEL_UNAVAILABLE" | wc -l`
 set -e
