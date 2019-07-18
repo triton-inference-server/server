@@ -227,7 +227,7 @@ SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(Status)> OnComplete)
+    std::function<void(const Status&)> OnComplete)
 {
   // Queue timer starts at the beginning of the queueing and scheduling process
   std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
@@ -614,7 +614,7 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(Status)> OnComplete)
+    std::function<void(const Status&)> OnComplete)
 {
   bool wake_runner = false;
 
@@ -845,12 +845,13 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
     }
 
     if ((payloads != nullptr) && !payloads->empty()) {
-      auto OnCompleteQueuedPayloads = [payloads](Status status) {
+      auto OnCompleteQueuedPayloads = [payloads](const Status& rstatus) {
         // Payloads that don't have a completion function don't have
         // anywhere to report their errors. Those errors could have
         // caused other payloads to have issues (due to mis-alignment
         // within the batch, etc.). So if any such payload has an
         // error we just fail all payloads.
+        Status status = rstatus;
         if (status.IsOk()) {
           for (auto& payload : *payloads) {
             if (payload.complete_function_ == nullptr) {

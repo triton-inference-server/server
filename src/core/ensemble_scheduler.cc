@@ -46,7 +46,7 @@ struct Step {
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InternalInferResponseProvider> response_provider_;
-  RequestStatus request_status_;
+  Status infer_status_;
 
   size_t step_idx_;
 };
@@ -67,7 +67,7 @@ class EnsembleContext {
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(Status)> OnComplete);
+      std::function<void(const Status&)> OnComplete);
 
   // Perform transition on 'context' state given the information of
   // 'completed_step'
@@ -143,7 +143,7 @@ class EnsembleContext {
   std::shared_ptr<ModelInferStats> stats_;
   std::shared_ptr<InferRequestProvider> request_provider_;
   std::shared_ptr<InferResponseProvider> response_provider_;
-  std::function<void(Status)> OnComplete_;
+  std::function<void(const Status&)> OnComplete_;
 
   // Output tensors whose labels are not provided by the ensemble
   std::unordered_map<size_t, std::string> no_label_tensors_;
@@ -154,7 +154,7 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(Status)> OnComplete)
+    std::function<void(const Status&)> OnComplete)
     : is_(is), info_(info), inflight_step_counter_(0),
       tensor_data_(info_->tensor_to_step_.size()), stats_(stats),
       request_provider_(request_provider),
@@ -273,62 +273,54 @@ EnsembleContext::UpdateEnsembleState(
     }
   } else {
     inflight_step_counter_--;
-    if (completed_step->request_status_.code() != RequestStatusCode::SUCCESS) {
-      return Status(
-          completed_step->request_status_.code(),
-          completed_step->request_status_.msg());
-    } else {
-      auto step_idx = completed_step->step_idx_;
-      RETURN_IF_ERROR(completed_step->response_provider_->FinalizeResponse(
-          *(completed_step->backend_)));
-      const auto& response_header =
-          completed_step->response_provider_->ResponseHeader();
-      for (const auto& output : response_header.output()) {
-        if (output.has_raw()) {
-          auto it =
-              info_->steps_[step_idx].output_to_tensor_.find(output.name());
-          if (it != info_->steps_[step_idx].output_to_tensor_.end()) {
-            auto& tensor_data = tensor_data_[it->second];
-            *(tensor_data.first.mutable_dims()) = output.raw().dims();
-            tensor_data.first.set_batch_byte_size(
-                output.raw().batch_byte_size());
+    RETURN_IF_ERROR(completed_step->infer_status_);
 
-            RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
-                it->first, &(tensor_data.second)));
-            updated_tensors.push_back(it->second);
+    auto step_idx = completed_step->step_idx_;
+    RETURN_IF_ERROR(completed_step->response_provider_->FinalizeResponse(
+        *(completed_step->backend_)));
+    const auto& response_header =
+        completed_step->response_provider_->ResponseHeader();
+    for (const auto& output : response_header.output()) {
+      if (output.has_raw()) {
+        auto it = info_->steps_[step_idx].output_to_tensor_.find(output.name());
+        if (it != info_->steps_[step_idx].output_to_tensor_.end()) {
+          auto& tensor_data = tensor_data_[it->second];
+          *(tensor_data.first.mutable_dims()) = output.raw().dims();
+          tensor_data.first.set_batch_byte_size(output.raw().batch_byte_size());
 
-            auto tensor_it = no_label_tensors_.find(it->second);
-            if (tensor_it != no_label_tensors_.end()) {
-              // Check the inner model's lookup map first in case it is also an
-              // ensemble model. In that case, the label of the inner model may
-              // come from another model.
-              InferResponseProvider::SecondaryLabelProvider provider;
-              if (completed_step->response_provider_->GetSecondaryLabelProvider(
-                      it->first, &provider)) {
-                response_provider_->SetSecondaryLabelProvider(
-                    tensor_it->second, provider);
-              } else {
-                const std::shared_ptr<LabelProvider>& label_provider =
-                    completed_step->response_provider_->GetLabelProvider();
-                response_provider_->SetSecondaryLabelProvider(
-                    tensor_it->second,
-                    std::make_pair(it->first, label_provider));
-              }
-              no_label_tensors_.erase(tensor_it);
+          RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
+              it->first, &(tensor_data.second)));
+          updated_tensors.push_back(it->second);
+
+          auto tensor_it = no_label_tensors_.find(it->second);
+          if (tensor_it != no_label_tensors_.end()) {
+            // Check the inner model's lookup map first in case it is also an
+            // ensemble model. In that case, the label of the inner model may
+            // come from another model.
+            InferResponseProvider::SecondaryLabelProvider provider;
+            if (completed_step->response_provider_->GetSecondaryLabelProvider(
+                    it->first, &provider)) {
+              response_provider_->SetSecondaryLabelProvider(
+                  tensor_it->second, provider);
+            } else {
+              const std::shared_ptr<LabelProvider>& label_provider =
+                  completed_step->response_provider_->GetLabelProvider();
+              response_provider_->SetSecondaryLabelProvider(
+                  tensor_it->second, std::make_pair(it->first, label_provider));
             }
-          } else {
-            return Status(
-                RequestStatusCode::INTERNAL,
-                "internal response header specified output '" + output.name() +
-                    "' that does not map to any ensemble tensors");
+            no_label_tensors_.erase(tensor_it);
           }
         } else {
           return Status(
               RequestStatusCode::INTERNAL,
-              "internal response header should return output '" +
-                  output.name() +
-                  "' as raw data instead of classification result");
+              "internal response header specified output '" + output.name() +
+                  "' that does not map to any ensemble tensors");
         }
+      } else {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "internal response header should return output '" + output.name() +
+                "' as raw data instead of classification result");
       }
     }
   }
@@ -495,12 +487,13 @@ EnsembleContext::ScheduleSteps(
     infer_stats->SetBatchSize(
         step->request_provider_->RequestHeader().batch_size());
 
-    context->is_->HandleInfer(
-        &(step->request_status_), step->backend_, step->request_provider_,
-        step->response_provider_, infer_stats,
-        [context, step, infer_stats, timer]() mutable {
+    context->is_->Infer(
+        step->backend_, step->request_provider_, step->response_provider_,
+        infer_stats,
+        [context, step, infer_stats, timer](const Status& status) mutable {
           timer.reset();
           infer_stats.reset();
+          step->infer_status_ = status;
           Proceed(context, step);
         });
   }
@@ -521,7 +514,7 @@ EnsembleScheduler::Enqueue(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(Status)> OnComplete)
+    std::function<void(const Status&)> OnComplete)
 {
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
       is_, info_.get(), stats, request_provider, response_provider,

@@ -81,7 +81,7 @@ class InferenceBackend {
       std::shared_ptr<ModelInferStats> stats,
       std::shared_ptr<InferRequestProvider> request_provider,
       std::shared_ptr<InferResponseProvider> response_provider,
-      std::function<void(Status)> OnCompleteHandleInfer);
+      std::function<void(const Status&)> OnCompleteHandleInfer);
 
  protected:
   // Set the configuration of the model being served.
