@@ -28,6 +28,7 @@
 
 #include "src/core/backend.h"
 #include "src/core/logging.h"
+#include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
@@ -189,12 +190,44 @@ TrtServerProtobuf::Serialize(const char** base, size_t* byte_size) const
 }
 
 //
+// TrtServerMetrics
+//
+// Implementation for TRTSERVER_Metrics.
+//
+class TrtServerMetrics {
+ public:
+  TrtServerMetrics() = default;
+  TRTSERVER_Error* Serialize(const char** base, size_t* byte_size);
+
+ private:
+  std::string serialized_;
+};
+
+TRTSERVER_Error*
+TrtServerMetrics::Serialize(const char** base, size_t* byte_size)
+{
+#ifdef TRTIS_ENABLE_METRICS
+  serialized_ = ni::Metrics::SerializedMetrics();
+  *base = serialized_.c_str();
+  *byte_size = serialized_.size();
+  return nullptr;  // Success
+#else
+  *base = nullptr;
+  *byte_size = 0;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
+}
+
+//
 // TrtServerOptions
 //
 // Implementation for TRTSERVER_ServerOptions.
 //
 class TrtServerOptions {
  public:
+  TrtServerOptions();
+
   const std::string& ServerId() const { return server_id_; }
   void SetServerId(const char* id) { server_id_ = id; }
 
@@ -216,6 +249,12 @@ class TrtServerOptions {
   unsigned int ExitTimeout() const { return exit_timeout_; }
   void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
 
+  bool Metrics() const { return metrics_; }
+  void SetMetrics(bool b) { metrics_ = b; }
+
+  bool GpuMetrics() const { return gpu_metrics_; }
+  void SetGpuMetrics(bool b) { gpu_metrics_ = b; }
+
   bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
   void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
 
@@ -229,11 +268,25 @@ class TrtServerOptions {
   bool strict_model_config_;
   bool strict_readiness_;
   bool profiling_;
+  bool metrics_;
+  bool gpu_metrics_;
   unsigned int exit_timeout_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
 };
+
+TrtServerOptions::TrtServerOptions()
+    : server_id_("inference:0"), exit_on_error_(true),
+      strict_model_config_(true), strict_readiness_(true), profiling_(false),
+      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
+      tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
+{
+#ifndef TRTIS_ENABLE_METRICS
+  metrics_ = false;
+  gpu_metrics_ = false;
+#endif  // TRTIS_ENABLE_METRICS
+}
 
 //
 // TrtServerRequestProvider
@@ -429,6 +482,39 @@ TRTSERVER_ProtobufSerialize(
   TrtServerProtobuf* lprotobuf = reinterpret_cast<TrtServerProtobuf*>(protobuf);
   lprotobuf->Serialize(base, byte_size);
   return nullptr;  // Success
+}
+
+//
+// TRTSERVER_Metrics
+//
+TRTSERVER_Error*
+TRTSERVER_MetricsDelete(TRTSERVER_Metrics* metrics)
+{
+  TrtServerMetrics* lmetrics = reinterpret_cast<TrtServerMetrics*>(metrics);
+  delete lmetrics;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_MetricsFormatted(
+    TRTSERVER_Metrics* metrics, TRTSERVER_Metric_Format format,
+    const char** base, size_t* byte_size)
+{
+  TrtServerMetrics* lmetrics = reinterpret_cast<TrtServerMetrics*>(metrics);
+
+  switch (format) {
+    case TRTSERVER_METRIC_PROMETHEUS: {
+      return lmetrics->Serialize(base, byte_size);
+    }
+
+    default:
+      break;
+  }
+
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_INVALID_ARG,
+      std::string("unknown metrics format '" + std::to_string(format) + "'")
+          .c_str());
 }
 
 //
@@ -654,6 +740,34 @@ TRTSERVER_ServerOptionsSetExitTimeout(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetMetrics(
+    TRTSERVER_ServerOptions* options, bool metrics)
+{
+#ifdef TRTIS_ENABLE_METRICS
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetMetrics(metrics);
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetGpuMetrics(
+    TRTSERVER_ServerOptions* options, bool gpu_metrics)
+{
+#ifdef TRTIS_ENABLE_METRICS
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetGpuMetrics(gpu_metrics);
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
     TRTSERVER_ServerOptions* options, bool soft_placement)
 {
@@ -679,6 +793,12 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 {
   ni::InferenceServer* lserver = new ni::InferenceServer();
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+
+#ifdef TRTIS_ENABLE_METRICS
+  if (loptions->Metrics() && loptions->GpuMetrics()) {
+    ni::Metrics::EnableGPUMetrics();
+  }
+#endif  // TRTIS_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelStorePath(loptions->ModelRepositoryPath());
@@ -801,6 +921,20 @@ TRTSERVER_ServerModelStatus(
   *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
 
   return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
+{
+#ifdef TRTIS_ENABLE_METRICS
+  TrtServerMetrics* lmetrics = new TrtServerMetrics();
+  *metrics = reinterpret_cast<TRTSERVER_Metrics*>(lmetrics);
+  return nullptr;  // Success
+#else
+  *metrics = nullptr;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 TRTSERVER_Error*
