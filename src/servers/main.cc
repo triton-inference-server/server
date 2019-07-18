@@ -717,12 +717,14 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
           server_options, std::max(0, exit_timeout_secs)),
       "setting exit timeout");
 
+#ifdef TRTIS_ENABLE_METRICS
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetMetrics(server_options, allow_metrics_),
       "setting metrics enable");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetGpuMetrics(server_options, allow_gpu_metrics),
       "setting GPU metrics enable");
+#endif  // TRTIS_ENABLE_GRPC
 
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(

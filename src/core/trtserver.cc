@@ -197,18 +197,26 @@ TrtServerProtobuf::Serialize(const char** base, size_t* byte_size) const
 class TrtServerMetrics {
  public:
   TrtServerMetrics() = default;
-  void Serialize(const char** base, size_t* byte_size);
+  TRTSERVER_Error* Serialize(const char** base, size_t* byte_size);
 
  private:
   std::string serialized_;
 };
 
-void
+TRTSERVER_Error*
 TrtServerMetrics::Serialize(const char** base, size_t* byte_size)
 {
+#ifdef TRTIS_ENABLE_METRICS
   serialized_ = ni::Metrics::SerializedMetrics();
   *base = serialized_.c_str();
   *byte_size = serialized_.size();
+  return nullptr;  // Success
+#else
+  *base = nullptr;
+  *byte_size = 0;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 //
@@ -274,6 +282,10 @@ TrtServerOptions::TrtServerOptions()
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
+#ifndef TRTIS_ENABLE_METRICS
+  metrics_ = false;
+  gpu_metrics_ = false;
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 //
@@ -492,8 +504,7 @@ TRTSERVER_MetricsFormatted(
 
   switch (format) {
     case TRTSERVER_METRIC_PROMETHEUS: {
-      lmetrics->Serialize(base, byte_size);
-      return nullptr;  // Success
+      return lmetrics->Serialize(base, byte_size);
     }
 
     default:
@@ -732,18 +743,28 @@ TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetMetrics(
     TRTSERVER_ServerOptions* options, bool metrics)
 {
+#ifdef TRTIS_ENABLE_METRICS
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
   loptions->SetMetrics(metrics);
   return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetGpuMetrics(
     TRTSERVER_ServerOptions* options, bool gpu_metrics)
 {
+#ifdef TRTIS_ENABLE_METRICS
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
   loptions->SetGpuMetrics(gpu_metrics);
   return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 TRTSERVER_Error*
@@ -773,9 +794,11 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   ni::InferenceServer* lserver = new ni::InferenceServer();
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
 
+#ifdef TRTIS_ENABLE_METRICS
   if (loptions->Metrics() && loptions->GpuMetrics()) {
     ni::Metrics::EnableGPUMetrics();
   }
+#endif  // TRTIS_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelStorePath(loptions->ModelRepositoryPath());
@@ -903,9 +926,15 @@ TRTSERVER_ServerModelStatus(
 TRTSERVER_Error*
 TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 {
+#ifdef TRTIS_ENABLE_METRICS
   TrtServerMetrics* lmetrics = new TrtServerMetrics();
   *metrics = reinterpret_cast<TRTSERVER_Metrics*>(lmetrics);
   return nullptr;  // Success
+#else
+  *metrics = nullptr;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRTIS_ENABLE_METRICS
 }
 
 TRTSERVER_Error*
