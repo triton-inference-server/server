@@ -227,8 +227,8 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
-             --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=true \
+             --repository-poll-secs=0 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -286,8 +286,8 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 \
-             --allow-poll-model-repository=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 \
+             --allow-poll-model-repository=true --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -478,8 +478,8 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 \
-             --allow-poll-model-repository=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 \
+             --allow-poll-model-repository=true --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
