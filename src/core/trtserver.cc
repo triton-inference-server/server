@@ -960,6 +960,32 @@ TRTSERVER_ServerModelStatus(
 }
 
 TRTSERVER_Error*
+TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
+
+  return nullptr; // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_UnloadModel(TRTSERVER_Server* server, const char* model_name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      
+  RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
+
+  return nullptr; // success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 {
 #ifdef TRTIS_ENABLE_METRICS

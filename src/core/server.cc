@@ -336,6 +336,32 @@ InferenceServer::GetStatus(
   return Status::Success;
 }
 
+Status
+InferenceServer::LoadModel(const std::string& model_name)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  auto action_type = ModelRepositoryManager::ActionType::LOAD;
+  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+}
+
+Status
+InferenceServer::UnloadModel(const std::string& model_name)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
+  return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+}
+
 uint64_t
 InferenceServer::UptimeNs() const
 {

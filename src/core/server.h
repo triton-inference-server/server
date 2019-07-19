@@ -77,6 +77,12 @@ class InferenceServer {
   // 'model_name' is empty, update with the status of all models.
   Status GetStatus(ServerStatus* server_status, const std::string& model_name);
 
+  // Load the corresponding model. Reload the model if it has been loaded.
+  Status LoadModel(const std::string& model_name);
+
+  // Unload the corresponding model.
+  Status UnloadModel(const std::string& model_name);
+
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
 
