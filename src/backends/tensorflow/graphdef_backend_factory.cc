@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "src/backends/tensorflow/graphdef_backend.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -49,6 +50,10 @@ GraphDefBackendFactory::Create(
   auto graphdef_backend_config =
       std::static_pointer_cast<Config>(backend_config);
   factory->reset(new GraphDefBackendFactory(graphdef_backend_config));
+
+  // Initalize VGPUs if required
+  VirtualDeviceTracker::Init(graphdef_backend_config->memory_limit_mb);
+
   return Status::Success;
 }
 

@@ -339,6 +339,13 @@ TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
     TRTSERVER_ServerOptions* options, float fraction);
 
+// Add Tensorflow virtual GPU instances to physical GPU. Specify limit
+// for total memory available for use on that physical GPU.
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
+    TRTSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
+    uint64_t per_vgpu_memory_mbytes);
+
 //
 // TRTSERVER_Server
 //

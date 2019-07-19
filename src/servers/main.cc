@@ -135,6 +135,7 @@ enum OptionId {
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
+  OPTION_TF_ADD_VGPU,
 };
 
 struct Option {
@@ -226,7 +227,17 @@ std::vector<Option> options_{
      "Reserve a portion of GPU memory for TensorFlow models. Default "
      "value 0.0 indicates that TensorFlow should dynamically allocate "
      "memory as needed. Value of 1.0 indicates that TensorFlow should "
-     "allocate all of GPU memory."}};
+     "allocate all of GPU memory."},
+    {OPTION_TF_ADD_VGPU, "tf-add-vgpu",
+     "Add a tensorflow virtual GPU instances on a physical GPU. Input "
+     "should be 2 integers and 1 float separated by semicolons in the format "
+     "<physical GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
+     "megabytes>. "
+     "This option can be used multiple times, but only once per physical GPU "
+     "device. "
+     "Subsequent uses will overwrite previous uses with the same physical "
+     "device. "
+     "By default, no VGPUs are enabled. "}};
 
 void
 SignalHandler(int signum)
@@ -505,6 +516,69 @@ ParseFloatOption(const std::string arg)
   return std::stof(arg);
 }
 
+struct VgpuOption {
+  int gpu_device_;
+  int num_vgpus_;
+  uint64_t mem_limit_mbytes_;
+};
+
+VgpuOption
+ParseVGPUOption(const std::string arg)
+{
+  int delim_gpu = arg.find(";");
+  int delim_num_vgpus = arg.find(";", delim_gpu + 1);
+
+  // Check for 2 semicolons
+  if ((delim_gpu < 0) || (delim_num_vgpus < 0)) {
+    LOG_ERROR << "Cannot add virtual devices due to incorrect number of inputs."
+                 "--tf-add-vgpu argument requires format <physical "
+                 "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
+                 "megabytes>. "
+              << "Found: " << arg;
+    LOG_ERROR << Usage();
+    exit(1);
+  }
+
+  std::string gpu_string = arg.substr(0, delim_gpu);
+  std::string vgpu_string =
+      arg.substr(delim_gpu + 1, delim_num_vgpus - delim_gpu - 1);
+  std::string mem_limit_string = arg.substr(delim_num_vgpus + 1);
+
+  // Ensure that options are non-empty otherwise calling stoi/stof will throw an
+  // exception
+  if (gpu_string.empty() || vgpu_string.empty() || mem_limit_string.empty()) {
+    LOG_ERROR << "Cannot add virtual devices due to empty inputs."
+                 "--tf-add-vgpu argument requires format <physical "
+                 "GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
+                 "megabytes>. "
+              << "Found: " << arg;
+    LOG_ERROR << Usage();
+    exit(1);
+  }
+
+  int gpu_device = std::stoi(gpu_string);
+  int num_vgpus_on_device = std::stoi(vgpu_string);
+  uint64_t mem_limit = std::stoi(mem_limit_string);
+
+  if (gpu_device < 0) {
+    LOG_ERROR << "Cannot add virtual devices. Physical GPU device index must "
+                 "be >= 0. "
+              << "Found: " << gpu_string;
+    LOG_ERROR << Usage();
+    exit(1);
+  }
+
+  if (num_vgpus_on_device <= 0) {
+    LOG_ERROR
+        << "Cannot add virtual devices. Number of virtual GPUs must be > 0. "
+        << "Found: " << vgpu_string;
+    LOG_ERROR << Usage();
+    exit(1);
+  }
+
+  return {gpu_device, num_vgpus_on_device, mem_limit};
+}
+
 bool
 Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 {
@@ -516,6 +590,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   bool allow_profiling = false;
   bool tf_allow_soft_placement = true;
   float tf_gpu_memory_fraction = 0.0;
+  VgpuOption tf_vgpu;
   int32_t exit_timeout_secs = 30;
 
   int32_t repository_poll_secs = repository_poll_secs_;
@@ -650,6 +725,14 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         break;
       case OPTION_TF_GPU_MEMORY_FRACTION:
         tf_gpu_memory_fraction = ParseFloatOption(optarg);
+        break;
+      case OPTION_TF_ADD_VGPU:
+        tf_vgpu = ParseVGPUOption(optarg);
+        FAIL_IF_ERR(
+            TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
+                server_options, tf_vgpu.gpu_device_, tf_vgpu.num_vgpus_,
+                tf_vgpu.mem_limit_mbytes_),
+            "adding tensorflow VGPU instances");
         break;
     }
   }

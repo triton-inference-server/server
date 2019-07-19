@@ -45,6 +45,7 @@ class GraphDefBackendFactory {
     bool allow_gpu_memory_growth;
     float per_process_gpu_memory_fraction;
     bool allow_soft_placement;
+    std::map<int, std::vector<float>> memory_limit_mb;
   };
 
   static Status Create(
