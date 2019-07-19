@@ -67,9 +67,9 @@ ValidateTensorConsistency(
   if (lhs.type_ != rhs.type_) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        message + "inconsistent data type: " + std::to_string(lhs.type_) +
+        message + "inconsistent data type: " + DataType_Name(lhs.type_) +
             " is inferred from model " + lhs.model_name_ + " while " +
-            std::to_string(rhs.type_) + " is inferred from model " +
+            DataType_Name(rhs.type_) + " is inferred from model " +
             rhs.model_name_);
   }
 
