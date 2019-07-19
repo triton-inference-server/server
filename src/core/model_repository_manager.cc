@@ -803,10 +803,13 @@ ModelRepositoryManager::ModelRepositoryManager(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path,
     const BackendConfigMap& backend_config_map, const bool autofill,
-    const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle)
+    const bool polling_enabled, const bool model_control_enabled,
+    std::unique_ptr<BackendLifeCycle> life_cycle)
     : repository_path_(repository_path),
       backend_config_map_(backend_config_map), autofill_(autofill),
-      polling_enabled_(polling_enabled), status_manager_(status_manager),
+      polling_enabled_(polling_enabled),
+      model_control_enabled_(model_control_enabled),
+      status_manager_(status_manager),
       backend_life_cycle_(std::move(life_cycle))
 {
 }
@@ -820,7 +823,7 @@ ModelRepositoryManager::Create(
     const std::string& repository_path, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
-    const bool polling_enabled,
+    const bool polling_enabled, const bool model_control_enabled,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {
   // The rest only matters if repository path is valid directory
@@ -847,11 +850,12 @@ ModelRepositoryManager::Create(
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
           status_manager, repository_path, backend_config_map,
-          !strict_model_config, polling_enabled, std::move(life_cycle)));
+          !strict_model_config, polling_enabled, model_control_enabled,
+          std::move(life_cycle)));
 
   // Similar to PollAndUpdate(), but simplier
   std::set<std::string> added, deleted, modified, unmodified;
-  if (polling_enabled) {
+  if (!model_control_enabled) {
     RETURN_IF_ERROR(
         local_manager->Poll(&added, &deleted, &modified, &unmodified));
 
@@ -1008,7 +1012,7 @@ Status
 ModelRepositoryManager::LoadUnloadModel(
     const std::string& model_name, ActionType type)
 {
-  if (polling_enabled_) {
+  if (!model_control_enabled_) {
     return Status(
         RequestStatusCode::INVALID,
         "explicit model load / unload is not allowed if polling is enabled");

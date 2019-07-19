@@ -88,7 +88,7 @@ class ModelRepositoryManager {
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
-      const bool polling_enabled,
+      const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 
   /// Poll the model repository to determine the new set of models and
@@ -145,7 +145,8 @@ class ModelRepositoryManager {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
       const BackendConfigMap& backend_config_map, const bool autofill,
-      const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle);
+      const bool polling_enabled, const bool model_control_enabled,
+      std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -235,6 +236,7 @@ class ModelRepositoryManager {
   const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;
+  const bool model_control_enabled_;
 
   std::mutex poll_mu_;
   std::mutex infos_mu_;

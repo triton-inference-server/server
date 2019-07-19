@@ -61,6 +61,9 @@ std::condition_variable exit_cv_;
 // changes.
 int32_t repository_poll_secs_ = 15;
 
+// Whether explicit model control is allowed
+bool allow_model_control_ = false;
+
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args. Set to -1
 // to indicate the protocol is disabled.
@@ -132,6 +135,7 @@ enum OptionId {
 #endif  // TRTIS_ENABLE_METRICS
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
+  OPTION_ALLOW_MODEL_CONTROL,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
@@ -213,9 +217,12 @@ std::vector<Option> options_{
      "controlled by 'repository-poll-secs'."},
     {OPTION_POLL_REPO_SECS, "repository-poll-secs",
      "Interval in seconds between each poll of the model repository to check "
-     "for changes. A value of zero indicates that the repository is checked "
-     "only a single time at startup. Valid only when "
+     "for changes. Valid only when "
      "--allow-poll-model-repository=true is specified."},
+    {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
+     "Allow to load or to unload models explicitly using model control API. "
+     "If true the model repository will not be polled at startup. Ignored "
+     "unless --allow-poll-model-repository is false."},
     {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
      "finish. After the timeout expires the server exits even if inferences "
@@ -613,6 +620,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_METRICS
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
+  bool allow_model_control = allow_model_control_;
 
   bool log_info = true;
   bool log_warn = true;
@@ -716,6 +724,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_POLL_REPO_SECS:
         repository_poll_secs = ParseIntOption(optarg);
         break;
+      case OPTION_ALLOW_MODEL_CONTROL:
+        allow_model_control = ParseBoolOption(optarg);
+        break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
         break;
@@ -751,6 +762,22 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   repository_poll_secs_ =
       (allow_poll_model_repository) ? std::max(0, repository_poll_secs) : 0;
 
+  if (allow_model_control && allow_poll_model_repository) {
+    LOG_ERROR << "--allow-model-control and --allow-poll-model-repository "
+              << "can not be both set to true";
+    LOG_ERROR << Usage();
+    return false;
+  }
+
+  TRTSERVER_Model_Control_Mode control_mode;
+  if (allow_model_control) {
+    control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
+  } else if (allow_poll_model_repository) {
+    control_mode = TRTSERVER_MODEL_CONTROL_POLL;
+  } else {
+    control_mode = TRTSERVER_MODEL_CONTROL_NONE;
+  }
+
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
@@ -782,8 +809,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
           server_options, model_store_path.c_str()),
       "setting model repository path");
   FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetModelPolling(server_options, allow_poll_model_repository),
-      "setting allow polling model repository");
+      TRTSERVER_ServerOptionsSetModelControlMode(server_options, control_mode),
+      "setting model control mode");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
       "setting exit on error");
