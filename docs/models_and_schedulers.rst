@@ -362,6 +362,9 @@ will be mapped to "preprocessed_image" tensor for later use. The tensor names
 recognized by the scheduler are the ensemble inputs, the ensemble outputs and
 all values in the input_map and the output_map.
 
+The models composing the ensemble may also have dynamic batching enabled.
+Since ensemble models are just routing the data between composing models, the inference server can take requests into an ensemble model without modifying the ensemble's configuration to exploit the dynamic batching of the composing models.
+
 Assuming that only the ensemble model, the preprocess model, the classification
 model and the segmentation model are being served, the client applications will
 see them as four different models which can process requests independently.
