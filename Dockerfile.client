@@ -76,12 +76,8 @@ COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
 
-# The build can fail the first time due to a protobuf_generate_cpp
-# error that doesn't repeat on subsequent builds, which is why there
-# are 2 make invocations below.
 RUN cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
-    (make -j16 trtis-clients || true) && \
     make -j16 trtis-clients
 RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \

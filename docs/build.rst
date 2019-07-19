@@ -79,10 +79,8 @@ with::
   # cd /workspace/builddir
   # make -j16 trtis
 
-The first build attempt may fail with a "protobuf_generate_cpp"
-error. If that happens simply run the make command again and the build
-should succeed. When the build completes the binary, libraries and
-headers can be found in trtis/install. To overwrite the existing versions::
+When the build completes the binary, libraries and headers can be
+found in trtis/install. To overwrite the existing versions::
 
   # cp trtis/install/bin/trtserver /opt/tensorrtserver/bin/.
   # cp trtis/install/lib/libtrtserver.so /opt/tensorrtserver/lib/.
@@ -300,10 +298,8 @@ After configuring, build the inference server with make::
   $ cd builddir
   $ make -j16 trtis
 
-The first build attempt may fail with a "protobuf_generate_cpp"
-error. If that happens simply run the make command again and the build
-should succeed. When the build completes the binary, libraries and
-headers can be found in trtis/install.
+When the build completes the binary, libraries and headers can be
+found in trtis/install.
 
 .. _section-building-a-custom-backend:
 
@@ -320,10 +316,8 @@ These custom backends are built using CMake::
   $ cmake ../build
   $ make -j16 trtis-custom-backends
 
-The first build attempt may fail with a "protobuf_generate_cpp"
-error. If that happens simply run the make command again and the build
-should succeed. When the build completes the custom backend libraries
-can be found in trtis-custom-backends/install.
+When the build completes the custom backend libraries can be found in
+trtis-custom-backends/install.
 
 A custom backend is not built-into the inference server. Instead if is
 built as a separate shared library that the inference server
