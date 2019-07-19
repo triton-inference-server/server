@@ -324,12 +324,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
 /// Set the model control mode in a server options. For each mode the models
 /// will be managed as the following:
 ///
-///   TRTSERVER_MODEL_CONTROL_NONE: the models in model repository will be loaded
-///   on startup. The model states will not be modified after startup.
+///   TRTSERVER_MODEL_CONTROL_NONE: the models in model repository will be
+///   loaded on startup. After startup any changes to the model repository will
+///   be ignored. Calling TRTSERVER_ServerPollModelRepository will result in an
+///   error.
 ///
-///   TRTSERVER_MODEL_CONTROL_POLL: the models in model repository will be loaded
-///   on startup. The model repository will be polled periodically and the models
-///   will be loaded / unloaded according to changes in the model repository.
+///   TRTSERVER_MODEL_CONTROL_POLL: the models in model repository will be
+///   loaded on startup. The model repository can be polled periodically using
+///   TRTSERVER_ServerPollModelRepository and the server will load, unload, and
+///   updated models according to changes in the model repository.
 ///
 ///   TRTSERVER_MODEL_CONTROL_EXPLICIT: the models in model repository will not
 ///   be loaded on startup. The corresponding model control APIs must be called

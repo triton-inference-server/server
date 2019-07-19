@@ -835,6 +835,12 @@ ModelRepositoryManager::Create(
         "repository path is not a valid directory");
   }
 
+  if (polling_enabled && model_control_enabled) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "cannot enable both polling and explicit model control");
+  }
+
   BackendConfigMap backend_config_map;
 
   BuildBackendConfigMap(
@@ -867,8 +873,8 @@ ModelRepositoryManager::Create(
 
     RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
 
-    // [TODO] fix this. On init, should return loading error and let
-    //        server decides whether to exit
+    // TODO [DLIS-506] On init, should return loading error and let
+    //                 server decides whether to exit
     // model loading / unloading error will be printed but ignored
     local_manager->LoadModelByDependency();
   }

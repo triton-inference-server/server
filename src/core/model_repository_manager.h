@@ -78,9 +78,12 @@ class ModelRepositoryManager {
   /// for TensorFlow models.
   /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
   /// implementation of an operation when a GPU implementation is not available
-  /// \param polling_enabled If true, then PollAndUpdate() is allowed and
-  /// LoadUnloadModel() is not allowed. If false, LoadUnloadModel() is allowed
-  /// and PollAndUpdate() is not allowed.
+  /// \param polling_enabled If true, then PollAndUpdate() is allowed.
+  /// Otherwise, it is not allowed.
+  /// \param model_control_enabled If true, then LoadUnloadModel() is allowed
+  /// and the models in the model repository will not be loaded at startup.
+  /// Otherwise, LoadUnloadModel() is not allowed and the models will be loaded.
+  /// Cannot be set to true if polling_enabled is true.
   /// \return The error status.
   static Status Create(
       InferenceServer* server, const std::string& server_version,

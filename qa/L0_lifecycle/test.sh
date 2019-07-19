@@ -390,14 +390,6 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-set +e
-code=`curl -s -w %{http_code} localhost:8000/api/health/ready`
-set -e
-if [ "$code" != "200" ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
 # no model should be loaded
 set +e
 model_count=`curl -s localhost:8000/api/status | grep "MODEL_" | wc -l`

@@ -124,8 +124,8 @@ InferenceServer::Init()
     return status;
   }
 
-  // Create the global manager for the repository. For now, all models are
-  // eagerly loaded below when the manager is created.
+  // Create the model manager for the repository. Unless model control
+  // is disabled, all models are eagerly loaded when the manager is created.
   bool polling_enabled = (model_control_mode_ == MODE_POLL);
   bool model_control_enabled = (model_control_mode_ == MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(

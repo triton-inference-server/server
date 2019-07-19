@@ -221,8 +221,8 @@ std::vector<Option> options_{
      "--allow-poll-model-repository=true is specified."},
     {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
      "Allow to load or to unload models explicitly using model control API. "
-     "If true the model repository will not be polled at startup. Ignored "
-     "unless --allow-poll-model-repository is false."},
+     "If true the models in the model repository will not be loaded at "
+     "startup. Cannot be specified if --allow-poll-model-repository is true."},
     {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
      "finish. After the timeout expires the server exits even if inferences "
@@ -772,7 +772,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   TRTSERVER_Model_Control_Mode control_mode;
   if (allow_model_control) {
     control_mode = TRTSERVER_MODEL_CONTROL_EXPLICIT;
-  } else if (allow_poll_model_repository) {
+  } else if (repository_poll_secs_ > 0) {
     control_mode = TRTSERVER_MODEL_CONTROL_POLL;
   } else {
     control_mode = TRTSERVER_MODEL_CONTROL_NONE;
