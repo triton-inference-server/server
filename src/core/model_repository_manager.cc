@@ -888,7 +888,7 @@ Status
 ModelRepositoryManager::PollAndUpdate()
 {
   if (!polling_enabled_) {
-    return Status(RequestStatusCode::INVALID, "polling is disabled");
+    return Status(RequestStatusCode::UNAVAILABLE, "polling is disabled");
   }
 
   // Serialize all operations that change model state
@@ -1020,7 +1020,7 @@ ModelRepositoryManager::LoadUnloadModel(
 {
   if (!model_control_enabled_) {
     return Status(
-        RequestStatusCode::INVALID,
+        RequestStatusCode::UNAVAILABLE,
         "explicit model load / unload is not allowed if polling is enabled");
   }
 
