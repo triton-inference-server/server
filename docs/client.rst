@@ -335,7 +335,7 @@ client API is available at `src/clients/c++/ensemble\_image\_client.cc
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
 `src/clients/python/ensemble\_image\_client.py
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/ensemble_image_client.py>`_.
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/ensemble_image_client.py>`_. 
 
 To use ensemble\_image\_client (or ensemble\_image\_client.py) you must first
 have a running inference server that is serving the
