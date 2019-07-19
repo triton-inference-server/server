@@ -261,15 +261,16 @@ class TrtServerOptions {
   float TensorFlowGpuMemoryFraction() const { return tf_gpu_mem_fraction_; }
   void SetTensorFlowGpuMemoryFraction(float f) { tf_gpu_mem_fraction_ = f; }
 
-  std::map<int, std::vector<float>> TensorFlowVgpuMemoryLimits() const
+  const std::map<int, std::pair<int, uint64_t>>& TensorFlowVgpuMemoryLimits()
+      const
   {
     return tf_vgpu_memory_limits_;
   }
   void AddTensorFlowVgpuMemoryLimits(
-      int gpu_device, int num_vgpus, float mem_limit)
+      int gpu_device, int num_vgpus, uint64_t per_vgpu_memory_mbytes)
   {
-    std::vector<float> mem_limits_per_device(num_vgpus, mem_limit);
-    tf_vgpu_memory_limits_[gpu_device] = mem_limits_per_device;
+    tf_vgpu_memory_limits_[gpu_device] =
+        std::make_pair(num_vgpus, per_vgpu_memory_mbytes);
   }
 
  private:
@@ -285,7 +286,7 @@ class TrtServerOptions {
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
-  std::map<int, std::vector<float>> tf_vgpu_memory_limits_;
+  std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limits_;
 };
 
 TrtServerOptions::TrtServerOptions()
@@ -836,10 +837,11 @@ TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
 TRTSERVER_Error*
 TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
     TRTSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
-    float mem_limit)
+    uint64_t per_vgpu_memory_mbytes)
 {
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
-  loptions->AddTensorFlowVgpuMemoryLimits(gpu_device, num_vgpus, mem_limit);
+  loptions->AddTensorFlowVgpuMemoryLimits(
+      gpu_device, num_vgpus, per_vgpu_memory_mbytes);
   return nullptr;  // Success
 }
 

@@ -129,13 +129,14 @@ class InferenceServer {
   void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
 
   // Get / set Tensorflow vGPU memory limits
-  std::map<int, std::vector<float>> TensorFlowVGPUMemoryLimits() const
+  const std::map<int, std::pair<int, uint64_t>>& TensorFlowVGPUMemoryLimits()
+      const
   {
     return tf_vgpu_memory_limits_;
   }
 
   void SetTensorFlowVGPUMemoryLimits(
-      const std::map<int, std::vector<float>>& memory_limits)
+      const std::map<int, std::pair<int, uint64_t>>& memory_limits)
   {
     tf_vgpu_memory_limits_ = memory_limits;
   }
@@ -172,7 +173,7 @@ class InferenceServer {
   // Tensorflow options
   bool tf_soft_placement_enabled_;
   float tf_gpu_memory_fraction_;
-  std::map<int, std::vector<float>> tf_vgpu_memory_limits_;
+  std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limits_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;

@@ -70,7 +70,7 @@ BuildBackendConfigMap(
     const std::string& version, const std::string& model_store_path,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
     const bool tf_allow_soft_placement,
-    const std::map<int, std::vector<float>> tf_vgpu_memory_limit_mb,
+    const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
     BackendConfigMap* backend_configs)
 {
 #ifdef TRTIS_ENABLE_TENSORFLOW
@@ -87,7 +87,10 @@ BuildBackendConfigMap(
     }
 
     if (!tf_vgpu_memory_limit_mb.empty()) {
-      graphdef_config->memory_limit_mb = tf_vgpu_memory_limit_mb;
+      for (const auto& mem_limit : tf_vgpu_memory_limit_mb) {
+        graphdef_config->memory_limit_mb[mem_limit.first] =
+            std::vector<float>(mem_limit.second.first, mem_limit.second.second);
+      }
       graphdef_config->per_process_gpu_memory_fraction = 0.0;
     }
 
@@ -816,7 +819,7 @@ ModelRepositoryManager::Create(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    const std::map<int, std::vector<float>> tf_memory_limit_mb,
+    const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {

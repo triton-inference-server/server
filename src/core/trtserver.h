@@ -344,7 +344,7 @@ TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
     TRTSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
-    float mem_limit);
+    uint64_t per_vgpu_memory_mbytes);
 
 //
 // TRTSERVER_Server
