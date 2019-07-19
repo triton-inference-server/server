@@ -158,7 +158,7 @@ main(int argc, char** argv)
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
         TRTSERVER_ServerModelStatus(
-            server.get(), &model_status_protobuf, "simple"),
+            server.get(), "simple", &model_status_protobuf),
         "unable to get model status protobuf");
     const char* buffer;
     size_t byte_size;
