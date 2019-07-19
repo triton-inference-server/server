@@ -44,11 +44,11 @@ void
 Usage(char** argv, const std::string& msg = std::string())
 {
   if (!msg.empty()) {
-    std::cerr << "error: " << msg << std::endl;
+    LOG_ERROR << msg;
   }
 
-  std::cerr << "Usage: " << argv[0] << " [options]" << std::endl;
-  std::cerr << "\t-r [model repository absolute path]" << std::endl;
+  LOG_ERROR << "Usage: " << argv[0] << " [options]";
+  LOG_ERROR << "\t-r [model repository absolute path]";
 
   exit(1);
 }
@@ -133,8 +133,7 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRTSERVER_ServerIsReady(server.get(), &ready),
         "unable to get server readiness");
-    std::cout << "Server Health: live " << live << ", ready " << ready
-              << std::endl;
+    LOG_INFO << "Server Health: live " << live << ", ready " << ready;
     if (live && ready) {
       break;
     }
@@ -164,8 +163,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse server status");
     }
 
-    std::cout << "Server Status:" << std::endl;
-    std::cout << server_status.DebugString() << std::endl;
+    LOG_INFO << "Server Status:";
+    LOG_INFO << server_status.DebugString();
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(server_status_protobuf),
@@ -200,9 +199,8 @@ main(int argc, char** argv)
       FAIL("unable to find version 1 status for model 'simple'");
     }
 
-    std::cout << "'simple' model is "
-              << ni::ModelReadyState_Name(vitr->second.ready_state())
-              << std::endl;
+    LOG_INFO << "'simple' model is "
+             << ni::ModelReadyState_Name(vitr->second.ready_state());
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
       break;
     }
@@ -310,8 +308,8 @@ main(int argc, char** argv)
       FAIL("error: failed to parse response header");
     }
 
-    std::cout << "Model \"simple\" response header:" << std::endl;
-    std::cout << response_header.DebugString() << std::endl;
+    LOG_INFO << "Model \"simple\" response header:";
+    LOG_INFO << response_header.DebugString();
 
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(response_protobuf),
@@ -353,10 +351,10 @@ main(int argc, char** argv)
       reinterpret_cast<const int32_t*>(output1_content);
 
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
-              << output0_result[i] << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
-              << output1_result[i] << std::endl;
+    LOG_INFO << input0_data[i] << " + " << input1_data[i] << " = "
+             << output0_result[i];
+    LOG_INFO << input0_data[i] << " - " << input1_data[i] << " = "
+             << output1_result[i];
 
     if ((input0_data[i] + input1_data[i]) != output0_result[i]) {
       FAIL("incorrect sum in " + output0->name());

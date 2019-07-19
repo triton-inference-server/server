@@ -25,9 +25,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/core/logging.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/trtserver.h"
+
+// For now just use the src/core logging utils...
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 

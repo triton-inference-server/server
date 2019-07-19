@@ -36,7 +36,6 @@
 #include "grpc/grpc.h"
 #include "src/core/constants.h"
 #include "src/core/grpc_service.grpc.pb.h"
-#include "src/core/logging.h"
 #include "src/core/trtserver.h"
 #include "src/nvrpc/Context.h"
 #include "src/nvrpc/Executor.h"
