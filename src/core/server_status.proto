@@ -98,6 +98,21 @@ message HealthRequestStats
 }
 
 //@@
+//@@.. cpp:var:: message ControlRequestStats
+//@@
+//@@   Statistics collected for Control requests.
+//@@
+message ControlRequestStats
+{
+  //@@  .. cpp:var:: StatDuration success
+  //@@
+  //@@     Total time required to handle successful Control requests, not
+  //@@     including HTTP or gRPC endpoint termination time.
+  //@@
+  StatDuration success = 1;
+}
+
+//@@
 //@@.. cpp:var:: message InferRequestStats
 //@@
 //@@   Statistics collected for Infer requests.
@@ -334,4 +349,10 @@ message ServerStatus
   //@@     Statistics for Health requests.
   //@@
   HealthRequestStats health_stats = 8;
+
+  //@@  .. cpp:var:: ControlRequestStats control_stats
+  //@@
+  //@@     Statistics for Control requests.
+  //@@
+  ControlRequestStats control_stats = 9;
 }

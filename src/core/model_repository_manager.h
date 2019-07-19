@@ -99,14 +99,10 @@ class ModelRepositoryManager {
   /// \parm model_name The name of the model to be loaded or unloaded
   /// \parm type The type action to be performed. If the action is LOAD and
   /// the model has been loaded, the model will be re-loaded.
-  /// \param OnCompleteUpdate The callback function to be invoked once the
-  /// action is completed.
   /// \return error status. Return "NOT_FOUND" if it tries to load
   /// a non-existing model or if it tries to unload a model that hasn't been
   /// loaded.
-  Status LoadUnloadModel(
-      const std::string& model_name, ActionType type,
-      std::function<void(Status)> OnCompleteUpdate);
+  Status LoadUnloadModel(const std::string& model_name, ActionType type);
 
   /// Unload all models. This function should be called before shutting down
   /// the model repository manager.
@@ -232,7 +228,7 @@ class ModelRepositoryManager {
   /// \return The error status.
   Status VersionsToLoad(
       const std::string& name, const ModelConfig& model_config,
-      std::set<int64_t>& versions);
+      std::set<int64_t>* versions);
 
   const std::string repository_path_;
   const BackendConfigMap backend_config_map_;

@@ -865,6 +865,10 @@ ModelRepositoryManager::PollAndUpdate()
   if (!polling_enabled_) {
     return Status(RequestStatusCode::INVALID, "polling is disabled");
   }
+
+  // Serialize all operations that change model state
+  std::lock_guard<std::mutex> lock(poll_mu_);
+
   std::set<std::string> added, deleted, modified, unmodified;
   RETURN_IF_ERROR(Poll(&added, &deleted, &modified, &unmodified));
   // Nothing to do if no model adds, deletes or modifies.
@@ -946,7 +950,7 @@ ModelRepositoryManager::LoadModelByDependency()
       std::set<int64_t> versions;
       Status status;
       status = VersionsToLoad(
-          valid_model->model_name_, valid_model->model_config_, versions);
+          valid_model->model_name_, valid_model->model_config_, &versions);
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
             valid_model->model_name_, versions, valid_model->model_config_,
@@ -987,17 +991,139 @@ ModelRepositoryManager::LoadModelByDependency()
 
 Status
 ModelRepositoryManager::LoadUnloadModel(
-    const std::string& model_name, ActionType type,
-    std::function<void(Status)> OnCompleteUpdate)
+    const std::string& model_name, ActionType type)
 {
   if (polling_enabled_) {
     return Status(
         RequestStatusCode::INVALID,
         "explicit model load / unload is not allowed if polling is enabled");
   }
-  Status status = Status(RequestStatusCode::UNSUPPORTED, "not implemented");
-  OnCompleteUpdate(status);
-  return status;
+
+  // Serialize all operations that change model state
+  std::lock_guard<std::mutex> lock(poll_mu_);
+
+  // Update ModelInfo related to file system accordingly
+  std::set<std::string> added, deleted, modified;
+  {
+    std::lock_guard<std::mutex> lk(infos_mu_);
+    if (type == ActionType::UNLOAD) {
+      size_t erased_cnt = infos_.erase(model_name);
+      if (erased_cnt == 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "model '" + model_name + "' is not loaded");
+      }
+      deleted.insert(model_name);
+    } else {
+      const auto full_path = JoinPath({repository_path_, model_name});
+
+      int64_t mtime_ns = GetModifiedTime(std::string(full_path));
+      if (mtime_ns == 0) {
+        return Status(
+            RequestStatusCode::NOT_FOUND,
+            "failed to stat directory for model '" + model_name + "'");
+      }
+
+      bool need_load = false;
+      auto iitr = infos_.find(model_name);
+      if (iitr == infos_.end()) {
+        added.insert(model_name);
+        need_load = true;
+      } else {
+        if (mtime_ns > iitr->second->mtime_nsec_) {
+          modified.insert(model_name);
+          need_load = true;
+        }
+      }
+
+      if (need_load) {
+        std::unique_ptr<ModelInfo> model_info(new ModelInfo());
+        ModelConfig& model_config = model_info->model_config_;
+        model_info->mtime_nsec_ = mtime_ns;
+
+        // If enabled, try to automatically generate missing parts of
+        // the model configuration (autofill) from the model
+        // definition. In all cases normalize and validate the config.
+        RETURN_IF_ERROR(GetNormalizedModelConfig(
+            full_path, backend_config_map_, autofill_, &model_config));
+        RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
+
+        model_info->platform_ = GetPlatform(model_config.platform());
+
+        // Make sure the name of the model matches the name of the
+        // directory. This is a somewhat arbitrary requirement but seems
+        // like good practice to require it of the user. It also acts as a
+        // check to make sure we don't have two different models with the
+        // same name.
+        if (model_config.name() != model_name) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "unexpected directory name '" + model_name + "' for model '" +
+                  model_config.name() +
+                  "', directory name must equal model name");
+        }
+
+        // Only update the infos when all validation is completed
+        if (iitr == infos_.end()) {
+          iitr = infos_.emplace(model_name, nullptr).first;
+        }
+        iitr->second = std::move(model_info);
+      }
+    }
+  }
+
+  // Update dependency graph and load
+  Update(added, deleted, modified);
+
+  for (const auto& name : deleted) {
+    ModelConfig model_config;
+    std::set<int64_t> versions;
+    // Utilize "force_unload" of AsyncLoad()
+    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+  }
+
+  // model loading / unloading error will be printed but ignored
+  LoadModelByDependency();
+
+  // Check if model is loaded / unloaded properly
+  const auto version_states = GetVersionStates(model_name);
+  if (type == ActionType::LOAD) {
+    const auto& config =
+        dependency_graph_.find(model_name)->second->model_config_;
+    std::set<int64_t> expected_versions;
+    RETURN_IF_ERROR(VersionsToLoad(model_name, config, &expected_versions));
+    
+    std::string not_ready_version_str;
+    for (const auto version : expected_versions) {
+      const auto it = version_states.find(version);
+      if ((it == version_states.end()) || (it->second != ModelReadyState::MODEL_READY)) {
+        not_ready_version_str += std::to_string(version);
+        not_ready_version_str += ",";
+      }
+    }
+    if (!not_ready_version_str.empty()) {
+      not_ready_version_str.pop_back();
+      return Status(RequestStatusCode::INTERNAL,
+          "failed to load '" + model_name +
+          "', versions that are not available: " + not_ready_version_str);
+    }
+  } else {
+    std::string ready_version_str;
+    for (const auto& version_state : version_states) {
+      if (version_state.second == ModelReadyState::MODEL_READY) {
+        ready_version_str += std::to_string(version_state.first);
+        ready_version_str += ",";
+      }
+    }
+    if (!ready_version_str.empty()) {
+      ready_version_str.pop_back();
+      return Status(RequestStatusCode::INTERNAL,
+          "failed to unload '" + model_name +
+          "', versions that are still available: " + ready_version_str);
+    }
+  }
+
+  return Status::Success;
 }
 
 Status
@@ -1052,9 +1178,6 @@ ModelRepositoryManager::Poll(
     std::set<std::string>* added, std::set<std::string>* deleted,
     std::set<std::string>* modified, std::set<std::string>* unmodified)
 {
-  // Serialize all polling operation...
-  std::lock_guard<std::mutex> lock(poll_mu_);
-
   added->clear();
   deleted->clear();
   modified->clear();
@@ -1407,9 +1530,9 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
 Status
 ModelRepositoryManager::VersionsToLoad(
     const std::string& name, const ModelConfig& model_config,
-    std::set<int64_t>& versions)
+    std::set<int64_t>* versions)
 {
-  versions.clear();
+  versions->clear();
 
   // Get integral number of the version directory
   const auto model_path = JoinPath({repository_path_, name});
@@ -1441,7 +1564,7 @@ ModelRepositoryManager::VersionsToLoad(
       // Only load the specific versions that are presented in model directory
       bool version_not_exist = existing_versions.insert(v).second;
       if (!version_not_exist) {
-        versions.emplace(v);
+        versions->emplace(v);
       } else {
         LOG_ERROR << "version " << v << " is specified for model '" << name
                   << "', but the version directory is not present";
@@ -1451,19 +1574,19 @@ ModelRepositoryManager::VersionsToLoad(
     if (model_config.version_policy().has_latest()) {
       // std::set is sorted with std::greater
       for (const auto& v : existing_versions) {
-        if (versions.size() >=
+        if (versions->size() >=
             model_config.version_policy().latest().num_versions()) {
           break;
         }
-        versions.emplace(v);
+        versions->emplace(v);
       }
     } else {
       // all
-      versions.insert(existing_versions.begin(), existing_versions.end());
+      versions->insert(existing_versions.begin(), existing_versions.end());
     }
   }
 
-  if (versions.empty()) {
+  if (versions->empty()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
         "at least one version must be available under the version policy of "

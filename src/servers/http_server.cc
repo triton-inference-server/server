@@ -192,9 +192,10 @@ class HTTPAPIServer : public HTTPServerImpl {
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         endpoint_names_(endpoints),
-        api_regex_(R"(/api/(health|profile|infer|status)(.*))"),
+        api_regex_(R"(/api/(health|profile|infer|status|control)(.*))"),
         health_regex_(R"(/(live|ready))"),
-        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))")
+        infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
+        control_regex_(R"(/(load|unload)/([^/]+))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -235,6 +236,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
+  void HandleControl(evhtp_request_t* req, const std::string& control_uri);
 
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
@@ -253,6 +255,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 health_regex_;
   re2::RE2 infer_regex_;
   re2::RE2 status_regex_;
+  re2::RE2 control_regex_;
 };
 
 void
@@ -292,6 +295,13 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleInfer(req, rest);
       return;
     }
+    // control
+    if (endpoint == "control" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "control") !=
+         endpoint_names_.end())) {
+      HandleControl(req, rest);
+      return;
+    }
   }
 
   LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full
@@ -308,11 +318,10 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
   }
 
   std::string mode;
-  if (!health_uri.empty()) {
-    if (!RE2::FullMatch(health_uri, health_regex_, &mode)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
+  if ((health_uri.empty()) ||
+      (!RE2::FullMatch(health_uri, health_regex_, &mode))) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
   }
 
   TRTSERVER_Error* err = nullptr;
@@ -459,6 +468,52 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
   TRTSERVER_ErrorDelete(err);
 }
 
+void
+HTTPAPIServer::HandleControl(
+    evhtp_request_t* req, const std::string& control_uri)
+{
+  if (req->method != htp_method_POST) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  std::string action_type_str, model_name;
+  if ((control_uri.empty()) ||
+      (!RE2::FullMatch(
+          control_uri, control_regex_, &action_type_str, &model_name))) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  TRTSERVER_Error* err = nullptr;
+  if (action_type_str == "load") {
+    err = TRTSERVER_LoadModel(server_.get(), model_name.c_str());
+  } else if (action_type_str == "unload") {
+    err = TRTSERVER_UnloadModel(server_.get(), model_name.c_str());
+  } else {
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNKNOWN,
+        std::string("unknown action type '" + action_type_str + "'").c_str());
+  }
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
@@ -549,12 +604,11 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   }
 
   std::string model_name, model_version_str;
-  if (!infer_uri.empty()) {
-    if (!RE2::FullMatch(
-            infer_uri, infer_regex_, &model_name, &model_version_str)) {
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
-    }
+  if ((infer_uri.empty()) ||
+      (!RE2::FullMatch(
+          infer_uri, infer_regex_, &model_name, &model_version_str))) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
   }
 
   int64_t model_version = -1;

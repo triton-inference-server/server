@@ -59,6 +59,12 @@ service GRPCService
   //@@
   rpc Health(HealthRequest) returns (HealthResponse) {}
 
+  //@@  .. cpp:var:: rpc Control(ControlRequest) returns (ControlResponse)
+  //@@
+  //@@     Request to load / unload a specified model.
+  //@@
+  rpc Control(ControlRequest) returns (ControlResponse) {}
+
   //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
   //@@
   //@@     Request inference using a specific model. [ To handle large input
@@ -186,6 +192,62 @@ message HealthResponse
   //@@     live/ready, false indicates the inference server is not live/ready.
   //@@
   bool health = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ControlRequest
+//@@
+//@@   Request message for Control gRPC endpoint.
+//@@
+message ControlRequest
+{
+  //@@  .. cpp:enum:: Type
+  //@@
+  //@@     Types of control operation
+  //@@
+  enum Type {
+    //@@    .. cpp:enumerator:: Type::UNLOAD = 0
+    //@@
+    //@@       To unload the specified model.
+    //@@
+    UNLOAD = 0;
+
+    //@@    .. cpp:enumerator:: Type::LOAD = 1
+    //@@
+    //@@       To load the specified model. If the model has been loaded,
+    //@@       it will be reloaded to fetch the latest change.
+    //@@
+    LOAD = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The target model name.
+  //@@
+  string model_name = 1;
+
+  //@@
+  //@@  .. cpp:var:: Type type
+  //@@
+  //@@     The control type that is operated on the specified model.
+  //@@
+  Type type = 2;
+}
+
+//@@
+//@@.. cpp:var:: message ControlResponse
+//@@
+//@@   Response message for Control gRPC endpoint.
+//@@
+message ControlResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
 }
 
 //@@
