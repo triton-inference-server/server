@@ -69,6 +69,18 @@ nic::Error* ServerStatusContextGetServerStatus(
     ServerStatusContextCtx* ctx, char** status, uint32_t* status_len);
 
 //==============================================================================
+// ControlContext
+typedef struct ControlContextCtx ControlContextCtx;
+nic::Error* ControlContextNew(
+    ControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose);
+void ControlContextDelete(ControlContextCtx* ctx);
+nic::Error* ControlContextLoad(
+    ControlContextCtx* ctx, const char* model_name);
+nic::Error* ControlContextUnload(
+    ControlContextCtx* ctx, const char* model_name);
+
+//==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
