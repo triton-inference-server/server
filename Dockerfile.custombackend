@@ -52,14 +52,10 @@ COPY src/backends/custom/custom.h src/backends/custom/custom.h
 COPY src/custom src/custom
 COPY src/core src/core
 
-# The build can fail the first time due to a protobuf_generate_cpp
-# error that doesn't repeat on subsequent builds, which is why there
-# are 2 make invocations below.
 RUN (cd build && \
             cmake -DTRTIS_ENABLE_GPU=OFF \
                   -DCMAKE_BUILD_TYPE=Release \
                   -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install/custom-backend-sdk && \
-            (make -j16 trtis-custom-backends || true) && \
             make -j16 trtis-custom-backends) && \
     export VERSION=`cat /workspace/VERSION` && \
     (cd install && tar zcf /workspace/v$VERSION.custombackend.tar.gz custom-backend-sdk)
