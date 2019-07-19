@@ -630,16 +630,16 @@ GrpcRequestImpl::GetResults(
   // in-place instead of copying it out.
   size_t idx = 0;
   for (const auto& output : response_header.output()) {
-    std::shared_ptr<InferContext::Output> infer_output;
-    Error err = ctx.GetOutput(output.name(), &infer_output);
-    if (!err.IsOk()) {
-      results->clear();
-      return err;
-    }
-
-    std::unique_ptr<GrpcResultImpl> result(
-        new GrpcResultImpl(grpc_response_, infer_output));
     if (!ctx.HasSharedMemory(output.name())) {
+      std::shared_ptr<InferContext::Output> infer_output;
+      Error err = ctx.GetOutput(output.name(), &infer_output);
+      if (!err.IsOk()) {
+        results->clear();
+        return err;
+      }
+
+      std::unique_ptr<GrpcResultImpl> result(
+          new GrpcResultImpl(grpc_response_, infer_output));
       err = InitResult(infer_output, output, idx, result.get());
       if (!err.IsOk()) {
         results->clear();
@@ -990,8 +990,8 @@ InferGrpcContextImpl::HasSharedMemory(std::string output_name) const
 {
   size_t output_pos_idx = 0;
   while (output_pos_idx < outputs_.size()) {
-    InputImpl* io =
-        reinterpret_cast<InputImpl*>(outputs_[output_pos_idx].get());
+    OutputImpl* io =
+        reinterpret_cast<OutputImpl*>(outputs_[output_pos_idx].get());
     if (io->Name() == output_name) {
       return io->IsSharedMemory();
     }
