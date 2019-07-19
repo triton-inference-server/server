@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "src/backends/tensorflow/savedmodel_backend.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
@@ -49,6 +50,10 @@ SavedModelBackendFactory::Create(
   auto savedmodel_backend_config =
       std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
   factory->reset(new SavedModelBackendFactory(savedmodel_backend_config));
+
+  // Initialize VGPUs if required
+  VirtualDeviceTracker::Init(savedmodel_backend_config->memory_limit_mb);
+
   return Status::Success;
 }
 

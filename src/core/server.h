@@ -28,9 +28,10 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <atomic>
+#include <map>
 #include <string>
 #include <thread>
-#include <unordered_map>
+#include <vector>
 
 #include "src/core/api.pb.h"
 #include "src/core/model_config.pb.h"
@@ -127,6 +128,19 @@ class InferenceServer {
   float TensorFlowGPUMemoryFraction() const { return tf_gpu_memory_fraction_; }
   void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
 
+  // Get / set Tensorflow vGPU memory limits
+  const std::map<int, std::pair<int, uint64_t>>& TensorFlowVGPUMemoryLimits()
+      const
+  {
+    return tf_vgpu_memory_limits_;
+  }
+
+  void SetTensorFlowVGPUMemoryLimits(
+      const std::map<int, std::pair<int, uint64_t>>& memory_limits)
+  {
+    tf_vgpu_memory_limits_ = memory_limits;
+  }
+
   // Return the status manager for this server.
   std::shared_ptr<ServerStatusManager> StatusManager() const
   {
@@ -156,8 +170,10 @@ class InferenceServer {
   bool profiling_enabled_;
   uint32_t exit_timeout_secs_;
 
+  // Tensorflow options
   bool tf_soft_placement_enabled_;
   float tf_gpu_memory_fraction_;
+  std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limits_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;

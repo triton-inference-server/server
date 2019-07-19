@@ -28,6 +28,7 @@
 
 #include <set>
 #include "src/backends/tensorflow/tf_utils.h"
+#include "src/backends/tensorflow/tf_virtual_device.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.pb.h"
@@ -120,6 +121,8 @@ BaseBackend::CreateExecutionContext(
   // For a GPU context, determine the model file to use for device
   // compute capability. CPU always uses the default model file.
   std::string cc_model_filename;
+  int vgpu_device = gpu_device;
+
   if (gpu_device == Context::NO_GPU_DEVICE) {
     cc_model_filename = Config().default_model_filename();
 
@@ -143,8 +146,14 @@ BaseBackend::CreateExecutionContext(
                             ? Config().default_model_filename()
                             : cc_itr->second;
 
+    // Get virtual device tracker instance, and get next device id
+    if (VirtualDeviceTracker::HasVirtualDevice()) {
+      RETURN_IF_ERROR(
+          VirtualDeviceTracker::GetNextVirtualDevice(gpu_device, &vgpu_device));
+    }
+
     LOG_INFO << "Creating instance " << instance_name << " on GPU "
-             << gpu_device << " (" << cc << ") using " << cc_model_filename;
+             << vgpu_device << " (" << cc << ") using " << cc_model_filename;
 #else
     return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
@@ -171,7 +180,7 @@ BaseBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
-      graphdef_backend_config, gpu_device, Config().optimization().has_graph(),
+      graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_));
