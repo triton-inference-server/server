@@ -147,41 +147,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsFormatted(
     const char** base, size_t* byte_size);
 
 //
-// TRTSERVER_MemoryAllocator
-//
-// Object representing a memory allocator.
-//
-struct TRTSERVER_MemoryAllocator;
-
-// Memory allocation regions.
-typedef enum trtserver_memoryallocatorregions_enum {
-  TRTSERVER_MEMORY_CPU,
-  TRTSERVER_MEMORY_GPU
-} TRTSERVER_MemoryAllocator_Region;
-
-// Type for allocation function. Return in 'buffer' the pointer to the
-// contiguous memory block of size 'byte_size'. Return a
-// TRTSERVER_Error object on failure, return nullptr on success.
-typedef TRTSERVER_Error* (*TRTSERVER_MemoryAllocFn_t)(
-    void** buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id);
-
-// Type for delete function. Return a TRTSERVER_Error object on
-// failure, return nullptr on success.
-typedef TRTSERVER_Error* (*TRTSERVER_MemoryDeleteFn_t)(
-    void* buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id);
-
-// Create a new memory allocator object.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MemoryAllocatorNew(
-    TRTSERVER_MemoryAllocator** allocator, TRTSERVER_MemoryAllocFn_t alloc_fn,
-    TRTSERVER_MemoryDeleteFn_t delete_fn);
-
-// Delete a memory allocator.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MemoryAllocatorDelete(
-    TRTSERVER_MemoryAllocator* allocator);
-
-//
 // TRTSERVER_InferenceRequestProvider
 //
 // Object representing the request provider for an inference
