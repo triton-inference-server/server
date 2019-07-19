@@ -96,6 +96,23 @@ class ProfileGrpcContext {
 };
 
 //==============================================================================
+//// ControlGrpcContext is the GRPC instantiation of ControlContext.
+////
+class ControlGrpcContext {
+ public:
+  /// Create context that controls model ready state on a server using GRPC
+  /// protocol.
+  /// \param ctx Returns the new ControlContext object.
+  /// \param server_url The inference server name and port.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+      bool verbose = false);
+};
+
+//==============================================================================
 /// InferGrpcContext is the GRPC instantiation of InferContext.
 ///
 class InferGrpcContext {
