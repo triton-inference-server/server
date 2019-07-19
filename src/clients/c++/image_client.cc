@@ -66,6 +66,47 @@ enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
 
 enum ProtocolType { HTTP = 0, GRPC = 1 };
 
+int
+create_shared_region(std::string shm_key, size_t batch_byte_size)
+{
+  // get shared memory region descriptor
+  int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
+    std::cerr << "error: unable to get input shared memory descriptor";
+    exit(1);
+  }
+  // extend shared memory object as by default it's initialized with size 0
+  int res = ftruncate(shm_fd, batch_byte_size);
+  if (res == -1) {
+    std::cerr << "error: unable to get initialize size";
+    exit(1);
+  }
+  return shm_fd;
+}
+
+void*
+get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
+{
+  // map shared memory to process address space
+  void* shm_addr =
+      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  if (shm_addr == MAP_FAILED) {
+    std::cerr << "error: unable to process address space";
+    exit(1);
+  }
+  return shm_addr;
+}
+
+void
+shm_cleanup(std::string shm_key)
+{
+  int shm_fd = shm_unlink(shm_key.c_str());
+  if (shm_fd == -1) {
+    std::cerr << "error: unable to unlink shared memory for " << shm_key;
+    exit(1);
+  }
+}
+
 void
 Preprocess(
     const cv::Mat& img, ni::ModelInput::Format format, int img_type1,
@@ -176,15 +217,14 @@ Postprocess(
     const std::map<std::string, std::unique_ptr<nic::InferContext::Result>>&
         results,
     const std::vector<std::string>& filenames, const size_t batch_size,
-    const std::string& shm_key, size_t offset, const size_t& byte_size,
-    bool use_shm)
+    const float* shm_addr, size_t offset, const size_t& byte_size, bool use_shm)
 {
-  if (results.size() != 1) {
+  if ((results.size() != 1) && (!use_shm)) {
     std::cerr << "expected 1 result, got " << results.size() << std::endl;
     exit(1);
   }
 
-  if (filenames.size() != batch_size) {
+  if ((filenames.size() != batch_size) && (!use_shm)) {
     std::cerr << "expected " << batch_size << " filenames, got "
               << filenames.size() << std::endl;
     exit(1);
@@ -192,22 +232,6 @@ Postprocess(
 
   if (use_shm) {
     float output_data[byte_size / sizeof(float)];
-    void* shm_addr;
-    int res;
-    int shm_fd;
-    // get shared memory file descriptor (NOT a file)
-    shm_fd = shm_open(shm_key.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get shared memory descriptor";
-      exit(1);
-    }
-    // map shared memory to process address space
-    shm_addr = mmap(
-        NULL, batch_size * byte_size, PROT_READ, MAP_SHARED, shm_fd, offset);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
 
     for (size_t b = 0; b < batch_size; ++b) {
       std::cout << "Image '" << filenames[b] << "':" << std::endl;
@@ -218,19 +242,6 @@ Postprocess(
         std::cout << "    P(" << i + 1 << ") = " << output_data[i] << std::endl;
       }
       offset += byte_size;
-    }
-    // Perform CLEANUP for Output - if needed
-    // mmap cleanup
-    res = munmap(shm_addr, batch_size * byte_size);
-    if (res == -1) {
-      std::cerr << "error: unable to unassign mmap";
-      exit(1);
-    }
-    // shm_open cleanup
-    shm_fd = shm_unlink(shm_key.c_str());
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to unlink shared memory";
-      exit(1);
     }
   } else {
     const std::unique_ptr<nic::InferContext::Result>& result =
@@ -515,7 +526,7 @@ void
 FileToInputData(
     const std::string& filename, size_t c, size_t h, size_t w,
     ni::ModelInput::Format format, int type1, int type3, ScaleType scale,
-    std::vector<uint8_t>* input_data, const std::string& shm_key,
+    std::vector<uint8_t>* input_data, const float* shm_addr,
     const size_t& offset, size_t* byte_size, bool use_shm)
 {
   // Load the specified image.
@@ -540,29 +551,13 @@ FileToInputData(
   Preprocess(img, format, type1, type3, c, cv::Size(w, h), scale, input_data);
 
   if (use_shm) {
-    int shm_fd;
-    void* shm_addr;
-
-    // Write input image to shared memory
     *byte_size = (size_t)(img.total() * img.elemSize());
-
-    // get shared memory file descriptor (NOT a file)
-    shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-    if (shm_fd == -1) {
-      std::cerr << "error: unable to get shared memory descriptor";
-      exit(1);
-    }
-
-    // map shared memory to process address space
-    shm_addr = mmap(NULL, *byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-    if (shm_addr == MAP_FAILED) {
-      std::cerr << "error: unable to process address space";
-      exit(1);
-    }
 
     // place image data into memory in the form [channel][width][height]
     // void *input = (void*)(img.data);
-    memcpy(shm_addr, (void*)(img.data), *byte_size);
+    memcpy(
+        (float*)(((uint8_t*)shm_addr) + offset), (float*)(img.data),
+        *byte_size);
   }
 }
 
@@ -691,71 +686,10 @@ main(int argc, char** argv)
   // Collect the names of the image(s) and their sizes (for shared memory).
   std::vector<std::string> image_filenames;
 
-  size_t byte_size = c * h * w * sizeof(float);
-  int num_batches = ceil(image_filenames.size() * 1.0 / batch_size);
+  size_t input_byte_size = c * h * w * sizeof(float);
   size_t output_byte_size = sizeof(float) * op_size;
-  std::string shm_key;
-  int shm_fd_ip;
-  void* shm_addr_ip;
-  int res_ip;
-  int shm_fd_op;
-  void* shm_addr_op;
-  int res_op;
-
-  // Create shared memory regions for Input and Output batches
-  if (use_shm) {
-    size_t offset = 0;  // start
-
-    for (int batch_i = 0; batch_i < num_batches; batch_i++) {
-      // For INPUT
-      // get shared memory file descriptor (NOT a file)
-      shm_key = "/input_batch_" + std::to_string(batch_i);
-      shm_fd_ip =
-          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-      if (shm_fd_ip == -1) {
-        std::cerr << "error: unable to get input shared memory descriptor";
-        exit(1);
-      }
-      // extend shared memory object as by default it's initialized with size 0
-      res_ip = ftruncate(shm_fd_ip, batch_size * byte_size);
-      if (res_ip == -1) {
-        std::cerr << "error: unable to get initialize size";
-        exit(1);
-      }
-      // map shared memory to process address space
-      shm_addr_ip = mmap(
-          NULL, batch_size * byte_size, PROT_WRITE, MAP_SHARED, shm_fd_ip,
-          offset);
-      if (shm_addr_ip == MAP_FAILED) {
-        std::cerr << "error: unable to process address space";
-        exit(1);
-      }
-
-      // For OUTPUT
-      // get shared memory file descriptor (NOT a file)
-      shm_key = "/output_batch_" + std::to_string(batch_i);
-      shm_fd_op =
-          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-      if (shm_fd_op == -1) {
-        std::cerr << "error: unable to get output shared memory descriptor";
-        exit(1);
-      }
-      // extend shared memory object as by default it's initialized with size 0
-      res_op = ftruncate(shm_fd_op, batch_size * output_byte_size);
-      if (res_op == -1) {
-        std::cerr << "error: unable to get initialize size";
-        exit(1);
-      }
-      // map shared memory to process address space
-      shm_addr_op = mmap(
-          NULL, batch_size * output_byte_size, PROT_READ, MAP_SHARED, shm_fd_op,
-          offset);
-      if (shm_addr_op == MAP_FAILED) {
-        std::cerr << "error: unable to process address space";
-        exit(1);
-      }
-    }
-  }
+  float* shm_addr_ip = nullptr;
+  float* shm_addr_op = nullptr;
 
   struct stat name_stat;
   if (stat(argv[optind], &name_stat) != 0) {
@@ -783,20 +717,30 @@ main(int argc, char** argv)
   // (readdir does not guarantee any particular order).
   std::sort(image_filenames.begin(), image_filenames.end());
 
-  // Preprocess the images into input data according to model
-  // requirements and place in shared memory (if needed)
-  int image_i = 0, batch_i = 0;
+  // Create shared memory regions for Input and Output batches
+  if (use_shm) {
+    std::string shm_key = "/input_data";
+    int shm_fd =
+        create_shared_region(shm_key, input_byte_size * image_filenames.size());
+    shm_addr_ip = (float*)(get_shm_addr(
+        shm_fd, 0, input_byte_size * image_filenames.size()));
+    shm_key = "/output_data";
+    shm_fd = create_shared_region(
+        shm_key, output_byte_size * image_filenames.size());
+    shm_addr_op = (float*)(get_shm_addr(
+        shm_fd, 0, output_byte_size * image_filenames.size()));
+  }
+
+  // Preprocess the images into input data according to model requirements and
+  // place in shared memory (if needed)
   size_t offset = 0;
   std::vector<std::vector<uint8_t>> image_data;
   for (const auto& fn : image_filenames) {
-    image_i++;
     image_data.emplace_back();
     size_t byte_size = 0;
-    batch_i = ceil(image_i * 1.0 / batch_size);
-    shm_key = "/input_batch_" + std::to_string(batch_i);
     FileToInputData(
         fn, c, h, w, format, type1, type3, scale, &(image_data.back()),
-        /*shm_key=*/shm_key, /*offset=*/offset, &byte_size, use_shm);
+        shm_addr_ip, offset, &byte_size, use_shm);
 
     if (!use_shm) {
       if ((image_data.size() == 1) && !preprocess_output_filename.empty()) {
@@ -838,7 +782,8 @@ main(int argc, char** argv)
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
   size_t image_idx = 0;
   bool last_request = false;
-  int ib_num = 0;
+  offset = 0;
+  size_t op_offset = 0;
 
   while (!last_request) {
     // Already verified that there is 1 input...
@@ -855,25 +800,22 @@ main(int argc, char** argv)
     // Set input to be the next 'batch_size' images (preprocessed).
     std::vector<std::string> input_filenames;
     if (use_shm) {
-      size_t offset = 0;  // start
-
       err = input->SetSharedMemory(
-          "/input_batch_" + std::to_string(ib_num), /*offset=*/offset,
-          batch_size * byte_size);
+          "/input_data", offset, batch_size * input_byte_size);
       if (!err.IsOk()) {
-        std::cerr << "failed setting shared memory input batch: " << err
-                  << std::endl;
+        std::cerr << "failed setting shared memory input: " << err << std::endl;
         exit(1);
       }
 
       err = output->SetSharedMemory(
-          "/output_batch_" + std::to_string(ib_num), /*offset=*/offset,
-          batch_size * output_byte_size);
+          "/output_data", op_offset, batch_size * output_byte_size);
       if (!err.IsOk()) {
-        std::cerr << "failed setting shared memory output batch: " << err
+        std::cerr << "failed setting shared memory output: " << err
                   << std::endl;
         exit(1);
       }
+      offset += batch_size * input_byte_size;
+      op_offset += batch_size * output_byte_size;
     }
 
     for (size_t idx = 0; idx < batch_size; ++idx) {
@@ -913,7 +855,6 @@ main(int argc, char** argv)
 
       requests.emplace_back(std::move(req));
     }
-    ib_num++;
   }
 
   // For async, retrieve results according to the send order
@@ -930,46 +871,19 @@ main(int argc, char** argv)
     }
   }
 
-  if (use_shm) {
-    // CLEANUP input (after sending request - if needed)
-    for (size_t idx = 0; idx < results.size(); idx++) {
-      shm_key = "/input_batch_" + std::to_string(idx);
-      shm_fd_ip =
-          shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-      if (shm_fd_ip == -1) {
-        std::cerr << "error: unable to get input shared memory descriptor";
-        exit(1);
-      }
-      shm_addr_ip = mmap(
-          NULL, batch_size * byte_size, PROT_WRITE, MAP_SHARED, shm_fd_ip,
-          /*offset=*/0);
-      if (shm_addr_ip == MAP_FAILED) {
-        std::cerr << "error: unable to process address space";
-        exit(1);
-      }
-      // mmap cleanup
-      res_ip = munmap(shm_addr_ip, batch_size * byte_size);
-      if (res_ip == -1) {
-        std::cerr << "error: unable to unassign mmap";
-        exit(1);
-      }
-      // shm_open cleanup
-      shm_fd_ip = shm_unlink(shm_key.c_str());
-      if (shm_fd_ip == -1) {
-        std::cerr << "error: unable to unlink shared memory";
-        exit(1);
-      }
-    }
-  }
-
   // Post-process the results to make prediction(s)
   for (size_t idx = 0; idx < results.size(); idx++) {
     std::cout << "Request " << idx << ", batch size " << batch_size
               << std::endl;
     Postprocess(
-        results[idx], result_filenames[idx], batch_size,
-        "/output_batch_" + std::to_string(idx), /*offset=*/0, output_byte_size,
-        use_shm);
+        results[idx], result_filenames[idx], batch_size, shm_addr_op,
+        idx * output_byte_size, output_byte_size, use_shm);
+  }
+
+  if (use_shm) {
+    // shm_unlink input and output shared memory regions
+    shm_cleanup("/input_data");
+    shm_cleanup("/output_data");
   }
 
   return 0;

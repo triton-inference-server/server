@@ -639,7 +639,7 @@ GrpcRequestImpl::GetResults(
 
     std::unique_ptr<GrpcResultImpl> result(
         new GrpcResultImpl(grpc_response_, infer_output));
-    if (ctx.HasSharedMemory(output.name())) {
+    if (!ctx.HasSharedMemory(output.name())) {
       err = InitResult(infer_output, output, idx, result.get());
       if (!err.IsOk()) {
         results->clear();

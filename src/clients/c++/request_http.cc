@@ -1165,7 +1165,7 @@ HttpRequestImpl::CreateResult(
     return err;
   }
 
-  if (ctx.HasSharedMemory(output.name())) {
+  if (!ctx.HasSharedMemory(output.name())) {
     std::unique_ptr<ResultImpl> result(
         new ResultImpl(infer_output, batch_size));
     result->SetBatch1Shape(output.raw().dims());
