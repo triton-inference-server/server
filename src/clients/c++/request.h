@@ -732,13 +732,14 @@ class ControlContext {
  public:
   virtual ~ControlContext() = 0;
 
-  /// Load a model on the inference server. If the model has been loaded,
+  /// Load a model on the inference server. If the model is already loaded,
   /// it will be reloaded to use the latest configuration.
   /// \param model_name The name of the model to be loaded.
   /// \return Error object indicating success or failure.
   virtual Error Load(const std::string& model_name) = 0;
 
-  /// Unload a model on the inference server.
+  /// Unload a model from the inference server. Unloading a model that
+  /// is not loaded on server has no affect and success code will be returned.
   /// \param model_name The name of the model to be unloaded.
   /// \return Error object indicating success or failure.
   virtual Error Unload(const std::string& model_name) = 0;

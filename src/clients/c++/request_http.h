@@ -144,7 +144,8 @@ class ProfileHttpContext {
 ///
 class ControlHttpContext {
  public:
-  /// Create context that controls model ready state on a server using HTTP
+  /// Create context that controls models to be loaded on a server and
+  /// to be unloaded from a server using HTTP
   /// protocol.
   /// \param ctx Returns the new ControlContext object.
   /// \param server_url The inference server name and port.
