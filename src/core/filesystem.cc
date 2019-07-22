@@ -539,7 +539,6 @@ class S3FileSystem : public FileSystem {
  public:
   S3FileSystem();
   ~S3FileSystem();
-  Status CheckClient();
   Status FileExists(const std::string& path, bool* exists) override;
   Status IsDirectory(const std::string& path, bool* is_dir) override;
   Status FileModificationTime(
@@ -683,7 +682,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #ifndef TRTIS_ENABLE_GCS
     return Status(
         RequestStatusCode::INTERNAL,
-        "gs:// file-system not supported. To enable build with "
+        "gs:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_GCS=ON.");
 #else
     static GCSFileSystem gcs_fs;
@@ -691,6 +690,22 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
     *file_system = &gcs_fs;
     return Status::Success;
 #endif  // TRTIS_ENABLE_GCS
+  }
+
+  // Check if this is a GCS path (gs://$BUCKET_NAME)
+  if (!path.empty() && !path.rfind("s3://", 0)) {
+#ifndef TRTIS_ENABLE_S3
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "s3:// file-system not supported. To enable, build with "
+        "-DTRTIS_ENABLE_S3=ON.");
+#else
+    static S3FileSystem s3_fs;
+    //RETURN_IF_ERROR(s3_fs.CheckClient());
+    std::cout << "Reading s3 path" + path << std::endl;
+    *file_system = &s3_fs;
+    return Status::Success;
+#endif  // TRTIS_ENABLE_S3
   }
 
   // For now assume all paths are local...
