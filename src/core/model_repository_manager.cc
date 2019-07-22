@@ -985,7 +985,7 @@ ModelRepositoryManager::LoadModelByDependency()
       }
       if (!status.IsOk()) {
         model_states.pop_back();
-        LOG_ERROR << "failed to load model '" << valid_model
+        LOG_ERROR << "failed to load model '" << valid_model->model_name_
                   << "': " << status.Message();
         valid_model->status_ = status;
         valid_model->loaded_versions_ = std::set<int64_t>();
