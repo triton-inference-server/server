@@ -290,6 +290,13 @@ These additional options may be specified:
   GPUs are disable the inference server will :ref:`run models on CPU
   when possible<section-running-the-inference-server-without-gpu>`.
 
+* **TRTIS_MIN_COMPUTE_CAPABILITY**: By default, the inference server
+  supports NVIDIA GPUs with CUDA compute capability 6.0 or higher. If
+  all framework backends included in the inference server are built to
+  support a lower compute capability, then TRTIS can be built to support
+  that lower compute capability by setting -DTRTIS_MIN_COMPUTE_CAPABILITY
+  appropriately. The setting is ignored if -DTRTIS_ENABLE_GPU=OFF.
+ 
 Build Inference Server
 ^^^^^^^^^^^^^^^^^^^^^^
 

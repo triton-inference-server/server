@@ -41,6 +41,12 @@
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 
+#ifdef TRTIS_ENABLE_GPU
+static_assert(
+    TRTIS_MIN_COMPUTE_CAPABILITY >= 1.0,
+    "Invalid TRTIS_MIN_COMPUTE_CAPABILITY specified");
+#endif  // TRTIS_ENABLE_GPU
+
 #if defined(TRTIS_ENABLE_HTTP) || defined(TRTIS_ENABLE_METRICS)
 #include "src/servers/http_server.h"
 #endif  // TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS

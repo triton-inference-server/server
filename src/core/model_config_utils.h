@@ -131,4 +131,19 @@ Status ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size);
 Status CheckAllowedModelOutput(
     const ModelOutput& io, const std::set<std::string>& allowed);
 
+#ifdef TRTIS_ENABLE_GPU
+/// Validates the compute capability of the GPU indexed
+/// \param The index of the target GPU.
+/// \return The error status. A non-OK status means the target GPU is
+/// \ not supported
+Status CheckGPUCompatibility(const int gpu_id);
+
+/// Obtains a set of gpu ids that is supported by TRTIS.
+/// \param The set of integers which is populated by ids of
+///  supported GPUS
+/// \return The error status. A non-ok status means there were
+/// errors encountered while querying GPU devices.
+Status GetSupportedGPUs(std::set<int>& supported_gpus);
+#endif
+
 }}  // namespace nvidia::inferenceserver
