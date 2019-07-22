@@ -296,17 +296,15 @@ GetNormalizedModelConfig(
       group->set_name(config->name());
     }
 
-    int device_cnt = 0;
+    // Creates a set of supported GPU device ids
+    std::set<int> supported_gpus;
 #ifdef TRTIS_ENABLE_GPU
-    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-    if (cuerr == cudaErrorNoDevice) {
-      device_cnt = 0;
-    } else if (cuerr != cudaSuccess) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unable to get number of CUDA devices for " + config->name() + ": " +
-              cudaGetErrorString(cuerr));
+    // Get the total number of GPUs from the runtime library.
+    Status status = GetSupportedGPUs(supported_gpus);
+    if (!status.IsOk()) {
+      return status;
     }
+
 #endif  // TRTIS_ENABLE_GPU
 
     // Assign default name, kind and count to each instance group that
@@ -323,11 +321,11 @@ GetNormalizedModelConfig(
       // For KIND_AUTO... if there are no GPUs or if any of the listed
       // 'gpu's are not present, then use KIND_CPU.
       if (group.kind() == ModelInstanceGroup::KIND_AUTO) {
-        if (device_cnt == 0) {
+        if (supported_gpus.empty()) {
           group.set_kind(ModelInstanceGroup::KIND_CPU);
         } else {
           for (const int32_t gid : group.gpus()) {
-            if ((gid < 0) || (gid >= device_cnt)) {
+            if (supported_gpus.find(gid) == supported_gpus.end()) {
               group.set_kind(ModelInstanceGroup::KIND_CPU);
               break;
             }
@@ -347,7 +345,7 @@ GetNormalizedModelConfig(
       // GPUs
       if ((group.kind() == ModelInstanceGroup::KIND_GPU) &&
           (group.gpus().size() == 0)) {
-        for (int d = 0; d < device_cnt; d++) {
+        for (auto d : supported_gpus) {
           group.add_gpus(d);
         }
       }
@@ -469,15 +467,10 @@ ValidateModelConfig(
     // doesn't specify a non-existent GPU. Make sure non-KIND_GPU does
     // not specify any GPUs.
 #ifdef TRTIS_ENABLE_GPU
-    int dcnt = 0;
-    cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-    if (cuerr == cudaErrorNoDevice) {
-      dcnt = 0;
-    } else if (cuerr != cudaSuccess) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to get device count for validation of model " +
-              config.name() + ": " + cudaGetErrorString(cuerr));
+    std::set<int> supported_gpus;
+    Status status = GetSupportedGPUs(supported_gpus);
+    if (!status.IsOk()) {
+      return status;
     }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -497,13 +490,15 @@ ValidateModelConfig(
         }
 
         for (const int32_t gid : group.gpus()) {
-          if ((gid < 0) || (gid >= dcnt)) {
+          if (supported_gpus.find(gid) == supported_gpus.end()) {
             return Status(
                 RequestStatusCode::INVALID_ARG,
                 "instance group " + group.name() + " of model " +
-                    config.name() + " specifies invalid GPU id " +
-                    std::to_string(gid) + ", valid GPUs are 0 - " +
-                    std::to_string(dcnt - 1));
+                    config.name() +
+                    " specifies invalid or unsupported gpu id of " +
+                    std::to_string(gid) +
+                    ". The minimum required CUDA compute compatibility is " +
+                    std::to_string(TRTIS_MIN_COMPUTE_CAPABILITY));
           }
         }
 #endif  // !TRTIS_ENABLE_GPU
@@ -904,5 +899,63 @@ CheckAllowedModelOutput(
 
   return Status::Success;
 }
+
+#ifdef TRTIS_ENABLE_GPU
+Status
+CheckGPUCompatibility(const int gpu_id)
+{
+  // Query the compute capability from the device
+  cudaDeviceProp cuprops;
+  cudaError_t cuerr = cudaGetDeviceProperties(&cuprops, gpu_id);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to get CUDA device properties for GPU ID" +
+            std::to_string(gpu_id) + ": " + cudaGetErrorString(cuerr));
+  }
+  double compute_compability = cuprops.major + (cuprops.minor / 10.0);
+  if ((compute_compability > TRTIS_MIN_COMPUTE_CAPABILITY) ||
+      (abs(compute_compability - TRTIS_MIN_COMPUTE_CAPABILITY) < 0.01)) {
+    return Status::Success;
+  } else {
+    return Status(
+        RequestStatusCode::UNSUPPORTED,
+        "gpu " + std::to_string(gpu_id) + " has compute capability '" +
+            std::to_string(cuprops.major) + "." +
+            std::to_string(cuprops.minor) +
+            "' which is less than the minimum supported of '" +
+            std::to_string(TRTIS_MIN_COMPUTE_CAPABILITY) + "'");
+  }
+}
+
+Status
+GetSupportedGPUs(std::set<int>& supported_gpus)
+{
+  // Make sure set is empty before starting
+  supported_gpus.clear();
+
+  int device_cnt;
+  cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
+  if (cuerr == cudaErrorNoDevice) {
+    device_cnt = 0;
+  } else if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to get number of CUDA devices" +
+            std::string(cudaGetErrorString(cuerr)));
+  }
+
+  // populates supported_gpus
+  for (int gpu_id = 0; gpu_id < device_cnt; gpu_id++) {
+    Status status = CheckGPUCompatibility(gpu_id);
+    if (status.IsOk()) {
+      supported_gpus.insert(gpu_id);
+    }
+  }
+  return Status::Success;
+
+}
+
+#endif
 
 }}  // namespace nvidia::inferenceserver
