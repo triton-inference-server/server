@@ -468,7 +468,8 @@ CustomBackend::Context::GetOutput(
 
   // If there is no response provider return content == nullptr with
   // OK status as an indication that the output should not be written.
-  if (payload->response_provider_ != nullptr) {
+  if ((payload->response_provider_ != nullptr) &&
+        payload->response_provider_->RequiresOutput(std::string(cname))) {
     std::vector<int64_t> shape;
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
