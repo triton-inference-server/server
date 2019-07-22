@@ -803,10 +803,13 @@ ModelRepositoryManager::ModelRepositoryManager(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::string& repository_path,
     const BackendConfigMap& backend_config_map, const bool autofill,
-    const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle)
+    const bool polling_enabled, const bool model_control_enabled,
+    std::unique_ptr<BackendLifeCycle> life_cycle)
     : repository_path_(repository_path),
       backend_config_map_(backend_config_map), autofill_(autofill),
-      polling_enabled_(polling_enabled), status_manager_(status_manager),
+      polling_enabled_(polling_enabled),
+      model_control_enabled_(model_control_enabled),
+      status_manager_(status_manager),
       backend_life_cycle_(std::move(life_cycle))
 {
 }
@@ -820,7 +823,7 @@ ModelRepositoryManager::Create(
     const std::string& repository_path, const bool strict_model_config,
     const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
-    const bool polling_enabled,
+    const bool polling_enabled, const bool model_control_enabled,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
 {
   // The rest only matters if repository path is valid directory
@@ -830,6 +833,12 @@ ModelRepositoryManager::Create(
     return Status(
         RequestStatusCode::INVALID_ARG,
         "repository path is not a valid directory");
+  }
+
+  if (polling_enabled && model_control_enabled) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "cannot enable both polling and explicit model control");
   }
 
   BackendConfigMap backend_config_map;
@@ -847,24 +856,28 @@ ModelRepositoryManager::Create(
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
           status_manager, repository_path, backend_config_map,
-          !strict_model_config, polling_enabled, std::move(life_cycle)));
+          !strict_model_config, polling_enabled, model_control_enabled,
+          std::move(life_cycle)));
 
   // Similar to PollAndUpdate(), but simplier
   std::set<std::string> added, deleted, modified, unmodified;
-  if (polling_enabled) {
+  if (!model_control_enabled) {
     RETURN_IF_ERROR(
         local_manager->Poll(&added, &deleted, &modified, &unmodified));
-  }
-  if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Unexpected initial state for model repository");
-  }
 
-  RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
+    if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "Unexpected initial state for model repository");
+    }
 
-  // model loading / unloading error will be printed but ignored
-  local_manager->LoadModelByDependency();
+    RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
+
+    // TODO [DLIS-506] On init, should return loading error and let
+    //                 server decides whether to exit
+    // model loading / unloading error will be printed but ignored
+    local_manager->LoadModelByDependency();
+  }
 
   *model_repository_manager = std::move(local_manager);
 
@@ -875,7 +888,7 @@ Status
 ModelRepositoryManager::PollAndUpdate()
 {
   if (!polling_enabled_) {
-    return Status(RequestStatusCode::INVALID, "polling is disabled");
+    return Status(RequestStatusCode::UNAVAILABLE, "polling is disabled");
   }
 
   // Serialize all operations that change model state
@@ -1005,9 +1018,9 @@ Status
 ModelRepositoryManager::LoadUnloadModel(
     const std::string& model_name, ActionType type)
 {
-  if (polling_enabled_) {
+  if (!model_control_enabled_) {
     return Status(
-        RequestStatusCode::INVALID,
+        RequestStatusCode::UNAVAILABLE,
         "explicit model load / unload is not allowed if polling is enabled");
   }
 

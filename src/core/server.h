@@ -44,6 +44,8 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceBackend;
 
+enum ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
+
 // Inference server information.
 class InferenceServer {
  public:
@@ -97,6 +99,10 @@ class InferenceServer {
   // Get / set the model repository path
   const std::string& ModelStorePath() const { return model_store_path_; }
   void SetModelStorePath(const std::string& p) { model_store_path_ = p; }
+
+  // Get / set model control mode.
+  ModelControlMode GetModelControlMode() const { return model_control_mode_; }
+  void SetModelControlMode(ModelControlMode m) { model_control_mode_ = m; }
 
   // Get / set strict model configuration enable.
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
@@ -165,6 +171,7 @@ class InferenceServer {
   uint64_t start_time_ns_;
 
   std::string model_store_path_;
+  ModelControlMode model_control_mode_;
   bool strict_model_config_;
   bool strict_readiness_;
   bool profiling_enabled_;

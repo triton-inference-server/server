@@ -234,6 +234,9 @@ class TrtServerOptions {
   const std::string& ModelRepositoryPath() const { return repo_path_; }
   void SetModelRepositoryPath(const char* p) { repo_path_ = p; }
 
+  ni::ModelControlMode ModelControlMode() const { return model_control_mode_; }
+  void SetModelControlMode(ni::ModelControlMode m) { model_control_mode_ = m; }
+
   bool ExitOnError() const { return exit_on_error_; }
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
@@ -276,6 +279,7 @@ class TrtServerOptions {
  private:
   std::string server_id_;
   std::string repo_path_;
+  ni::ModelControlMode model_control_mode_;
   bool exit_on_error_;
   bool strict_model_config_;
   bool strict_readiness_;
@@ -290,9 +294,9 @@ class TrtServerOptions {
 };
 
 TrtServerOptions::TrtServerOptions()
-    : server_id_("inference:0"), exit_on_error_(true),
-      strict_model_config_(true), strict_readiness_(true), profiling_(false),
-      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
+    : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
+      exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
+      profiling_(false), metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
@@ -687,6 +691,37 @@ TRTSERVER_ServerOptionsSetModelRepositoryPath(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetModelControlMode(
+    TRTSERVER_ServerOptions* options, TRTSERVER_Model_Control_Mode mode)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+
+  // convert mode from TRTSERVER_ to nvidia::inferenceserver
+  switch (mode) {
+    case TRTSERVER_MODEL_CONTROL_NONE: {
+      loptions->SetModelControlMode(ni::MODE_NONE);
+      break;
+    }
+    case TRTSERVER_MODEL_CONTROL_POLL: {
+      loptions->SetModelControlMode(ni::MODE_POLL);
+      break;
+    }
+    case TRTSERVER_MODEL_CONTROL_EXPLICIT: {
+      loptions->SetModelControlMode(ni::MODE_EXPLICIT);
+      break;
+    }
+    default: {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string("unknown control mode '" + std::to_string(mode) + "'")
+              .c_str());
+    }
+  }
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetExitOnError(
     TRTSERVER_ServerOptions* options, bool exit)
 {
@@ -841,6 +876,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 
   lserver->SetId(loptions->ServerId());
   lserver->SetModelStorePath(loptions->ModelRepositoryPath());
+  lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetProfilingEnabled(loptions->Profiling());
