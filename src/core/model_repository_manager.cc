@@ -1020,12 +1020,9 @@ ModelRepositoryManager::LoadUnloadModel(
     std::lock_guard<std::mutex> lk(infos_mu_);
     if (type == ActionType::UNLOAD) {
       size_t erased_cnt = infos_.erase(model_name);
-      if (erased_cnt == 0) {
-        return Status(
-            RequestStatusCode::NOT_FOUND,
-            "model '" + model_name + "' is not loaded");
+      if (erased_cnt != 0) {
+        deleted.insert(model_name);
       }
-      deleted.insert(model_name);
     } else {
       const auto full_path = JoinPath({repository_path_, model_name});
 
