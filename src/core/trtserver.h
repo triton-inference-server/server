@@ -510,9 +510,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
     TRTSERVER_Server* server, const char* model_name,
     TRTSERVER_Protobuf** status);
 
-/// Load the requested model or reload the model if it has been
-/// loaded.  The function does not return until the model is loaded or
-/// fails to load.  Returned error indicates if model loaded
+/// Load the requested model or reload the model if it is already
+/// loaded. The function does not return until the model is loaded or
+/// fails to load. Returned error indicates if model loaded
 /// successfully or not.
 /// \param server The inference server object.
 /// \param model_name The name of the model.
@@ -520,9 +520,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
     TRTSERVER_Server* server, const char* model_name);
 
-/// Unload the requested model.  The function does not return until the
-/// model is unloaded or fails to unload.  Returned error indicates if
-/// model unloaded successfully or not.
+/// Unload the requested model. Unloading a model that is not loaded
+/// on server has no affect and success code will be returned.
+/// The function does not return until the model is unloaded or fails to unload.
+/// Returned error indicates if model unloaded successfully or not.
 /// \param server The inference server object.
 /// \param model_name The name of the model.
 /// \return a TRTSERVER_Error indicating success or failure.
