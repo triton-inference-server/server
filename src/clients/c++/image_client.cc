@@ -219,6 +219,7 @@ Postprocess(
     const std::vector<std::string>& filenames, const size_t batch_size,
     const float* shm_addr, size_t offset, const size_t& byte_size, bool use_shm)
 {
+  // Can read outputs directly from shared memory but also use the client APIs
   if ((results.size() != 1) && (!use_shm)) {
     std::cerr << "expected 1 result, got " << results.size() << std::endl;
     exit(1);
@@ -407,7 +408,7 @@ void
 ParseModel(
     const std::unique_ptr<nic::InferContext>& ctx, const size_t batch_size,
     size_t* c, size_t* h, size_t* w, ni::ModelInput::Format* format, int* type1,
-    int* type3, size_t* op_size, bool verbose = false)
+    int* type3, size_t* output_size, bool verbose = false)
 {
   if (ctx->Inputs().size() != 1) {
     std::cerr << "expecting 1 input, model \"" << ctx->ModelName() << "\" has "
@@ -445,7 +446,7 @@ ParseModel(
 
     if (dim > 1) {
       non_one_cnt++;
-      *op_size = dim;
+      *output_size = dim;
       if (non_one_cnt > 1) {
         std::cerr << "expecting model output to be a vector" << std::endl;
         exit(1);
@@ -523,11 +524,22 @@ ParseModel(
 }
 
 void
+CopyInputToSharedMemory(
+    const float* shm_addr, const size_t& offset, size_t* byte_size,
+    std::vector<uint8_t>* input_data)
+{
+  *byte_size = (size_t)(input_data->size());
+  // place image data into memory in the form [channel][width][height]
+  memcpy(
+      (float*)(((uint8_t*)shm_addr) + offset), (float*)(&((*input_data)[0])),
+      *byte_size);
+}
+
+void
 FileToInputData(
     const std::string& filename, size_t c, size_t h, size_t w,
     ni::ModelInput::Format format, int type1, int type3, ScaleType scale,
-    std::vector<uint8_t>* input_data, const float* shm_addr,
-    const size_t& offset, size_t* byte_size, bool use_shm)
+    std::vector<uint8_t>* input_data)
 {
   // Load the specified image.
   std::ifstream file(filename);
@@ -549,16 +561,6 @@ FileToInputData(
 
   // Pre-process the image to match input size expected by the model.
   Preprocess(img, format, type1, type3, c, cv::Size(w, h), scale, input_data);
-
-  if (use_shm) {
-    *byte_size = (size_t)(img.total() * img.elemSize());
-
-    // place image data into memory in the form [channel][width][height]
-    // void *input = (void*)(img.data);
-    memcpy(
-        (float*)(((uint8_t*)shm_addr) + offset), (float*)(img.data),
-        *byte_size);
-  }
 }
 
 }  // namespace
@@ -677,17 +679,18 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  size_t c, h, w, op_size;
+  size_t c, h, w, output_size;
   ni::ModelInput::Format format;
   int type1, type3;
   ParseModel(
-      ctx, batch_size, &c, &h, &w, &format, &type1, &type3, &op_size, verbose);
+      ctx, batch_size, &c, &h, &w, &format, &type1, &type3, &output_size,
+      verbose);
 
   // Collect the names of the image(s) and their sizes (for shared memory).
   std::vector<std::string> image_filenames;
 
-  size_t input_byte_size = c * h * w * sizeof(float);
-  size_t output_byte_size = sizeof(float) * op_size;
+  size_t input_byte_size = c * h * w * sizeof(type1);
+  size_t output_byte_size = sizeof(float) * output_size;
   float* shm_addr_ip = nullptr;
   float* shm_addr_op = nullptr;
 
@@ -716,19 +719,27 @@ main(int argc, char** argv)
   // Sort the filenames so that we always visit them in the same order
   // (readdir does not guarantee any particular order).
   std::sort(image_filenames.begin(), image_filenames.end());
+  int num_of_batches = ceil(image_filenames.size() / batch_size);
 
-  // Create shared memory regions for Input and Output batches
+  // Create and Register shared memory regions for Input and Output batches
   if (use_shm) {
-    std::string shm_key = "/input_data";
-    int shm_fd =
-        create_shared_region(shm_key, input_byte_size * image_filenames.size());
+    int shm_fd = create_shared_region(
+        "/input_data", input_byte_size * image_filenames.size());
     shm_addr_ip = (float*)(get_shm_addr(
         shm_fd, 0, input_byte_size * image_filenames.size()));
-    shm_key = "/output_data";
     shm_fd = create_shared_region(
-        shm_key, output_byte_size * image_filenames.size());
+        "/output_data", output_byte_size * image_filenames.size());
     shm_addr_op = (float*)(get_shm_addr(
         shm_fd, 0, output_byte_size * image_filenames.size()));
+
+    for (int i = 0; i < num_of_batches; i++) {
+      ctx->RegisterSharedMemory(
+          "input_batch" + std::to_string(i), "/input_data",
+          i * batch_size * input_byte_size, batch_size * input_byte_size);
+      ctx->RegisterSharedMemory(
+          "output_batch" + std::to_string(i), "/output_data",
+          i * batch_size * output_byte_size, batch_size * output_byte_size);
+    }
   }
 
   // Preprocess the images into input data according to model requirements and
@@ -737,10 +748,8 @@ main(int argc, char** argv)
   std::vector<std::vector<uint8_t>> image_data;
   for (const auto& fn : image_filenames) {
     image_data.emplace_back();
-    size_t byte_size = 0;
     FileToInputData(
-        fn, c, h, w, format, type1, type3, scale, &(image_data.back()),
-        shm_addr_ip, offset, &byte_size, use_shm);
+        fn, c, h, w, format, type1, type3, scale, &(image_data.back()));
 
     if (!use_shm) {
       if ((image_data.size() == 1) && !preprocess_output_filename.empty()) {
@@ -749,6 +758,9 @@ main(int argc, char** argv)
         std::copy(image_data[0].begin(), image_data[0].end(), output_iterator);
       }
     } else {
+      size_t byte_size = 0;
+      CopyInputToSharedMemory(
+          shm_addr_ip, offset, &byte_size, &(image_data.back()));
       offset += byte_size;
     }
   }
@@ -782,8 +794,7 @@ main(int argc, char** argv)
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
   size_t image_idx = 0;
   bool last_request = false;
-  offset = 0;
-  size_t op_offset = 0;
+  size_t batch_id = 0;
 
   while (!last_request) {
     // Already verified that there is 1 input...
@@ -800,22 +811,26 @@ main(int argc, char** argv)
     // Set input to be the next 'batch_size' images (preprocessed).
     std::vector<std::string> input_filenames;
     if (use_shm) {
-      err = input->SetSharedMemory(
-          "/input_data", offset, batch_size * input_byte_size);
+      // Set shared memory regions for this pair of input and output
+      err = output->SetSharedMemory(
+          "input_batch" + std::to_string(batch_id), 0,
+          batch_size * input_byte_size);
       if (!err.IsOk()) {
-        std::cerr << "failed setting shared memory input: " << err << std::endl;
+        std::cerr << "failed setting shared memory input_batch" +
+                         std::to_string(batch_id) + ": "
+                  << err << std::endl;
         exit(1);
       }
 
       err = output->SetSharedMemory(
-          "/output_data", op_offset, batch_size * output_byte_size);
+          "output_batch" + std::to_string(batch_id), 0,
+          batch_size * output_byte_size);
       if (!err.IsOk()) {
-        std::cerr << "failed setting shared memory output: " << err
-                  << std::endl;
+        std::cerr << "failed setting shared memory output_batch" +
+                         std::to_string(batch_id) + ": "
+                  << err << std::endl;
         exit(1);
       }
-      offset += batch_size * input_byte_size;
-      op_offset += batch_size * output_byte_size;
     }
 
     for (size_t idx = 0; idx < batch_size; ++idx) {
@@ -855,6 +870,7 @@ main(int argc, char** argv)
 
       requests.emplace_back(std::move(req));
     }
+    batch_id++;
   }
 
   // For async, retrieve results according to the send order
@@ -882,6 +898,10 @@ main(int argc, char** argv)
 
   if (use_shm) {
     // shm_unlink input and output shared memory regions
+    for (int i = 0; i < num_of_batches; i++) {
+      ctx->UnregisterSharedMemory("input_batch" + std::to_string(i));
+      ctx->UnregisterSharedMemory("output_batch" + std::to_string(i));
+    }
     shm_cleanup("/input_data");
     shm_cleanup("/output_data");
   }

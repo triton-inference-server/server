@@ -163,7 +163,7 @@ class InputImpl : public InferContext::Input {
   Error SetRaw(const std::vector<uint8_t>& input) override;
   Error SetRaw(const uint8_t* input, size_t input_byte_size) override;
   Error SetSharedMemory(
-      const std::string& shm_key, size_t offset, size_t byte_size) override;
+      const std::string& shm_name, size_t offset, size_t byte_size) override;
   Error SetFromString(const std::vector<std::string>& input) override;
 
   // Copy into 'buf' up to 'size' bytes of this input's data. Return
@@ -177,7 +177,7 @@ class InputImpl : public InferContext::Input {
 
   // Copy the shared memory key, offset and batch_byte_size
   Error GetSharedMemory(
-      std::string* shm_key, size_t* offset, size_t* batch_byte_size);
+      std::string* shm_name, size_t* offset, size_t* batch_byte_size);
 
   // Prepare to send this input as part of a request.
   Error PrepareForRequest();
@@ -205,7 +205,7 @@ class InputImpl : public InferContext::Input {
 
   // Used only if working with Shared Memory
   bool use_shm_;
-  std::string shm_key_;
+  std::string shm_name_;
   size_t offset_;
   size_t shm_byte_size_;
 };
@@ -235,7 +235,7 @@ class OutputImpl : public InferContext::Output {
   }
 
   Error SetSharedMemory(
-      const std::string& shm_key, size_t offset, size_t byte_size) override;
+      const std::string& shm_name, size_t offset, size_t byte_size) override;
 
  private:
   const ModelOutput mio_;
@@ -243,7 +243,7 @@ class OutputImpl : public InferContext::Output {
 
   // Used only if working with Shared Memory
   bool use_shm_;
-  std::string shm_key_;
+  std::string shm_name_;
   size_t offset_;
   size_t shm_byte_size_;
 };
