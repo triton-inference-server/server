@@ -78,9 +78,12 @@ class ModelRepositoryManager {
   /// for TensorFlow models.
   /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
   /// implementation of an operation when a GPU implementation is not available
-  /// \param polling_enabled If true, then PollAndUpdate() is allowed and
-  /// LoadUnloadModel() is not allowed. If false, LoadUnloadModel() is allowed
-  /// and PollAndUpdate() is not allowed.
+  /// \param polling_enabled If true, then PollAndUpdate() is allowed.
+  /// Otherwise, it is not allowed.
+  /// \param model_control_enabled If true, then LoadUnloadModel() is allowed
+  /// and the models in the model repository will not be loaded at startup.
+  /// Otherwise, LoadUnloadModel() is not allowed and the models will be loaded.
+  /// Cannot be set to true if polling_enabled is true.
   /// \return The error status.
   static Status Create(
       InferenceServer* server, const std::string& server_version,
@@ -88,7 +91,7 @@ class ModelRepositoryManager {
       const std::string& repository_path, const bool strict_model_config,
       const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
-      const bool polling_enabled,
+      const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
 
   /// Poll the model repository to determine the new set of models and
@@ -145,7 +148,8 @@ class ModelRepositoryManager {
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::string& repository_path,
       const BackendConfigMap& backend_config_map, const bool autofill,
-      const bool polling_enabled, std::unique_ptr<BackendLifeCycle> life_cycle);
+      const bool polling_enabled, const bool model_control_enabled,
+      std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// Poll the model repository to determine the new set of models and
   /// compare with the current set. Return the additions, deletions,
@@ -235,6 +239,7 @@ class ModelRepositoryManager {
   const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;
+  const bool model_control_enabled_;
 
   std::mutex poll_mu_;
   std::mutex infos_mu_;

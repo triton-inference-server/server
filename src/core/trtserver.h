@@ -284,6 +284,13 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
 /// Options to use when creating an inference server.
 ///
 
+/// Model control modes
+typedef enum trtserver_modelcontrolmode_enum {
+  TRTSERVER_MODEL_CONTROL_NONE,
+  TRTSERVER_MODEL_CONTROL_POLL,
+  TRTSERVER_MODEL_CONTROL_EXPLICIT
+} TRTSERVER_Model_Control_Mode;
+
 /// Create a new server options object. The caller takes ownership of
 /// the TRTSERVER_ServerOptions object and must call
 /// TRTSERVER_ServerOptionsDelete to release the object.
@@ -313,6 +320,29 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path);
+
+/// Set the model control mode in a server options. For each mode the models
+/// will be managed as the following:
+///
+///   TRTSERVER_MODEL_CONTROL_NONE: the models in model repository will be
+///   loaded on startup. After startup any changes to the model repository will
+///   be ignored. Calling TRTSERVER_ServerPollModelRepository will result in an
+///   error.
+///
+///   TRTSERVER_MODEL_CONTROL_POLL: the models in model repository will be
+///   loaded on startup. The model repository can be polled periodically using
+///   TRTSERVER_ServerPollModelRepository and the server will load, unload, and
+///   updated models according to changes in the model repository.
+///
+///   TRTSERVER_MODEL_CONTROL_EXPLICIT: the models in model repository will not
+///   be loaded on startup. The corresponding model control APIs must be called
+///   to load / unload a model in the model repository.
+///
+/// \param options The server options object.
+/// \param mode The mode to use for the model control.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelControlMode(
+    TRTSERVER_ServerOptions* options, TRTSERVER_Model_Control_Mode mode);
 
 /// Enable or disable strict model configuration handling in a server
 /// options.
