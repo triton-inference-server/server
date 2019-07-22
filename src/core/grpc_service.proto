@@ -65,6 +65,12 @@ service GRPCService
   //@@
   rpc ModelControl(ModelControlRequest) returns (ModelControlResponse) {}
 
+  //@@  .. cpp:var:: rpc ShmControl(ShmControlRequest) returns (ShmControlResponse)
+  //@@
+  //@@     Request to register / unregister a specified shared memory region.
+  //@@
+  rpc ShmControl(ShmControlRequest) returns (ShmControlResponse) {}
+
   //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
   //@@
   //@@     Request inference using a specific model. [ To handle large input
@@ -241,6 +247,100 @@ message ModelControlRequest
 //@@   Response message for ModelControl gRPC endpoint.
 //@@
 message ModelControlResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+}
+
+//@@.. cpp:var:: message InferSharedMemory
+//@@
+//@@   The meta-data for the shared memory from which to read the input
+//@@   data and/or write the output data.
+//@@
+message InferSharedMemory
+{
+  //@@  .. cpp:var:: string shm_key
+  //@@
+  //@@     The name of the shared memory region that holds the input data
+  //@@     (or where the output data should be written).
+  //@@
+  string shm_key = 1;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     The offset from the start of the shared memory region.
+  //@@     start = offset, end = offset + size;
+  //@@
+  uint64 offset = 2;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the memory block, in bytes.
+  //@@
+  uint64 byte_size = 3;
+}
+
+//@@
+//@@.. cpp:var:: message ShmControlRequest
+//@@
+//@@   Request message for managing registered shared memory regions in TRTIS.
+//@@
+message ShmControlRequest
+{
+  //@@  .. cpp:enum:: Type
+  //@@
+  //@@     Types of control operation
+  //@@
+  enum Type {
+    //@@    .. cpp:enumerator:: Type::UNREGISTER = 0
+    //@@
+    //@@       To unregister the specified shared memory region.
+    //@@
+    UNREGISTER = 0;
+
+    //@@    .. cpp:enumerator:: Type::REGISTER = 1
+    //@@
+    //@@       To register the specified shared memory region. If used the
+    //@@       InferSharedMemory message and all its fields are required.
+    //@@
+    REGISTER = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: string model_name
+  //@@
+  //@@     The target shared memory region name (different from the shm_key)
+  //@@     that the user will use to refer to the specified region.
+  //@@
+  string shm_name = 1;
+
+  //@@
+  //@@  .. cpp:var:: Type type
+  //@@
+  //@@     The control type that states whether to register or unregister the
+  //@@     specified shared memory region.
+  //@@
+  Type type = 2;
+
+  //@@    .. cpp:var:: InferSharedMemory shared_memory
+  //@@
+  //@@       It is the location in shared memory that the user wishes to
+  //@@       register. Only needed for REGISTER requests. All fields are
+  //@@       required.
+  //@@
+  InferSharedMemory shared_memory = 4;
+}
+
+//@@
+//@@.. cpp:var:: message ShmControlResponse
+//@@
+//@@   Response message for ShmControl gRPC endpoint.
+//@@
+message ShmControlResponse
 {
   //@@
   //@@  .. cpp:var:: RequestStatus request_status
