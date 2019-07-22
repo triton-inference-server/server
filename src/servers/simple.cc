@@ -53,24 +53,6 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-TRTSERVER_Error*
-MemoryAlloc(
-    void** buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id)
-{
-  FAIL("MemoryAlloc: NYI");
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-MemoryDelete(
-    void* buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id)
-{
-  FAIL("MemoryDelete: NYI");
-  return nullptr;  // Success
-}
-
 void
 InferComplete(
     TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
@@ -176,7 +158,7 @@ main(int argc, char** argv)
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
         TRTSERVER_ServerModelStatus(
-            server.get(), &model_status_protobuf, "simple"),
+            server.get(), "simple", &model_status_protobuf),
         "unable to get model status protobuf");
     const char* buffer;
     size_t byte_size;
@@ -211,12 +193,6 @@ main(int argc, char** argv)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
-
-  // Create the memory allocator...
-  TRTSERVER_MemoryAllocator* allocator = nullptr;
-  FAIL_IF_ERR(
-      TRTSERVER_MemoryAllocatorNew(&allocator, MemoryAlloc, MemoryDelete),
-      "creating memory allocator");
 
   // The inference request provides meta-data with an
   // InferRequestHeader and the actual data via a provider.
@@ -367,8 +343,6 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseDelete(response),
       "deleting inference response");
-  FAIL_IF_ERR(
-      TRTSERVER_MemoryAllocatorDelete(allocator), "deleting memory allocator");
 
   return 0;
 }

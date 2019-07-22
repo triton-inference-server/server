@@ -1104,20 +1104,22 @@ ModelRepositoryManager::LoadUnloadModel(
         dependency_graph_.find(model_name)->second->model_config_;
     std::set<int64_t> expected_versions;
     RETURN_IF_ERROR(VersionsToLoad(model_name, config, &expected_versions));
-    
+
     std::string not_ready_version_str;
     for (const auto version : expected_versions) {
       const auto it = version_states.find(version);
-      if ((it == version_states.end()) || (it->second != ModelReadyState::MODEL_READY)) {
+      if ((it == version_states.end()) ||
+          (it->second != ModelReadyState::MODEL_READY)) {
         not_ready_version_str += std::to_string(version);
         not_ready_version_str += ",";
       }
     }
     if (!not_ready_version_str.empty()) {
       not_ready_version_str.pop_back();
-      return Status(RequestStatusCode::INTERNAL,
+      return Status(
+          RequestStatusCode::INTERNAL,
           "failed to load '" + model_name +
-          "', versions that are not available: " + not_ready_version_str);
+              "', versions that are not available: " + not_ready_version_str);
     }
   } else {
     std::string ready_version_str;
@@ -1129,9 +1131,10 @@ ModelRepositoryManager::LoadUnloadModel(
     }
     if (!ready_version_str.empty()) {
       ready_version_str.pop_back();
-      return Status(RequestStatusCode::INTERNAL,
+      return Status(
+          RequestStatusCode::INTERNAL,
           "failed to unload '" + model_name +
-          "', versions that are still available: " + ready_version_str);
+              "', versions that are still available: " + ready_version_str);
     }
   }
 
