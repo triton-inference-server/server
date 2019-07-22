@@ -65,7 +65,8 @@ service GRPCService
   //@@
   rpc ModelControl(ModelControlRequest) returns (ModelControlResponse) {}
 
-  //@@  .. cpp:var:: rpc ShmControl(ShmControlRequest) returns (ShmControlResponse)
+  //@@  .. cpp:var:: rpc ShmControl(ShmControlRequest) returns
+  //@@     (ShmControlResponse)
   //@@
   //@@     Request to register / unregister a specified shared memory region.
   //@@
