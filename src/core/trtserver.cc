@@ -531,27 +531,6 @@ TRTSERVER_MetricsFormatted(
 }
 
 //
-// TRTSERVER_MemoryAllocator
-//
-TRTSERVER_Error*
-TRTSERVER_MemoryAllocatorNew(
-    TRTSERVER_MemoryAllocator** allocator, TRTSERVER_MemoryAllocFn_t alloc_fn,
-    TRTSERVER_MemoryDeleteFn_t delete_fn)
-{
-  // FIXME: allocator requires provider changes that are
-  // not-yet-implemented so for now do nothing
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_MemoryAllocatorDelete(TRTSERVER_MemoryAllocator* allocator)
-{
-  // FIXME: allocator requires provider changes that are
-  // not-yet-implemented so for now do nothing
-  return nullptr;  // Success
-}
-
-//
 // TRTSERVER_InferenceRequestProvider
 //
 TRTSERVER_Error*
@@ -967,8 +946,8 @@ TRTSERVER_ServerStatus(TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
 
 TRTSERVER_Error*
 TRTSERVER_ServerModelStatus(
-    TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
-    const char* model_name)
+    TRTSERVER_Server* server, const char* model_name,
+    TRTSERVER_Protobuf** status)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -995,7 +974,7 @@ TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
 
   RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
 
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 TRTSERVER_Error*
@@ -1005,10 +984,10 @@ TRTSERVER_UnloadModel(TRTSERVER_Server* server, const char* model_name)
 
   ni::ServerStatTimerScoped timer(
       lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
-      
+
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
 
-  return nullptr; // success
+  return nullptr;  // success
 }
 
 TRTSERVER_Error*

@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+/// \file
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -49,19 +51,18 @@ struct TRTSERVER_Protobuf;
 struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
 
-//
-// TRTSERVER_Error
-//
-// Errors are reported by a TRTSERVER_Error object. A NULL
-// TRTSERVER_Error indicates no error, a non-NULL TRTSERVER_Error
-// indicates error and the code and message for the error can be
-// retrieved from the object.
-//
-// The caller takes ownership of a TRTSERVER_Error object returned by
-// the API and must call TRTSERVER_ErrorDelete to release the object.
-//
+/// TRTSERVER_Error
+///
+/// Errors are reported by a TRTSERVER_Error object. A NULL
+/// TRTSERVER_Error indicates no error, a non-NULL TRTSERVER_Error
+/// indicates error and the code and message for the error can be
+/// retrieved from the object.
+///
+/// The caller takes ownership of a TRTSERVER_Error object returned by
+/// the API and must call TRTSERVER_ErrorDelete to release the object.
+///
 
-// The error codes
+/// The TRTSERVER_Error error codes
 typedef enum trtserver_errorcode_enum {
   TRTSERVER_ERROR_UNKNOWN,
   TRTSERVER_ERROR_INTERNAL,
@@ -72,367 +73,492 @@ typedef enum trtserver_errorcode_enum {
   TRTSERVER_ERROR_ALREADY_EXISTS
 } TRTSERVER_Error_Code;
 
-// Create a new error object. The caller takes ownership of the
-// TRTSERVER_Error object and must call TRTSERVER_ErrorDelete to
-// release the object.
+/// Create a new error object. The caller takes ownership of the
+/// TRTSERVER_Error object and must call TRTSERVER_ErrorDelete to
+/// release the object.
+/// \param code The error code.
+/// \param msg The error message.
+/// \return A new TRTSERVER_Error object.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ErrorNew(
     TRTSERVER_Error_Code code, const char* msg);
 
-// Delete an error object.
+/// Delete an error object.
+/// \param error The error object.
 TRTSERVER_EXPORT void TRTSERVER_ErrorDelete(TRTSERVER_Error* error);
 
-// Get the error code.
+/// Get the error code.
+/// \param error The error object.
+/// \return The error code.
 TRTSERVER_EXPORT TRTSERVER_Error_Code
 TRTSERVER_ErrorCode(TRTSERVER_Error* error);
 
-// Get the string representation of an error code. The returned string
-// is not owned by the caller and so should not be modified or
-// freed. The lifetime of the returned string extends only as long as
-// 'error' and must not be accessed once 'error' is deleted.
+/// Get the string representation of an error code. The returned
+/// string is not owned by the caller and so should not be modified or
+/// freed. The lifetime of the returned string extends only as long as
+/// 'error' and must not be accessed once 'error' is deleted.
+/// \param error The error object.
+/// \return The string representation of the error code.
 TRTSERVER_EXPORT const char* TRTSERVER_ErrorCodeString(TRTSERVER_Error* error);
 
-// Get the error message. The returned string is not owned by the
-// caller and so should not be modified or freed. The lifetime of the
-// returned string extends only as long as 'error' and must not be
-// accessed once 'error' is deleted.
+/// Get the error message. The returned string is not owned by the
+/// caller and so should not be modified or freed. The lifetime of the
+/// returned string extends only as long as 'error' and must not be
+/// accessed once 'error' is deleted.
+/// \param error The error object.
+/// \return The error message.
 TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
 
-//
-// TRTSERVER_Protobuf
-//
-// Object representing a protobuf.
-//
+/// TRTSERVER_Protobuf
+///
+/// Object representing a protobuf.
+///
 
-// Delete a protobuf object.
+/// Delete a protobuf object.
+/// \param protobuf The protobuf object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufDelete(
     TRTSERVER_Protobuf* protobuf);
 
-// Get the base and size of the buffer containing the serialized
-// version of the protobuf. The buffer is owned by the
-// TRTSERVER_Protobuf object and should not be modified or freed by
-// the caller. The lifetime of the buffer extends only as long as
-// 'protobuf' and must not be accessed once 'protobuf' is deleted.
+/// Get the base and size of the buffer containing the serialized
+/// version of the protobuf. The buffer is owned by the
+/// TRTSERVER_Protobuf object and should not be modified or freed by
+/// the caller. The lifetime of the buffer extends only as long as
+/// 'protobuf' and must not be accessed once 'protobuf' is deleted.
+/// \param protobuf The protobuf object.
+/// \param base Returns the base of the serialized protobuf.
+/// \param byte_size Returns the size, in bytes, of the serialized
+/// protobuf.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ProtobufSerialize(
     TRTSERVER_Protobuf* protobuf, const char** base, size_t* byte_size);
 
-//
-// TRTSERVER_Metrics
-//
-// Object representing metrics.
-//
+/// TRTSERVER_Metrics
+///
+/// Object representing metrics.
+///
 
-// Metric format types
+/// Metric format types
 typedef enum trtserver_metricformat_enum {
   TRTSERVER_METRIC_PROMETHEUS
 } TRTSERVER_Metric_Format;
 
-// Delete a metrics object.
+/// Delete a metrics object.
+/// \param metrics The metrics object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsDelete(
     TRTSERVER_Metrics* metrics);
 
-// Get a buffer containing the metrics in the specified format. For
-// each format the buffer contains the following:
-//
-//   TRTSERVER_METRIC_PROMETHEUS: 'base' points to a single multiline
-//   string (char*) that gives a text representation of the metrics in
-//   prometheus format. 'byte_size' returns the length of the string
-//   in bytes.
-//
-// The buffer is owned by the TRTSERVER_Metrics object and should not
-// be modified or freed by the caller. The lifetime of the buffer
-// extends only as long as 'metrics' and must not be accessed once
-// 'metrics' is deleted.
+/// Get a buffer containing the metrics in the specified format. For
+/// each format the buffer contains the following:
+///
+///   TRTSERVER_METRIC_PROMETHEUS: 'base' points to a single multiline
+///   string (char*) that gives a text representation of the metrics in
+///   prometheus format. 'byte_size' returns the length of the string
+///   in bytes.
+///
+/// The buffer is owned by the 'metrics' object and should not be
+/// modified or freed by the caller. The lifetime of the buffer
+/// extends only as long as 'metrics' and must not be accessed once
+/// 'metrics' is deleted.
+/// \param metrics The metrics object.
+/// \param format The format to use for the returned metrics.
+/// \param base Returns a pointer to the base of the formatted
+/// metrics, as described above.
+/// \param byte_size Returns the size, in bytes, of the formatted
+/// metrics.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsFormatted(
     TRTSERVER_Metrics* metrics, TRTSERVER_Metric_Format format,
     const char** base, size_t* byte_size);
 
-//
-// TRTSERVER_MemoryAllocator
-//
-// Object representing a memory allocator.
-//
-struct TRTSERVER_MemoryAllocator;
+/// TRTSERVER_InferenceRequestProvider
+///
+/// Object representing the request provider for an inference
+/// request. The request provider provides the meta-data and input
+/// tensor values needed for an inference.
+///
 
-// Memory allocation regions.
-typedef enum trtserver_memoryallocatorregions_enum {
-  TRTSERVER_MEMORY_CPU,
-  TRTSERVER_MEMORY_GPU
-} TRTSERVER_MemoryAllocator_Region;
-
-// Type for allocation function. Return in 'buffer' the pointer to the
-// contiguous memory block of size 'byte_size'. Return a
-// TRTSERVER_Error object on failure, return nullptr on success.
-typedef TRTSERVER_Error* (*TRTSERVER_MemoryAllocFn_t)(
-    void** buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id);
-
-// Type for delete function. Return a TRTSERVER_Error object on
-// failure, return nullptr on success.
-typedef TRTSERVER_Error* (*TRTSERVER_MemoryDeleteFn_t)(
-    void* buffer, size_t byte_size, TRTSERVER_MemoryAllocator_Region region,
-    int64_t region_id);
-
-// Create a new memory allocator object.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MemoryAllocatorNew(
-    TRTSERVER_MemoryAllocator** allocator, TRTSERVER_MemoryAllocFn_t alloc_fn,
-    TRTSERVER_MemoryDeleteFn_t delete_fn);
-
-// Delete a memory allocator.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MemoryAllocatorDelete(
-    TRTSERVER_MemoryAllocator* allocator);
-
-//
-// TRTSERVER_InferenceRequestProvider
-//
-// Object representing the request provider for an inference
-// request. The request provider provides the meta-data and input
-// tensor values needed for an inference.
-//
-
-// Create a new inference request provider object. The request header
-// protobuf must be serialized and provided as a base address and a
-// size, in bytes.
+/// Create a new inference request provider object. The request header
+/// protobuf must be serialized and provided as a base address and a
+/// size, in bytes.
+/// \param request_provider Returns the new request provider object.
+/// \param server the inference server object.
+/// \param model_name The name of the model that the inference request
+/// is for.
+/// \param model_version The version of the model that the inference
+/// request is for, or -1 to select the latest (highest numbered)
+/// version.
+/// \param request_header_base Pointer to the serialized request
+/// header protobuf.
+/// \param request_header_byte_size The size of the serialized request
+/// header in bytes.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestProviderNew(
     TRTSERVER_InferenceRequestProvider** request_provider,
     TRTSERVER_Server* server, const char* model_name, int64_t model_version,
     const char* request_header_base, size_t request_header_byte_size);
 
-// Delete an inference request provider object.
+/// Delete an inference request provider object.
+/// \param request_provider The request provider object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceRequestProviderDelete(
     TRTSERVER_InferenceRequestProvider* request_provider);
 
-// Get the size, in bytes, expected by the inference server for the
-// named input tensor. The returned size is the total size for the
-// entire batch of the input.
+/// Get the size, in bytes, expected by the inference server for the
+/// named input tensor. The returned size is the total size for the
+/// entire batch of the input.
+/// \param request_provider The request provider object.
+/// \param name The name of the input.
+/// \param byte_size Returns the size, in bytes, of the full batch of
+/// tensors for the named input.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderInputBatchByteSize(
     TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
     uint64_t* byte_size);
 
-// Assign a buffer of data to an input. The buffer will be appended to
-// any existing buffers for that input. The 'request_provider' takes
-// ownership of the buffer and so the caller should not modify or
-// freed the buffer until that ownership is released when
-// 'request_provider' is deleted. The total size of data that is
-// provided for an input must equal the value returned by
-// TRTSERVER_InferenceRequestProviderInputBatchByteSize().
+/// Assign a buffer of data to an input. The buffer will be appended
+/// to any existing buffers for that input. The 'request_provider'
+/// takes ownership of the buffer and so the caller should not modify
+/// or free the buffer until that ownership is released when
+/// 'request_provider' is deleted. The total size of data that is
+/// provided for an input must equal the value returned by
+/// TRTSERVER_InferenceRequestProviderInputBatchByteSize().
+/// \param request_provider The request provider object.
+/// \param name The name of the input.
+/// \param base The base address of the input data.
+/// \param byte_size The size, in bytes, of the input data.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
-    TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const void* base, size_t byte_size);
+    TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
+    const void* base, size_t byte_size);
 
-//
-// TRTSERVER_InferenceResponse
-//
-// Object representing the response for an inference request. The
-// response handler collects output tensor data and result meta-data.
-//
+/// TRTSERVER_InferenceResponse
+///
+/// Object representing the response for an inference request. The
+/// response handler collects output tensor data and result meta-data.
+///
 
-// Delete an inference response handler object.
+/// Delete an inference response handler object.
+/// \param response The response object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseDelete(
     TRTSERVER_InferenceResponse* response);
 
-// Return the success or failure status of the inference
-// request. Return a TRTSERVER_Error object on failure, return nullptr
-// on success.
+/// Return the success or failure status of the inference
+/// request. Return a TRTSERVER_Error object on failure, return nullptr
+/// on success.
+/// \param response The response object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseStatus(
     TRTSERVER_InferenceResponse* response);
 
-// Get the response header as a TRTSERVER_protobuf object. The caller
-// takes ownership of the object and must call
-// TRTSERVER_ProtobufDelete to release the object.
+/// Get the response header as a TRTSERVER_Protobuf object. The caller
+/// takes ownership of the object and must call
+/// TRTSERVER_ProtobufDelete to release the object.
+/// \param response The response object.
+/// \param header Returns the response header as a TRTSERVER_Protobuf
+/// object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
     TRTSERVER_InferenceResponse* response, TRTSERVER_Protobuf** header);
 
-// Get the results data for a named output. The result data is
-// returned as the base pointer to the data and the size, in bytes, of
-// the data. The caller does not own the returned data and must not
-// modify or delete it. The lifetime of the returned data extends only
-// as long as 'response' and must not be accessed once 'response' is
-// deleted.
+/// Get the results data for a named output. The result data is
+/// returned as the base pointer to the data and the size, in bytes, of
+/// the data. The caller does not own the returned data and must not
+/// modify or delete it. The lifetime of the returned data extends only
+/// as long as 'response' and must not be accessed once 'response' is
+/// deleted.
+/// \param response The response object.
+/// \param name The name of the output.
+/// \param base Returns the result data for the named output.
+/// \param byte_size Returns the size, in bytes, of the output data.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
     size_t* byte_size);
 
-//
-// TRTSERVER_ServerOptions
-//
-// Options to use when creating an inference server.
-//
+/// TRTSERVER_ServerOptions
+///
+/// Options to use when creating an inference server.
+///
 
-// Create a new server options object. The caller takes ownership of
-// the TRTSERVER_ServerOptions object and must call
-// TRTSERVER_ServerOptionsDelete to release the object.
+/// Create a new server options object. The caller takes ownership of
+/// the TRTSERVER_ServerOptions object and must call
+/// TRTSERVER_ServerOptionsDelete to release the object.
+/// \param options Returns the new server options object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsNew(
     TRTSERVER_ServerOptions** options);
 
-// Delete a server options object.
+/// Delete a server options object.
+/// \param options The server options object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsDelete(
     TRTSERVER_ServerOptions* options);
 
-// Set the textual ID for the server in a server options. The ID is a
-// name that identifies the server.
+/// Set the textual ID for the server in a server options. The ID is a
+/// name that identifies the server.
+/// \param options The server options object.
+/// \param server_id The server identifier.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
     TRTSERVER_ServerOptions* options, const char* server_id);
 
-// Set the model repository path in a server options. The path must be
-// the full absolute path to the model repository.
+/// Set the model repository path in a server options. The path must be
+/// the full absolute path to the model repository.
+/// \param options The server options object.
+/// \param model_repository_path The full path to the model repository.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
     TRTSERVER_ServerOptions* options, const char* model_repository_path);
 
-// Enable or disable strict model configuration handling in a server
-// options.
+/// Enable or disable strict model configuration handling in a server
+/// options.
+/// \param options The server options object.
+/// \param strict True to enable strict model configuration handling,
+/// false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictModelConfig(
     TRTSERVER_ServerOptions* options, bool strict);
 
-// Enable or disable exit-on-error in a server options.
+/// Enable or disable exit-on-error in a server options.
+/// \param options The server options object.
+/// \param exit True to enable exiting on intialization error, false
+/// to continue.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitOnError(
     TRTSERVER_ServerOptions* options, bool exit);
 
-// Enable or disable strict readiness handling in a server options.
+/// Enable or disable strict readiness handling in a server options.
+/// \param options The server options object.
+/// \param strict True to enable strict readiness handling, false to
+/// disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictReadiness(
     TRTSERVER_ServerOptions* options, bool strict);
 
-// Enable or disable profiling in a server options.
+/// Enable or disable profiling in a server options.
+/// \param options The server options object.
+/// \param strict True to enable profiling, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetProfiling(
     TRTSERVER_ServerOptions* options, bool profiling);
 
-// Set the exit timeout, in seconds, for the server in a server
-// options.
+/// Set the exit timeout, in seconds, for the server in a server
+/// options.
+/// \param options The server options object.
+/// \param timeout The exit timeout, in seconds.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitTimeout(
     TRTSERVER_ServerOptions* options, unsigned int timeout);
 
-// Enable or disable info level logging.
+/// Enable or disable info level logging.
+/// \param options The server options object.
+/// \param log True to enable info logging, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogInfo(
     TRTSERVER_ServerOptions* options, bool log);
 
-// Enable or disable warning level logging.
+/// Enable or disable warning level logging.
+/// \param options The server options object.
+/// \param log True to enable warning logging, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogWarn(
     TRTSERVER_ServerOptions* options, bool log);
 
-// Enable or disable error level logging.
+/// Enable or disable error level logging.
+/// \param options The server options object.
+/// \param log True to enable error logging, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogError(
     TRTSERVER_ServerOptions* options, bool log);
 
-// Set verbose logging level. Level zero disables verbose logging.
+/// Set verbose logging level. Level zero disables verbose logging.
+/// \param options The server options object.
+/// \param level The verbose logging level.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetLogVerbose(
     TRTSERVER_ServerOptions* options, int level);
 
-// Enable or disable metrics collection in a server options.
+/// Enable or disable metrics collection in a server options.
+/// \param options The server options object.
+/// \param metrics True to enable metrics, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetMetrics(
     TRTSERVER_ServerOptions* options, bool metrics);
 
-// Enable or disable GPU metrics collection in a server options. GPU
-// metrics are collected if both this option and
-// TRTSERVER_ServerOptionsSetMetrics are true.
+/// Enable or disable GPU metrics collection in a server options. GPU
+/// metrics are collected if both this option and
+/// TRTSERVER_ServerOptionsSetMetrics are true.
+/// \param options The server options object.
+/// \param gpu_metrics True to enable GPU metrics, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetGpuMetrics(
     TRTSERVER_ServerOptions* options, bool gpu_metrics);
 
-// Enable or disable TensorFlow soft-placement of operators.
+/// Enable or disable TensorFlow soft-placement of operators.
+/// \param options The server options object.
+/// \param soft_placement True to enable, false to disable.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetTensorFlowSoftPlacement(
     TRTSERVER_ServerOptions* options, bool soft_placement);
 
-// Set the fraction of GPU dedicated to TensorFlow models on each GPU
-// visible to the inference server.
+/// Set the fraction of GPU memory dedicated to TensorFlow models on
+/// each GPU visible to the inference server. Zero (0) indicates that
+/// no memory will be dedicated to TensorFlow and that it will instead
+/// allocate memory as needed.
+/// \param options The server options object.
+/// \param fraction The fraction of the GPU memory dedicated to
+/// TensorFlow.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetTensorFlowGpuMemoryFraction(
     TRTSERVER_ServerOptions* options, float fraction);
 
-// Add Tensorflow virtual GPU instances to physical GPU. Specify limit
-// for total memory available for use on that physical GPU.
+/// Add Tensorflow virtual GPU instances to a physical GPU.
+/// \param options The server options object.
+/// \param gpu_device The physical GPU device id.
+/// \param num_vgpus The number of virtual GPUs to create on the
+/// physical GPU.
+/// \param per_vgpu_memory_mbytes The amount of GPU memory, in
+/// megabytes, to dedicate to each virtual GPU instance.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_ServerOptionsAddTensorFlowVgpuMemoryLimits(
     TRTSERVER_ServerOptions* options, int gpu_device, int num_vgpus,
     uint64_t per_vgpu_memory_mbytes);
 
-//
-// TRTSERVER_Server
-//
-// An inference server.
-//
+/// TRTSERVER_Server
+///
+/// An inference server.
+///
 
-// Create a new server object. The caller takes ownership of the
-// TRTSERVER_Server object and must call TRTSERVER_ServerDelete
-// to release the object.
+/// Create a new server object. The caller takes ownership of the
+/// TRTSERVER_Server object and must call TRTSERVER_ServerDelete
+/// to release the object.
+/// \param server Returns the new inference server object.
+/// \param options The inference server options object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerNew(
     TRTSERVER_Server** server, TRTSERVER_ServerOptions* options);
 
-// Delete a server object. If server is not already stopped it is
-// stopped before being deleted.
+/// Delete a server object. If server is not already stopped it is
+/// stopped before being deleted.
+/// \param server The inference server object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerDelete(
     TRTSERVER_Server* server);
 
-// Stop a server object. A server can't be restarted once it is
-// stopped.
+/// Stop a server object. A server can't be restarted once it is
+/// stopped.
+/// \param server The inference server object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStop(
     TRTSERVER_Server* server);
 
-// Get the string identifier (i.e. name) of the server. The caller
-// does not own the returned string and must not modify or delete
-// it. The lifetime of the returned string extends only as long as
-// 'server' and must not be accessed once 'server' is deleted.
+/// Get the string identifier (i.e. name) of the server. The caller
+/// does not own the returned string and must not modify or delete
+/// it. The lifetime of the returned string extends only as long as
+/// 'server' and must not be accessed once 'server' is deleted.
+/// \param server The inference server object.
+/// \param id Returns the server identifier.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerId(
     TRTSERVER_Server* server, const char** id);
 
-// Check the model repository for changes and update server state
-// based on those changes.
+/// Check the model repository for changes and update server state
+/// based on those changes.
+/// \param server The inference server object.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerPollModelRepository(
     TRTSERVER_Server* server);
 
-// Is the server live?
+/// Is the server live?
+/// \param server The inference server object.
+/// \param live Returns true if server is live, false otherwise.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerIsLive(
     TRTSERVER_Server* server, bool* live);
 
-// Is the server ready?
+/// Is the server ready?
+/// \param server The inference server object.
+/// \param ready Returns true if server is ready, false otherwise.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerIsReady(
     TRTSERVER_Server* server, bool* ready);
 
-// Get the current server status for all models as a
-// TRTSERVER_protobuf object. The caller takes ownership of the object
-// and must call TRTSERVER_ProtobufDelete to release the object.
+/// Get the current server status for all models as a
+/// TRTSERVER_Protobuf object. The caller takes ownership of the object
+/// and must call TRTSERVER_ProtobufDelete to release the object.
+/// \param server The inference server object.
+/// \param status Returns the server status protobuf.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status);
 
-// Get the current server status for a single model as a
-// TRTSERVER_protobuf object. The caller takes ownership of the object
-// and must call TRTSERVER_ProtobufDelete to release the object.
+/// Get the current server status for a single model as a
+/// TRTSERVER_Protobuf object. The caller takes ownership of the object
+/// and must call TRTSERVER_ProtobufDelete to release the object.
+/// \param server The inference server object.
+/// \param model_name The name of the model to get status for.
+/// \param status Returns the server status protobuf.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
-    TRTSERVER_Server* server, TRTSERVER_Protobuf** status,
-    const char* model_name);
+    TRTSERVER_Server* server, const char* model_name,
+    TRTSERVER_Protobuf** status);
 
-// Load the requested model, or reload the model if it has been loaded.
-// The function does not return until the model is loaded or fails to load.
-// Returned error indicates if model loaded successfully or not.
+/// Load the requested model or reload the model if it has been
+/// loaded.  The function does not return until the model is loaded or
+/// fails to load.  Returned error indicates if model loaded
+/// successfully or not.
+/// \param server The inference server object.
+/// \param model_name The name of the model.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
     TRTSERVER_Server* server, const char* model_name);
 
-// Unload the requested model.
-// The function does not return until the model is unloaded or fails to unload.
-// Returned error indicates if model unloaded successfully or not.
+/// Unload the requested model.  The function does not return until the
+/// model is unloaded or fails to unload.  Returned error indicates if
+/// model unloaded successfully or not.
+/// \param server The inference server object.
+/// \param model_name The name of the model.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_UnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 
-// Get the current metrics for the server. The caller takes ownership
-// of the metrics object and must call TRTSERVER_MetricsDelete to
-// release the object.
+/// Get the current metrics for the server. The caller takes ownership
+/// of the metrics object and must call TRTSERVER_MetricsDelete to
+/// release the object.
+/// \param server The inference server object.
+/// \param metrics Returns the metrics.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
     TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
 
-// Type for inference completion callback function. The callback
-// function takes ownership of the TRTSERVER_InferenceResponse object
-// and must call TRTSERVER_InferenceResponseDelete to release the
-// object. The 'userp' data is the same as what is supplied in the
-// call to TRTSERVER_ServerInferAsync.
+/// Type for inference completion callback function. The callback
+/// function takes ownership of the TRTSERVER_InferenceResponse object
+/// and must call TRTSERVER_InferenceResponseDelete to release the
+/// object. The 'userp' data is the same as what is supplied in the
+/// call to TRTSERVER_ServerInferAsync.
 typedef void (*TRTSERVER_InferenceCompleteFn_t)(
     TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
     void* userp);
 
-// Perform inference using the meta-data and inputs supplied by the
-// request provider. The caller retains ownership of
-// 'request_provider' but may release it by calling
-// TRTSERVER_InferenceRequestProviderDelete once this function
-// returns.
+/// Perform inference using the meta-data and inputs supplied by the
+/// request provider. The caller retains ownership of
+/// 'request_provider' but may release it by calling
+/// TRTSERVER_InferenceRequestProviderDelete once this function
+/// returns.
+/// \param server The inference server object.
+/// \param request_provider The request provider for the request.
+/// \param complete_fn The function called when the inference
+/// completes.
+/// \param userp User-provided pointer that is delivered to the
+/// completion function.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
