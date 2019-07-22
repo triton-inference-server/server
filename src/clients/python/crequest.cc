@@ -259,6 +259,73 @@ ServerStatusContextGetServerStatus(
 }
 
 //==============================================================================
+struct ControlContextCtx {
+  std::unique_ptr<nic::ControlContext> ctx;
+};
+
+nic::Error*
+ControlContextNew(
+    ControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose)
+{
+  nic::Error err;
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
+  if (err.IsOk()) {
+    ControlContextCtx* lctx = new ControlContextCtx;
+    if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::ControlHttpContext::Create(
+            &(lctx->ctx), std::string(url), http_headers, verbose);
+      }
+    } else {
+      err = nic::ControlGrpcContext::Create(
+          &(lctx->ctx), std::string(url), verbose);
+    }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
+  }
+
+  *ctx = nullptr;
+  return new nic::Error(err);
+}
+
+void
+ControlContextDelete(ControlContextCtx* ctx)
+{
+  delete ctx;
+}
+
+nic::Error*
+ControlContextLoad(ControlContextCtx* ctx, const char* model_name)
+{
+  nic::Error err = ctx->ctx->Load(std::string(model_name));
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+ControlContextUnload(ControlContextCtx* ctx, const char* model_name)
+{
+  nic::Error err = ctx->ctx->Unload(std::string(model_name));
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+//==============================================================================
 struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
   nic::InferContext::ResultMap results;

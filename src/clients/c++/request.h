@@ -705,8 +705,44 @@ class ProfileContext {
   virtual Error StartProfile() = 0;
 
   /// Stop profiling on the inference server.
-  // \return Error object indicating success or failure.
+  /// \return Error object indicating success or failure.
   virtual Error StopProfile() = 0;
+};
+
+//==============================================================================
+/// A ControlContext object is used to control the model loading / unloading
+/// on the inference server. Once created a ControlContext object can be used
+/// repeatedly.
+///
+/// A ControlContext object can use either HTTP protocol or GRPC protocol
+/// depending on the Create function (ControlHttpContext::Create or
+/// ControlGrpcContext::Create). For example:
+///
+/// \code
+///   std::unique_ptr<ControlContext> ctx;
+///   ControlGrpcContext::Create(&ctx, "localhost:8000");
+///   std::string model_name = "model";
+///   ctx->Load(model_name);
+///   ...
+///   ctx->Unload(model_name);
+///   ...
+/// \endcode
+///
+class ControlContext {
+ public:
+  virtual ~ControlContext() = 0;
+
+  /// Load a model on the inference server. If the model is already loaded,
+  /// it will be reloaded to use the latest configuration.
+  /// \param model_name The name of the model to be loaded.
+  /// \return Error object indicating success or failure.
+  virtual Error Load(const std::string& model_name) = 0;
+
+  /// Unload a model from the inference server. Unloading a model that
+  /// is not loaded on server has no affect and success code will be returned.
+  /// \param model_name The name of the model to be unloaded.
+  /// \return Error object indicating success or failure.
+  virtual Error Unload(const std::string& model_name) = 0;
 };
 
 //==============================================================================

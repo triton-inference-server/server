@@ -294,6 +294,78 @@ ProfileGrpcContext::Create(
 }
 
 //==============================================================================
+
+class ControlGrpcContextImpl : public ControlContext {
+ public:
+  ControlGrpcContextImpl(const std::string& url, bool verbose);
+  Error Load(const std::string& model_name) override;
+  Error Unload(const std::string& model_name) override;
+
+ private:
+  Error SendRequest(const std::string& model_name, const bool is_load);
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ControlGrpcContextImpl::ControlGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
+{
+}
+
+Error
+ControlGrpcContextImpl::Load(const std::string& model_name)
+{
+  return SendRequest(model_name, true);
+}
+
+Error
+ControlGrpcContextImpl::Unload(const std::string& model_name)
+{
+  return SendRequest(model_name, false);
+}
+
+Error
+ControlGrpcContextImpl::SendRequest(
+    const std::string& model_name, const bool is_load)
+{
+  ControlRequest request;
+  ControlResponse response;
+  grpc::ClientContext context;
+
+  request.set_model_name(model_name);
+  if (is_load) {
+    request.set_type(ControlRequest::LOAD);
+  } else {
+    request.set_type(ControlRequest::UNLOAD);
+  }
+  grpc::Status status = stub_->Control(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+
+Error
+ControlGrpcContext::Create(
+    std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<ControlContext*>(
+      new ControlGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
 class GrpcResultImpl : public ResultImpl {
  public:
   GrpcResultImpl(

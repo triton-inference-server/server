@@ -585,6 +585,160 @@ ProfileHttpContext::Create(
 
 //==============================================================================
 
+class ControlHttpContextImpl : public ControlContext {
+ public:
+  ControlHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
+  Error Load(const std::string& model_name) override;
+  Error Unload(const std::string& model_name) override;
+
+ private:
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  Error SendRequest(
+      const std::string& action_str, const std::string& model_name);
+
+  // URL for control endpoint on inference server.
+  const std::string url_;
+
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
+
+  // RequestStatus received in server response
+  RequestStatus request_status_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+ControlHttpContextImpl::ControlHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kControlRESTEndpoint), headers_(headers),
+      verbose_(verbose)
+{
+}
+
+Error
+ControlHttpContextImpl::Load(const std::string& model_name)
+{
+  return SendRequest("load", model_name);
+}
+
+Error
+ControlHttpContextImpl::Unload(const std::string& model_name)
+{
+  return SendRequest("unload", model_name);
+}
+
+Error
+ControlHttpContextImpl::SendRequest(
+    const std::string& action_str, const std::string& model_name)
+{
+  request_status_.Clear();
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error(
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+  }
+
+  // Want binary representation of the status.
+  std::string full_url = url_ + "/" + action_str + "/" + model_name;
+  curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  // use POST method
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // response headers handled by ResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  // Must use long with curl_easy_getinfo
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  // Should have a request status, if not then create an error status.
+  if (request_status_.code() == RequestStatusCode::INVALID) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg("control request did not return status");
+  }
+
+  return Error(request_status_);
+}
+
+size_t
+ControlHttpContextImpl::ResponseHeaderHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  ControlHttpContextImpl* ctx =
+      reinterpret_cast<ControlHttpContextImpl*>(userp);
+
+  char* buf = reinterpret_cast<char*>(contents);
+  size_t byte_size = size * nmemb;
+
+  size_t idx = strlen(kStatusHTTPHeader);
+  if ((idx < byte_size) && !strncasecmp(buf, kStatusHTTPHeader, idx)) {
+    while ((idx < byte_size) && (buf[idx] != ':')) {
+      ++idx;
+    }
+
+    if (idx < byte_size) {
+      std::string hdr(buf + idx + 1, byte_size - idx - 1);
+
+      if (!google::protobuf::TextFormat::ParseFromString(
+              hdr, &ctx->request_status_)) {
+        ctx->request_status_.Clear();
+      }
+    }
+  }
+
+  return byte_size;
+}
+
+Error
+ControlHttpContext::Create(
+    std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+    const std::map<std::string, std::string>& headers, bool verbose)
+{
+  ctx->reset(static_cast<ControlContext*>(
+      new ControlHttpContextImpl(server_url, headers, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
 class HttpRequestImpl : public RequestImpl {
  public:
   HttpRequestImpl(
