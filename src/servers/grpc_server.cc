@@ -129,10 +129,10 @@ class StatusContext final
   }
 };
 
-class ControlContext final
-    : public Context<ControlRequest, ControlResponse, AsyncResources> {
+class ModelControlContext final
+    : public Context<ModelControlRequest, ModelControlResponse, AsyncResources> {
   void ExecuteRPC(
-      ControlRequest& request, ControlResponse& response) final override
+      ModelControlRequest& request, ModelControlResponse& response) final override
   {
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
@@ -140,7 +140,7 @@ class ControlContext final
       TRTSERVER_Server* server = GetResources()->Server();
 
       TRTSERVER_Error* err = nullptr;
-      if (request.type() == ControlRequest::LOAD) {
+      if (request.type() == ModelControlRequest::LOAD) {
         err = TRTSERVER_LoadModel(server, request.model_name().c_str());
       } else {
         err = TRTSERVER_UnloadModel(server, request.model_name().c_str());
@@ -461,9 +461,9 @@ GRPCServer::Create(
   (*grpc_server)->rpcStatus_ = inferenceService->RegisterRPC<StatusContext>(
       &GRPCService::AsyncService::RequestStatus);
 
-  LOG_VERBOSE(1) << "Register Control RPC";
-  (*grpc_server)->rpcControl_ = inferenceService->RegisterRPC<ControlContext>(
-      &GRPCService::AsyncService::RequestControl);
+  LOG_VERBOSE(1) << "Register ModelControl RPC";
+  (*grpc_server)->rpcModelControl_ = inferenceService->RegisterRPC<ModelControlContext>(
+      &GRPCService::AsyncService::RequestModelControl);
 
   LOG_VERBOSE(1) << "Register Profile RPC";
   (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
@@ -490,7 +490,7 @@ GRPCServer::Start()
     executor->RegisterContexts(
         rpcStreamInfer_, g_Resources, stream_infer_thread_cnt_);
     executor->RegisterContexts(rpcStatus_, g_Resources, 1);
-    executor->RegisterContexts(rpcControl_, g_Resources, 1);
+    executor->RegisterContexts(rpcModelControl_, g_Resources, 1);
     executor->RegisterContexts(rpcHealth_, g_Resources, 1);
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
 

@@ -259,29 +259,29 @@ ServerStatusContextGetServerStatus(
 }
 
 //==============================================================================
-struct ControlContextCtx {
-  std::unique_ptr<nic::ControlContext> ctx;
+struct ModelControlContextCtx {
+  std::unique_ptr<nic::ModelControlContext> ctx;
 };
 
 nic::Error*
-ControlContextNew(
-    ControlContextCtx** ctx, const char* url, int protocol_int,
+ModelControlContextNew(
+    ModelControlContextCtx** ctx, const char* url, int protocol_int,
     const char** headers, int num_headers, bool verbose)
 {
   nic::Error err;
   ProtocolType protocol;
   err = ParseProtocol(&protocol, protocol_int);
   if (err.IsOk()) {
-    ControlContextCtx* lctx = new ControlContextCtx;
+    ModelControlContextCtx* lctx = new ModelControlContextCtx;
     if (protocol == ProtocolType::HTTP) {
       std::map<std::string, std::string> http_headers;
       err = ParseHttpHeaders(&http_headers, headers, num_headers);
       if (err.IsOk()) {
-        err = nic::ControlHttpContext::Create(
+        err = nic::ModelControlHttpContext::Create(
             &(lctx->ctx), std::string(url), http_headers, verbose);
       }
     } else {
-      err = nic::ControlGrpcContext::Create(
+      err = nic::ModelControlGrpcContext::Create(
           &(lctx->ctx), std::string(url), verbose);
     }
 
@@ -298,13 +298,13 @@ ControlContextNew(
 }
 
 void
-ControlContextDelete(ControlContextCtx* ctx)
+ModelControlContextDelete(ModelControlContextCtx* ctx)
 {
   delete ctx;
 }
 
 nic::Error*
-ControlContextLoad(ControlContextCtx* ctx, const char* model_name)
+ModelControlContextLoad(ModelControlContextCtx* ctx, const char* model_name)
 {
   nic::Error err = ctx->ctx->Load(std::string(model_name));
   if (err.IsOk()) {
@@ -315,7 +315,7 @@ ControlContextLoad(ControlContextCtx* ctx, const char* model_name)
 }
 
 nic::Error*
-ControlContextUnload(ControlContextCtx* ctx, const char* model_name)
+ModelControlContextUnload(ModelControlContextCtx* ctx, const char* model_name)
 {
   nic::Error err = ctx->ctx->Unload(std::string(model_name));
   if (err.IsOk()) {

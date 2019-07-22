@@ -59,11 +59,11 @@ service GRPCService
   //@@
   rpc Health(HealthRequest) returns (HealthResponse) {}
 
-  //@@  .. cpp:var:: rpc Control(ControlRequest) returns (ControlResponse)
+  //@@  .. cpp:var:: rpc ModelControl(ModelControlRequest) returns (ModelControlResponse)
   //@@
   //@@     Request to load / unload a specified model.
   //@@
-  rpc Control(ControlRequest) returns (ControlResponse) {}
+  rpc ModelControl(ModelControlRequest) returns (ModelControlResponse) {}
 
   //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
   //@@
@@ -195,11 +195,11 @@ message HealthResponse
 }
 
 //@@
-//@@.. cpp:var:: message ControlRequest
+//@@.. cpp:var:: message ModelControlRequest
 //@@
-//@@   Request message for Control gRPC endpoint.
+//@@   Request message for ModelControl gRPC endpoint.
 //@@
-message ControlRequest
+message ModelControlRequest
 {
   //@@  .. cpp:enum:: Type
   //@@
@@ -236,11 +236,11 @@ message ControlRequest
 }
 
 //@@
-//@@.. cpp:var:: message ControlResponse
+//@@.. cpp:var:: message ModelControlResponse
 //@@
-//@@   Response message for Control gRPC endpoint.
+//@@   Response message for ModelControl gRPC endpoint.
 //@@
-message ControlResponse
+message ModelControlResponse
 {
   //@@
   //@@  .. cpp:var:: RequestStatus request_status

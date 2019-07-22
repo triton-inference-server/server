@@ -35,7 +35,7 @@ namespace nvidia { namespace inferenceserver { namespace client {
 ProfileContext::~ProfileContext() {}
 ServerHealthContext::~ServerHealthContext() {}
 ServerStatusContext::~ServerStatusContext() {}
-ControlContext::~ControlContext() {}
+ModelControlContext::~ModelControlContext() {}
 InferContext::Input::~Input() {}
 InferContext::Output::~Output() {}
 InferContext::Result::~Result() {}
