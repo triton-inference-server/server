@@ -1626,6 +1626,36 @@ ParseProtocol(const std::string& str)
   return ProtocolType::HTTP;
 }
 
+// [TODO] stat or stats
+nic::Error
+ReportServerSideStats(const ServerSideStats& stats)
+{
+  const uint64_t cnt = stats.request_count;
+
+  const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
+  const uint64_t cumm_avg_us = cumm_time_us / cnt;
+
+  const uint64_t queue_time_us = stats.queue_time_ns / 1000;
+  const uint64_t queue_avg_us = queue_time_us / cnt;
+
+  const uint64_t compute_time_us = stats.compute_time_ns / 1000;
+  const uint64_t compute_avg_us = compute_time_us / cnt;
+
+  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
+                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
+                                : 0;
+  std::cout << stats.cumm_time_ns << " - " << stats.queue_time_ns << " - " << stats.compute_time_ns << std::endl;
+
+  std::cout << "    Request count: " << cnt << std::endl
+            << "    Avg request latency: " << cumm_avg_us << " usec"
+            << " (overhead " << overhead << " usec + "
+            << "queue " << queue_avg_us << " usec + "
+            << "compute " << compute_avg_us << " usec)" << std::endl
+            << std::endl;
+  
+  return nic::Error(ni::RequestStatusCode::SUCCESS);
+}
+
 nic::Error
 Report(
     const PerfStatus& summary, const size_t concurrent_request_count,
@@ -1698,28 +1728,18 @@ Report(
   }
   std::cout << client_library_detail << std::endl;
 
-  const uint64_t cnt = summary.server_stats.request_count;
-
-  const uint64_t cumm_time_us = summary.server_stats.cumm_time_ns / 1000;
-  const uint64_t cumm_avg_us = cumm_time_us / cnt;
-
-  const uint64_t queue_time_us = summary.server_stats.queue_time_ns / 1000;
-  const uint64_t queue_avg_us = queue_time_us / cnt;
-
-  const uint64_t compute_time_us = summary.server_stats.compute_time_ns / 1000;
-  const uint64_t compute_avg_us = compute_time_us / cnt;
-
-  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
-                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
-                                : 0;
-
-  std::cout << "  Server: " << std::endl
-            << "    Request count: " << cnt << std::endl
-            << "    Avg request latency: " << cumm_avg_us << " usec"
-            << " (overhead " << overhead << " usec + "
-            << "queue " << queue_avg_us << " usec + "
-            << "compute " << compute_avg_us << " usec)" << std::endl
-            << std::endl;
+  std::cout << "  Server: " << std::endl;
+  ReportServerSideStats(summary.server_stats);
+  
+  if (!summary.server_composing_model_stats.empty()) {
+    std::cout << "  Composing models: " << std::endl;
+    for (const auto& model_stats : summary.server_composing_model_stats) {
+      const auto& model_info = model_stats.first;
+      std::cout << "  " << model_info.first << ", version: "
+                << model_info.second << std::endl;
+      ReportServerSideStats(model_stats.second);
+    }
+  }
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
