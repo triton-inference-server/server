@@ -585,9 +585,9 @@ ProfileHttpContext::Create(
 
 //==============================================================================
 
-class ControlHttpContextImpl : public ControlContext {
+class ModelControlHttpContextImpl : public ModelControlContext {
  public:
-  ControlHttpContextImpl(
+  ModelControlHttpContextImpl(
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
   Error Load(const std::string& model_name) override;
@@ -611,28 +611,28 @@ class ControlHttpContextImpl : public ControlContext {
   const bool verbose_;
 };
 
-ControlHttpContextImpl::ControlHttpContextImpl(
+ModelControlHttpContextImpl::ModelControlHttpContextImpl(
     const std::string& url, const std::map<std::string, std::string>& headers,
     bool verbose)
-    : url_(url + "/" + kControlRESTEndpoint), headers_(headers),
+    : url_(url + "/" + kModelControlRESTEndpoint), headers_(headers),
       verbose_(verbose)
 {
 }
 
 Error
-ControlHttpContextImpl::Load(const std::string& model_name)
+ModelControlHttpContextImpl::Load(const std::string& model_name)
 {
   return SendRequest("load", model_name);
 }
 
 Error
-ControlHttpContextImpl::Unload(const std::string& model_name)
+ModelControlHttpContextImpl::Unload(const std::string& model_name)
 {
   return SendRequest("unload", model_name);
 }
 
 Error
-ControlHttpContextImpl::SendRequest(
+ModelControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& model_name)
 {
   request_status_.Clear();
@@ -699,11 +699,11 @@ ControlHttpContextImpl::SendRequest(
 }
 
 size_t
-ControlHttpContextImpl::ResponseHeaderHandler(
+ModelControlHttpContextImpl::ResponseHeaderHandler(
     void* contents, size_t size, size_t nmemb, void* userp)
 {
-  ControlHttpContextImpl* ctx =
-      reinterpret_cast<ControlHttpContextImpl*>(userp);
+  ModelControlHttpContextImpl* ctx =
+      reinterpret_cast<ModelControlHttpContextImpl*>(userp);
 
   char* buf = reinterpret_cast<char*>(contents);
   size_t byte_size = size * nmemb;
@@ -728,12 +728,12 @@ ControlHttpContextImpl::ResponseHeaderHandler(
 }
 
 Error
-ControlHttpContext::Create(
-    std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+ModelControlHttpContext::Create(
+    std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
     const std::map<std::string, std::string>& headers, bool verbose)
 {
-  ctx->reset(static_cast<ControlContext*>(
-      new ControlHttpContextImpl(server_url, headers, verbose)));
+  ctx->reset(static_cast<ModelControlContext*>(
+      new ModelControlHttpContextImpl(server_url, headers, verbose)));
   return Error::Success;
 }
 

@@ -96,16 +96,16 @@ _crequest_status_ctx_get = _crequest.ServerStatusContextGetServerStatus
 _crequest_status_ctx_get.restype = c_void_p
 _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
 
-_crequest_control_ctx_new = _crequest.ControlContextNew
+_crequest_control_ctx_new = _crequest.ModelControlContextNew
 _crequest_control_ctx_new.restype = c_void_p
 _crequest_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
                                      POINTER(c_char_p), c_int, c_bool]
-_crequest_control_ctx_del = _crequest.ControlContextDelete
+_crequest_control_ctx_del = _crequest.ModelControlContextDelete
 _crequest_control_ctx_del.argtypes = [c_void_p]
-_crequest_control_ctx_load = _crequest.ControlContextLoad
+_crequest_control_ctx_load = _crequest.ModelControlContextLoad
 _crequest_control_ctx_load.restype = c_void_p
 _crequest_control_ctx_load.argtypes = [c_void_p, _utf8]
-_crequest_control_ctx_unload = _crequest.ControlContextUnload
+_crequest_control_ctx_unload = _crequest.ModelControlContextUnload
 _crequest_control_ctx_unload.restype = c_void_p
 _crequest_control_ctx_unload.argtypes = [c_void_p, _utf8]
 
@@ -540,7 +540,7 @@ class ServerStatusContext:
         return self._last_request_id
 
 
-class ControlContext:
+class ModelControlContext:
     """Performs a model control request to an inference server.
 
     Parameters
@@ -611,7 +611,7 @@ class ControlContext:
         """
         self._last_request_id = None
         if self._ctx is None:
-            _raise_error("ControlContext is closed")
+            _raise_error("ModelControlContext is closed")
 
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_control_ctx_load(self._ctx, model_name)))
@@ -633,7 +633,7 @@ class ControlContext:
         """
         self._last_request_id = None
         if self._ctx is None:
-            _raise_error("ControlContext is closed")
+            _raise_error("ModelControlContext is closed")
 
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_control_ctx_unload(self._ctx, model_name)))

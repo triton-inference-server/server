@@ -710,17 +710,17 @@ class ProfileContext {
 };
 
 //==============================================================================
-/// A ControlContext object is used to control the model loading / unloading
-/// on the inference server. Once created a ControlContext object can be used
+/// A ModelControlContext object is used to control the model loading / unloading
+/// on the inference server. Once created a ModelControlContext object can be used
 /// repeatedly.
 ///
-/// A ControlContext object can use either HTTP protocol or GRPC protocol
+/// A ModelControlContext object can use either HTTP protocol or GRPC protocol
 /// depending on the Create function (ControlHttpContext::Create or
-/// ControlGrpcContext::Create). For example:
+/// ModelControlGrpcContext::Create). For example:
 ///
 /// \code
-///   std::unique_ptr<ControlContext> ctx;
-///   ControlGrpcContext::Create(&ctx, "localhost:8000");
+///   std::unique_ptr<ModelControlContext> ctx;
+///   ModelControlGrpcContext::Create(&ctx, "localhost:8000");
 ///   std::string model_name = "model";
 ///   ctx->Load(model_name);
 ///   ...
@@ -728,9 +728,9 @@ class ProfileContext {
 ///   ...
 /// \endcode
 ///
-class ControlContext {
+class ModelControlContext {
  public:
-  virtual ~ControlContext() = 0;
+  virtual ~ModelControlContext() = 0;
 
   /// Load a model on the inference server. If the model is already loaded,
   /// it will be reloaded to use the latest configuration.

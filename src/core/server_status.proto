@@ -98,15 +98,15 @@ message HealthRequestStats
 }
 
 //@@
-//@@.. cpp:var:: message ControlRequestStats
+//@@.. cpp:var:: message ModelControlRequestStats
 //@@
-//@@   Statistics collected for Control requests.
+//@@   Statistics collected for ModelControl requests.
 //@@
-message ControlRequestStats
+message ModelControlRequestStats
 {
   //@@  .. cpp:var:: StatDuration success
   //@@
-  //@@     Total time required to handle successful Control requests, not
+  //@@     Total time required to handle successful ModelControl requests, not
   //@@     including HTTP or gRPC endpoint termination time.
   //@@
   StatDuration success = 1;
@@ -350,9 +350,9 @@ message ServerStatus
   //@@
   HealthRequestStats health_stats = 8;
 
-  //@@  .. cpp:var:: ControlRequestStats control_stats
+  //@@  .. cpp:var:: ModelControlRequestStats model_control_stats
   //@@
-  //@@     Statistics for Control requests.
+  //@@     Statistics for ModelControl requests.
   //@@
-  ControlRequestStats control_stats = 9;
+  ModelControlRequestStats model_control_stats = 9;
 }
