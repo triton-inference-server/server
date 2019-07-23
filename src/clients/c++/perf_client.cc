@@ -343,10 +343,9 @@ ContextFactory::CreateServerStatusContext(
 {
   nic::Error err;
   if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ServerStatusHttpContext::Create(
-        ctx, url_, http_headers_, model_name_, false);
+    err = nic::ServerStatusHttpContext::Create(ctx, url_, http_headers_, false);
   } else {
-    err = nic::ServerStatusGrpcContext::Create(ctx, url_, model_name_, false);
+    err = nic::ServerStatusGrpcContext::Create(ctx, url_, false);
   }
   return err;
 }
