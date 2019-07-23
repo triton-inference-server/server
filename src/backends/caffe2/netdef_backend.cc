@@ -223,8 +223,8 @@ NetDefBackend::CreateExecutionContext(
   const int mbs = (Config().max_batch_size() <= 0) ? Context::NO_BATCHING
                                                    : Config().max_batch_size();
 
-  contexts_.emplace_back(instance_name, gpu_device, mbs);
-  Context& context = contexts_.back();
+  contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
+  const std::unique_ptr<Context>& context = contexts_.back();
 
   // Extract input and output names from the config...
   std::vector<std::string> input_names;
@@ -256,7 +256,7 @@ NetDefBackend::CreateExecutionContext(
       return Status(RequestStatusCode::INTERNAL, err.Message());
     }
 
-    context.workspace_.reset(c2ws);
+    context->workspace_.reset(c2ws);
   }
   catch (const std::exception& ex) {
     return Status(
@@ -264,8 +264,8 @@ NetDefBackend::CreateExecutionContext(
         "load failed for '" + Config().name() + "': " + ex.what());
   }
 
-  RETURN_IF_ERROR(context.ValidateInputs(Config().input()));
-  RETURN_IF_ERROR(context.ValidateOutputs(Config().output()));
+  RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
+  RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
   return Status::Success;
 }
@@ -355,11 +355,15 @@ NetDefBackend::Run(
     if (payload.stats_ != nullptr) {
       compute_timers.emplace_back();
       payload.stats_->StartComputeTimer(&compute_timers.back());
-      payload.stats_->SetGPUDevice(contexts_[runner_idx].gpu_device_);
+      payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx].Run(this, payloads));
+  Status status = contexts_[runner_idx]->Run(this, payloads);
+  // reset compute timers before calling OnComplete function
+  compute_timers.clear();
+
+  OnCompleteQueuedPayloads(status);
 }
 
 Status
@@ -663,10 +667,10 @@ operator<<(std::ostream& out, const NetDefBackend& pb)
   out << "name=" << pb.Name() << std::endl;
   out << "contexts:" << std::endl;
   for (const auto& context : pb.contexts_) {
-    out << "  name=" << context.name_ << ", gpu="
-        << ((context.gpu_device_ == NetDefBackend::Context::NO_GPU_DEVICE)
+    out << "  name=" << context->name_ << ", gpu="
+        << ((context->gpu_device_ == NetDefBackend::Context::NO_GPU_DEVICE)
                 ? "<none>"
-                : std::to_string(context.gpu_device_));
+                : std::to_string(context->gpu_device_));
   }
 
   return out;

@@ -128,7 +128,7 @@ class NetDefBackend : public InferenceBackend {
     std::unique_ptr<Caffe2Workspace> workspace_;
   };
 
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const NetDefBackend& pb);
