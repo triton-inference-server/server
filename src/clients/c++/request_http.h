@@ -140,14 +140,14 @@ class ProfileHttpContext {
 };
 
 //==============================================================================
-/// ControlHttpContext is the HTTP instantiation of ControlContext.
+/// ModelControlHttpContext is the HTTP instantiation of ModelControlContext.
 ///
-class ControlHttpContext {
+class ModelControlHttpContext {
  public:
   /// Create context that controls models to be loaded on a server and
   /// to be unloaded from a server using HTTP
   /// protocol.
-  /// \param ctx Returns the new ControlContext object.
+  /// \param ctx Returns the new ModelControlContext object.
   /// \param server_url The inference server name and port.
   /// \param headers Map of HTTP headers to use with the control
   /// request. The map key/value indicates the header name/value.
@@ -155,7 +155,7 @@ class ControlHttpContext {
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
-      std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+      std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
       const std::map<std::string, std::string>& headers, bool verbose = false);
 };
 

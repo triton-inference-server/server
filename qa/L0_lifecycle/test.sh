@@ -61,7 +61,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_noexit
 SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
@@ -86,7 +86,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_modelfail
 rm -fr models
@@ -119,7 +119,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models
@@ -152,7 +152,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_model_no_version
 rm -fr models
@@ -187,7 +187,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_model_load_unload
 rm -fr models savedmodel_float32_float32_float32
@@ -217,7 +217,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_model_load_unload_disabled
 rm -fr models savedmodel_float32_float32_float32
@@ -248,7 +248,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_version_load_unload
 rm -fr models
@@ -277,7 +277,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_version_load_unload_disabled
 rm -fr models
@@ -307,7 +307,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_model_modify
 rm -fr models config.pbtxt.*
@@ -343,7 +343,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_dynamic_file_delete
 rm -fr models config.pbtxt.*
@@ -370,7 +370,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # enable explicit model control, no model in the repository should be loaded
 rm -fr models config.pbtxt.*
@@ -423,7 +423,7 @@ fi
 
 # unload API should return bad request
 set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/api/control/unload/graphdef_float32_float32_float32`
+code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/unload/graphdef_float32_float32_float32`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -444,7 +444,7 @@ rm models/graphdef_float32_float32_float32/*/*
 
 # load API should return bad request
 set +e
-code=`curl -s -w %{http_code} -X POST localhost:8000/api/control/load/graphdef_float32_float32_float32`
+code=`curl -s -w %{http_code} -X POST localhost:8000/api/modelcontrol/load/graphdef_float32_float32_float32`
 set -e
 if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
@@ -463,7 +463,7 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # Send HTTP request to invalid endpoints
 rm -fr models
@@ -501,7 +501,7 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1)) 
+LOG_IDX=$((LOG_IDX+1))
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see

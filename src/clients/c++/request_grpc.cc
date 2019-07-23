@@ -295,9 +295,9 @@ ProfileGrpcContext::Create(
 
 //==============================================================================
 
-class ControlGrpcContextImpl : public ControlContext {
+class ModelControlGrpcContextImpl : public ModelControlContext {
  public:
-  ControlGrpcContextImpl(const std::string& url, bool verbose);
+  ModelControlGrpcContextImpl(const std::string& url, bool verbose);
   Error Load(const std::string& model_name) override;
   Error Unload(const std::string& model_name) override;
 
@@ -311,39 +311,39 @@ class ControlGrpcContextImpl : public ControlContext {
   const bool verbose_;
 };
 
-ControlGrpcContextImpl::ControlGrpcContextImpl(
+ModelControlGrpcContextImpl::ModelControlGrpcContextImpl(
     const std::string& url, bool verbose)
     : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
 {
 }
 
 Error
-ControlGrpcContextImpl::Load(const std::string& model_name)
+ModelControlGrpcContextImpl::Load(const std::string& model_name)
 {
   return SendRequest(model_name, true);
 }
 
 Error
-ControlGrpcContextImpl::Unload(const std::string& model_name)
+ModelControlGrpcContextImpl::Unload(const std::string& model_name)
 {
   return SendRequest(model_name, false);
 }
 
 Error
-ControlGrpcContextImpl::SendRequest(
+ModelControlGrpcContextImpl::SendRequest(
     const std::string& model_name, const bool is_load)
 {
-  ControlRequest request;
-  ControlResponse response;
+  ModelControlRequest request;
+  ModelControlResponse response;
   grpc::ClientContext context;
 
   request.set_model_name(model_name);
   if (is_load) {
-    request.set_type(ControlRequest::LOAD);
+    request.set_type(ModelControlRequest::LOAD);
   } else {
-    request.set_type(ControlRequest::UNLOAD);
+    request.set_type(ModelControlRequest::UNLOAD);
   }
-  grpc::Status status = stub_->Control(&context, request, &response);
+  grpc::Status status = stub_->ModelControl(&context, request, &response);
   if (status.ok()) {
     return Error(response.request_status());
   } else {
@@ -356,12 +356,12 @@ ControlGrpcContextImpl::SendRequest(
 }
 
 Error
-ControlGrpcContext::Create(
-    std::unique_ptr<ControlContext>* ctx, const std::string& server_url,
+ModelControlGrpcContext::Create(
+    std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
     bool verbose)
 {
-  ctx->reset(static_cast<ControlContext*>(
-      new ControlGrpcContextImpl(server_url, verbose)));
+  ctx->reset(static_cast<ModelControlContext*>(
+      new ModelControlGrpcContextImpl(server_url, verbose)));
   return Error::Success;
 }
 

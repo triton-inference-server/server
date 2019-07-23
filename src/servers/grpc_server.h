@@ -54,7 +54,7 @@ class GRPCServer : private nvrpc::Server {
   nvrpc::IRPC* rpcInfer_;
   nvrpc::IRPC* rpcStreamInfer_;
   nvrpc::IRPC* rpcStatus_;
-  nvrpc::IRPC* rpcControl_;
+  nvrpc::IRPC* rpcModelControl_;
   nvrpc::IRPC* rpcProfile_;
   nvrpc::IRPC* rpcHealth_;
   int infer_thread_cnt_;
