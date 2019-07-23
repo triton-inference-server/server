@@ -34,6 +34,7 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
+#include <c10/cuda/CUDACachingAllocator.h>
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -50,6 +51,8 @@ LibTorchBackend::Context::Context(
 
 LibTorchBackend::Context::~Context()
 {
+  torch_model_.reset();
+  c10::cuda::CUDACachingAllocator::emptyCache();
   LOG_VERBOSE(1) << "~LibTorchBackend::Context ";
 }
 
