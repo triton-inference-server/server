@@ -76,7 +76,7 @@ class Context : public CustomInstance {
       const size_t expected_byte_size, std::vector<uint8_t>* input);
 
   // Delay to introduce into execution, in milliseconds.
-  int execute_delay_ms_ = 0;
+  int execute_delay_ms_;
 
   // Accumulators maintained by this context, one for each batch slot.
   std::vector<int32_t> accumulator_;
@@ -107,7 +107,8 @@ class Context : public CustomInstance {
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : CustomInstance(instance_name, model_config, gpu_device)
+    : CustomInstance(instance_name, model_config, gpu_device),
+      execute_delay_ms_(0)
 {
   if (model_config_.parameters_size() > 0) {
     const auto itr = model_config_.parameters().find("execute_delay_ms");
