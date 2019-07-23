@@ -277,25 +277,29 @@ main(int argc, char** argv)
   int* output0_shm = (int*)(get_shm_addr(shm_fd, 0, output_byte_size * 2));
   int* output1_shm = (int*)(output0_shm + 16);
 
-  err = input0->SetSharedMemory("/input_simple", 0, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
-  err = input1->SetSharedMemory(
-      "/input_simple", input_byte_size, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
+  // Register all Inputs and Outputs with TRTIS
+  infer_ctx->RegisterSharedMemory("input0_data", "/input_simple", 0, input_byte_size);
+  infer_ctx->RegisterSharedMemory("input1_data", "/input_simple", input_byte_size, input_byte_size);
+  infer_ctx->RegisterSharedMemory("output0_data", "/output_simple", 0, output_byte_size);
+  infer_ctx->RegisterSharedMemory("output1_data", "/output_simple", output_byte_size, output_byte_size);
 
-  err = output0->SetSharedMemory("/output_simple", 0, output_byte_size);
+  // Set the shared memory region for Inputs and Outputs
+  err = input0->SetSharedMemory("input0_data", 0, input_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory input: " << err << std::endl;
+    exit(1);
+  }
+  err = input1->SetSharedMemory("input1_data", 0, input_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory input: " << err << std::endl;
+    exit(1);
+  }
+  err = output0->SetSharedMemory("output0_data", 0, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
   }
-  err = output1->SetSharedMemory(
-      "/output_simple", output_byte_size, output_byte_size);
+  err = output1->SetSharedMemory("output1_data", 0, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
@@ -324,6 +328,11 @@ main(int argc, char** argv)
     }
   }
 
+  // Unregister and cleanup shared memory
+  infer_ctx->UnregisterSharedMemory("input0_data");
+  infer_ctx->UnregisterSharedMemory("input1_data");
+  infer_ctx->UnregisterSharedMemory("output0_data");
+  infer_ctx->UnregisterSharedMemory("output1_data");
   shm_cleanup("/input_simple");
   shm_cleanup("/output_simple");
 
