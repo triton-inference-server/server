@@ -30,16 +30,11 @@
 NVIDIA TensorRT Inference Server
 ================================
 
-    **NOTICE: The master branch has recently converted to using CMake
-    to build the server, clients and other artifacts. Read the new
-    documentation carefully to understand the new** `build process
-    <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/build.html>`_.
-
     **LATEST RELEASE: You are currently on the master branch which
     tracks under-development progress towards the next release. The
-    latest release of the TensorRT Inference Server is 1.3.0 and
-    is available on branch** `r19.06
-    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.06>`_.
+    latest release of the TensorRT Inference Server is 1.4.0 and
+    is available on branch** `r19.07
+    <https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.07>`_.
 
 .. overview-begin-marker-do-not-remove
 
@@ -115,20 +110,20 @@ inference server provides the following features:
 
 .. overview-end-marker-do-not-remove
 
-The current release of the TensorRT Inference Server is 1.3.0 and
-corresponds to the 19.06 release of the tensorrtserver container on
+The current release of the TensorRT Inference Server is 1.4.0 and
+corresponds to the 19.07 release of the tensorrtserver container on
 `NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_. The branch for
-this release is `r19.06
-<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.06>`_.
+this release is `r19.07
+<https://github.com/NVIDIA/tensorrt-inference-server/tree/r19.07>`_.
 
 Backwards Compatibility
 -----------------------
 
-Continuing in version 1.3.0 the following interfaces maintain
+Continuing in the latest version the following interfaces maintain
 backwards compatibilty with the 1.0.0 release. If you have model
 configuration files, custom backends, or clients that use the
 inference server HTTP or GRPC APIs (either directly or through the
-client libraries) from releases prior to 1.0.0 (19.03) you should edit
+client libraries) from releases prior to 1.0.0 you should edit
 and rebuild those as necessary to match the version 1.0.0 APIs.
 
 These inferfaces will maintain backwards compatibility for all future
