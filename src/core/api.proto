@@ -37,12 +37,12 @@ package nvidia.inferenceserver;
 //@@
 message InferSharedMemory
 {
-  //@@  .. cpp:var:: string shm_name
+  //@@  .. cpp:var:: string name
   //@@
   //@@     The name given during registration of a shared memory region that
   //@@     holds the input data (or where the output data should be written).
   //@@
-  string shm_name = 1;
+  string name = 1;
 
   //@@  .. cpp:var:: uint64 offset
   //@@
