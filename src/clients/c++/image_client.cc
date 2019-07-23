@@ -742,9 +742,7 @@ main(int argc, char** argv)
     }
   }
 
-  // Preprocess the images into input data according to model requirements and
-  // place in shared memory (if needed)
-  size_t offset = 0;
+  // Preprocess the images into input data according to model requirements
   std::vector<std::vector<uint8_t>> image_data;
   for (const auto& fn : image_filenames) {
     image_data.emplace_back();
@@ -757,11 +755,6 @@ main(int argc, char** argv)
         std::ostream_iterator<uint8_t> output_iterator(output_file);
         std::copy(image_data[0].begin(), image_data[0].end(), output_iterator);
       }
-    } else {
-      size_t byte_size = 0;
-      CopyInputToSharedMemory(
-          shm_addr_ip, offset, &byte_size, &(image_data.back()));
-      offset += byte_size;
     }
   }
 
@@ -795,6 +788,7 @@ main(int argc, char** argv)
   size_t image_idx = 0;
   bool last_request = false;
   size_t batch_id = 0;
+  size_t offset = 0;
 
   while (!last_request) {
     // Already verified that there is 1 input...
@@ -811,6 +805,11 @@ main(int argc, char** argv)
     // Set input to be the next 'batch_size' images (preprocessed).
     std::vector<std::string> input_filenames;
     if (use_shm) {
+      // Load data into shared memory for this batch
+      size_t byte_size = 0;
+      CopyInputToSharedMemory(
+          shm_addr_ip, offset, &byte_size, &(image_data.at(image_idx)));
+      offset += byte_size;
       // Set shared memory regions for this pair of input and output
       err = output->SetSharedMemory(
           "input_batch" + std::to_string(batch_id), 0,

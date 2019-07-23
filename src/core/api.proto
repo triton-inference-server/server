@@ -123,12 +123,13 @@ message InferRequestHeader
     //@@
     uint64 batch_byte_size = 3;
 
-    //@@  .. cpp:var:: string shm_name
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
     //@@
-    //@@     The name given by the user during registration of a shared memory
-    //@@     region that holds the input data.
+    //@@       It is the location in shared memory that contains the tensor data
+    //@@       for this input. Using shared memory is optional but if this
+    //@@       message is used, all fields are required.
     //@@
-    string shm_name = 4;
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: message Output
@@ -168,12 +169,13 @@ message InferRequestHeader
     //@@
     Class cls = 3;
 
-    //@@  .. cpp:var:: string shm_name
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
     //@@
-    //@@     The name given by the user during registration of a shared memory
-    //@@     region where the output data should be written.
+    //@@       It is the location in shared memory that the result tensor data
+    //@@       for this output will be written. Using shared memory is optional
+    //@@       but if this message is used, all fields are required.
     //@@
-    string shm_name = 4;
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: uint64 id

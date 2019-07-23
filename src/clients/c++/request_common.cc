@@ -217,9 +217,9 @@ InputImpl::SetRaw(const std::vector<uint8_t>& input)
 
 Error
 InputImpl::SetSharedMemory(
-    const std::string& shm_name, size_t offset, size_t byte_size)
+    const std::string& name, size_t offset, size_t byte_size)
 {
-  shm_name_ = shm_name;
+  name_ = name;
   offset_ = offset;
   shm_byte_size_ = byte_size;
   use_shm_ = true;
@@ -354,9 +354,9 @@ InputImpl::PrepareForRequest()
 
 Error
 OutputImpl::SetSharedMemory(
-    const std::string& shm_name, size_t offset, size_t byte_size)
+    const std::string& name, size_t offset, size_t byte_size)
 {
-  shm_name_ = shm_name;
+  name_ = name;
   offset_ = offset;
   shm_byte_size_ = byte_size;
   use_shm_ = true;

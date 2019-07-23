@@ -298,8 +298,8 @@ class InferContext {
     virtual Error SetShape(const std::vector<int64_t>& dims) = 0;
 
     /// Set tensor values for this input from a byte array. The array
-    /// is not copied and so  shared memory region must not be modified or
-    /// destroyed until this input is no longer needed (that is until the Run()
+    /// is not copied and so it must not be modified or destroyed
+    /// until this input is no longer needed (that is until the Run()
     /// call(s) that use the input have completed). For batched inputs
     /// this function must be called batch-size times to provide all
     /// tensor values for a batch of this input.
@@ -310,8 +310,8 @@ class InferContext {
     virtual Error SetRaw(const uint8_t* input, size_t input_byte_size) = 0;
 
     /// Set tensor values for this input from a byte vector. The vector
-    /// is not copied and so  shared memory region must not be modified or
-    /// destroyed until this input is no longer needed (that is until the Run()
+    /// is not copied and so it must not be modified or destroyed
+    /// until this input is no longer needed (that is until the Run()
     /// call(s) that use the input have completed). For batched inputs
     /// this function must be called batch-size times to provide all
     /// tensor values for a batch of this input.
@@ -331,12 +331,12 @@ class InferContext {
     virtual Error SetFromString(const std::vector<std::string>& input) = 0;
 
     /// Set tensor values for this input by reference into a shared memory
-    /// region. The values are not copied and so it must not be modified or
+    /// region. The values are not copied and so the shared memory region and its contents must not be modified or
     /// destroyed until this input is no longer needed (that is until the Run()
     //// call(s) that use the input have completed). For batched inputs this
     /// function must be called batch-size times to provide all tensor values
     /// for a batch of this input.
-    /// \param shm_name The user-given name for the registered shared memory
+    /// \param name The user-given name for the registered shared memory
     /// region where the tensor values for this input is stored.
     /// \param offset The offset into the shared memory region upto the start
     /// of the input tensor values.
@@ -344,7 +344,7 @@ class InferContext {
     /// match the size expected by the input.
     /// \return Error object indicating success or failure.
     virtual Error SetSharedMemory(
-        const std::string& shm_name, size_t offset, size_t byte_size) = 0;
+        const std::string& name, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
@@ -364,13 +364,13 @@ class InferContext {
     /// -1.
     virtual const DimsList& Dims() const = 0;
 
-    /// Set tensor values for this output by reference into a shared memory
-    /// region. The values are not copied and so it must not be modified or
+    /// The values for this output are set by reference in a shared memory
+    /// region. The values are not copied and so the shared memory region and its contents must not be modified or
     /// destroyed until this output is ready (that is until after the Run()
-    //// call(s) have written the input completely). For batched outputs this
-    /// function must be called batch-size times to write all tensor values
+    /// call(s) have written the output completely). For batched outputs this
+    /// function must be called batch-size times to copy all tensor values
     /// for a batch of this output.
-    /// \param shm_name The user-given name for the registered shared memory
+    /// \param name The user-given name for the registered shared memory
     /// region where the tensor values for this output should be stored.
     /// \param offset The offset into the shared memory region upto the start
     /// of the output tensor values.
@@ -378,7 +378,7 @@ class InferContext {
     /// match the size expected by the output.
     /// \return Error object indicating success or failure.
     virtual Error SetSharedMemory(
-        const std::string& shm_name, size_t offset, size_t byte_size) = 0;
+        const std::string& name, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
