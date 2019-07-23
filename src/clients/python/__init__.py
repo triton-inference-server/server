@@ -96,18 +96,31 @@ _crequest_status_ctx_get = _crequest.ServerStatusContextGetServerStatus
 _crequest_status_ctx_get.restype = c_void_p
 _crequest_status_ctx_get.argtypes = [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
 
-_crequest_control_ctx_new = _crequest.ModelControlContextNew
-_crequest_control_ctx_new.restype = c_void_p
-_crequest_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+_crequest_model_control_ctx_new = _crequest.ModelControlContextNew
+_crequest_model_control_ctx_new.restype = c_void_p
+_crequest_model_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
                                      POINTER(c_char_p), c_int, c_bool]
-_crequest_control_ctx_del = _crequest.ModelControlContextDelete
-_crequest_control_ctx_del.argtypes = [c_void_p]
-_crequest_control_ctx_load = _crequest.ModelControlContextLoad
-_crequest_control_ctx_load.restype = c_void_p
-_crequest_control_ctx_load.argtypes = [c_void_p, _utf8]
-_crequest_control_ctx_unload = _crequest.ModelControlContextUnload
-_crequest_control_ctx_unload.restype = c_void_p
-_crequest_control_ctx_unload.argtypes = [c_void_p, _utf8]
+_crequest_model_control_ctx_del = _crequest.ModelControlContextDelete
+_crequest_model_control_ctx_del.argtypes = [c_void_p]
+_crequest_model_control_ctx_load = _crequest.ModelControlContextLoad
+_crequest_model_control_ctx_load.restype = c_void_p
+_crequest_model_control_ctx_load.argtypes = [c_void_p, _utf8]
+_crequest_model_control_ctx_unload = _crequest.ModelControlContextUnload
+_crequest_model_control_ctx_unload.restype = c_void_p
+_crequest_model_control_ctx_unload.argtypes = [c_void_p, _utf8]
+
+_crequest_shm_control_ctx_new = _crequest.SharedMemoryControlContextNew
+_crequest_shm_control_ctx_new.restype = c_void_p
+_crequest_shm_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
+                                     POINTER(c_char_p), c_int, c_bool]
+_crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
+_crequest_shm_control_ctx_del.argtypes = [c_void_p]
+_crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
+_crequest_shm_control_ctx_register.restype = c_void_p
+_crequest_shm_control_ctx_register.argtypes = [c_void_p, _utf8]
+_crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
+_crequest_shm_control_ctx_unregister.restype = c_void_p
+_crequest_shm_control_ctx_unregister.argtypes = [c_void_p, _utf8]
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
@@ -162,6 +175,17 @@ _crequest_infer_ctx_input_set_raw = _crequest.InferContextInputSetRaw
 _crequest_infer_ctx_input_set_raw.restype = c_void_p
 _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 
+_crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
+_crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
+_crequest_infer_ctx_input_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
+
+ _crequest_infer_ctx_output_set_shared_memory = _crequest.InferContextOutputSetSharedMemory
+_crequest_infer_ctx_output_set_shared_memory.restype = c_void_p
+_crequest_infer_ctx_output_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
+
+ _crequest_infer_ctx_output_set_shared_memory = _crequest.InferContextOutputSetSharedMemory
+_crequest_infer_ctx_output_set_shared_memory.restype = c_void_p
+_crequest_infer_ctx_output_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
 _crequest_infer_ctx_result_new.argtypes = [POINTER(c_void_p), c_void_p, _utf8]
@@ -571,14 +595,14 @@ class ModelControlContext:
 
         _raise_if_error(
             c_void_p(
-                _crequest_control_ctx_new(
+                _crequest_model_control_ctx_new(
                     byref(self._ctx), url, int(protocol),
                     http_headers_arr, len(http_headers), verbose)))
 
     def __del__(self):
         # when module is unloading may get called after
-        # _crequest_control_ctx_del has been released
-        if _crequest_control_ctx_del is not None:
+        # _crequest_model_control_ctx_del has been released
+        if _crequest_model_control_ctx_del is not None:
             self.close()
 
     def __enter__(self):
@@ -592,7 +616,7 @@ class ModelControlContext:
         result in an Error.
 
         """
-        _crequest_control_ctx_del(self._ctx)
+        _crequest_model_control_ctx_del(self._ctx)
         self._ctx = None
 
     def load(self, model_name):
@@ -614,7 +638,7 @@ class ModelControlContext:
             _raise_error("ModelControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_control_ctx_load(self._ctx, model_name)))
+            c_void_p(_crequest_model_control_ctx_load(self._ctx, model_name)))
         return
 
     def unload(self, model_name):
@@ -636,11 +660,130 @@ class ModelControlContext:
             _raise_error("ModelControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_control_ctx_unload(self._ctx, model_name)))
+            c_void_p(_crequest_model_control_ctx_unload(self._ctx, model_name)))
         return
 
     def get_last_request_id(self):
         """Get the request ID of the most recent load() or unload()
+        request.
+
+        Returns
+        -------
+        int
+            The request ID, or None if a request has not yet been made
+            or if the last request was not successful.
+
+        """
+        return self._last_request_id
+
+
+class SharedMemoryControlContext:
+    """Performs a shared memory control request to an inference server.
+
+    Parameters
+    ----------
+    url : str
+        The inference server URL, e.g. localhost:8000.
+
+    protocol : ProtocolType
+        The protocol used to communicate with the server.
+
+    verbose : bool
+        If True generate verbose output.
+
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
+
+    """
+    def __init__(self, url, protocol, verbose=False, http_headers=[]):
+        self._last_request_id = 0
+        self._ctx = c_void_p()
+
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
+
+        _raise_if_error(
+            c_void_p(
+                _crequest_shm_control_ctx_new(
+                    byref(self._ctx), url, int(protocol),
+                    http_headers_arr, len(http_headers), verbose)))
+
+    def __del__(self):
+        # when module is unloading may get called after
+        # _crequest_model_control_ctx_del has been released
+        if _crequest_shm_control_ctx_del is not None:
+            self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        """Close the context. Any future calls to register() or unregister() will
+        result in an Error.
+
+        """
+        _crequest_shm_control_ctx_del(self._ctx)
+        self._ctx = None
+
+    def register(self, name, shm_key, offset, byte_size):
+        """Request the inference server to register specified shared memory region.
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory region to be registered.
+        shm_key : str
+            The unique key of the shared memory object.
+        offset : int
+            The offset from the start of the shared shared memory region.
+        byte_size : int
+            The size in bytes of the data to be read / written in the shared memory region.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the shared memory region.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_register(self._ctx, name, shm_key, offset, byte_size)))
+        return
+
+    def unregister(self, name):
+        """Request the inference server to unregister specified shared memory region.
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory region to be unregistered.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister the shared memory region.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, model_name)))
+        return
+
+    def get_last_request_id(self):
+        """Get the request ID of the most recent register() or unregister()
         request.
 
         Returns
@@ -794,11 +937,18 @@ class InferContext:
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
         # containing one array.
+        # Each element in the list must be a 'numpy array' if inputs are being
+        # passed directly and a 'tuple' if passing a reference to shared memory
         for inp_name, inp in inputs.items():
             if not isinstance(inp, (list, tuple)):
                 _raise_error("input '" + inp_name +
-                             "' values must be specified as a list of numpy arrays")
-
+                             "' values must be specified as a list of numpy arrays \
+                              or list of tuples representing location in shared memory")
+            for ip in inp:
+                if not isinstance(ip, (np.ndarray, tuple)):
+                    _raise_error("input '" + inp_name +
+                                 "' values must be specified as a list of numpy arrays \
+                                 or list of tuples representing location in shared memory")
         # Set run options using formats specified in 'outputs'
         options = c_void_p()
         try:
@@ -806,7 +956,18 @@ class InferContext:
                 _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
-                if output_format == InferContext.ResultFormat.RAW:
+                if output_format == InferContext.ResultFormat.RAW \
+                    and isinstance(output_format, (list, tuple)) and len(output_format) == 3:
+                    if (type(output_format[0]) != str) or (type(output_format[1]) != int) \
+                        or (type(output_format[2]) != int):
+                        _raise_error("shared memory requires tuple of size 3" \
+                            + " - shm_key (string), offset (int), size (int)")
+                    _raise_if_error(
+                        c_void_p(
+                            _crequest_infer_ctx_output_set_shared_memory(
+                                output, output_format[0], c_uint64(output_format[1]),
+                                c_uint64(output_format[2]))))
+                elif output_format == InferContext.ResultFormat.RAW:
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_raw(self._ctx, options, output_name)))
@@ -833,50 +994,64 @@ class InferContext:
 
                 # Set the input shape
                 if len(input_values) > 0:
-                    shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
+                    if isinstance(input_values[0], (np.ndarray,)):
+                        shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_input_set_shape(
-                                input, shape_value, c_uint64(shape_value.size))))
+                                   input, shape_value, c_uint64(shape_value.size))))
 
                 for input_value in input_values:
-                    # If the input tensor is empty then avoid going
-                    # through the more complicated logic since
-                    # creating the buffer for string objects results
-                    # is a size-1 array instead of 0.
-                    if input_value.size == 0:
-                        _raise_if_error(
-                            c_void_p(
-                                _crequest_infer_ctx_input_set_raw(input, 0, 0)))
-                    else:
-                        # If the input is a tensor of string objects,
-                        # then must flatten those into a 1-dimensional
-                        # array containing the 4-byte string length
-                        # followed by the actual string characters.
-                        # All strings are concatenated together in "C"
-                        # order.
-                        if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
-                            flattened = bytes()
-                            for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                # If directly passing bytes to STRING type,
-                                # don't convert it to str as Python will encode the
-                                # bytes which may distort the meaning
-                                if obj.dtype.type == np.bytes_:
-                                    s = bytes(obj)
-                                else:
-                                    s = str(obj).encode('utf-8')
-                                flattened += struct.pack("<I", len(s))
-                                flattened += s
-                            input_value = np.asarray(flattened)
+                    # use values if numpy array, reference if shared memory
+                    if isinstance(input_value, (np.ndarray,)):
+                        # If the input tensor is empty then avoid going
+                        # through the more complicated logic since
+                        # creating the buffer for string objects results
+                        # is a size-1 array instead of 0.
+                        if input_value.size == 0:
+                            _raise_if_error(
+                                c_void_p(
+                                    _crequest_infer_ctx_input_set_raw(input, 0, 0)))
+                        else:
+                            # If the input is a tensor of string objects,
+                            # then must flatten those into a 1-dimensional
+                            # array containing the 4-byte string length
+                            # followed by the actual string characters.
+                            # All strings are concatenated together in "C"
+                            # order.
+                            if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
+                                flattened = bytes()
+                                for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+                                    # If directly passing bytes to STRING type,
+                                    # don't convert it to str as Python will encode the
+                                    # bytes which may distort the meaning
+                                    if obj.dtype.type == np.bytes_:
+                                        s = bytes(obj)
+                                    else:
+                                        s = str(obj).encode('utf-8')
+                                    flattened += struct.pack("<I", len(s))
+                                    flattened += s
+                                input_value = np.asarray(flattened)
 
-                        if not input_value.flags['C_CONTIGUOUS']:
-                            input_value = np.ascontiguousarray(input_value)
-                        contiguous_input_values.append(input_value)
+                             if not input_value.flags['C_CONTIGUOUS']:
+                                input_value = np.ascontiguousarray(input_value)
+                            contiguous_input_values.append(input_value)
+                            _raise_if_error(
+                                c_void_p(
+                                    _crequest_infer_ctx_input_set_raw(
+                                        input, input_value.ctypes.data_as(c_void_p),
+                                        c_uint64(input_value.size * input_value.itemsize))))
+                    else:
+                        if len(input_value) != 3 or (type(input_value[0]) != str) \
+                            or (type(input_value[1]) != int) or (type(input_value[2]) != int):
+                            _raise_error("shared memory requires tuple of size 3" \
+                                + " - shm_key (string), offset (int), size (int)")
                         _raise_if_error(
                             c_void_p(
-                                _crequest_infer_ctx_input_set_raw(
-                                    input, input_value.ctypes.data_as(c_void_p),
-                                    c_uint64(input_value.size * input_value.itemsize))))
+                                _crequest_infer_ctx_input_set_shared_memory(
+                                    input, input_value[0], c_uint64(input_value[1]),
+                                    c_uint64(input_value[2]))))
+
             finally:
                 _crequest_infer_ctx_input_del(input)
 

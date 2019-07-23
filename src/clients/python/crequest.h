@@ -81,6 +81,18 @@ nic::Error* ModelControlContextUnload(
     ModelControlContextCtx* ctx, const char* model_name);
 
 //==============================================================================
+// SharedMemoryControlContext
+typedef struct SharedMemoryControlContextCtx SharedMemoryControlContextCtx;
+nic::Error* SharedMemoryControlContextNew(
+    SharedMemoryControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose);
+void SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx);
+nic::Error* SharedMemoryControlContextRegister(
+    SharedMemoryControlContextCtx* ctx, const char* model_name);
+nic::Error* SharedMemoryControlContextUnregister(
+    SharedMemoryControlContextCtx* ctx, const char* model_name);
+
+//==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
@@ -123,6 +135,16 @@ nic::Error* InferContextInputSetShape(
     InferContextInputCtx* ctx, const int64_t* dims, uint64_t size);
 nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
+nic::Error* InferContextInputSetSharedMemory(
+    InferContextInputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size);
+
+ //==============================================================================
+// InferContext::Output
+typedef struct InferContextOutputCtx InferContextOutputCtx;
+nic::Error* InferContextOutputSetSharedMemory(
+    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size);
 
 //==============================================================================
 // InferContext::Result

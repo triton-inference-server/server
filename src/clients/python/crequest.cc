@@ -326,6 +326,78 @@ ModelControlContextUnload(ModelControlContextCtx* ctx, const char* model_name)
 }
 
 //==============================================================================
+struct SharedMemoryControlContextCtx {
+  std::unique_ptr<nic::SharedMemoryControlContext> ctx;
+};
+
+nic::Error*
+SharedMemoryControlContextNew(
+    SharedMemoryControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose)
+{
+  nic::Error err;
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
+  if (err.IsOk()) {
+    SharedMemoryControlContextCtx* lctx = new SharedMemoryControlContextCtx;
+    if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::SharedMemoryControlHttpContext::Create(
+            &(lctx->ctx), std::string(url), http_headers, verbose);
+      }
+    } else {
+      err = nic::SharedMemoryControlGrpcContext::Create(
+          &(lctx->ctx), std::string(url), verbose);
+    }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
+  }
+
+  *ctx = nullptr;
+  return new nic::Error(err);
+}
+
+void
+SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx)
+{
+  delete ctx;
+}
+
+nic::Error*
+SharedMemoryControlContextRegister(
+    SharedMemoryControlContextCtx* ctx, const char* name,
+    const char* shm_key, const int offset, const int byte_size)
+{
+  nic::Error err = ctx->ctx->RegisterSharedMemory(
+      std::string(name), std::string(shm_key), (size_t)offset,
+      size_t(byte_size));
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+SharedMemoryControlContextUnregister(
+    SharedMemoryControlContextCtx* ctx, const char* name)
+{
+  nic::Error err = ctx->ctx->UnregisterSharedMemory(std::string(name));
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+//==============================================================================
 struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
   nic::InferContext::ResultMap results;
@@ -562,6 +634,30 @@ InferContextInputSetRaw(
   return new nic::Error(err);
 }
 
+nic::Error*
+InferContextInputSetSharedMemory(
+    InferContextInputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size)
+{
+  nic::Error err =
+      ctx->input->SetSharedMemory(std::string(shm_key), offset, byte_size);
+  return new nic::Error(err);
+}
+
+//==============================================================================
+struct InferContextOutputCtx {
+  std::shared_ptr<nic::InferContext::Output> output;
+};
+
+ nic::Error*
+InferContextOutputSetSharedMemory(
+    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
+    size_t byte_size)
+{
+  nic::Error err =
+      ctx->output->SetSharedMemory(std::string(shm_key), offset, byte_size);
+  return new nic::Error(err);
+}
 //==============================================================================
 struct InferContextResultCtx {
   std::unique_ptr<nic::InferContext::Result> result;
