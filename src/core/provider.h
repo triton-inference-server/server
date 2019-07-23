@@ -30,6 +30,7 @@
 #include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -404,6 +405,8 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
   static Status Create(
       const InferRequestHeader& request_header,
       const std::shared_ptr<LabelProvider>& label_provider,
+      TRTSERVER_ResponseAllocator* allocator,
+      TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       std::shared_ptr<DelegatingInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -415,10 +418,17 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
  private:
   DelegatingInferResponseProvider(
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider)
-      : InferResponseProvider(request_header, label_provider)
+      const std::shared_ptr<LabelProvider>& label_provider,
+      TRTSERVER_ResponseAllocator* allocator,
+      TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp)
+      : InferResponseProvider(request_header, label_provider),
+        allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp)
   {
   }
+
+  TRTSERVER_ResponseAllocator* allocator_;
+  TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
+  void* alloc_userp_;
 
   InferResponseHeader response_header_;
 };
