@@ -265,7 +265,11 @@ CustomBackend::RunBackend(
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
+  Status status = contexts_[runner_idx]->Run(this, payloads);
+  // reset compute timers before calling OnComplete function
+  compute_timers.clear();
+
+  OnCompleteQueuedPayloads(status);
 }
 
 Status
@@ -469,7 +473,7 @@ CustomBackend::Context::GetOutput(
   // If there is no response provider return content == nullptr with
   // OK status as an indication that the output should not be written.
   if ((payload->response_provider_ != nullptr) &&
-        payload->response_provider_->RequiresOutput(std::string(cname))) {
+      payload->response_provider_->RequiresOutput(std::string(cname))) {
     std::vector<int64_t> shape;
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);

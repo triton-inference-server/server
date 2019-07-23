@@ -251,7 +251,11 @@ BaseBackend::Run(
     }
   }
 
-  OnCompleteQueuedPayloads(contexts_[runner_idx]->Run(this, payloads));
+  Status status = contexts_[runner_idx]->Run(this, payloads);
+  // reset compute timers before calling OnComplete function
+  compute_timers.clear();
+
+  OnCompleteQueuedPayloads(status);
 }
 
 namespace {
