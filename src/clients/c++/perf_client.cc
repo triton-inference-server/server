@@ -226,6 +226,8 @@ ReadFile(const std::string& path, std::vector<char>* contents)
 ///
 class ContextFactory {
  public:
+  enum ModelSchedulerType { NONE, DYNAMIC, SEQUENCE, ENSEMBLE };
+
   /// Create a context factory that is responsible to create different types of
   /// contexts that is directly related to the specified model.
   /// \param url The inference server name and port.
@@ -264,8 +266,8 @@ class ContextFactory {
   /// \return The model version.
   int64_t ModelVersion() const { return model_version_; }
 
-  /// \return Whether the model is sequence model.
-  bool IsSequenceModel() const { return is_sequence_model_; }
+  /// \return The scheduler type of the model.
+  ModelSchedulerType SchedulerType() const { return scheduler_type_; }
 
  private:
   ContextFactory(
@@ -286,7 +288,7 @@ class ContextFactory {
   const std::string model_name_;
   const int64_t model_version_;
 
-  bool is_sequence_model_;
+  ModelSchedulerType scheduler_type_;
   ni::CorrelationID current_correlation_id_;
   std::mutex correlation_id_mutex_;
 };
@@ -310,8 +312,15 @@ ContextFactory::Create(
     return nic::Error(
         ni::RequestStatusCode::INTERNAL, "unable to find status for model");
   } else {
-    (*factory)->is_sequence_model_ =
-        itr->second.config().has_sequence_batching();
+    if (itr->second.config().has_sequence_batching()) {
+      (*factory)->scheduler_type_ = SEQUENCE;
+    } else if (itr->second.config().has_ensemble_scheduling()) {
+      (*factory)->scheduler_type_ = ENSEMBLE;
+    } else if (itr->second.config().has_dynamic_batching()) {
+      (*factory)->scheduler_type_ = DYNAMIC;
+    } else {
+      (*factory)->scheduler_type_ = NONE;
+    }
   }
   return nic::Error::Success;
 }
@@ -350,7 +359,7 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
   // make sure to use an unused correlation id if requested.
   ni::CorrelationID correlation_id = 0;
 
-  if (is_sequence_model_) {
+  if (scheduler_type_ == SEQUENCE) {
     std::lock_guard<std::mutex> lock(correlation_id_mutex_);
     current_correlation_id_++;
     correlation_id = current_correlation_id_;
@@ -573,7 +582,7 @@ ConcurrencyManager::ConcurrencyManager(
       factory_(factory)
 {
   request_timestamps_.reset(new TimestampVector());
-  on_sequence_model_ = factory_->IsSequenceModel();
+  on_sequence_model_ = (factory_->SchedulerType() == ContextFactory::SEQUENCE);
 }
 
 nic::Error
@@ -1016,8 +1025,8 @@ class InferenceProfiler {
       const bool verbose, const bool profile, const double stable_offset,
       const int32_t measurement_window_ms, const size_t max_measurement_count,
       const bool extra_percentile, const size_t percentile,
-      const bool on_sequence_model, const std::string& model_name,
-      const int64_t model_version,
+      const ContextFactory::ModelSchedulerType scheduler_type,
+      const std::string& model_name, const int64_t model_version,
       std::unique_ptr<nic::ProfileContext> profile_ctx,
       std::unique_ptr<nic::ServerStatusContext> status_ctx,
       std::unique_ptr<ConcurrencyManager> manager);
@@ -1106,7 +1115,7 @@ class InferenceProfiler {
   bool extra_percentile_;
   size_t percentile_;
 
-  bool on_sequence_model_;
+  ContextFactory::ModelSchedulerType scheduler_type_;
   std::string model_name_;
   int64_t model_version_;
 
@@ -1131,7 +1140,7 @@ InferenceProfiler::Create(
   profiler->reset(new InferenceProfiler(
       verbose, profile, stable_offset, measurement_window_ms,
       max_measurement_count, (percentile != -1), percentile,
-      factory->IsSequenceModel(), factory->ModelName(), factory->ModelVersion(),
+      factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
       std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
   return nic::Error::Success;
 }
@@ -1140,8 +1149,8 @@ InferenceProfiler::InferenceProfiler(
     const bool verbose, const bool profile, const double stable_offset,
     const int32_t measurement_window_ms, const size_t max_measurement_count,
     const bool extra_percentile, const size_t percentile,
-    const bool on_sequence_model, const std::string& model_name,
-    const int64_t model_version,
+    const ContextFactory::ModelSchedulerType scheduler_type,
+    const std::string& model_name, const int64_t model_version,
     std::unique_ptr<nic::ProfileContext> profile_ctx,
     std::unique_ptr<nic::ServerStatusContext> status_ctx,
     std::unique_ptr<ConcurrencyManager> manager)
@@ -1149,7 +1158,7 @@ InferenceProfiler::InferenceProfiler(
       measurement_window_ms_(measurement_window_ms),
       max_measurement_count_(max_measurement_count),
       extra_percentile_(extra_percentile), percentile_(percentile),
-      on_sequence_model_(on_sequence_model), model_name_(model_name),
+      scheduler_type_(scheduler_type), model_name_(model_name),
       model_version_(model_version), profile_ctx_(std::move(profile_ctx)),
       status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
 {
@@ -1450,7 +1459,7 @@ InferenceProfiler::SummarizeClientStat(
     const size_t valid_request_count, const size_t valid_sequence_count,
     PerfStatus& summary)
 {
-  summary.on_sequence_model = on_sequence_model_;
+  summary.on_sequence_model = (scheduler_type_ == ContextFactory::SEQUENCE);
   summary.batch_size = manager_->BatchSize();
   summary.client_request_count = valid_request_count;
   summary.client_sequence_count = valid_sequence_count;
