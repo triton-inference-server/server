@@ -152,14 +152,21 @@ SignalHandler(int signum)
   }
 }
 
+struct ServerSideStats {
+  uint64_t request_count;
+  uint64_t cumm_time_ns;
+  uint64_t queue_time_ns;
+  uint64_t compute_time_ns;
+};
+
 typedef struct PerformanceStatusStruct {
   uint32_t concurrency;
   size_t batch_size;
   // Request count and elapsed time measured by server
-  uint64_t server_request_count;
-  uint64_t server_cumm_time_ns;
-  uint64_t server_queue_time_ns;
-  uint64_t server_compute_time_ns;
+  // [TODO] clean up server_stats usage
+  ServerSideStats server_stats;
+  std::map<std::pair<std::string, int64_t>, ServerSideStats>
+      server_composing_model_stats;
 
   // Request count and elapsed time measured by client
   uint64_t client_request_count;
@@ -1039,10 +1046,13 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   nic::Error Measure(PerfStatus& status_summary);
 
-  /// \param model_status Returns the status of the model provided by
-  /// the server.
+  /// \param server_status Returns the status of the models provided by
+  /// the server. If the model being profiled is non-ensemble model,
+  /// only its status will be returned. Otherwise, the status of the composing
+  /// models will also be returned.
   /// \return Error object indicating success or failure.
-  nic::Error GetModelStatus(ni::ModelStatus* model_status);
+  nic::Error GetServerSideStatus(
+      std::map<std::string, ni::ModelStatus>* model_status);
 
   /// Sumarize the measurement with the provided statistics.
   /// \param timestamps The timestamps of the requests completed during the
@@ -1054,8 +1064,9 @@ class InferenceProfiler {
   /// \param summary Returns the summary of the measurement.
   /// \return Error object indicating success or failure.
   nic::Error Summarize(
-      const TimestampVector& timestamps, const ni::ModelStatus& start_status,
-      const ni::ModelStatus& end_status,
+      const TimestampVector& timestamps,
+      const std::map<std::string, ni::ModelStatus>& start_status,
+      const std::map<std::string, ni::ModelStatus>& end_status,
       const nic::InferContext::Stat& start_stat,
       const nic::InferContext::Stat& end_stat, PerfStatus& summary);
 
@@ -1097,14 +1108,16 @@ class InferenceProfiler {
       const size_t valid_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
+  /// [TODO] update docs
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
   /// \param summary Returns the summary that the fileds recorded by server
   /// are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeServerStat(
+      const std::string& model_name, const int64_t model_version,
       const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-      PerfStatus& summary);
+      ServerSideStats* server_stat);
 
   bool verbose_;
   bool profile_;
@@ -1117,6 +1130,7 @@ class InferenceProfiler {
   ContextFactory::ModelSchedulerType scheduler_type_;
   std::string model_name_;
   int64_t model_version_;
+  std::set<std::pair<std::string, int64_t>> composing_models_;
 
   std::unique_ptr<nic::ProfileContext> profile_ctx_;
   std::unique_ptr<nic::ServerStatusContext> status_ctx_;
@@ -1136,11 +1150,23 @@ InferenceProfiler::Create(
   RETURN_IF_ERROR(factory->CreateProfileContext(&profile_ctx));
   RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
 
-  profiler->reset(new InferenceProfiler(
+  std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
       verbose, profile, stable_offset, measurement_window_ms,
       max_measurement_count, (percentile != -1), percentile,
       factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
       std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
+
+  if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
+    std::map<std::string, ni::ModelStatus> model_status;
+    RETURN_IF_ERROR(local_profiler->GetServerSideStatus(&model_status));
+    const auto& it = model_status.find(local_profiler->model_name_);
+    for (const auto& step : it->second.config().ensemble_scheduling().step()) {
+      local_profiler->composing_models_.emplace(
+          step.model_name(), step.model_version());
+    }
+  }
+
+  *profiler = std::move(local_profiler);
   return nic::Error::Success;
 }
 
@@ -1247,17 +1273,34 @@ InferenceProfiler::Profile(
 }
 
 nic::Error
-InferenceProfiler::GetModelStatus(ni::ModelStatus* model_status)
+InferenceProfiler::GetServerSideStatus(
+    std::map<std::string, ni::ModelStatus>* model_status)
 {
+  model_status->clear();
+
   ni::ServerStatus server_status;
   RETURN_IF_ERROR(status_ctx_->GetServerStatus(&server_status));
   const auto& itr = server_status.model_status().find(model_name_);
   if (itr == server_status.model_status().end()) {
     return nic::Error(
-        ni::RequestStatusCode::INTERNAL, "unable to find status for model");
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find status for model" + model_name_);
   } else {
-    model_status->CopyFrom(itr->second);
+    model_status->emplace(model_name_, itr->second);
   }
+
+  // Also get status for composing models if any
+  for (const auto& model_info : composing_models_) {
+    const auto& itr = server_status.model_status().find(model_info.first);
+    if (itr == server_status.model_status().end()) {
+      return nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "unable to find status for composing model" + model_info.first);
+    } else {
+      model_status->emplace(model_info.first, itr->second);
+    }
+  }
+
   return nic::Error::Success;
 }
 
@@ -1265,12 +1308,12 @@ InferenceProfiler::GetModelStatus(ni::ModelStatus* model_status)
 nic::Error
 InferenceProfiler::Measure(PerfStatus& status_summary)
 {
-  ni::ModelStatus start_status;
-  ni::ModelStatus end_status;
+  std::map<std::string, ni::ModelStatus> start_status;
+  std::map<std::string, ni::ModelStatus> end_status;
   nic::InferContext::Stat start_stat;
   nic::InferContext::Stat end_stat;
 
-  RETURN_IF_ERROR(GetModelStatus(&start_status));
+  RETURN_IF_ERROR(GetServerSideStatus(&start_status));
 
   // Start profiling on the server if requested.
   if (profile_) {
@@ -1292,7 +1335,7 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
 
   // Get server status and then print report on difference between
   // before and after status.
-  RETURN_IF_ERROR(GetModelStatus(&end_status));
+  RETURN_IF_ERROR(GetServerSideStatus(&end_status));
 
   TimestampVector current_timestamps;
   RETURN_IF_ERROR(manager_->SwapTimestamps(current_timestamps));
@@ -1306,8 +1349,9 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
 
 nic::Error
 InferenceProfiler::Summarize(
-    const TimestampVector& timestamps, const ni::ModelStatus& start_status,
-    const ni::ModelStatus& end_status,
+    const TimestampVector& timestamps,
+    const std::map<std::string, ni::ModelStatus>& start_status,
+    const std::map<std::string, ni::ModelStatus>& end_status,
     const nic::InferContext::Stat& start_stat,
     const nic::InferContext::Stat& end_stat, PerfStatus& summary)
 {
@@ -1322,7 +1366,24 @@ InferenceProfiler::Summarize(
   RETURN_IF_ERROR(SummarizeClientStat(
       start_stat, end_stat, valid_range.second - valid_range.first,
       latencies.size(), valid_sequence_count, summary));
-  RETURN_IF_ERROR(SummarizeServerStat(start_status, end_status, summary));
+
+  {
+    const auto& model_start = start_status.find(model_name_)->second;
+    const auto& model_end = end_status.find(model_name_)->second;
+    RETURN_IF_ERROR(SummarizeServerStat(
+        model_name_, model_version_, model_start, model_end,
+        &(summary.server_stats)));
+  }
+  for (const auto& model_info : composing_models_) {
+    const auto& model_start = start_status.find(model_info.first)->second;
+    const auto& model_end = end_status.find(model_info.first)->second;
+    auto it = summary.server_composing_model_stats
+                  .emplace(model_info, ServerSideStats())
+                  .first;
+    RETURN_IF_ERROR(SummarizeServerStat(
+        model_info.first, model_info.second, model_start, model_end,
+        &(it->second)));
+  }
 
   return nic::Error::Success;
 }
@@ -1489,13 +1550,14 @@ InferenceProfiler::SummarizeClientStat(
 
 nic::Error
 InferenceProfiler::SummarizeServerStat(
+    const std::string& model_name, const int64_t model_version,
     const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-    PerfStatus& summary)
+    ServerSideStats* server_stat)
 {
   // If model_version is -1 then look in the end status to find the
   // latest (highest valued version) and use that as the version.
   int64_t status_model_version = 0;
-  if (model_version_ < 0) {
+  if (model_version < 0) {
     for (const auto& vp : end_status.version_status()) {
       status_model_version = std::max(status_model_version, vp.first);
     }
@@ -1509,7 +1571,7 @@ InferenceProfiler::SummarizeServerStat(
         ni::RequestStatusCode::INTERNAL, "missing model version status");
   } else {
     const auto& end_itr =
-        vend_itr->second.infer_stats().find(summary.batch_size);
+        vend_itr->second.infer_stats().find(manager_->BatchSize());
     if (end_itr == vend_itr->second.infer_stats().end()) {
       return nic::Error(
           ni::RequestStatusCode::INTERNAL, "missing inference stats");
@@ -1523,7 +1585,7 @@ InferenceProfiler::SummarizeServerStat(
           start_status.version_status().find(status_model_version);
       if (vstart_itr != start_status.version_status().end()) {
         const auto& start_itr =
-            vstart_itr->second.infer_stats().find(summary.batch_size);
+            vstart_itr->second.infer_stats().find(manager_->BatchSize());
         if (start_itr != vstart_itr->second.infer_stats().end()) {
           start_cnt = start_itr->second.success().count();
           start_cumm_time_ns = start_itr->second.success().total_time_ns();
@@ -1532,13 +1594,13 @@ InferenceProfiler::SummarizeServerStat(
         }
       }
 
-      summary.server_request_count =
+      server_stat->request_count =
           end_itr->second.success().count() - start_cnt;
-      summary.server_cumm_time_ns =
+      server_stat->cumm_time_ns =
           end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      summary.server_queue_time_ns =
+      server_stat->queue_time_ns =
           end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-      summary.server_compute_time_ns =
+      server_stat->compute_time_ns =
           end_itr->second.compute().total_time_ns() - start_compute_time_ns;
     }
   }
@@ -1569,21 +1631,6 @@ Report(
     const PerfStatus& summary, const size_t concurrent_request_count,
     const int64_t percentile, const ProtocolType protocol, const bool verbose)
 {
-  const uint64_t cnt = summary.server_request_count;
-
-  const uint64_t cumm_time_us = summary.server_cumm_time_ns / 1000;
-  const uint64_t cumm_avg_us = cumm_time_us / cnt;
-
-  const uint64_t queue_time_us = summary.server_queue_time_ns / 1000;
-  const uint64_t queue_avg_us = queue_time_us / cnt;
-
-  const uint64_t compute_time_us = summary.server_compute_time_ns / 1000;
-  const uint64_t compute_avg_us = compute_time_us / cnt;
-
-  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
-                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
-                                : 0;
-
   const uint64_t avg_latency_us = summary.client_avg_latency_ns / 1000;
   const uint64_t std_us = summary.std_us;
 
@@ -1649,8 +1696,24 @@ Report(
               << " latency: " << (percentile.second / 1000) << " usec"
               << std::endl;
   }
-  std::cout << client_library_detail << std::endl
-            << "  Server: " << std::endl
+  std::cout << client_library_detail << std::endl;
+
+  const uint64_t cnt = summary.server_stats.request_count;
+
+  const uint64_t cumm_time_us = summary.server_stats.cumm_time_ns / 1000;
+  const uint64_t cumm_avg_us = cumm_time_us / cnt;
+
+  const uint64_t queue_time_us = summary.server_stats.queue_time_ns / 1000;
+  const uint64_t queue_avg_us = queue_time_us / cnt;
+
+  const uint64_t compute_time_us = summary.server_stats.compute_time_ns / 1000;
+  const uint64_t compute_avg_us = compute_time_us / cnt;
+
+  const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
+                                ? (cumm_avg_us - queue_avg_us - compute_avg_us)
+                                : 0;
+
+  std::cout << "  Server: " << std::endl
             << "    Request count: " << cnt << std::endl
             << "    Avg request latency: " << cumm_avg_us << " usec"
             << " (overhead " << overhead << " usec + "
@@ -2050,10 +2113,10 @@ main(int argc, char** argv)
           });
 
       for (PerfStatus& status : summary) {
-        uint64_t avg_queue_ns =
-            status.server_queue_time_ns / status.server_request_count;
-        uint64_t avg_compute_ns =
-            status.server_compute_time_ns / status.server_request_count;
+        uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
+                                status.server_stats.request_count;
+        uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
+                                  status.server_stats.request_count;
         uint64_t avg_client_wait_ns = status.client_avg_latency_ns -
                                       status.client_avg_send_time_ns -
                                       status.client_avg_receive_time_ns;
