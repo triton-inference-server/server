@@ -467,6 +467,11 @@ GRPCServer::Create(
       inferenceService->RegisterRPC<ModelControlContext>(
           &GRPCService::AsyncService::RequestModelControl);
 
+  LOG_VERBOSE(1) << "Register SharedMemoryControl RPC";
+  (*grpc_server)->rpcSharedMemoryControl_ =
+      inferenceService->RegisterRPC<SharedMemoryControlContext>(
+          &GRPCService::AsyncService::RequestSharedMemoryControl);
+
   LOG_VERBOSE(1) << "Register Profile RPC";
   (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
       &GRPCService::AsyncService::RequestProfile);
@@ -493,6 +498,7 @@ GRPCServer::Start()
         rpcStreamInfer_, g_Resources, stream_infer_thread_cnt_);
     executor->RegisterContexts(rpcStatus_, g_Resources, 1);
     executor->RegisterContexts(rpcModelControl_, g_Resources, 1);
+    executor->RegisterContexts(rpcSharedMemoryControl_, g_Resources, 1);
     executor->RegisterContexts(rpcHealth_, g_Resources, 1);
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
 

@@ -715,7 +715,7 @@ class ProfileContext {
 /// can be used repeatedly.
 ///
 /// A ModelControlContext object can use either HTTP protocol or GRPC protocol
-/// depending on the Create function (ControlHttpContext::Create or
+/// depending on the Create function (ModelControlHttpContext::Create or
 /// ModelControlGrpcContext::Create). For example:
 ///
 /// \code
@@ -743,6 +743,46 @@ class ModelControlContext {
   /// \param model_name The name of the model to be unloaded.
   /// \return Error object indicating success or failure.
   virtual Error Unload(const std::string& model_name) = 0;
+};
+
+//==============================================================================
+/// A SharedMemoryControlContext object is used to control the registration /
+/// unregistration of shared memory regions on the inference server. Once
+/// created, a SharedMemoryControlContext object can be used repeatedly.
+///
+/// A SharedMemoryControlContext object can use either HTTP protocol or GRPC
+/// protocol depending on the Create function
+/// (SharedMemoryControlHttpContext::Create or
+/// SharedMemoryControlGrpcContext::Create). For example:
+///
+/// \code
+///   std::unique_ptr<SharedMemoryControlContext> ctx;
+///   SharedMemoryControlGrpcContext::Create(&ctx, "localhost:8000");
+///   std::string name = "shared_memory";
+///   std::string shm_key = "/input";
+///   ctx->RegisterSharedMemory(name, shm_key, 0, 104);
+///   ...
+///   ctx->UnregisterSharedMemory(name);
+///   ...
+/// \endcode
+///
+class SharedMemoryControlContext {
+ public:
+  virtual ~SharedMemoryControlContext() = 0;
+
+  /// Register a model on the inference server. If the shared memory is already
+  /// loaded, it will be reloaded to update the LRU policy. \param name The
+  /// name of the shared memory region to be registered. \return Error object
+  /// indicating success or failure.
+  virtual Error RegisterSharedMemory(
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size) = 0;
+
+  /// Unload a model from the inference server. unregistering a shared memory
+  /// region that is not registered on server has no affect and success code
+  /// will be returned. \param name The name of the shared memory region to
+  /// be unregistered. \return Error object indicating success or failure.
+  virtual Error UnregisterSharedMemory(const std::string& name) = 0;
 };
 
 //==============================================================================
