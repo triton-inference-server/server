@@ -90,15 +90,6 @@ NetDefBackend::Context::Context(
 {
 }
 
-NetDefBackend::Context::Context(Context&& o)
-    : name_(std::move(o.name_)), gpu_device_(o.gpu_device_),
-      max_batch_size_(o.max_batch_size_)
-{
-  o.gpu_device_ = NO_GPU_DEVICE;
-  o.max_batch_size_ = NO_BATCHING;
-  workspace_.swap(o.workspace_);
-}
-
 NetDefBackend::Context::~Context()
 {
   LOG_VERBOSE(1) << "~NetDefBackend::Context ";

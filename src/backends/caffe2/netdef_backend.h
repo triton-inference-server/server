@@ -75,9 +75,9 @@ class NetDefBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
     ~Context();
 
+    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
