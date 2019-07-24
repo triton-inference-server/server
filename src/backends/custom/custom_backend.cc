@@ -227,7 +227,11 @@ CustomBackend::InitBackend(uint32_t runner_idx)
 
   int err =
       context->InitializeFn_(&init_data, &(context->library_context_handle_));
-  if (err != 0) {
+  if (context->library_context_handle_ == nullptr) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "initialize error for '" + Name() + "': failed to create instance");
+  } else if (err != 0) {
     return Status(
         RequestStatusCode::INTERNAL, "initialize error for '" + Name() +
                                          "': (" + std::to_string(err) + ") " +
@@ -469,7 +473,7 @@ CustomBackend::Context::GetOutput(
   // If there is no response provider return content == nullptr with
   // OK status as an indication that the output should not be written.
   if ((payload->response_provider_ != nullptr) &&
-        payload->response_provider_->RequiresOutput(std::string(cname))) {
+      payload->response_provider_->RequiresOutput(std::string(cname))) {
     std::vector<int64_t> shape;
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
