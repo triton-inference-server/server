@@ -57,7 +57,7 @@ TRTSERVER_Error*
 ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Allocator_Region region, int64_t region_id, void* userp)
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
 {
   // Pass the tensor name with buffer_userp so we can show it when
   // releasing the buffer.
@@ -65,7 +65,7 @@ ResponseAlloc(
   // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
   // need to do any other book-keeping. Only handle allocation in the
   // CPU region.
-  if ((byte_size == 0) || (region == TRTSERVER_MEMORY_CPU)) {
+  if ((byte_size == 0) || (memory_type == TRTSERVER_MEMORY_CPU)) {
     *buffer = (byte_size == 0) ? nullptr : malloc(byte_size);
     *buffer_userp = new std::string(tensor_name);
     LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
@@ -83,7 +83,7 @@ ResponseAlloc(
 TRTSERVER_Error*
 ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Allocator_Region region, int64_t region_id)
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
   std::string* name = nullptr;
   if (buffer_userp != nullptr) {

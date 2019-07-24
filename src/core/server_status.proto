@@ -113,6 +113,21 @@ message ModelControlRequestStats
 }
 
 //@@
+//@@.. cpp:var:: message SharedMemoryControlRequestStats
+//@@
+//@@   Statistics collected for SharedMemoryControl requests.
+//@@
+message SharedMemoryControlRequestStats
+{
+  //@@  .. cpp:var:: StatDuration success
+  //@@
+  //@@     Total time required to handle successful SharedMemoryControl
+  //@@     requests, not including HTTP or gRPC endpoint termination time.
+  //@@
+  StatDuration success = 1;
+}
+
+//@@
 //@@.. cpp:var:: message InferRequestStats
 //@@
 //@@   Statistics collected for Infer requests.
@@ -355,4 +370,10 @@ message ServerStatus
   //@@     Statistics for ModelControl requests.
   //@@
   ModelControlRequestStats model_control_stats = 9;
+
+  //@@  .. cpp:var:: SharedMemoryControlRequestStats shm_control_stats
+  //@@
+  //@@     Statistics for SharedMemoryControl requests.
+  //@@
+  SharedMemoryControlRequestStats shm_control_stats = 10;
 }

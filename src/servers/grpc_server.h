@@ -28,6 +28,7 @@
 #include "src/core/trtserver.h"
 #include "src/nvrpc/Interfaces.h"
 #include "src/nvrpc/Server.h"
+#include "src/servers/shared_memory_block_manager.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -37,8 +38,9 @@ class ServerStatus;
 class GRPCServer : private nvrpc::Server {
  public:
   static TRTSERVER_Error* Create(
-      const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
-      int infer_thread_cnt, int stream_infer_thread_cnt,
+      const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      int32_t port, int infer_thread_cnt, int stream_infer_thread_cnt,
       std::unique_ptr<GRPCServer>* grpc_servers);
 
   ~GRPCServer();
@@ -55,6 +57,7 @@ class GRPCServer : private nvrpc::Server {
   nvrpc::IRPC* rpcStreamInfer_;
   nvrpc::IRPC* rpcStatus_;
   nvrpc::IRPC* rpcModelControl_;
+  nvrpc::IRPC* rpcSharedMemoryControl_;
   nvrpc::IRPC* rpcProfile_;
   nvrpc::IRPC* rpcHealth_;
   int infer_thread_cnt_;

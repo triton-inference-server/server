@@ -308,24 +308,31 @@ message SharedMemoryControlRequest
   //@@     Types of control operations for shared memory
   //@@
   enum Type {
-    //@@    .. cpp:enumerator:: Type::UNREGISTER = 0
-    //@@
-    //@@       To unregister the specified shared memory region.
-    //@@
-    UNREGISTER = 0;
-
-    //@@    .. cpp:enumerator:: Type::REGISTER = 1
+    //@@    .. cpp:enumerator:: Type::REGISTER = 0
     //@@
     //@@       To register the specified shared memory region.
     //@@
-    REGISTER = 1;
+    REGISTER = 0;
+
+    //@@    .. cpp:enumerator:: Type::UNREGISTER = 1
+    //@@
+    //@@       To unregister the specified shared memory region.
+    //@@
+    UNREGISTER = 1;
+
+    //@@    .. cpp:enumerator:: Type::UNREGISTER_ALL = 2
+    //@@
+    //@@       To unregister all active shared memory regions.
+    //@@
+    UNREGISTER_ALL = 2;
   }
 
   //@@
   //@@  .. cpp:var:: Type type
   //@@
-  //@@     The control type that states whether to register or unregister the
-  //@@     specified shared memory region.
+  //@@     The control type that states whether to register/unregister the
+  //@@     specified shared memory region. Unregister all active shared memory
+  //@@     regions or get the list of active shared memory regions
   //@@
   Type type = 1;
 
@@ -334,6 +341,7 @@ message SharedMemoryControlRequest
   //@@     The shared memory region to register or unregister.
   //@@     All fields are needed to REGISTER the shared memory region.
   //@@     Only 'name' is needed to UNREGISTER the shared memory region.
+  //@@     No fields are needed to UNREGISTER_ALL.
   //@@
   InferSharedMemoryRegion shared_memory_region = 2;
 }

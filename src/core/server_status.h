@@ -47,8 +47,11 @@ class ServerStatTimerScoped {
     PROFILE,
     // Stat for health request. Duration from request to response.
     HEALTH,
-    // Stat for control request. Duration from request to response.
-    CONTROL
+    // Stat for model control request. Duration from request to response.
+    MODEL_CONTROL,
+    // Stat for shared memory control request. Duration from request to
+    // response.
+    SHARED_MEMORY_CONTROL
   };
 
   // Start server timer for a given status 'kind'.

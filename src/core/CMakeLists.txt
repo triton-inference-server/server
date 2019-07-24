@@ -135,6 +135,7 @@ set(
   sequence_batch_scheduler.cc
   server.cc
   server_status.cc
+  shared_memory_manager.cc
   status.cc
   trtserver.cc
 )
@@ -161,6 +162,7 @@ set(
   sequence_batch_scheduler.h
   server.h
   server_status.h
+  shared_memory_manager.h
   status.h
   trtserver.h
 )
