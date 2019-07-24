@@ -170,7 +170,9 @@ struct Option {
 
 std::vector<Option> options_{
     {OPTION_HELP, "help", "Print usage", false},
-    {OPTION_LOG_VERBOSE, "log-verbose", "Enable/disable verbose-level logging"},
+    {OPTION_LOG_VERBOSE, "log-verbose",
+     "Set verbose logging level. Zero (0) disables verbose logging and values "
+     ">= 1 enable verbose logging"},
     {OPTION_LOG_INFO, "log-info", "Enable/disable info-level logging"},
     {OPTION_LOG_WARNING, "log-warning", "Enable/disable warning-level logging"},
     {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
@@ -529,6 +531,19 @@ ParseFloatOption(const std::string arg)
   return std::stof(arg);
 }
 
+int
+ParseIntBoolOption(const std::string arg)
+{
+  if ((arg == "true") || (arg == "True")) {
+    return 1;
+  }
+  if ((arg == "false") || (arg == "False")) {
+    return 0;
+  }
+
+  return ParseIntOption(arg);
+}
+
 struct VgpuOption {
   int gpu_device_;
   int num_vgpus_;
@@ -648,7 +663,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         return false;
 
       case OPTION_LOG_VERBOSE:
-        log_verbose = ParseIntOption(optarg);
+        log_verbose = ParseIntBoolOption(optarg);
         break;
       case OPTION_LOG_INFO:
         log_info = ParseBoolOption(optarg);
