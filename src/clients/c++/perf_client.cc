@@ -1644,7 +1644,6 @@ ReportServerSideStats(const ServerSideStats& stats)
   const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
                                 ? (cumm_avg_us - queue_avg_us - compute_avg_us)
                                 : 0;
-  std::cout << stats.cumm_time_ns << " - " << stats.queue_time_ns << " - " << stats.compute_time_ns << std::endl;
 
   std::cout << "    Request count: " << cnt << std::endl
             << "    Avg request latency: " << cumm_avg_us << " usec"
@@ -1652,7 +1651,7 @@ ReportServerSideStats(const ServerSideStats& stats)
             << "queue " << queue_avg_us << " usec + "
             << "compute " << compute_avg_us << " usec)" << std::endl
             << std::endl;
-  
+
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
 
@@ -1730,13 +1729,13 @@ Report(
 
   std::cout << "  Server: " << std::endl;
   ReportServerSideStats(summary.server_stats);
-  
+
   if (!summary.server_composing_model_stats.empty()) {
     std::cout << "  Composing models: " << std::endl;
     for (const auto& model_stats : summary.server_composing_model_stats) {
       const auto& model_info = model_stats.first;
-      std::cout << "  " << model_info.first << ", version: "
-                << model_info.second << std::endl;
+      std::cout << "  " << model_info.first
+                << ", version: " << model_info.second << std::endl;
       ReportServerSideStats(model_stats.second);
     }
   }
@@ -2159,6 +2158,33 @@ main(int argc, char** argv)
         ofs << std::endl;
       }
       ofs.close();
+
+      // Record composing model stat in a separate file
+      if (!summary.front().server_composing_model_stats.empty()) {
+        std::ofstream ofs(filename + ".composing_stats", std::ofstream::out);
+
+        ofs << "Concurrency,Model,Requested Version,"
+            << "Server Overhead,Server Queue,Server Compute"
+            << std::endl;
+        for (PerfStatus& status : summary) {
+          for (const auto& model_info : status.server_composing_model_stats) {
+            const auto& name_version = model_info.first;
+            const auto& stats = model_info.second;
+            uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
+            uint64_t avg_compute_ns =
+                stats.compute_time_ns / stats.request_count;
+            uint64_t avg_overhead_ns = stats.cumm_time_ns / stats.request_count;
+            avg_overhead_ns =
+                (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
+                    ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
+                    : 0;
+            ofs << status.concurrency << "," << name_version.first << ","
+                << name_version.second << "," << (avg_overhead_ns / 1000) << ","
+                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000)
+                << std::endl;
+          }
+        }
+      }
     }
   }
   return 0;
