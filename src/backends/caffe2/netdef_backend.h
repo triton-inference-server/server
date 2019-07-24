@@ -75,9 +75,9 @@ class NetDefBackend : public InferenceBackend {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
-    Context(Context&& o);
     ~Context();
 
+    DISALLOW_MOVE(Context);
     DISALLOW_COPY_AND_ASSIGN(Context);
 
     Status ValidateInputs(
@@ -128,7 +128,7 @@ class NetDefBackend : public InferenceBackend {
     std::unique_ptr<Caffe2Workspace> workspace_;
   };
 
-  std::vector<Context> contexts_;
+  std::vector<std::unique_ptr<Context>> contexts_;
 };
 
 std::ostream& operator<<(std::ostream& out, const NetDefBackend& pb);
