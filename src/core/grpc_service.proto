@@ -59,11 +59,22 @@ service GRPCService
   //@@
   rpc Health(HealthRequest) returns (HealthResponse) {}
 
-  //@@  .. cpp:var:: rpc ModelControl(ModelControlRequest) returns (ModelControlResponse)
+  //@@  .. cpp:var:: rpc ModelControl(ModelControlRequest) returns
+  //@@     (ModelControlResponse)
   //@@
   //@@     Request to load / unload a specified model.
   //@@
   rpc ModelControl(ModelControlRequest) returns (ModelControlResponse) {}
+
+  //@@  .. cpp:var:: rpc SharedMemoryControl(SharedMemoryControlRequest) returns
+  //@@     (SharedMemoryControlResponse)
+  //@@
+  //@@     Request to register / unregister a specified shared memory region.
+  //@@
+  rpc SharedMemoryControl(SharedMemoryControlRequest)
+      returns (SharedMemoryControlResponse)
+  {
+  }
 
   //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
   //@@
@@ -241,6 +252,98 @@ message ModelControlRequest
 //@@   Response message for ModelControl gRPC endpoint.
 //@@
 message ModelControlResponse
+{
+  //@@
+  //@@  .. cpp:var:: RequestStatus request_status
+  //@@
+  //@@     The status of the request, indicating success or failure.
+  //@@
+  RequestStatus request_status = 1;
+}
+
+//@@.. cpp:var:: message InferSharedMemoryRegion
+//@@
+//@@   The meta-data for the shared memory region from which to read the input
+//@@   data and/or write the output data.
+//@@
+message InferSharedMemoryRegion
+{
+  //@@
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name for this shared memory region.
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: string shm_key
+  //@@
+  //@@     The name of the shared memory region that holds the input data
+  //@@     (or where the output data should be written).
+  //@@
+  string shm_key = 2;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     The offset from the start of the shared memory region.
+  //@@     start = offset, end = offset + size;
+  //@@
+  uint64 offset = 3;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the memory block, in bytes.
+  //@@
+  uint64 byte_size = 4;
+}
+
+//@@
+//@@.. cpp:var:: message SharedMemoryControlRequest
+//@@
+//@@   Request message for managing registered shared memory regions in TRTIS.
+//@@
+message SharedMemoryControlRequest
+{
+  //@@  .. cpp:enum:: Type
+  //@@
+  //@@     Types of control operations for shared memory
+  //@@
+  enum Type {
+    //@@    .. cpp:enumerator:: Type::UNREGISTER = 0
+    //@@
+    //@@       To unregister the specified shared memory region.
+    //@@
+    UNREGISTER = 0;
+
+    //@@    .. cpp:enumerator:: Type::REGISTER = 1
+    //@@
+    //@@       To register the specified shared memory region.
+    //@@
+    REGISTER = 1;
+  }
+
+  //@@
+  //@@  .. cpp:var:: Type type
+  //@@
+  //@@     The control type that states whether to register or unregister the
+  //@@     specified shared memory region.
+  //@@
+  Type type = 1;
+
+  //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
+  //@@
+  //@@     The shared memory region to register or unregister.
+  //@@     All fields are needed to REGISTER the shared memory region.
+  //@@     Only 'name' is needed to UNREGISTER the shared memory region.
+  //@@
+  InferSharedMemoryRegion shared_memory_region = 2;
+}
+
+//@@
+//@@.. cpp:var:: message SharedMemoryControlResponse
+//@@
+//@@   Response message for SharedMemoryControl gRPC endpoint.
+//@@
+message SharedMemoryControlResponse
 {
   //@@
   //@@  .. cpp:var:: RequestStatus request_status
