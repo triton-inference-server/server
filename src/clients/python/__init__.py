@@ -161,13 +161,6 @@ _crequest_infer_ctx_input_set_shape.argtypes = [c_void_p,
 _crequest_infer_ctx_input_set_raw = _crequest.InferContextInputSetRaw
 _crequest_infer_ctx_input_set_raw.restype = c_void_p
 _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
-_crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
-_crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_input_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
-
-_crequest_infer_ctx_output_set_shared_memory = _crequest.InferContextOutputSetSharedMemory
-_crequest_infer_ctx_output_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_output_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -801,18 +794,11 @@ class InferContext:
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
         # containing one array.
-        # Each element in the list must be a 'numpy array' if inputs are being
-        # passed directly and a 'tuple' if passing a reference to shared memory
         for inp_name, inp in inputs.items():
             if not isinstance(inp, (list, tuple)):
                 _raise_error("input '" + inp_name +
-                             "' values must be specified as a list of numpy arrays \
-                             or list of tuples representing location in shared memory")
-            for ip in inp:
-                if not isinstance(ip, (np.ndarray, tuple)):
-                    _raise_error("input '" + inp_name +
-                                 "' values must be specified as a list of numpy arrays \
-                                 or list of tuples representing location in shared memory")
+                             "' values must be specified as a list of numpy arrays")
+
         # Set run options using formats specified in 'outputs'
         options = c_void_p()
         try:
@@ -820,18 +806,7 @@ class InferContext:
                 _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
-                if output_format == InferContext.ResultFormat.RAW \
-                    and isinstance(output_format, (list, tuple)) and len(output_format) == 3:
-                    if (type(output_format[0]) != str) or (type(output_format[1]) != int) \
-                        or (type(output_format[2]) != int):
-                        _raise_error("shared memory requires tuple of size 3" \
-                            + " - shm_key (string), offset (int), size (int)")
-                    _raise_if_error(
-                        c_void_p(
-                            _crequest_infer_ctx_output_set_shared_memory(
-                                output, output_format[0], c_uint64(output_format[1]),
-                                c_uint64(output_format[2]))))
-                elif output_format == InferContext.ResultFormat.RAW:
+                if output_format == InferContext.ResultFormat.RAW:
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_raw(self._ctx, options, output_name)))
@@ -858,65 +833,50 @@ class InferContext:
 
                 # Set the input shape
                 if len(input_values) > 0:
-                    if isinstance(input_values[0], (np.ndarray,)):
-                        shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
-                        _raise_if_error(
-                            c_void_p(
-                                _crequest_infer_ctx_input_set_shape(
-                                    input, shape_value, c_uint64(shape_value.size))))
+                    shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
+                    _raise_if_error(
+                        c_void_p(
+                            _crequest_infer_ctx_input_set_shape(
+                                input, shape_value, c_uint64(shape_value.size))))
 
                 for input_value in input_values:
-                    # use values if numpy array, reference if shared memory
-                    if isinstance(input_value, (np.ndarray,)):
-                        # If the input tensor is empty then avoid going
-                        # through the more complicated logic since
-                        # creating the buffer for string objects results
-                        # is a size-1 array instead of 0.
-                        if input_value.size == 0:
-                            _raise_if_error(
-                                c_void_p(
-                                    _crequest_infer_ctx_input_set_raw(input, 0, 0)))
-                        else:
-                            # If the input is a tensor of string objects,
-                            # then must flatten those into a 1-dimensional
-                            # array containing the 4-byte string length
-                            # followed by the actual string characters.
-                            # All strings are concatenated together in "C"
-                            # order.
-                            if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
-                                flattened = bytes()
-                                for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                    # If directly passing bytes to STRING type,
-                                    # don't convert it to str as Python will encode the
-                                    # bytes which may distort the meaning
-                                    if obj.dtype.type == np.bytes_:
-                                        s = bytes(obj)
-                                    else:
-                                        s = str(obj).encode('utf-8')
-                                    flattened += struct.pack("<I", len(s))
-                                    flattened += s
-                                input_value = np.asarray(flattened)
-
-                            if not input_value.flags['C_CONTIGUOUS']:
-                                input_value = np.ascontiguousarray(input_value)
-                            contiguous_input_values.append(input_value)
-                            _raise_if_error(
-                                c_void_p(
-                                    _crequest_infer_ctx_input_set_raw(
-                                        input, input_value.ctypes.data_as(c_void_p),
-                                        c_uint64(input_value.size * input_value.itemsize))))
-                    else:
-                        if len(input_value) != 3 or (type(input_value[0]) != str) \
-                            or (type(input_value[1]) != int) or (type(input_value[2]) != int):
-                            _raise_error("shared memory requires tuple of size 3" \
-                                + " - shm_key (string), offset (int), size (int)")
+                    # If the input tensor is empty then avoid going
+                    # through the more complicated logic since
+                    # creating the buffer for string objects results
+                    # is a size-1 array instead of 0.
+                    if input_value.size == 0:
                         _raise_if_error(
                             c_void_p(
-                                _crequest_infer_ctx_input_set_shared_memory(
-                                    input, input_value[0], c_uint64(input_value[1]),
-                                    c_uint64(input_value[2]))))
+                                _crequest_infer_ctx_input_set_raw(input, 0, 0)))
+                    else:
+                        # If the input is a tensor of string objects,
+                        # then must flatten those into a 1-dimensional
+                        # array containing the 4-byte string length
+                        # followed by the actual string characters.
+                        # All strings are concatenated together in "C"
+                        # order.
+                        if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
+                            flattened = bytes()
+                            for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+                                # If directly passing bytes to STRING type,
+                                # don't convert it to str as Python will encode the
+                                # bytes which may distort the meaning
+                                if obj.dtype.type == np.bytes_:
+                                    s = bytes(obj)
+                                else:
+                                    s = str(obj).encode('utf-8')
+                                flattened += struct.pack("<I", len(s))
+                                flattened += s
+                            input_value = np.asarray(flattened)
 
-
+                        if not input_value.flags['C_CONTIGUOUS']:
+                            input_value = np.ascontiguousarray(input_value)
+                        contiguous_input_values.append(input_value)
+                        _raise_if_error(
+                            c_void_p(
+                                _crequest_infer_ctx_input_set_raw(
+                                    input, input_value.ctypes.data_as(c_void_p),
+                                    c_uint64(input_value.size * input_value.itemsize))))
             finally:
                 _crequest_infer_ctx_input_del(input)
 
