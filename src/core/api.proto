@@ -30,6 +30,34 @@ package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
 
+//@@.. cpp:var:: message InferSharedMemory
+//@@
+//@@   The meta-data for the shared memory from which to read the input
+//@@   data and/or write the output data.
+//@@
+message InferSharedMemory
+{
+  //@@  .. cpp:var:: string name
+  //@@
+  //@@     The name given during registration of a shared memory region that
+  //@@     holds the input data (or where the output data should be written).
+  //@@
+  string name = 1;
+
+  //@@  .. cpp:var:: uint64 offset
+  //@@
+  //@@     The offset from the start of the shared memory region.
+  //@@     start = offset, end = offset + size;
+  //@@
+  uint64 offset = 2;
+
+  //@@  .. cpp:var:: uint64 byte_size
+  //@@
+  //@@     Size of the memory block, in bytes.
+  //@@
+  uint64 byte_size = 3;
+}
+
 //@@
 //@@.. cpp:var:: message InferRequestHeader
 //@@
@@ -94,6 +122,14 @@ message InferRequestHeader
     //@@       for tensors with a non-fixed-size datatype (like STRING).
     //@@
     uint64 batch_byte_size = 3;
+
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
+    //@@
+    //@@       It is the location in shared memory that contains the tensor data
+    //@@       for this input. Using shared memory is optional but if this
+    //@@       message is used, all fields are required.
+    //@@
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: message Output
@@ -132,6 +168,14 @@ message InferRequestHeader
     //@@       highest probabilities will be returned.
     //@@
     Class cls = 3;
+
+    //@@    .. cpp:var:: InferSharedMemory shared_memory
+    //@@
+    //@@       It is the location in shared memory that the result tensor data
+    //@@       for this output will be written. Using shared memory is optional
+    //@@       but if this message is used, all fields are required.
+    //@@
+    InferSharedMemory shared_memory = 4;
   }
 
   //@@  .. cpp:var:: uint64 id
