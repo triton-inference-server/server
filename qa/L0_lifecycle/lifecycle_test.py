@@ -843,6 +843,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
                     self.assertTrue(False, "expected unknown model failure")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
@@ -854,7 +855,7 @@ class LifeCycleTest(unittest.TestCase):
         for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
             try:
                 ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.Load("unknown_model")
+                ctx.load("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
             except InferenceServerException as ex:
                 self.assertEqual("inference:0", ex.server_id())
@@ -867,7 +868,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.Load(model_name)
+                    ctx.load(model_name)
                     self.assertTrue(False, "expected unknown model failure")
                 except InferenceServerException as ex:
                     self.assertEqual("inference:0", ex.server_id())
@@ -881,7 +882,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.Load(model_name)
+                    ctx.load(model_name)
 
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
@@ -915,8 +916,10 @@ class LifeCycleTest(unittest.TestCase):
                     iu.infer_exact(self, model_name, model_shape, 1,
                                    np.float32, np.float32, np.float32, swap=(version == 3),
                                    model_version=version)
+                    # ensemble always swap because it uses latest version (v3)
+                    # of the composing model
                     iu.infer_exact(self, ensemble_prefix + model_name, model_shape, 1,
-                                   np.float32, np.float32, np.float32, swap=(version == 3),
+                                   np.float32, np.float32, np.float32, swap=True,
                                    model_version=version)
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
@@ -926,7 +929,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.Load(model_name)
+                    ctx.load(model_name)
 
                     ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
                     ss = ctx.get_server_status()
@@ -951,7 +954,7 @@ class LifeCycleTest(unittest.TestCase):
         for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
             try:
                 ctx = ModelControlContext(pair[0], pair[1], True)
-                ctx.Unload("unknown_model")
+                ctx.unload("unknown_model")
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -961,7 +964,7 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.Unload(model_name)
+                    ctx.unload(model_name)
 
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
@@ -989,8 +992,8 @@ class LifeCycleTest(unittest.TestCase):
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.Unload(ensemble_prefix + model_name)
-                    ctx.Load(model_name)
+                    ctx.unload(ensemble_prefix + model_name)
+                    ctx.load(model_name)
 
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
