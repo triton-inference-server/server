@@ -100,16 +100,34 @@ class ProfileGrpcContext {
 ////
 class ModelControlGrpcContext {
  public:
-  /// Create context that controls models to be loaded on a server and
-  /// to be unloaded from a server using GRPC.
+  /// Create context that controls models to be loaded on a server and to be
+  /// unloaded from a server using GRPC.
   /// \param ctx Returns the new ModelControlContext object.
   /// \param server_url The inference server name and port.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
+  /// \param verbose If true generate verbose output when contacting the
+  /// inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
       bool verbose = false);
+};
+
+//==============================================================================
+//// SharedMemoryControlGrpcContext is the GRPC instantiation of
+//// SharedMemoryControlContext.
+////
+class SharedMemoryControlGrpcContext {
+ public:
+  /// Create context that controls registration / unregistration of shared
+  /// memory regions on the server using GRPC.
+  /// \param ctx Returns the new SharedMemoryControlContext object.
+  /// \param server_url The inference server name and port.
+  /// \param verbose If true generate verbose output when contacting the
+  /// inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<SharedMemoryControlContext>* ctx,
+      const std::string& server_url, bool verbose = false);
 };
 
 //==============================================================================

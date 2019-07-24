@@ -366,6 +366,93 @@ ModelControlGrpcContext::Create(
 }
 
 //==============================================================================
+
+class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
+ public:
+  SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
+  Error RegisterSharedMemory(
+      const std::string& name, const std::string& shm_key,
+      const size_t offset, const size_t byte_size) override;
+  Error UnregisterSharedMemory(const std::string& name) override;
+
+ private:
+  Error SendRequest(
+      const std::string& name, const bool is_register,
+      const std::string& shm_key, const size_t offset, const size_t byte_size);
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
+{
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
+    const std::string& name, const std::string& shm_key,
+    const size_t offset, const size_t byte_size)
+{
+  return SendRequest(name, true, shm_key, offset, byte_size);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
+    const std::string& name)
+{
+  return SendRequest(name, false, "", 0, 0);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::SendRequest(
+    const std::string& name, const bool is_register,
+    const std::string& shm_key, const size_t offset, const size_t byte_size)
+{
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+
+  auto rshm_region = request.mutable_shared_memory_region();
+  rshm_region->set_name(name);
+
+  if (is_register) {
+    rshm_region->set_shm_key(shm_key);
+    rshm_region->set_offset(offset);
+    rshm_region->set_byte_size(byte_size);
+    request.set_type(SharedMemoryControlRequest::REGISTER);
+  } else {
+    request.set_type(SharedMemoryControlRequest::UNREGISTER);
+  }
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+
+Error
+SharedMemoryControlGrpcContext::Create(
+    std::unique_ptr<SharedMemoryControlContext>* ctx,
+    const std::string& server_url, bool verbose)
+{
+  ctx->reset(static_cast<SharedMemoryControlContext*>(
+      new SharedMemoryControlGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
 class GrpcResultImpl : public ResultImpl {
  public:
   GrpcResultImpl(

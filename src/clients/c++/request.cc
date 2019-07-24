@@ -36,6 +36,7 @@ ProfileContext::~ProfileContext() {}
 ServerHealthContext::~ServerHealthContext() {}
 ServerStatusContext::~ServerStatusContext() {}
 ModelControlContext::~ModelControlContext() {}
+SharedMemoryControlContext::~SharedMemoryControlContext() {}
 InferContext::Input::~Input() {}
 InferContext::Output::~Output() {}
 InferContext::Result::~Result() {}
