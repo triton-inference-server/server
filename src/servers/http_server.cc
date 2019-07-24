@@ -192,7 +192,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         endpoint_names_(endpoints),
-        api_regex_(R"(/api/(health|profile|infer|status|control)(.*))"),
+        api_regex_(R"(/api/(health|profile|infer|status|modelcontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         control_regex_(R"(/(load|unload)/([^/]+))")
@@ -296,8 +296,8 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       return;
     }
     // control
-    if (endpoint == "control" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "control") !=
+    if (endpoint == "modelcontrol" &&
+        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "modelcontrol") !=
          endpoint_names_.end())) {
       HandleControl(req, rest);
       return;
