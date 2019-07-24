@@ -416,6 +416,9 @@ OnnxBackend::Run(
   Status status = contexts_[runner_idx]->Run(this, payloads);
   // Release all run related resources regardless of the run status
   contexts_[runner_idx]->ReleaseOrtRunResources();
+  // reset compute timers before calling OnComplete function
+  compute_timers.clear();
+
   OnCompleteQueuedPayloads(status);
 }
 
