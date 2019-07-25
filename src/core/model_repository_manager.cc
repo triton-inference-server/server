@@ -1323,22 +1323,22 @@ ModelRepositoryManager::UpdateDependencyGraph(
   for (const auto& model_name : deleted) {
     auto it = dependency_graph_.find(model_name);
     if (it != dependency_graph_.end()) {
+      // remove this node from its upstreams
+      for (auto& upstream : it->second->upstreams_) {
+        upstream.first->downstreams_.erase(it->second.get());
+      }
+      it->second->upstreams_.clear();
+      
       if (!it->second->downstreams_.empty()) {
         UncheckDownstream(&it->second->downstreams_, &affected_nodes);
         // mark this node as missing upstream in its downstreams
         for (auto& downstream : it->second->downstreams_) {
           downstream->missing_upstreams_.emplace(it->second.get());
         }
-
-        // remove this node from its upstreams
-        for (auto& upstream : it->second->upstreams_) {
-          upstream.first->downstreams_.erase(it->second.get());
-        }
-        it->second->upstreams_.clear();
-
         missing_nodes_.emplace(
             std::make_pair(model_name, std::move(it->second)));
       }
+
       // Make sure deleted node will not be in affected nodes
       affected_nodes.erase(it->second.get());
       dependency_graph_.erase(it);
