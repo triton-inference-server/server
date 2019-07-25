@@ -55,21 +55,24 @@ Usage(char** argv, const std::string& msg = std::string())
 
 TRTSERVER_Error*
 ResponseAlloc(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer,
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Allocator_Region region, int64_t region_id, void* userp)
 {
-  // Only handle allocation in the CPU region. Just use malloc...
-  if (region == TRTSERVER_MEMORY_CPU) {
-    *buffer = malloc(byte_size);
-  } else {
-    *buffer = nullptr;
-  }
+  // Pass the tensor name with buffer_userp so we can show it when
+  // releasing the buffer.
 
-  if (buffer != nullptr) {
+  // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
+  // need to do any other book-keeping. Only handle allocation in the
+  // CPU region.
+  if ((byte_size == 0) || (region == TRTSERVER_MEMORY_CPU)) {
+    *buffer = (byte_size == 0) ? nullptr : malloc(byte_size);
+    *buffer_userp = new std::string(tensor_name);
     LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
              << tensor_name;
   } else {
+    *buffer = nullptr;
+    *buffer_userp = nullptr;
     LOG_INFO << "failed to allocated " << byte_size
              << " bytes for result tensor " << tensor_name;
   }
@@ -78,9 +81,23 @@ ResponseAlloc(
 }
 
 TRTSERVER_Error*
-ResponseAllocatorDelete(TRTSERVER_ResponseAllocator* allocator, void* userp)
+ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Allocator_Region region, int64_t region_id)
 {
-  LOG_INFO << "Delete response allocator";
+  std::string* name = nullptr;
+  if (buffer_userp != nullptr) {
+    name = reinterpret_cast<std::string*>(buffer_userp);
+  } else {
+    name = new std::string("<unknown>");
+  }
+
+  LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
+           << " for result '" << *name << "'";
+  free(buffer);
+
+  delete name;
+
   return nullptr;  // Success
 }
 
@@ -230,7 +247,7 @@ main(int argc, char** argv)
   TRTSERVER_ResponseAllocator* allocator = nullptr;
   FAIL_IF_ERR(
       TRTSERVER_ResponseAllocatorNew(
-          &allocator, ResponseAlloc, ResponseAllocatorDelete),
+          &allocator, ResponseAlloc, ResponseRelease),
       "creating response allocator");
 
   // The inference request provides meta-data with an
@@ -385,7 +402,7 @@ main(int argc, char** argv)
       "deleting inference response");
 
   FAIL_IF_ERR(
-      TRTSERVER_ResponseAllocatorDelete(allocator, nullptr /* userp */),
+      TRTSERVER_ResponseAllocatorDelete(allocator),
       "deleting response allocator");
 
   return 0;

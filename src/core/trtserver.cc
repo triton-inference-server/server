@@ -118,20 +118,23 @@ class TrtServerResponseAllocator {
  public:
   explicit TrtServerResponseAllocator(
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-      TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn);
+      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
   TRTSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
-  TRTSERVER_ResponseAllocatorDeleteFn_t DeleteFn() const { return delete_fn_; }
+  TRTSERVER_ResponseAllocatorReleaseFn_t ReleaseFn() const
+  {
+    return release_fn_;
+  }
 
  private:
   TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
-  TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn_;
+  TRTSERVER_ResponseAllocatorReleaseFn_t release_fn_;
 };
 
 TrtServerResponseAllocator::TrtServerResponseAllocator(
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn)
-    : alloc_fn_(alloc_fn), delete_fn_(delete_fn)
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    : alloc_fn_(alloc_fn), release_fn_(release_fn)
 {
 }
 
@@ -460,27 +463,20 @@ TRTSERVER_Error*
 TRTSERVER_ResponseAllocatorNew(
     TRTSERVER_ResponseAllocator** allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn)
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
 {
   *allocator = reinterpret_cast<TRTSERVER_ResponseAllocator*>(
-      new TrtServerResponseAllocator(alloc_fn, delete_fn));
+      new TrtServerResponseAllocator(alloc_fn, release_fn));
   return nullptr;  // Success
 }
 
 TRTSERVER_Error*
-TRTSERVER_ResponseAllocatorDelete(
-    TRTSERVER_ResponseAllocator* allocator, void* userp)
+TRTSERVER_ResponseAllocatorDelete(TRTSERVER_ResponseAllocator* allocator)
 {
   TrtServerResponseAllocator* lalloc =
       reinterpret_cast<TrtServerResponseAllocator*>(allocator);
-
-  TRTSERVER_Error* err = nullptr;  // success
-  if (lalloc->DeleteFn() != nullptr) {
-    err = lalloc->DeleteFn()(allocator, userp);
-  }
   delete lalloc;
-
-  return err;
+  return nullptr;  // Success
 }
 
 //
@@ -1093,7 +1089,7 @@ TRTSERVER_ServerInferAsync(
     RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
         *request_header, lprovider->Backend()->GetLabelProvider(),
         response_allocator, lresponsealloc->AllocFn(), response_allocator_userp,
-        &del_response_provider));
+        lresponsealloc->ReleaseFn(), &del_response_provider));
     infer_response_provider = del_response_provider;
   }
 

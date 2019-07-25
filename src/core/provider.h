@@ -226,9 +226,10 @@ class InferResponseProvider {
   using SecondaryLabelProviderMap =
       std::unordered_map<std::string, SecondaryLabelProvider>;
 
-  explicit InferResponseProvider(
+  InferResponseProvider(
       const InferRequestHeader& request_header,
       const std::shared_ptr<LabelProvider>& label_provider);
+  virtual ~InferResponseProvider() = default;
 
   // Get the full response header for this inference request.
   virtual const InferResponseHeader& ResponseHeader() const = 0;
@@ -296,6 +297,9 @@ class InferResponseProvider {
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;
+
+    void* release_buffer_;
+    void* release_userp_;
   };
 
   // Ordered list of outputs as they "added" by AllocateOutputBuffer().
@@ -407,7 +411,10 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
       std::shared_ptr<DelegatingInferResponseProvider>* infer_provider);
+
+  ~DelegatingInferResponseProvider();
 
   const InferResponseHeader& ResponseHeader() const override;
   InferResponseHeader* MutableResponseHeader() override;
@@ -420,15 +427,18 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
       const InferRequestHeader& request_header,
       const std::shared_ptr<LabelProvider>& label_provider,
       TRTSERVER_ResponseAllocator* allocator,
-      TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp)
+      TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+      TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
       : InferResponseProvider(request_header, label_provider),
-        allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp)
+        allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
+        release_fn_(release_fn)
   {
   }
 
   TRTSERVER_ResponseAllocator* allocator_;
   TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
   void* alloc_userp_;
+  TRTSERVER_ResponseAllocatorReleaseFn_t release_fn_;
 
   InferResponseHeader response_header_;
 };
