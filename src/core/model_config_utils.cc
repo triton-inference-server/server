@@ -746,37 +746,73 @@ ValidateIOShape(
               std::to_string(WILDCARD_DIM) +
               " to indicate a variable-size dimension");
     }
-
-    // Wildcards are not allowed in dims if there is a reshape.
-    if (io.has_reshape() && (dim == WILDCARD_DIM)) {
-      return Status(
-          RequestStatusCode::INVALID_ARG,
-          message_prefix +
-              "using reshape cannot have variable-size dimension " +
-              std::to_string(WILDCARD_DIM));
-    }
   }
 
-  // Wildcards and zeros are not allowed in reshape. Make sure the
-  // element count output dims matches the reshape.
   if (io.has_reshape()) {
+    // Zeros are not allowed in reshape.
     for (auto dim : io.reshape().shape()) {
-      if (dim <= 0) {
+      if ((dim < 1) && (dim != WILDCARD_DIM)) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            message_prefix + "reshape dimensions must be integer >= 1");
+            message_prefix + "reshape dimensions must be integer >= 1, or " +
+                std::to_string(WILDCARD_DIM) +
+                " to indicate a variable-size dimension");
       }
     }
 
+    const int64_t dims_size = GetElementCount(io.dims());
+    const int64_t reshape_size = GetElementCount(io.reshape().shape());
+
+    // dims and reshape must both have same element count
+    // or both have variable-size dimension.
     // Special case for empty reshape... expect dims to have element
     // count of 1.
-    const int64_t reshape_size =
-        std::max((int64_t)1, GetElementCount(io.reshape().shape()));
-    const int64_t dims_size = GetElementCount(io.dims());
-    if (dims_size != reshape_size) {
+    if ((dims_size != reshape_size) &&
+        ((reshape_size != 0) || (dims_size != 1))) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           message_prefix + "has different size for dims and reshape");
+    }
+
+    // shape contains variable-size dimension, in this case we compare if
+    // it matches the reshape by padding / squeezing dimension with size 1
+    if (dims_size == -1) {
+      int64_t dim_idx = 0;
+      int64_t reshape_idx = 0;
+      while (dim_idx < io.dims_size() &&
+             reshape_idx < io.reshape().shape_size()) {
+        const int64_t dim = io.dims(dim_idx);
+        const int64_t reshape_dim = io.reshape().shape(reshape_idx);
+        if (dim != reshape_dim) {
+          if (dim == 1) {
+            dim_idx++;
+          } else if (reshape_dim == 1) {
+            reshape_idx++;
+          } else {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                message_prefix + "has different size for dims and reshape");
+          }
+        } else {
+          dim_idx++;
+          reshape_idx++;
+        }
+      }
+      // if shape / reshape idx is not at the end, check if the rest are ones
+      for (; dim_idx < io.dims_size(); dim_idx++) {
+        if (io.dims(dim_idx) != 1) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              message_prefix + "has different size for dims and reshape");
+        }
+      }
+      for (; reshape_idx < io.reshape().shape_size(); reshape_idx++) {
+        if (io.reshape().shape(reshape_idx) != 1) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              message_prefix + "has different size for dims and reshape");
+        }
+      }
     }
   }
 
@@ -789,7 +825,7 @@ Status
 ValidateModelInput(const ModelInput& io, int32_t max_batch_size)
 {
   RETURN_IF_ERROR(ValidateIOShape(io, max_batch_size, "model input "));
-  
+
   if (((io.format() == ModelInput::FORMAT_NHWC) ||
        (io.format() == ModelInput::FORMAT_NCHW)) &&
       (io.dims_size() != 3)) {
