@@ -372,11 +372,13 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_model_control
 # enable explicit model control, no model in the repository should be loaded
 rm -fr models config.pbtxt.*
 mkdir models
-for i in graphdef savedmodel netdef plan ; do
+for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
 done
 
 SERVER_ARGS="--model-store=`pwd`/models --allow-model-control=true \
@@ -398,6 +400,14 @@ if [ "$model_count" != "0" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_model_control >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

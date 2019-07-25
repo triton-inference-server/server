@@ -652,7 +652,7 @@ ModelControlHttpContextImpl::SendRequest(
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   // use POST method
-  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
