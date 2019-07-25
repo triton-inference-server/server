@@ -178,14 +178,20 @@ NewSessionOptions(
   if (!memory_limit_mb.empty()) {
     (*(session_options->config.mutable_device_count()))["GPU"] =
         memory_limit_mb.size();
+    std::string visible_device_list = "";
     for (const auto& v : memory_limit_mb) {
       auto virtual_devices = session_options->config.mutable_gpu_options()
                                  ->mutable_experimental()
                                  ->add_virtual_devices();
-      for (float mb : v.second) {
-        virtual_devices->add_memory_limit_mb(mb);
+      visible_device_list += ("," + std::to_string(v.first));
+      if (!v.second.empty()) {
+        for (float mb : v.second) {
+          virtual_devices->add_memory_limit_mb(mb);
+        }
       }
     }
+    session_options->config.mutable_gpu_options()->set_visible_device_list(
+        visible_device_list.substr(1));
   }
 
   // Enable/disable XLA based on the model config optimization
@@ -687,14 +693,13 @@ TRTISTF_ModelCreateFromSavedModel(
   //
   // The GraphDef where we need to use this workaround is only
   // available in tensorflow/cc/saved_model/loader.cc so we use
-  // visible_device_list in pass in the gpu_device we want and then
+  // allocator_type in pass in the gpu_device we want and then
   // loader.cc (our modified version) will use that to
   // SetDefaultDevice appropriately.
   if (device_id == TRTISTF_NO_GPU_DEVICE) {
-    session_options.config.mutable_gpu_options()->set_visible_device_list(
-        "/cpu:0");
+    session_options.config.mutable_gpu_options()->set_allocator_type("/cpu:0");
   } else {
-    session_options.config.mutable_gpu_options()->set_visible_device_list(
+    session_options.config.mutable_gpu_options()->set_allocator_type(
         "/gpu:" + std::to_string(device_id));
   }
 

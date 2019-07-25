@@ -37,13 +37,23 @@ VirtualDeviceTracker::VirtualDeviceTracker(
     const std::map<int, std::vector<float>>& memory_limit_mb)
 {
   // Initialize virtual device counter
+  int base_index = 0;
   for (auto const& allocation : memory_limit_mb) {
     int gpu_idx = allocation.first;
     auto mem_limits_for_device = allocation.second;
-    num_virtual_per_physical_[gpu_idx] = (mem_limits_for_device.size());
+    virtual_device_base_index_[gpu_idx] = base_index;
+
+    // default 1 vgpu case
+    if (mem_limits_for_device.empty()) {
+      num_virtual_per_physical_[gpu_idx] = 1;
+    } else {
+      num_virtual_per_physical_[gpu_idx] = (mem_limits_for_device.size());
+    }
+
     virtual_device_ids_.emplace(
         std::piecewise_construct, std::forward_as_tuple(gpu_idx),
         std::forward_as_tuple(0));
+    base_index += num_virtual_per_physical_[gpu_idx];
   }
 }
 
@@ -104,7 +114,9 @@ VirtualDeviceTracker::NextDeviceId(const int gpu_device)
 {
   // Read and atomically increment virtual device id to use for creating model
   int num_vgpus_on_device = num_virtual_per_physical_[gpu_device];
-  return (virtual_device_ids_[gpu_device]++) % num_vgpus_on_device;
+  int base_index = virtual_device_base_index_[gpu_device];
+  return ((virtual_device_ids_[gpu_device]++) % num_vgpus_on_device) +
+         base_index;
 }
 
 }}  // namespace nvidia::inferenceserver
