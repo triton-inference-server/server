@@ -73,4 +73,56 @@ Status::AsString() const
   return str;
 }
 
+RequestStatusCode
+TrtServerCodeToRequestStatus(TRTSERVER_Error_Code code)
+{
+  switch (code) {
+    case TRTSERVER_ERROR_UNKNOWN:
+      return RequestStatusCode::UNKNOWN;
+    case TRTSERVER_ERROR_INTERNAL:
+      return RequestStatusCode::INTERNAL;
+    case TRTSERVER_ERROR_NOT_FOUND:
+      return RequestStatusCode::NOT_FOUND;
+    case TRTSERVER_ERROR_INVALID_ARG:
+      return RequestStatusCode::INVALID_ARG;
+    case TRTSERVER_ERROR_UNAVAILABLE:
+      return RequestStatusCode::UNAVAILABLE;
+    case TRTSERVER_ERROR_UNSUPPORTED:
+      return RequestStatusCode::UNSUPPORTED;
+    case TRTSERVER_ERROR_ALREADY_EXISTS:
+      return RequestStatusCode::ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return RequestStatusCode::UNKNOWN;
+}
+
+TRTSERVER_Error_Code
+RequestStatusToTrtServerCode(RequestStatusCode status_code)
+{
+  switch (status_code) {
+    case RequestStatusCode::UNKNOWN:
+      return TRTSERVER_ERROR_UNKNOWN;
+    case RequestStatusCode::INTERNAL:
+      return TRTSERVER_ERROR_INTERNAL;
+    case RequestStatusCode::NOT_FOUND:
+      return TRTSERVER_ERROR_NOT_FOUND;
+    case RequestStatusCode::INVALID_ARG:
+      return TRTSERVER_ERROR_INVALID_ARG;
+    case RequestStatusCode::UNAVAILABLE:
+      return TRTSERVER_ERROR_UNAVAILABLE;
+    case RequestStatusCode::UNSUPPORTED:
+      return TRTSERVER_ERROR_UNSUPPORTED;
+    case RequestStatusCode::ALREADY_EXISTS:
+      return TRTSERVER_ERROR_ALREADY_EXISTS;
+
+    default:
+      break;
+  }
+
+  return TRTSERVER_ERROR_UNKNOWN;
+}
+
 }}  // namespace nvidia::inferenceserver

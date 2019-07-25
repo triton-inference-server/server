@@ -48,6 +48,7 @@ struct TRTSERVER_InferenceRequestProvider;
 struct TRTSERVER_InferenceResponse;
 struct TRTSERVER_Metrics;
 struct TRTSERVER_Protobuf;
+struct TRTSERVER_ResponseAllocator;
 struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
 
@@ -107,6 +108,64 @@ TRTSERVER_EXPORT const char* TRTSERVER_ErrorCodeString(TRTSERVER_Error* error);
 /// \param error The error object.
 /// \return The error message.
 TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
+
+/// TRTSERVER_ResponseAllocator
+///
+/// Object representing a memory allocator for inference response
+/// tensors.
+///
+
+/// Allocation regions.
+typedef enum trtserver_allocatorregion_enum {
+  TRTSERVER_MEMORY_CPU,
+  TRTSERVER_MEMORY_GPU
+} TRTSERVER_Allocator_Region;
+
+/// Type for allocation function that allocates a buffer to hold a
+/// result tensor. Return in 'buffer' a pointer to the contiguous
+/// memory block of size 'byte_size' for result tensor called
+/// 'tensor_name'. The buffer must be allocated in the memory region
+/// identified by 'region' and 'region_id'. The 'userp' data is the
+/// same as what is supplied in the call to
+/// TRTSERVER_ServerInferAsync.
+///
+/// The function may return 'buffer' == nullptr to indicate that an
+/// allocation in the requested 'region' is not possible. In this case
+/// the function may be called again for the same 'tensor_name' but
+/// with a different 'region'.
+///
+/// Return a TRTSERVER_Error object on failure, return nullptr on
+/// success.
+typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Allocator_Region region, int64_t region_id, void* userp);
+
+/// Type for function called when a TRTSERVER_ResponseAllocator is
+/// deleted. The 'userp' data is the same as what is supplied in the
+/// call to TRTSERVER_ResponseAllocatorDelete.
+typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorDeleteFn_t)(
+    TRTSERVER_ResponseAllocator* allocator, void* userp);
+
+/// Create a new response allocator object.
+/// \param allocator The response allocator object.
+/// \param alloc_fn The function to use to allocate buffers for result
+/// tensors.
+/// \param delete_fn The function to call when 'allocator' is deleted
+/// by TRTSERVER_ResponseAllocatorDelete. May be nullptr.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ResponseAllocatorNew(
+    TRTSERVER_ResponseAllocator** allocator,
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
+    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn);
+
+/// Delete a response allocator.
+/// \param allocator The response allocator object.
+/// \param userp User-provided pointer that is delivered to the
+/// TRTSERVER_ResponseAllocatorDeleteFn_t associated with 'allocator'.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ResponseAllocatorDelete(
+    TRTSERVER_ResponseAllocator* allocator, void* userp);
 
 /// TRTSERVER_Protobuf
 ///
@@ -585,16 +644,22 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 /// returns.
 /// \param server The inference server object.
 /// \param request_provider The request provider for the request.
+/// \param response_allocator The TRTSERVER_ResponseAllocator to use
+/// to allocate buffers to hold inference results.
+/// \param response_allocator_userp User-provided pointer that is
+/// delivered to the response allocator's allocation function.
 /// \param complete_fn The function called when the inference
 /// completes.
-/// \param userp User-provided pointer that is delivered to the
-/// completion function.
+/// \param complete_userp User-provided pointer that is delivered to
+/// the completion function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
     void* http_response_provider_hack, void* grpc_response_provider_hack,
-    TRTSERVER_InferenceCompleteFn_t complete_fn, void* userp);
+    TRTSERVER_ResponseAllocator* response_allocator,
+    void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
+    void* complete_userp);
 
 #ifdef __cplusplus
 }

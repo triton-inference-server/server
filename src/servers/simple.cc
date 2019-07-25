@@ -53,6 +53,37 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
+TRTSERVER_Error*
+ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Allocator_Region region, int64_t region_id, void* userp)
+{
+  // Only handle allocation in the CPU region. Just use malloc...
+  if (region == TRTSERVER_MEMORY_CPU) {
+    *buffer = malloc(byte_size);
+  } else {
+    *buffer = nullptr;
+  }
+
+  if (buffer != nullptr) {
+    LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
+             << tensor_name;
+  } else {
+    LOG_INFO << "failed to allocated " << byte_size
+             << " bytes for result tensor " << tensor_name;
+  }
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+ResponseAllocatorDelete(TRTSERVER_ResponseAllocator* allocator, void* userp)
+{
+  LOG_INFO << "Delete response allocator";
+  return nullptr;  // Success
+}
+
 void
 InferComplete(
     TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
@@ -194,6 +225,14 @@ main(int argc, char** argv)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
+  // Create the allocator that will be used to allocate buffers for
+  // the result tensors.
+  TRTSERVER_ResponseAllocator* allocator = nullptr;
+  FAIL_IF_ERR(
+      TRTSERVER_ResponseAllocatorNew(
+          &allocator, ResponseAlloc, ResponseAllocatorDelete),
+      "creating response allocator");
+
   // The inference request provides meta-data with an
   // InferRequestHeader and the actual data via a provider.
   const std::string model_name("simple");
@@ -253,7 +292,8 @@ main(int argc, char** argv)
       TRTSERVER_ServerInferAsync(
           server.get(), request_provider,
           nullptr /* http_response_provider_hack */,
-          nullptr /* grpc_response_provider_hack */, InferComplete,
+          nullptr /* grpc_response_provider_hack */, allocator,
+          nullptr /* response_allocator_userp */, InferComplete,
           reinterpret_cast<void*>(p)),
       "running inference");
 
@@ -343,6 +383,10 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseDelete(response),
       "deleting inference response");
+
+  FAIL_IF_ERR(
+      TRTSERVER_ResponseAllocatorDelete(allocator, nullptr /* userp */),
+      "deleting response allocator");
 
   return 0;
 }
