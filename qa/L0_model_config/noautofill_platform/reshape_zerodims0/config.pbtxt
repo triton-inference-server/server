@@ -5,7 +5,7 @@ input [
     name: "input"
     data_type: TYPE_FP32
     dims: [ 2, 2 ]
-    reshape { shape: [ -1 ] }
+    reshape { shape: [ 0 ] }
   }
 ]
 output [
