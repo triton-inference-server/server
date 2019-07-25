@@ -1,4 +1,4 @@
-name: "reshape_nobatch_variable3"
+name: "reshape_nobatch_zerodims1"
 max_batch_size: 0
 input [
   {

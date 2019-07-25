@@ -1,4 +1,4 @@
-name: "reshape_variable2"
+name: "reshape_zerodims0"
 max_batch_size: 4
 input [
   {
