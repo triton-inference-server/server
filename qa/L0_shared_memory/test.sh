@@ -56,17 +56,6 @@ if [ `grep -c "localhost:8000" client_c++.log` != "5" ]; then
     RET=1
 fi
 
-# Run with custom host header...
-$SIMPLE_SHM_CLIENT -v -H"Host:my_host_" >>client_c++_host.log 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-if [ `grep -c my_host_ client_c++_host.log` != "5" ]; then
-    echo -e "\n***\n*** Failed. Expected 5 Host:my_host_ headers for C++ client\n***"
-    RET=1
-fi
-
 set -e
 
 kill $SERVER_PID

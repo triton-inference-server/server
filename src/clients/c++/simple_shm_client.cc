@@ -78,7 +78,7 @@ create_shared_region(std::string shm_key, size_t batch_byte_size)
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
-    std::cerr << "error: unable to get input shared memory descriptor";
+    std::cerr << "error: unable to get shared memory descriptor";
     exit(1);
   }
   // extend shared memory object as by default it's initialized with size 0
@@ -109,6 +109,16 @@ shm_cleanup(std::string shm_key)
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
     std::cerr << "error: unable to unlink shared memory for " << shm_key;
+    exit(1);
+  }
+}
+
+void
+mmap_cleanup(void* shm_addr, size_t byte_size)
+{
+  int tmp_fd = munmap(shm_addr, byte_size);
+  if (tmp_fd == -1) {
+    std::cerr << "Unable to munmap shared memory region";
     exit(1);
   }
 }
@@ -263,8 +273,8 @@ main(int argc, char** argv)
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
   std::string shm_key = "/input_simple";
-  int shm_fd = create_shared_region(shm_key, input_byte_size * 2);
-  int* input0_shm = (int*)(get_shm_addr(shm_fd, 0, input_byte_size * 2));
+  int shm_fd_ip = create_shared_region(shm_key, input_byte_size * 2);
+  int* input0_shm = (int*)(get_shm_addr(shm_fd_ip, 0, input_byte_size * 2));
   int* input1_shm = (int*)(input0_shm + 16);
   for (size_t i = 0; i < 16; ++i) {
     *(input0_shm + i) = i;
@@ -273,33 +283,34 @@ main(int argc, char** argv)
 
   // Create Output0 and Output1 in Shared Memory
   shm_key = "/output_simple";
-  shm_fd = create_shared_region(shm_key, output_byte_size * 2);
-  int* output0_shm = (int*)(get_shm_addr(shm_fd, 0, output_byte_size * 2));
+  int shm_fd_op = create_shared_region(shm_key, output_byte_size * 2);
+  int* output0_shm = (int*)(get_shm_addr(shm_fd_op, 0, output_byte_size * 2));
   int* output1_shm = (int*)(output0_shm + 16);
 
   // Register all Inputs and Outputs with TRTIS
-  infer_ctx->RegisterSharedMemory("input0_data", "/input_simple", 0, input_byte_size);
-  infer_ctx->RegisterSharedMemory("input1_data", "/input_simple", input_byte_size, input_byte_size);
-  infer_ctx->RegisterSharedMemory("output0_data", "/output_simple", 0, output_byte_size);
-  infer_ctx->RegisterSharedMemory("output1_data", "/output_simple", output_byte_size, output_byte_size);
+  infer_ctx->RegisterSharedMemory(
+      "input_data", "/input_simple", 0, input_byte_size * 2);
+  infer_ctx->RegisterSharedMemory(
+      "output_data", "/output_simple", 0, output_byte_size * 2);
 
   // Set the shared memory region for Inputs and Outputs
-  err = input0->SetSharedMemory("input0_data", 0, input_byte_size);
+  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
-  err = input1->SetSharedMemory("input1_data", 0, input_byte_size);
+  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
-  err = output0->SetSharedMemory("output0_data", 0, output_byte_size);
+  err = output0->SetSharedMemory("output_data", 0, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
   }
-  err = output1->SetSharedMemory("output1_data", 0, output_byte_size);
+  err = output1->SetSharedMemory(
+      "output_data", output_byte_size, output_byte_size);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory output: " << err << std::endl;
     exit(1);
@@ -329,10 +340,10 @@ main(int argc, char** argv)
   }
 
   // Unregister and cleanup shared memory
-  infer_ctx->UnregisterSharedMemory("input0_data");
-  infer_ctx->UnregisterSharedMemory("input1_data");
-  infer_ctx->UnregisterSharedMemory("output0_data");
-  infer_ctx->UnregisterSharedMemory("output1_data");
+  infer_ctx->UnregisterSharedMemory("input_data");
+  infer_ctx->UnregisterSharedMemory("output_data");
+  mmap_cleanup(shm_fd_ip);
+  mmap_cleanup(shm_fd_op);
   shm_cleanup("/input_simple");
   shm_cleanup("/output_simple");
 
