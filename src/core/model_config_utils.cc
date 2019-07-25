@@ -777,37 +777,24 @@ ValidateIOShape(
     // shape contains variable-size dimension, in this case we compare if
     // it matches the reshape by padding / squeezing dimension with size 1
     if (dims_size == -1) {
-      int64_t dim_idx = 0;
-      int64_t reshape_idx = 0;
-      while (dim_idx < io.dims_size() &&
-             reshape_idx < io.reshape().shape_size()) {
-        const int64_t dim = io.dims(dim_idx);
-        const int64_t reshape_dim = io.reshape().shape(reshape_idx);
-        if (dim != reshape_dim) {
-          if (dim == 1) {
-            dim_idx++;
-          } else if (reshape_dim == 1) {
-            reshape_idx++;
-          } else {
-            return Status(
-                RequestStatusCode::INVALID_ARG,
-                message_prefix + "has different size for dims and reshape");
-          }
-        } else {
-          dim_idx++;
-          reshape_idx++;
+      DimsList dim_lite, reshape_lite;
+      for (const auto& dim : io.dims()) {
+        if (dim != 1) {
+          dim_lite.Add(dim);
         }
       }
-      // if shape / reshape idx is not at the end, check if the rest are ones
-      for (; dim_idx < io.dims_size(); dim_idx++) {
-        if (io.dims(dim_idx) != 1) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              message_prefix + "has different size for dims and reshape");
+      for (const auto& dim : io.reshape().shape()) {
+        if (dim != 1) {
+          reshape_lite.Add(dim);
         }
       }
-      for (; reshape_idx < io.reshape().shape_size(); reshape_idx++) {
-        if (io.reshape().shape(reshape_idx) != 1) {
+      if (dim_lite.size() != reshape_lite.size()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            message_prefix + "has different size for dims and reshape");
+      }
+      for (int64_t idx = 0; idx < dim_lite.size(); idx++) {
+        if (dim_lite[idx] != reshape_lite[idx]) {
           return Status(
               RequestStatusCode::INVALID_ARG,
               message_prefix + "has different size for dims and reshape");
