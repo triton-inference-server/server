@@ -130,9 +130,10 @@ class StatusContext final
 };
 
 class ModelControlContext final
-    : public Context<ModelControlRequest, ModelControlResponse, AsyncResources> {
-  void ExecuteRPC(
-      ModelControlRequest& request, ModelControlResponse& response) final override
+    : public Context<
+          ModelControlRequest, ModelControlResponse, AsyncResources> {
+  void ExecuteRPC(ModelControlRequest& request, ModelControlResponse& response)
+      final override
   {
     uintptr_t execution_context = this->GetExecutionContext();
     GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
@@ -317,7 +318,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           err = TRTSERVER_ServerInferAsync(
               server, request_provider,
               nullptr /* http_response_provider_hack */,
-              &response /* grpc_response_provider_hack */,
+              &response /* grpc_response_provider_hack */, nullptr, nullptr,
               GRPCInferRequest::InferComplete,
               reinterpret_cast<void*>(grpc_infer_request));
           if (err != nullptr) {
@@ -462,8 +463,9 @@ GRPCServer::Create(
       &GRPCService::AsyncService::RequestStatus);
 
   LOG_VERBOSE(1) << "Register ModelControl RPC";
-  (*grpc_server)->rpcModelControl_ = inferenceService->RegisterRPC<ModelControlContext>(
-      &GRPCService::AsyncService::RequestModelControl);
+  (*grpc_server)->rpcModelControl_ =
+      inferenceService->RegisterRPC<ModelControlContext>(
+          &GRPCService::AsyncService::RequestModelControl);
 
   LOG_VERBOSE(1) << "Register Profile RPC";
   (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(

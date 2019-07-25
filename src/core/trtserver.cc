@@ -33,6 +33,7 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
+#include "src/core/status.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -50,9 +51,6 @@ class TrtServerError {
       ni::RequestStatusCode status_code, const std::string& msg);
   static TRTSERVER_Error* Create(const ni::Status& status);
 
-  static ni::RequestStatusCode CodeToStatus(TRTSERVER_Error_Code code);
-  static TRTSERVER_Error_Code StatusToCode(ni::RequestStatusCode status);
-
   ni::RequestStatusCode StatusCode() const { return status_code_; }
   const std::string& Message() const { return msg_; }
 
@@ -68,7 +66,7 @@ TRTSERVER_Error*
 TrtServerError::Create(TRTSERVER_Error_Code code, const char* msg)
 {
   return reinterpret_cast<TRTSERVER_Error*>(
-      new TrtServerError(TrtServerError::CodeToStatus(code), msg));
+      new TrtServerError(ni::TrtServerCodeToRequestStatus(code), msg));
 }
 
 TRTSERVER_Error*
@@ -91,58 +89,6 @@ TrtServerError::Create(const ni::Status& status)
   return Create(status.Code(), status.Message());
 }
 
-ni::RequestStatusCode
-TrtServerError::CodeToStatus(TRTSERVER_Error_Code code)
-{
-  switch (code) {
-    case TRTSERVER_ERROR_UNKNOWN:
-      return ni::RequestStatusCode::UNKNOWN;
-    case TRTSERVER_ERROR_INTERNAL:
-      return ni::RequestStatusCode::INTERNAL;
-    case TRTSERVER_ERROR_NOT_FOUND:
-      return ni::RequestStatusCode::NOT_FOUND;
-    case TRTSERVER_ERROR_INVALID_ARG:
-      return ni::RequestStatusCode::INVALID_ARG;
-    case TRTSERVER_ERROR_UNAVAILABLE:
-      return ni::RequestStatusCode::UNAVAILABLE;
-    case TRTSERVER_ERROR_UNSUPPORTED:
-      return ni::RequestStatusCode::UNSUPPORTED;
-    case TRTSERVER_ERROR_ALREADY_EXISTS:
-      return ni::RequestStatusCode::ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return ni::RequestStatusCode::UNKNOWN;
-}
-
-TRTSERVER_Error_Code
-TrtServerError::StatusToCode(ni::RequestStatusCode status_code)
-{
-  switch (status_code) {
-    case ni::RequestStatusCode::UNKNOWN:
-      return TRTSERVER_ERROR_UNKNOWN;
-    case ni::RequestStatusCode::INTERNAL:
-      return TRTSERVER_ERROR_INTERNAL;
-    case ni::RequestStatusCode::NOT_FOUND:
-      return TRTSERVER_ERROR_NOT_FOUND;
-    case ni::RequestStatusCode::INVALID_ARG:
-      return TRTSERVER_ERROR_INVALID_ARG;
-    case ni::RequestStatusCode::UNAVAILABLE:
-      return TRTSERVER_ERROR_UNAVAILABLE;
-    case ni::RequestStatusCode::UNSUPPORTED:
-      return TRTSERVER_ERROR_UNSUPPORTED;
-    case ni::RequestStatusCode::ALREADY_EXISTS:
-      return TRTSERVER_ERROR_ALREADY_EXISTS;
-
-    default:
-      break;
-  }
-
-  return TRTSERVER_ERROR_UNKNOWN;
-}
-
 TrtServerError::TrtServerError(
     ni::RequestStatusCode status_code, const std::string& msg)
     : status_code_(status_code), msg_(msg)
@@ -162,6 +108,32 @@ TrtServerError::TrtServerError(
       return TrtServerError::Create(status__); \
     }                                          \
   } while (false)
+
+//
+// TrtServerResponseAllocator
+//
+// Implementation for TRTSERVER_ResponseAllocator.
+//
+class TrtServerResponseAllocator {
+ public:
+  explicit TrtServerResponseAllocator(
+      TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
+      TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn);
+
+  TRTSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
+  TRTSERVER_ResponseAllocatorDeleteFn_t DeleteFn() const { return delete_fn_; }
+
+ private:
+  TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
+  TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn_;
+};
+
+TrtServerResponseAllocator::TrtServerResponseAllocator(
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
+    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn)
+    : alloc_fn_(alloc_fn), delete_fn_(delete_fn)
+{
+}
 
 //
 // TrtServerProtobuf
@@ -464,7 +436,7 @@ TRTSERVER_Error_Code
 TRTSERVER_ErrorCode(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
-  return TrtServerError::StatusToCode(lerror->StatusCode());
+  return ni::RequestStatusToTrtServerCode(lerror->StatusCode());
 }
 
 const char*
@@ -479,6 +451,36 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
   return lerror->Message().c_str();
+}
+
+//
+// TRTSERVER_ResponseAllocator
+//
+TRTSERVER_Error*
+TRTSERVER_ResponseAllocatorNew(
+    TRTSERVER_ResponseAllocator** allocator,
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
+    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn)
+{
+  *allocator = reinterpret_cast<TRTSERVER_ResponseAllocator*>(
+      new TrtServerResponseAllocator(alloc_fn, delete_fn));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ResponseAllocatorDelete(
+    TRTSERVER_ResponseAllocator* allocator, void* userp)
+{
+  TrtServerResponseAllocator* lalloc =
+      reinterpret_cast<TrtServerResponseAllocator*>(allocator);
+
+  TRTSERVER_Error* err = nullptr;  // success
+  if (lalloc->DeleteFn() != nullptr) {
+    err = lalloc->DeleteFn()(allocator, userp);
+  }
+  delete lalloc;
+
+  return err;
 }
 
 //
@@ -1045,11 +1047,16 @@ TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
     void* http_response_provider_hack, void* grpc_response_provider_hack,
-    TRTSERVER_InferenceCompleteFn_t complete_fn, void* userp)
+    TRTSERVER_ResponseAllocator* response_allocator,
+    void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
+    void* complete_userp)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
   TrtServerRequestProvider* lprovider =
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+  TrtServerResponseAllocator* lresponsealloc =
+      reinterpret_cast<TrtServerResponseAllocator*>(response_allocator);
+
   ni::InferRequestHeader* request_header = lprovider->InferRequestHeader();
 
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
@@ -1085,6 +1092,7 @@ TRTSERVER_ServerInferAsync(
     std::shared_ptr<ni::DelegatingInferResponseProvider> del_response_provider;
     RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
         *request_header, lprovider->Backend()->GetLabelProvider(),
+        response_allocator, lresponsealloc->AllocFn(), response_allocator_userp,
         &del_response_provider));
     infer_response_provider = del_response_provider;
   }
@@ -1093,7 +1101,7 @@ TRTSERVER_ServerInferAsync(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
       [infer_stats, timer, infer_response_provider, server, complete_fn,
-       userp](const ni::Status& status) mutable {
+       complete_userp](const ni::Status& status) mutable {
         infer_stats->SetFailed(!status.IsOk());
         if (!status.IsOk()) {
           LOG_VERBOSE(1) << "Infer failed: " << status.Message();
@@ -1105,7 +1113,7 @@ TRTSERVER_ServerInferAsync(
             new TrtServerResponse(status, infer_response_provider);
         complete_fn(
             server, reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
-            userp);
+            complete_userp);
       });
 
   return nullptr;  // Success

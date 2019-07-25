@@ -768,10 +768,13 @@ Status
 DelegatingInferResponseProvider::Create(
     const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
+    TRTSERVER_ResponseAllocator* allocator,
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     std::shared_ptr<DelegatingInferResponseProvider>* infer_provider)
 {
   DelegatingInferResponseProvider* provider =
-      new DelegatingInferResponseProvider(request_header, label_provider);
+      new DelegatingInferResponseProvider(
+          request_header, label_provider, allocator, alloc_fn, alloc_userp);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -801,10 +804,26 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
       name, content, content_byte_size, content_shape, &output));
 
   if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
-    char* buffer = new char[content_byte_size];
-    *content = static_cast<void*>(buffer);
-    output->ptr_ = static_cast<void*>(buffer);
-    output->buffer_.reset(buffer);
+    void* buffer = nullptr;
+    TRTSERVER_Error* err = alloc_fn_(
+        allocator_, &buffer, name.c_str(), content_byte_size,
+        TRTSERVER_MEMORY_CPU, 0 /* region_id */, alloc_userp_);
+    if (err != nullptr) {
+      Status status = Status(
+          TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+          TRTSERVER_ErrorMessage(err));
+      TRTSERVER_ErrorDelete(err);
+      return status;
+    }
+    if (buffer == nullptr) {
+      return Status(
+          RequestStatusCode::UNAVAILABLE,
+          "unable to allocate memory for result tensor '" + name + "'");
+    }
+
+    *content = buffer;
+    output->ptr_ = buffer;
+    output->buffer_.reset(reinterpret_cast<char*>(buffer));
   }
 
   return Status::Success;
