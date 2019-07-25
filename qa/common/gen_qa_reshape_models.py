@@ -913,6 +913,8 @@ if __name__ == '__main__':
                         help='Generate Pytorch LibTorch models')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
+    parser.add_argument('--variable', required=False, action='store_true',
+                        help='Used variable-shape tensors for input/output')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.netdef:
@@ -956,6 +958,19 @@ if __name__ == '__main__':
                       ([4,4], [2], [2,2,3], [1]), ([2,2,4], [1,2,1], [3,2,2], [1,1,1]),
                       output_shapes=([2,2,4], [1,2,1], [3,2,2], [1,1,1]),
                       output_model_shapes=([2,2,4], [1,2,1], [3,2,2], [1,1,1]))
+
+    # Tests with models that accept variable-shape input/output tensors and reshape
+    # TensorRT is ignored as it only allows fixed-shape tensors
+    # PyTorch is ignored as "tensor.view()" is shape dependent (shape is fixed
+    # based on input used for tracing), need to find equivalent operation that
+    # is not shape dependent.
+    if FLAGS.variable:
+        create_models(FLAGS.models_dir, np.int32,
+                      ([1,-1,1], [-1], [2,2,3]), ([-1], [1,-1,1], [3,2,2]))
+        create_models(FLAGS.models_dir, np.int32,
+                    ([-1,1], [2]), ([1,-1], [1,2]),
+                    output_shapes=([1,-1], [1,2]),
+                    output_model_shapes=([1,-1], [1,2]))
 
     # TRT plan that reshapes neither input nor output. Needed for
     # L0_perflab_nomodel.
