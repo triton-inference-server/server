@@ -775,26 +775,41 @@ ValidateIOShape(
     }
 
     // shape contains variable-size dimension, in this case we compare if
-    // it matches the reshape by padding / squeezing dimension with size 1
+    // each pair of the trunks separated by variable-size dimension has
+    // the same element count. For instance, from [2, 4, -1, 6] to [8, -1, 1, 6]
+    // is valid reshape as 2 * 4 = 8 and 6 = 1 * 6.
     if (dims_size == -1) {
-      DimsList dim_lite, reshape_lite;
+      std::vector<int64_t> dim_element_cnts;
+      std::vector<int64_t> reshape_element_cnts;
+      int64_t current_cnt = 1;
       for (const auto& dim : io.dims()) {
-        if (dim != 1) {
-          dim_lite.Add(dim);
+        if (dim != -1) {
+          current_cnt *= dim;
+        } else {
+          dim_element_cnts.push_back(current_cnt);
+          current_cnt = 1;
         }
       }
+      dim_element_cnts.push_back(current_cnt);
+
+      current_cnt = 1;
       for (const auto& dim : io.reshape().shape()) {
-        if (dim != 1) {
-          reshape_lite.Add(dim);
+        if (dim != -1) {
+          current_cnt *= dim;
+        } else {
+          reshape_element_cnts.push_back(current_cnt);
+          current_cnt = 1;
         }
       }
-      if (dim_lite.size() != reshape_lite.size()) {
+      reshape_element_cnts.push_back(current_cnt);
+
+      if (dim_element_cnts.size() != reshape_element_cnts.size()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            message_prefix + "has different size for dims and reshape");
+            message_prefix + "has different number of variable-size dimensions for dims and reshape");
       }
-      for (int64_t idx = 0; idx < dim_lite.size(); idx++) {
-        if (dim_lite[idx] != reshape_lite[idx]) {
+      for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
+        if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
           return Status(
               RequestStatusCode::INVALID_ARG,
               message_prefix + "has different size for dims and reshape");
