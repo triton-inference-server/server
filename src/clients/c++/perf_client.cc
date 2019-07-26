@@ -2164,8 +2164,7 @@ main(int argc, char** argv)
         std::ofstream ofs(filename + ".composing_stats", std::ofstream::out);
 
         ofs << "Concurrency,Model,Requested Version,"
-            << "Server Overhead,Server Queue,Server Compute"
-            << std::endl;
+            << "Server Overhead,Server Queue,Server Compute" << std::endl;
         for (PerfStatus& status : summary) {
           for (const auto& model_info : status.server_composing_model_stats) {
             const auto& name_version = model_info.first;
