@@ -157,6 +157,41 @@ class ModelControlContext final
   }
 };
 
+class SharedMemoryControlContext final
+    : public Context<
+          SharedMemoryControlRequest, SharedMemoryControlResponse,
+          AsyncResources> {
+  void ExecuteRPC(
+      SharedMemoryControlRequest& request,
+      SharedMemoryControlResponse& response) final override
+  {
+    uintptr_t execution_context = this->GetExecutionContext();
+    GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
+                                                 &request, &response] {
+      TRTSERVER_Server* server = GetResources()->Server();
+
+      TRTSERVER_Error* err = nullptr;
+      if (request.type() == SharedMemoryControlRequest::REGISTER) {
+        err = TRTSERVER_RegisterSharedMemory(
+            server, request.shared_memory_region().name().c_str(),
+            request.shared_memory_region().shm_key().c_str(),
+            request.shared_memory_region().offset(),
+            request.shared_memory_region().byte_size());
+      } else {
+        err = TRTSERVER_UnregisterSharedMemory(
+            server, request.shared_memory_region().name().c_str());
+      }
+
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), err,
+          RequestStatusUtil::NextUniqueRequestId(), GetResources()->ServerId());
+
+      TRTSERVER_ErrorDelete(err);
+      this->CompleteExecution(execution_context);
+    });
+  }
+};
+
 template <class LifeCycle>
 class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   class GRPCInferRequest {

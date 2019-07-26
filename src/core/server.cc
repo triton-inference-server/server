@@ -367,6 +367,36 @@ InferenceServer::UnloadModel(const std::string& model_name)
   return model_repository_manager_->LoadUnloadModel(model_name, action_type);
 }
 
+Status
+InferenceServer::RegisterSharedMemory(
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  auto action_type = SharedMemoryManager::ActionType::REGISTER;
+  return shared_memory_manager_->RegisterUnregisterSharedMemory(
+      name, shm_key, offset, byte_size, action_type);
+}
+
+Status
+InferenceServer::UnregisterSharedMemory(const std::string& name)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  auto action_type = SharedMemoryManager::ActionType::UNREGISTER;
+  return shared_memory_manager_->RegisterUnregisterSharedMemory(
+      name, "", 0, 0, action_type);
+}
+
 uint64_t
 InferenceServer::UptimeNs() const
 {

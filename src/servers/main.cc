@@ -80,8 +80,8 @@ bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-std::vector<std::string> endpoint_names = {"status", "health", "profile",
-                                           "infer", "modelcontrol"};
+std::vector<std::string> endpoint_names = {
+    "status", "health", "profile", "infer", "modelcontrol", "shmcontrol"};
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC

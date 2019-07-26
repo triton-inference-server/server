@@ -1004,7 +1004,7 @@ TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODELCONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
 
@@ -1017,9 +1017,38 @@ TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODELCONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_RegisterSharedMemory(
+    TRTSERVER_Server* server, const char* name, const char* shm_key,
+    const size_t offset, const size_t byte_size)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::SHMCONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
+      std::string(name), std::string(shm_key), offset, byte_size));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_UnregisterSharedMemory(TRTSERVER_Server* server, const char* name)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::SHMCONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->UnregisterSharedMemory(std::string(name)));
 
   return nullptr;  // success
 }

@@ -187,6 +187,8 @@ class InferRequestProvider {
   std::unordered_map<
       std::string, std::pair<std::shared_ptr<SystemMemory>, size_t>>
       input_buffer_;
+  std::unordered_map<std::string, std::tuple<std::string, size_t, size_t>>
+      io_shm_regions_;
 };
 
 //
