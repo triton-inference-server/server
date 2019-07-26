@@ -1562,7 +1562,7 @@ InferenceProfiler::SummarizeServerStat(
       status_model_version = std::max(status_model_version, vp.first);
     }
   } else {
-    status_model_version = model_version_;
+    status_model_version = model_version;
   }
 
   const auto& vend_itr = end_status.version_status().find(status_model_version);
