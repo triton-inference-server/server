@@ -770,14 +770,32 @@ DelegatingInferResponseProvider::Create(
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
     std::shared_ptr<DelegatingInferResponseProvider>* infer_provider)
 {
   DelegatingInferResponseProvider* provider =
       new DelegatingInferResponseProvider(
-          request_header, label_provider, allocator, alloc_fn, alloc_userp);
+          request_header, label_provider, allocator, alloc_fn, alloc_userp,
+          release_fn);
   infer_provider->reset(provider);
 
   return Status::Success;
+}
+
+DelegatingInferResponseProvider::~DelegatingInferResponseProvider()
+{
+  for (const auto& output : outputs_) {
+    if (output.release_buffer_ != nullptr) {
+      TRTSERVER_Error* err = release_fn_(
+          allocator_, output.release_buffer_, output.release_userp_,
+          output.byte_size_, TRTSERVER_MEMORY_CPU, 0);
+      if (err != nullptr) {
+        LOG_ERROR << "failed to release result tensor '" << output.name_
+                  << "': " << TRTSERVER_ErrorMessage(err);
+        TRTSERVER_ErrorDelete(err);
+      }
+    }
+  }
 }
 
 const InferResponseHeader&
@@ -803,10 +821,12 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
 
-  if ((output->buffer_ == nullptr) && (content_byte_size > 0)) {
+  if (output->buffer_ == nullptr) {
     void* buffer = nullptr;
+    void* buffer_userp = nullptr;
+
     TRTSERVER_Error* err = alloc_fn_(
-        allocator_, &buffer, name.c_str(), content_byte_size,
+        allocator_, &buffer, &buffer_userp, name.c_str(), content_byte_size,
         TRTSERVER_MEMORY_CPU, 0 /* region_id */, alloc_userp_);
     if (err != nullptr) {
       Status status = Status(
@@ -815,7 +835,10 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
       TRTSERVER_ErrorDelete(err);
       return status;
     }
-    if (buffer == nullptr) {
+
+    // If buffer size is zero the don't need to get a buffer back from
+    // the allocator, but if it sends one handle it correctly.
+    if ((content_byte_size > 0) && (buffer == nullptr)) {
       return Status(
           RequestStatusCode::UNAVAILABLE,
           "unable to allocate memory for result tensor '" + name + "'");
@@ -823,7 +846,8 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
 
     *content = buffer;
     output->ptr_ = buffer;
-    output->buffer_.reset(reinterpret_cast<char*>(buffer));
+    output->release_buffer_ = buffer;
+    output->release_userp_ = buffer_userp;
   }
 
   return Status::Success;

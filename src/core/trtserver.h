@@ -122,50 +122,77 @@ typedef enum trtserver_allocatorregion_enum {
 } TRTSERVER_Allocator_Region;
 
 /// Type for allocation function that allocates a buffer to hold a
-/// result tensor. Return in 'buffer' a pointer to the contiguous
-/// memory block of size 'byte_size' for result tensor called
-/// 'tensor_name'. The buffer must be allocated in the memory region
-/// identified by 'region' and 'region_id'. The 'userp' data is the
-/// same as what is supplied in the call to
-/// TRTSERVER_ServerInferAsync.
+/// result tensor.
 ///
-/// The function may return 'buffer' == nullptr to indicate that an
-/// allocation in the requested 'region' is not possible. In this case
-/// the function may be called again for the same 'tensor_name' but
-/// with a different 'region'.
+/// Return in 'buffer' a pointer to the contiguous memory block of
+/// size 'byte_size' for result tensor called 'tensor_name'. The
+/// buffer must be allocated in the memory region identified by
+/// 'region' and 'region_id'. The 'userp' data is the same as what is
+/// supplied in the call to TRTSERVER_ServerInferAsync.
 ///
-/// Return a TRTSERVER_Error object on failure, return nullptr on
-/// success.
+/// Return in 'buffer_userp' a user-specified value to associate with
+/// the buffer. This value will be provided in the call to
+/// TRTSERVER_ResponseAllocatorReleaseFn_t.
+///
+/// The function will be called for each result tensor, even if the
+/// 'byte_size' required for that tensor is zero. When 'byte_size' is
+/// zero the function does not need to allocate any memory but may
+/// perform other tasks associated with the result tensor. In this
+/// case the function should return success and set 'buffer' ==
+/// nullptr.
+///
+/// If the function is called with 'byte_size' non-zero but an
+/// allocation is not possible for the request 'region', the function
+/// should return success and set 'buffer' == nullptr to indicate that
+/// an allocation in the requested 'region' is not possible. In this
+/// case the function may be called again for the same 'tensor_name'
+/// but with a different 'region'.
+///
+/// The function should return a TRTSERVER_Error object if a failure
+/// occurs while attempting an allocation. If an error object is
+/// returned, or if 'buffer' == nullptr is returned on all attempts
+/// for a result tensor, the inference server will assume allocation
+/// is not possible for the result buffer and will abort the inference
+/// request.
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
-    TRTSERVER_ResponseAllocator* allocator, void** buffer,
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Allocator_Region region, int64_t region_id, void* userp);
 
-/// Type for function called when a TRTSERVER_ResponseAllocator is
-/// deleted. The 'userp' data is the same as what is supplied in the
-/// call to TRTSERVER_ResponseAllocatorDelete.
-typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorDeleteFn_t)(
-    TRTSERVER_ResponseAllocator* allocator, void* userp);
+/// Type for function that is called when the server no longer holds
+/// any reference to a buffer allocated by
+/// TRTSERVER_ResponseAllocatorAllocFn_t. In practice this function is
+/// called when the response object associated with the buffer is
+/// deleted by TRTSERVER_InferenceResponseDelete.
+///
+/// The 'buffer' and 'buffer_userp' arguments equal those returned by
+/// TRTSERVER_ResponseAllocatorAllocFn_t and 'byte_size', 'region' and
+/// 'region_id' equal the values passed to
+/// TRTSERVER_ResponseAllocatorAllocFn_t.
+///
+/// Return a TRTSERVER_Error object on failure, return nullptr on
+/// success.
+typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorReleaseFn_t)(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Allocator_Region region, int64_t region_id);
 
 /// Create a new response allocator object.
 /// \param allocator The response allocator object.
-/// \param alloc_fn The function to use to allocate buffers for result
+/// \param alloc_fn The function to call to allocate buffers for result
 /// tensors.
-/// \param delete_fn The function to call when 'allocator' is deleted
-/// by TRTSERVER_ResponseAllocatorDelete. May be nullptr.
+/// \param release_fn The function to call when the server no longer
+/// holds a reference to an allocated buffer.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ResponseAllocatorNew(
     TRTSERVER_ResponseAllocator** allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-    TRTSERVER_ResponseAllocatorDeleteFn_t delete_fn);
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn);
 
 /// Delete a response allocator.
 /// \param allocator The response allocator object.
-/// \param userp User-provided pointer that is delivered to the
-/// TRTSERVER_ResponseAllocatorDeleteFn_t associated with 'allocator'.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ResponseAllocatorDelete(
-    TRTSERVER_ResponseAllocator* allocator, void* userp);
+    TRTSERVER_ResponseAllocator* allocator);
 
 /// TRTSERVER_Protobuf
 ///
