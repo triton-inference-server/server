@@ -137,6 +137,8 @@ class InferReshapeTest(unittest.TestCase):
                            output_shapes=([16],[1,2],[3,2,2],[1]))
         self._trt_reshape(np.float32, input_shapes=([4,4],[2],[2,2,3],[1]),
                           output_shapes=([2,2,4],[1,2,1],[3,2,2],[1,1,1]))
+    def test_ii1(self):
+        self._full_reshape(np.int32, input_shapes=([2,4,5,6],))
     def test_ii2(self):
         self._full_reshape(np.int32, input_shapes=([4,1], [2]), 
                            output_shapes=([1,4], [1,2]))

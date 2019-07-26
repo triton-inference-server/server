@@ -966,6 +966,8 @@ if __name__ == '__main__':
     # is not shape dependent.
     if FLAGS.variable:
         create_models(FLAGS.models_dir, np.int32,
+                      ([2,4,-1,6],), ([8,-1,1,6],))
+        create_models(FLAGS.models_dir, np.int32,
                       ([1,-1,1], [-1], [2,2,3]), ([-1], [1,-1,1], [3,2,2]))
         create_models(FLAGS.models_dir, np.int32,
                     ([-1,1], [2]), ([1,-1], [1,2]),
