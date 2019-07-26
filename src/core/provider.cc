@@ -117,6 +117,11 @@ InferRequestProvider::Create(
               (*provider)->model_name_ + "'");
     }
     (*provider)->input_buffer_[io.name()] = std::make_pair(it->second, 0);
+    // If using shared memory set shm_regions
+    if (false) {
+      // (*provider)->io_shm_regions_[io.name()] = std::make_tuple(shm_key_,
+      // offset_, byte_size_);
+    }
   }
 
   return Status::Success;
@@ -177,39 +182,46 @@ InferRequestProvider::GetNextInputContent(
       return Status(
           RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
-
-    auto& input_content = pr->second;
-
-    bool isLastChunk =
-        (input_content.first->BufferAt(
-             input_content.second + 1, content_byte_size) == nullptr);
-    if (!force_contiguous || isLastChunk) {
-      *content = input_content.first->BufferAt(
-          input_content.second++, content_byte_size);
+    // If using shared memory return void* to address start for that input
+    if (false) {
+      // TODO create a shm_manager class that does
+      // shm_open and mmap for each new shared memory region and maintains
+      // list of current / registered shm regions
     } else {
-      size_t total_size = 0;
-      size_t start_idx = input_content.second;
-      do {
+      auto& input_content = pr->second;
+
+      bool isLastChunk =
+          (input_content.first->BufferAt(
+               input_content.second + 1, content_byte_size) == nullptr);
+      if (!force_contiguous || isLastChunk) {
         *content = input_content.first->BufferAt(
             input_content.second++, content_byte_size);
-        total_size += *content_byte_size;
-      } while (*content != nullptr);
+      } else {
+        size_t total_size = 0;
+        size_t start_idx = input_content.second;
+        do {
+          *content = input_content.first->BufferAt(
+              input_content.second++, content_byte_size);
+          total_size += *content_byte_size;
+        } while (*content != nullptr);
 
-      contiguous_buffers_.emplace_back();
-      std::vector<char>& buf = contiguous_buffers_.back();
-      buf.reserve(total_size);
+        contiguous_buffers_.emplace_back();
+        std::vector<char>& buf = contiguous_buffers_.back();
+        buf.reserve(total_size);
 
-      for (size_t i = start_idx; i < input_content.second; i++) {
-        const auto& block = input_content.first->BufferAt(i, content_byte_size);
-        buf.insert(buf.end(), block, block + *content_byte_size);
+        for (size_t i = start_idx; i < input_content.second; i++) {
+          const auto& block =
+              input_content.first->BufferAt(i, content_byte_size);
+          buf.insert(buf.end(), block, block + *content_byte_size);
+        }
+
+        if (buf.size() != total_size) {
+          return Status(RequestStatusCode::INTERNAL, "contiguous input failed");
+        }
+
+        *content = &(buf[0]);
+        *content_byte_size = total_size;
       }
-
-      if (buf.size() != total_size) {
-        return Status(RequestStatusCode::INTERNAL, "contiguous input failed");
-      }
-
-      *content = &(buf[0]);
-      *content_byte_size = total_size;
     }
   }
 
@@ -413,6 +425,10 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
 
   int output_idx = 0;
   for (const auto& output : outputs_) {
+    // TODO fix for shared memory
+    if (false) {
+      continue;
+    }
     const ModelOutput* output_config;
     RETURN_IF_ERROR(is.GetOutput(output.name_, &output_config));
 

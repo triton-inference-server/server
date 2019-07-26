@@ -94,11 +94,10 @@ class SharedMemoryManager {
   /// automatically when destroying the shared memory manager.
   Status UnregisterAllSharedMemory();
 
-  // Get the base address + offset for the specific shared memory region. If
+  // Get the base address and offset for the specific shared memory region. If
   // the shared memory region is not valid return an error message
-  Status SharedMemoryAddress(
-      const std::string& name, size_t offset, size_t byte_size,
-      void** shm_mapped_addr);
+  Status GetSharedMemoryInfo(
+      const std::string& name, void** shm_mapped_addr, size_t* shm_offset);
 
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(

@@ -745,8 +745,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
   Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key,
-      const size_t offset, const size_t byte_size) override;
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
 
  private:
@@ -778,8 +778,8 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
-    const std::string& name, const std::string& shm_key,
-    const size_t offset, const size_t byte_size)
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
 {
   return SendRequest("register", name, shm_key, offset, byte_size);
 }

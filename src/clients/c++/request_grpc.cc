@@ -371,8 +371,8 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
  public:
   SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
   Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key,
-      const size_t offset, const size_t byte_size) override;
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
 
  private:
@@ -395,8 +395,8 @@ SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
 
 Error
 SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
-    const std::string& name, const std::string& shm_key,
-    const size_t offset, const size_t byte_size)
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
 {
   return SendRequest(name, true, shm_key, offset, byte_size);
 }
@@ -410,8 +410,8 @@ SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
 
 Error
 SharedMemoryControlGrpcContextImpl::SendRequest(
-    const std::string& name, const bool is_register,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& name, const bool is_register, const std::string& shm_key,
+    const size_t offset, const size_t byte_size)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;

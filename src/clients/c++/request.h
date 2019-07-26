@@ -770,18 +770,25 @@ class SharedMemoryControlContext {
  public:
   virtual ~SharedMemoryControlContext() = 0;
 
-  /// Register a model on the inference server. If the shared memory is already
-  /// loaded, it will be reloaded to update the LRU policy. \param name The
-  /// name of the shared memory region to be registered. \return Error object
-  /// indicating success or failure.
+  /// Register a shared memory region on the inference server. If the shared
+  /// memory region is already registered, it will be unregistered and then
+  /// re-registered.
+  /// \param name The user-given name for the shared memory region to be
+  /// registered.
+  /// \param shm_key The unique name of the location in shared memory being
+  /// registered.
+  /// \param offset The offset into the shared memory region.
+  /// \param byte_size The size, in bytes of the tensor data.
+  /// \return Error object indicating success or failure.
   virtual Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) = 0;
 
-  /// Unload a model from the inference server. unregistering a shared memory
-  /// region that is not registered on server has no affect and success code
-  /// will be returned. \param name The name of the shared memory region to
-  /// be unregistered. \return Error object indicating success or failure.
+  /// Unregister a registered shared memory region on the inference server. If
+  /// the shared memory region is not registered, do nothing and return failure.
+  /// \param name The user-given name for the shared memory region to be
+  /// unregistered.
+  /// \return Error object indicating success or failure.
   virtual Error UnregisterSharedMemory(const std::string& name) = 0;
 };
 
