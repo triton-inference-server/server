@@ -28,9 +28,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <string>
-#include "src/backends/custom/custom.h"
+
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -43,27 +44,14 @@
 namespace nvidia { namespace inferenceserver { namespace custom {
 namespace image_preprocess {
 
-// Integer error codes. TRTIS requires that success must be 0. All
-// other codes are interpreted by TRTIS as failures.
-enum ErrorCodes {
-  kSuccess = 0,
-  kUnknown,
-  kInvalidModelConfig,
-  kBatching,
-  kOutput,
-  kOutputBuffer,
-  kInput,
-  kInputBuffer,
-  kInputSize,
-  kOpenCV
-};
-
 enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
 
 // Context object. All state must be kept in this object.
-class Context {
+class Context : public CustomInstance {
  public:
-  Context(const std::string& instance_name, const ModelConfig& config);
+  Context(
+      const std::string& instance_name, const ModelConfig& config,
+      const int gpu_device);
 
   // Initialize the context. Validate that the model configuration,
   // etc. is something that we can handle.
@@ -84,12 +72,6 @@ class Context {
 
   bool ParseType(const DataType& dtype, int* type1, int* type3);
 
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
   // The format of the preprocessed image
   ModelInput::Format format_;
 
@@ -101,11 +83,25 @@ class Context {
 
   // The data type of preprocessed image
   DataType output_type_;
+
+  // Local error codes
+  const int kBatching = RegisterError("batching not supported");
+  const int kOutput = RegisterError(
+      "expected single output with 3 dimensions, each dimension >= 1");
+  const int kOutputBuffer =
+      RegisterError("unable to get buffer for output tensor values");
+  const int kInput = RegisterError("expected single input, 1 STRING element");
+  const int kInputBuffer =
+      RegisterError("unable to get buffer for input tensor values");
+  const int kInputSize =
+      RegisterError("input obtained does not match batch size");
+  const int kOpenCV = RegisterError("unable to preprocess image");
 };
 
 Context::Context(
-    const std::string& instance_name, const ModelConfig& model_config)
-    : instance_name_(instance_name), model_config_(model_config)
+    const std::string& instance_name, const ModelConfig& model_config,
+    const int gpu_device)
+    : CustomInstance(instance_name, model_config, gpu_device)
 {
 }
 
@@ -164,7 +160,7 @@ Context::Init()
     }
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -184,7 +180,7 @@ Context::Execute(
     std::vector<std::vector<char>> input;
     int err = GetInputTensor(
         input_fn, payloads[idx].input_context, "INPUT", batch_size, input);
-    if (err != kSuccess) {
+    if (err != ErrorCodes::Success) {
       payloads[idx].error_code = err;
       continue;
     }
@@ -217,7 +213,7 @@ Context::Execute(
         size_t image_byte_size;
 
         err = Preprocess(img, (char*)obuffer + byte_used, &image_byte_size);
-        if (err != kSuccess) {
+        if (err != ErrorCodes::Success) {
           payloads[idx].error_code = err;
           break;
         }
@@ -226,7 +222,7 @@ Context::Execute(
     }
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -305,7 +301,7 @@ Context::GetInputTensor(
     return kInputSize;
   }
 
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 int
@@ -416,7 +412,7 @@ Context::Preprocess(const cv::Mat& img, char* data, size_t* image_byte_size)
   if (pos != *image_byte_size) {
     return kOpenCV;
   }
-  return kSuccess;
+  return ErrorCodes::Success;
 }
 
 bool
@@ -451,87 +447,27 @@ Context::ParseType(const DataType& dtype, int* type1, int* type3)
 }
 
 
-/////////////
+}  // namespace image_preprocess
 
-extern "C" {
-
+// Creates a new image_preprocess instance
 int
-CustomInitialize(const CustomInitializeData* data, void** custom_context)
+CustomInstance::Create(
+    CustomInstance** instance, const std::string& name,
+    const ModelConfig& model_config, int gpu_device,
+    const CustomInitializeData* data)
 {
-  // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
-  if (!model_config.ParseFromString(std::string(
-          data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
-  }
-
   // Create the context and validate that the model configuration is
   // something that we can handle.
-  Context* context =
-      new Context(std::string(data->instance_name), model_config);
-  int err = context->Init();
-  if (err != kSuccess) {
-    return err;
+  image_preprocess::Context* context =
+      new image_preprocess::Context(name, model_config, gpu_device);
+  *instance = context;
+
+  if (context == nullptr) {
+    return ErrorCodes::CreationFailure;
   }
 
-  *custom_context = static_cast<void*>(context);
-
-  return kSuccess;
+  return context->Init();
 }
 
-int
-CustomFinalize(void* custom_context)
-{
-  if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
-    delete context;
-  }
 
-  return kSuccess;
-}
-
-const char*
-CustomErrorString(void* custom_context, int errcode)
-{
-  switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kBatching:
-      return "batching not supported";
-    case kOutput:
-      return "expected single output with 3 dimensions, each dimension >= 1";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    case kInput:
-      return "expected single input, 1 STRING element";
-    case kInputBuffer:
-      return "unable to get buffer for input tensor values";
-    case kInputSize:
-      return "input obtained does not match batch size";
-    case kOpenCV:
-      return "unable to preprocess image";
-    default:
-      break;
-  }
-
-  return "unknown error";
-}
-
-int
-CustomExecute(
-    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  if (custom_context == nullptr) {
-    return kUnknown;
-  }
-
-  Context* context = static_cast<Context*>(custom_context);
-  return context->Execute(payload_cnt, payloads, input_fn, output_fn);
-}
-
-}  // extern "C"
-
-}}}}  // namespace nvidia::inferenceserver::custom::image_preprocess
+}}}  // namespace nvidia::inferenceserver::custom

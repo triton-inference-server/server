@@ -25,9 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string>
-#include "src/backends/custom/custom.h"
+
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
+#include "src/custom/sdk/custom_instance.h"
 
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
@@ -56,11 +57,12 @@ enum ErrorCodes {
 };
 
 // Context object. All state must be kept in this object.
-class Context {
+class Context : public CustomInstance {
  public:
   Context(
       const std::string& instance_name, const ModelConfig& config,
-      const size_t server_parameter_cnt, const char** server_parameters);
+      const int gpu_device, const size_t server_parameter_cnt,
+      const char** server_parameters);
 
   // Initialize the context. Validate that the model configuration is
   // something that we can handle.
@@ -72,20 +74,24 @@ class Context {
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
 
  private:
-  // The name of this instance of the backend.
-  const std::string instance_name_;
-
-  // The model configuration.
-  const ModelConfig model_config_;
-
   // The server parameter values.
   std::vector<std::string> server_params_;
+
+  const int kBatching = RegisterError("batching not supported");
+  const int kInput =
+      RegisterError("expected single int32 input with shape [ 1 ]");
+  const int kInputContents = RegisterError("unable to get input tensor values");
+  const int kOutput =
+      RegisterError("expected single output, variable-size vector of string");
+  const int kOutputBuffer =
+      RegisterError("unable to get buffer for output tensor values");
 };
 
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
-    const size_t server_parameter_cnt, const char** server_parameters)
-    : instance_name_(instance_name), model_config_(model_config)
+    const int gpu_device, const size_t server_parameter_cnt,
+    const char** server_parameters)
+    : CustomInstance(instance_name, model_config, gpu_device)
 {
   // Must make a copy of server_parameters since we don't own those
   // strings.
@@ -238,84 +244,26 @@ Context::Execute(
   return kSuccess;
 }
 
-/////////////
+}  // namespace param
 
-extern "C" {
-
+// Creates a new param context instance
 int
-CustomInitialize(const CustomInitializeData* data, void** custom_context)
+CustomInstance::Create(
+    CustomInstance** instance, const std::string& name,
+    const ModelConfig& model_config, int gpu_device,
+    const CustomInitializeData* data)
 {
-  // Convert the serialized model config to a ModelConfig object.
-  ModelConfig model_config;
-  if (!model_config.ParseFromString(std::string(
-          data->serialized_model_config, data->serialized_model_config_size))) {
-    return kInvalidModelConfig;
+  param::Context* context = new param::Context(
+      name, model_config, gpu_device, data->server_parameter_cnt,
+      data->server_parameters);
+
+  *instance = context;
+
+  if (context == nullptr) {
+    return ErrorCodes::CreationFailure;
   }
 
-  // Create the context and validate that the model configuration is
-  // something that we can handle.
-  Context* context = new Context(
-      std::string(data->instance_name), model_config,
-      data->server_parameter_cnt, data->server_parameters);
-  int err = context->Init();
-  if (err != kSuccess) {
-    return err;
-  }
-
-  *custom_context = static_cast<void*>(context);
-
-  return kSuccess;
+  return context->Init();
 }
 
-int
-CustomFinalize(void* custom_context)
-{
-  if (custom_context != nullptr) {
-    Context* context = static_cast<Context*>(custom_context);
-    delete context;
-  }
-
-  return kSuccess;
-}
-
-const char*
-CustomErrorString(void* custom_context, int errcode)
-{
-  switch (errcode) {
-    case kSuccess:
-      return "success";
-    case kInvalidModelConfig:
-      return "invalid model configuration";
-    case kBatching:
-      return "batching not supported";
-    case kInput:
-      return "expected single int32 input with shape [ 1 ]";
-    case kInputContents:
-      return "unable to get input tensor values";
-    case kOutput:
-      return "expected single output, variable-size vector of string";
-    case kOutputBuffer:
-      return "unable to get buffer for output tensor values";
-    default:
-      break;
-  }
-
-  return "unknown error";
-}
-
-int
-CustomExecute(
-    void* custom_context, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
-{
-  if (custom_context == nullptr) {
-    return kUnknown;
-  }
-
-  Context* context = static_cast<Context*>(custom_context);
-  return context->Execute(payload_cnt, payloads, input_fn, output_fn);
-}
-
-}  // extern "C"
-
-}}}}  // namespace nvidia::inferenceserver::custom::param
+}}}  // namespace nvidia::inferenceserver::custom

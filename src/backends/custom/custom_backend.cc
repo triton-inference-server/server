@@ -227,7 +227,11 @@ CustomBackend::InitBackend(uint32_t runner_idx)
 
   int err =
       context->InitializeFn_(&init_data, &(context->library_context_handle_));
-  if (err != 0) {
+  if (context->library_context_handle_ == nullptr) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "initialize error for '" + Name() + "': failed to create instance");
+  } else if (err != 0) {
     return Status(
         RequestStatusCode::INTERNAL, "initialize error for '" + Name() +
                                          "': (" + std::to_string(err) + ") " +
