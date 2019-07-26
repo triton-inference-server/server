@@ -135,7 +135,7 @@ Status CheckAllowedModelOutput(
 /// Validates the compute capability of the GPU indexed
 /// \param The index of the target GPU.
 /// \return The error status. A non-OK status means the target GPU is
-/// \ not supported
+///  not supported
 Status CheckGPUCompatibility(const int gpu_id);
 
 /// Obtains a set of gpu ids that is supported by TRTIS.
