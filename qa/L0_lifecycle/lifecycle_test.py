@@ -209,6 +209,39 @@ class LifeCycleTest(unittest.TestCase):
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
+    def test_parse_ignore_zero_prefixed_version(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # Server was started but only version 1 is loaded
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                model_name = tu.get_model_name('savedmodel', np.float32, np.float32, np.float32)
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                uptime = ss.uptime_ns
+                self.assertGreater(uptime, 0)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                self.assertEqual(len(ss.model_status[model_name].version_status), 1,
+                                "expected only one version for model " + model_name)
+                version_status = ss.model_status[savedmodel_name].version_status[1]
+                self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        try:
+            # swap=False for version 1
+            iu.infer_exact(self, 'savedmodel', tensor_shape, 1,
+                           np.float32, np.float32, np.float32, swap=False)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_dynamic_model_load_unload(self):
         input_size = 16
         tensor_shape = (input_size,)
