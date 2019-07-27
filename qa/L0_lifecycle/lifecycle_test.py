@@ -230,7 +230,7 @@ class LifeCycleTest(unittest.TestCase):
                                 "expected status for model " + model_name)
                 self.assertEqual(len(ss.model_status[model_name].version_status), 1,
                                 "expected only one version for model " + model_name)
-                version_status = ss.model_status[savedmodel_name].version_status[1]
+                version_status = ss.model_status[model_name].version_status[1]
                 self.assertEqual(version_status.ready_state, server_status.MODEL_READY)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
