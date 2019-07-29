@@ -45,11 +45,11 @@ _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch", "onnx_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "netdef_nobatch", "plan_nobatch", "onnx_nobatch", "libtorch_nobatch")
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef", "onnx")
+    _trials = ("savedmodel", "graphdef", "netdef", "onnx", "libtorch")
 else:
-    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
+    _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx", "libtorch")
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 res = []
