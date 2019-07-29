@@ -37,7 +37,7 @@
 ##
 ############################################################################
 
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:19.07-py3}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:19.08-py3}
 
 CUDA_DEVICE=0
 
