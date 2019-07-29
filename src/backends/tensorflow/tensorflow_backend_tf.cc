@@ -691,10 +691,7 @@ TRTISTF_ModelCreateFromSavedModel(
       &session_options);
 
   // Set the default device to control the CPU/GPU that the graph runs
-  // on. This isn't foolproof since individual operations in the graph
-  // could specify a specific run location. But given that
-  // visible_device_list doesn't work it seems like the only option we
-  // have. [DLIS-43]
+  // on. 
   //
   // The GraphDef where we need to use this workaround is only
   // available in tensorflow/cc/saved_model/loader.cc so we use
