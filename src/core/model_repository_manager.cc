@@ -1587,17 +1587,13 @@ ModelRepositoryManager::VersionsToLoad(
   RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &subdirs));
   std::set<int64_t, std::greater<int64_t>> existing_versions;
   for (const auto& subdir : subdirs) {
+    if ((subdir.length() > 1) && (subdir.front() == '0')) {
+      LOG_WARNING << "ignore version directory '" << subdir
+                  << "' which contains leading zeros in its directory name";
+      continue;
+    }
     try {
       int64_t version = std::stoll(subdir);
-
-      if ((subdir.length() > 1) && (subdir.front() == '0')) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "model '" + name +
-                "' has at least one version with "
-                "leading zeros in its directory name which is not allowed");
-      }
-
       existing_versions.insert(version);
     }
     catch (const std::invalid_argument& ia) {

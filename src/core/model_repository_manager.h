@@ -226,7 +226,8 @@ class ModelRepositoryManager {
   bool CheckNode(DependencyNode* node);
 
   /// Get the list of versions to be loaded for a named model based on version
-  /// policy.
+  /// policy. Version directories that are not numerically named,
+  /// or that have zero prefix will be ignored.
   /// \param name The model name.
   /// \param model_config The model configuration.
   /// \param versions Returns the versions to be loaded
