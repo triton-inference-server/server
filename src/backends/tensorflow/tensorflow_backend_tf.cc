@@ -641,7 +641,10 @@ TRTISTF_ModelCreateFromGraphDef(
     }
   }
   // Set the default device to control the CPU/GPU that the graph runs
-  // on.
+  // on. This isn't foolproof since individual operations in the graph
+  // could specify a specific run location. But given that
+  // visible_device_list doesn't work it seems like the only option we
+  // have. [DLIS-43]
   if (device_id == TRTISTF_NO_GPU_DEVICE) {
     tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
   } else {
@@ -691,13 +694,16 @@ TRTISTF_ModelCreateFromSavedModel(
       &session_options);
 
   // Set the default device to control the CPU/GPU that the graph runs
-  // on. 
+  // on. This isn't foolproof since individual operations in the graph
+  // could specify a specific run location. But given that
+  // visible_device_list doesn't work it seems like the only option we
+  // have. [DLIS-43]
   //
   // The GraphDef where we need to use this workaround is only
   // available in tensorflow/cc/saved_model/loader.cc so we use
   // allocator_type in pass in the gpu_device we want and then
   // loader.cc (our modified version) will use that to
-  // SetDefaultDevice appropriately.
+  // SetDefaultDevice appropriately. 
   if (device_id == TRTISTF_NO_GPU_DEVICE) {
     session_options.config.mutable_gpu_options()->set_allocator_type("/cpu:0");
   } else {

@@ -11,13 +11,15 @@ index 85d3dd01fa..b385f8b857 100644
  #include "tensorflow/core/lib/io/path.h"
  #include "tensorflow/core/lib/monitoring/counter.h"
  #include "tensorflow/core/lib/strings/str_util.h"
-@@ -244,9 +245,28 @@ Status LoadSavedModelInternal(const SessionOptions& session_options,
+@@ -244,9 +245,30 @@ Status LoadSavedModelInternal(const SessionOptions& session_options,
                                SavedModelBundle* const bundle) {
    TF_RETURN_IF_ERROR(ReadMetaGraphDefFromSavedModel(export_dir, tags,
                                                      &bundle->meta_graph_def));
 +  
 +  // If allocator starts with a '/' then it is being used to
-+  // communicate the CPU/GPU that the graph runs on.
++  // communicate the CPU/GPU that the graph runs on. This isn't
++  // foolproof since individual operations in the graph could specify
++  // a specific run location. [DLIS-43]
 +  SessionOptions lsession_options = session_options;
 +  const std::string& alloc_type =
 +    lsession_options.config.gpu_options().allocator_type();
