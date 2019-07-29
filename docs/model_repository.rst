@@ -149,7 +149,8 @@ Model Versions
 Each model can have one or more versions available in the model
 repository. Each version is stored in its own, numerically named,
 subdirectory where the name of the subdirectory corresponds to the
-version number of the model. Each model specifies a :ref:`version
+version number of the model. The subdirectories that are not numerically named,
+or that have zero prefix will be ignored. Each model specifies a :ref:`version
 policy <section-version-policy>` that controls which of the versions
 in the model repository are made available by the server at any given
 time.
