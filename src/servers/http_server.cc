@@ -297,7 +297,8 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     }
     // control
     if (endpoint == "modelcontrol" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "modelcontrol") !=
+        (std::find(
+             endpoint_names_.begin(), endpoint_names_.end(), "modelcontrol") !=
          endpoint_names_.end())) {
       HandleControl(req, rest);
       return;

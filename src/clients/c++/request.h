@@ -710,9 +710,9 @@ class ProfileContext {
 };
 
 //==============================================================================
-/// A ModelControlContext object is used to control the model loading / unloading
-/// on the inference server. Once created a ModelControlContext object can be used
-/// repeatedly.
+/// A ModelControlContext object is used to control the model loading /
+/// unloading on the inference server. Once created a ModelControlContext object
+/// can be used repeatedly.
 ///
 /// A ModelControlContext object can use either HTTP protocol or GRPC protocol
 /// depending on the Create function (ControlHttpContext::Create or

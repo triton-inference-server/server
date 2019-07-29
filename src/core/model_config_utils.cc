@@ -806,7 +806,9 @@ ValidateIOShape(
       if (dim_element_cnts.size() != reshape_element_cnts.size()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
-            message_prefix + "has different number of variable-size dimensions for dims and reshape");
+            message_prefix +
+                "has different number of variable-size dimensions for dims and "
+                "reshape");
       }
       for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
         if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
