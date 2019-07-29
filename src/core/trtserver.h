@@ -633,7 +633,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerModelStatus(
 /// \param server The inference server object.
 /// \param model_name The name of the model.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerLoadModel(
     TRTSERVER_Server* server, const char* model_name);
 
 /// Unload the requested model. Unloading a model that is not loaded
@@ -643,7 +643,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_LoadModel(
 /// \param server The inference server object.
 /// \param model_name The name of the model.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_UnloadModel(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 
 /// Get the current metrics for the server. The caller takes ownership

@@ -142,9 +142,9 @@ class ModelControlContext final
 
       TRTSERVER_Error* err = nullptr;
       if (request.type() == ModelControlRequest::LOAD) {
-        err = TRTSERVER_LoadModel(server, request.model_name().c_str());
+        err = TRTSERVER_ServerLoadModel(server, request.model_name().c_str());
       } else {
-        err = TRTSERVER_UnloadModel(server, request.model_name().c_str());
+        err = TRTSERVER_ServerUnloadModel(server, request.model_name().c_str());
       }
 
       RequestStatusUtil::Create(

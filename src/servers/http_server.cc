@@ -488,9 +488,9 @@ HTTPAPIServer::HandleControl(
 
   TRTSERVER_Error* err = nullptr;
   if (action_type_str == "load") {
-    err = TRTSERVER_LoadModel(server_.get(), model_name.c_str());
+    err = TRTSERVER_ServerLoadModel(server_.get(), model_name.c_str());
   } else if (action_type_str == "unload") {
-    err = TRTSERVER_UnloadModel(server_.get(), model_name.c_str());
+    err = TRTSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,
