@@ -247,4 +247,19 @@ SharedMemoryManager::SharedMemoryAddress(
   return Status::Success;
 }
 
+// Note: change to return entire SharedMemoryStateMap if needed
+Status
+SharedMemoryManager::GetLiveSharedMemory(
+    std::vector<std::string>& active_shm_regions)
+{
+  // use mutex to report consistent active regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  active_shm_regions.clear();
+  for (const auto& shm_info : shared_memory_map_) {
+    active_shm_regions.push_back(shm_info.first);
+  }
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver
