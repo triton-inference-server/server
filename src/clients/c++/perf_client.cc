@@ -2160,27 +2160,21 @@ main(int argc, char** argv)
 
       // Record composing model stat in a separate file
       if (!summary.front().server_composing_model_stats.empty()) {
-        auto pos = filename.rfind(".csv");
-        if (pos == std::string::npos) {
-          filename += ".composing_stats";
-        } else {
-          filename.insert(pos, ".composing_stats");
-        }
-        std::ofstream ofs(filename, std::ofstream::out);
-
-        ofs << "Concurrency";
+        // For each of the composing model, generate CSV file in the same format
+        // as the one for ensemble.
         for (const auto& model_info : summary[0].server_composing_model_stats) {
           const auto& name = model_info.first.first;
           const auto& version = model_info.first.second;
           const auto name_ver = name + "_v" + std::to_string(version);
-          ofs << "," << name_ver << " Overhead," << name_ver << " Queue,"
-              << name_ver << " Compute";
-        }
-        ofs << std::endl;
-        for (PerfStatus& status : summary) {
-          ofs << status.concurrency;
-          for (const auto& model_info : status.server_composing_model_stats) {
-            const auto& stats = model_info.second;
+
+          std::ofstream ofs(name_ver + "." +filename, std::ofstream::out);
+          ofs << "Concurrency,Inferences/Second,Client Send,"
+            << "Network+Server Send/Recv,Server Queue,"
+            << "Server Compute,Client Recv" << std::endl;
+
+          for (PerfStatus& status : summary) {
+            auto it = status.server_composing_model_stats.find(model_info.first);
+            const auto& stats = it->second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =
                 stats.compute_time_ns / stats.request_count;
@@ -2189,10 +2183,15 @@ main(int argc, char** argv)
                 (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
                     ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
                     : 0;
-            ofs << "," << (avg_overhead_ns / 1000) << ","
-                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000);
+            // infer / sec of the composing model is calculated using the
+            // request count ratio between the composing model and the ensemble
+            double infer_ratio = 1.0 * stats.request_count / status.server_stats.request_count;
+            int infer_per_sec = infer_ratio * status.client_infer_per_sec;
+            ofs << status.concurrency << "," << infer_per_sec << ",0,"
+                << (avg_overhead_ns / 1000) << ","
+                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000)
+                << ",0" << std::endl;
           }
-          ofs << std::endl;
         }
       }
     }
