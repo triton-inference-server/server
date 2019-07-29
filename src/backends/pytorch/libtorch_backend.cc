@@ -26,6 +26,7 @@
 
 #include "src/backends/pytorch/libtorch_backend.h"
 
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <stdint.h>
 #include <exception>
 #include "src/core/constants.h"
@@ -34,7 +35,6 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
-#include <c10/cuda/CUDACachingAllocator.h>
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
