@@ -469,7 +469,6 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
             variable_size_values.pop_front();
           } else {
             poutput->mutable_raw()->add_dims(dim);
-            ;
           }
         }
       } else {
