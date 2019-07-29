@@ -68,6 +68,7 @@ class VirtualDeviceTracker {
 
   std::unordered_map<int, std::atomic<size_t>> virtual_device_ids_;
   std::unordered_map<int, size_t> num_virtual_per_physical_;
+  std::unordered_map<int, int> virtual_device_base_index_;
   static std::unique_ptr<VirtualDeviceTracker> instance_;
 };
 

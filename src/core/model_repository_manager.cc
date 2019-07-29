@@ -40,6 +40,10 @@
 #include "src/core/model_config_utils.h"
 #include "src/core/server_status.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif
+
 #ifdef TRTIS_ENABLE_CAFFE2
 #include "src/backends/caffe2/netdef_backend_factory.h"
 #endif  // TRTIS_ENABLE_CAFFE2
@@ -86,13 +90,31 @@ BuildBackendConfigMap(
       graphdef_config->per_process_gpu_memory_fraction = tf_gpu_memory_fraction;
     }
 
+#ifdef TRTIS_ENABLE_GPU
+    int device_cnt = 0;
+    cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
+    if (cuerr == cudaErrorNoDevice) {
+      device_cnt = 0;
+    } else if (cuerr != cudaSuccess) {
+      LOG_ERROR << "unable to get number of CUDA devices while building "
+                   "BackendConfigMap: "
+                << cudaGetErrorString(cuerr);
+      device_cnt = 0;
+    }
+
     if (!tf_vgpu_memory_limit_mb.empty()) {
-      for (const auto& mem_limit : tf_vgpu_memory_limit_mb) {
-        graphdef_config->memory_limit_mb[mem_limit.first] =
-            std::vector<float>(mem_limit.second.first, mem_limit.second.second);
+      for (int device = 0; device < device_cnt; device++) {
+        auto device_mapping = tf_vgpu_memory_limit_mb.find(device);
+        if (device_mapping != tf_vgpu_memory_limit_mb.end()) {
+          graphdef_config->memory_limit_mb[device] = std::vector<float>(
+              device_mapping->second.first, device_mapping->second.second);
+        } else {
+          graphdef_config->memory_limit_mb[device] = {};
+        }
       }
       graphdef_config->per_process_gpu_memory_fraction = 0.0;
     }
+#endif  // TRTIS_ENABLE_GPU
 
     graphdef_config->allow_soft_placement = tf_allow_soft_placement;
 
@@ -1328,7 +1350,7 @@ ModelRepositoryManager::UpdateDependencyGraph(
         upstream.first->downstreams_.erase(it->second.get());
       }
       it->second->upstreams_.clear();
-      
+
       if (!it->second->downstreams_.empty()) {
         UncheckDownstream(&it->second->downstreams_, &affected_nodes);
         // mark this node as missing upstream in its downstreams
