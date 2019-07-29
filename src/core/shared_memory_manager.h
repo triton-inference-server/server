@@ -95,13 +95,15 @@ class SharedMemoryManager {
   /// user. It should be called before shutting down the shared memory manager.
   Status UnregisterAllSharedMemory();
 
-  /// \return the list of all registered shared memory regions.
-  const SharedMemoryStateMap GetLiveBackendStates();
+  /// updates the list of all registered shared memory regions.
+  Status GetLiveSharedMemory(std::vector<std::string>& active_shm_regions);
 
- private:
-  void Create(
+  /// Creates a SharedMemoryManager object that uses the given status_manager
+  static Status Create(
       const std::shared_ptr<ServerStatusManager>& status_manager,
       std::unique_ptr<SharedMemoryManager>* shared_memory_manager);
+
+ private:
   SharedMemoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager);
 

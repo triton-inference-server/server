@@ -96,6 +96,9 @@ class InferenceServer {
   // Unregister the corresponding shared memory region.
   Status UnregisterSharedMemory(const std::string& name);
 
+  // Get the list of live shared memory regions.
+  Status GetLiveSharedMemory(std::vector<std::string>& active_shm_regions);
+
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
 

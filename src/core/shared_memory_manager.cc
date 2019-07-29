@@ -182,7 +182,7 @@ SharedMemoryManager::~SharedMemoryManager()
   UnregisterAllSharedMemory();
 }
 
-void
+Status
 SharedMemoryManager::Create(
     const std::shared_ptr<ServerStatusManager>& status_manager,
     std::unique_ptr<SharedMemoryManager>* shared_memory_manager)
@@ -191,6 +191,8 @@ SharedMemoryManager::Create(
   std::unique_ptr<SharedMemoryManager> tmp_manager(
       new SharedMemoryManager(status_manager));
   *shared_memory_manager = std::move(tmp_manager);
+
+  return Status::Success;
 }
 
 Status
@@ -198,18 +200,12 @@ SharedMemoryManager::RegisterUnregisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size, ActionType type)
 {
-  // Serialize all operations that change model state
+  // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
-
-  // Update SharedMemoryInfo related to file system accordingly
-  std::set<std::string> added, deleted, modified;
-  {
-    std::lock_guard<std::mutex> lk(shm_info_mu_);
-    if (type == ActionType::UNREGISTER) {
-      UnregisterSharedMemory(name);
-    } else {
-      RegisterSharedMemory(name, shm_key, offset, byte_size);
-    }
+  if (type == ActionType::UNREGISTER) {
+    UnregisterSharedMemory(name);
+  } else {
+    RegisterSharedMemory(name, shm_key, offset, byte_size);
   }
 
   return Status::Success;
@@ -226,6 +222,21 @@ SharedMemoryManager::UnregisterAllSharedMemory()
           "Failed to gracefully unregister all shared memory regions: " +
               unregister_status.Message());
     }
+  }
+  return Status::Success;
+}
+
+// Note: change to return entire SharedMemoryStateMap if needed
+Status
+SharedMemoryManager::GetLiveSharedMemory(
+    std::vector<std::string>& active_shm_regions)
+{
+  // use mutex to report consistent active regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  active_shm_regions.clear();
+  for (const auto& shm_info : shared_memory_map_) {
+    active_shm_regions.push_back(shm_info.first);
   }
   return Status::Success;
 }

@@ -802,8 +802,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
-  http_ports_ = {http_port_, http_health_port_, http_port_, http_port_,
-                 http_port_};
+  http_ports_ = {http_port_, http_health_port_, http_port_,
+                 http_port_, http_port_,        http_port_};
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
