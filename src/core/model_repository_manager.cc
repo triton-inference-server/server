@@ -99,6 +99,7 @@ BuildBackendConfigMap(
       LOG_ERROR << "unable to get number of CUDA devices while building "
                    "BackendConfigMap: "
                 << cudaGetErrorString(cuerr);
+      device_cnt = 0;
     }
 
     if (!tf_vgpu_memory_limit_mb.empty()) {
