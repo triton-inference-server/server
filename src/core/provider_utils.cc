@@ -27,6 +27,7 @@
 #include "src/core/provider_utils.h"
 
 #include <google/protobuf/text_format.h>
+#include <deque>
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -89,13 +90,27 @@ NormalizeRequestHeader(
                 DimsListToString(io.dims()));
       }
 
-      // If there is a reshape for this input then clear the dims so
-      // that we set them to the reshape below. There cannot be a
-      // reshape if the tensor has variable-size dimensions so it is
-      // ok to throw away the request shape since it must be equal to
-      // the configuration shape.
+      // If there is a reshape for this input then clear the dims and
+      // set them to the reshape. As reshape may have variable-size dimensions,
+      // we need to record corresponding value
+      // so that we can set the value correctly for reshape.
       if (input_config->has_reshape()) {
+        std::deque<int64_t> variable_size_values;
+        for (int64_t idx = 0; idx < input_config->dims_size(); idx++) {
+          if (input_config->dims(idx) == -1) {
+            variable_size_values.push_back(io.dims(idx));
+          }
+        }
+
         io.clear_dims();
+        for (const auto& dim : input_config->reshape().shape()) {
+          if (dim == -1) {
+            io.add_dims(variable_size_values.front());
+            variable_size_values.pop_front();
+          } else {
+            io.add_dims(dim);
+          }
+        }
       }
     }
 

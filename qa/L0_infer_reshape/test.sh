@@ -44,7 +44,13 @@ for i in \
         zero_1_float32 \
         zero_2_float32 \
         zero_3_float32 \
-        zero_4_float32 ; do
+        zero_4_float32 \
+        nobatch_zero_1_int32 \
+        nobatch_zero_2_int32 \
+        nobatch_zero_3_int32 \
+        zero_1_int32 \
+        zero_2_int32 \
+        zero_3_int32 ; do
     cp -r models/graphdef_${i} models/custom_${i}
     rm -fr models/custom_${i}/1/*
     cp libidentity.so models/custom_${i}/1/.

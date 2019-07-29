@@ -125,7 +125,7 @@ python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --variable --models_
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --onnx --netdef --models_dir=$IDENTITYDESTDIR
 chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --libtorch --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --libtorch --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --netdef --libtorch --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
@@ -166,7 +166,7 @@ python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --graphdef --savedmodel --models_dir=$IDENTITYDESTDIR
 chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --graphdef --savedmodel --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --graphdef --savedmodel --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR
@@ -216,7 +216,7 @@ python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --models_dir=$RESHAPEDESTDIR
+python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
 chown -R $(id -u):$(id -g) $SEQDESTDIR

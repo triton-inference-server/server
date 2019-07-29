@@ -1,1 +1,1 @@
-model output using reshape cannot have variable-size dimension -1 for reshape_variable1
+model output has different size for dims and reshape for reshape_variable1
