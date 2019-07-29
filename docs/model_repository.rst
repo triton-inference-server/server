@@ -360,6 +360,12 @@ targeted at a GPU with a different `Compute Capability
 <section-model-configuration>` for description of how to specify
 different shared libraries for different compute capabilities.
 
+Currently, only model repositories on the local filesystem support
+custom backends. A custom backend contained in a model repository in
+cloud storage (for example, a repository in GCS accessed with the
+gs:// prefix as described above) cannot be loaded by the inference
+server.
+
 Custom Backend API
 ^^^^^^^^^^^^^^^^^^
 
