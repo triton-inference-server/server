@@ -86,14 +86,21 @@ class InferReshapeTest(unittest.TestCase):
 
         if tu.validate_for_libtorch_model(dtype, dtype, dtype,
                                     input_shapes[0], input_shapes[0], input_shapes[0]):
-            # model that supports batching
-            for bs in (1, 8):
-                iu.infer_zero(self, 'libtorch', bs, dtype, input_shapes, output_shapes)
-            # model that does not support batching
-            if no_batch:
-                iu.infer_zero(self, 'libtorch_nobatch', 1, dtype, input_shapes, output_shapes)
+            # skip variable size reshape on libtorch for now,
+            # see "gen_qa_reshape_model.py" for detail
+            if dtype != np.int32:
+                # model that supports batching
+                for bs in (1, 8):
+                    iu.infer_zero(self, 'libtorch', bs, dtype, input_shapes, output_shapes)
+                # model that does not support batching
+                if no_batch:
+                    iu.infer_zero(self, 'libtorch_nobatch', 1, dtype, input_shapes, output_shapes)
 
         for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
+            # [TODO] Skip variable size reshape on ensemble for now.
+            # Need rework on how ensemble for reshape are generated
+            if dtype == np.int32:
+                break
             if tu.validate_for_ensemble_model(name, dtype, dtype, dtype,
                                         input_shapes[0], input_shapes[0], input_shapes[0]):
                 # model that supports batching
@@ -130,6 +137,13 @@ class InferReshapeTest(unittest.TestCase):
                            output_shapes=([16],[1,2],[3,2,2],[1]))
         self._trt_reshape(np.float32, input_shapes=([4,4],[2],[2,2,3],[1]),
                           output_shapes=([2,2,4],[1,2,1],[3,2,2],[1,1,1]))
+    def test_ii1(self):
+        self._full_reshape(np.int32, input_shapes=([2,4,5,6],))
+    def test_ii2(self):
+        self._full_reshape(np.int32, input_shapes=([4,1], [2]), 
+                           output_shapes=([1,4], [1,2]))
+    def test_ii3(self):
+        self._full_reshape(np.int32, input_shapes=([1,4,1], [8], [2,2,3]))
 
 
 if __name__ == '__main__':

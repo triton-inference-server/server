@@ -11,7 +11,7 @@ output [
   {
     name: "output"
     data_type: TYPE_FP32
-    dims: [ 2, 2 ]
-    reshape { shape: [ -1 ] }
+    dims: [ 2, -1 ]
+    reshape { shape: [ 1, -1, 2 ] }
   }
 ]

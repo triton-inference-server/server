@@ -26,6 +26,7 @@
 
 #include "src/core/provider.h"
 
+#include <deque>
 #include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
@@ -449,12 +450,27 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
       poutput->mutable_raw()->Clear();
       poutput->mutable_raw()->set_batch_byte_size(output.byte_size_);
 
-      // If there is a reshape them we know that output_config dims
-      // are non-variable so use them directly. If there is not a
-      // reshape then use output shape as that will have actual sized
-      // in place of any wildcard dimensions.
+      // If there is a reshape them we need to record corresponding value for
+      // variable-size dimensions so that we can set the output shape correctly.
+      // If there is not a reshape then use output shape as that will have
+      // actual sized in place of any wildcard dimensions.
       if (output_config->has_reshape()) {
-        poutput->mutable_raw()->mutable_dims()->CopyFrom(output_config->dims());
+        std::deque<int64_t> variable_size_values;
+        for (int64_t idx = 0; idx < output_config->reshape().shape_size();
+             idx++) {
+          if (output_config->reshape().shape(idx) == -1) {
+            variable_size_values.push_back(batch1_backend_shape[idx]);
+          }
+        }
+
+        for (const auto& dim : output_config->dims()) {
+          if (dim == -1) {
+            poutput->mutable_raw()->add_dims(variable_size_values.front());
+            variable_size_values.pop_front();
+          } else {
+            poutput->mutable_raw()->add_dims(dim);
+          }
+        }
       } else {
         poutput->mutable_raw()->mutable_dims()->CopyFrom(batch1_backend_shape);
       }

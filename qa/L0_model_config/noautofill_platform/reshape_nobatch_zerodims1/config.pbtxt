@@ -1,4 +1,4 @@
-name: "reshape_nobatch_variable3"
+name: "reshape_nobatch_zerodims1"
 max_batch_size: 0
 input [
   {
@@ -11,7 +11,7 @@ output [
   {
     name: "output"
     data_type: TYPE_FP32
-    dims: [ 2, -1 ]
-    reshape { shape: [ 1, -1, 2 ] }
+    dims: [ 2, 2 ]
+    reshape { shape: [ 0 ] }
   }
 ]
