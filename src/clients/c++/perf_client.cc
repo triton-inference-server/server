@@ -163,7 +163,6 @@ typedef struct PerformanceStatusStruct {
   uint32_t concurrency;
   size_t batch_size;
   // Request count and elapsed time measured by server
-  // [TODO] clean up server_stats usage
   ServerSideStats server_stats;
   std::map<std::pair<std::string, int64_t>, ServerSideStats>
       server_composing_model_stats;
@@ -1108,16 +1107,17 @@ class InferenceProfiler {
       const size_t valid_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
-  /// [TODO] update docs
+  /// \param model_name The name of the model to summarize the server side stats
+  /// \param model_version The version of the model
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
-  /// \param summary Returns the summary that the fileds recorded by server
+  /// \param server_stats Returns the summary that the fileds recorded by server
   /// are set.
   /// \return Error object indicating success or failure.
-  nic::Error SummarizeServerStat(
+  nic::Error SummarizeServerStats(
       const std::string& model_name, const int64_t model_version,
       const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-      ServerSideStats* server_stat);
+      ServerSideStats* server_stats);
 
   bool verbose_;
   bool profile_;
@@ -1370,7 +1370,7 @@ InferenceProfiler::Summarize(
   {
     const auto& model_start = start_status.find(model_name_)->second;
     const auto& model_end = end_status.find(model_name_)->second;
-    RETURN_IF_ERROR(SummarizeServerStat(
+    RETURN_IF_ERROR(SummarizeServerStats(
         model_name_, model_version_, model_start, model_end,
         &(summary.server_stats)));
   }
@@ -1380,7 +1380,7 @@ InferenceProfiler::Summarize(
     auto it = summary.server_composing_model_stats
                   .emplace(model_info, ServerSideStats())
                   .first;
-    RETURN_IF_ERROR(SummarizeServerStat(
+    RETURN_IF_ERROR(SummarizeServerStats(
         model_info.first, model_info.second, model_start, model_end,
         &(it->second)));
   }
@@ -1549,10 +1549,10 @@ InferenceProfiler::SummarizeClientStat(
 }
 
 nic::Error
-InferenceProfiler::SummarizeServerStat(
+InferenceProfiler::SummarizeServerStats(
     const std::string& model_name, const int64_t model_version,
     const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-    ServerSideStats* server_stat)
+    ServerSideStats* server_stats)
 {
   // If model_version is -1 then look in the end status to find the
   // latest (highest valued version) and use that as the version.
@@ -1594,13 +1594,13 @@ InferenceProfiler::SummarizeServerStat(
         }
       }
 
-      server_stat->request_count =
+      server_stats->request_count =
           end_itr->second.success().count() - start_cnt;
-      server_stat->cumm_time_ns =
+      server_stats->cumm_time_ns =
           end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      server_stat->queue_time_ns =
+      server_stats->queue_time_ns =
           end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-      server_stat->compute_time_ns =
+      server_stats->compute_time_ns =
           end_itr->second.compute().total_time_ns() - start_compute_time_ns;
     }
   }
@@ -1626,7 +1626,6 @@ ParseProtocol(const std::string& str)
   return ProtocolType::HTTP;
 }
 
-// [TODO] stat or stats
 nic::Error
 ReportServerSideStats(const ServerSideStats& stats)
 {
@@ -2161,13 +2160,26 @@ main(int argc, char** argv)
 
       // Record composing model stat in a separate file
       if (!summary.front().server_composing_model_stats.empty()) {
-        std::ofstream ofs(filename + ".composing_stats", std::ofstream::out);
+        auto pos = filename.rfind(".csv");
+        if (pos == std::string::npos) {
+          filename += ".composing_stats";
+        } else {
+          filename.insert(pos, ".composing_stats");
+        }
+        std::ofstream ofs(filename, std::ofstream::out);
 
-        ofs << "Concurrency,Model,Requested Version,"
-            << "Server Overhead,Server Queue,Server Compute" << std::endl;
+        ofs << "Concurrency";
+        for (const auto& model_info : summary[0].server_composing_model_stats) {
+          const auto& name = model_info.first.first;
+          const auto& version = model_info.first.second;
+          const auto name_ver = name + "_v" + std::to_string(version);
+          ofs << "," << name_ver << " Overhead," << name_ver << " Queue,"
+              << name_ver << " Compute";
+        }
+        ofs << std::endl;
         for (PerfStatus& status : summary) {
+          ofs << status.concurrency;
           for (const auto& model_info : status.server_composing_model_stats) {
-            const auto& name_version = model_info.first;
             const auto& stats = model_info.second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =
@@ -2177,11 +2189,10 @@ main(int argc, char** argv)
                 (avg_overhead_ns > (avg_queue_ns + avg_compute_ns))
                     ? (avg_overhead_ns - avg_queue_ns - avg_compute_ns)
                     : 0;
-            ofs << status.concurrency << "," << name_version.first << ","
-                << name_version.second << "," << (avg_overhead_ns / 1000) << ","
-                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000)
-                << std::endl;
+            ofs << "," << (avg_overhead_ns / 1000) << ","
+                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000);
           }
+          ofs << std::endl;
         }
       }
     }
