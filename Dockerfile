@@ -230,8 +230,8 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/includ
      /opt/tensorrtserver/include/torch
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libtorch.so \
       /opt/tensorrtserver/lib/
-COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libthnvrtc.so \
-      /opt/tensorrtserver/lib/
+COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
+     /opt/tensorrtserver/lib/
 
 # Onnx Runtime headers and library
 ARG ONNX_RUNTIME_VERSION=0.4.0
