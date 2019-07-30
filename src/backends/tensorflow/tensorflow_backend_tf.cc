@@ -32,6 +32,7 @@
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.pb.h"
 #include "tensorflow/core/graph/default_device.h"
+#include "tensorflow/core/grappler/utils.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
@@ -632,6 +633,13 @@ TRTISTF_ModelCreateFromGraphDef(
         "model " + std::string(model_name) + " has an empty network");
   }
 
+  // Clear the device field from the graphdef so that the default device
+  // setting below will control which GPU the graph will run on
+  for (tensorflow::NodeDef& node : *graph_def.mutable_node()) {
+    if (!tensorflow::grappler::NodeIsOnCpu(&node)) {
+      node.clear_device();
+    }
+  }
   // Set the default device to control the CPU/GPU that the graph runs
   // on. This isn't foolproof since individual operations in the graph
   // could specify a specific run location. But given that
