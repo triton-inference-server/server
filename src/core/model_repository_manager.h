@@ -167,12 +167,23 @@ class ModelRepositoryManager {
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
-  /// [TODO] docs
-  Status Poll(
-      const std::set<std::string>& models,
-      std::set<std::string>* added, std::set<std::string>* deleted,
-      std::set<std::string>* modified, std::set<std::string>* unmodified,
-      ModelInfoMap* updated_infos);
+  /// Poll the requested models in the model repository and
+  /// compare with the current set. Return the additions, deletions,
+  /// and modifications that have occurred. This function will not updated
+  /// the current model info, it is caller's responsibility to do so.
+  /// \param models The set of models to be polled
+  /// \param added The names of the models added to the repository.
+  /// \param deleted The names of the models removed from the repository.
+  /// \param modified The names of the models remaining in the
+  /// repository that have been changed.
+  /// \param unmodified The names of the models remaining in the
+  /// repository that have not changed.
+  /// \param updated_infos The model infos retrieved from the poll.
+  /// \return The error status.
+  Status PollModels(
+      const std::set<std::string>& models, std::set<std::string>* added,
+      std::set<std::string>* deleted, std::set<std::string>* modified,
+      std::set<std::string>* unmodified, ModelInfoMap* updated_infos);
 
   /// Update the configurations of newly added / modified model and their
   /// information shown in server status

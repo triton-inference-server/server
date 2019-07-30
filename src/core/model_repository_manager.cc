@@ -1063,7 +1063,8 @@ ModelRepositoryManager::LoadUnloadModel(
       // [TODO] potentially should handle multiple models for ensemble
       ModelInfoMap new_infos;
       std::set<std::string> subdirs{model_name};
-      RETURN_IF_ERROR(Poll(subdirs, &added, &deleted, &modified, &unmodified, &new_infos));
+      RETURN_IF_ERROR(PollModels(
+          subdirs, &added, &deleted, &modified, &unmodified, &new_infos));
 
       // If the model is marked deleted, model directory is not found
       if (!deleted.empty()) {
@@ -1209,9 +1210,10 @@ ModelRepositoryManager::Poll(
   // which we read the model configuration.
   std::set<std::string> subdirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(repository_path_, &subdirs));
-  
-  RETURN_IF_ERROR(Poll(subdirs, added, deleted, modified, unmodified, &new_infos));
-  
+
+  RETURN_IF_ERROR(
+      PollModels(subdirs, added, deleted, modified, unmodified, &new_infos));
+
   // Anything in 'infos_' that is not in "added", "modified", or
   // "unmodified" is deleted.
   for (const auto& pr : infos_) {
@@ -1233,11 +1235,10 @@ ModelRepositoryManager::Poll(
 }
 
 Status
-ModelRepositoryManager::Poll(
-    const std::set<std::string>& models,
-    std::set<std::string>* added, std::set<std::string>* deleted,
-    std::set<std::string>* modified, std::set<std::string>* unmodified,
-    ModelInfoMap* updated_infos)
+ModelRepositoryManager::PollModels(
+    const std::set<std::string>& models, std::set<std::string>* added,
+    std::set<std::string>* deleted, std::set<std::string>* modified,
+    std::set<std::string>* unmodified, ModelInfoMap* updated_infos)
 {
   for (const auto& child : models) {
     const auto full_path = JoinPath({repository_path_, child});
