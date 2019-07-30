@@ -92,12 +92,10 @@ inference server provides the following features:
 * Multi-GPU support. The server can distribute inferencing across all
   system GPUs.
 
-* The inference server `monitors the model repository
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#modifying-the-model-repository>`_
-  for any change and dynamically reloads the model(s) when necessary,
-  without requiring a server restart. Models and model versions can be
-  added and removed, and model configurations can be modified while
-  the server is running.
+* The inference server provides `multiple modes for model management
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_management.html>`_. These
+  model management modes allow for both implicit and explicit loading
+  and unloading of models without requiring a server restart.
 
 * `Model repositories
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
@@ -161,12 +159,13 @@ following features are in beta:
 Documentation
 -------------
 
-The User Guide, Developer Guide, and API Reference `documentation
+The User Guide, Developer Guide, and API Reference `documentation for
+the current release
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building and running the latest
-release of the TensorRT Inference Server.
+provide guidance on installing, building and running the TensorRT
+Inference Server.
 
-You can also view the documentation for the `master branch
+You can also view the `documentation for the master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
 and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
