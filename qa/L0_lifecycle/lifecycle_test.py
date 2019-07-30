@@ -896,26 +896,12 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertTrue(
                     ex.message().startswith("failed to stat directory for model"))
 
-        # Load ensemble model first, should fail due to depending model is not loaded
-        for model_name in ensemble_models:
-            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                try:
-                    ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.load(model_name)
-                    self.assertTrue(False, "expected unknown model failure")
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertGreater(ex.request_id(), 0)
-                    self.assertTrue(
-                        ex.message().startswith("failed to load "))
-
-        # Load the depending model, as side effect, the ensemble model will be
-        # re-evaluated and loaded
+        # Load ensemble model first, the dependent model will be polled and loaded
         for model_name in models:
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 try:
                     ctx = ModelControlContext(pair[0], pair[1], True)
-                    ctx.load(model_name)
+                    ctx.load(ensemble_prefix + model_name)
 
                     for model in [model_name, ensemble_prefix + model_name]:
                         ctx = ServerStatusContext(pair[0], pair[1], model, True)
