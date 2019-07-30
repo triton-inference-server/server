@@ -1059,27 +1059,45 @@ ModelRepositoryManager::LoadUnloadModel(
         deleted.insert(model_name);
       }
     } else {
-      // [TODO] some kind of loop with conditon of whether new model is required
-      // [TODO] potentially should handle multiple models for ensemble
-      ModelInfoMap new_infos;
-      std::set<std::string> subdirs{model_name};
-      RETURN_IF_ERROR(PollModels(
-          subdirs, &added, &deleted, &modified, &unmodified, &new_infos));
+      std::set<std::string> checked_modes{model_name};
+      std::set<std::string> models{model_name};
 
-      // If the model is marked deleted, model directory is not found
-      if (!deleted.empty()) {
-        return Status(
-            RequestStatusCode::NOT_FOUND,
-            "failed to stat directory for model '" + model_name + "'");
+      ModelInfoMap new_infos;
+      while (!models.empty()) {
+        RETURN_IF_ERROR(PollModels(
+            models, &added, &deleted, &modified, &unmodified, &new_infos));
+
+        // If at least one model is marked deleted, model directory is not found
+        // and the whole load process should return as failure.
+        if (!deleted.empty()) {
+          return Status(
+              RequestStatusCode::NOT_FOUND,
+              "failed to stat directory for model '" + model_name + "'");
+        }
+
+        // More models should be polled is the polled models are ensembles
+        std::set<std::string> next_models;
+        for (const auto& model : models) {
+          const auto& config = new_infos.find(model)->second->model_config_;
+          if (config.has_ensemble_scheduling()) {
+            for (const auto& step : config.ensemble_scheduling().step()) {
+              bool need_poll = checked_modes.emplace(step.model_name()).second;
+              if (need_poll) {
+                next_models.emplace(step.model_name());
+              }
+            }
+          }
+        }
+        models.swap(next_models);
       }
 
       // Only update the infos when all validation is completed
       std::lock_guard<std::mutex> lk(infos_mu_);
-      if (!added.empty()) {
+      for (const auto& model_name : added) {
         auto nitr = new_infos.find(model_name);
         infos_.emplace(model_name, std::move(nitr->second));
       }
-      if (!modified.empty()) {
+      for (const auto& model_name : modified) {
         auto nitr = new_infos.find(model_name);
         auto itr = infos_.find(model_name);
         itr->second = std::move(nitr->second);
