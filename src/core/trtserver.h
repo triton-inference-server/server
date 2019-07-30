@@ -647,9 +647,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 
 /// Register a shared memory region on the inference server. If the shared
-/// memory region is already registered, it will be unregistered and then
-/// re-registered. Returned error indicates if shared memory region was
-/// registered successfully or not.
+/// memory region is already registered, it will return an error message.
+/// Returned error indicates if shared memory region is registered successfully
+/// or not.
 /// \param server The inference server object.
 /// \param name The user-given name for the shared memory region to be
 /// registered.
@@ -658,19 +658,18 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
 /// \param offset The offset into the shared memory region.
 /// \param byte_size The size, in bytes of the tensor data.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_RegisterSharedMemory(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
     TRTSERVER_Server* server, const char* name, const char* shm_key,
     const size_t offset, const size_t byte_size);
 
 /// Unregister a registered shared memory region on the inference server. If
-/// the shared memory region is not registered, do nothing and return failure.
-/// Returned error indicates if the shared memory region was unregistered
-/// successfully or not.
+/// the shared memory region is not registered, do nothing. Returned error
+/// indicates if the shared memory region was unregistered successfully or not.
 /// \param server The inference server object.
 /// \param name The user-given name for the shared memory region to be
 /// registered.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_UnregisterSharedMemory(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnregisterSharedMemory(
     TRTSERVER_Server* server, const char* name);
 
 /// Get the current metrics for the server. The caller takes ownership

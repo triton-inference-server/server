@@ -182,6 +182,7 @@ InferRequestProvider::GetNextInputContent(
       return Status(
           RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
+    
     // If using shared memory return void* to address start for that input
     if (false) {
       // TODO create a shm_manager class that does

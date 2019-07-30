@@ -40,27 +40,29 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
 Status
-open_shm_region(const std::string& shm_key, int* shm_fd)
+OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
 {
   // get shared memory region descriptor
   *shm_fd = shm_open(shm_key.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (*shm_fd == -1) {
     return Status(
-        RequestStatusCode::INTERNAL, "Unable to get shared memory descriptor");
+        RequestStatusCode::INTERNAL, "Unable to open shared memory region: '" + shm_key + "'");
   }
 
   return Status::Success;
 }
 
 Status
-get_shm_addr(
+MapSharedMemory(
     const int shm_fd, const size_t offset, const size_t byte_size,
-    void** shm_addr)
+    void** mapped_addr)
 {
   // map shared memory to process address space
-  *shm_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (*shm_addr == MAP_FAILED) {
+  *mapped_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  if (*mapped_addr == MAP_FAILED) {
     return Status(
         RequestStatusCode::INTERNAL, "Unable to process address space");
   }
@@ -69,7 +71,7 @@ get_shm_addr(
 }
 
 Status
-shm_close(int shm_fd)
+CloseSharedMemoryRegion(int shm_fd)
 {
   int tmp = close(shm_fd);
   if (tmp == -1) {
@@ -81,9 +83,9 @@ shm_close(int shm_fd)
 }
 
 Status
-mmap_cleanup(void* shm_addr, size_t byte_size)
+UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 {
-  int tmp_fd = munmap(shm_addr, byte_size);
+  int tmp_fd = munmap(mapped_addr, byte_size);
   if (tmp_fd == -1) {
     return Status(
         RequestStatusCode::INTERNAL, "Unable to munmap shared memory region");
@@ -92,46 +94,54 @@ mmap_cleanup(void* shm_addr, size_t byte_size)
   return Status::Success;
 }
 
+}  // namespace
+
 Status
 SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
   LOG_VERBOSE(1) << "Register() shared memory region: '" << name << "'";
-  Status status = Status::Success;
 
-  // check if key is in shared_memory_map_ then remove
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  // If key is already in shared_memory_map_ then return error saying already
+  // registered
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
-    UnregisterSharedMemory(name);
+    return Status(
+        RequestStatusCode::ALREADY_EXISTS,
+        "shared memory region '" + name + "' is already registered");
   }
 
   // register (or re-register)
-  try {
-    void* tmp_addr;
-    int shm_fd;
+  void* mapped_addr;
+  int shm_fd = -1;
 
-    // don't re-open if shared memory is alreay open
-    for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
-         ++itr) {
-      if (itr->second->shm_key_ == shm_key)
-        shm_fd = itr->second->shm_fd_;
-      else {
-        RETURN_IF_ERROR(open_shm_region(shm_key, &shm_fd));
-      }
+  // don't re-open if shared memory is already open
+  for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
+       ++itr) {
+    if (itr->second->shm_key_ == shm_key) {
+      shm_fd = itr->second->shm_fd_;
+      break;
     }
-
-    RETURN_IF_ERROR(get_shm_addr(shm_fd, offset, byte_size, &tmp_addr));
-    std::unique_ptr<SharedMemoryInfo> shm_info(new SharedMemoryInfo(
-        name, shm_key, offset, byte_size, shm_fd, tmp_addr));
-    shared_memory_map_.insert(std::make_pair(
-        name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                  name, shm_key, offset, byte_size, shm_fd, tmp_addr))));
   }
-  catch (std::exception& ex) {
+
+  // open and set new shm_fd if new shared memory key
+  if (shm_fd == -1) {
+    RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  }
+
+  Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr));
+  if (!status.IsOk()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "Unable to register shared memory region successfully.");
+        "failed to register shared memory region '" + name + "'");
   }
+
+  shared_memory_map_.insert(std::make_pair(
+      name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
+                name, shm_key, offset, byte_size, shm_fd, mapped_addr))));
 
   return Status::Success;
 }
@@ -139,33 +149,56 @@ SharedMemoryManager::RegisterSharedMemory(
 Status
 SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
 {
-  LOG_VERBOSE(1) << "Unregister() '" << name << "'";
+  LOG_VERBOSE(1) << "Unregister() shared memory region: '" << name << "'";
+
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(register_mu_);
 
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
-    void* tmp_addr;
-    RETURN_IF_ERROR(get_shm_addr(
-        it->second->shm_fd_, it->second->offset_, it->second->byte_size_,
-        &tmp_addr));
-    RETURN_IF_ERROR(mmap_cleanup(tmp_addr, it->second->byte_size_));
+    RETURN_IF_ERROR(UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+
+    // remove region info from shared_memory_map_
+    shared_memory_map_.erase(it);
 
     // if no other region with same shm_key then close
     bool last_one = true;
     for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
          ++itr) {
-      if (itr->second->shm_key_ == it->second->shm_key_)
+      if (itr->second->shm_key_ == it->second->shm_key_) {
         last_one = false;
+        break;
+      }
     }
     if (last_one) {
-      RETURN_IF_ERROR(shm_close(it->second->shm_fd_));
+      RETURN_IF_ERROR(CloseSharedMemoryRegion(it->second->shm_fd_));
     }
+  }
 
-    // remove region info from shared_memory_map_
-    shared_memory_map_.erase(it);
-  } else {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Cannot unregister shared memory region that has not been registered.");
+  return Status::Success;
+}
+
+Status
+SharedMemoryManager::UnregisterAllSharedMemory()
+{
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  std::string error_message =
+      "Failed to unregister the following shared memory regions: ";
+  std::vector<std::string> unregister_fails;
+  for (const auto& shm_info : shared_memory_map_) {
+    Status unregister_status = UnregisterSharedMemory(shm_info.first);
+    if (!unregister_status.IsOk()) {
+      unregister_fails.push_back(shm_info.first);
+    }
+  }
+
+  if (!unregister_fails.empty()) {
+    for (auto unreg_fail : unregister_fails) {
+      error_message += unreg_fail + " ,";
+    }
+    LOG_ERROR << error_message;
   }
 
   return Status::Success;
@@ -196,42 +229,10 @@ SharedMemoryManager::Create(
 }
 
 Status
-SharedMemoryManager::RegisterUnregisterSharedMemory(
-    const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, ActionType type)
-{
-  // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock(register_mu_);
-  if (type == ActionType::UNREGISTER) {
-    UnregisterSharedMemory(name);
-  } else {
-    RegisterSharedMemory(name, shm_key, offset, byte_size);
-  }
-
-  return Status::Success;
-}
-
-Status
-SharedMemoryManager::UnregisterAllSharedMemory()
-{
-  for (const auto& shm_info : shared_memory_map_) {
-    Status unregister_status = UnregisterSharedMemory(shm_info.first);
-    if (!unregister_status.IsOk()) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "Failed to gracefully unregister all shared memory regions: " +
-              unregister_status.Message());
-    }
-  }
-  return Status::Success;
-}
-
-// Note: change to return entire SharedMemoryStateMap if needed
-Status
-SharedMemoryManager::GetLiveSharedMemory(
+SharedMemoryManager::GetSharedMemoryStatus(
     std::vector<std::string>& active_shm_regions)
 {
-  // use mutex to report consistent active regions
+  // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
 
   active_shm_regions.clear();

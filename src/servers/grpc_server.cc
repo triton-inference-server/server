@@ -172,13 +172,13 @@ class SharedMemoryControlContext final
 
       TRTSERVER_Error* err = nullptr;
       if (request.type() == SharedMemoryControlRequest::REGISTER) {
-        err = TRTSERVER_RegisterSharedMemory(
+        err = TRTSERVER_ServerRegisterSharedMemory(
             server, request.shared_memory_region().name().c_str(),
             request.shared_memory_region().shm_key().c_str(),
             request.shared_memory_region().offset(),
             request.shared_memory_region().byte_size());
       } else {
-        err = TRTSERVER_UnregisterSharedMemory(
+        err = TRTSERVER_ServerUnregisterSharedMemory(
             server, request.shared_memory_region().name().c_str());
       }
 

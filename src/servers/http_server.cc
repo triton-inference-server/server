@@ -193,11 +193,12 @@ class HTTPAPIServer : public HTTPServerImpl {
       : HTTPServerImpl(port, thread_cnt), server_(server),
         endpoint_names_(endpoints),
         api_regex_(
-            R"(/api/(health|profile|infer|status|modelcontrol|shmcontrol)(.*))"),
+            R"(/api/(health|profile|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
-        shmcontrol_regex_(R"(/(register|unregister)/([^/]+))/([\d]+))/([\d]+))")
+        sharedmemorycontrol_regex_(
+            R"(/(register|unregister)/([^/]+)/([\d]+)/([\d]+))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -241,7 +242,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleModelControl(
       evhtp_request_t* req, const std::string& modelcontrol_uri);
   void HandleSharedMemoryControl(
-      evhtp_request_t* req, const std::string& shmcontrol_uri);
+      evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
@@ -261,7 +262,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 infer_regex_;
   re2::RE2 status_regex_;
   re2::RE2 modelcontrol_regex_;
-  re2::RE2 shmcontrol_regex_;
+  re2::RE2 sharedmemorycontrol_regex_;
 };
 
 void
@@ -309,11 +310,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleModelControl(req, rest);
       return;
     }
-    // shmcontrol
-    if (endpoint == "shmcontrol" &&
+    // sharedmemorycontrol
+    if (endpoint == "sharedmemorycontrol" &&
         (std::find(
-             endpoint_names_.begin(), endpoint_names_.end(), "shmcontrol") !=
-         endpoint_names_.end())) {
+             endpoint_names_.begin(), endpoint_names_.end(),
+             "sharedmemorycontrol") != endpoint_names_.end())) {
       HandleSharedMemoryControl(req, rest);
       return;
     }
@@ -531,7 +532,7 @@ HTTPAPIServer::HandleModelControl(
 
 void
 HTTPAPIServer::HandleSharedMemoryControl(
-    evhtp_request_t* req, const std::string& shmcontrol_uri)
+    evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -541,10 +542,10 @@ HTTPAPIServer::HandleSharedMemoryControl(
   std::string action_type_str, remaining, name, shm_key, offset_str,
       byte_size_str;
   int offset = 0, byte_size = 0;
-  if ((shmcontrol_uri.empty()) ||
+  if ((sharedmemorycontrol_uri.empty()) ||
       (!RE2::FullMatch(
-          shmcontrol_uri, shmcontrol_regex_, &action_type_str, &name,
-          &offset_str, &byte_size_str))) {
+          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
+          &name, &offset_str, &byte_size_str))) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -560,10 +561,10 @@ HTTPAPIServer::HandleSharedMemoryControl(
   // }
   TRTSERVER_Error* err = nullptr;
   if (action_type_str == "register") {
-    err = TRTSERVER_RegisterSharedMemory(
+    err = TRTSERVER_ServerRegisterSharedMemory(
         server_.get(), name.c_str(), name.c_str(), offset, byte_size);
   } else if (action_type_str == "unregister") {
-    err = TRTSERVER_UnregisterSharedMemory(server_.get(), name.c_str());
+    err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), name.c_str());
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,

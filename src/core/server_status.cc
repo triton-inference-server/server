@@ -190,7 +190,7 @@ ServerStatusManager::UpdateServerStat(
       break;
     }
 
-    case ServerStatTimerScoped::Kind::MODELCONTROL: {
+    case ServerStatTimerScoped::Kind::MODEL_CONTROL: {
       StatDuration* d =
           server_status_.mutable_model_control_stats()->mutable_success();
       d->set_count(d->count() + 1);
@@ -198,7 +198,7 @@ ServerStatusManager::UpdateServerStat(
       break;
     }
 
-    case ServerStatTimerScoped::Kind::SHMCONTROL: {
+    case ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL: {
       StatDuration* d =
           server_status_.mutable_shm_control_stats()->mutable_success();
       d->set_count(d->count() + 1);

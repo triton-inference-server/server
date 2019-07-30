@@ -46,9 +46,9 @@ class SharedMemoryManager {
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, int shm_fd, void* shm_addr)
+        const size_t offset, const size_t byte_size, int shm_fd, void* mapped_addr)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_fd_(shm_fd), shm_addr_(shm_addr)
+          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr)
     {
     }
 
@@ -57,17 +57,16 @@ class SharedMemoryManager {
     size_t offset_;
     size_t byte_size_;
     int shm_fd_;
-    void* shm_addr_;
+    void* mapped_addr_;
   };
 
   using SharedMemoryStateMap =
       std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
 
-  enum ActionType { NO_ACTION, REGISTER, UNREGISTER };
-
   ~SharedMemoryManager();
 
-  /// Register or Unregister a specified shared memory region.
+  /// Register a specified shared memory region if valid. If already registered
+  /// return an error.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \param shm_key The unique name of the location in shared memory being
@@ -77,26 +76,25 @@ class SharedMemoryManager {
   /// \parm type The type action to be performed. If the action is REGISTER and
   /// the shared memory region has been registered, the shared memory region
   /// will be re-registered.
-  /// \return error status. Return "NOT_FOUND" if it tries to unregister a
-  /// shared memory region that hasn't been registered.
-  Status RegisterUnregisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, ActionType type);
-
-  /// Helper function that (Re)registers shared memory region if valid
+  /// \return error status. Return an error if it tries to register a shared
+  /// memory region that has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size);
 
-  /// Helper function that Unregisters shared memory region if it is registered
+  /// Unregister a specified shared memory region if registered else do nothing
+  /// if not registered and return success.
+  /// \param name The user-given name for the shared memory region to be
+  /// registered.
+  /// \return error status.
   Status UnregisterSharedMemory(const std::string& name);
 
-  /// Unregisters all shared memory regions. This function can be called by the
-  /// user. It should be called before shutting down the shared memory manager.
+  /// Unregisters all registered shared memory regions. This function is called
+  /// automatically when destroying the shared memory manager.
   Status UnregisterAllSharedMemory();
 
   /// updates the list of all registered shared memory regions.
-  Status GetLiveSharedMemory(std::vector<std::string>& active_shm_regions);
+  Status GetSharedMemoryStatus(std::vector<std::string>& active_shm_regions);
 
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(
@@ -107,7 +105,6 @@ class SharedMemoryManager {
   SharedMemoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager);
 
-  std::mutex shm_info_mu_;
   std::mutex register_mu_;
 
   std::shared_ptr<ServerStatusManager> status_manager_;

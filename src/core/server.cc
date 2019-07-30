@@ -124,6 +124,15 @@ InferenceServer::Init()
     return status;
   }
 
+  // Create the shared memory manager that registers / unregisters and returns
+  // the shared memory regions that are current registered.
+  status =
+      SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+
   // Create the model manager for the repository. Unless model control
   // is disabled, all models are eagerly loaded when the manager is created.
   bool polling_enabled = (model_control_mode_ == MODE_POLL);
@@ -142,15 +151,6 @@ InferenceServer::Init()
       // continue if not exiting on error.
       ready_state_ = ServerReadyState::SERVER_READY;
     }
-    return status;
-  }
-
-  // Create the shared memory manager that registers / unregisters and returns
-  // the current registered shared memory regions.
-  status =
-      SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
-  if (!status.IsOk()) {
-    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;
   }
 
@@ -387,22 +387,8 @@ InferenceServer::RegisterSharedMemory(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  auto action_type = SharedMemoryManager::ActionType::REGISTER;
-  return shared_memory_manager_->RegisterUnregisterSharedMemory(
-      name, shm_key, offset, byte_size, action_type);
-}
-
-Status
-InferenceServer::GetLiveSharedMemory(
-    std::vector<std::string>& active_shm_regions)
-{
-  if (shared_memory_manager_ == nullptr) {
-    LOG_INFO << "No shared memory manager is available. Exiting immediately.";
-    return Status::Success;
-  }
-  return shared_memory_manager_->GetLiveSharedMemory(active_shm_regions);
-
-  return Status::Success;
+  return shared_memory_manager_->RegisterSharedMemory(
+      name, shm_key, offset, byte_size);
 }
 
 Status
@@ -414,9 +400,20 @@ InferenceServer::UnregisterSharedMemory(const std::string& name)
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  auto action_type = SharedMemoryManager::ActionType::UNREGISTER;
-  return shared_memory_manager_->RegisterUnregisterSharedMemory(
-      name, "", 0, 0, action_type);
+  return shared_memory_manager_->UnregisterSharedMemory(name);
+}
+
+Status
+InferenceServer::GetSharedMemoryStatus(
+    std::vector<std::string>& active_shm_regions)
+{
+  if (shared_memory_manager_ == nullptr) {
+    LOG_INFO << "No shared memory manager is available. Exiting immediately.";
+    return Status::Success;
+  }
+  return shared_memory_manager_->GetSharedMemoryStatus(active_shm_regions);
+
+  return Status::Success;
 }
 
 uint64_t

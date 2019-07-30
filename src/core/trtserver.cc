@@ -1004,7 +1004,7 @@ TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODELCONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODEL_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
 
@@ -1017,7 +1017,7 @@ TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODELCONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODEL_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
 
@@ -1025,14 +1025,15 @@ TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
 }
 
 TRTSERVER_Error*
-TRTSERVER_RegisterSharedMemory(
+TRTSERVER_ServerRegisterSharedMemory(
     TRTSERVER_Server* server, const char* name, const char* shm_key,
     const size_t offset, const size_t byte_size)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::SHMCONTROL);
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
       std::string(name), std::string(shm_key), offset, byte_size));
@@ -1041,12 +1042,14 @@ TRTSERVER_RegisterSharedMemory(
 }
 
 TRTSERVER_Error*
-TRTSERVER_UnregisterSharedMemory(TRTSERVER_Server* server, const char* name)
+TRTSERVER_ServerUnregisterSharedMemory(
+    TRTSERVER_Server* server, const char* name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::SHMCONTROL);
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->UnregisterSharedMemory(std::string(name)));
 

@@ -771,8 +771,8 @@ class SharedMemoryControlContext {
   virtual ~SharedMemoryControlContext() = 0;
 
   /// Register a shared memory region on the inference server. If the shared
-  /// memory region is already registered, it will be unregistered and then
-  /// re-registered.
+  /// memory region is already registered, it will return an error message
+  /// with the error code 'TRTSERVER_ERROR_ALEADY_EXISTS'.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \param shm_key The unique name of the location in shared memory being
@@ -785,7 +785,7 @@ class SharedMemoryControlContext {
       size_t byte_size) = 0;
 
   /// Unregister a registered shared memory region on the inference server. If
-  /// the shared memory region is not registered, do nothing and return failure.
+  /// the shared memory region is not registered, do nothing and return success.
   /// \param name The user-given name for the shared memory region to be
   /// unregistered.
   /// \return Error object indicating success or failure.
