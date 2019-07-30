@@ -999,7 +999,7 @@ TRTSERVER_ServerModelStatus(
 }
 
 TRTSERVER_Error*
-TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
+TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1012,7 +1012,7 @@ TRTSERVER_LoadModel(TRTSERVER_Server* server, const char* model_name)
 }
 
 TRTSERVER_Error*
-TRTSERVER_UnloadModel(TRTSERVER_Server* server, const char* model_name)
+TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
