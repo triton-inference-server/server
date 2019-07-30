@@ -167,6 +167,13 @@ class ModelRepositoryManager {
       std::set<std::string>* added, std::set<std::string>* deleted,
       std::set<std::string>* modified, std::set<std::string>* unmodified);
 
+  /// [TODO] docs
+  Status Poll(
+      const std::set<std::string>& models,
+      std::set<std::string>* added, std::set<std::string>* deleted,
+      std::set<std::string>* modified, std::set<std::string>* unmodified,
+      ModelInfoMap* updated_infos);
+
   /// Update the configurations of newly added / modified model and their
   /// information shown in server status
   /// \param added The names of the models added to the repository.
