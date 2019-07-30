@@ -177,9 +177,15 @@ class SharedMemoryControlContext final
             request.shared_memory_region().shm_key().c_str(),
             request.shared_memory_region().offset(),
             request.shared_memory_region().byte_size());
-      } else {
+      } else if (request.type() == SharedMemoryControlRequest::UNREGISTER) {
         err = TRTSERVER_ServerUnregisterSharedMemory(
             server, request.shared_memory_region().name().c_str());
+      } else if (request.type() == SharedMemoryControlRequest::UNREGISTER_ALL) {
+        err = TRTSERVER_ServerUnregisterAllSharedMemory(server);
+      } else {
+        std::vector<std::string> active_shm_regions;
+        err = TRTSERVER_ServerGetSharedMemoryStatus(server, active_shm_regions);
+        // TODO Write to response
       }
 
       RequestStatusUtil::Create(

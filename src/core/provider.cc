@@ -182,12 +182,12 @@ InferRequestProvider::GetNextInputContent(
       return Status(
           RequestStatusCode::INTERNAL, "unexpected input '" + name + "'");
     }
-    
+
     // If using shared memory return void* to address start for that input
     if (false) {
-      // TODO create a shm_manager class that does
-      // shm_open and mmap for each new shared memory region and maintains
-      // list of current / registered shm regions
+      // auto it = shared_memory_map_.find(name);
+      // *content = it->second->mapped_addr_;
+      // *content_byte_size = it->second->byte_size_;
     } else {
       auto& input_content = pr->second;
 

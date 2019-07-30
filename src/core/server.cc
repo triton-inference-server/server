@@ -404,6 +404,18 @@ InferenceServer::UnregisterSharedMemory(const std::string& name)
 }
 
 Status
+InferenceServer::UnregisterAllSharedMemory()
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->UnregisterAllSharedMemory();
+}
+
+Status
 InferenceServer::GetSharedMemoryStatus(
     std::vector<std::string>& active_shm_regions)
 {

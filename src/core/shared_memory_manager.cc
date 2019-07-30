@@ -49,7 +49,8 @@ OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
   *shm_fd = shm_open(shm_key.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
   if (*shm_fd == -1) {
     return Status(
-        RequestStatusCode::INTERNAL, "Unable to open shared memory region: '" + shm_key + "'");
+        RequestStatusCode::INTERNAL,
+        "Unable to open shared memory region: '" + shm_key + "'");
   }
 
   return Status::Success;
@@ -132,7 +133,7 @@ SharedMemoryManager::RegisterSharedMemory(
     RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
   }
 
-  Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr));
+  Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
   if (!status.IsOk()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -156,7 +157,8 @@ SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
 
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
-    RETURN_IF_ERROR(UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+    RETURN_IF_ERROR(
+        UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
 
     // remove region info from shared_memory_map_
     shared_memory_map_.erase(it);

@@ -26,6 +26,8 @@
 
 #include "src/core/trtserver.h"
 
+#include <string>
+#include <vector>
 #include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
@@ -1052,6 +1054,35 @@ TRTSERVER_ServerUnregisterSharedMemory(
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->UnregisterSharedMemory(std::string(name)));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerUnregisterAllSharedMemory(TRTSERVER_Server* server)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->UnregisterAllSharedMemory());
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerGetSharedMemoryStatus(
+    TRTSERVER_Server* server, std::vector<std::string>& active_shm_regions)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(active_shm_regions));
 
   return nullptr;  // success
 }

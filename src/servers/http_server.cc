@@ -198,7 +198,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister)/([^/]+)/([\d]+)/([\d]+))")
+            R"(/(register|unregister|unregisterall|status)/([^/]+)/([\d]+)/([\d]+))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -550,21 +550,19 @@ HTTPAPIServer::HandleSharedMemoryControl(
     return;
   }
 
-  // try {
-  //
-  // }
-  // catch () {
-  //   err = TRTSERVER_ErrorNew(
-  //       TRTSERVER_ERROR_UNKNOWN,
-  //       std::string("unknown action type '" + action_type_str +
-  //       "'").c_str());
-  // }
   TRTSERVER_Error* err = nullptr;
   if (action_type_str == "register") {
     err = TRTSERVER_ServerRegisterSharedMemory(
         server_.get(), name.c_str(), name.c_str(), offset, byte_size);
   } else if (action_type_str == "unregister") {
     err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), name.c_str());
+  } else if (action_type_str == "unregisterall") {
+    err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
+  } else if (action_type_str == "status") {
+    std::vector<std::string> active_shm_regions;
+    err = TRTSERVER_ServerGetSharedMemoryStatus(
+        server_.get(), active_shm_regions);
+    // TODO Write to response
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,

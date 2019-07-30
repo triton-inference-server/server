@@ -46,7 +46,8 @@ class SharedMemoryManager {
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, int shm_fd, void* mapped_addr)
+        const size_t offset, const size_t byte_size, int shm_fd,
+        void* mapped_addr)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr)
     {
@@ -93,7 +94,8 @@ class SharedMemoryManager {
   /// automatically when destroying the shared memory manager.
   Status UnregisterAllSharedMemory();
 
-  /// updates the list of all registered shared memory regions.
+  /// Get the list of names of all registered (active) shared memory regions on
+  /// the inference server. It is empty if there are none.
   Status GetSharedMemoryStatus(std::vector<std::string>& active_shm_regions);
 
   /// Creates a SharedMemoryManager object that uses the given status_manager

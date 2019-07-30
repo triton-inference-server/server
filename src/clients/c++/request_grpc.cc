@@ -374,10 +374,12 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
+  Error UnregisterAllSharedMemory() override;
+  Error GetSharedMemoryStatus() override;
 
  private:
   Error SendRequest(
-      const std::string& name, const bool is_register,
+      const std::string& name, const SharedMemoryControlRequest::Type action,
       const std::string& shm_key, const size_t offset, const size_t byte_size);
 
   // GRPC end point.
@@ -398,36 +400,55 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest(name, true, shm_key, offset, byte_size);
+  return SendRequest(
+      name, SharedMemoryControlRequest::REGISTER, shm_key, offset, byte_size);
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest(name, false, "", 0, 0);
+  return SendRequest(name, SharedMemoryControlRequest::UNREGISTER, "", 0, 0);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
+{
+  return SendRequest("", SharedMemoryControlRequest::UNREGISTER_ALL, "", 0, 0);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus()
+{
+  return SendRequest("", SharedMemoryControlRequest::GET_STATUS, "", 0, 0);
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::SendRequest(
-    const std::string& name, const bool is_register, const std::string& shm_key,
-    const size_t offset, const size_t byte_size)
+    const std::string& name, const SharedMemoryControlRequest::Type action,
+    const std::string& shm_key, const size_t offset, const size_t byte_size)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
 
-  auto rshm_region = request.mutable_shared_memory_region();
-  rshm_region->set_name(name);
-
-  if (is_register) {
+  if (action == SharedMemoryControlRequest::REGISTER) {
+    auto rshm_region = request.mutable_shared_memory_region();
+    rshm_region->set_name(name);
     rshm_region->set_shm_key(shm_key);
     rshm_region->set_offset(offset);
     rshm_region->set_byte_size(byte_size);
-    request.set_type(SharedMemoryControlRequest::REGISTER);
+    request.set_type(action);
+  } else if (action == SharedMemoryControlRequest::UNREGISTER) {
+    auto rshm_region = request.mutable_shared_memory_region();
+    rshm_region->set_name(name);
+    request.set_type(action);
+  } else if (action == SharedMemoryControlRequest::UNREGISTER_ALL) {
+    request.set_type(action);
   } else {
-    request.set_type(SharedMemoryControlRequest::UNREGISTER);
+    request.set_type(action);
   }
+
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
