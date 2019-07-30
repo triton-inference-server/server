@@ -253,8 +253,8 @@ if(${TRTIS_ENABLE_CAFFE2} OR ${TRTIS_ENABLE_PYTORCH})
     trtserver
     PUBLIC ${TRTIS_EXTRA_LDFLAGS}
     PUBLIC -ltorch
-    PUBLIC -lthnvrtc
     PUBLIC -lcaffe2_detectron_ops_gpu
+    PUBLIC -lcaffe2_nvrtc
     PUBLIC -lc10
     PUBLIC -lc10_cuda
     PUBLIC -lmkl_core
