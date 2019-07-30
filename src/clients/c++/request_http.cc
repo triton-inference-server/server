@@ -748,6 +748,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
+  Error UnregisterAllSharedMemory() override;
+  Error GetSharedMemoryStatus() override;
 
  private:
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
@@ -792,6 +794,18 @@ SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
 }
 
 Error
+SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
+{
+  return SendRequest("unregisterall", "", "", 0, 0);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus()
+{
+  return SendRequest("status", "", "", 0, 0);
+}
+
+Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
     const std::string& shm_key, const size_t offset, const size_t byte_size)
@@ -808,11 +822,13 @@ SharedMemoryControlHttpContextImpl::SendRequest(
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
-  // Want binary representation of the status.
-  std::string full_url = url_ + "/" + action_str + "/" + name;
+  // For unregisterall and status only action_str is needed
+  std::string full_url = url_ + "/" + action_str;
   if (action_str == "register") {
-    full_url += "/" + shm_key + "/" + std::to_string(offset) + "/" +
-                std::to_string(byte_size);
+    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
+                "/" + std::to_string(byte_size);
+  } else if (action_str == "unregister") {
+    full_url += +"/" + name;
   }
 
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
