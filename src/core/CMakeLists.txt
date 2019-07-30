@@ -129,7 +129,6 @@ set(
   metrics.cc
   model_config_utils.cc
   model_repository_manager.cc
-  shared_memory_manager.cc
   profile.cc
   provider.cc
   provider_utils.cc
@@ -156,7 +155,6 @@ set(
   metrics.h
   model_config_utils.h
   model_repository_manager.h
-  shared_memory_manager.h
   profile.h
   provider.h
   provider_utils.h

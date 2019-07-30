@@ -154,15 +154,6 @@ InferenceServer::Init()
     return status;
   }
 
-  // Create the shared memory manager that registers / unregisters and returns
-  // the current registered shared memory regions.
-  status =
-      SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
-  if (!status.IsOk()) {
-    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
-    return status;
-  }
-
   ready_state_ = ServerReadyState::SERVER_READY;
   return Status::Success;
 }
@@ -401,19 +392,6 @@ InferenceServer::RegisterSharedMemory(
 }
 
 Status
-InferenceServer::GetLiveSharedMemory(
-    std::vector<std::string>& active_shm_regions)
-{
-  if (shared_memory_manager_ == nullptr) {
-    LOG_INFO << "No shared memory manager is available. Exiting immediately.";
-    return Status::Success;
-  }
-  return shared_memory_manager_->GetLiveSharedMemory(active_shm_regions);
-
-  return Status::Success;
-}
-
-Status
 InferenceServer::UnregisterSharedMemory(const std::string& name)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
@@ -424,6 +402,7 @@ InferenceServer::UnregisterSharedMemory(const std::string& name)
 
   return shared_memory_manager_->UnregisterSharedMemory(name);
 }
+
 
 Status
 InferenceServer::UnregisterAllSharedMemory()
