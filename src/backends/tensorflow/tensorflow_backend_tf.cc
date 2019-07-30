@@ -633,8 +633,8 @@ TRTISTF_ModelCreateFromGraphDef(
         "model " + std::string(model_name) + " has an empty network");
   }
 
-  // Clear the device field from the graphdef so that TRTIS can control
-  // which GPU device should graph run on.
+  // Clear the device field from the graphdef so that the default device
+  // setting below will control which GPU the graph will run on
   for (tensorflow::NodeDef& node : *graph_def.mutable_node()) {
     if (!tensorflow::grappler::NodeIsOnCpu(&node)) {
       node.clear_device();
@@ -703,7 +703,7 @@ TRTISTF_ModelCreateFromSavedModel(
   // available in tensorflow/cc/saved_model/loader.cc so we use
   // allocator_type in pass in the gpu_device we want and then
   // loader.cc (our modified version) will use that to
-  // SetDefaultDevice appropriately. 
+  // SetDefaultDevice appropriately.
   if (device_id == TRTISTF_NO_GPU_DEVICE) {
     session_options.config.mutable_gpu_options()->set_allocator_type("/cpu:0");
   } else {

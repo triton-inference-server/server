@@ -6,7 +6,7 @@ index 52345a376c..ed9f03730a 100644
          "//tensorflow/core:lib_internal",
          "//tensorflow/core:protos_all_cc",
          "//tensorflow/core/util/tensor_bundle:naming",
-+       "//tensorflow/core/grappler:utils",
++        "//tensorflow/core/grappler:utils",
          # mobile not supported yet
      ]),
  )

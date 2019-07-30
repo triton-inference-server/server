@@ -24,11 +24,11 @@ index 85d3dd01fa..b385f8b857 100644
 +  const std::string& alloc_type =
 +    lsession_options.config.gpu_options().allocator_type();
 +  if (!alloc_type.empty() && (alloc_type[0] == '/')) {
-+    // Clear the device field from the graphdef so that TRTIS can control
-+    // which GPU device should graph run on.
-+    for(tensorflow::NodeDef& node :
++    // Clear the device field from the graphdef so that the default device
++    // setting below will control which GPU the graph will run on.
++    for (tensorflow::NodeDef& node :
 +      *bundle->meta_graph_def.mutable_graph_def()->mutable_node()) {
-+      if(!tensorflow::grappler::NodeIsOnCpu(&node)) {
++      if (!tensorflow::grappler::NodeIsOnCpu(&node)) {
 +        node.clear_device();
 +      }
 +    }
