@@ -38,7 +38,7 @@ Model Control Mode NONE
 
 The server attempts to load all models in the model repository at
 startup. Models that the server is not able to load will be marked as
-NOT_READY in the server status and will not be available for
+UNAVAILABLE in the server status and will not be available for
 inferencing.
 
 Changes to the model repository while the server is running will be
@@ -55,7 +55,7 @@ Model Control Mode POLL
 
 The server attempts to load all models in the model repository at
 startup. Models that the server is not able to load will be marked as
-NOT_READY in the server status and will not be available for
+UNAVAILABLE in the server status and will not be available for
 inferencing.
 
 Changes to the model repository will be detected and the server will
