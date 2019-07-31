@@ -56,6 +56,7 @@ NVIDIA TensorRT Inference Server
    models_and_schedulers
    model_repository
    model_configuration
+   model_management
    http_grpc_api
    metrics
 
