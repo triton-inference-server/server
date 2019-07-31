@@ -99,6 +99,11 @@ class SharedMemoryManager {
   Status GetSharedMemoryInfo(
       const std::string& name, void** shm_mapped_addr, size_t* shm_offset);
 
+  // Get the base address and offset for the specific shared memory region. If
+  // the shared memory region is not valid return an error message
+  Status GetSharedMemoryInfo(
+      const std::string& name, void** shm_mapped_addr, size_t* shm_offset);
+
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(
       const std::shared_ptr<ServerStatusManager>& status_manager,
