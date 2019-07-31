@@ -34,18 +34,18 @@ namespace perfclient {
 
 /// Constant parameters that determine the whether stopping criteria has met
 /// for the current phase of testing
-typedef struct LoadParametersStruct {
+struct LoadParams {
   // The number of measurements to account for during calculation of load
   // status
   uint32_t stability_window;
   // The +/- range to account for while assessing load status
   double stable_offset;
-} LoadParams;
+};
 
 
 /// Data structure to keep track of real-time load status and determine wether
 /// stopping criteria has met for the current phase of testing.
-typedef struct LoadStatusStruct {
+struct LoadStatus {
   // Record of the measurements in the current session
   //
   // Stores the observations of infer_per_sec and latencies in a vector
@@ -55,7 +55,7 @@ typedef struct LoadStatusStruct {
   double avg_ips = 0;
   // Stores the average latency within the stability window
   uint64_t avg_latency = 0;
-} LoadStatus;
+};
 
 
 struct ServerSideStats {
@@ -65,7 +65,7 @@ struct ServerSideStats {
   uint64_t compute_time_ns;
 };
 
-typedef struct PerformanceStatusStruct {
+struct PerfStatus {
   uint32_t concurrency;
   size_t batch_size;
   // Request count and elapsed time measured by server
@@ -93,7 +93,7 @@ typedef struct PerformanceStatusStruct {
 
   // placeholder for the latency value that is used for conditional checking
   uint64_t stabilizing_latency_ns;
-} PerfStatus;
+};
 
 
 //==============================================================================
