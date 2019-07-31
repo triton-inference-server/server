@@ -326,7 +326,7 @@ These custom backends are built using CMake::
 When the build completes the custom backend libraries can be found in
 trtis-custom-backends/install.
 
-A custom backend is not built-into the inference server. Instead if is
+A custom backend is not built-into the inference server. Instead it is
 built as a separate shared library that the inference server
 dynamically loads when the model repository contains a model that uses
 that custom backend. There are a couple of ways you can build your
@@ -368,6 +368,17 @@ src/param.cc. You can create a custom backend from that source using
 the following command::
 
   g++ -fpic -shared -std=c++11 -o libparam.so custom-backend-sdk/src/param.cc -Icustom-backend-sdk/include custom-backend-sdk/lib/libcustombackend.a
+
+Using the Custom Instance Wrapper Class
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The custom backend SDK provides a `CustomInstance Class 
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_. 
+The CustomInstance class is a C++ wrapper class that abstracts away the 
+backend C-API for ease of use. All of the example custom backends in 
+`src/custom directory
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_
+derive from the CustomInstance class and can be referenced for usage.
 
 Building the Client Libraries and Examples
 ------------------------------------------
