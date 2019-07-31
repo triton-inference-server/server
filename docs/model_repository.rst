@@ -99,47 +99,13 @@ the output it corresponds to in the :ref:`model configuration
 Modifying the Model Repository
 ------------------------------
 
-By default, changes to the model repository will be detected and the
-server will attempt to add, remove, and reload models as necessary
-based on those changes. Changes to the model repository may not be
-detected immediately because the server polls the repository
-periodically. You can control the polling interval with the
--\\-repository-poll-secs options. The console log or the :ref:`Status
-API <section-api-status>` can be used to determine when model
-repository changes have taken effect. You can disable the server from
-responding to repository changes by using the
--\\-allow-poll-model-repository=false option.
-
-The TensorRT Inference Server responds to the following changes:
-
-* Versions may be added and removed from models by adding and removing
-  the corresponding version subdirectory. The inference server will
-  allow in-flight requests to complete even if they are using a
-  removed version of the model. New requests for a removed model
-  version will fail. Depending on the model's :ref:`version policy
-  <section-version-policy>`, changes to the available versions may
-  change which model version is served by default.
-
-* Existing models can be removed from the repository by removing the
-  corresponding model directory.  The inference server will allow
-  in-flight requests to any version of the removed model to
-  complete. New requests for a removed model will fail.
-
-* New models can be added to the repository by adding a new model
-  directory.
-
-* The :ref:`model configuration <section-model-configuration>`
-  (config.pbtxt) can be changed and the server will unload and reload
-  the model to pick up the new model configuration.
-
-* Labels files providing labels for outputs that represent
-  classifications can be added, removed, or modified and the inference
-  server will unload and reload the model to pick up the new
-  labels. If a label file is added or removed the corresponding edit
-  to the :cpp:var:`label_filename
-  <nvidia::inferenceserver::ModelOutput::label_filename>` property of
-  the output it corresponds to in the :ref:`model configuration
-  <section-model-configuration>` must be performed at the same time.
+The inference server has multiple execution modes that control how the
+models within the model repository are managed. These modes are
+described in :ref:`section-model-management`. In the default mode
+changes to the model repository will be detected and the server will
+attempt to load and unload models as necessary based on those
+changes. In the other modes changes to the model repository will be
+ignored
 
 .. _section-model-versions:
 
@@ -166,9 +132,9 @@ definition. By default, the name of this file or directory must be:
 * **model.plan** for TensorRT models
 * **model.graphdef** for TensorFlow GraphDef models
 * **model.savedmodel** for TensorFlow SavedModel models
-* **model.netdef** and **init_model.netdef** for Caffe2 Netdef models
 * **model.onnx** for ONNX Runtime ONNX models
 * **model.pt** for PyTorch TorchScript models
+* **model.netdef** and **init_model.netdef** for Caffe2 Netdef models
 
 This default name can be overridden using the *default_model_filename*
 property in the :ref:`model configuration
@@ -264,19 +230,6 @@ required the minimal model repository would look like::
         model.savedmodel/
            <saved-model files>
 
-Caffe2 Models
-^^^^^^^^^^^^^
-
-A Caffe2 model definition is called a *NetDef*. A Caffe2 NetDef is a
-single file that by default must be named model.netdef. A minimal
-model repository for a single NetDef model would look like::
-
-  models/
-    <model-name>/
-      config.pbtxt
-      1/
-        model.netdef
-
 TensorRT/TensorFlow Models
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -341,6 +294,19 @@ A minimal model repository for a single PyTorch model would look like::
         model.pt
 
 .. _section-custom-backends:
+
+Caffe2 Models
+^^^^^^^^^^^^^
+
+A Caffe2 model definition is called a *NetDef*. A Caffe2 NetDef is a
+single file that by default must be named model.netdef. A minimal
+model repository for a single NetDef model would look like::
+
+  models/
+    <model-name>/
+      config.pbtxt
+      1/
+        model.netdef
 
 Custom Backends
 ---------------

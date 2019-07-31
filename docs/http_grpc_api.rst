@@ -31,14 +31,16 @@ Inference Server API
 ====================
 
 The TensorRT Inference Server exposes both HTTP and GRPC
-endpoints. Three endpoints with identical functionality are exposed
-for each protocol.
+endpoints. The following endpoints are exposed for each protocol.
 
 * :ref:`section-api-health`: The server health API for determining
   server liveness and readiness.
 
 * :ref:`section-api-status`: The server status API for getting
   information about the server and about the models being served.
+
+* :ref:`section-api-model-control`: The server model-control API for
+  explicitly loading and unloading models.
 
 * :ref:`section-api-inference`: The inference API that accepts model
   inputs, runs inference and returns the requested outputs.
@@ -119,6 +121,29 @@ message indicating success or failure.
 For either protocol the status itself is returned as a
 :cpp:var:`ServerStatus <nvidia::inferenceserver::ServerStatus>`
 message.
+
+.. _section-api-model-control:
+
+Model Control
+-------------
+
+Performing an HTTP POST to /api/modelcontrol/<load|unload>/<model
+name> loads or unloads a model from the inference server as described
+in :ref:`section-model-management`.
+
+The success or failure of the inference request is indicated in the
+HTTP response code and the **NV-Status** response header. The
+**NV-Status** response header returns a text protobuf formatted
+:cpp:var:`RequestStatus <nvidia::inferenceserver::RequestStatus>`
+message.
+
+For GRPC the :cpp:var:`GRPCService
+<nvidia::inferenceserver::GRPCService>` uses the
+:cpp:var:`ModelControlRequest
+<nvidia::inferenceserver::ModelControlRequest>` and
+:cpp:var:`ModelControlResponse
+<nvidia::inferenceserver::ModelControlResponse>` messages to implement
+the endpoint.
 
 .. _section-api-inference:
 
