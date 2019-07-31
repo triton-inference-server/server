@@ -42,6 +42,7 @@
 #include "src/clients/c++/request_grpc.h"
 #include "src/clients/c++/request_http.h"
 #include "src/core/constants.h"
+#include "src/core/model_config.pb.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -409,13 +410,14 @@ class ConcurrencyManager {
   /// \param max_threads The maximum number of working threads to be spawned.
   /// \param sequence_length The base length of each sequence.
   /// \param zero_input Whether to fill the input tensors with zero.
+  /// \param string_length Length of string used to fill string input tensors.
   /// \param factory The ContextFactory object used to create InferContext.
   /// \param manger Returns a new ConcurrencyManager object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const bool zero_input,
-      const std::string& data_directory,
+      const size_t string_length, const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<ConcurrencyManager>* manager);
 
@@ -476,6 +478,7 @@ class ConcurrencyManager {
   ConcurrencyManager(
       const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const bool zero_input,
+      const size_t string_length,
       const std::shared_ptr<ContextFactory>& factory);
 
   /// Function for worker that sends async inference requests.
@@ -491,10 +494,13 @@ class ConcurrencyManager {
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
   /// \param input_buffer Returns the generated input_buffer for all requests.
+  /// \param string_input_buffer Returns the generated string input_buffer for
+  //         all requests.
   nic::Error PrepareInfer(
       std::unique_ptr<nic::InferContext>* ctx,
       std::unique_ptr<nic::InferContext::Options>* options,
-      std::vector<uint8_t>& input_buffer);
+      std::vector<uint8_t>& input_buffer,
+      std::vector<std::string>& string_input_buffer);
 
   /// Generate random sequence length based on 'offset_ratio' and
   /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
@@ -506,6 +512,7 @@ class ConcurrencyManager {
   size_t max_threads_;
   size_t sequence_length_;
   bool zero_input_;
+  size_t string_length_;
 
   bool on_sequence_model_;
 
@@ -554,12 +561,13 @@ nic::Error
 ConcurrencyManager::Create(
     const int32_t batch_size, const size_t max_threads,
     const size_t sequence_length, const bool zero_input,
-    const std::string& data_directory,
+    const size_t string_length, const std::string& data_directory,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<ConcurrencyManager>* manager)
 {
   manager->reset(new ConcurrencyManager(
-      batch_size, max_threads, sequence_length, zero_input, factory));
+      batch_size, max_threads, sequence_length, zero_input, string_length,
+      factory));
 
   // Read provided data
   if (!data_directory.empty()) {
@@ -567,6 +575,13 @@ ConcurrencyManager::Create(
     std::unique_ptr<nic::InferContext> ctx;
     RETURN_IF_ERROR((*manager)->factory_->CreateInferContext(&ctx));
     for (const auto& input : ctx->Inputs()) {
+      if (input->DType() == ni::DataType::TYPE_STRING) {
+        return nic::Error(
+            ni::RequestStatusCode::UNSUPPORTED,
+            "input '" + input->Name() +
+                "' is of type string. Reading prepared string data is"
+                " not supported at the moment.");
+      }
       const auto file_path = data_directory + "/" + input->Name();
       auto it = (*manager)
                     ->input_data_.emplace(input->Name(), std::vector<char>())
@@ -581,10 +596,10 @@ ConcurrencyManager::Create(
 ConcurrencyManager::ConcurrencyManager(
     const int32_t batch_size, const size_t max_threads,
     const size_t sequence_length, const bool zero_input,
-    const std::shared_ptr<ContextFactory>& factory)
+    const size_t string_length, const std::shared_ptr<ContextFactory>& factory)
     : batch_size_(batch_size), max_threads_(max_threads),
       sequence_length_(sequence_length), zero_input_(zero_input),
-      factory_(factory)
+      string_length_(string_length), factory_(factory)
 {
   request_timestamps_.reset(new TimestampVector());
   on_sequence_model_ = (factory_->SchedulerType() == ContextFactory::SEQUENCE);
@@ -663,7 +678,8 @@ nic::Error
 ConcurrencyManager::PrepareInfer(
     std::unique_ptr<nic::InferContext>* ctx,
     std::unique_ptr<nic::InferContext::Options>* options,
-    std::vector<uint8_t>& input_buffer)
+    std::vector<uint8_t>& input_buffer,
+    std::vector<std::string>& string_input_buffer)
 {
   RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
 
@@ -702,55 +718,97 @@ ConcurrencyManager::PrepareInfer(
 
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
-  // Create a zero or randomly (as indicated by zero_input_)
-  // initialized buffer that is large enough to provide the largest
-  // needed input. We (re)use this buffer for all input values.
-  size_t max_input_byte_size = 0;
-  for (const auto& input : (*ctx)->Inputs()) {
-    const int64_t bs = input->ByteSize();
-    if (bs < 0) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "input '" + input->Name() +
-              "' has variable-size shape, unable to create input values for "
-              "model '" +
-              (*ctx)->ModelName() + "'");
+  if (input_buffer.size() == 0) {
+    // Create buffers that are large enough to provide the largest
+    // input. Create a zero or randomly (as indicated by zero_input_)
+    // initialized buffer for numeric input as well as a buffer
+    // initialized with empty strings of specified length for string
+    // input. We (re)use these buffers for all input values.
+    size_t max_input_byte_size = 0;
+    size_t max_string_input_length = 0;
+    for (const auto& input : (*ctx)->Inputs()) {
+      if (input->DType() != ni::DataType::TYPE_STRING) {
+        const int64_t bs = input->ByteSize();
+        if (bs < 0) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "input '" + input->Name() +
+                  "' has variable-size shape, unable to create"
+                  " input values for model '" +
+                  (*ctx)->ModelName() + "'");
+        }
+
+        max_input_byte_size =
+            std::max(max_input_byte_size, (size_t)input->ByteSize());
+      } else {
+        size_t string_input_length = 0;
+        for (const auto dim : input->Dims()) {
+          if (dim == -1) {
+            return nic::Error(
+                ni::RequestStatusCode::INVALID_ARG,
+                "input '" + input->Name() +
+                    "' has variable-size shape, unable to create"
+                    " input values for model '" +
+                    (*ctx)->ModelName() + "'");
+          }
+
+          string_input_length += dim;
+        }
+
+        max_string_input_length =
+          std::max(max_string_input_length, string_input_length);
+      }
     }
 
-    max_input_byte_size =
-        std::max(max_input_byte_size, (size_t)input->ByteSize());
-  }
-
-  if (input_buffer.size() == 0) {
     std::vector<uint8_t> input_buf(max_input_byte_size);
     for (size_t i = 0; i < input_buf.size(); ++i) {
       input_buf[i] = (zero_input_) ? 0 : rand();
     }
     input_buffer.swap(input_buf);
+
+    std::vector<std::string> string_input_buf(max_string_input_length);
+    for (size_t i = 0; i < string_input_buf.size(); ++i) {
+      string_input_buf[i] = std::string(string_length_, ' ');
+    }
+    string_input_buffer.swap(string_input_buf);
   }
 
   // Initialize inputs
   for (const auto& input : (*ctx)->Inputs()) {
     RETURN_IF_ERROR(input->Reset());
 
-    size_t batch1_size = (size_t)input->ByteSize();
-    const uint8_t* data = &input_buffer[0];
-    // if available, use provided data instead
-    auto it = input_data_.find(input->Name());
-    if (it != input_data_.end()) {
-      if (batch1_size > it->second.size()) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() + "' requires " +
-                std::to_string(batch1_size) +
-                " bytes for each batch, but provided data only has " +
-                std::to_string(it->second.size()) + " bytes");
+    if (input->DType() != ni::DataType::TYPE_STRING) {
+      size_t batch1_size = (size_t)input->ByteSize();
+      const uint8_t* data = &input_buffer[0];
+      // if available, use provided data instead
+      auto it = input_data_.find(input->Name());
+      if (it != input_data_.end()) {
+        if (batch1_size > it->second.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_size) +
+                  " bytes for each batch, but provided data only has " +
+                  std::to_string(it->second.size()) + " bytes");
+        }
+        data = (const uint8_t*)&(it->second)[0];
       }
-      data = (const uint8_t*)&(it->second)[0];
-    }
 
-    for (size_t i = 0; i < batch_size_; ++i) {
-      RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
+      for (size_t i = 0; i < batch_size_; ++i) {
+        RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
+      }
+    } else {
+      size_t batch1_length = 0;
+      for (const auto dim : input->Dims()) {
+        batch1_length += dim;
+      }
+      std::vector<std::string> data(
+          string_input_buffer.begin(),
+          string_input_buffer.begin() + batch1_length);
+
+      for (size_t i = 0; i < batch_size_; ++i) {
+        RETURN_IF_ERROR(input->SetFromString(data));
+      }
     }
   }
 
@@ -792,6 +850,7 @@ ConcurrencyManager::AsyncInfer(
 
   // Variable that can be used across InferContexts
   std::vector<uint8_t> input_buf;
+  std::vector<std::string> string_input_buf;
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
 
@@ -818,7 +877,8 @@ ConcurrencyManager::AsyncInfer(
     while (active_ctx_cnt > ctxs.size()) {
       ctxs.emplace_back(new InferContextMetaData());
       stats->emplace_back();
-      *err = PrepareInfer(&(ctxs.back()->ctx_), &options, input_buf);
+      *err = PrepareInfer(&(ctxs.back()->ctx_), &options, input_buf,
+          string_input_buf);
       if (!err->IsOk()) {
         return;
       }
@@ -1773,6 +1833,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-H <HTTP header>" << std::endl;
+  std::cerr << "\t-y <length of strings used to fill inputs>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--percentile <percentile>" << std::endl;
   std::cerr << "\t--data-directory <path>" << std::endl;
@@ -1831,6 +1892,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "The -z flag causes input tensors to be initialized with zeros "
                "instead of random data"
             << std::endl;
+  std::cerr << "For -y, it indicates the length of strings initialized for"
+               " string input tensors"
+            << std::endl;
   std::cerr
       << "For --sequence-length, it indicates the base length of a sequence"
       << " used for sequence models. A sequence with length x will be composed"
@@ -1863,6 +1927,7 @@ main(int argc, char** argv)
   bool dynamic_concurrency_mode = false;
   bool streaming = false;
   bool zero_input = false;
+  int32_t string_length = 128;
   size_t max_threads = 16;
   // average length of a sentence
   size_t sequence_length = 20;
@@ -1891,7 +1956,7 @@ main(int argc, char** argv)
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vndazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
+              argc, argv, "vndazc:u:m:x:b:t:p:i:H:l:r:s:f:y:", long_options,
               NULL)) != -1) {
     switch (opt) {
       case 0:
@@ -1963,6 +2028,9 @@ main(int argc, char** argv)
       case 'f':
         filename = optarg;
         break;
+      case 'y':
+        string_length = std::atoi(optarg);
+        break;
       case 'a':
         std::cerr << "WARNING: -a flag is deprecated. Enable it will not change"
                   << "perf client behaviors." << std::endl;
@@ -2008,6 +2076,9 @@ main(int argc, char** argv)
   if (zero_input && !data_directory.empty()) {
     Usage(argv, "zero input can't be set when data directory is provided");
   }
+  if (string_length <= 0) {
+    Usage(argv, "string length must be > 0");
+  }
 
   // trap SIGINT to allow threads to exit gracefully
   signal(SIGINT, SignalHandler);
@@ -2024,8 +2095,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = ConcurrencyManager::Create(
-      batch_size, max_threads, sequence_length, zero_input, data_directory,
-      factory, &manager);
+      batch_size, max_threads, sequence_length, zero_input, string_length,
+      data_directory, factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
