@@ -423,9 +423,21 @@ InferenceServer::GetSharedMemoryStatus(
     LOG_INFO << "No shared memory manager is available. Exiting immediately.";
     return Status::Success;
   }
-  return shared_memory_manager_->GetSharedMemoryStatus(active_shm_regions);
 
-  return Status::Success;
+  return shared_memory_manager_->GetSharedMemoryStatus(active_shm_regions);
+}
+
+Status
+InferenceServer::GetSharedMemoryInfo(
+    const std::string& name, void** shm_mapped_addr, size_t* shm_offset)
+{
+  if (shared_memory_manager_ == nullptr) {
+    LOG_INFO << "No shared memory manager is available. Exiting immediately.";
+    return Status::Success;
+  }
+
+  return shared_memory_manager_->GetSharedMemoryInfo(
+      name, shm_mapped_addr, shm_offset);
 }
 
 uint64_t

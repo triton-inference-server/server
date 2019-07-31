@@ -304,6 +304,10 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     // the provided raw tensor data.
     size_t idx = 0;
     for (const auto& io : request_header.input()) {
+      if (io.shared_memory().name() == "") {
+        idx++;
+        continue;
+      }
       uint64_t byte_size = 0;
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
           request_provider, io.name().c_str(), &byte_size));
@@ -323,6 +327,41 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       const std::string& raw = request.raw_input(idx++);
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, io.name().c_str(), raw.c_str(), raw.size()));
+    }
+
+    return nullptr;  // success
+  }
+
+  TRTSERVER_Error* GRPCSharedMemoryInput(
+      TRTSERVER_Server* server, const InferRequestHeader& request_header,
+      const InferRequest& request,
+      TRTSERVER_InferenceRequestProvider* request_provider)
+  {
+    // Verify that the batch-byte-size of each input matches the size of
+    // the provided raw tensor data.
+    size_t idx = 0;
+    for (const auto& io : request_header.input()) {
+      if (io.shared_memory().name() != "") {
+        idx++;
+        continue;
+      }
+
+      if (io.batch_byte_size() != io.shared_memory().byte_size()) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "unexpected size " +
+                std::to_string(io.shared_memory().byte_size()) +
+                " for input '" + io.name() + "', expecting " +
+                std::to_string(io.batch_byte_size()) + " for model '" +
+                request.model_name() + "'")
+                .c_str());
+      }
+
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
+          server, request_provider, io.name().c_str(),
+          io.shared_memory().name().c_str(), io.shared_memory().offset(),
+          io.shared_memory().byte_size()));
     }
 
     return nullptr;  // success
@@ -352,24 +391,28 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       if (err == nullptr) {
         err = GRPCToInput(request.meta_data(), request, request_provider);
         if (err == nullptr) {
-          GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
-              this, execution_context, response, request.meta_data().id(),
-              server_id, unique_id);
+          err = GRPCSharedMemoryInput(
+              server, request.meta_data(), request, request_provider);
+          if (err == nullptr) {
+            GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
+                this, execution_context, response, request.meta_data().id(),
+                server_id, unique_id);
 
-          err = TRTSERVER_ServerInferAsync(
-              server, request_provider,
-              nullptr /* http_response_provider_hack */,
-              &response /* grpc_response_provider_hack */, nullptr, nullptr,
-              GRPCInferRequest::InferComplete,
-              reinterpret_cast<void*>(grpc_infer_request));
-          if (err != nullptr) {
-            delete grpc_infer_request;
-            grpc_infer_request = nullptr;
+            err = TRTSERVER_ServerInferAsync(
+                server, request_provider,
+                nullptr /* http_response_provider_hack */,
+                &response /* grpc_response_provider_hack */, nullptr, nullptr,
+                GRPCInferRequest::InferComplete,
+                reinterpret_cast<void*>(grpc_infer_request));
+            if (err != nullptr) {
+              delete grpc_infer_request;
+              grpc_infer_request = nullptr;
+            }
+
+            // The request provider can be deleted immediately after the
+            // ServerInferAsync call returns.
+            TRTSERVER_InferenceRequestProviderDelete(request_provider);
           }
-
-          // The request provider can be deleted immediately after the
-          // ServerInferAsync call returns.
-          TRTSERVER_InferenceRequestProviderDelete(request_provider);
         }
       }
     }

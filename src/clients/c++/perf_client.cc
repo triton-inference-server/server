@@ -2167,13 +2167,14 @@ main(int argc, char** argv)
           const auto& version = model_info.first.second;
           const auto name_ver = name + "_v" + std::to_string(version);
 
-          std::ofstream ofs(name_ver + "." +filename, std::ofstream::out);
+          std::ofstream ofs(name_ver + "." + filename, std::ofstream::out);
           ofs << "Concurrency,Inferences/Second,Client Send,"
-            << "Network+Server Send/Recv,Server Queue,"
-            << "Server Compute,Client Recv" << std::endl;
+              << "Network+Server Send/Recv,Server Queue,"
+              << "Server Compute,Client Recv" << std::endl;
 
           for (PerfStatus& status : summary) {
-            auto it = status.server_composing_model_stats.find(model_info.first);
+            auto it =
+                status.server_composing_model_stats.find(model_info.first);
             const auto& stats = it->second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =
@@ -2185,12 +2186,12 @@ main(int argc, char** argv)
                     : 0;
             // infer / sec of the composing model is calculated using the
             // request count ratio between the composing model and the ensemble
-            double infer_ratio = 1.0 * stats.request_count / status.server_stats.request_count;
+            double infer_ratio =
+                1.0 * stats.request_count / status.server_stats.request_count;
             int infer_per_sec = infer_ratio * status.client_infer_per_sec;
             ofs << status.concurrency << "," << infer_per_sec << ",0,"
-                << (avg_overhead_ns / 1000) << ","
-                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000)
-                << ",0" << std::endl;
+                << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
+                << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
           }
         }
       }
