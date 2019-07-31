@@ -26,6 +26,8 @@
 
 #include "src/clients/c++/inference_profiler.h"
 
+#include <math.h>
+
 
 namespace perfclient {
 
