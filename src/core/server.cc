@@ -428,16 +428,15 @@ InferenceServer::GetSharedMemoryStatus(
 }
 
 Status
-InferenceServer::GetSharedMemoryInfo(
-    const std::string& name, void** shm_mapped_addr, size_t* shm_offset)
+InferenceServer::GetSharedMemoryAddress(
+    const std::string& name, void** shm_mapped_addr)
 {
   if (shared_memory_manager_ == nullptr) {
     LOG_INFO << "No shared memory manager is available. Exiting immediately.";
     return Status::Success;
   }
 
-  return shared_memory_manager_->GetSharedMemoryInfo(
-      name, shm_mapped_addr, shm_offset);
+  return shared_memory_manager_->GetSharedMemoryAddress(name, shm_mapped_addr);
 }
 
 uint64_t

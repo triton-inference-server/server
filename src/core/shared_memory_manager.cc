@@ -245,8 +245,8 @@ SharedMemoryManager::GetSharedMemoryStatus(
 }
 
 Status
-SharedMemoryManager::GetSharedMemoryInfo(
-    const std::string& name, void** shm_mapped_addr, size_t* shm_offset)
+SharedMemoryManager::GetSharedMemoryAddress(
+    const std::string& name, void** shm_mapped_addr)
 {
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {
@@ -255,8 +255,8 @@ SharedMemoryManager::GetSharedMemoryInfo(
         "Unable to find shared memory region: '" + name + "'");
   }
 
-  *shm_mapped_addr = it->second->mapped_addr_;
-  *shm_offset = it->second->offset_;
+  *shm_mapped_addr =
+      (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_);
   return Status::Success;
 }
 

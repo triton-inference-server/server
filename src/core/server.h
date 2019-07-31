@@ -102,9 +102,9 @@ class InferenceServer {
   // Get the list of active shared memory regions.
   Status GetSharedMemoryStatus(std::vector<std::string>& active_shm_regions);
 
-  // Get the base address and offset for the specific shared memory region
-  Status GetSharedMemoryInfo(
-      const std::string& name, void** shm_mapped_addr, size_t* shm_offset);
+  // Get the base address + offset for the specific shared memory region
+  Status GetSharedMemoryAddress(
+      const std::string& name, void** shm_mapped_addr);
 
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }

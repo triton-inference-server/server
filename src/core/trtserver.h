@@ -715,12 +715,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryStatus(
 /// an error message.
 /// \param server The inference server object.
 /// \param shm_name The user-given name for the shared memory region.
-/// \param shm_mapped_addr The start address of the shared memory region.
-/// \param offset The offset into the shared memory region to be read.
+/// \param shm_mapped_addr The offseted address of the shared memory region.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryInfo(
-    TRTSERVER_Server* server, const char* shm_name, void** shm_mapped_addr,
-    size_t* shm_offset);
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryAddress(
+    TRTSERVER_Server* server, const char* shm_name, void** shm_mapped_addr);
 
 /// Get the current metrics for the server. The caller takes ownership
 /// of the metrics object and must call TRTSERVER_MetricsDelete to

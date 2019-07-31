@@ -623,9 +623,8 @@ TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
 
   void* shm_mapped_addr;
-  size_t shm_offset;
-  TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryInfo(
-      server, shm_name, &shm_mapped_addr, &shm_offset);
+  TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryAddress(
+      server, shm_name, &shm_mapped_addr);
   if (err != nullptr) {
     return TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_INVALID_ARG,
@@ -634,10 +633,9 @@ TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
             .c_str());
   }
 
-  // modify base by adding current offset as well are shared region offset
+  // modify mapped appress by adding current offset
   lprovider->SetInputData(
-      input_name, (void*)((char*)shm_mapped_addr + offset + shm_offset),
-      byte_size);
+      input_name, (void*)((char*)shm_mapped_addr + offset), byte_size);
   return nullptr;  // Success
 }
 
@@ -1117,9 +1115,8 @@ TRTSERVER_ServerGetSharedMemoryStatus(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerGetSharedMemoryInfo(
-    TRTSERVER_Server* server, const char* name, void** shm_mapped_addr,
-    size_t* shm_offset)
+TRTSERVER_ServerGetSharedMemoryAddress(
+    TRTSERVER_Server* server, const char* name, void** shm_mapped_addr)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
@@ -1127,8 +1124,8 @@ TRTSERVER_ServerGetSharedMemoryInfo(
       lserver->StatusManager(),
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
-  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryInfo(
-      std::string(name), shm_mapped_addr, shm_offset));
+  RETURN_IF_STATUS_ERROR(
+      lserver->GetSharedMemoryAddress(std::string(name), shm_mapped_addr));
 
   return nullptr;  // success
 }
