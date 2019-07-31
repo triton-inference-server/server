@@ -380,7 +380,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     // the provided raw tensor data.
     size_t idx = 0;
     for (const auto& io : request_header.input()) {
-      if (io.shared_memory().name() != "") {
+      if (io.shared_memory().name() == "") {
         idx++;
         continue;
       }
