@@ -240,7 +240,8 @@ LibTorchBackend::CreateExecutionContext(
   try {
     // lp_itr->second is the torch model serialized to string
     std::istringstream model_stream(lp_itr->second);
-    context->torch_model_ = std::make_shared<torch::jit::script::Module>(torch::jit::load(model_stream, context->device_));
+    context->torch_model_ = std::make_shared<torch::jit::script::Module>(
+        torch::jit::load(model_stream, context->device_));
   }
   catch (const std::exception& ex) {
     return Status(
