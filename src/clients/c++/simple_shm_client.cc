@@ -58,13 +58,12 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
-  std::cerr << "\t-H <HTTP header>" << std::endl;
+  std::cerr << "\t-I use shared memory for Inputs" << std::endl;
+  std::cerr << "\t-O use shared memory for Outputs" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-      << std::endl;
-  std::cerr
-      << "For -H, header must be 'Header:Value'. May be given multiple times."
+      << "If neither -I and -O are set shared memory is used for both."
       << std::endl;
 
   exit(1);
@@ -73,7 +72,7 @@ Usage(char** argv, const std::string& msg = std::string())
 }  // namespace
 
 int
-create_shared_region(std::string shm_key, size_t batch_byte_size)
+CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
 {
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -91,7 +90,7 @@ create_shared_region(std::string shm_key, size_t batch_byte_size)
 }
 
 void*
-get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
+MapSharedMemory(int shm_fd, size_t offset, size_t batch_byte_size)
 {
   // map shared memory to process address space
   void* shm_addr =
@@ -104,7 +103,7 @@ get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
 }
 
 void
-shm_cleanup(std::string shm_key)
+UnlinkSharedMemoryRegion(std::string shm_key)
 {
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
@@ -114,7 +113,7 @@ shm_cleanup(std::string shm_key)
 }
 
 void
-mmap_cleanup(void* shm_addr, size_t byte_size)
+UnmapSharedMemory(void* shm_addr, size_t byte_size)
 {
   int tmp_fd = munmap(shm_addr, byte_size);
   if (tmp_fd == -1) {
@@ -126,14 +125,14 @@ mmap_cleanup(void* shm_addr, size_t byte_size)
 int
 main(int argc, char** argv)
 {
-  bool verbose = false;
+  bool verbose = false, use_shm_input = true, use_shm_output = true;
   std::string url("localhost:8000");
   std::string protocol = "http";
   std::map<std::string, std::string> http_headers;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:H:")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:IO")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -144,10 +143,15 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
-      case 'H': {
-        std::string arg = optarg;
-        std::string header = arg.substr(0, arg.find(":"));
-        http_headers[header] = arg.substr(header.size() + 1);
+      case 'I':
+        use_shm_output = false;
+        break;
+      case 'O': {
+        use_shm_input = false;
+        if (!use_shm_output) {
+          use_shm_input = true;
+          use_shm_output = true;
+        }
         break;
       }
       case '?':
@@ -252,6 +256,11 @@ main(int argc, char** argv)
       "unable to create inference options");
 
   options->SetBatchSize(1);
+  if (!use_shm_output) {
+    for (const auto& output : infer_ctx->Outputs()) {
+      options->AddRawResult(output);
+    }
+  }
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
@@ -270,82 +279,136 @@ main(int argc, char** argv)
   size_t input_byte_size = 16 * sizeof(int32_t);
   size_t output_byte_size = 16 * sizeof(int32_t);
 
+  std::vector<int32_t> input0_data(16);
+  std::vector<int32_t> input1_data(16);
+  int *input0_shm, *input1_shm, *output0_shm, *output1_shm;
+  int shm_fd_ip, shm_fd_op;
+
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
-  std::string shm_key = "/input_simple";
-  int shm_fd_ip = create_shared_region(shm_key, input_byte_size * 2);
-  int* input0_shm = (int*)(get_shm_addr(shm_fd_ip, 0, input_byte_size * 2));
-  int* input1_shm = (int*)(input0_shm + 16);
-  for (size_t i = 0; i < 16; ++i) {
-    *(input0_shm + i) = i;
-    *(input1_shm + i) = 1;
+  if (use_shm_input) {
+    std::string shm_key = "/input_simple";
+    shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
+    input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
+    input1_shm = (int*)(input0_shm + 16);
+    for (size_t i = 0; i < 16; ++i) {
+      *(input0_shm + i) = i;
+      *(input1_shm + i) = 1;
+    // Register Input shared memory with TRTIS
+    infer_ctx->RegisterSharedMemory(
+        "input_data", "/input_simple", 0, input_byte_size * 2);
+    }
+
+    // Set the shared memory region for Inputs
+    err = input0->SetSharedMemory("input_data", 0, input_byte_size);
+    if (!err.IsOk()) {
+      std::cerr << "failed setting shared memory input: " << err << std::endl;
+      exit(1);
+    }
+    err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
+    if (!err.IsOk()) {
+      std::cerr << "failed setting shared memory input: " << err << std::endl;
+      exit(1);
+    }
+  } else {
+    for (size_t i = 0; i < 16; ++i) {
+      input0_data[i] = i;
+      input1_data[i] = 1;
+    }
+
+    FAIL_IF_ERR(
+        input0->SetRaw(
+            reinterpret_cast<uint8_t*>(&input0_data[0]),
+            input0_data.size() * sizeof(int32_t)),
+        "unable to set data for INPUT0");
+    FAIL_IF_ERR(
+        input1->SetRaw(
+            reinterpret_cast<uint8_t*>(&input1_data[0]),
+            input1_data.size() * sizeof(int32_t)),
+        "unable to set data for INPUT1");
   }
 
-  // Create Output0 and Output1 in Shared Memory
-  shm_key = "/output_simple";
-  int shm_fd_op = create_shared_region(shm_key, output_byte_size * 2);
-  int* output0_shm = (int*)(get_shm_addr(shm_fd_op, 0, output_byte_size * 2));
-  int* output1_shm = (int*)(output0_shm + 16);
+  if (use_shm_output) {
+    // Create Output0 and Output1 in Shared Memory
+    std::string shm_key = "/output_simple";
+    shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
+    output0_shm = (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
+    output1_shm = (int*)(output0_shm + 16);
 
-  // Register all Inputs and Outputs with TRTIS
-  infer_ctx->RegisterSharedMemory(
-      "input_data", "/input_simple", 0, input_byte_size * 2);
-  infer_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, output_byte_size * 2);
+    // Register Output shared memory with TRTIS
+    infer_ctx->RegisterSharedMemory(
+        "output_data", "/output_simple", 0, output_byte_size * 2);
 
-  // Set the shared memory region for Inputs and Outputs
-  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
-  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory input: " << err << std::endl;
-    exit(1);
-  }
-  err = output0->SetSharedMemory("output_data", 0, output_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory output: " << err << std::endl;
-    exit(1);
-  }
-  err = output1->SetSharedMemory(
-      "output_data", output_byte_size, output_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory output: " << err << std::endl;
-    exit(1);
+    // Set the shared memory region for Outputs
+    err = output0->SetSharedMemory("output_data", 0, output_byte_size);
+    if (!err.IsOk()) {
+      std::cerr << "failed setting shared memory output: " << err << std::endl;
+      exit(1);
+    }
+    err = output1->SetSharedMemory(
+        "output_data", output_byte_size, output_byte_size);
+    if (!err.IsOk()) {
+      std::cerr << "failed setting shared memory output: " << err << std::endl;
+      exit(1);
+    }
   }
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(infer_ctx->Run(&results), "unable to run model");
 
-  // We expect there to be 2 results and them to be written by TRTIS into the
-  // corresponding shared memory location provided. The 16 result elements
-  // in both outputs are the sum and difference calculated by the model.
-  for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_shm[i] << " + " << input1_shm[i] << " = "
-              << output0_shm[i] << std::endl;
-    std::cout << input0_shm[i] << " - " << input1_shm[i] << " = "
-              << output1_shm[i] << std::endl;
+  // We expect there to be 2 results. Walk over all 16 result elements
+  // and print the sum and difference calculated by the model.
+  if (results.size() != 2) {
+    std::cerr << "error: expected 2 results, got " << results.size()
+              << std::endl;
+  }
 
-    if ((input0_shm[i] + input1_shm[i]) != output0_shm[i]) {
+  for (size_t i = 0; i < 16; ++i) {
+    int32_t ip0, ip1, r0, r1;
+    if (use_shm_input) {
+      ip0 = input0_shm[i];
+      ip1 = input1_shm[i];
+    } else {
+      ip0 = input0_data[i];
+      ip1 = input1_data[i];
+    }
+    if (use_shm_output) {
+      ip0 = input0_shm[i];
+      ip1 = input1_shm[i];
+    } else {
+      FAIL_IF_ERR(
+          results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
+          "unable to get OUTPUT0 result at idx " + std::to_string(i));
+      FAIL_IF_ERR(
+          results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
+          "unable to get OUTPUT1 result at idx " + std::to_string(i));
+    }
+    std::cout << ip0 << " + " << ip1 << " = "
+              << r0 << std::endl;
+    std::cout << ip0 << " - " << ip1 << " = "
+              << r1 << std::endl;
+
+    if ((ip0 + ip1) != r0) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_shm[i] - input1_shm[i]) != output1_shm[i]) {
+    if ((ip0 - ip1) != r1) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
   }
 
   // Unregister and cleanup shared memory
-  infer_ctx->UnregisterSharedMemory("input_data");
-  infer_ctx->UnregisterSharedMemory("output_data");
-  mmap_cleanup(shm_fd_ip);
-  mmap_cleanup(shm_fd_op);
-  shm_cleanup("/input_simple");
-  shm_cleanup("/output_simple");
-
+  if (use_shm_input) {
+    infer_ctx->UnregisterSharedMemory("input_data");
+    UnmapSharedMemory(input0_shm, input_byte_size * 2);
+    UnlinkSharedMemoryRegion("/input_simple");
+  }
+  if (use_shm_output) {
+    infer_ctx->UnregisterSharedMemory("output_data");
+    UnmapSharedMemory(output0_shm, output_byte_size * 2);
+    UnlinkSharedMemoryRegion("/output_simple");
+  }
   return 0;
 }
