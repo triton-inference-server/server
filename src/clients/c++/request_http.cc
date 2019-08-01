@@ -1165,16 +1165,15 @@ HttpRequestImpl::CreateResult(
     return err;
   }
 
-  if (!ctx.HasSharedMemory(output.name())) {
-    std::unique_ptr<ResultImpl> result(
-        new ResultImpl(infer_output, batch_size));
-    result->SetBatch1Shape(output.raw().dims());
-    if (IsFixedSizeDataType(infer_output->DType())) {
-      result->SetBatchnByteSize(output.raw().batch_byte_size());
-    }
-
-    ordered_results_.emplace_back(std::move(result));
+  std::unique_ptr<ResultImpl> result(
+      new ResultImpl(infer_output, batch_size));
+  // Check if output uses shared memory. If so handle differently
+  result->SetBatch1Shape(output.raw().dims());
+  if (IsFixedSizeDataType(infer_output->DType())) {
+    result->SetBatchnByteSize(output.raw().batch_byte_size());
   }
+
+  ordered_results_.emplace_back(std::move(result));
 
   return Error::Success;
 }

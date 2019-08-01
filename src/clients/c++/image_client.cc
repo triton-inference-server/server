@@ -219,8 +219,7 @@ Postprocess(
     const std::vector<std::string>& filenames, const size_t batch_size,
     const float* shm_addr, size_t offset, const size_t& byte_size, bool use_shm)
 {
-  // Can read outputs directly from shared memory but also use the client APIs
-  if ((results.size() != 1) && (!use_shm)) {
+  if (results.size() != 1) {
     std::cerr << "expected 1 result, got " << results.size() << std::endl;
     exit(1);
   }
@@ -231,22 +230,21 @@ Postprocess(
     exit(1);
   }
 
-  if (use_shm) {
-    float output_data[byte_size / sizeof(float)];
+  const std::unique_ptr<nic::InferContext::Result>& result =
+      results.begin()->second;
 
+  if (use_shm) {
     for (size_t b = 0; b < batch_size; ++b) {
       std::cout << "Image '" << filenames[b] << "':" << std::endl;
-      // read output from memory
-      memcpy(output_data, (float*)(((uint8_t*)shm_addr) + offset), byte_size);
+      const uint8_t* output_data;
+      result->GetRawAtCursor(b, &output_data, byte_size);
+
       // first 5 probabilities (TEST)
       for (int i = 0; i < 5; i++) {
-        std::cout << "    P(" << i + 1 << ") = " << output_data[i] << std::endl;
+        std::cout << "    P(" << i + 1 << ") = " << ((float*)output_data)[i] << std::endl;
       }
-      offset += byte_size;
     }
   } else {
-    const std::unique_ptr<nic::InferContext::Result>& result =
-        results.begin()->second;
     for (size_t b = 0; b < batch_size; ++b) {
       size_t cnt = 0;
       nic::Error err = result->GetClassCount(b, &cnt);

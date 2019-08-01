@@ -630,24 +630,24 @@ GrpcRequestImpl::GetResults(
   // in-place instead of copying it out.
   size_t idx = 0;
   for (const auto& output : response_header.output()) {
-    if (!ctx.HasSharedMemory(output.name())) {
-      std::shared_ptr<InferContext::Output> infer_output;
-      Error err = ctx.GetOutput(output.name(), &infer_output);
-      if (!err.IsOk()) {
-        results->clear();
-        return err;
-      }
-
-      std::unique_ptr<GrpcResultImpl> result(
-          new GrpcResultImpl(grpc_response_, infer_output));
-      err = InitResult(infer_output, output, idx, result.get());
-      if (!err.IsOk()) {
-        results->clear();
-        return err;
-      }
-      results->insert(std::make_pair(output.name(), std::move(result)));
-      ++idx;
+    std::shared_ptr<InferContext::Output> infer_output;
+    Error err = ctx.GetOutput(output.name(), &infer_output);
+    if (!err.IsOk()) {
+      results->clear();
+      return err;
     }
+
+    std::unique_ptr<GrpcResultImpl> result(
+        new GrpcResultImpl(grpc_response_, infer_output));
+    // Check if output uses shared memory. If so handle differently
+    err = InitResult(infer_output, output, idx, result.get());
+
+    if (!err.IsOk()) {
+      results->clear();
+      return err;
+    }
+    results->insert(std::make_pair(output.name(), std::move(result)));
+    ++idx;
   }
 
   Error err = PostRunProcessing(response_header, results);
