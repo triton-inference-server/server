@@ -25,39 +25,33 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <getopt.h>
-#include <math.h>
-#include <stdlib.h>
-#include <time.h>
-#include <unistd.h>
-#include <algorithm>
-#include <chrono>
-#include <condition_variable>
-#include <csignal>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <mutex>
-#include <string>
-#include <thread>
-#include "src/clients/c++/request_grpc.h"
-#include "src/clients/c++/request_http.h"
-#include "src/core/constants.h"
 
-namespace ni = nvidia::inferenceserver;
-namespace nic = nvidia::inferenceserver::client;
+#include "src/clients/c++/concurrency_manager.h"
+#include "src/clients/c++/context_factory.h"
+#include "src/clients/c++/inference_profiler.h"
+#include "src/clients/c++/load_manager.h"
+#include "src/clients/c++/perf_utils.h"
 
-using TimestampVector =
-    std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
 
-// [TODO] move this to more general place
-// If status is non-OK, return the Error.
-#define RETURN_IF_ERROR(S)            \
-  do {                                \
-    const nic::Error& status__ = (S); \
-    if (!status__.IsOk()) {           \
-      return status__;                \
-    }                                 \
-  } while (false)
+namespace perfclient {
+
+volatile bool early_exit = false;
+
+void
+SignalHandler(int signum)
+{
+  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
+  // Upon invoking the SignalHandler for the first time early_exit flag is
+  // invoked and client waits for in-flight inferences to complete before
+  // exiting. On the second invocation, the program exits immediately.
+  if (!early_exit) {
+    std::cout << "Waiting for in-flight inferences to complete." << std::endl;
+    early_exit = true;
+  } else {
+    std::cout << "Exiting immediately..." << std::endl;
+    exit(0);
+  }
+}
 
 //==============================================================================
 // Perf Client
@@ -132,1500 +126,6 @@ using TimestampVector =
 // For detail of the options not listed, please refer to the usage.
 //
 
-namespace {
-
-volatile bool early_exit = false;
-
-void
-SignalHandler(int signum)
-{
-  std::cout << "Interrupt signal (" << signum << ") received." << std::endl;
-  // Upon invoking the SignalHandler for the first time early_exit flag is
-  // invoked and client waits for in-flight inferences to complete before
-  // exiting. On the second invocation, the program exits immediately.
-  if (!early_exit) {
-    std::cout << "Waiting for in-flight inferences to complete." << std::endl;
-    early_exit = true;
-  } else {
-    std::cout << "Exiting immediately..." << std::endl;
-    exit(0);
-  }
-}
-
-struct ServerSideStats {
-  uint64_t request_count;
-  uint64_t cumm_time_ns;
-  uint64_t queue_time_ns;
-  uint64_t compute_time_ns;
-};
-
-typedef struct PerformanceStatusStruct {
-  uint32_t concurrency;
-  size_t batch_size;
-  // Request count and elapsed time measured by server
-  ServerSideStats server_stats;
-  std::map<std::pair<std::string, int64_t>, ServerSideStats>
-      server_composing_model_stats;
-
-  // Request count and elapsed time measured by client
-  uint64_t client_request_count;
-  // Only record sequences that finish within the measurement window
-  uint64_t client_sequence_count;
-  uint64_t client_duration_ns;
-  uint64_t client_avg_latency_ns;
-  // a ordered map of percentiles to be reported (<percentile, value> pair)
-  std::map<size_t, uint64_t> client_percentile_latency_ns;
-  // Using usec to avoid square of large number (large in nsec)
-  uint64_t std_us;
-  uint64_t client_avg_request_time_ns;
-  uint64_t client_avg_send_time_ns;
-  uint64_t client_avg_receive_time_ns;
-  // Per sec stat
-  int client_infer_per_sec;
-  int client_sequence_per_sec;
-  bool on_sequence_model;
-
-  // placeholder for the latency value that is used for conditional checking
-  uint64_t stabilizing_latency_ns;
-} PerfStatus;
-
-
-enum ProtocolType { HTTP = 0, GRPC = 1 };
-
-nic::Error
-ReadFile(const std::string& path, std::vector<char>* contents)
-{
-  std::ifstream in(path, std::ios::in | std::ios::binary);
-  if (!in) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to open file '" + path + "'");
-  }
-
-  in.seekg(0, std::ios::end);
-
-  int file_size = in.tellg();
-  if (file_size > 0) {
-    contents->resize(file_size);
-    in.seekg(0, std::ios::beg);
-    in.read(&(*contents)[0], contents->size());
-  }
-
-  in.close();
-
-  // If size is invalid, report after ifstream is closed
-  if (file_size < 0) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "failed to get size for file '" + path + "'");
-  } else if (file_size == 0) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG, "file '" + path + "' is empty");
-  }
-
-  return nic::Error::Success;
-}
-
-//==============================================================================
-/// ContextFactory is a helper class to create client contexts used
-/// in perf_client.
-///
-class ContextFactory {
- public:
-  enum ModelSchedulerType { NONE, DYNAMIC, SEQUENCE, ENSEMBLE };
-
-  /// Create a context factory that is responsible to create different types of
-  /// contexts that is directly related to the specified model.
-  /// \param url The inference server name and port.
-  /// \param protocol The protocol type used.
-  /// \param http_headers Map of HTTP headers. The map key/value
-  /// indicates the header name/value.
-  /// \param streaming Whether to use streaming API.
-  /// \param model_name The name of the model.
-  /// \param model_version The version of the model to use for inference,
-  /// or -1 to indicate that the latest (i.e. highest version number)
-  /// version should be used.
-  /// \param factory Returns a new ContextFactory object.
-  /// \return Error object indicating success or failure.
-  static nic::Error Create(
-      const std::string& url, const ProtocolType protocol,
-      const std::map<std::string, std::string>& http_headers,
-      const bool streaming, const std::string& model_name,
-      const int64_t model_version, std::shared_ptr<ContextFactory>* factory);
-
-  /// Create a ProfileContext.
-  /// \param ctx Returns a new ProfileContext object.
-  nic::Error CreateProfileContext(std::unique_ptr<nic::ProfileContext>* ctx);
-
-  /// Create a ServerStatusContext.
-  /// \param ctx Returns a new ServerStatusContext object.
-  nic::Error CreateServerStatusContext(
-      std::unique_ptr<nic::ServerStatusContext>* ctx);
-
-  /// Create a InferContext.
-  /// \param ctx Returns a new InferContext object.
-  nic::Error CreateInferContext(std::unique_ptr<nic::InferContext>* ctx);
-
-  /// \return The model name.
-  const std::string& ModelName() const { return model_name_; }
-
-  /// \return The model version.
-  int64_t ModelVersion() const { return model_version_; }
-
-  /// \return The scheduler type of the model.
-  ModelSchedulerType SchedulerType() const { return scheduler_type_; }
-
- private:
-  ContextFactory(
-      const std::string& url, const ProtocolType protocol,
-      const std::map<std::string, std::string>& http_headers,
-      const bool streaming, const std::string& model_name,
-      const int64_t model_version)
-      : url_(url), protocol_(protocol), http_headers_(http_headers),
-        streaming_(streaming), model_name_(model_name),
-        model_version_(model_version), current_correlation_id_(0)
-  {
-  }
-
-  const std::string url_;
-  const ProtocolType protocol_;
-  const std::map<std::string, std::string> http_headers_;
-  const bool streaming_;
-  const std::string model_name_;
-  const int64_t model_version_;
-
-  ModelSchedulerType scheduler_type_;
-  ni::CorrelationID current_correlation_id_;
-  std::mutex correlation_id_mutex_;
-};
-
-nic::Error
-ContextFactory::Create(
-    const std::string& url, const ProtocolType protocol,
-    const std::map<std::string, std::string>& http_headers,
-    const bool streaming, const std::string& model_name,
-    const int64_t model_version, std::shared_ptr<ContextFactory>* factory)
-{
-  factory->reset(new ContextFactory(
-      url, protocol, http_headers, streaming, model_name, model_version));
-
-  ni::ServerStatus server_status;
-  std::unique_ptr<nic::ServerStatusContext> ctx;
-  (*factory)->CreateServerStatusContext(&ctx);
-  RETURN_IF_ERROR(ctx->GetServerStatus(&server_status));
-  const auto& itr = server_status.model_status().find(model_name);
-  if (itr == server_status.model_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL, "unable to find status for model");
-  } else {
-    if (itr->second.config().has_sequence_batching()) {
-      (*factory)->scheduler_type_ = SEQUENCE;
-    } else if (itr->second.config().has_ensemble_scheduling()) {
-      (*factory)->scheduler_type_ = ENSEMBLE;
-    } else if (itr->second.config().has_dynamic_batching()) {
-      (*factory)->scheduler_type_ = DYNAMIC;
-    } else {
-      (*factory)->scheduler_type_ = NONE;
-    }
-  }
-  return nic::Error::Success;
-}
-
-nic::Error
-ContextFactory::CreateProfileContext(std::unique_ptr<nic::ProfileContext>* ctx)
-{
-  nic::Error err;
-  if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ProfileHttpContext::Create(ctx, url_, http_headers_, false);
-  } else {
-    err = nic::ProfileGrpcContext::Create(ctx, url_, false);
-  }
-  return err;
-}
-
-nic::Error
-ContextFactory::CreateServerStatusContext(
-    std::unique_ptr<nic::ServerStatusContext>* ctx)
-{
-  nic::Error err;
-  if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ServerStatusHttpContext::Create(ctx, url_, http_headers_, false);
-  } else {
-    err = nic::ServerStatusGrpcContext::Create(ctx, url_, false);
-  }
-  return err;
-}
-
-nic::Error
-ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
-{
-  nic::Error err;
-  // Create the context for inference of the specified model,
-  // make sure to use an unused correlation id if requested.
-  ni::CorrelationID correlation_id = 0;
-
-  if (scheduler_type_ == SEQUENCE) {
-    std::lock_guard<std::mutex> lock(correlation_id_mutex_);
-    current_correlation_id_++;
-    correlation_id = current_correlation_id_;
-  }
-
-  if (streaming_) {
-    err = nic::InferGrpcStreamContext::Create(
-        ctx, correlation_id, url_, model_name_, model_version_, false);
-  } else if (protocol_ == ProtocolType::HTTP) {
-    err = nic::InferHttpContext::Create(
-        ctx, correlation_id, url_, http_headers_, model_name_, model_version_,
-        false);
-  } else {
-    err = nic::InferGrpcContext::Create(
-        ctx, correlation_id, url_, model_name_, model_version_, false);
-  }
-  return err;
-}
-
-//==============================================================================
-/// ConcurrencyManager is a helper class to send inference requests to inference
-/// server consistently, based on the specified setting, so that the perf_client
-/// can measure performance under different concurrency.
-///
-/// An instance of concurrency manager will be created at the beginning of the
-/// perf client and it will be used to simulate different load level in respect
-/// to number of concurrent infer requests and to collect per-request statistic.
-///
-/// Detail:
-/// Concurrency Manager will maintain the number of concurrent requests by
-/// spawning worker threads that keep sending randomly generated requests to the
-/// server. The worker threads will record the start time and end
-/// time of each request into a shared vector.
-///
-class ConcurrencyManager {
- public:
-  ~ConcurrencyManager();
-
-  /// Create a concurrency manager that is responsible to maintain specified
-  /// load on inference server.
-  /// \param batch_size The batch size used for each request.
-  /// \param max_threads The maximum number of working threads to be spawned.
-  /// \param sequence_length The base length of each sequence.
-  /// \param zero_input Whether to fill the input tensors with zero.
-  /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manger Returns a new ConcurrencyManager object.
-  /// \return Error object indicating success or failure.
-  static nic::Error Create(
-      const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const bool zero_input,
-      const std::string& data_directory,
-      const std::shared_ptr<ContextFactory>& factory,
-      std::unique_ptr<ConcurrencyManager>* manager);
-
-  /// Adjust the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating threads or by pausing threads)
-  /// \parm concurent_request_count The number of concurrent requests to be
-  /// maintained.
-  /// \return Error object indicating success or failure.
-  nic::Error ChangeConcurrencyLevel(const size_t concurrent_request_count);
-
-  /// Check if the concurrency level can be maintained.
-  /// \return Error object indicating success or failure. Failure will be
-  /// returned if concurrency manager can't produce the requested concurrency.
-  nic::Error CheckHealth();
-
-  /// Swap the content of the timestamp vector recorded by the concurrency
-  /// manager with a new timestamp vector
-  /// \param new_timestamps The timestamp vector to be swapped.
-  /// \return Error object indicating success or failure.
-  nic::Error SwapTimestamps(TimestampVector& new_timestamps);
-
-  /// Get the sum of all contexts' stat
-  /// \param contexts_stat Returned the accumulated stat from all contexts
-  /// in concurrency manager
-  nic::Error GetAccumulatedContextStat(nic::InferContext::Stat* contexts_stat);
-
-  /// \return the batch size used for the inference requests
-  size_t BatchSize() const { return batch_size_; }
-
- public:
-  struct RequestMetaData {
-    RequestMetaData(
-        const std::shared_ptr<nic::InferContext::Request> request,
-        const struct timespec start_time, const uint32_t flags)
-        : request_(std::move(request)), start_time_(start_time), flags_(flags)
-    {
-    }
-
-    const std::shared_ptr<nic::InferContext::Request> request_;
-    const struct timespec start_time_;
-    const uint32_t flags_;
-  };
-
-  struct InferContextMetaData {
-    InferContextMetaData() : inflight_request_cnt_(0) {}
-    InferContextMetaData(InferContextMetaData&&) = delete;
-    InferContextMetaData(const InferContextMetaData&) = delete;
-
-    std::unique_ptr<nic::InferContext> ctx_;
-    size_t inflight_request_cnt_;
-    // mutex to guard 'completed_requests_' which will be acessed by
-    // both the main thread and callback thread
-    std::mutex mtx_;
-    std::vector<RequestMetaData> completed_requests_;
-  };
-
- private:
-  ConcurrencyManager(
-      const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const bool zero_input,
-      const std::shared_ptr<ContextFactory>& factory);
-
-  /// Function for worker that sends async inference requests.
-  /// \param err Returns the status of the worker
-  /// \param stats Returns the statistic of the InferContexts
-  /// \param concurrency The concurrency level that the worker should produce.
-  void AsyncInfer(
-      std::shared_ptr<nic::Error> err,
-      std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-      std::shared_ptr<size_t> concurrency);
-
-  /// Helper function to prepare the InferContext for sending inference request.
-  /// \param ctx Returns a new InferContext.
-  /// \param options Returns the options used by 'ctx'.
-  /// \param input_buffer Returns the generated input_buffer for all requests.
-  nic::Error PrepareInfer(
-      std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options,
-      std::vector<uint8_t>& input_buffer);
-
-  /// Generate random sequence length based on 'offset_ratio' and
-  /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
-  /// \param offset_ratio The offset ratio of the generated length
-  /// \return random sequence length
-  size_t GetRandomLength(double offset_ratio);
-
-  size_t batch_size_;
-  size_t max_threads_;
-  size_t sequence_length_;
-  bool zero_input_;
-
-  bool on_sequence_model_;
-
-  std::shared_ptr<ContextFactory> factory_;
-
-  // User provided input data, it will be preferred over synthetic data
-  std::unordered_map<std::string, std::vector<char>> input_data_;
-
-  // Note: early_exit signal is kept global
-  std::vector<std::thread> threads_;
-  std::vector<std::shared_ptr<nic::Error>> threads_status_;
-  std::vector<std::shared_ptr<std::vector<nic::InferContext::Stat>>>
-      threads_contexts_stat_;
-  std::vector<std::shared_ptr<size_t>> threads_concurrency_;
-
-  // Use condition variable to pause/continue worker threads
-  std::condition_variable wake_signal_;
-  std::mutex wake_mutex_;
-
-  // Pointer to a vector of request timestamps <start_time, end_time>
-  // Request latency will be end_time - start_time
-  std::shared_ptr<TimestampVector> request_timestamps_;
-  // Mutex to avoid race condition on adding elements into the timestamp vector
-  // and on updating context statistic.
-  std::mutex status_report_mutex_;
-};
-
-ConcurrencyManager::~ConcurrencyManager()
-{
-  early_exit = true;
-  // wake up all threads
-  wake_signal_.notify_all();
-
-  size_t cnt = 0;
-  for (auto& thread : threads_) {
-    thread.join();
-    if (!threads_status_[cnt]->IsOk()) {
-      std::cerr << "Thread [" << cnt
-                << "] had error: " << *(threads_status_[cnt]) << std::endl;
-    }
-    cnt++;
-  }
-}
-
-nic::Error
-ConcurrencyManager::Create(
-    const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const bool zero_input,
-    const std::string& data_directory,
-    const std::shared_ptr<ContextFactory>& factory,
-    std::unique_ptr<ConcurrencyManager>* manager)
-{
-  manager->reset(new ConcurrencyManager(
-      batch_size, max_threads, sequence_length, zero_input, factory));
-
-  // Read provided data
-  if (!data_directory.empty()) {
-    // Get all input names
-    std::unique_ptr<nic::InferContext> ctx;
-    RETURN_IF_ERROR((*manager)->factory_->CreateInferContext(&ctx));
-    for (const auto& input : ctx->Inputs()) {
-      const auto file_path = data_directory + "/" + input->Name();
-      auto it = (*manager)
-                    ->input_data_.emplace(input->Name(), std::vector<char>())
-                    .first;
-      RETURN_IF_ERROR(ReadFile(file_path, &it->second));
-    }
-  }
-
-  return nic::Error::Success;
-}
-
-ConcurrencyManager::ConcurrencyManager(
-    const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const bool zero_input,
-    const std::shared_ptr<ContextFactory>& factory)
-    : batch_size_(batch_size), max_threads_(max_threads),
-      sequence_length_(sequence_length), zero_input_(zero_input),
-      factory_(factory)
-{
-  request_timestamps_.reset(new TimestampVector());
-  on_sequence_model_ = (factory_->SchedulerType() == ContextFactory::SEQUENCE);
-}
-
-nic::Error
-ConcurrencyManager::ChangeConcurrencyLevel(
-    const size_t concurrent_request_count)
-{
-  // Always prefer to create new threads if the maximum limit has not been met
-  while ((concurrent_request_count > threads_.size()) &&
-         (threads_.size() < max_threads_)) {
-    // Launch new thread for inferencing
-    threads_status_.emplace_back(
-        new nic::Error(ni::RequestStatusCode::SUCCESS));
-    threads_contexts_stat_.emplace_back(
-        new std::vector<nic::InferContext::Stat>());
-    threads_concurrency_.emplace_back(new size_t(0));
-
-    // Worker maintains concurrency in different ways.
-    // For sequence models, multiple contexts must be created for multiple
-    // concurrent sequences.
-    // For non-sequence models, one context can send out multiple requests
-    // at the same time. Thus it uses one single context as every infer context
-    // creates a worker thread implicitly.
-    threads_.emplace_back(
-        &ConcurrencyManager::AsyncInfer, this, threads_status_.back(),
-        threads_contexts_stat_.back(), threads_concurrency_.back());
-  }
-
-  // Compute the new concurrency level for each thread (take floor)
-  // and spread the remaining value
-  size_t avg_concurrency = concurrent_request_count / threads_.size();
-  size_t threads_add_one = concurrent_request_count % threads_.size();
-  for (size_t i = 0; i < threads_concurrency_.size(); i++) {
-    *(threads_concurrency_[i]) =
-        avg_concurrency + (i < threads_add_one ? 1 : 0);
-  }
-
-  // Make sure all threads will check their updated concurrency level
-  wake_signal_.notify_all();
-
-  std::cout << "Request concurrency: " << concurrent_request_count << std::endl;
-  return nic::Error::Success;
-}
-
-nic::Error
-ConcurrencyManager::CheckHealth()
-{
-  // Check thread status to make sure that the actual concurrency level is
-  // consistent to the one being reported
-  // If some thread return early, main thread will return and
-  // the worker thread's error message will be reported
-  // when ConcurrencyManager's destructor get called.
-  for (auto& thread_status : threads_status_) {
-    if (!thread_status->IsOk()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "Failed to maintain concurrency level requested."
-          " Worker thread(s) failed to generate concurrent requests.");
-    }
-  }
-  return nic::Error::Success;
-}
-
-nic::Error
-ConcurrencyManager::SwapTimestamps(TimestampVector& new_timestamps)
-{
-  // Get the requests in the shared vector
-  std::lock_guard<std::mutex> lock(status_report_mutex_);
-  request_timestamps_->swap(new_timestamps);
-  return nic::Error::Success;
-}
-
-nic::Error
-ConcurrencyManager::PrepareInfer(
-    std::unique_ptr<nic::InferContext>* ctx,
-    std::unique_ptr<nic::InferContext::Options>* options,
-    std::vector<uint8_t>& input_buffer)
-{
-  RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
-
-  uint64_t max_batch_size = (*ctx)->MaxBatchSize();
-
-  // Model specifying maximum batch size of 0 indicates that batching
-  // is not supported and so the input tensors do not expect a "N"
-  // dimension (and 'batch_size' should be 1 so that only a single
-  // image instance is inferred at a time).
-  if (max_batch_size == 0) {
-    if (batch_size_ != 1) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "expecting batch size 1 for model '" + (*ctx)->ModelName() +
-              "' which does not support batching");
-    }
-  } else if (batch_size_ > max_batch_size) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        "expecting batch size <= " + std::to_string(max_batch_size) +
-            " for model '" + (*ctx)->ModelName() + "'");
-  }
-
-  // Prepare context for 'batch_size' batches. Request that all
-  // outputs be returned.
-  // Only set options if it has not been created, otherwise,
-  // assuming that the options for this model has been created previously
-  if (*options == nullptr) {
-    RETURN_IF_ERROR(nic::InferContext::Options::Create(options));
-
-    (*options)->SetBatchSize(batch_size_);
-    for (const auto& output : (*ctx)->Outputs()) {
-      (*options)->AddRawResult(output);
-    }
-  }
-
-  RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
-
-  // Create a zero or randomly (as indicated by zero_input_)
-  // initialized buffer that is large enough to provide the largest
-  // needed input. We (re)use this buffer for all input values.
-  size_t max_input_byte_size = 0;
-  for (const auto& input : (*ctx)->Inputs()) {
-    const int64_t bs = input->ByteSize();
-    if (bs < 0) {
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "input '" + input->Name() +
-              "' has variable-size shape, unable to create input values for "
-              "model '" +
-              (*ctx)->ModelName() + "'");
-    }
-
-    max_input_byte_size =
-        std::max(max_input_byte_size, (size_t)input->ByteSize());
-  }
-
-  if (input_buffer.size() == 0) {
-    std::vector<uint8_t> input_buf(max_input_byte_size);
-    for (size_t i = 0; i < input_buf.size(); ++i) {
-      input_buf[i] = (zero_input_) ? 0 : rand();
-    }
-    input_buffer.swap(input_buf);
-  }
-
-  // Initialize inputs
-  for (const auto& input : (*ctx)->Inputs()) {
-    RETURN_IF_ERROR(input->Reset());
-
-    size_t batch1_size = (size_t)input->ByteSize();
-    const uint8_t* data = &input_buffer[0];
-    // if available, use provided data instead
-    auto it = input_data_.find(input->Name());
-    if (it != input_data_.end()) {
-      if (batch1_size > it->second.size()) {
-        return nic::Error(
-            ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() + "' requires " +
-                std::to_string(batch1_size) +
-                " bytes for each batch, but provided data only has " +
-                std::to_string(it->second.size()) + " bytes");
-      }
-      data = (const uint8_t*)&(it->second)[0];
-    }
-
-    for (size_t i = 0; i < batch_size_; ++i) {
-      RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
-    }
-  }
-
-  return nic::Error::Success;
-}
-
-nic::Error
-ConcurrencyManager::GetAccumulatedContextStat(
-    nic::InferContext::Stat* contexts_stat)
-{
-  std::lock_guard<std::mutex> lk(status_report_mutex_);
-  for (auto& thread_contexts_stat : threads_contexts_stat_) {
-    for (auto& context_stat : (*thread_contexts_stat)) {
-      contexts_stat->completed_request_count +=
-          context_stat.completed_request_count;
-      contexts_stat->cumulative_total_request_time_ns +=
-          context_stat.cumulative_total_request_time_ns;
-      contexts_stat->cumulative_send_time_ns +=
-          context_stat.cumulative_send_time_ns;
-      contexts_stat->cumulative_receive_time_ns +=
-          context_stat.cumulative_receive_time_ns;
-    }
-  }
-  return nic::Error::Success;
-}
-
-// Function for worker threads.
-// If the model is non-sequence model, each worker uses only one context
-// to maintain concurrency assigned to worker.
-// If the model is sequence model, each worker has to use multiples contexts
-// to maintain (sequence) concurrency assigned to worker.
-void
-ConcurrencyManager::AsyncInfer(
-    std::shared_ptr<nic::Error> err,
-    std::shared_ptr<std::vector<nic::InferContext::Stat>> stats,
-    std::shared_ptr<size_t> concurrency)
-{
-  std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
-
-  // Variable that can be used across InferContexts
-  std::vector<uint8_t> input_buf;
-  std::unique_ptr<nic::InferContext::Options> options(nullptr);
-  std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-
-  // Variable used to signal request completion
-  bool notified = false;
-  std::mutex cb_mtx;
-  std::condition_variable cb_cv;
-
-  // run inferencing until receiving exit signal to maintain server load.
-  do {
-    // Only interact with synchronous mechanism if the worker should wait
-    if (*concurrency == 0) {
-      // Wait if no request should be sent and it is not exiting
-      std::unique_lock<std::mutex> lock(wake_mutex_);
-      wake_signal_.wait(
-          lock, [concurrency]() { return early_exit || (*concurrency > 0); });
-    }
-
-    size_t num_reqs = *concurrency;
-    // If the model is non-sequence model, use one InferContext to maintain
-    // concurrency for this thread
-    size_t active_ctx_cnt = on_sequence_model_ ? num_reqs : 1;
-    // Create the context for inference of the specified model.
-    while (active_ctx_cnt > ctxs.size()) {
-      ctxs.emplace_back(new InferContextMetaData());
-      stats->emplace_back();
-      *err = PrepareInfer(&(ctxs.back()->ctx_), &options, input_buf);
-      if (!err->IsOk()) {
-        return;
-      }
-    }
-
-    // Create async requests such that the number of ongoing requests
-    // matches the concurrency level
-    // Non-sequence model is 'num_reqs' * 1 ctx
-    // Sequence model is 1 sequence (n requests) * 'active_ctx_cnt' ctxs
-    for (size_t idx = 0; idx < active_ctx_cnt; idx++) {
-      // for sequence model, only starts new sequence
-      // when the previous one is done
-      if (on_sequence_model_) {
-        num_reqs =
-            ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
-      }
-      for (size_t& i = ctxs[idx]->inflight_request_cnt_; i < num_reqs; i++) {
-        uint32_t flags = 0;
-        if (on_sequence_model_) {
-          if (i == 0) {
-            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
-          }
-          if (i == num_reqs - 1) {
-            flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
-          }
-          options->SetFlag(
-              ni::InferRequestHeader::FLAG_SEQUENCE_START,
-              flags & ni::InferRequestHeader::FLAG_SEQUENCE_START);
-          options->SetFlag(
-              ni::InferRequestHeader::FLAG_SEQUENCE_END,
-              flags & ni::InferRequestHeader::FLAG_SEQUENCE_END);
-          ctxs[idx]->ctx_->SetRunOptions(*options);
-        }
-        struct timespec start_time;
-        clock_gettime(CLOCK_MONOTONIC, &start_time);
-        *err = ctxs[idx]->ctx_->AsyncRun(
-            [&notified, &cb_mtx, &cb_cv, &ctxs, start_time, flags, idx](
-                nic::InferContext* ctx,
-                std::shared_ptr<nic::InferContext::Request> request) {
-              {
-                std::lock_guard<std::mutex> lk(ctxs[idx]->mtx_);
-                ctxs[idx]->completed_requests_.emplace_back(
-                    std::move(request), start_time, flags);
-              }
-
-              // avoid competition over 'cb_mtx'
-              if (!notified) {
-                {
-                  std::lock_guard<std::mutex> lk(cb_mtx);
-                  notified = true;
-                }
-                cb_cv.notify_all();
-              }
-              return;
-            });
-        if (!err->IsOk()) {
-          return;
-        }
-      }
-    }
-
-    // wait for signal from callback that there is completed request,
-    // and then record the end time of the request
-    {
-      std::unique_lock<std::mutex> lk(cb_mtx);
-      cb_cv.wait(lk, [&notified] {
-        if (notified) {
-          notified = false;
-          return true;
-        }
-        return false;
-      });
-    }
-
-    for (size_t idx = 0; idx < ctxs.size(); idx++) {
-      if (ctxs[idx]->inflight_request_cnt_ > 0) {
-        std::vector<RequestMetaData> swap_vector;
-        bool is_ready = false;
-        {
-          std::lock_guard<std::mutex> lk(ctxs[idx]->mtx_);
-          swap_vector.swap(ctxs[idx]->completed_requests_);
-        }
-        for (const auto& request : swap_vector) {
-          *err = ctxs[idx]->ctx_->GetAsyncRunResults(
-              &results, &is_ready, request.request_, true);
-          if (!err->IsOk()) {
-            return;
-          }
-
-          if (!is_ready) {
-            *err = nic::Error(
-                ni::RequestStatusCode::INTERNAL,
-                "AsyncRun callback is invoked but request is not ready");
-          }
-
-          struct timespec end_time;
-          clock_gettime(CLOCK_MONOTONIC, &end_time);
-          struct timespec start_time = request.start_time_;
-          uint32_t flags = request.flags_;
-
-          ctxs[idx]->inflight_request_cnt_--;
-
-          {
-            // Add the request timestamp to shared vector with proper locking
-            std::lock_guard<std::mutex> lk(status_report_mutex_);
-            request_timestamps_->emplace_back(
-                std::make_tuple(start_time, end_time, flags));
-            ctxs[idx]->ctx_->GetStat(&((*stats)[idx]));
-          }
-        }
-      }
-    }
-
-    // Stop inferencing and wait for all callbacks are invoked
-    // if an early exit has been signaled, in case of referencing on
-    // released resources in the callback function.
-    if (early_exit) {
-      for (auto& ctx : ctxs) {
-        // lock on ctx's mutex so that the 'completed_requests' is synchronized
-        std::unique_lock<std::mutex> lk(ctx->mtx_);
-        cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
-          ctx->inflight_request_cnt_ -= ctx->completed_requests_.size();
-          ctx->completed_requests_.clear();
-          return (ctx->inflight_request_cnt_ == 0);
-        });
-      }
-      // end loop
-      break;
-    }
-  } while (true);
-}
-
-size_t
-ConcurrencyManager::GetRandomLength(double offset_ratio)
-{
-  int random_offset = ((2.0 * rand() / double(RAND_MAX)) - 1.0) * offset_ratio *
-                      sequence_length_;
-  if (int(sequence_length_) + random_offset <= 0) {
-    return 1;
-  }
-  return sequence_length_ + random_offset;
-}
-
-//==============================================================================
-/// A InferenceProfiler is a helper class that measures and summarizes the
-/// inference statistic under different concurrency level.
-///
-/// The profiler can adjust the number of concurrent requests by informing the
-/// concurrency manager. And after the adjustment, the profiler will actively
-/// collecting the statistic from both the concurrency manager and the inference
-/// server directly until it is stable. Once stable, the profiler updates the
-/// 'status_summary' based on the most recent measurement.
-///
-/// The measurement procedure:
-/// 1. The profiler gets start status from the server and records the start
-/// time.
-/// 2. After given time interval, the profiler gets end status from the server
-///    and records the end time.
-/// 3. The profiler obtains the timestamps recorded by concurrency manager,
-///    and uses the timestamps that are recorded between start time and end time
-///    to measure client side status and update status_summary.
-///
-class InferenceProfiler {
- public:
-  /// Create a profiler that collects and summarizes inference statistic.
-  /// \param verbose Whether to print verbose logging.
-  /// \param profile Whether to send profile requests to server.
-  /// \param stable_offset The range that the measurement is considered as
-  /// stable. i.e. within (1 +/- stable_offset) * average value of the last
-  /// 3 measurements. The criterias are "infer per second" and "average
-  /// latency", or "infer per second" and "percentile latency" if valid
-  /// percentile is set (see 'percentile' below).
-  /// \param measurement_window_ms The duration of each measurement in msec.
-  /// \param max_measurement_count The maximum number of attempts to obtain
-  /// stable measurement.
-  /// \param percentile The percentile in terms of latency to be reported.
-  /// if it is a valid percentile value, the percentile latency will reported
-  /// and used as stable criteria instead of average latency. If it is -1,
-  /// average latency will be reported and used as stable criteria.
-  /// \param factory The ContextFactory object used to create InferContext.
-  /// \param manger Returns a new InferenceProfiler object.
-  /// \return Error object indicating success or failure.
-  static nic::Error Create(
-      const bool verbose, const bool profile, const double stable_offset,
-      const uint64_t measurement_window_ms, const size_t max_measurement_count,
-      const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
-      std::unique_ptr<ConcurrencyManager> manager,
-      std::unique_ptr<InferenceProfiler>* profiler);
-
-  /// Actively measure throughput in every 'measurement_window' msec until the
-  /// throughput is stable. Once the throughput is stable, it summarize the most
-  /// recent measurement into 'status_summary'.
-  /// NOTE: the requests are being sent regardless of the measurement, so the
-  /// data returned by the server (see struct PerforamnceStatusStruct) will
-  /// include more requests than what the client measures (we can't get the
-  /// exact server status right before the first request and right after the
-  /// last request in the measurement window).
-  /// \param concurrent_request_count The concurrency level for the measurement.
-  /// \param status_summary Returns the summary of the measurement.
-  /// \return Error object indicating success or failure.
-  nic::Error Profile(
-      const size_t concurrent_request_count, PerfStatus& status_summary);
-
- private:
-  using TimestampVector =
-      std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
-
-  InferenceProfiler(
-      const bool verbose, const bool profile, const double stable_offset,
-      const int32_t measurement_window_ms, const size_t max_measurement_count,
-      const bool extra_percentile, const size_t percentile,
-      const ContextFactory::ModelSchedulerType scheduler_type,
-      const std::string& model_name, const int64_t model_version,
-      std::unique_ptr<nic::ProfileContext> profile_ctx,
-      std::unique_ptr<nic::ServerStatusContext> status_ctx,
-      std::unique_ptr<ConcurrencyManager> manager);
-
-  nic::Error StartProfile() { return profile_ctx_->StartProfile(); }
-
-  nic::Error StopProfile() { return profile_ctx_->StopProfile(); }
-
-  /// Helper function to perform measurement.
-  /// \param status_summary The summary of this measurement.
-  /// \return Error object indicating success or failure.
-  nic::Error Measure(PerfStatus& status_summary);
-
-  /// \param server_status Returns the status of the models provided by
-  /// the server. If the model being profiled is non-ensemble model,
-  /// only its status will be returned. Otherwise, the status of the composing
-  /// models will also be returned.
-  /// \return Error object indicating success or failure.
-  nic::Error GetServerSideStatus(
-      std::map<std::string, ni::ModelStatus>* model_status);
-
-  /// Sumarize the measurement with the provided statistics.
-  /// \param timestamps The timestamps of the requests completed during the
-  /// measurement.
-  /// \param start_status The model status at the start of the measurement.
-  /// \param end_status The model status at the end of the measurement.
-  /// \param start_stat The accumulated context status at the start.
-  /// \param end_stat The accumulated context status at the end.
-  /// \param summary Returns the summary of the measurement.
-  /// \return Error object indicating success or failure.
-  nic::Error Summarize(
-      const TimestampVector& timestamps,
-      const std::map<std::string, ni::ModelStatus>& start_status,
-      const std::map<std::string, ni::ModelStatus>& end_status,
-      const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat, PerfStatus& summary);
-
-  /// \param timestamps The timestamps collected for the measurement.
-  /// \return the start and end timestamp of the measurement window.
-  std::pair<uint64_t, uint64_t> MeasurementTimestamp(
-      const TimestampVector& timestamps);
-
-  /// \param timestamps The timestamps collected for the measurement.
-  /// \param valid_range The start and end timestamp of the measurement window.
-  /// \param valid_sequence_count Returns the number of completed sequences
-  /// during the measurement. A sequence is a set of correlated requests sent to
-  /// sequence model.
-  /// \return the vector of request latencies where the requests are completed
-  /// within the measurement window.
-  std::vector<uint64_t> ValidLatencyMeasurement(
-      const TimestampVector& timestamps,
-      const std::pair<uint64_t, uint64_t>& valid_range,
-      size_t& valid_sequence_count);
-
-  /// \param latencies The vector of request latencies collected.
-  /// \param summary Returns the summary that the latency related fields are
-  /// set.
-  /// \return Error object indicating success or failure.
-  nic::Error SummarizeLatency(
-      const std::vector<uint64_t>& latencies, PerfStatus& summary);
-
-  /// \param start_stat The accumulated context status at the start.
-  /// \param end_stat The accumulated context status at the end.
-  /// \param duration_ns The duration of the measurement in nsec.
-  /// \param valid_request_count The number of completed requests recorded.
-  /// \param valid_sequence_count The number of completed sequences recorded.
-  /// \param summary Returns the summary that the fileds recorded by client
-  /// are set.
-  /// \return Error object indicating success or failure.
-  nic::Error SummarizeClientStat(
-      const nic::InferContext::Stat& start_stat,
-      const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
-      const size_t valid_request_count, const size_t valid_sequence_count,
-      PerfStatus& summary);
-
-  /// \param model_name The name of the model to summarize the server side stats
-  /// \param model_version The version of the model
-  /// \param start_status The model status at the start of the measurement.
-  /// \param end_status The model status at the end of the measurement.
-  /// \param server_stats Returns the summary that the fileds recorded by server
-  /// are set.
-  /// \return Error object indicating success or failure.
-  nic::Error SummarizeServerStats(
-      const std::string& model_name, const int64_t model_version,
-      const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-      ServerSideStats* server_stats);
-
-  bool verbose_;
-  bool profile_;
-  double stable_offset_;
-  uint64_t measurement_window_ms_;
-  size_t max_measurement_count_;
-  bool extra_percentile_;
-  size_t percentile_;
-
-  ContextFactory::ModelSchedulerType scheduler_type_;
-  std::string model_name_;
-  int64_t model_version_;
-  std::set<std::pair<std::string, int64_t>> composing_models_;
-
-  std::unique_ptr<nic::ProfileContext> profile_ctx_;
-  std::unique_ptr<nic::ServerStatusContext> status_ctx_;
-  std::unique_ptr<ConcurrencyManager> manager_;
-};
-
-nic::Error
-InferenceProfiler::Create(
-    const bool verbose, const bool profile, const double stable_offset,
-    const uint64_t measurement_window_ms, const size_t max_measurement_count,
-    const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
-    std::unique_ptr<ConcurrencyManager> manager,
-    std::unique_ptr<InferenceProfiler>* profiler)
-{
-  std::unique_ptr<nic::ProfileContext> profile_ctx;
-  std::unique_ptr<nic::ServerStatusContext> status_ctx;
-  RETURN_IF_ERROR(factory->CreateProfileContext(&profile_ctx));
-  RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
-
-  std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
-      verbose, profile, stable_offset, measurement_window_ms,
-      max_measurement_count, (percentile != -1), percentile,
-      factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
-      std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
-
-  if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
-    std::map<std::string, ni::ModelStatus> model_status;
-    RETURN_IF_ERROR(local_profiler->GetServerSideStatus(&model_status));
-    const auto& it = model_status.find(local_profiler->model_name_);
-    for (const auto& step : it->second.config().ensemble_scheduling().step()) {
-      local_profiler->composing_models_.emplace(
-          step.model_name(), step.model_version());
-    }
-  }
-
-  *profiler = std::move(local_profiler);
-  return nic::Error::Success;
-}
-
-InferenceProfiler::InferenceProfiler(
-    const bool verbose, const bool profile, const double stable_offset,
-    const int32_t measurement_window_ms, const size_t max_measurement_count,
-    const bool extra_percentile, const size_t percentile,
-    const ContextFactory::ModelSchedulerType scheduler_type,
-    const std::string& model_name, const int64_t model_version,
-    std::unique_ptr<nic::ProfileContext> profile_ctx,
-    std::unique_ptr<nic::ServerStatusContext> status_ctx,
-    std::unique_ptr<ConcurrencyManager> manager)
-    : verbose_(verbose), profile_(profile), stable_offset_(stable_offset),
-      measurement_window_ms_(measurement_window_ms),
-      max_measurement_count_(max_measurement_count),
-      extra_percentile_(extra_percentile), percentile_(percentile),
-      scheduler_type_(scheduler_type), model_name_(model_name),
-      model_version_(model_version), profile_ctx_(std::move(profile_ctx)),
-      status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
-{
-}
-
-nic::Error
-InferenceProfiler::Profile(
-    const size_t concurrent_request_count, PerfStatus& status_summary)
-{
-  status_summary.concurrency = concurrent_request_count;
-
-  RETURN_IF_ERROR(manager_->ChangeConcurrencyLevel(concurrent_request_count));
-
-  // Start measurement
-  size_t recent_k = 3;
-  std::vector<int> infer_per_sec;
-  std::vector<uint64_t> latencies;
-  // Stable will only be changed if max_measurement_count >= recent_k
-  bool stable = true;
-  double avg_ips = 0;
-  uint64_t avg_latency = 0;
-  do {
-    RETURN_IF_ERROR(manager_->CheckHealth());
-
-    RETURN_IF_ERROR(Measure(status_summary));
-
-    infer_per_sec.push_back(status_summary.client_infer_per_sec);
-    latencies.push_back(status_summary.stabilizing_latency_ns);
-    avg_ips += (double)infer_per_sec.back() / recent_k;
-    avg_latency += latencies.back() / recent_k;
-
-    if (verbose_) {
-      std::cout << "  Pass [" << infer_per_sec.size()
-                << "] throughput: " << infer_per_sec.back() << " infer/sec. ";
-      if (extra_percentile_) {
-        std::cout << "p" << percentile_ << " latency: "
-                  << (status_summary.client_percentile_latency_ns
-                          .find(percentile_)
-                          ->second /
-                      1000)
-                  << " usec" << std::endl;
-      } else {
-        std::cout << "Avg latency: "
-                  << (status_summary.client_avg_latency_ns / 1000)
-                  << " usec (std " << status_summary.std_us << " usec)"
-                  << std::endl;
-      }
-    }
-
-    if (infer_per_sec.size() >= recent_k) {
-      size_t idx = infer_per_sec.size() - recent_k;
-      if (infer_per_sec.size() > recent_k) {
-        avg_ips -= (double)infer_per_sec[idx - 1] / recent_k;
-        avg_latency -= latencies[idx - 1] / recent_k;
-      }
-      stable = true;
-      for (; idx < infer_per_sec.size(); idx++) {
-        // We call it stable only if recent_k measurement are within
-        // +/-(stable_offset_)% of the average infer per second and latency
-        if ((infer_per_sec[idx] < avg_ips * (1 - stable_offset_)) ||
-            (infer_per_sec[idx] > avg_ips * (1 + stable_offset_))) {
-          stable = false;
-          break;
-        }
-        if ((latencies[idx] < avg_latency * (1 - stable_offset_)) ||
-            (latencies[idx] > avg_latency * (1 + stable_offset_))) {
-          stable = false;
-          break;
-        }
-      }
-      if (stable) {
-        break;
-      }
-    }
-  } while ((!early_exit) && (infer_per_sec.size() < max_measurement_count_));
-  if (early_exit) {
-    return nic::Error(ni::RequestStatusCode::INTERNAL, "Received exit signal.");
-  } else if (!stable) {
-    std::cerr << "Failed to obtain stable measurement within "
-              << max_measurement_count_
-              << " measurement windows for concurrency "
-              << concurrent_request_count << ". Please try to "
-              << "increase the time window." << std::endl;
-  }
-
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::GetServerSideStatus(
-    std::map<std::string, ni::ModelStatus>* model_status)
-{
-  model_status->clear();
-
-  ni::ServerStatus server_status;
-  RETURN_IF_ERROR(status_ctx_->GetServerStatus(&server_status));
-  const auto& itr = server_status.model_status().find(model_name_);
-  if (itr == server_status.model_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model" + model_name_);
-  } else {
-    model_status->emplace(model_name_, itr->second);
-  }
-
-  // Also get status for composing models if any
-  for (const auto& model_info : composing_models_) {
-    const auto& itr = server_status.model_status().find(model_info.first);
-    if (itr == server_status.model_status().end()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "unable to find status for composing model" + model_info.first);
-    } else {
-      model_status->emplace(model_info.first, itr->second);
-    }
-  }
-
-  return nic::Error::Success;
-}
-
-// Used for measurement
-nic::Error
-InferenceProfiler::Measure(PerfStatus& status_summary)
-{
-  std::map<std::string, ni::ModelStatus> start_status;
-  std::map<std::string, ni::ModelStatus> end_status;
-  nic::InferContext::Stat start_stat;
-  nic::InferContext::Stat end_stat;
-
-  RETURN_IF_ERROR(GetServerSideStatus(&start_status));
-
-  // Start profiling on the server if requested.
-  if (profile_) {
-    RETURN_IF_ERROR(StartProfile());
-  }
-
-  RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&start_stat));
-
-  // Wait for specified time interval in msec
-  std::this_thread::sleep_for(
-      std::chrono::milliseconds((uint64_t)(measurement_window_ms_ * 1.2)));
-
-  RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&end_stat));
-
-  // Stop profiling on the server if requested.
-  if (profile_) {
-    RETURN_IF_ERROR(StopProfile());
-  }
-
-  // Get server status and then print report on difference between
-  // before and after status.
-  RETURN_IF_ERROR(GetServerSideStatus(&end_status));
-
-  TimestampVector current_timestamps;
-  RETURN_IF_ERROR(manager_->SwapTimestamps(current_timestamps));
-
-  RETURN_IF_ERROR(Summarize(
-      current_timestamps, start_status, end_status, start_stat, end_stat,
-      status_summary));
-
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::Summarize(
-    const TimestampVector& timestamps,
-    const std::map<std::string, ni::ModelStatus>& start_status,
-    const std::map<std::string, ni::ModelStatus>& end_status,
-    const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat, PerfStatus& summary)
-{
-  size_t valid_sequence_count = 0;
-
-  // Get measurement from requests that fall within the time interval
-  std::pair<uint64_t, uint64_t> valid_range = MeasurementTimestamp(timestamps);
-  std::vector<uint64_t> latencies =
-      ValidLatencyMeasurement(timestamps, valid_range, valid_sequence_count);
-
-  RETURN_IF_ERROR(SummarizeLatency(latencies, summary));
-  RETURN_IF_ERROR(SummarizeClientStat(
-      start_stat, end_stat, valid_range.second - valid_range.first,
-      latencies.size(), valid_sequence_count, summary));
-
-  {
-    const auto& model_start = start_status.find(model_name_)->second;
-    const auto& model_end = end_status.find(model_name_)->second;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_name_, model_version_, model_start, model_end,
-        &(summary.server_stats)));
-  }
-  for (const auto& model_info : composing_models_) {
-    const auto& model_start = start_status.find(model_info.first)->second;
-    const auto& model_end = end_status.find(model_info.first)->second;
-    auto it = summary.server_composing_model_stats
-                  .emplace(model_info, ServerSideStats())
-                  .first;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_info.first, model_info.second, model_start, model_end,
-        &(it->second)));
-  }
-
-  return nic::Error::Success;
-}
-
-std::pair<uint64_t, uint64_t>
-InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
-{
-  // finding the start time of the first request
-  // and the end time of the last request in the timestamp queue
-  uint64_t first_request_start_ns = 0;
-  uint64_t last_request_end_ns = 0;
-  for (auto& timestamp : timestamps) {
-    uint64_t request_start_time =
-        std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<0>(timestamp).tv_nsec;
-    uint64_t request_end_time =
-        std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<1>(timestamp).tv_nsec;
-    if ((first_request_start_ns > request_start_time) ||
-        (first_request_start_ns == 0)) {
-      first_request_start_ns = request_start_time;
-    }
-    if ((last_request_end_ns < request_end_time) ||
-        (last_request_end_ns == 0)) {
-      last_request_end_ns = request_end_time;
-    }
-  }
-
-  // Define the measurement window [client_start_ns, client_end_ns) to be
-  // in the middle of the queue
-  uint64_t measurement_window_ns = measurement_window_ms_ * 1000 * 1000;
-  uint64_t offset = first_request_start_ns + measurement_window_ns;
-  offset =
-      (offset > last_request_end_ns) ? 0 : (last_request_end_ns - offset) / 2;
-
-  uint64_t start_ns = first_request_start_ns + offset;
-  uint64_t end_ns = start_ns + measurement_window_ns;
-
-  return std::make_pair(start_ns, end_ns);
-}
-
-std::vector<uint64_t>
-InferenceProfiler::ValidLatencyMeasurement(
-    const TimestampVector& timestamps,
-    const std::pair<uint64_t, uint64_t>& valid_range,
-    size_t& valid_sequence_count)
-{
-  std::vector<uint64_t> valid_latencies;
-  valid_sequence_count = 0;
-  for (auto& timestamp : timestamps) {
-    uint64_t request_start_ns =
-        std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<0>(timestamp).tv_nsec;
-    uint64_t request_end_ns =
-        std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<1>(timestamp).tv_nsec;
-
-    if (request_start_ns <= request_end_ns) {
-      // Only counting requests that end within the time interval
-      if ((request_end_ns >= valid_range.first) &&
-          (request_end_ns <= valid_range.second)) {
-        valid_latencies.push_back(request_end_ns - request_start_ns);
-        if (std::get<2>(timestamp) & ni::InferRequestHeader::FLAG_SEQUENCE_END)
-          valid_sequence_count++;
-      }
-    }
-  }
-
-  // Always sort measured latencies as percentile will be reported as default
-  std::sort(valid_latencies.begin(), valid_latencies.end());
-
-  return valid_latencies;
-}
-
-nic::Error
-InferenceProfiler::SummarizeLatency(
-    const std::vector<uint64_t>& latencies, PerfStatus& summary)
-{
-  if (latencies.size() == 0) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL,
-        "No valid requests recorded within time interval."
-        " Please use a larger time window.");
-  }
-
-  uint64_t tol_latency_ns = 0;
-  uint64_t tol_square_latency_us = 0;
-
-  for (const auto& latency : latencies) {
-    tol_latency_ns += latency;
-    tol_square_latency_us += (latency * latency) / (1000 * 1000);
-  }
-
-  summary.client_avg_latency_ns = tol_latency_ns / latencies.size();
-
-  // retrieve other interesting percentile
-  summary.client_percentile_latency_ns.clear();
-  std::set<size_t> percentiles{50, 90, 95, 99};
-  if (extra_percentile_) {
-    percentiles.emplace(percentile_);
-  }
-
-  for (const auto percentile : percentiles) {
-    size_t index = (percentile / 100.0) * (latencies.size() - 1) + 0.5;
-    summary.client_percentile_latency_ns.emplace(percentile, latencies[index]);
-  }
-
-  if (extra_percentile_) {
-    summary.stabilizing_latency_ns =
-        summary.client_percentile_latency_ns.find(percentile_)->second;
-  } else {
-    summary.stabilizing_latency_ns = summary.client_avg_latency_ns;
-  }
-
-  // calculate standard deviation
-  uint64_t expected_square_latency_us =
-      tol_square_latency_us / latencies.size();
-  uint64_t square_avg_latency_us =
-      (summary.client_avg_latency_ns * summary.client_avg_latency_ns) /
-      (1000 * 1000);
-  uint64_t var_us = (expected_square_latency_us > square_avg_latency_us)
-                        ? (expected_square_latency_us - square_avg_latency_us)
-                        : 0;
-  summary.std_us = (uint64_t)(sqrt(var_us));
-
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::SummarizeClientStat(
-    const nic::InferContext::Stat& start_stat,
-    const nic::InferContext::Stat& end_stat, const uint64_t duration_ns,
-    const size_t valid_request_count, const size_t valid_sequence_count,
-    PerfStatus& summary)
-{
-  summary.on_sequence_model = (scheduler_type_ == ContextFactory::SEQUENCE);
-  summary.batch_size = manager_->BatchSize();
-  summary.client_request_count = valid_request_count;
-  summary.client_sequence_count = valid_sequence_count;
-  summary.client_duration_ns = duration_ns;
-  float client_duration_sec =
-      (float)summary.client_duration_ns / ni::NANOS_PER_SECOND;
-  summary.client_sequence_per_sec =
-      (int)(valid_sequence_count / client_duration_sec);
-  summary.client_infer_per_sec =
-      (int)(valid_request_count * summary.batch_size / client_duration_sec);
-
-  size_t completed_count =
-      end_stat.completed_request_count - start_stat.completed_request_count;
-  uint64_t request_time_ns = end_stat.cumulative_total_request_time_ns -
-                             start_stat.cumulative_total_request_time_ns;
-  uint64_t send_time_ns =
-      end_stat.cumulative_send_time_ns - start_stat.cumulative_send_time_ns;
-  uint64_t receive_time_ns = end_stat.cumulative_receive_time_ns -
-                             start_stat.cumulative_receive_time_ns;
-  if (completed_count != 0) {
-    summary.client_avg_request_time_ns = request_time_ns / completed_count;
-    summary.client_avg_send_time_ns = send_time_ns / completed_count;
-    summary.client_avg_receive_time_ns = receive_time_ns / completed_count;
-  }
-
-  return nic::Error::Success;
-}
-
-nic::Error
-InferenceProfiler::SummarizeServerStats(
-    const std::string& model_name, const int64_t model_version,
-    const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
-    ServerSideStats* server_stats)
-{
-  // If model_version is -1 then look in the end status to find the
-  // latest (highest valued version) and use that as the version.
-  int64_t status_model_version = 0;
-  if (model_version < 0) {
-    for (const auto& vp : end_status.version_status()) {
-      status_model_version = std::max(status_model_version, vp.first);
-    }
-  } else {
-    status_model_version = model_version;
-  }
-
-  const auto& vend_itr = end_status.version_status().find(status_model_version);
-  if (vend_itr == end_status.version_status().end()) {
-    return nic::Error(
-        ni::RequestStatusCode::INTERNAL, "missing model version status");
-  } else {
-    const auto& end_itr =
-        vend_itr->second.infer_stats().find(manager_->BatchSize());
-    if (end_itr == vend_itr->second.infer_stats().end()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL, "missing inference stats");
-    } else {
-      uint64_t start_cnt = 0;
-      uint64_t start_cumm_time_ns = 0;
-      uint64_t start_queue_time_ns = 0;
-      uint64_t start_compute_time_ns = 0;
-
-      const auto& vstart_itr =
-          start_status.version_status().find(status_model_version);
-      if (vstart_itr != start_status.version_status().end()) {
-        const auto& start_itr =
-            vstart_itr->second.infer_stats().find(manager_->BatchSize());
-        if (start_itr != vstart_itr->second.infer_stats().end()) {
-          start_cnt = start_itr->second.success().count();
-          start_cumm_time_ns = start_itr->second.success().total_time_ns();
-          start_queue_time_ns = start_itr->second.queue().total_time_ns();
-          start_compute_time_ns = start_itr->second.compute().total_time_ns();
-        }
-      }
-
-      server_stats->request_count =
-          end_itr->second.success().count() - start_cnt;
-      server_stats->cumm_time_ns =
-          end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      server_stats->queue_time_ns =
-          end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-      server_stats->compute_time_ns =
-          end_itr->second.compute().total_time_ns() - start_compute_time_ns;
-    }
-  }
-
-  return nic::Error::Success;
-}
-
-ProtocolType
-ParseProtocol(const std::string& str)
-{
-  std::string protocol(str);
-  std::transform(protocol.begin(), protocol.end(), protocol.begin(), ::tolower);
-  if (protocol == "http") {
-    return ProtocolType::HTTP;
-  } else if (protocol == "grpc") {
-    return ProtocolType::GRPC;
-  }
-
-  std::cerr << "unexpected protocol type \"" << str
-            << "\", expecting HTTP or gRPC" << std::endl;
-  exit(1);
-
-  return ProtocolType::HTTP;
-}
-
 nic::Error
 ReportServerSideStats(const ServerSideStats& stats)
 {
@@ -1643,7 +143,6 @@ ReportServerSideStats(const ServerSideStats& stats)
   const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
                                 ? (cumm_avg_us - queue_avg_us - compute_avg_us)
                                 : 0;
-
   std::cout << "    Request count: " << cnt << std::endl
             << "    Avg request latency: " << cumm_avg_us << " usec"
             << " (overhead " << overhead << " usec + "
@@ -1741,6 +240,7 @@ Report(
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
+}  // namespace perfclient
 
 void
 Usage(char** argv, const std::string& msg = std::string())
@@ -1853,8 +353,6 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-}  // namespace
-
 int
 main(int argc, char** argv)
 {
@@ -1879,7 +377,7 @@ main(int argc, char** argv)
   std::string url("localhost:8000");
   std::string filename("");
   std::string data_directory("");
-  ProtocolType protocol = ProtocolType::HTTP;
+  perfclient::ProtocolType protocol = perfclient::ProtocolType::HTTP;
   std::map<std::string, std::string> http_headers;
 
   // {name, has_arg, *flag, val}
@@ -1940,7 +438,7 @@ main(int argc, char** argv)
         measurement_window_ms = std::atoi(optarg);
         break;
       case 'i':
-        protocol = ParseProtocol(optarg);
+        protocol = perfclient::ParseProtocol(optarg);
         break;
       case 'H': {
         std::string arg = optarg;
@@ -1985,10 +483,13 @@ main(int argc, char** argv)
   if (concurrent_request_count <= 0) {
     Usage(argv, "concurrent request count must be > 0");
   }
-  if (streaming && (protocol != ProtocolType::GRPC)) {
+  if (protocol == perfclient::ProtocolType::UNKNOWN) {
+    Usage(argv, "protocol should be either HTTP or gRPC");
+  }
+  if (streaming && (protocol != perfclient::ProtocolType::GRPC)) {
     Usage(argv, "streaming is only allowed with gRPC protocol");
   }
-  if (!http_headers.empty() && (protocol != ProtocolType::HTTP)) {
+  if (!http_headers.empty() && (protocol != perfclient::ProtocolType::HTTP)) {
     std::cerr << "WARNING: HTTP headers specified with -H are ignored when "
                  "using non-HTTP protocol."
               << std::endl;
@@ -2010,27 +511,27 @@ main(int argc, char** argv)
   }
 
   // trap SIGINT to allow threads to exit gracefully
-  signal(SIGINT, SignalHandler);
+  signal(SIGINT, perfclient::SignalHandler);
 
   nic::Error err;
-  std::shared_ptr<ContextFactory> factory;
-  std::unique_ptr<ConcurrencyManager> manager;
-  std::unique_ptr<InferenceProfiler> profiler;
-  err = ContextFactory::Create(
+  std::shared_ptr<perfclient::ContextFactory> factory;
+  std::unique_ptr<perfclient::LoadManager> manager;
+  std::unique_ptr<perfclient::InferenceProfiler> profiler;
+  err = perfclient::ContextFactory::Create(
       url, protocol, http_headers, streaming, model_name, model_version,
       &factory);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
   }
-  err = ConcurrencyManager::Create(
+  err = perfclient::ConcurrencyManager::Create(
       batch_size, max_threads, sequence_length, zero_input, data_directory,
       factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
   }
-  err = InferenceProfiler::Create(
+  err = perfclient::InferenceProfiler::Create(
       verbose, profile, stable_offset, measurement_window_ms,
       max_measurement_count, percentile, factory, std::move(manager),
       &profiler);
@@ -2060,12 +561,13 @@ main(int argc, char** argv)
   }
   std::cout << std::endl;
 
-  PerfStatus status_summary;
-  std::vector<PerfStatus> summary;
+  perfclient::PerfStatus status_summary;
+  std::vector<perfclient::PerfStatus> summary;
+
   if (!dynamic_concurrency_mode) {
     err = profiler->Profile(concurrent_request_count, status_summary);
     if (err.IsOk()) {
-      err = Report(
+      err = perfclient::Report(
           status_summary, concurrent_request_count, percentile, protocol,
           verbose);
     }
@@ -2074,7 +576,8 @@ main(int argc, char** argv)
          (count <= max_concurrency) || (max_concurrency == 0); count++) {
       err = profiler->Profile(count, status_summary);
       if (err.IsOk()) {
-        err = Report(status_summary, count, percentile, protocol, verbose);
+        err = perfclient::Report(
+            status_summary, count, percentile, protocol, verbose);
         summary.push_back(status_summary);
         uint64_t stabilizing_latency_ms =
             status_summary.stabilizing_latency_ns / (1000 * 1000);
@@ -2092,7 +595,7 @@ main(int argc, char** argv)
     std::cerr << err << std::endl;
     // In the case of early_exit, the thread does not return and continues to
     // report the summary
-    if (!early_exit) {
+    if (!perfclient::early_exit) {
       return 1;
     }
   }
@@ -2105,7 +608,7 @@ main(int argc, char** argv)
       std::cout << "p" << percentile << " Batch Latency" << std::endl;
     }
 
-    for (PerfStatus& status : summary) {
+    for (perfclient::PerfStatus& status : summary) {
       std::cout << "Concurrency: " << status.concurrency << ", "
                 << status.client_infer_per_sec << " infer/sec, latency "
                 << (status.stabilizing_latency_ns / 1000) << " usec"
@@ -2126,11 +629,12 @@ main(int argc, char** argv)
       // Sort summary results in order of increasing infer/sec.
       std::sort(
           summary.begin(), summary.end(),
-          [](const PerfStatus& a, const PerfStatus& b) -> bool {
+          [](const perfclient::PerfStatus& a,
+             const perfclient::PerfStatus& b) -> bool {
             return a.client_infer_per_sec < b.client_infer_per_sec;
           });
 
-      for (PerfStatus& status : summary) {
+      for (perfclient::PerfStatus& status : summary) {
         uint64_t avg_queue_ns = status.server_stats.queue_time_ns /
                                 status.server_stats.request_count;
         uint64_t avg_compute_ns = status.server_stats.compute_time_ns /
@@ -2167,13 +671,14 @@ main(int argc, char** argv)
           const auto& version = model_info.first.second;
           const auto name_ver = name + "_v" + std::to_string(version);
 
-          std::ofstream ofs(name_ver + "." +filename, std::ofstream::out);
+          std::ofstream ofs(name_ver + "." + filename, std::ofstream::out);
           ofs << "Concurrency,Inferences/Second,Client Send,"
-            << "Network+Server Send/Recv,Server Queue,"
-            << "Server Compute,Client Recv" << std::endl;
+              << "Network+Server Send/Recv,Server Queue,"
+              << "Server Compute,Client Recv" << std::endl;
 
-          for (PerfStatus& status : summary) {
-            auto it = status.server_composing_model_stats.find(model_info.first);
+          for (perfclient::PerfStatus& status : summary) {
+            auto it =
+                status.server_composing_model_stats.find(model_info.first);
             const auto& stats = it->second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =
@@ -2185,12 +690,12 @@ main(int argc, char** argv)
                     : 0;
             // infer / sec of the composing model is calculated using the
             // request count ratio between the composing model and the ensemble
-            double infer_ratio = 1.0 * stats.request_count / status.server_stats.request_count;
+            double infer_ratio =
+                1.0 * stats.request_count / status.server_stats.request_count;
             int infer_per_sec = infer_ratio * status.client_infer_per_sec;
             ofs << status.concurrency << "," << infer_per_sec << ",0,"
-                << (avg_overhead_ns / 1000) << ","
-                << (avg_queue_ns / 1000) << "," << (avg_compute_ns / 1000)
-                << ",0" << std::endl;
+                << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
+                << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
           }
         }
       }

@@ -109,10 +109,29 @@ install(
   RUNTIME DESTINATION bin
 )
 
+
 #
 # perf_client
 #
-add_executable(perf_client perf_client.cc)
+set(
+  PERF_CLIENT_SRCS
+  perf_client.cc
+  context_factory.cc
+  concurrency_manager.cc
+  inference_profiler.cc
+  perf_utils.cc
+)
+
+set(
+  PERF_CLIENT_HDRS
+  context_factory.h
+  inference_profiler.h
+  perf_utils.h
+  load_manager.h
+)
+
+add_executable(perf_client 
+  ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_link_libraries(
   perf_client
   PRIVATE request
