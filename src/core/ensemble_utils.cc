@@ -125,8 +125,8 @@ ValidateTensorMapping(
     for (const auto& input_map : step.input_map()) {
       if (model_input.name() == input_map.first) {
         TensorNode model_tensor(
-            step.model_name(), batching,
-            model_input.data_type(), model_input.dims());
+            step.model_name(), batching, model_input.data_type(),
+            model_input.dims());
         auto it = ensemble_tensors->find(input_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -175,8 +175,8 @@ ValidateTensorMapping(
     for (const auto& model_output : model_config.output()) {
       if (model_output.name() == output_map.first) {
         TensorNode model_tensor(
-            step.model_name(), batching,
-            model_output.data_type(), model_output.dims());
+            step.model_name(), batching, model_output.data_type(),
+            model_output.dims());
         auto it = ensemble_tensors->find(output_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -261,7 +261,10 @@ ValidateEnsembleConfig(
       }
     }
 
-    if (model_config.max_batch_size() < ensemble_config.max_batch_size()) {
+    // batchable ensemble can include non-batchable models as long as
+    // the expanded shapes are consistent
+    if ((model_config.max_batch_size() != 0) &&
+        (model_config.max_batch_size() < ensemble_config.max_batch_size())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "ensemble " + ensemble_name + " allows maximum batch size " +
