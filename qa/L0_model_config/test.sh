@@ -91,6 +91,12 @@ for modelpath in \
        autofill_noplatform_success/ensemble/embedded_ensemble/embedded_ensemble/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/fp32_dim1_batch4/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/inner_ensemble/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/inconsistent_shape/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/fp32_dim1_batch4/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/fp32_dim2_nobatch/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/inconsistent_shape_2/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/fp32_dim1_batch4/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/fp32_dim2_nobatch/1 \
        autofill_noplatform_success/ensemble/unmapped_output/unmapped_output/1 \
        autofill_noplatform_success/ensemble/unmapped_output/fp32_dim1_batch4_output3/1 ; do
    mkdir -p $modelpath
