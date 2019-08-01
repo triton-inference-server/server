@@ -23,10 +23,10 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #pragma once
+
+#include "src/clients/c++/context_factory.h"
 #include "src/clients/c++/load_manager.h"
-#include "src/clients/c++/model_context.h"
 #include "src/clients/c++/perf_utils.h"
 
 #include <condition_variable>
@@ -69,32 +69,21 @@ class ConcurrencyManager : public LoadManager {
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
 
-  /// Implementation of ChangeConccurencyLevel to maintain the specified
-  /// concurency.
-  /// \parm concurent_request_count The number of concurrent requests to be
-  /// maintained.
-  /// \return Error object indicating success or failure.
+  /// @ See LoadManager.ChangeConurrencyLevel()
   nic::Error ChangeConcurrencyLevel(
       const size_t concurrent_request_count) override;
 
-  /// Check if the concurrency level can be maintained.
-  /// \return Error object indicating success or failure. Failure will be
-  /// returned if concurrency manager can't produce the requested concurrency.
+  /// @ See LoadManager.CheckHealth()
   nic::Error CheckHealth() override;
 
-  /// Swap the content of the timestamp vector recorded by the concurrency
-  /// manager with a new timestamp vector
-  /// \param new_timestamps The timestamp vector to be swapped.
-  /// \return Error object indicating success or failure.
+  /// @ See LoadManager.SwapTimestamps()
   nic::Error SwapTimestamps(TimestampVector& new_timestamps) override;
 
-  /// Get the sum of all contexts' stat
-  /// \param contexts_stat Returned the accumulated stat from all contexts
-  /// in concurrency manager
+  /// @ See LoadManager.GetAccumulatedContextStat()
   nic::Error GetAccumulatedContextStat(
       nic::InferContext::Stat* contexts_stat) override;
 
-  /// \return the batch size used for the inference requests
+  /// @ See LoadManager.BatchSize()
   size_t BatchSize() const override { return batch_size_; }
 
  public:

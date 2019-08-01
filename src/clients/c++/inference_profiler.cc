@@ -28,7 +28,6 @@
 
 #include <math.h>
 
-
 namespace perfclient {
 
 nic::Error

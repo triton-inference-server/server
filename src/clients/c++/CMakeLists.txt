@@ -116,7 +116,7 @@ install(
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
-  model_context.cc
+  context_factory.cc
   concurrency_manager.cc
   inference_profiler.cc
   perf_utils.cc
@@ -124,7 +124,7 @@ set(
 
 set(
   PERF_CLIENT_HDRS
-  model_context.h
+  context_factory.h
   inference_profiler.h
   perf_utils.h
   load_manager.h

@@ -27,9 +27,9 @@
 #include <getopt.h>
 
 #include "src/clients/c++/concurrency_manager.h"
+#include "src/clients/c++/context_factory.h"
 #include "src/clients/c++/inference_profiler.h"
 #include "src/clients/c++/load_manager.h"
-#include "src/clients/c++/model_context.h"
 #include "src/clients/c++/perf_utils.h"
 
 

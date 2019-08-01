@@ -26,11 +26,10 @@
 #pragma once
 
 #include <string>
+
 #include "src/clients/c++/perf_utils.h"
 
-
 namespace perfclient {
-
 
 //==============================================================================
 /// ContextFactory is a helper class to create client contexts used
