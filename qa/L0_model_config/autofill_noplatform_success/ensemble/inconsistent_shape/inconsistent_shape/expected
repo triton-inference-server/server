@@ -1,6 +1,11 @@
 name: "inconsistent_shape"
 max_batch_size: 2
 platform: "ensemble"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
 ensemble_scheduling {
   step [
     {
