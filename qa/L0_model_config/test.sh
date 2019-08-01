@@ -230,24 +230,22 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
 
     echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
 
-    set +e
-
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
         RET=1
     else
+        set +e
         python ./compare_status.py --expected_dir models/$TARGET --model $TARGET >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "*** FAILED: unexpected model config" >> $CLIENT_LOG
             RET=1
         fi
+        set -e
 
         kill $SERVER_PID
         wait $SERVER_PID
     fi
-
-    set -e
 done
 
 if [ $RET -eq 0 ]; then
