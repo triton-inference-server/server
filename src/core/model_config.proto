@@ -109,6 +109,16 @@ message ModelInstanceGroup
     //@@       CPU.
     //@@
     KIND_CPU = 2;
+
+    //@@    .. cpp:enumerator:: Kind::KIND_MODEL = 3
+    //@@
+    //@@       This instance group represents instances that should run on the
+    //@@       CPU and/or GPU(s) as specified by the model or backend itself.
+    //@@       The inference server will not override the model/backend
+    //@@       settings.
+    //@@       Currently, this option is supported only for Tensorflow models.
+    //@@
+    KIND_MODEL = 3;
   }
 
   //@@  .. cpp:var:: string name
@@ -124,8 +134,8 @@ message ModelInstanceGroup
   //@@
   //@@     The kind of this instance group. Default is KIND_AUTO. If
   //@@     KIND_AUTO or KIND_GPU then both 'count' and 'gpu' are valid and
-  //@@     may be specified. If KIND_CPU only 'count' is valid and 'gpu'
-  //@@     cannot be specified.
+  //@@     may be specified. If KIND_CPU or KIND_MODEL only 'count' is valid
+  //@@     and 'gpu' cannot be specified.
   //@@
   Kind kind = 4;
 

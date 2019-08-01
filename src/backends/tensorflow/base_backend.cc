@@ -83,6 +83,11 @@ BaseBackend::CreateExecutionContexts(
         RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, Context::NO_GPU_DEVICE, backend_config, paths));
         total_context_cnt++;
+      } else if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
+        const std::string instance_name =
+            group.name() + "_" + std::to_string(c) + "_model_device";
+        RETURN_IF_ERROR(CreateExecutionContext(
+            instance_name, Context::MODEL_DEVICE, backend_config, paths));
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
@@ -128,6 +133,11 @@ BaseBackend::CreateExecutionContext(
 
     LOG_INFO << "Creating instance " << instance_name << " on CPU using "
              << cc_model_filename;
+  } else if (gpu_device == Context::MODEL_DEVICE) {
+    cc_model_filename = Config().default_model_filename();
+
+    LOG_INFO << "Creating instance " << instance_name
+             << " on devices as specified in " << cc_model_filename;
   } else {
 #ifdef TRTIS_ENABLE_GPU
     cudaDeviceProp cuprops;

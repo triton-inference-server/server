@@ -50,6 +50,10 @@ extern "C" {
 // GPU device number that indicates that no gpu is available.
 #define TRTISTF_NO_GPU_DEVICE -1
 
+// GPU device number that indicates TRTIS should do nothing to control
+// the device alloaction for the network and let Tensorflow handle it.
+#define TRTISTF_MODEL_DEVICE -2
+
 // Max batch size value that indicates batching is not supported.
 #define TRTISTF_NO_BATCHING 0
 
