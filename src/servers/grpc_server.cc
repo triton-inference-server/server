@@ -318,11 +318,10 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
                   .c_str());
         }
 
-        RETURN_IF_ERR(
-            TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
-                server, request_provider, io.name().c_str(),
-                io.shared_memory().name().c_str(), io.shared_memory().offset(),
-                io.shared_memory().byte_size()));
+        RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+            server, request_provider, io.name().c_str(),
+            io.shared_memory().name().c_str(), nullptr,
+            io.shared_memory().byte_size(), io.shared_memory().offset()));
 
         idx++;
       } else {
@@ -344,7 +343,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
 
         const std::string& raw = request.raw_input(idx++);
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), raw.c_str(), raw.size()));
+            server, request_provider, io.name().c_str(), nullptr, raw.c_str(),
+            raw.size(), 0));
       }
     }
 

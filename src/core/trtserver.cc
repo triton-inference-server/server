@@ -603,39 +603,32 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
 
 TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
-    TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const void* base, size_t byte_size)
-{
-  TrtServerRequestProvider* lprovider =
-      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
-  lprovider->SetInputData(input_name, base, byte_size);
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const char* shm_name, size_t offset,
-    size_t byte_size)
+    const char* input_name, const char* shm_name, const void* base,
+    size_t byte_size, size_t offset)
 {
   TrtServerRequestProvider* lprovider =
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
+  if (shm_name == nullptr) {
+    lprovider->SetInputData(input_name, base, byte_size);
+  } else {
+    void* shm_mapped_addr;
+    TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryAddress(
+        server, shm_name, &shm_mapped_addr);
+    if (err != nullptr) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "shared memory region '" + std::string(shm_name) +
+              "' is not valid")
+              .c_str());
+    }
 
-  void* shm_mapped_addr;
-  TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryAddress(
-      server, shm_name, &shm_mapped_addr);
-  if (err != nullptr) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "shared memory region '" + std::string(shm_name) + "' is not valid")
-            .c_str());
+    // modify mapped appress by adding current offset
+    lprovider->SetInputData(
+        input_name, (void*)((char*)shm_mapped_addr + offset), byte_size);
   }
-
-  // modify mapped appress by adding current offset
-  lprovider->SetInputData(
-      input_name, (void*)((char*)shm_mapped_addr + offset), byte_size);
   return nullptr;  // Success
 }
 

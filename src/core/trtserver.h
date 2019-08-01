@@ -312,35 +312,24 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
 /// 'request_provider' is deleted. The total size of data that is
 /// provided for an input must equal the value returned by
 /// TRTSERVER_InferenceRequestProviderInputBatchByteSize().
+/// \param server The inference server object. Not needed if not using
+/// shared memory.
 /// \param request_provider The request provider object.
-/// \param name The name of the input.
-/// \param base The base address of the input data.
+/// \param input_name The name of the input.
+/// \param shm_name The name of the registered shared memory region to use. Set
+/// to nullptr if not using shared memory.
+/// \param base The base address of the input data. Set to nullptr if using
+/// shared memory.
 /// \param byte_size The size, in bytes, of the input data.
+/// \param offset The offset from the start address of the registered shared.
+/// Set to 0 if using shared memory.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
-    TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
-    const void* base, size_t byte_size);
-
-/// Assign a buffer of data to an input by pointing to that location in shared
-/// memory. The 'request_provider' takes ownership of the buffer in the shared
-/// memory region and so the caller should not modify or free the shared memory
-/// region until that ownership is released when 'request_provider' is deleted.
-/// The total size of data that is provided for an input must equal the
-/// batch_byte_size for that input.
-/// \param server The inference server object.
-/// \param request_provider The request provider object.
-/// \param input_name The name of the input.
-/// \param input_name The name of the registered shared memory region to use.
-/// \param offset The offset from the start address of the registered shared
-/// memory region. \param byte_size The size, in bytes, of the input data.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error*
-TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const char* shm_name, size_t offset,
-    size_t byte_size);
+    const char* input_name, const char* shm_name, const void* base,
+    size_t byte_size, size_t offset);
 
 /// TRTSERVER_InferenceResponse
 ///

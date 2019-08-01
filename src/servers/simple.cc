@@ -292,13 +292,13 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input0->name().c_str(), &input0_data[0],
-          input0_data.size() * sizeof(int32_t)),
+          server.get(), request_provider, input0->name().c_str(), nullptr,
+          &input0_data[0], input0_data.size() * sizeof(int32_t), 0),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input1->name().c_str(), &input1_data[0],
-          input1_data.size() * sizeof(int32_t)),
+          server.get(), request_provider, input1->name().c_str(), nullptr,
+          &input1_data[0], input1_data.size() * sizeof(int32_t), 0),
       "assigning INPUT1 data");
 
   // Perform inference...
