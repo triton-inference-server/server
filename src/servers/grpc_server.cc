@@ -55,10 +55,11 @@ namespace {
 class AsyncResources : public nvrpc::Resources {
  public:
   explicit AsyncResources(
-      const std::shared_ptr<TRTSERVER_Server>& server, int infer_threads,
-      int mgmt_threads)
-      : server_(server), mgmt_thread_pool_(mgmt_threads),
-        infer_thread_pool_(infer_threads)
+      const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+      int infer_threads, int mgmt_threads)
+      : server_(server), smb_manager_(smb_manager),
+        mgmt_thread_pool_(mgmt_threads), infer_thread_pool_(infer_threads)
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -70,12 +71,19 @@ class AsyncResources : public nvrpc::Resources {
   TRTSERVER_Server* Server() const { return server_.get(); }
   const char* ServerId() const { return server_id_; }
 
+  const std::shared_ptr<SharedMemoryBlockManager>& SharedMemoryManager() const
+  {
+    return smb_manager_;
+  }
+
   ThreadPool& GetMgmtThreadPool() { return mgmt_thread_pool_; }
   ThreadPool& GetInferThreadPool() { return infer_thread_pool_; }
 
  private:
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
+
+  std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
 
   // We can and should get specific on thread affinity.  It might not
   // be as important on the frontend, but the backend threadpool
@@ -145,6 +153,67 @@ class ModelControlContext final
         err = TRTSERVER_ServerLoadModel(server, request.model_name().c_str());
       } else {
         err = TRTSERVER_ServerUnloadModel(server, request.model_name().c_str());
+      }
+
+      RequestStatusUtil::Create(
+          response.mutable_request_status(), err,
+          RequestStatusUtil::NextUniqueRequestId(), GetResources()->ServerId());
+
+      TRTSERVER_ErrorDelete(err);
+      this->CompleteExecution(execution_context);
+    });
+  }
+};
+
+class SharedMemoryControlContext final
+    : public Context<
+          SharedMemoryControlRequest, SharedMemoryControlResponse,
+          AsyncResources> {
+  void ExecuteRPC(
+      SharedMemoryControlRequest& request,
+      SharedMemoryControlResponse& response) final override
+  {
+    uintptr_t execution_context = this->GetExecutionContext();
+    GetResources()->GetMgmtThreadPool().enqueue([this, execution_context,
+                                                 &request, &response] {
+      TRTSERVER_Server* server = GetResources()->Server();
+      TRTSERVER_SharedMemoryBlock* smb = nullptr;
+
+      TRTSERVER_Error* err = nullptr;
+      switch (request.type()) {
+        case SharedMemoryControlRequest::REGISTER:
+          err = GetResources()->SharedMemoryManager()->Create(
+              &smb, request.shared_memory_region().name(),
+              request.shared_memory_region().shm_key(),
+              request.shared_memory_region().offset(),
+              request.shared_memory_region().byte_size());
+          if (err == nullptr) {
+            err = TRTSERVER_ServerRegisterSharedMemory(server, smb);
+          }
+          break;
+        case SharedMemoryControlRequest::UNREGISTER:
+          err = GetResources()->SharedMemoryManager()->Remove(
+              &smb, request.shared_memory_region().name());
+          if ((err == nullptr) && (smb != nullptr)) {
+            err = TRTSERVER_ServerUnregisterSharedMemory(server, smb);
+            TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
+            if (del_err != nullptr) {
+              LOG_ERROR << "failed to delete shared memory block: "
+                        << TRTSERVER_ErrorMessage(del_err);
+            }
+          }
+          break;
+        case SharedMemoryControlRequest::UNREGISTER_ALL:
+          err = GetResources()->SharedMemoryManager()->Clear();
+          if (err == nullptr) {
+            err = TRTSERVER_ServerUnregisterAllSharedMemory(server);
+          }
+          break;
+        default:
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN,
+              "unknown sharedmemorycontrol request type");
+          break;
       }
 
       RequestStatusUtil::Create(
@@ -243,7 +312,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
   };
 
   TRTSERVER_Error* GRPCToInput(
-      const InferRequestHeader& request_header, const InferRequest& request,
+      TRTSERVER_Server* server, const InferRequestHeader& request_header,
+      const InferRequest& request,
       TRTSERVER_InferenceRequestProvider* request_provider)
   {
     // Make sure that the request is providing the same number of raw
@@ -260,28 +330,42 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     }
 
     // Verify that the batch-byte-size of each input matches the size of
-    // the provided raw tensor data.
+    // the provided tensor data (provided raw or from shared memory)
     size_t idx = 0;
     for (const auto& io : request_header.input()) {
-      uint64_t byte_size = 0;
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
-          request_provider, io.name().c_str(), &byte_size));
+      const void* base;
+      size_t byte_size;
+      if (io.has_shared_memory()) {
+        TRTSERVER_SharedMemoryBlock* smb = nullptr;
+        RETURN_IF_ERR(this->GetResources()->SharedMemoryManager()->Get(
+            &smb, io.shared_memory().name()));
+        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+            server, smb, io.shared_memory().offset(),
+            io.shared_memory().byte_size(), const_cast<void**>(&base)));
+        byte_size = io.shared_memory().byte_size();
+      } else {
+        const std::string& raw = request.raw_input(idx++);
+        base = raw.c_str();
+        byte_size = raw.size();
+      }
 
-      if (byte_size != request.raw_input(idx).size()) {
+      uint64_t expected_byte_size = 0;
+      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
+          request_provider, io.name().c_str(), &expected_byte_size));
+
+      if (byte_size != expected_byte_size) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INVALID_ARG,
             std::string(
-                "unexpected size " +
-                std::to_string(request.raw_input(idx).size()) + " for input '" +
-                io.name() + "', expecting " +
-                std::to_string(io.batch_byte_size()) + " for model '" +
+                "unexpected size " + std::to_string(byte_size) +
+                " for input '" + io.name() + "', expecting " +
+                std::to_string(expected_byte_size) + " for model '" +
                 request.model_name() + "'")
                 .c_str());
       }
 
-      const std::string& raw = request.raw_input(idx++);
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), raw.c_str(), raw.size()));
+          request_provider, io.name().c_str(), base, byte_size));
     }
 
     return nullptr;  // success
@@ -309,7 +393,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           request.model_version(), request_header_serialized.c_str(),
           request_header_serialized.size());
       if (err == nullptr) {
-        err = GRPCToInput(request.meta_data(), request, request_provider);
+        err =
+            GRPCToInput(server, request.meta_data(), request, request_provider);
         if (err == nullptr) {
           GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
               this, execution_context, response, request.meta_data().id(),
@@ -432,12 +517,13 @@ GRPCServer::~GRPCServer()
 
 TRTSERVER_Error*
 GRPCServer::Create(
-    const std::shared_ptr<TRTSERVER_Server>& server, int32_t port,
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager, int32_t port,
     int infer_thread_cnt, int stream_infer_thread_cnt,
     std::unique_ptr<GRPCServer>* grpc_server)
 {
   g_Resources = std::make_shared<AsyncResources>(
-      server, 1 /* infer threads */, 1 /* mgmt threads */);
+      server, smb_manager, 1 /* infer threads */, 1 /* mgmt threads */);
 
   std::string addr = "0.0.0.0:" + std::to_string(port);
   LOG_INFO << "Starting a GRPCService at " << addr;
@@ -467,6 +553,11 @@ GRPCServer::Create(
       inferenceService->RegisterRPC<ModelControlContext>(
           &GRPCService::AsyncService::RequestModelControl);
 
+  LOG_VERBOSE(1) << "Register SharedMemoryControl RPC";
+  (*grpc_server)->rpcSharedMemoryControl_ =
+      inferenceService->RegisterRPC<SharedMemoryControlContext>(
+          &GRPCService::AsyncService::RequestSharedMemoryControl);
+
   LOG_VERBOSE(1) << "Register Profile RPC";
   (*grpc_server)->rpcProfile_ = inferenceService->RegisterRPC<ProfileContext>(
       &GRPCService::AsyncService::RequestProfile);
@@ -493,6 +584,7 @@ GRPCServer::Start()
         rpcStreamInfer_, g_Resources, stream_infer_thread_cnt_);
     executor->RegisterContexts(rpcStatus_, g_Resources, 1);
     executor->RegisterContexts(rpcModelControl_, g_Resources, 1);
+    executor->RegisterContexts(rpcSharedMemoryControl_, g_Resources, 1);
     executor->RegisterContexts(rpcHealth_, g_Resources, 1);
     executor->RegisterContexts(rpcProfile_, g_Resources, 1);
 

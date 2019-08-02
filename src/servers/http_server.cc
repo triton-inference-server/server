@@ -188,14 +188,18 @@ class HTTPAPIServer : public HTTPServerImpl {
  public:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
-        endpoint_names_(endpoints),
-        api_regex_(R"(/api/(health|profile|infer|status|modelcontrol)(.*))"),
+        smb_manager_(smb_manager), endpoint_names_(endpoints),
+        api_regex_(
+            R"(/api/(health|profile|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
-        control_regex_(R"(/(load|unload)/([^/]+))")
+        modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
+        sharedmemorycontrol_regex_(
+            R"(/(register|unregister|unregisterall|status)/([^/]+)/([^/]+)/([0-9]+)/([0-9]+))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -236,7 +240,10 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
-  void HandleControl(evhtp_request_t* req, const std::string& control_uri);
+  void HandleModelControl(
+      evhtp_request_t* req, const std::string& modelcontrol_uri);
+  void HandleSharedMemoryControl(
+      evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
@@ -249,13 +256,15 @@ class HTTPAPIServer : public HTTPServerImpl {
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
 
+  std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   std::vector<std::string> endpoint_names_;
 
   re2::RE2 api_regex_;
   re2::RE2 health_regex_;
   re2::RE2 infer_regex_;
   re2::RE2 status_regex_;
-  re2::RE2 control_regex_;
+  re2::RE2 modelcontrol_regex_;
+  re2::RE2 sharedmemorycontrol_regex_;
 };
 
 void
@@ -295,12 +304,20 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleInfer(req, rest);
       return;
     }
-    // control
+    // modelcontrol
     if (endpoint == "modelcontrol" &&
         (std::find(
              endpoint_names_.begin(), endpoint_names_.end(), "modelcontrol") !=
          endpoint_names_.end())) {
-      HandleControl(req, rest);
+      HandleModelControl(req, rest);
+      return;
+    }
+    // sharedmemorycontrol
+    if (endpoint == "sharedmemorycontrol" &&
+        (std::find(
+             endpoint_names_.begin(), endpoint_names_.end(),
+             "sharedmemorycontrol") != endpoint_names_.end())) {
+      HandleSharedMemoryControl(req, rest);
       return;
     }
   }
@@ -470,8 +487,8 @@ HTTPAPIServer::HandleStatus(evhtp_request_t* req, const std::string& status_uri)
 }
 
 void
-HTTPAPIServer::HandleControl(
-    evhtp_request_t* req, const std::string& control_uri)
+HTTPAPIServer::HandleModelControl(
+    evhtp_request_t* req, const std::string& modelcontrol_uri)
 {
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
@@ -479,9 +496,9 @@ HTTPAPIServer::HandleControl(
   }
 
   std::string action_type_str, model_name;
-  if ((control_uri.empty()) ||
-      (!RE2::FullMatch(
-          control_uri, control_regex_, &action_type_str, &model_name))) {
+  if ((modelcontrol_uri.empty()) || (!RE2::FullMatch(
+                                        modelcontrol_uri, modelcontrol_regex_,
+                                        &action_type_str, &model_name))) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -491,6 +508,73 @@ HTTPAPIServer::HandleControl(
     err = TRTSERVER_ServerLoadModel(server_.get(), model_name.c_str());
   } else if (action_type_str == "unload") {
     err = TRTSERVER_ServerUnloadModel(server_.get(), model_name.c_str());
+  } else {
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_UNKNOWN,
+        std::string("unknown action type '" + action_type_str + "'").c_str());
+  }
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, err, RequestStatusUtil::NextUniqueRequestId(),
+      server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
+
+  TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServer::HandleSharedMemoryControl(
+    evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
+{
+  if (req->method != htp_method_POST) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  std::string action_type_str, remaining, name, shm_key;
+  std::string offset_str, byte_size_str;
+  if ((sharedmemorycontrol_uri.empty()) ||
+      (!RE2::FullMatch(
+          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
+          &name, &shm_key, &offset_str, &byte_size_str))) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  size_t offset = std::atoll(offset_str.c_str());
+  size_t byte_size = std::atoll(byte_size_str.c_str());
+
+  TRTSERVER_Error* err = nullptr;
+  TRTSERVER_SharedMemoryBlock* smb = nullptr;
+
+  if (action_type_str == "register") {
+    err = smb_manager_->Create(
+        &smb, name.c_str(), shm_key.c_str(), offset, byte_size);
+    if (err == nullptr) {
+      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
+    }
+  } else if (action_type_str == "unregister") {
+    err = smb_manager_->Remove(&smb, name.c_str());
+    if ((err == nullptr) && (smb != nullptr)) {
+      err = TRTSERVER_ServerUnregisterSharedMemory(server_.get(), smb);
+      TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
+      if (del_err != nullptr) {
+        LOG_ERROR << "failed to delete shared memory block: "
+                  << TRTSERVER_ErrorMessage(del_err);
+      }
+    }
+  } else if (action_type_str == "unregisterall") {
+    err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,
@@ -555,33 +639,57 @@ HTTPAPIServer::EVBufferToInput(
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, io.name().c_str(), nullptr, 0 /* byte_size */));
     } else {
-      while ((byte_size > 0) && (v_idx < n)) {
-        char* base = static_cast<char*>(v[v_idx].iov_base);
-        size_t base_size;
-        if (v[v_idx].iov_len > byte_size) {
-          base_size = byte_size;
-          v[v_idx].iov_base = static_cast<void*>(base + byte_size);
-          v[v_idx].iov_len -= byte_size;
-          byte_size = 0;
-        } else {
-          base_size = v[v_idx].iov_len;
-          byte_size -= v[v_idx].iov_len;
-          v_idx++;
+      // If input is in shared memory then verify that the size is
+      // correct and set input from the shared memory.
+      if (io.has_shared_memory()) {
+        if (byte_size != io.shared_memory().byte_size()) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "unexpected shared-memory size " +
+                  std::to_string(io.shared_memory().byte_size()) +
+                  " for input '" + io.name() + "', expecting " +
+                  std::to_string(byte_size) + " for model '" + model_name + "'")
+                  .c_str());
         }
 
+        void* base;
+        TRTSERVER_SharedMemoryBlock* smb = nullptr;
+        RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
+        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+            server_.get(), smb, io.shared_memory().offset(),
+            io.shared_memory().byte_size(), &base));
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-            request_provider, io.name().c_str(), base, base_size));
-      }
-    }
+            request_provider, io.name().c_str(), base, byte_size));
+      } else {
+        while ((byte_size > 0) && (v_idx < n)) {
+          char* base = static_cast<char*>(v[v_idx].iov_base);
+          size_t base_size;
+          if (v[v_idx].iov_len > byte_size) {
+            base_size = byte_size;
+            v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+            v[v_idx].iov_len -= byte_size;
+            byte_size = 0;
+          } else {
+            base_size = v[v_idx].iov_len;
+            byte_size -= v[v_idx].iov_len;
+            v_idx++;
+          }
 
-    if (byte_size != 0) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG,
-          std::string(
-              "unexpected size for input '" + io.name() + "', expecting " +
-              std::to_string(byte_size) + " bytes for model '" + model_name +
-              "'")
-              .c_str());
+          RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
+              request_provider, io.name().c_str(), base, base_size));
+        }
+
+        if (byte_size != 0) {
+          return TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "unexpected size for input '" + io.name() + "', expecting " +
+                  std::to_string(byte_size) + " bytes for model '" +
+                  model_name + "'")
+                  .c_str());
+        }
+      }
     }
   }
 
@@ -818,6 +926,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
 TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
 {
@@ -831,8 +940,8 @@ HTTPServer::CreateAPIServer(
   for (auto const& ep_map : port_map) {
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPService at " << addr;
-    http_servers->emplace_back(
-        new HTTPAPIServer(server, ep_map.second, ep_map.first, thread_cnt));
+    http_servers->emplace_back(new HTTPAPIServer(
+        server, smb_manager, ep_map.second, ep_map.first, thread_cnt));
   }
 
   return nullptr;

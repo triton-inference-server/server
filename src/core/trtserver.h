@@ -51,6 +51,13 @@ struct TRTSERVER_Protobuf;
 struct TRTSERVER_ResponseAllocator;
 struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
+struct TRTSERVER_SharedMemoryBlock;
+
+/// Types of memory recognized by TRTSERVER.
+typedef enum trtserver_memorytype_enum {
+  TRTSERVER_MEMORY_CPU,
+  TRTSERVER_MEMORY_GPU
+} TRTSERVER_Memory_Type;
 
 /// TRTSERVER_Error
 ///
@@ -109,26 +116,50 @@ TRTSERVER_EXPORT const char* TRTSERVER_ErrorCodeString(TRTSERVER_Error* error);
 /// \return The error message.
 TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
 
+/// TRTSERVER_SharedMemoryBlock
+///
+/// Object representing a reference to a contiguous block of shared
+/// memory. The TRTSERVER_SharedMemoryBlock object does not create or
+/// manage the lifetime of the shared-memory block, it simply
+/// maintains a reference into the block.
+///
+
+/// Create a new shared memory block object referencing a shared
+/// memory block residing in TRTSERVER_MEMORY_CPU type memory.
+/// \param shared_memory_block Returns the new shared memory block object.
+/// \param name A unique name for the shared memory block. This name
+/// is used in inference requests to refer to this shared memory
+/// block.
+/// \param shm_key The name of the posix shared memory object
+/// containing the block of memory.
+/// \param offset The offset within the shared memory object to the
+/// start of the block.
+/// \param byte_size The size, in bytes of the block.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const char* shm_key, const size_t offset, const size_t byte_size);
+
+/// Delete a shared memory block object.
+/// \param shared_memory_block The object to delete.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block);
+
 /// TRTSERVER_ResponseAllocator
 ///
 /// Object representing a memory allocator for inference response
 /// tensors.
 ///
 
-/// Allocation regions.
-typedef enum trtserver_allocatorregion_enum {
-  TRTSERVER_MEMORY_CPU,
-  TRTSERVER_MEMORY_GPU
-} TRTSERVER_Allocator_Region;
-
 /// Type for allocation function that allocates a buffer to hold a
 /// result tensor.
 ///
 /// Return in 'buffer' a pointer to the contiguous memory block of
 /// size 'byte_size' for result tensor called 'tensor_name'. The
-/// buffer must be allocated in the memory region identified by
-/// 'region' and 'region_id'. The 'userp' data is the same as what is
-/// supplied in the call to TRTSERVER_ServerInferAsync.
+/// buffer must be allocated in the memory type identified by
+/// 'memory_type' and 'memory_type_id'. The 'userp' data is the same
+/// as what is supplied in the call to TRTSERVER_ServerInferAsync.
 ///
 /// Return in 'buffer_userp' a user-specified value to associate with
 /// the buffer. This value will be provided in the call to
@@ -142,11 +173,11 @@ typedef enum trtserver_allocatorregion_enum {
 /// nullptr.
 ///
 /// If the function is called with 'byte_size' non-zero but an
-/// allocation is not possible for the request 'region', the function
-/// should return success and set 'buffer' == nullptr to indicate that
-/// an allocation in the requested 'region' is not possible. In this
-/// case the function may be called again for the same 'tensor_name'
-/// but with a different 'region'.
+/// allocation is not possible for the requested 'memory_type', the
+/// function should return success and set 'buffer' == nullptr to
+/// indicate that an allocation in the requested 'memory_type' is not
+/// possible. In this case the function may be called again for the
+/// same 'tensor_name' but with a different 'memory_type'.
 ///
 /// The function should return a TRTSERVER_Error object if a failure
 /// occurs while attempting an allocation. If an error object is
@@ -157,7 +188,7 @@ typedef enum trtserver_allocatorregion_enum {
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Allocator_Region region, int64_t region_id, void* userp);
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
 
 /// Type for function that is called when the server no longer holds
 /// any reference to a buffer allocated by
@@ -166,18 +197,19 @@ typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
 /// deleted by TRTSERVER_InferenceResponseDelete.
 ///
 /// The 'buffer' and 'buffer_userp' arguments equal those returned by
-/// TRTSERVER_ResponseAllocatorAllocFn_t and 'byte_size', 'region' and
-/// 'region_id' equal the values passed to
+/// TRTSERVER_ResponseAllocatorAllocFn_t and 'byte_size',
+/// 'memory_type' and 'memory_type_id' equal the values passed to
 /// TRTSERVER_ResponseAllocatorAllocFn_t.
 ///
 /// Return a TRTSERVER_Error object on failure, return nullptr on
 /// success.
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorReleaseFn_t)(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
-    size_t byte_size, TRTSERVER_Allocator_Region region, int64_t region_id);
+    size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id);
 
 /// Create a new response allocator object.
-/// \param allocator The response allocator object.
+/// \param allocator Returns the new response allocator object.
 /// \param alloc_fn The function to call to allocate buffers for result
 /// tensors.
 /// \param release_fn The function to call when the server no longer
@@ -645,6 +677,50 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerLoadModel(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
     TRTSERVER_Server* server, const char* model_name);
+
+/// Register a shared memory block on the inference server. After a
+/// block is registered, addresses within the block can be used for
+/// input and output tensors in inference requests. If a shared memory
+/// block with the same name is already registered
+/// TRTSERVER_ERROR_ALREADY_EXISTS is returned.
+/// \param server The inference server object.
+/// \param shared_memory_block The shared memory block to register.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
+
+/// Unregister a shared memory block on the inference server. No
+/// operation is performed if the shared memory block is not
+/// registered.
+/// \param server The inference server object.
+/// \param shared_memory_block The shared memory block to unregister.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnregisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
+
+/// Unregister all shared memory blocks that are currently registered
+/// \param server The inference server object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnregisterAllSharedMemory(
+    TRTSERVER_Server* server);
+
+/// Get an address in a shared memory block that has been registered
+/// with the inference server. Verify that a 'byte_size' block of
+/// memory starting at that address is completely contained within the
+/// shared memory block.
+
+/// \param server The inference server object.
+/// \param shared_memory_block The shared memory block.
+/// \param offset The offset within the shared memory block to get the
+/// address for.
+/// \param byte_size The size of block to within the shared memory
+/// block. Returns error if a block of this size (starting at
+/// 'offset') isn't completely contained in the shared memory block.
+/// \param base Returns the base address.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    size_t offset, size_t byte_size, void** base);
 
 /// Get the current metrics for the server. The caller takes ownership
 /// of the metrics object and must call TRTSERVER_MetricsDelete to
