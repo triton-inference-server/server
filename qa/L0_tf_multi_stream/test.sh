@@ -1,0 +1,119 @@
+#!/bin/bash
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+TF_MULTI_STREAM_TEST=multi_stream_test.py
+
+CLIENT_LOG_BASE="./client"
+
+DATADIR=`pwd`/models
+MODEL_SRCDIR=/data/inference/server/qa_custom_ops
+MODEL="graphdef_busyop"
+source ../common/util.sh
+
+SERVER=/opt/tensorrtserver/bin/trtserver
+# Allow more time to exit. Ensemble brings in too many models
+SERVER_LOG_BASE="./inference_server.log"
+
+CLIENT_LOG="./client.log"
+MULTI_STREAM_CLIENT=multi_stream_client.py
+
+NUM_GPUS=${NUM_GPUS:=1}
+TOTAL_MEM=${TOTAL_MEM:=10000}
+
+rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
+
+export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libbusyop.so
+
+for INSTANCE_CNT in 2 4 8; do
+    # Create local model repository
+    rm -fr models && \
+        mkdir models && \
+        cp -r ${MODEL_SRCDIR}/*busyop* models/
+
+    # Establish baseline
+    echo "instance_group [ { kind: KIND_GPU, count: ${INSTANCE_CNT} } ]" >> models/${MODEL}/config.pbtxt
+    SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # The first run of the client warms up TF/CUDA
+    set +e
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        exit 1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Test with multi-stream
+    SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
+    PER_VGPU_MEM_LIMIT_MBYTES=$(( TOTAL_MEM / INSTANCE_CNT ))
+
+    for i in $(seq 0 $(( NUM_GPUS - 1 ))); do
+       VGPU_ARG=--tf-add-vgpu="${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
+       SERVER_ARGS=${SERVER_ARGS}" "${VGPU_ARG}
+    done
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # The first run of the client warms up TF/CUDA
+    set +e
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        exit 1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    SCALE_FACTOR=$(grep -i "Completion time for ${INSTANCE_CNT}" $CLIENT_LOG | awk '{printf "%s ",$6}' | awk '{print $1/$2}') 
+    if [ $(awk -v a="$SCALE_FACTOR" -v b="$INSTANCE_CNT" 'BEGIN{print(a<b-1)}') -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        exit 1
+    fi
+done
+echo -e "\n***\n*** Test Passed\n***"
+unset LD_PRELOAD
