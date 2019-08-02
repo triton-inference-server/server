@@ -331,8 +331,9 @@ class InferContext {
     virtual Error SetFromString(const std::vector<std::string>& input) = 0;
 
     /// Set tensor values for this input by reference into a shared memory
-    /// region. The values are not copied and so the shared memory region and its contents must not be modified or
-    /// destroyed until this input is no longer needed (that is until the Run()
+    /// region. The values are not copied and so the shared memory region and
+    /// its contents must not be modified or destroyed until this input is no
+    /// longer needed (that is until the Run()
     //// call(s) that use the input have completed). For batched inputs this
     /// function must be called batch-size times to provide all tensor values
     /// for a batch of this input.
@@ -365,18 +366,17 @@ class InferContext {
     virtual const DimsList& Dims() const = 0;
 
     /// The values for this output are set by reference in a shared memory
-    /// region. The values are not copied and so the shared memory region and its contents must not be modified or
-    /// destroyed until this output is ready (that is until after the Run()
-    /// call(s) have written the output completely). For batched outputs this
-    /// function must be called batch-size times to copy all tensor values
-    /// for a batch of this output.
-    /// \param name The user-given name for the registered shared memory
-    /// region where the tensor values for this output should be stored.
-    /// \param offset The offset into the shared memory region upto the start
-    /// of the output tensor values.
-    /// \param byte_size The size, in bytes of the output tensor data. Must
-    /// match the size expected by the output.
-    /// \return Error object indicating success or failure.
+    /// region. The values are not copied and so the shared memory region and
+    /// its contents must not be modified or destroyed until this output is
+    /// ready (that is until after the Run() call(s) have written the output
+    /// completely). For batched outputs this function must be called batch-size
+    /// times to copy all tensor values for a batch of this output. \param name
+    /// The user-given name for the registered shared memory region where the
+    /// tensor values for this output should be stored. \param offset The offset
+    /// into the shared memory region upto the start of the output tensor
+    /// values. \param byte_size The size, in bytes of the output tensor data.
+    /// Must match the size expected by the output. \return Error object
+    /// indicating success or failure.
     virtual Error SetSharedMemory(
         const std::string& name, size_t offset, size_t byte_size) = 0;
   };
@@ -826,7 +826,7 @@ class SharedMemoryControlContext {
   /// \return Error object indicating success or failure.
   virtual Error UnregisterSharedMemory(const std::string& name) = 0;
 
-   /// Unregisters all registered shared memory regions on the inference server.
+  /// Unregisters all registered shared memory regions on the inference server.
   /// \return Error object indicating success or failure.
   virtual Error UnregisterAllSharedMemory() = 0;
 };

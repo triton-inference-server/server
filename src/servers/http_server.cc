@@ -249,10 +249,9 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider);
-  TRTSERVER_Error*
-  SharedMemoryToInput(
-      TRTSERVER_Server* server, const std::string& model_name, const InferRequestHeader& request_header,
-      evbuffer* input_buffer,
+  TRTSERVER_Error* SharedMemoryToInput(
+      TRTSERVER_Server* server, const std::string& model_name,
+      const InferRequestHeader& request_header, evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -713,52 +712,6 @@ HTTPAPIServer::EVBufferToInput(
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
-HTTPAPIServer::SharedMemoryToInput(
-    TRTSERVER_Server* server, const std::string& model_name, const InferRequestHeader& request_header,
-    evbuffer* input_buffer,
-    TRTSERVER_InferenceRequestProvider* request_provider)
-{
-  // Extracts input data from the shared memory region and registers in
-  // 'request_provider' using the provided offset and byte_size
-  //
-  // Get the base address and offset into the shared memory region for the
-  // input data from the registered shared memory region.
-
-
-  // Get the byte-size for each input and from that get the blocks
-  // holding the data for that input
-  for (const auto& io : request_header.input()) {
-    if (io.shared_memory().name() == "") {
-      continue;
-    }
-    // If 'byte_size' is zero then need to add an empty input data
-    // block... the provider expects at least one data block for every
-    // input.
-    if (io.shared_memory().byte_size() == 0) {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
-          server, request_provider, io.name().c_str(), "", 0, 0));
-    } else {
-      RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
-          server, request_provider, io.name().c_str(), io.shared_memory().name().c_str(), io.shared_memory().offset(), io.shared_memory().byte_size()));
-    }
-
-    if (io.batch_byte_size() != io.shared_memory().byte_size()) {
-      return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size " +
-            std::to_string(io.shared_memory().byte_size()) +
-            " bytes for input '" + io.name() + "', expecting " +
-            std::to_string(io.batch_byte_size()) + " bytes for model '" +
-            model_name + "'")
-            .c_str());
-    }
-  }
-
-  return nullptr;  // success
-}
-
 void
 HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 {
@@ -808,26 +761,22 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
     err = EVBufferToInput(
         model_name, request_header, req->buffer_in, request_provider);
     if (err == nullptr) {
-      err = SharedMemoryToInput(
-          server_.get(), model_name, request_header, req->buffer_in, request_provider);
-      if (err == nullptr) {
-        InferRequest* infer_request =
-            new InferRequest(req, request_header.id(), server_id_, unique_id);
+      InferRequest* infer_request =
+          new InferRequest(req, request_header.id(), server_id_, unique_id);
 
-        err = TRTSERVER_ServerInferAsync(
-            server_.get(), request_provider,
-            req->buffer_out /* http_response_provider_hack */,
-            nullptr /* grpc_response_provider_hack */, nullptr, nullptr,
-            InferRequest::InferComplete, reinterpret_cast<void*>(infer_request));
-        if (err != nullptr) {
-          delete infer_request;
-          infer_request = nullptr;
-        }
-
-        // The request provider can be deleted immediately after the
-        // ServerInferAsync call returns.
-        TRTSERVER_InferenceRequestProviderDelete(request_provider);
+      err = TRTSERVER_ServerInferAsync(
+          server_.get(), request_provider,
+          req->buffer_out /* http_response_provider_hack */,
+          nullptr /* grpc_response_provider_hack */, nullptr, nullptr,
+          InferRequest::InferComplete, reinterpret_cast<void*>(infer_request));
+      if (err != nullptr) {
+        delete infer_request;
+        infer_request = nullptr;
       }
+
+      // The request provider can be deleted immediately after the
+      // ServerInferAsync call returns.
+      TRTSERVER_InferenceRequestProviderDelete(request_provider);
     }
   }
 

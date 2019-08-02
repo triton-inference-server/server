@@ -215,7 +215,8 @@ class InputImpl : public InferContext::Input {
 class OutputImpl : public InferContext::Output {
  public:
   OutputImpl(const ModelOutput& mio)
-      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW), use_shm_(false)
+      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW),
+        use_shm_(false)
   {
   }
   ~OutputImpl() = default;

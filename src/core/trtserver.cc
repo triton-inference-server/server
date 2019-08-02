@@ -666,35 +666,6 @@ TRTSERVER_InferenceRequestProviderSetInputData(
   return nullptr;  // Success
 }
 
-TRTSERVER_Error*
-TRTSERVER_InferenceRequestProviderSetSharedMemoryInputData(
-    TRTSERVER_Server* server,
-    TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const char* shm_name, size_t offset,
-    size_t byte_size)
-{
-  TrtServerRequestProvider* lprovider =
-      reinterpret_cast<TrtServerRequestProvider*>(request_provider);
-
-  void* shm_mapped_addr;
-  size_t shm_offset;
-  TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryInfo(
-      server, shm_name, &shm_mapped_addr, &shm_offset);
-  if (err != nullptr) {
-    return TRTSERVER_ErrorNew(
-        TRTSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "shared memory region '" + std::string(shm_name) + "' is not valid")
-            .c_str());
-  }
-
-  // modify base by adding current offset as well are shared region offset
-  lprovider->SetInputData(
-      input_name, (void*)((char*)shm_mapped_addr + offset + shm_offset),
-      byte_size);
-  return nullptr;  // Success
-}
-
 //
 // TRTSERVER_InferenceResponse
 //
@@ -1173,37 +1144,6 @@ TRTSERVER_ServerSharedMemoryAddress(
 
   RETURN_IF_STATUS_ERROR(
       lserver->SharedMemoryAddress(lsmb->Name(), offset, byte_size, base));
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerUnregisterAllSharedMemory(TRTSERVER_Server* server)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-
-  RETURN_IF_STATUS_ERROR(lserver->UnregisterAllSharedMemory());
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerGetSharedMemoryInfo(
-    TRTSERVER_Server* server, const char* name, void** shm_mapped_addr,
-    size_t* shm_offset)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-
-  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryInfo(
-      std::string(name), shm_mapped_addr, shm_offset));
 
   return nullptr;  // success
 }

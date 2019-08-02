@@ -1158,8 +1158,7 @@ HttpRequestImpl::CreateResult(
     return err;
   }
 
-  std::unique_ptr<ResultImpl> result(
-      new ResultImpl(infer_output, batch_size));
+  std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
   // Check if output uses shared memory. If so handle differently
   result->SetBatch1Shape(output.raw().dims());
   if (IsFixedSizeDataType(infer_output->DType())) {
