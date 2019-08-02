@@ -69,9 +69,19 @@ for TARGET in cpu gpu; do
         cp -r /data/inferenceserver/qa_ensemble_model_repository/qa_model_repository/* models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
-        cp -r ../custom_models/custom_nobatch_* models/.
+        cp -r ../custom_models/custom_nobatch_* models/. && \
+        cp -r ../custom_models/custom_zero_1_float32 models/.
 
     create_nop_modelfile `pwd`/libidentity.so `pwd`/models
+
+    # Modify custom_zero_1_float32 for relevant ensembles
+    mkdir -p models/custom_zero_1_float32/1 && \
+        cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
+        (cd models/custom_zero_1_float32 && \
+            echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
 
     for EM in `ls ../ensemble_models`; do
         mkdir -p ../ensemble_models/$EM/1
