@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -79,18 +79,6 @@ if __name__ == '__main__':
     model_version = 1
     batch_size = 1
 
-    # Create a health context, get the ready and live state of server.
-    health_ctx = ServerHealthContext(FLAGS.url, protocol,
-                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
-    print("Health for model {}".format(model_name))
-    print("Live: {}".format(health_ctx.is_live()))
-    print("Ready: {}".format(health_ctx.is_ready()))
-
-    # Create a status context and get server status
-    status_ctx = ServerStatusContext(FLAGS.url, protocol, model_name,
-                                     http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
-    print("Status for model {}".format(model_name))
-
     # Create the inference context for the model.
     infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
                              http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
@@ -103,7 +91,10 @@ if __name__ == '__main__':
     start_time = time()
 
     for i in range(FLAGS.count):
-        infer_ctx.async_run_with_cb(partial(completion_callback), { 'in' : (input_data,) }, { 'out' : InferContext.ResultFormat.RAW }, batch_size)
+        infer_ctx.async_run_with_cb(partial(completion_callback), 
+            { 'in' : (input_data,) }, 
+            { 'out' : InferContext.ResultFormat.RAW }, 
+            batch_size)
 
     # Wait for N requests to finish
     finished_requests = 0

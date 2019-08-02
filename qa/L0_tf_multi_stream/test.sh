@@ -44,6 +44,12 @@ MULTI_STREAM_CLIENT=multi_stream_client.py
 NUM_GPUS=${NUM_GPUS:=1}
 TOTAL_MEM=${TOTAL_MEM:=10000}
 
+# A standard TITAN V does 1200 MHz. So this value
+# allows the busy loop kernel to run for over
+# 2 seconds. Note: This is close to the limit for
+# ints. The input to the busyloop model is an int
+NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
+
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libbusyop.so
@@ -66,8 +72,8 @@ for INSTANCE_CNT in 2 4 8; do
 
     # The first run of the client warms up TF/CUDA
     set +e
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> /dev/null
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> $CLIENT_LOG 2>&1
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -96,8 +102,8 @@ for INSTANCE_CNT in 2 4 8; do
 
     # The first run of the client warms up TF/CUDA
     set +e
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> /dev/null
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d 2100000000 >> $CLIENT_LOG 2>&1
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"

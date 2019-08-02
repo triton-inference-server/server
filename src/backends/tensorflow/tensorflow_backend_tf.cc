@@ -175,17 +175,6 @@ NewSessionOptions(
       ->set_per_process_gpu_memory_fraction(per_process_gpu_memory_fraction);
   session_options->config.set_allow_soft_placement(allow_soft_placement);
 
-
-
-  if(std::getenv("TRTIS_TF_INTER_OP_THREADS") && std::getenv("TRTIS_TF_INTRA_OP_THREADS")) {
-    std::string inter_op = std::getenv("TRTIS_TF_INTER_OP_THREADS");
-    std::string intra_op = std::getenv("TRTIS_TF_INTRA_OP_THREADS");
-    if(!inter_op.empty() && !intra_op.empty()) {
-      session_options->config.set_inter_op_parallelism_threads(std::stoi(inter_op));
-      session_options->config.set_intra_op_parallelism_threads(std::stoi(intra_op));
-    }
-  }
-
   // Create virtual devices
   if (!memory_limit_mb.empty()) {
     (*(session_options->config.mutable_device_count()))["GPU"] =
