@@ -25,14 +25,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TF_MULTI_STREAM_TEST=multi_stream_test.py
-
 CLIENT_LOG_BASE="./client"
 
 DATADIR=`pwd`/models
-MODEL_SRCDIR=/data/inference/server/qa_custom_ops
+MODEL_SRCDIR=/data/inferenceserver/qa_custom_ops
 MODEL="graphdef_busyop"
-source ../common/util.sh
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
@@ -43,6 +40,7 @@ MULTI_STREAM_CLIENT=multi_stream_client.py
 
 NUM_GPUS=${NUM_GPUS:=1}
 TOTAL_MEM=${TOTAL_MEM:=10000}
+source ../common/util.sh
 
 # A standard TITAN V does 1200 MHz. So this value
 # allows the busy loop kernel to run for over
@@ -53,6 +51,7 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libbusyop.so
+export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
 
 for INSTANCE_CNT in 2 4 8; do
     # Create local model repository
@@ -72,8 +71,8 @@ for INSTANCE_CNT in 2 4 8; do
 
     # The first run of the client warms up TF/CUDA
     set +e
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> /dev/null
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -92,7 +91,6 @@ for INSTANCE_CNT in 2 4 8; do
        VGPU_ARG=--tf-add-vgpu="${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
        SERVER_ARGS=${SERVER_ARGS}" "${VGPU_ARG}
     done
-
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -102,8 +100,8 @@ for INSTANCE_CNT in 2 4 8; do
 
     # The first run of the client warms up TF/CUDA
     set +e
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> /dev/null
-    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -d $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
+    python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -123,3 +121,4 @@ for INSTANCE_CNT in 2 4 8; do
 done
 echo -e "\n***\n*** Test Passed\n***"
 unset LD_PRELOAD
+unset CUDA_VISIBLE_DEVICES

@@ -60,7 +60,7 @@ if __name__ == '__main__':
                         help='Model to request for inference. Default is graphdef_busyop')
     parser.add_argument('-c', '--count', type=int, required=False, default=1,
                         help='Number of inference requests to send. Default is 1')
-    parser.add_argument('-d', '--delay', type=int, required=False, default=12000000,
+    parser.add_argument('-n', '--delay', type=int, required=False, default=12000000,
                         help='Number of cycles to perform the busyloop op. Default is 12000000')
     parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
                         help='Protocol ("http"/"grpc") used to ' +
