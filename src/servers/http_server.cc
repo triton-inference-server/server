@@ -249,10 +249,6 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider);
-  TRTSERVER_Error* SharedMemoryToInput(
-      TRTSERVER_Server* server, const std::string& model_name,
-      const InferRequestHeader& request_header, evbuffer* input_buffer,
-      TRTSERVER_InferenceRequestProvider* request_provider);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -632,10 +628,6 @@ HTTPAPIServer::EVBufferToInput(
   // Get the byte-size for each input and from that get the blocks
   // holding the data for that input
   for (const auto& io : request_header.input()) {
-    if (io.shared_memory().name() != "") {
-      v_idx++;
-      continue;
-    }
     uint64_t byte_size = 0;
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderInputBatchByteSize(
         request_provider, io.name().c_str(), &byte_size));

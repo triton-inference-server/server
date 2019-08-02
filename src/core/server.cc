@@ -403,7 +403,6 @@ InferenceServer::UnregisterSharedMemory(const std::string& name)
   return shared_memory_manager_->UnregisterSharedMemory(name);
 }
 
-
 Status
 InferenceServer::UnregisterAllSharedMemory()
 {

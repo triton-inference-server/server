@@ -100,7 +100,6 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
 
-
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(
       const std::shared_ptr<ServerStatusManager>& status_manager,

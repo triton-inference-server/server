@@ -359,13 +359,6 @@ message SharedMemoryControlResponse
   //@@     The status of the request, indicating success or failure.
   //@@
   RequestStatus request_status = 1;
-
-  //@@
-  //@@  .. cpp:var:: RequestStatus request_status
-  //@@
-  //@@     The list of active shared memory regions. Empty if there are none.
-  //@@
-  repeated string active_shm_regions = 2;
 }
 
 //@@
