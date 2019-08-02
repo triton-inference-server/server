@@ -881,24 +881,13 @@ ModelRepositoryManager::Create(
           !strict_model_config, polling_enabled, model_control_enabled,
           std::move(life_cycle)));
 
-  // Similar to PollAndUpdate(), but simplier
-  std::set<std::string> added, deleted, modified, unmodified;
   if (!model_control_enabled) {
-    RETURN_IF_ERROR(
-        local_manager->Poll(&added, &deleted, &modified, &unmodified));
-
-    if (!deleted.empty() || !modified.empty() || !unmodified.empty()) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "Unexpected initial state for model repository");
-    }
-
-    RETURN_IF_ERROR(local_manager->Update(added, deleted, modified));
-
-    // TODO [DLIS-506] On init, should return loading error and let
-    //                 server decides whether to exit
+    // only error happens before model load / unload will be return
     // model loading / unloading error will be printed but ignored
-    local_manager->LoadModelByDependency();
+    RETURN_IF_ERROR(local_manager->PollAndUpdateInternal());
+    // TODO [DLIS-506] On init, should check whether all model versions
+    //                 are in READY state. If not, return loading error and let
+    //                 server decides whether to exit
   }
 
   *model_repository_manager = std::move(local_manager);
@@ -913,14 +902,50 @@ ModelRepositoryManager::PollAndUpdate()
     return Status(RequestStatusCode::UNAVAILABLE, "polling is disabled");
   }
 
+  return PollAndUpdateInternal();
+}
+
+Status
+ModelRepositoryManager::PollAndUpdateInternal()
+{
   // Serialize all operations that change model state
   std::lock_guard<std::mutex> lock(poll_mu_);
 
   std::set<std::string> added, deleted, modified, unmodified;
-  RETURN_IF_ERROR(Poll(&added, &deleted, &modified, &unmodified));
+
+  // We don't modify 'infos_' in place to minimize how long we need to
+  // hold the lock and also prevent any partial changes to do an error
+  // during processing.
+  ModelInfoMap new_infos;
+
+  // Each subdirectory of repository path is a model directory from
+  // which we read the model configuration.
+  std::set<std::string> subdirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(repository_path_, &subdirs));
+
+  RETURN_IF_ERROR(
+      Poll(subdirs, &added, &deleted, &modified, &unmodified, &new_infos));
+
+  // Anything in 'infos_' that is not in "added", "modified", or
+  // "unmodified" is deleted.
+  for (const auto& pr : infos_) {
+    if ((added.find(pr.first) == added.end()) &&
+        (modified.find(pr.first) == modified.end()) &&
+        (unmodified.find(pr.first) == unmodified.end())) {
+      deleted.insert(pr.first);
+    }
+  }
+
   // Nothing to do if no model adds, deletes or modifies.
   if (added.empty() && deleted.empty() && modified.empty()) {
     return Status::Success;
+  }
+
+  // Swap the new infos in place under a short-lived lock and only if
+  // there were no errors encountered during polling.
+  {
+    std::lock_guard<std::mutex> lock(infos_mu_);
+    infos_.swap(new_infos);
   }
 
   Update(added, deleted, modified);
@@ -1050,68 +1075,57 @@ ModelRepositoryManager::LoadUnloadModel(
   std::lock_guard<std::mutex> lock(poll_mu_);
 
   // Update ModelInfo related to file system accordingly
-  std::set<std::string> added, deleted, modified;
+  std::set<std::string> added, deleted, modified, unmodified;
   {
-    std::lock_guard<std::mutex> lk(infos_mu_);
     if (type == ActionType::UNLOAD) {
+      std::lock_guard<std::mutex> lk(infos_mu_);
       size_t erased_cnt = infos_.erase(model_name);
       if (erased_cnt != 0) {
         deleted.insert(model_name);
       }
     } else {
-      const auto full_path = JoinPath({repository_path_, model_name});
+      std::set<std::string> checked_modes{model_name};
+      std::set<std::string> models{model_name};
 
-      int64_t mtime_ns = GetModifiedTime(std::string(full_path));
-      if (mtime_ns == 0) {
-        return Status(
-            RequestStatusCode::NOT_FOUND,
-            "failed to stat directory for model '" + model_name + "'");
-      }
+      ModelInfoMap new_infos;
+      while (!models.empty()) {
+        RETURN_IF_ERROR(
+            Poll(models, &added, &deleted, &modified, &unmodified, &new_infos));
 
-      bool need_load = false;
-      auto iitr = infos_.find(model_name);
-      if (iitr == infos_.end()) {
-        added.insert(model_name);
-        need_load = true;
-      } else {
-        if (mtime_ns > iitr->second->mtime_nsec_) {
-          modified.insert(model_name);
-          need_load = true;
-        }
-      }
-
-      if (need_load) {
-        std::unique_ptr<ModelInfo> model_info(new ModelInfo());
-        ModelConfig& model_config = model_info->model_config_;
-        model_info->mtime_nsec_ = mtime_ns;
-
-        // If enabled, try to automatically generate missing parts of
-        // the model configuration (autofill) from the model
-        // definition. In all cases normalize and validate the config.
-        RETURN_IF_ERROR(GetNormalizedModelConfig(
-            full_path, backend_config_map_, autofill_, &model_config));
-        RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
-
-        model_info->platform_ = GetPlatform(model_config.platform());
-
-        // Make sure the name of the model matches the name of the
-        // directory. This is a somewhat arbitrary requirement but seems
-        // like good practice to require it of the user. It also acts as a
-        // check to make sure we don't have two different models with the
-        // same name.
-        if (model_config.name() != model_name) {
+        // If at least one model is marked deleted, model directory is not found
+        // and the whole load process should return as failure.
+        if (!deleted.empty()) {
           return Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected directory name '" + model_name + "' for model '" +
-                  model_config.name() +
-                  "', directory name must equal model name");
+              RequestStatusCode::NOT_FOUND,
+              "failed to stat directory for model '" + model_name + "'");
         }
 
-        // Only update the infos when all validation is completed
-        if (iitr == infos_.end()) {
-          iitr = infos_.emplace(model_name, nullptr).first;
+        // More models should be polled is the polled models are ensembles
+        std::set<std::string> next_models;
+        for (const auto& model : models) {
+          const auto& config = new_infos.find(model)->second->model_config_;
+          if (config.has_ensemble_scheduling()) {
+            for (const auto& step : config.ensemble_scheduling().step()) {
+              bool need_poll = checked_modes.emplace(step.model_name()).second;
+              if (need_poll) {
+                next_models.emplace(step.model_name());
+              }
+            }
+          }
         }
-        iitr->second = std::move(model_info);
+        models.swap(next_models);
+      }
+
+      // Only update the infos when all validation is completed
+      std::lock_guard<std::mutex> lk(infos_mu_);
+      for (const auto& model_name : added) {
+        auto nitr = new_infos.find(model_name);
+        infos_.emplace(model_name, std::move(nitr->second));
+      }
+      for (const auto& model_name : modified) {
+        auto nitr = new_infos.find(model_name);
+        auto itr = infos_.find(model_name);
+        itr->second = std::move(nitr->second);
       }
     }
   }
@@ -1222,26 +1236,20 @@ ModelRepositoryManager::GetInferenceBackend(
 
 Status
 ModelRepositoryManager::Poll(
-    std::set<std::string>* added, std::set<std::string>* deleted,
-    std::set<std::string>* modified, std::set<std::string>* unmodified)
+    const std::set<std::string>& models, std::set<std::string>* added,
+    std::set<std::string>* deleted, std::set<std::string>* modified,
+    std::set<std::string>* unmodified, ModelInfoMap* updated_infos)
 {
-  added->clear();
-  deleted->clear();
-  modified->clear();
-  unmodified->clear();
-
-  // We don't modify 'infos_' in place to minimize how long we need to
-  // hold the lock and also prevent any partial changes to do an error
-  // during processing.
-  ModelInfoMap new_infos;
-
-  // Each subdirectory of repository path is a model directory from
-  // which we read the model configuration.
-  std::set<std::string> subdirs;
-  RETURN_IF_ERROR(GetDirectorySubdirs(repository_path_, &subdirs));
-
-  for (const auto& child : subdirs) {
+  for (const auto& child : models) {
     const auto full_path = JoinPath({repository_path_, child});
+
+    // If the model directory does not exist, the model is marked as deleted
+    bool exists = false;
+    RETURN_IF_ERROR(FileExists(full_path, &exists));
+    if (!exists) {
+      deleted->insert(child);
+      continue;
+    }
 
     // If 'child' is a new model or an existing model that has been
     // modified since the last time it was polled, then need to
@@ -1260,7 +1268,7 @@ ModelRepositoryManager::Poll(
         need_load = true;
       } else {
         unmodified->insert(child);
-        const auto& ret = new_infos.emplace(child, nullptr);
+        const auto& ret = updated_infos->emplace(child, nullptr);
         if (!ret.second) {
           return Status(
               RequestStatusCode::ALREADY_EXISTS,
@@ -1273,7 +1281,7 @@ ModelRepositoryManager::Poll(
     }
 
     if (need_load) {
-      const auto& ret = new_infos.emplace(child, nullptr);
+      const auto& ret = updated_infos->emplace(child, nullptr);
       if (!ret.second) {
         return Status(
             RequestStatusCode::ALREADY_EXISTS,
@@ -1307,23 +1315,6 @@ ModelRepositoryManager::Poll(
                 "', directory name must equal model name");
       }
     }
-  }
-
-  // Anything in 'infos_' that is not in "added", "modified", or
-  // "unmodified" is deleted.
-  for (const auto& pr : infos_) {
-    if ((added->find(pr.first) == added->end()) &&
-        (modified->find(pr.first) == modified->end()) &&
-        (unmodified->find(pr.first) == unmodified->end())) {
-      deleted->insert(pr.first);
-    }
-  }
-
-  // Swap the new infos in place under a short-lived lock and only if
-  // there were no errors encountered during polling.
-  {
-    std::lock_guard<std::mutex> lock(infos_mu_);
-    infos_.swap(new_infos);
   }
 
   return Status::Success;
