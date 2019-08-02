@@ -241,7 +241,8 @@ Postprocess(
 
       // first 5 probabilities (TEST)
       for (int i = 0; i < 5; i++) {
-        std::cout << "    P(" << i + 1 << ") = " << ((float*)output_data)[i] << std::endl;
+        std::cout << "    P(" << i + 1 << ") = " << ((float*)output_data)[i]
+                  << std::endl;
       }
     }
   } else {
@@ -660,6 +661,7 @@ main(int argc, char** argv)
   // extract and validate that the model meets the requirements for
   // image classification.
   std::unique_ptr<nic::InferContext> ctx;
+  std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx;
   nic::Error err;
   if (streaming) {
     err = nic::InferGrpcStreamContext::Create(
@@ -721,6 +723,14 @@ main(int argc, char** argv)
 
   // Create and Register shared memory regions for Input and Output batches
   if (use_shm) {
+    err = nic::SharedMemoryControlGrpcContext::Create(
+        &shared_memory_ctx, url, verbose);
+    if (!err.IsOk()) {
+      std::cerr << "error: unable to create shared memory control context: "
+                << err << std::endl;
+      exit(1);
+    }
+
     int shm_fd = create_shared_region(
         "/input_data", input_byte_size * image_filenames.size());
     shm_addr_ip = (float*)(get_shm_addr(
@@ -731,10 +741,10 @@ main(int argc, char** argv)
         shm_fd, 0, output_byte_size * image_filenames.size()));
 
     for (int i = 0; i < num_of_batches; i++) {
-      ctx->RegisterSharedMemory(
+      shared_memory_ctx->RegisterSharedMemory(
           "input_batch" + std::to_string(i), "/input_data",
           i * batch_size * input_byte_size, batch_size * input_byte_size);
-      ctx->RegisterSharedMemory(
+      shared_memory_ctx->RegisterSharedMemory(
           "output_batch" + std::to_string(i), "/output_data",
           i * batch_size * output_byte_size, batch_size * output_byte_size);
     }
@@ -896,8 +906,10 @@ main(int argc, char** argv)
   if (use_shm) {
     // shm_unlink input and output shared memory regions
     for (int i = 0; i < num_of_batches; i++) {
-      ctx->UnregisterSharedMemory("input_batch" + std::to_string(i));
-      ctx->UnregisterSharedMemory("output_batch" + std::to_string(i));
+      shared_memory_ctx->UnregisterSharedMemory(
+          "input_batch" + std::to_string(i));
+      shared_memory_ctx->UnregisterSharedMemory(
+          "output_batch" + std::to_string(i));
     }
     shm_cleanup("/input_data");
     shm_cleanup("/output_data");
