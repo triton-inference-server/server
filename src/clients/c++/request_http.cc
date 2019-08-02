@@ -749,7 +749,6 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
-  Error GetSharedMemoryStatus() override;
 
  private:
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
@@ -797,12 +796,6 @@ Error
 SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 {
   return SendRequest("unregisterall", "", "", 0, 0);
-}
-
-Error
-SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus()
-{
-  return SendRequest("status", "", "", 0, 0);
 }
 
 Error

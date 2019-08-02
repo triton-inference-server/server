@@ -1192,21 +1192,6 @@ TRTSERVER_ServerUnregisterAllSharedMemory(TRTSERVER_Server* server)
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerGetSharedMemoryStatus(
-    TRTSERVER_Server* server, std::vector<std::string>& active_shm_regions)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-
-  ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(),
-      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
-
-  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(active_shm_regions));
-
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
 TRTSERVER_ServerGetSharedMemoryInfo(
     TRTSERVER_Server* server, const char* name, void** shm_mapped_addr,
     size_t* shm_offset)

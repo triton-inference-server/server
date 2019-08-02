@@ -375,7 +375,6 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
-  Error GetSharedMemoryStatus() override;
 
  private:
   Error SendRequest(
@@ -418,12 +417,6 @@ SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
 }
 
 Error
-SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus()
-{
-  return SendRequest("", SharedMemoryControlRequest::GET_STATUS, "", 0, 0);
-}
-
-Error
 SharedMemoryControlGrpcContextImpl::SendRequest(
     const std::string& name, const SharedMemoryControlRequest::Type action,
     const std::string& shm_key, const size_t offset, const size_t byte_size)
@@ -444,8 +437,6 @@ SharedMemoryControlGrpcContextImpl::SendRequest(
     rshm_region->set_name(name);
     request.set_type(action);
   } else if (action == SharedMemoryControlRequest::UNREGISTER_ALL) {
-    request.set_type(action);
-  } else {
     request.set_type(action);
   }
 

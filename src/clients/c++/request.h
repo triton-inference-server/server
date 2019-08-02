@@ -799,9 +799,6 @@ class ModelControlContext {
 ///   ...
 ///   ctx->UnregisterAllSharedMemory();
 ///   ...
-///   std::vector<std::string> active_shm_regions;
-///   ctx->GetSharedMemoryStatus(active_shm_regions);
-///   ...
 /// \endcode
 ///
 class SharedMemoryControlContext {
@@ -829,16 +826,9 @@ class SharedMemoryControlContext {
   /// \return Error object indicating success or failure.
   virtual Error UnregisterSharedMemory(const std::string& name) = 0;
 
-  /// Unregisters all registered shared memory regions on the inference server.
+   /// Unregisters all registered shared memory regions on the inference server.
   /// \return Error object indicating success or failure.
   virtual Error UnregisterAllSharedMemory() = 0;
-
-  /// Get the list of names of all registered (active) shared memory regions on
-  /// the inference server. It is empty if there are none.
-  /// \param active_shm_regions The vector of names to be populated with the
-  /// list of active shared memory regions.
-  /// \return Error object indicating success or failure.
-  virtual Error GetSharedMemoryStatus() = 0;
 };
 
 //==============================================================================

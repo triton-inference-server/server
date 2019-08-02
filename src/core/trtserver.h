@@ -752,14 +752,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnregisterAllSharedMemory(
     TRTSERVER_Server* server);
 
-/// Get the list of names of all active shared memory region on the inference
-/// server. If there are none then the list is empty. Returned error indicates
-/// if it was able to successfully get all active shared memory regions or not.
-/// \param server The inference server object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryStatus(
-    TRTSERVER_Server* server, std::vector<std::string>& active_shm_regions);
-
 /// Lookup information about a shared memory region on the inference server. If
 /// the shared memory region is no longer registered or valid, it will return
 /// an error message.
