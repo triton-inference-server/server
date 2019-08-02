@@ -26,6 +26,8 @@
 
 #include "src/core/trtserver.h"
 
+#include <string>
+#include <vector>
 #include "src/core/backend.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
@@ -108,6 +110,39 @@ TrtServerError::TrtServerError(
       return TrtServerError::Create(status__); \
     }                                          \
   } while (false)
+
+//
+// TrtServerSharedMemoryBlock
+//
+// Implementation for TRTSERVER_SharedMemoryBlock.
+//
+class TrtServerSharedMemoryBlock {
+ public:
+  explicit TrtServerSharedMemoryBlock(
+      TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
+      const size_t offset, const size_t byte_size);
+
+  TRTSERVER_Memory_Type Type() const { return type_; }
+  const std::string& Name() const { return name_; }
+  const std::string& ShmKey() const { return shm_key_; }
+  size_t Offset() const { return offset_; }
+  size_t ByteSize() const { return byte_size_; }
+
+ private:
+  const TRTSERVER_Memory_Type type_;
+  const std::string name_;
+  const std::string shm_key_;
+  const size_t offset_;
+  const size_t byte_size_;
+};
+
+TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
+    TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
+    const size_t offset, const size_t byte_size)
+    : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
+      byte_size_(byte_size)
+{
+}
 
 //
 // TrtServerResponseAllocator
@@ -454,6 +489,27 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 {
   TrtServerError* lerror = reinterpret_cast<TrtServerError*>(error);
   return lerror->Message().c_str();
+}
+
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockCpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const char* shm_key, const size_t offset, const size_t byte_size)
+{
+  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
+      new TrtServerSharedMemoryBlock(
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockDelete(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block)
+{
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+  delete lsmb;
+  return nullptr;  // Success
 }
 
 //
@@ -1004,7 +1060,7 @@ TRTSERVER_ServerLoadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODEL_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
 
@@ -1017,9 +1073,77 @@ TRTSERVER_ServerUnloadModel(TRTSERVER_Server* server, const char* model_name)
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   ni::ServerStatTimerScoped timer(
-      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::CONTROL);
+      lserver->StatusManager(), ni::ServerStatTimerScoped::Kind::MODEL_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->UnloadModel(std::string(model_name)));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerRegisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
+      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerUnregisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->UnregisterSharedMemory(lsmb->Name()));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerUnregisterAllSharedMemory(TRTSERVER_Server* server)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->UnregisterAllSharedMemory());
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerSharedMemoryAddress(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    size_t offset, size_t byte_size, void** base)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(
+      lserver->SharedMemoryAddress(lsmb->Name(), offset, byte_size, base));
 
   return nullptr;  // success
 }

@@ -124,6 +124,15 @@ InferenceServer::Init()
     return status;
   }
 
+  // Create the shared memory manager that registers / unregisters and returns
+  // the shared memory regions that are current registered.
+  status =
+      SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+
   // Create the model manager for the repository. Unless model control
   // is disabled, all models are eagerly loaded when the manager is created.
   bool polling_enabled = (model_control_mode_ == MODE_POLL);
@@ -365,6 +374,54 @@ InferenceServer::UnloadModel(const std::string& model_name)
 
   auto action_type = ModelRepositoryManager::ActionType::UNLOAD;
   return model_repository_manager_->LoadUnloadModel(model_name, action_type);
+}
+
+Status
+InferenceServer::RegisterSharedMemory(
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->RegisterSharedMemory(
+      name, shm_key, offset, byte_size);
+}
+
+Status
+InferenceServer::UnregisterSharedMemory(const std::string& name)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->UnregisterSharedMemory(name);
+}
+
+Status
+InferenceServer::UnregisterAllSharedMemory()
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->UnregisterAllSharedMemory();
+}
+
+Status
+InferenceServer::SharedMemoryAddress(
+    const std::string& name, size_t offset, size_t byte_size,
+    void** shm_mapped_addr)
+{
+  return shared_memory_manager_->SharedMemoryAddress(
+      name, offset, byte_size, shm_mapped_addr);
 }
 
 uint64_t

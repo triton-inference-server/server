@@ -40,6 +40,7 @@
 
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
+#include "src/servers/shared_memory_block_manager.h"
 
 #ifdef TRTIS_ENABLE_GPU
 static_assert(
@@ -80,8 +81,9 @@ bool allow_http_ = true;
 int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
-std::vector<std::string> endpoint_names = {"status", "health", "profile",
-                                           "infer", "modelcontrol"};
+std::vector<std::string> endpoint_names = {
+    "status", "health",       "profile",
+    "infer",  "modelcontrol", "sharedmemorycontrol"};
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
@@ -315,11 +317,13 @@ CheckPortCollision()
 TRTSERVER_Error*
 StartGrpcService(
     std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
-    const std::shared_ptr<TRTSERVER_Server>& server)
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
-      server, grpc_port_, grpc_infer_thread_cnt_, grpc_stream_infer_thread_cnt_,
-      service);
+      server, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
+      grpc_stream_infer_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -337,10 +341,12 @@ TRTSERVER_Error*
 StartHttpService(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
     const std::shared_ptr<TRTSERVER_Server>& server,
-    const std::map<int32_t, std::vector<std::string>>& port_map)
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager,
+    std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-      server, port_map, http_thread_cnt_, services);
+      server, smb_manager, port_map, http_thread_cnt_, services);
   if (err == nullptr) {
     for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
@@ -382,7 +388,10 @@ StartMetricsService(
 #endif  // TRTIS_ENABLE_METRICS
 
 bool
-StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
+StartEndpoints(
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
+        smb_manager)
 {
   if (LOG_INFO_IS_ON) {
     const char* id;
@@ -393,7 +402,8 @@ StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
 #ifdef TRTIS_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
-    TRTSERVER_Error* err = StartGrpcService(&grpc_service_, server);
+    TRTSERVER_Error* err =
+        StartGrpcService(&grpc_service_, server, smb_manager);
     if (err != nullptr) {
       LOG_ERROR << "Failed to start GRPC service: "
                 << TRTSERVER_ErrorMessage(err);
@@ -415,7 +425,8 @@ StartEndpoints(const std::shared_ptr<TRTSERVER_Server>& server)
       }
     }
 
-    TRTSERVER_Error* err = StartHttpService(&http_services_, server, port_map);
+    TRTSERVER_Error* err =
+        StartHttpService(&http_services_, server, smb_manager, port_map);
     if (err != nullptr) {
       LOG_ERROR << "Failed to start HTTP service: "
                 << TRTSERVER_ErrorMessage(err);
@@ -802,8 +813,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
-  http_ports_ = {http_port_, http_health_port_, http_port_, http_port_,
-                 http_port_};
+  http_ports_ = {http_port_, http_health_port_, http_port_,
+                 http_port_, http_port_,        http_port_};
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
@@ -899,6 +910,10 @@ main(int argc, char** argv)
     exit(1);
   }
 
+  // Manager for shared memory blocks.
+  std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>
+      smb_manager;
+
   // Create the server...
   TRTSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(
@@ -909,7 +924,7 @@ main(int argc, char** argv)
   std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
 
   // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server)) {
+  if (!StartEndpoints(server, smb_manager)) {
     exit(1);
   }
 

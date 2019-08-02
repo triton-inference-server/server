@@ -113,12 +113,12 @@ endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 #
 set(
   TRTSERVER_SRCS
-  main.cc common.cc ../core/logging.cc
+  main.cc common.cc shared_memory_block_manager.cc ../core/logging.cc
 )
 
 set(
   TRTSERVER_HDRS
-  common.h ../core/logging.h
+  common.h shared_memory_block_manager.h ../core/logging.h
 )
 
 add_executable(
