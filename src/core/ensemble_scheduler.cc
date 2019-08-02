@@ -124,10 +124,11 @@ class EnsembleContext {
 
   size_t inflight_step_counter_;
 
-  // Storing each tensor's shape, data type and the data
-  std::vector<
-      std::pair<InferRequestHeader::Input, std::shared_ptr<SystemMemory>>>
-      tensor_data_;
+  // Storing each tensor's shape, data type in 1st element, batch size in 2nd,
+  // and the data in 3rd.
+  using TensorData = std::tuple<
+      InferRequestHeader::Input, size_t, std::shared_ptr<SystemMemory>>;
+  std::vector<TensorData> tensor_data_;
 
   // Handle to all backend that may be used in the ensemble
   std::unordered_map<std::string, VersionMap> handles_;
@@ -193,8 +194,9 @@ EnsembleContext::EnsembleContext(
       auto it = info_->ensemble_input_to_tensor_.find(input.name());
       if (it != info_->ensemble_input_to_tensor_.end()) {
         auto& tensor_data = tensor_data_[it->second];
-        tensor_data.first = input;
-        request_provider_->GetSystemMemory(it->first, &(tensor_data.second));
+        std::get<0>(tensor_data) = input;
+        std::get<1>(tensor_data) = (info_->allow_batching_ ? batch_size_ : 0);
+        request_provider_->GetSystemMemory(it->first, &(std::get<2>(tensor_data)));
       } else {
         ensemble_status_ = Status(
             RequestStatusCode::INVALID_ARG,
@@ -267,7 +269,7 @@ EnsembleContext::UpdateEnsembleState(
   updated_tensors.clear();
   if (completed_step == nullptr) {
     for (size_t i = 0; i < tensor_data_.size(); i++) {
-      if (tensor_data_[i].second != nullptr) {
+      if (std::get<2>(tensor_data_[i]) != nullptr) {
         updated_tensors.push_back(i);
       }
     }
@@ -280,16 +282,21 @@ EnsembleContext::UpdateEnsembleState(
         *(completed_step->backend_)));
     const auto& response_header =
         completed_step->response_provider_->ResponseHeader();
+    const bool allow_batching = (completed_step->backend_->Config().max_batch_size() > 0);
+    const size_t batch_size = (allow_batching ? response_header.batch_size() : 0);
     for (const auto& output : response_header.output()) {
       if (output.has_raw()) {
         auto it = info_->steps_[step_idx].output_to_tensor_.find(output.name());
         if (it != info_->steps_[step_idx].output_to_tensor_.end()) {
           auto& tensor_data = tensor_data_[it->second];
-          *(tensor_data.first.mutable_dims()) = output.raw().dims();
-          tensor_data.first.set_batch_byte_size(output.raw().batch_byte_size());
+          auto& meta_data = std::get<0>(tensor_data);
+          *(meta_data.mutable_dims()) = output.raw().dims();
+          meta_data.set_batch_byte_size(output.raw().batch_byte_size());
+
+          std::get<1>(tensor_data) = batch_size;
 
           RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
-              it->first, &(tensor_data.second)));
+              it->first, &(std::get<2>(tensor_data))));
           updated_tensors.push_back(it->second);
 
           auto tensor_it = no_label_tensors_.find(it->second);
@@ -340,7 +347,7 @@ EnsembleContext::GetNextSteps(
     for (const auto& idx : step_idx) {
       bool ready = true;
       for (const auto& input_pair : info_->steps_[idx].input_to_tensor_) {
-        if (tensor_data_[input_pair.second].second == nullptr) {
+        if (std::get<2>(tensor_data_[input_pair.second]) == nullptr) {
           ready = false;
           break;
         }
@@ -369,13 +376,15 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
 
   request_header.set_correlation_id(correlation_id_);
+  // [TODO] should not set to 'batch_size_'
   request_header.set_batch_size(batch_size_);
   request_header.set_flags(flags_);
   for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
     auto input = request_header.add_input();
-    *input = tensor_data_[pair.second].first;
+    // [TODO] should check shape and batch size beforehead.
+    *input = std::get<0>(tensor_data_[pair.second]);
     input->set_name(pair.first);
-    input_map[pair.first] = tensor_data_[pair.second].second;
+    input_map[pair.first] = std::get<2>(tensor_data_[pair.second]);
   }
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
@@ -428,29 +437,32 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     }
     // Check if output is ready
     const auto& tensor_data = tensor_data_[output_pair.second];
-    if (tensor_data.second == nullptr) {
+    const auto& meta_data = std::get<0>(tensor_data);
+    const auto& memory_block = std::get<2>(tensor_data);
+    if (memory_block == nullptr) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unexpected deadlock, output '" + output_pair.first +
               "' is not set while no more ensemble steps can be made");
     } else if (
-        tensor_data.first.batch_byte_size() !=
-        tensor_data.second->TotalByteSize()) {
+        meta_data.batch_byte_size() !=
+        memory_block->TotalByteSize()) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unexpected size for output '" + output_pair.first + "', byte-size " +
-              std::to_string(tensor_data.first.batch_byte_size()) +
+              std::to_string(meta_data.batch_byte_size()) +
               " does not equal " +
-              std::to_string(tensor_data.second->TotalByteSize()));
+              std::to_string(memory_block->TotalByteSize()));
     }
 
     // copy data to ensemble response provider
-    size_t expected_byte_size = tensor_data.first.batch_byte_size();
+    size_t expected_byte_size = meta_data.batch_byte_size();
     std::vector<int64_t> shape;
     if (info_->allow_batching_) {
       shape.push_back(batch_size_);
     }
-    for (const auto& dim : tensor_data.first.dims()) {
+    // [TODO] set dims properly
+    for (const auto& dim : meta_data.dims()) {
       shape.push_back(dim);
     }
 
@@ -462,12 +474,12 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     size_t content_idx = 0;
     size_t content_size;
     const char* content =
-        tensor_data.second->BufferAt(content_idx, &content_size);
+        memory_block->BufferAt(content_idx, &content_size);
     while (content != nullptr) {
       memcpy(((char*)buffer) + content_offset, content, content_size);
       content_offset += content_size;
       content_idx++;
-      content = tensor_data.second->BufferAt(content_idx, &content_size);
+      content = memory_block->BufferAt(content_idx, &content_size);
     }
   }
   return Status::Success;
