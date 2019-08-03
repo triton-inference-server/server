@@ -475,7 +475,27 @@ ValidateModelConfig(
 #endif  // TRTIS_ENABLE_GPU
 
     for (const auto& group : config.instance_group()) {
-      if (group.kind() == ModelInstanceGroup::KIND_GPU) {
+      // KIND_MODEL is supported only on TensorFlow.
+      if (group.kind() == ModelInstanceGroup::KIND_MODEL) {
+        if (group.gpus().size() > 0) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "instance group " + group.name() + " of model " + config.name() +
+                  " has kind KIND_MODEL but specifies one or more GPUs");
+        }
+#ifdef TRTIS_ENABLE_TENSORFLOW
+        if (!(config.platform() == kTensorFlowGraphDefPlatform ||
+              config.platform() == kTensorFlowSavedModelPlatform))
+#endif  // TRTIS_ENABLE_TENSORFLOW
+        {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "instance group " + group.name() + " of model " + config.name() +
+                  "on platform " + config.platform() +
+                  " has kind KIND_MODEL which is supported only on TensorFlow "
+                  "models");
+        }
+      } else if (group.kind() == ModelInstanceGroup::KIND_GPU) {
 #ifndef TRTIS_ENABLE_GPU
         return Status(
             RequestStatusCode::INVALID_ARG,

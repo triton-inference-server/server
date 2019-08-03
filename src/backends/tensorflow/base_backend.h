@@ -71,6 +71,10 @@ class BaseBackend : public InferenceBackend {
     // context.
     static constexpr int NO_GPU_DEVICE = -1;
 
+    // GPU device number that indicates model will be loaded on GPUs
+    // as specified in model graph
+    static constexpr int MODEL_DEVICE = -2;
+
     // Max batch size value that indicates batching is not supported.
     static constexpr int NO_BATCHING = 0;
 
