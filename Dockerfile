@@ -203,9 +203,9 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 COPY --from=trtserver_tf \
      /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
-    ln -s libtensorflow_cc.so libtensorflow_framework.so.1 && \
-    ln -s libtensorflow_cc.so libtensorflow_framework.so && \
-    ln -s libtensorflow_cc.so libtensorflow_cc.so.1
+    ln -sf libtensorflow_cc.so libtensorflow_framework.so.1 && \
+    ln -sf libtensorflow_cc.so libtensorflow_framework.so && \
+    ln -sf libtensorflow_cc.so libtensorflow_cc.so.1
 
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
@@ -280,7 +280,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
-    (cd /opt/tensorrtserver && ln -s /workspace/qa qa)
+    (cd /opt/tensorrtserver && ln -sf /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
