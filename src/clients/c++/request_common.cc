@@ -140,7 +140,7 @@ InputImpl::InputImpl(const InputImpl& obj)
       total_byte_size_(obj.total_byte_size_), needs_shape_(obj.needs_shape_),
       shape_(obj.shape_), batch_size_(obj.batch_size_), bufs_idx_(0),
       buf_pos_(0), bufs_(obj.bufs_), buf_byte_sizes_(obj.buf_byte_sizes_),
-      str_bufs_(obj.str_bufs_), use_shm_(obj.use_shm_)
+      str_bufs_(obj.str_bufs_), use_shm_(obj.use_shm_), name_(obj.name_), offset_(obj.offset_), shm_byte_size_(obj.shm_byte_size_)
 {
 }
 

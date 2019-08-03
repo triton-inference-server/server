@@ -277,6 +277,11 @@ class InferContext {
     /// -1.
     virtual const DimsList& Dims() const = 0;
 
+    virtual bool IsSharedMemory() const = 0;
+    virtual const std::string& GetSharedMemoryName() const = 0;
+    virtual size_t GetSharedMemoryOffset() const = 0;
+    virtual size_t GetSharedMemoryByteSize() const = 0;
+
     /// Prepare this input to receive new tensor values. Forget any
     /// existing values that were set by previous calls to
     /// SetRaw().

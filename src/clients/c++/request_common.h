@@ -152,7 +152,10 @@ class InputImpl : public InferContext::Input {
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
-  bool IsSharedMemory() { return use_shm_; }
+  bool IsSharedMemory() const override { return use_shm_; }
+  const std::string& GetSharedMemoryName() const override { return name_; }
+  size_t GetSharedMemoryOffset() const override { return offset_; }
+  size_t GetSharedMemoryByteSize() const override { return byte_size_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
 

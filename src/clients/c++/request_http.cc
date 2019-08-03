@@ -1586,6 +1586,14 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
     }
+
+    // set shared memory
+    if (io->IsSharedMemory()) {
+      auto rshared_memory = rinput->mutable_shared_memory();
+      rshared_memory->set_name(io->GetSharedMemoryName());
+      rshared_memory->set_offset(io->GetSharedMemoryOffset());
+      rshared_memory->set_byte_size(io->GetSharedMemoryByteSize());
+    }
   }
 
   // Set the expected POST size. If you want to POST large amounts of
