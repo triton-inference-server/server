@@ -53,6 +53,9 @@ struct EnsembleInfo {
 
   bool allow_batching_;
 
+  // the ensemble output (re)shape expected by the ensemble
+  std::unordered_map<std::string, DimsList> ensemble_output_shape_;
+
   std::unordered_map<std::string, size_t> ensemble_input_to_tensor_;
   std::unordered_map<std::string, size_t> ensemble_output_to_tensor_;
 

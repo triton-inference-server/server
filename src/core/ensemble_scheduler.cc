@@ -196,7 +196,8 @@ EnsembleContext::EnsembleContext(
         auto& tensor_data = tensor_data_[it->second];
         std::get<0>(tensor_data) = input;
         std::get<1>(tensor_data) = (info_->allow_batching_ ? batch_size_ : 0);
-        request_provider_->GetSystemMemory(it->first, &(std::get<2>(tensor_data)));
+        request_provider_->GetSystemMemory(
+            it->first, &(std::get<2>(tensor_data)));
       } else {
         ensemble_status_ = Status(
             RequestStatusCode::INVALID_ARG,
@@ -282,8 +283,10 @@ EnsembleContext::UpdateEnsembleState(
         *(completed_step->backend_)));
     const auto& response_header =
         completed_step->response_provider_->ResponseHeader();
-    const bool allow_batching = (completed_step->backend_->Config().max_batch_size() > 0);
-    const size_t batch_size = (allow_batching ? response_header.batch_size() : 0);
+    const bool allow_batching =
+        (completed_step->backend_->Config().max_batch_size() > 0);
+    const size_t batch_size =
+        (allow_batching ? response_header.batch_size() : 0);
     for (const auto& output : response_header.output()) {
       if (output.has_raw()) {
         auto it = info_->steps_[step_idx].output_to_tensor_.find(output.name());
@@ -376,19 +379,48 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
 
   request_header.set_correlation_id(correlation_id_);
+  // [TODO] better naming
+  const bool allow_batching = (backend->Config().max_batch_size() > 0);
   // [TODO] should not set to 'batch_size_'
-  request_header.set_batch_size(batch_size_);
+  size_t batch_size = (allow_batching ? batch_size_ : 0);
   request_header.set_flags(flags_);
   for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
     auto input = request_header.add_input();
-    // [TODO] should check shape and batch size beforehead.
     *input = std::get<0>(tensor_data_[pair.second]);
     input->set_name(pair.first);
+
+    // [TODO] should check shape and batch size beforehead.
+    // If the actual shape and config shape agree with each other without
+    // considering batch size, non-batch / batch conversion are not required
+    const ModelInput* input_config;
+    backend->GetInput(pair.first, &input_config);
+    const size_t tensor_batch_size = std::get<1>(tensor_data_[pair.second]);
+    if (CompareDimsWithWildcard(input->dims(), input_config->dims())) {
+      batch_size = tensor_batch_size;
+    } else {
+      // [TODO] document it?
+      if (allow_batching != (tensor_batch_size != 0)) {
+        auto input_dims = input->mutable_dims();
+        if (allow_batching) {
+          // assume first dim is batch dim and extract it.
+          auto bit = input_dims->begin();
+          batch_size = *bit;
+          input_dims->erase(bit);
+        } else {
+          // insert batch size as first dim
+          input_dims->Add(tensor_batch_size);
+          input_dims->SwapElements(0, (input_dims->size() - 1));
+          batch_size = 0;
+        }
+      }
+    }
+
     input_map[pair.first] = std::get<2>(tensor_data_[pair.second]);
   }
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
   }
+  request_header.set_batch_size((batch_size == 0 ? 1 : batch_size));
   RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
 
   step->reset(new Step(step_idx));
@@ -444,14 +476,11 @@ EnsembleContext::CheckAndSetEnsembleOutput()
           RequestStatusCode::INVALID_ARG,
           "unexpected deadlock, output '" + output_pair.first +
               "' is not set while no more ensemble steps can be made");
-    } else if (
-        meta_data.batch_byte_size() !=
-        memory_block->TotalByteSize()) {
+    } else if (meta_data.batch_byte_size() != memory_block->TotalByteSize()) {
       return Status(
           RequestStatusCode::INTERNAL,
           "unexpected size for output '" + output_pair.first + "', byte-size " +
-              std::to_string(meta_data.batch_byte_size()) +
-              " does not equal " +
+              std::to_string(meta_data.batch_byte_size()) + " does not equal " +
               std::to_string(memory_block->TotalByteSize()));
     }
 
@@ -461,9 +490,24 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     if (info_->allow_batching_) {
       shape.push_back(batch_size_);
     }
-    // [TODO] set dims properly
     for (const auto& dim : meta_data.dims()) {
       shape.push_back(dim);
+    }
+
+    auto sit = info_->ensemble_output_shape_.find(output_pair.first);
+    if (!CompareDimsWithWildcard(sit->second, meta_data.dims())) {
+      const auto& tensor_batch_size = std::get<1>(tensor_data);
+      if (info_->allow_batching_ != (tensor_batch_size != 0)) {
+        if (info_->allow_batching_) {
+          // assume first dim in 'meta_data' is batch dim
+          // and remove it since we count it twice. By here, shape is
+          // [batch_size, meta_data_dim0, meta_data_dim1, ...]
+          shape.erase(shape.begin() + 1);
+        } else {
+          // insert batch size as first dim
+          shape.insert(shape.begin(), tensor_batch_size);
+        }
+      }
     }
 
     void* buffer;
@@ -473,8 +517,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     size_t content_offset = 0;
     size_t content_idx = 0;
     size_t content_size;
-    const char* content =
-        memory_block->BufferAt(content_idx, &content_size);
+    const char* content = memory_block->BufferAt(content_idx, &content_size);
     while (content != nullptr) {
       memcpy(((char*)buffer) + content_offset, content, content_size);
       content_offset += content_size;
@@ -561,6 +604,12 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
     info_->ensemble_output_to_tensor_[output.name()] = idx;
     name_to_idx[output.name()] = idx;
     info_->tensor_to_step_.emplace_back();
+
+    if (output.has_reshape()) {
+      info_->ensemble_output_shape_[output.name()] = output.reshape().shape();
+    } else {
+      info_->ensemble_output_shape_[output.name()] = output.dims();
+    }
   }
 
   for (const auto& element : config.ensemble_scheduling().step()) {
