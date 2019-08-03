@@ -328,7 +328,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << "For -H, the header will be added to HTTP requests (ignored for GRPC "
          "requests). The header must be specified as 'Header:Value'. -H may be "
-         "specified multiple times to add multiple headers.";
+         "specified multiple times to add multiple headers." << std::endl;
   std::cerr << "If -S is specified, the Shared Memory API will be used to make "
             << "the request." << std::endl;
   std::cerr << std::endl;
@@ -735,18 +735,18 @@ main(int argc, char** argv)
         "/input_data", input_byte_size * image_filenames.size());
     shm_addr_ip = (float*)(get_shm_addr(
         shm_fd, 0, input_byte_size * image_filenames.size()));
-    shm_fd = create_shared_region(
-        "/output_data", output_byte_size * image_filenames.size());
-    shm_addr_op = (float*)(get_shm_addr(
-        shm_fd, 0, output_byte_size * image_filenames.size()));
+    // shm_fd = create_shared_region(
+    //     "/output_data", output_byte_size * image_filenames.size());
+    // shm_addr_op = (float*)(get_shm_addr(
+    //     shm_fd, 0, output_byte_size * image_filenames.size()));
 
     for (int i = 0; i < num_of_batches; i++) {
       shared_memory_ctx->RegisterSharedMemory(
           "input_batch" + std::to_string(i), "/input_data",
           i * batch_size * input_byte_size, batch_size * input_byte_size);
-      shared_memory_ctx->RegisterSharedMemory(
-          "output_batch" + std::to_string(i), "/output_data",
-          i * batch_size * output_byte_size, batch_size * output_byte_size);
+      // shared_memory_ctx->RegisterSharedMemory(
+      //     "output_batch" + std::to_string(i), "/output_data",
+      //     i * batch_size * output_byte_size, batch_size * output_byte_size);
     }
   }
 
@@ -801,7 +801,7 @@ main(int argc, char** argv)
   while (!last_request) {
     // Already verified that there is 1 input...
     const auto& input = ctx->Inputs()[0];
-    const auto& output = ctx->Outputs()[0];
+    // const auto& output = ctx->Outputs()[0];
 
     // Reset the input for new request.
     err = input->Reset();
@@ -819,7 +819,7 @@ main(int argc, char** argv)
           shm_addr_ip, offset, &byte_size, &(image_data.at(image_idx)));
       offset += byte_size;
       // Set shared memory regions for this pair of input and output
-      err = output->SetSharedMemory(
+      err = input->SetSharedMemory(
           "input_batch" + std::to_string(batch_id), 0,
           batch_size * input_byte_size);
       if (!err.IsOk()) {
@@ -829,15 +829,15 @@ main(int argc, char** argv)
         exit(1);
       }
 
-      err = output->SetSharedMemory(
-          "output_batch" + std::to_string(batch_id), 0,
-          batch_size * output_byte_size);
-      if (!err.IsOk()) {
-        std::cerr << "failed setting shared memory output_batch" +
-                         std::to_string(batch_id) + ": "
-                  << err << std::endl;
-        exit(1);
-      }
+      // err = output->SetSharedMemory(
+      //     "output_batch" + std::to_string(batch_id), 0,
+      //     batch_size * output_byte_size);
+      // if (!err.IsOk()) {
+      //   std::cerr << "failed setting shared memory output_batch" +
+      //                    std::to_string(batch_id) + ": "
+      //             << err << std::endl;
+      //   exit(1);
+      // }
     }
 
     for (size_t idx = 0; idx < batch_size; ++idx) {
@@ -861,6 +861,8 @@ main(int argc, char** argv)
     if (!async) {
       results.emplace_back();
       err = ctx->Run(&(results.back()));
+      std::cerr << "sent first infer request: " << err
+                << std::endl;
       if (!err.IsOk()) {
         std::cerr << "failed sending synchronous infer request: " << err
                   << std::endl;
@@ -869,6 +871,8 @@ main(int argc, char** argv)
     } else {
       std::shared_ptr<nic::InferContext::Request> req;
       err = ctx->AsyncRun(&req);
+      std::cerr << "sent first infer request: " << err
+                << std::endl;
       if (!err.IsOk()) {
         std::cerr << "failed sending asynchronous infer request: " << err
                   << std::endl;
@@ -900,7 +904,7 @@ main(int argc, char** argv)
               << std::endl;
     Postprocess(
         results[idx], result_filenames[idx], batch_size, shm_addr_op,
-        idx * output_byte_size, output_byte_size, use_shm);
+        idx * output_byte_size, output_byte_size, false);
   }
 
   if (use_shm) {
@@ -908,11 +912,11 @@ main(int argc, char** argv)
     for (int i = 0; i < num_of_batches; i++) {
       shared_memory_ctx->UnregisterSharedMemory(
           "input_batch" + std::to_string(i));
-      shared_memory_ctx->UnregisterSharedMemory(
-          "output_batch" + std::to_string(i));
+      // shared_memory_ctx->UnregisterSharedMemory(
+      //     "output_batch" + std::to_string(i));
     }
     shm_cleanup("/input_data");
-    shm_cleanup("/output_data");
+    // shm_cleanup("/output_data");
   }
 
   return 0;

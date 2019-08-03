@@ -642,6 +642,7 @@ HTTPAPIServer::EVBufferToInput(
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
       if (io.has_shared_memory()) {
+        LOG_VERBOSE(1) << io.name() << " has shared memory";
         if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,

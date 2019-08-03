@@ -223,7 +223,7 @@ InputImpl::SetSharedMemory(
   offset_ = offset;
   shm_byte_size_ = byte_size;
   use_shm_ = true;
-  total_byte_size_ += byte_size;
+  // total_byte_size_ += byte_size;
   return Error::Success;
 }
 

@@ -865,10 +865,10 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   size_t input_pos_idx = 0;
   while (input_pos_idx < inputs_.size()) {
     InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
-    std::string* new_input = request_.add_raw_input();
 
     // Append all batches of one input together (skip if using shared memory)
     if (!io->IsSharedMemory()) {
+      std::string* new_input = request_.add_raw_input();
       for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
         const uint8_t* data_ptr;
         size_t data_byte_size;
