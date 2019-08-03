@@ -633,23 +633,22 @@ TRTISTF_ModelCreateFromGraphDef(
         "model " + std::string(model_name) + " has an empty network");
   }
 
-  // Clear the device field from the graphdef so that the default device
-  // setting below will control which GPU the graph will run on
-  for (tensorflow::NodeDef& node : *graph_def.mutable_node()) {
-    if (!tensorflow::grappler::NodeIsOnCpu(&node)) {
-      node.clear_device();
+  if (device_id != TRTISTF_MODEL_DEVICE) {
+    // Clear the device field from the graphdef so that the default device
+    // setting below will control which GPU the graph will run on
+    for (tensorflow::NodeDef& node : *graph_def.mutable_node()) {
+      if (!tensorflow::grappler::NodeIsOnCpu(&node)) {
+        node.clear_device();
+      }
     }
-  }
-  // Set the default device to control the CPU/GPU that the graph runs
-  // on. This isn't foolproof since individual operations in the graph
-  // could specify a specific run location. But given that
-  // visible_device_list doesn't work it seems like the only option we
-  // have. [DLIS-43]
-  if (device_id == TRTISTF_NO_GPU_DEVICE) {
-    tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
-  } else {
-    tensorflow::graph::SetDefaultDevice(
-        "/gpu:" + std::to_string(device_id), &graph_def);
+    // Set the default device to control the CPU/GPU that the graph runs
+    // on.
+    if (device_id == TRTISTF_NO_GPU_DEVICE) {
+      tensorflow::graph::SetDefaultDevice("/cpu:0", &graph_def);
+    } else {
+      tensorflow::graph::SetDefaultDevice(
+          "/gpu:" + std::to_string(device_id), &graph_def);
+    }
   }
 
   RETURN_IF_TF_ERROR(session->Create(graph_def));
@@ -693,22 +692,27 @@ TRTISTF_ModelCreateFromSavedModel(
       per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
       &session_options);
 
-  // Set the default device to control the CPU/GPU that the graph runs
-  // on. This isn't foolproof since individual operations in the graph
-  // could specify a specific run location. But given that
-  // visible_device_list doesn't work it seems like the only option we
-  // have. [DLIS-43]
-  //
-  // The GraphDef where we need to use this workaround is only
-  // available in tensorflow/cc/saved_model/loader.cc so we use
-  // allocator_type in pass in the gpu_device we want and then
-  // loader.cc (our modified version) will use that to
-  // SetDefaultDevice appropriately.
-  if (device_id == TRTISTF_NO_GPU_DEVICE) {
-    session_options.config.mutable_gpu_options()->set_allocator_type("/cpu:0");
+
+  if (device_id != TRTISTF_MODEL_DEVICE) {
+    // Set the default device to control the CPU/GPU that the graph runs
+    // on.
+    //
+    // The GraphDef where we need to use this workaround is only
+    // available in tensorflow/cc/saved_model/loader.cc so we use
+    // allocator_type in pass in the gpu_device we want and then
+    // loader.cc (our modified version) will use that to
+    // SetDefaultDevice appropriately.
+    if (device_id == TRTISTF_NO_GPU_DEVICE) {
+      session_options.config.mutable_gpu_options()->set_allocator_type(
+          "/cpu:0");
+    } else {
+      session_options.config.mutable_gpu_options()->set_allocator_type(
+          "/gpu:" + std::to_string(device_id));
+    }
   } else {
-    session_options.config.mutable_gpu_options()->set_allocator_type(
-        "/gpu:" + std::to_string(device_id));
+    // Make sure the allocator_type field is empty so that loader.cc doesn't set
+    // device for the placement and let Tensorflow handle the model placement.
+    session_options.config.mutable_gpu_options()->clear_allocator_type();
   }
 
   std::unique_ptr<tensorflow::SavedModelBundle> bundle(
