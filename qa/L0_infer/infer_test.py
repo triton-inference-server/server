@@ -375,6 +375,11 @@ class InferTest(unittest.TestCase):
             iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
                 np.float32, np.float32, np.float32)
 
+        # batch -> nobatch -> batch
+        for bs in (1, 8):
+            iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
+                np.float32, np.float32, np.float32)
+
     def test_ensemble_label_lookup(self):
         # Ensemble needs to look up label from the actual model
         for bs in (1, 8):

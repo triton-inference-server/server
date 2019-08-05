@@ -74,12 +74,17 @@ for TARGET in cpu gpu; do
 
     create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
-    # Modify custom_zero_1_float32 for relevant ensembles
+    # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
     mkdir -p models/custom_zero_1_float32/1 && \
         cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
         (cd models/custom_zero_1_float32 && \
             echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
-            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt && \
+            echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+    cp -r models/custom_zero_1_float32 models/custom_nobatch_zero_1_float32 && \
+        (cd models/custom_zero_1_float32 && \
+            sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
+        (cd models/custom_nobatch_zero_1_float32 && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
 
