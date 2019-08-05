@@ -911,8 +911,8 @@ main(int argc, char** argv)
   }
 
   // Manager for shared memory blocks.
-  std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>
-      smb_manager;
+  auto smb_manager =
+      std::make_shared<nvidia::inferenceserver::SharedMemoryBlockManager>();
 
   // Create the server...
   TRTSERVER_Server* server_ptr = nullptr;
