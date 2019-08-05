@@ -50,15 +50,15 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libbusyop.so
-for MODEL in graphdef_busyop savedmodel_busyop; do
-  # Create local model repository
-  rm -fr models && \
-      mkdir models && \
-      cp -r ${MODEL_SRCDIR}/${MODEL} models/
 
-  for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
-    export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
-    for INSTANCE_CNT in 2 4 8; do
+for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
+  export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
+  for INSTANCE_CNT in 2 4 8; do
+    for MODEL in graphdef_busyop savedmodel_busyop; do
+        # Create local model repository
+        rm -fr models && \
+          mkdir models && \
+          cp -r ${MODEL_SRCDIR}/${MODEL} models/
 
         # Establish baseline
         echo "instance_group [ { kind: KIND_GPU, count: ${INSTANCE_CNT} } ]" >> models/${MODEL}/config.pbtxt
