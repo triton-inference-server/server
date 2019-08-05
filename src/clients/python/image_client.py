@@ -207,8 +207,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
                         help='Enable verbose output')
-    parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
-                        help='Use asynchronous inference API')
+    parser.add_argument('-a', '--async', dest="async_set", action="store_true", required=False,
+                        default=False, help='Use asynchronous inference API')
     parser.add_argument('--streaming', action="store_true", required=False, default=False,
                         help='Use streaming inference API. ' +
                         'The flag is only available with gRPC protocol.')
@@ -284,7 +284,7 @@ if __name__ == '__main__':
         result_filenames.append(input_filenames)
 
         # Send request
-        if not FLAGS.async:
+        if not FLAGS.async_set:
             results.append(ctx.run(
                 { input_name : input_batch },
                 { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
@@ -296,7 +296,7 @@ if __name__ == '__main__':
                 FLAGS.batch_size))
 
     # For async, retrieve results according to the send order
-    if FLAGS.async:
+    if FLAGS.async_set:
         for request_id in request_ids:
             results.append(ctx.get_async_run_results(request_id, True))
 

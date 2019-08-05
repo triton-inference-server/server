@@ -74,8 +74,8 @@ if __name__ == '__main__':
                         help='Enable verbose output')
     parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8001',
                         help='Inference server URL and it gRPC port. Default is localhost:8001.')
-    parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
-                        help='Enable asynchronous inference')
+    parser.add_argument('-a', '--async', dest="async_set", action="store_true", required=False,
+                        default=False, help='Enable asynchronous inference')
     parser.add_argument('-r', '--reverse', action="store_true", required=False, default=False,
                         help='Enable to run non-streaming context first')
 
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     result0_list = []
     result1_list = []
 
-    if FLAGS.async:
+    if FLAGS.async_set:
         request0_ids = []
         request1_ids = []
 
