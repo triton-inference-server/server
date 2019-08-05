@@ -79,6 +79,10 @@ class EnsembleContext {
   using StepList = std::vector<std::shared_ptr<Step>>;
   using VersionMap =
       std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
+  // Storing each tensor's meta data in 1st element, batch size in 2nd
+  // (0 for non-batchable), and the raw data in 3rd.
+  using TensorData = std::tuple<
+      InferRequestHeader::Input, size_t, std::shared_ptr<SystemMemory>>;
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
@@ -114,6 +118,13 @@ class EnsembleContext {
   // Return error if some of the required outputs are not set (deadlock)
   Status CheckAndSetEnsembleOutput();
 
+  // Helper function to reshape the given tensor according to the
+  // config shape and batching info and its actual shape and batching info.
+  // Returns the batch size to be used after the reshape.
+  size_t ReshapeTensorDims(
+      const DimsList& config_dims, const bool allow_batching,
+      const size_t tensor_batch_size, DimsList* mutable_dims);
+
   InferenceServer* is_;
 
   EnsembleInfo* info_;
@@ -124,10 +135,6 @@ class EnsembleContext {
 
   size_t inflight_step_counter_;
 
-  // Storing each tensor's shape, data type in 1st element, batch size in 2nd,
-  // and the data in 3rd.
-  using TensorData = std::tuple<
-      InferRequestHeader::Input, size_t, std::shared_ptr<SystemMemory>>;
   std::vector<TensorData> tensor_data_;
 
   // Handle to all backend that may be used in the ensemble
@@ -378,48 +385,33 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   auto& version_map = handles_[info_->steps_[step_idx].model_name_];
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
 
-  request_header.set_correlation_id(correlation_id_);
-  // [TODO] better naming
   const bool allow_batching = (backend->Config().max_batch_size() > 0);
-  // [TODO] should not set to 'batch_size_'
   size_t batch_size = (allow_batching ? batch_size_ : 0);
-  request_header.set_flags(flags_);
+
+  // Set inputs in request header and prepare input map
   for (const auto& pair : info_->steps_[step_idx].input_to_tensor_) {
     auto input = request_header.add_input();
     *input = std::get<0>(tensor_data_[pair.second]);
     input->set_name(pair.first);
 
-    // [TODO] should check shape and batch size beforehead.
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required
     const ModelInput* input_config;
     backend->GetInput(pair.first, &input_config);
-    const size_t tensor_batch_size = std::get<1>(tensor_data_[pair.second]);
-    if (CompareDimsWithWildcard(input->dims(), input_config->dims())) {
-      batch_size = tensor_batch_size;
-    } else {
-      // [TODO] document it?
-      if (allow_batching != (tensor_batch_size != 0)) {
-        auto input_dims = input->mutable_dims();
-        if (allow_batching) {
-          // assume first dim is batch dim and extract it.
-          auto bit = input_dims->begin();
-          batch_size = *bit;
-          input_dims->erase(bit);
-        } else {
-          // insert batch size as first dim
-          input_dims->Add(tensor_batch_size);
-          input_dims->SwapElements(0, (input_dims->size() - 1));
-          batch_size = 0;
-        }
-      }
-    }
+    batch_size = ReshapeTensorDims(
+        input_config->dims(), allow_batching,
+        std::get<1>(tensor_data_[pair.second]), input->mutable_dims());
 
     input_map[pair.first] = std::get<2>(tensor_data_[pair.second]);
   }
+
+  // Set requested outputs in request header
   for (const auto& pair : info_->steps_[step_idx].output_to_tensor_) {
     request_header.add_output()->set_name(pair.first);
   }
+
+  request_header.set_correlation_id(correlation_id_);
+  request_header.set_flags(flags_);
   request_header.set_batch_size((batch_size == 0 ? 1 : batch_size));
   RETURN_IF_ERROR(NormalizeRequestHeader(*backend, request_header));
 
@@ -436,6 +428,35 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
       (*step)->backend_->GetLabelProvider(), &((*step)->response_provider_)));
 
   return Status::Success;
+}
+
+size_t
+EnsembleContext::ReshapeTensorDims(
+    const DimsList& config_dims, const bool allow_batching,
+    const size_t tensor_batch_size, DimsList* mutable_dims)
+{
+  size_t batch_size = tensor_batch_size;
+  // If the actual shape and config shape agree with each other without
+  // considering batch size, non-batch / batch conversion are not required.
+  if (!CompareDimsWithWildcard(*mutable_dims, config_dims)) {
+    // Only reshape if one setting is batchable while the other is not,
+    // otherwise the shape mismatch can not be recovered with reshape
+    // and should have caused error during validation.
+    if (allow_batching != (tensor_batch_size != 0)) {
+      if (allow_batching) {
+        // assume first dim is batch dim and extract it.
+        auto bit = mutable_dims->begin();
+        batch_size = *bit;
+        mutable_dims->erase(bit);
+      } else {
+        // insert batch size as first dim
+        mutable_dims->Add(tensor_batch_size);
+        mutable_dims->SwapElements(0, (mutable_dims->size() - 1));
+        batch_size = 0;
+      }
+    }
+  }
+  return batch_size;
 }
 
 Status
@@ -486,28 +507,19 @@ EnsembleContext::CheckAndSetEnsembleOutput()
 
     // copy data to ensemble response provider
     size_t expected_byte_size = meta_data.batch_byte_size();
+    DimsList output_dims = meta_data.dims();
+
+    auto sit = info_->ensemble_output_shape_.find(output_pair.first);
+    ReshapeTensorDims(
+        sit->second, info_->allow_batching_, std::get<1>(tensor_data),
+        &output_dims);
+
     std::vector<int64_t> shape;
     if (info_->allow_batching_) {
       shape.push_back(batch_size_);
     }
-    for (const auto& dim : meta_data.dims()) {
+    for (const auto& dim : output_dims) {
       shape.push_back(dim);
-    }
-
-    auto sit = info_->ensemble_output_shape_.find(output_pair.first);
-    if (!CompareDimsWithWildcard(sit->second, meta_data.dims())) {
-      const auto& tensor_batch_size = std::get<1>(tensor_data);
-      if (info_->allow_batching_ != (tensor_batch_size != 0)) {
-        if (info_->allow_batching_) {
-          // assume first dim in 'meta_data' is batch dim
-          // and remove it since we count it twice. By here, shape is
-          // [batch_size, meta_data_dim0, meta_data_dim1, ...]
-          shape.erase(shape.begin() + 1);
-        } else {
-          // insert batch size as first dim
-          shape.insert(shape.begin(), tensor_batch_size);
-        }
-      }
     }
 
     void* buffer;
