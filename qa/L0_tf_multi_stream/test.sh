@@ -37,7 +37,7 @@ SERVER_LOG_BASE="./inference_server.log"
 CLIENT_LOG="./client.log"
 MULTI_STREAM_CLIENT=multi_stream_client.py
 
-NUM_GPUS=${NUM_GPUS:=1}
+TOTAL_GPUS=${TOTAL_GPUS:=4}
 TOTAL_MEM=${TOTAL_MEM:=10000}
 source ../common/util.sh
 
@@ -50,74 +50,76 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libbusyop.so
-export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
+for MODEL in graphdef_busyop savedmodel_busyop; do
+  # Create local model repository
+  rm -fr models && \
+      mkdir models && \
+      cp -r ${MODEL_SRCDIR}/${MODEL} models/
 
-for INSTANCE_CNT in 2 4 8; do
-  for MODEL in graphdef_busyop savedmodel_busyop; do
-      # Create local model repository
-      rm -fr models && \
-          mkdir models && \
-          cp -r ${MODEL_SRCDIR}/${MODEL} models/
+  for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
+    export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))
+    for INSTANCE_CNT in 2 4 8; do
 
-      # Establish baseline
-      echo "instance_group [ { kind: KIND_GPU, count: ${INSTANCE_CNT} } ]" >> models/${MODEL}/config.pbtxt
-      SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
-      run_server
-      if [ "$SERVER_PID" == "0" ]; then
-          echo -e "\n***\n*** Failed to start $SERVER\n***"
-          cat $SERVER_LOG
-          exit 1
-      fi
+        # Establish baseline
+        echo "instance_group [ { kind: KIND_GPU, count: ${INSTANCE_CNT} } ]" >> models/${MODEL}/config.pbtxt
+        SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-      # The first run of the client warms up TF/CUDA
-      set +e
-      python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
-      python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
-      if [ $? -ne 0 ]; then
-          cat $CLIENT_LOG
-          echo -e "\n***\n*** Test Failed\n***"
-          exit 1
-      fi
-      set -e
+        # The first run of the client warms up TF/CUDA
+        set +e
+        python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
+        python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            exit 1
+        fi
+        set -e
 
-      kill $SERVER_PID
-      wait $SERVER_PID
+        kill $SERVER_PID
+        wait $SERVER_PID
 
-      # Test with multi-stream
-      SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
-      PER_VGPU_MEM_LIMIT_MBYTES=$(( TOTAL_MEM / INSTANCE_CNT ))
+        # Test with multi-stream
+        SERVER_ARGS="--model-store=${DATADIR} --exit-timeout-secs=120"
+        PER_VGPU_MEM_LIMIT_MBYTES=$(( TOTAL_MEM / INSTANCE_CNT ))
 
-      for i in $(seq 0 $(( NUM_GPUS - 1 ))); do
-         VGPU_ARG=--tf-add-vgpu="${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
-         SERVER_ARGS=${SERVER_ARGS}" "${VGPU_ARG}
-      done
-      run_server
-      if [ "$SERVER_PID" == "0" ]; then
-          echo -e "\n***\n*** Failed to start $SERVER\n***"
-          cat $SERVER_LOG
-          exit 1
-      fi
+        for i in $(seq 0 $(( NUM_GPUS - 1 ))); do
+           VGPU_ARG=--tf-add-vgpu="${i};${INSTANCE_CNT};${PER_VGPU_MEM_LIMIT_MBYTES}"
+           SERVER_ARGS=${SERVER_ARGS}" "${VGPU_ARG}
+        done
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-      # The first run of the client warms up TF/CUDA
-      set +e
-      python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
-      python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
-      if [ $? -ne 0 ]; then
-          cat $CLIENT_LOG
-          echo -e "\n***\n*** Test Failed\n***"
-          exit 1
-      fi
-      set -e
+        # The first run of the client warms up TF/CUDA
+        set +e
+        python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> /dev/null
+        python $MULTI_STREAM_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -c $INSTANCE_CNT -n $NUM_DELAY_CYCLES >> $CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            exit 1
+        fi
+        set -e
 
-      kill $SERVER_PID
-      wait $SERVER_PID
+        kill $SERVER_PID
+        wait $SERVER_PID
 
-      SCALE_FACTOR=$(grep -i "Completion time for ${INSTANCE_CNT}" $CLIENT_LOG | awk '{printf "%s ",$6}' | awk '{print $1/$2}') 
-      if [ $(awk -v a="$SCALE_FACTOR" -v b="$INSTANCE_CNT" 'BEGIN{print(a<b-1)}') -ne 0 ]; then
-          cat $CLIENT_LOG
-          echo -e "\n***\n*** Test Failed\n***"
-          exit 1
-      fi
+        SCALE_FACTOR=$(grep -i "Completion time for ${INSTANCE_CNT}" $CLIENT_LOG | awk '{printf "%s ",$6}' | awk '{print $1/$2}') 
+        if [ $(awk -v a="$SCALE_FACTOR" -v b="$INSTANCE_CNT" 'BEGIN{print(a<b-1)}') -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Failed\n***"
+            exit 1
+        fi
+    done
   done
 done
 echo -e "\n***\n*** Test Passed\n***"
