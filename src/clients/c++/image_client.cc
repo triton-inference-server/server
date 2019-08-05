@@ -723,8 +723,14 @@ main(int argc, char** argv)
 
   // Create and Register shared memory regions for Input and Output batches
   if (use_shm) {
-    err = nic::SharedMemoryControlGrpcContext::Create(
-        &shared_memory_ctx, url, verbose);
+    if (protocol == ProtocolType::HTTP) {
+      err = nic::SharedMemoryControlHttpContext::Create(
+          &shared_memory_ctx, url, http_headers, verbose);
+    }
+    else {
+      err = nic::SharedMemoryControlGrpcContext::Create(
+          &shared_memory_ctx, url, verbose);
+    }
     if (!err.IsOk()) {
       std::cerr << "error: unable to create shared memory control context: "
                 << err << std::endl;
@@ -741,9 +747,14 @@ main(int argc, char** argv)
     //     shm_fd, 0, output_byte_size * image_filenames.size()));
 
     for (int i = 0; i < num_of_batches; i++) {
-      shared_memory_ctx->RegisterSharedMemory(
+      err = shared_memory_ctx->RegisterSharedMemory(
           "input_batch" + std::to_string(i), "/input_data",
           i * batch_size * input_byte_size, batch_size * input_byte_size);
+      if (!err.IsOk()) {
+        std::cerr << "error: unable to register shared memory region: "
+                  << err << std::endl;
+        exit(1);
+      }
       // shared_memory_ctx->RegisterSharedMemory(
       //     "output_batch" + std::to_string(i), "/output_data",
       //     i * batch_size * output_byte_size, batch_size * output_byte_size);

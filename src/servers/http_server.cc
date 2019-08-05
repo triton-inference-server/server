@@ -199,7 +199,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister|unregisterall|status)/([^/]+)/([^/]+)/([0-9]+)/([0-9]+))")
+            R"(/(register|unregister|unregisterall|status)/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
