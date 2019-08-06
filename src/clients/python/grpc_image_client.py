@@ -261,8 +261,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
                         help='Enable verbose output')
-    parser.add_argument('-a', '--async', action="store_true", required=False, default=False,
-                        help='Use asynchronous inference API')
+    parser.add_argument('-a', '--async', dest="async_set", action="store_true", required=False,
+                        default=False, help='Use asynchronous inference API')
     parser.add_argument('--streaming', action="store_true", required=False, default=False,
                         help='Use streaming inference API')
     parser.add_argument('-m', '--model-name', type=str, required=True,
@@ -309,13 +309,13 @@ if __name__ == '__main__':
         responses = grpc_stub.StreamInfer(filledRequestGenerator(result_filenames))
     else:
         for request in filledRequestGenerator(result_filenames):
-            if not FLAGS.async:
+            if not FLAGS.async_set:
                 responses.append(grpc_stub.Infer(request))
             else:
                 requests.append(grpc_stub.Infer.future(request))
 
     # For async, retrieve results according to the send order
-    if FLAGS.async:
+    if FLAGS.async_set:
         for request in requests:
             responses.append(request.result())
 
