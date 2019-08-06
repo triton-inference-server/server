@@ -39,14 +39,21 @@ namespace {
 /// of the ensemble tensor and which model they are inferred from.
 struct TensorNode {
   TensorNode(
-      const std::string& model_name, const DataType& type, const DimsList& dims)
+      const std::string& model_name, const bool batching, const DataType& type,
+      const DimsList& dims)
       : model_name_(model_name), type_(type), dims_(dims), ready_(false)
   {
+    // Expand dims to full shape, which includes batch dimension if exist
+    if (batching) {
+      full_dims_.Add(-1);
+    }
+    full_dims_.MergeFrom(dims_);
   }
 
   std::string model_name_;
   DataType type_;
   DimsList dims_;
+  DimsList full_dims_;
   bool ready_;
   std::vector<TensorNode*> prev_nodes_;
   std::vector<TensorNode*> next_nodes_;
@@ -73,24 +80,19 @@ ValidateTensorConsistency(
             rhs.model_name_);
   }
 
-  bool consistent = (lhs.dims_.size() == rhs.dims_.size());
-  if (consistent) {
-    for (int i = 0; i < lhs.dims_.size(); i++) {
-      // Shapes must match or either one uses variable size shape, if one uses
-      // variable size shape, shape consistency will be checked at runtime.
-      if ((lhs.dims_[i] != rhs.dims_[i]) &&
-          ((lhs.dims_[i] != -1) && (rhs.dims_[i] != -1))) {
-        consistent = false;
-        break;
-      }
-    }
-  }
-  if (!consistent) {
+  // Shapes must match or either one uses variable size shape, if one uses
+  // variable size shape, shape consistency will be checked at runtime.
+  // If dims mismatch, compare agian with full dims in case the tensor is
+  // used for both non-batching model and batching model. In that case, it
+  // is acceptable if non-batching model shape is [-1, d_0, d_1, ..., d_n]
+  // while the batching model shape is [d_0, d_1, ..., d_n].
+  if (!CompareDimsWithWildcard(lhs.dims_, rhs.dims_) &&
+      !CompareDimsWithWildcard(lhs.full_dims_, rhs.full_dims_)) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        message + "inconsistent shape: " + DimsListToString(lhs.dims_) +
+        message + "inconsistent shape: " + DimsListToString(lhs.full_dims_) +
             " is inferred from model " + lhs.model_name_ + " while " +
-            DimsListToString(rhs.dims_) + " is inferred from model " +
+            DimsListToString(rhs.full_dims_) + " is inferred from model " +
             rhs.model_name_);
   }
 
@@ -103,6 +105,7 @@ ValidateTensorMapping(
     const ModelConfig& model_config,
     std::unordered_map<std::string, TensorNode>* ensemble_tensors)
 {
+  const bool batching = (model_config.max_batch_size() > 0);
   // Check all inputs are mapped and no mapping to invalid inputs
   std::set<std::string> input_names;
   for (const auto& model_input : model_config.input()) {
@@ -122,7 +125,8 @@ ValidateTensorMapping(
     for (const auto& input_map : step.input_map()) {
       if (model_input.name() == input_map.first) {
         TensorNode model_tensor(
-            step.model_name(), model_input.data_type(), model_input.dims());
+            step.model_name(), batching, model_input.data_type(),
+            model_input.dims());
         auto it = ensemble_tensors->find(input_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -171,7 +175,8 @@ ValidateTensorMapping(
     for (const auto& model_output : model_config.output()) {
       if (model_output.name() == output_map.first) {
         TensorNode model_tensor(
-            step.model_name(), model_output.data_type(), model_output.dims());
+            step.model_name(), batching, model_output.data_type(),
+            model_output.dims());
         auto it = ensemble_tensors->find(output_map.second);
         if (it != ensemble_tensors->end()) {
           RETURN_IF_ERROR(ValidateTensorConsistency(
@@ -231,17 +236,18 @@ ValidateEnsembleConfig(
   }
 
   const auto& ensemble_config = ensemble->model_config_;
+  const bool batching = (ensemble_config.max_batch_size() > 0);
   std::unordered_map<std::string, TensorNode> ensemble_tensors;
   for (const auto& input : ensemble_config.input()) {
     const auto& dims =
         input.has_reshape() ? input.reshape().shape() : input.dims();
-    TensorNode input_node(ensemble_name, input.data_type(), dims);
+    TensorNode input_node(ensemble_name, batching, input.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(input.name(), input_node));
   }
   for (const auto& output : ensemble_config.output()) {
     const auto& dims =
         output.has_reshape() ? output.reshape().shape() : output.dims();
-    TensorNode output_node(ensemble_name, output.data_type(), dims);
+    TensorNode output_node(ensemble_name, batching, output.data_type(), dims);
     ensemble_tensors.emplace(std::make_pair(output.name(), output_node));
   }
 
@@ -255,7 +261,10 @@ ValidateEnsembleConfig(
       }
     }
 
-    if (model_config.max_batch_size() < ensemble_config.max_batch_size()) {
+    // batchable ensemble can include non-batchable models as long as
+    // the expanded shapes are consistent
+    if ((model_config.max_batch_size() != 0) &&
+        (model_config.max_batch_size() < ensemble_config.max_batch_size())) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "ensemble " + ensemble_name + " allows maximum batch size " +
