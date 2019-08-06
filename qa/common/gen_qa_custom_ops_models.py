@@ -166,6 +166,75 @@ output [
         cfile.write(config)
 
 
+def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
+    # Load the busy_loop custom operator
+    _busy_op_module = tf.load_op_library(os.path.join(FLAGS.busy_op_lib_path))
+    busy_loop = _busy_op_module.busy_loop
+
+    # Create the model that uses custom operator.
+    tf.reset_default_graph()
+    zin = tf.placeholder(tf.int32, [ None, ], "in")
+    zout = busy_loop(zin, name="out")
+
+    model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    if create_savedmodel:
+        with tf.Session() as sess:
+            input_name = "in"
+            output_name = "out"
+            input_tensor = tf.get_default_graph().get_tensor_by_name(input_name + ":0")
+            output_tensor = tf.get_default_graph().get_tensor_by_name(output_name + ":0")
+            input_dict = dict()
+            output_dict = dict()
+            input_dict[input_name] = input_tensor
+            output_dict[output_name] = output_tensor
+            tf.saved_model.simple_save(sess, model_version_dir + "/model.savedmodel",
+                                       inputs=input_dict, outputs=output_dict)
+    else:
+        with tf.Session() as sess:
+            graph_io.write_graph(sess.graph.as_graph_def(), model_version_dir,
+                                 "model.graphdef", as_text=False)
+
+def create_busyop_modelconfig(create_savedmodel, models_dir, model_version):
+    model_name = "savedmodel_busyop" if create_savedmodel else "graphdef_busyop"
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "{}"
+max_batch_size: 0
+input [
+  {{
+    name: "in"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }}
+]
+output [
+  {{
+    name: "out"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }}
+]
+'''.format(model_name,
+           "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef")
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
+
 def create_zero_out_models(models_dir):
     model_version = 1
 
@@ -188,6 +257,17 @@ def create_cuda_op_models(models_dir):
         create_cudaop_modelconfig(True, models_dir, model_version)
         create_cudaop_modelfile(True, models_dir, model_version)
 
+def create_busy_op_models(models_dir):
+    model_version = 1
+
+    if FLAGS.graphdef:
+        create_busyop_modelconfig(False, models_dir, model_version)
+        create_busyop_modelfile(False, models_dir, model_version)
+
+    if FLAGS.savedmodel:
+        create_busyop_modelconfig(True, models_dir, model_version)
+        create_busyop_modelfile(True, models_dir, model_version)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -199,6 +279,9 @@ if __name__ == '__main__':
     parser.add_argument('--cuda_op_lib_path', type=str, required=False,
                         default="./libcudaop.so",
                         help='Fullpath to libcudaop.so')
+    parser.add_argument('--busy_op_lib_path', type=str, required=False,
+                        default="./libbusyop.so",
+                        help='Fullpath to libbusyop.so')
     parser.add_argument('--graphdef', required=False, action='store_true',
                         help='Generate GraphDef models')
     parser.add_argument('--savedmodel', required=False, action='store_true',
@@ -211,3 +294,5 @@ if __name__ == '__main__':
 
     create_zero_out_models(FLAGS.models_dir)
     create_cuda_op_models(FLAGS.models_dir)
+    create_busy_op_models(FLAGS.models_dir)
+
