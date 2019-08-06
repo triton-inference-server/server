@@ -38,7 +38,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libzeroout.so:/data/inferenceserver/qa_custom_ops/libcudaop.so
+export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libzeroout.so:/data/inferenceserver/qa_custom_ops/libcudaop.so:/data/inferenceserver/qa_custom_ops/libbusyop.so
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
