@@ -324,7 +324,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         shared_memory_input_count++;
       }
     }
-    if (request_header.input_size() != (request.raw_input_size() + shared_memory_input_count)) {
+    if (request_header.input_size() !=
+        (request.raw_input_size() + shared_memory_input_count)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
           std::string(

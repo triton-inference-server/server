@@ -27,6 +27,7 @@
 
 #include "src/core/shared_memory_manager.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -37,7 +38,6 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.h"
-#include <errno.h>
 
 namespace nvidia { namespace inferenceserver {
 

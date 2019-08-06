@@ -867,7 +867,8 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (request_status_.code() == RequestStatusCode::INVALID) {
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
-    request_status_.set_msg("sharedmemorycontrol request did not return status");
+    request_status_.set_msg(
+        "sharedmemorycontrol request did not return status");
   }
 
   return Error(request_status_);

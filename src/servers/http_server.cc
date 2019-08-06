@@ -198,7 +198,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
-        sharedmemorycontrol_regex_(R"(/(register|unregister|unregisterall|status)(.*))")
+        sharedmemorycontrol_regex_(
+            R"(/(register|unregister|unregisterall|status)(.*))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -547,23 +548,27 @@ HTTPAPIServer::HandleSharedMemoryControl(
   std::string offset_str, byte_size_str;
   if ((sharedmemorycontrol_uri.empty()) ||
       (!RE2::FullMatch(
-          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str, &remaining))) {
+          sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
+          &remaining))) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
-  }
-  else {
+  } else {
     if (remaining.empty()) {
-      if ((action_type_str != "unregisterall") && (action_type_str != "status")) {
+      if ((action_type_str != "unregisterall") &&
+          (action_type_str != "status")) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
-    }
-    else {
-      if (action_type_str == "register" && (!RE2::FullMatch(remaining, register_regex_, &name, &shm_key, &offset_str, &byte_size_str))) {
+    } else {
+      if (action_type_str == "register" &&
+          (!RE2::FullMatch(
+              remaining, register_regex_, &name, &shm_key, &offset_str,
+              &byte_size_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
-      if (action_type_str == "unregister" && (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
+      if (action_type_str == "unregister" &&
+          (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
