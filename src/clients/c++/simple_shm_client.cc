@@ -254,8 +254,7 @@ main(int argc, char** argv)
     if (protocol == "http") {
       err = nic::SharedMemoryControlHttpContext::Create(
           &shared_memory_ctx, url, http_headers, verbose);
-    }
-    else {
+    } else {
       err = nic::SharedMemoryControlGrpcContext::Create(
           &shared_memory_ctx, url, verbose);
     }
@@ -329,7 +328,8 @@ main(int argc, char** argv)
       std::cerr << "failed setting shared memory input: " << err << std::endl;
       exit(1);
     }
-    err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
+    err =
+        input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
     if (!err.IsOk()) {
       std::cerr << "failed setting shared memory input: " << err << std::endl;
       exit(1);
@@ -413,10 +413,8 @@ main(int argc, char** argv)
           results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
           "unable to get OUTPUT1 result at idx " + std::to_string(i));
     }
-    std::cout << ip0 << " + " << ip1 << " = "
-              << r0 << std::endl;
-    std::cout << ip0 << " - " << ip1 << " = "
-              << r1 << std::endl;
+    std::cout << ip0 << " + " << ip1 << " = " << r0 << std::endl;
+    std::cout << ip0 << " - " << ip1 << " = " << r1 << std::endl;
 
     if ((ip0 + ip1) != r0) {
       std::cerr << "error: incorrect sum" << std::endl;

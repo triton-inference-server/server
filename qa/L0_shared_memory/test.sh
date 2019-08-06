@@ -45,8 +45,8 @@ RET=0
 
 set +e
 
-# Run with default host header...
-$SIMPLE_SHM_CLIENT -v >>client_c++.log 2>&1
+# Run with shared memory only for input for now
+$SIMPLE_SHM_CLIENT -I -v >>client_c++.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
