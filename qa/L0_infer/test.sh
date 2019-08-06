@@ -85,6 +85,7 @@ for TARGET in cpu gpu; do
             sed -i "s/max_batch_size: 1/max_batch_size: 8/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1 \]/" config.pbtxt) && \
         (cd models/custom_nobatch_zero_1_float32 && \
+            sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
 

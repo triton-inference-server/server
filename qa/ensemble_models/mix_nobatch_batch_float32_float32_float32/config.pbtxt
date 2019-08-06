@@ -78,7 +78,7 @@ ensemble_scheduling {
         key: "OUTPUT0"
         value: "nobatch_input0"
       }
-    }
+    },
     {
       # batch model
       model_name: "graphdef_float32_float32_float32"
