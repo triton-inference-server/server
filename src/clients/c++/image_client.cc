@@ -67,7 +67,7 @@ enum ScaleType { NONE = 0, VGG = 1, INCEPTION = 2 };
 enum ProtocolType { HTTP = 0, GRPC = 1 };
 
 int
-create_shared_region(std::string shm_key, size_t batch_byte_size)
+CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
 {
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -85,7 +85,7 @@ create_shared_region(std::string shm_key, size_t batch_byte_size)
 }
 
 void*
-get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
+MmapSharedMemoryRegion(int shm_fd, size_t offset, size_t batch_byte_size)
 {
   // map shared memory to process address space
   void* shm_addr =
@@ -98,7 +98,7 @@ get_shm_addr(int shm_fd, size_t offset, size_t batch_byte_size)
 }
 
 void
-shm_cleanup(std::string shm_key)
+UnlinkSharedMemory(std::string shm_key)
 {
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
@@ -737,13 +737,13 @@ main(int argc, char** argv)
       exit(1);
     }
 
-    int shm_fd = create_shared_region(
+    int shm_fd = CreateSharedMemoryRegion(
         "/input_data", input_byte_size * image_filenames.size());
-    shm_addr_ip = (float*)(get_shm_addr(
+    shm_addr_ip = (float*)(MmapSharedMemoryRegion(
         shm_fd, 0, input_byte_size * image_filenames.size()));
-    // shm_fd = create_shared_region(
+    // shm_fd = CreateSharedMemoryRegion(
     //     "/output_data", output_byte_size * image_filenames.size());
-    // shm_addr_op = (float*)(get_shm_addr(
+    // shm_addr_op = (float*)(MmapSharedMemoryRegion(
     //     shm_fd, 0, output_byte_size * image_filenames.size()));
 
     for (int i = 0; i < num_of_batches; i++) {
@@ -786,9 +786,9 @@ main(int argc, char** argv)
   }
 
   options->SetBatchSize(batch_size);
-  if (!use_shm) {
-    options->AddClassResult(ctx->Outputs()[0], topk);
-  }
+  //if (!use_shm) {
+  options->AddClassResult(ctx->Outputs()[0], topk);
+  //}
   err = ctx->SetRunOptions(*options);
   if (!err.IsOk()) {
     std::cerr << "failed initializing batch size: " << err << std::endl;
@@ -926,8 +926,8 @@ main(int argc, char** argv)
       // shared_memory_ctx->UnregisterSharedMemory(
       //     "output_batch" + std::to_string(i));
     }
-    shm_cleanup("/input_data");
-    // shm_cleanup("/output_data");
+    UnlinkSharedMemory("/input_data");
+    // UnlinkSharedMemory("/output_data");
   }
 
   return 0;

@@ -37,6 +37,7 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.h"
+#include <errno.h>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -46,8 +47,9 @@ Status
 OpenSharedMemoryRegion(const std::string& shm_key, int* shm_fd)
 {
   // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key.c_str(), O_RDONLY, S_IRUSR | S_IWUSR);
+  *shm_fd = shm_open(shm_key.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
   if (*shm_fd == -1) {
+    LOG_VERBOSE(1) << "shm_open failed, errno: " << errno;
     return Status(
         RequestStatusCode::INTERNAL,
         "Unable to open shared memory region: '" + shm_key + "'");
@@ -64,6 +66,7 @@ MapSharedMemory(
   // map shared memory to process address space
   *mapped_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if (*mapped_addr == MAP_FAILED) {
+    LOG_VERBOSE(1) << "mmap failed, errno: " << errno;
     return Status(
         RequestStatusCode::INTERNAL, "Unable to process address space");
   }
@@ -242,8 +245,9 @@ SharedMemoryManager::SharedMemoryAddress(
         "Unable to find shared memory region: '" + name + "'");
   }
 
+  LOG_VERBOSE(1) << "offset from request: " << offset;
   *shm_mapped_addr =
-      (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_);
+      (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
   return Status::Success;
 }
 

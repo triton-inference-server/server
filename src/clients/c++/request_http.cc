@@ -692,7 +692,7 @@ ModelControlHttpContextImpl::SendRequest(
   if (request_status_.code() == RequestStatusCode::INVALID) {
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
-    request_status_.set_msg("control request did not return status");
+    request_status_.set_msg("modelcontrol request did not return status");
   }
 
   return Error(request_status_);
@@ -827,7 +827,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   // use POST method
-  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -867,7 +867,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (request_status_.code() == RequestStatusCode::INVALID) {
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
-    request_status_.set_msg("control request did not return status");
+    request_status_.set_msg("sharedmemorycontrol request did not return status");
   }
 
   return Error(request_status_);
