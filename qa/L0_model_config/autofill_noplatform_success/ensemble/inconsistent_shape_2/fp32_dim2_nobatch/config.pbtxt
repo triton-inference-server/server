@@ -1,0 +1,22 @@
+name: "fp32_dim2_nobatch"
+max_batch_size: 0
+platform: "custom"
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1, 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1, 16 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]

@@ -91,6 +91,12 @@ for modelpath in \
        autofill_noplatform_success/ensemble/embedded_ensemble/embedded_ensemble/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/fp32_dim1_batch4/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/inner_ensemble/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/inconsistent_shape/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/fp32_dim1_batch4/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape/fp32_dim2_nobatch/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/inconsistent_shape_2/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/fp32_dim1_batch4/1 \
+       autofill_noplatform_success/ensemble/inconsistent_shape_2/fp32_dim2_nobatch/1 \
        autofill_noplatform_success/ensemble/unmapped_output/unmapped_output/1 \
        autofill_noplatform_success/ensemble/unmapped_output/fp32_dim1_batch4_output3/1 ; do
    mkdir -p $modelpath
@@ -224,24 +230,22 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
 
     echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
 
-    set +e
-
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
         RET=1
     else
+        set +e
         python ./compare_status.py --expected_dir models/$TARGET --model $TARGET >>$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             echo -e "*** FAILED: unexpected model config" >> $CLIENT_LOG
             RET=1
         fi
+        set -e
 
         kill $SERVER_PID
         wait $SERVER_PID
     fi
-
-    set -e
 done
 
 if [ $RET -eq 0 ]; then
