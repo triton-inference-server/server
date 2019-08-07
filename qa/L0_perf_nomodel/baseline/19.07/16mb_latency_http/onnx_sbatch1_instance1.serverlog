@@ -1,0 +1,24 @@
+I0808 01:06:58.782298 15536 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 01:06:58.782498 15536 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 01:06:58.782515 15536 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 01:06:58.782528 15536 grpc_server.cc:281] Register Infer RPC
+I0808 01:06:58.782533 15536 grpc_server.cc:285] Register StreamInfer RPC
+I0808 01:06:58.782538 15536 grpc_server.cc:290] Register Status RPC
+I0808 01:06:58.782543 15536 grpc_server.cc:294] Register Profile RPC
+I0808 01:06:58.782548 15536 grpc_server.cc:298] Register Health RPC
+I0808 01:06:58.782553 15536 grpc_server.cc:310] Register Executor
+I0808 01:06:58.787215 15536 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 01:06:58.829089 15536 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 01:06:58.832745 15536 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 01:06:58.838959 15536 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 01:06:58.844948 15536 server.cc:111] Initializing TensorRT Inference Server
+I0808 01:06:58.877028 15536 server_status.cc:83] New status tracking for model 'onnx_zero_1_float32'
+I0808 01:06:58.877106 15536 model_repository_manager.cc:633] loading: onnx_zero_1_float32:1
+I0808 01:06:58.878412 15536 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.onnx
+I0808 01:07:02.684935 15536 model_repository_manager.cc:776] successfully loaded 'onnx_zero_1_float32' version 1
+I0808 01:07:38.866998 15536 main.cc:229] Interrupt signal (15) received.
+I0808 01:07:38.867059 15536 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 01:07:38.867082 15536 model_repository_manager.cc:659] unloading: onnx_zero_1_float32:1
+I0808 01:07:38.867158 15536 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 01:07:38.867172 15536 model_repository_manager.cc:761] successfully unloaded 'onnx_zero_1_float32' version 1
+I0808 01:07:39.867292 15536 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,45 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Pass [1] throughput: 2293 infer/sec. p95 latency: 513 usec
+  Pass [2] throughput: 2300 infer/sec. p95 latency: 528 usec
+  Pass [3] throughput: 2260 infer/sec. p95 latency: 531 usec
+  Client: 
+    Request count: 11300
+    Throughput: 2260 infer/sec
+    p50 latency: 431 usec
+    p90 latency: 510 usec
+    p95 latency: 531 usec
+    p99 latency: 582 usec
+    Avg HTTP time: 390 usec (send 34 usec + response wait 353 usec + receive 3 usec)
+  Server: 
+    Request count: 13666
+    Avg request latency: 281 usec (overhead 23 usec + queue 12 usec + compute 246 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 5043 infer/sec. p95 latency: 459 usec
+  Pass [2] throughput: 4952 infer/sec. p95 latency: 465 usec
+  Pass [3] throughput: 4998 infer/sec. p95 latency: 456 usec
+  Client: 
+    Request count: 24992
+    Throughput: 4998 infer/sec
+    p50 latency: 386 usec
+    p90 latency: 435 usec
+    p95 latency: 456 usec
+    p99 latency: 506 usec
+    Avg HTTP time: 357 usec (send 42 usec + response wait 310 usec + receive 5 usec)
+  Server: 
+    Request count: 29968
+    Avg request latency: 230 usec (overhead 20 usec + queue 25 usec + compute 185 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, 2260 infer/sec, latency 531 usec
+Concurrency: 2, 4998 infer/sec, latency 456 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4378  100  4378    0     0  4275k      0 --:--:-- --:--:-- --:--:-- 4275k

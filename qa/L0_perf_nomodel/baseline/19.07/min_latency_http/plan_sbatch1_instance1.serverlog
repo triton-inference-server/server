@@ -1,0 +1,27 @@
+I0808 00:54:11.525282 14142 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 00:54:11.525476 14142 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 00:54:11.525494 14142 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 00:54:11.525506 14142 grpc_server.cc:281] Register Infer RPC
+I0808 00:54:11.525511 14142 grpc_server.cc:285] Register StreamInfer RPC
+I0808 00:54:11.525516 14142 grpc_server.cc:290] Register Status RPC
+I0808 00:54:11.525521 14142 grpc_server.cc:294] Register Profile RPC
+I0808 00:54:11.525526 14142 grpc_server.cc:298] Register Health RPC
+I0808 00:54:11.525531 14142 grpc_server.cc:310] Register Executor
+I0808 00:54:11.530200 14142 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 00:54:11.572186 14142 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 00:54:11.575653 14142 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 00:54:11.581780 14142 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 00:54:11.587512 14142 server.cc:111] Initializing TensorRT Inference Server
+I0808 00:54:11.623448 14142 server_status.cc:83] New status tracking for model 'plan_zero_1_float32'
+I0808 00:54:11.623521 14142 model_repository_manager.cc:633] loading: plan_zero_1_float32:1
+I0808 00:54:11.624891 14142 plan_backend.cc:209] Creating instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.plan
+I0808 00:54:13.963761 14142 logging.cc:49] Glob Size is 0 bytes.
+I0808 00:54:15.392834 14142 logging.cc:49] Deserialize required 1429564 microseconds.
+I0808 00:54:15.394688 14142 plan_backend.cc:319] Created instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) with stream priority 0
+I0808 00:54:15.394848 14142 model_repository_manager.cc:776] successfully loaded 'plan_zero_1_float32' version 1
+I0808 00:54:57.575558 14142 main.cc:229] Interrupt signal (15) received.
+I0808 00:54:57.575604 14142 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 00:54:57.575620 14142 model_repository_manager.cc:659] unloading: plan_zero_1_float32:1
+I0808 00:54:57.575680 14142 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 00:54:57.575679 14142 model_repository_manager.cc:761] successfully unloaded 'plan_zero_1_float32' version 1
+I0808 00:54:58.575808 14142 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests
