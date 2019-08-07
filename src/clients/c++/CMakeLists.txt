@@ -154,6 +154,20 @@ install(
 )
 
 #
+# simple_shm_client
+#
+add_executable(simple_shm_client simple_shm_client.cc)
+target_link_libraries(
+  simple_shm_client
+  PRIVATE request
+  rt
+)
+install(
+  TARGETS simple_shm_client
+  RUNTIME DESTINATION bin
+)
+
+#
 # simple_callback_client
 #
 add_executable(simple_callback_client simple_callback_client.cc)
