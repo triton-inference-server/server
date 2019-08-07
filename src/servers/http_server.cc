@@ -199,7 +199,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister|unregisterall|status)/([^/]+)/([^/]+)/([0-9]+)/([0-9]+))")
+            R"(/(register|unregister|unregisterall|status)(.*))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -541,14 +541,38 @@ HTTPAPIServer::HandleSharedMemoryControl(
     return;
   }
 
+  re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
+  re2::RE2 unregister_regex_(R"(/([^/]+))");
+
   std::string action_type_str, remaining, name, shm_key;
   std::string offset_str, byte_size_str;
   if ((sharedmemorycontrol_uri.empty()) ||
       (!RE2::FullMatch(
           sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
-          &name, &shm_key, &offset_str, &byte_size_str))) {
+          &remaining))) {
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
+  } else {
+    if (remaining.empty()) {
+      if ((action_type_str != "unregisterall") &&
+          (action_type_str != "status")) {
+        evhtp_send_reply(req, EVHTP_RES_BADREQ);
+        return;
+      }
+    } else {
+      if (action_type_str == "register" &&
+          (!RE2::FullMatch(
+              remaining, register_regex_, &name, &shm_key, &offset_str,
+              &byte_size_str))) {
+        evhtp_send_reply(req, EVHTP_RES_BADREQ);
+        return;
+      }
+      if (action_type_str == "unregister" &&
+          (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
+        evhtp_send_reply(req, EVHTP_RES_BADREQ);
+        return;
+      }
+    }
   }
 
   size_t offset = std::atoll(offset_str.c_str());
@@ -642,6 +666,7 @@ HTTPAPIServer::EVBufferToInput(
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
       if (io.has_shared_memory()) {
+        LOG_VERBOSE(1) << io.name() << " has shared memory";
         if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,

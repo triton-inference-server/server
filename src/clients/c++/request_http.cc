@@ -692,7 +692,7 @@ ModelControlHttpContextImpl::SendRequest(
   if (request_status_.code() == RequestStatusCode::INVALID) {
     request_status_.Clear();
     request_status_.set_code(RequestStatusCode::INTERNAL);
-    request_status_.set_msg("control request did not return status");
+    request_status_.set_msg("modelcontrol request did not return status");
   }
 
   return Error(request_status_);
@@ -734,6 +734,183 @@ ModelControlHttpContext::Create(
 {
   ctx->reset(static_cast<ModelControlContext*>(
       new ModelControlHttpContextImpl(server_url, headers, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
+class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
+ public:
+  SharedMemoryControlHttpContextImpl(
+      const std::string& url, const std::map<std::string, std::string>& headers,
+      bool verbose);
+  Error RegisterSharedMemory(
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size) override;
+  Error UnregisterSharedMemory(const std::string& name) override;
+  Error UnregisterAllSharedMemory() override;
+
+ private:
+  static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
+  Error SendRequest(
+      const std::string& action_str, const std::string& name,
+      const std::string& shm_key, const size_t offset, const size_t byte_size);
+
+  // URL for control endpoint on inference server.
+  const std::string url_;
+
+  // Custom HTTP headers
+  const std::map<std::string, std::string> headers_;
+
+  // RequestStatus received in server response
+  RequestStatus request_status_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
+    const std::string& url, const std::map<std::string, std::string>& headers,
+    bool verbose)
+    : url_(url + "/" + kSharedMemoryControlRESTEndpoint), headers_(headers),
+      verbose_(verbose)
+{
+}
+
+Error
+SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
+{
+  return SendRequest("register", name, shm_key, offset, byte_size);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
+    const std::string& name)
+{
+  return SendRequest("unregister", name, "", 0, 0);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
+{
+  return SendRequest("unregisterall", "", "", 0, 0);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::SendRequest(
+    const std::string& action_str, const std::string& name,
+    const std::string& shm_key, const size_t offset, const size_t byte_size)
+{
+  request_status_.Clear();
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error(
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+  }
+
+  // For unregisterall and status only action_str is needed
+  std::string full_url = url_ + "/" + action_str;
+  if (action_str == "register") {
+    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
+                "/" + std::to_string(byte_size);
+  } else if (action_str == "unregister") {
+    full_url += +"/" + name;
+  }
+
+  curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  // use POST method
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // response headers handled by ResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  // Must use long with curl_easy_getinfo
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  // Should have a request status, if not then create an error status.
+  if (request_status_.code() == RequestStatusCode::INVALID) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg(
+        "sharedmemorycontrol request did not return status");
+  }
+
+  return Error(request_status_);
+}
+
+size_t
+SharedMemoryControlHttpContextImpl::ResponseHeaderHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  SharedMemoryControlHttpContextImpl* ctx =
+      reinterpret_cast<SharedMemoryControlHttpContextImpl*>(userp);
+
+  char* buf = reinterpret_cast<char*>(contents);
+  size_t byte_size = size * nmemb;
+
+  size_t idx = strlen(kStatusHTTPHeader);
+  if ((idx < byte_size) && !strncasecmp(buf, kStatusHTTPHeader, idx)) {
+    while ((idx < byte_size) && (buf[idx] != ':')) {
+      ++idx;
+    }
+
+    if (idx < byte_size) {
+      std::string hdr(buf + idx + 1, byte_size - idx - 1);
+
+      if (!google::protobuf::TextFormat::ParseFromString(
+              hdr, &ctx->request_status_)) {
+        ctx->request_status_.Clear();
+      }
+    }
+  }
+
+  return byte_size;
+}
+
+Error
+SharedMemoryControlHttpContext::Create(
+    std::unique_ptr<SharedMemoryControlContext>* ctx,
+    const std::string& server_url,
+    const std::map<std::string, std::string>& headers, bool verbose)
+{
+  ctx->reset(static_cast<SharedMemoryControlContext*>(
+      new SharedMemoryControlHttpContextImpl(server_url, headers, verbose)));
   return Error::Success;
 }
 
@@ -1407,6 +1584,17 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     }
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
+    }
+
+    // set shared memory
+    if (reinterpret_cast<InputImpl*>(io.get())->IsSharedMemory()) {
+      auto rshared_memory = rinput->mutable_shared_memory();
+      rshared_memory->set_name(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
+      rshared_memory->set_offset(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
+      rshared_memory->set_byte_size(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryByteSize());
     }
   }
 

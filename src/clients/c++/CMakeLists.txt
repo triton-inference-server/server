@@ -109,7 +109,6 @@ install(
   RUNTIME DESTINATION bin
 )
 
-
 #
 # perf_client
 #
@@ -130,7 +129,7 @@ set(
   load_manager.h
 )
 
-add_executable(perf_client 
+add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_link_libraries(
   perf_client

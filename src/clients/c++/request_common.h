@@ -152,6 +152,10 @@ class InputImpl : public InferContext::Input {
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
+  const std::string& GetSharedMemoryName() const { return shm_name_; }
+  size_t GetSharedMemoryOffset() const { return shm_offset_; }
+  size_t GetSharedMemoryByteSize() const { return byte_size_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
 
@@ -161,6 +165,8 @@ class InputImpl : public InferContext::Input {
   Error Reset() override;
   Error SetRaw(const std::vector<uint8_t>& input) override;
   Error SetRaw(const uint8_t* input, size_t input_byte_size) override;
+  Error SetSharedMemory(
+      const std::string& name, size_t offset, size_t byte_size) override;
   Error SetFromString(const std::vector<std::string>& input) override;
 
   // Copy into 'buf' up to 'size' bytes of this input's data. Return
@@ -171,6 +177,10 @@ class InputImpl : public InferContext::Input {
 
   // Copy the pointer of the raw buffer at 'batch_idx' into 'buf'
   Error GetRaw(size_t batch_idx, const uint8_t** buf, size_t* byte_size) const;
+
+  // Copy the shared memory key, offset and batch_byte_size
+  Error GetSharedMemory(
+      std::string* name, size_t* offset, size_t* batch_byte_size);
 
   // Prepare to send this input as part of a request.
   Error PrepareForRequest();
@@ -195,6 +205,13 @@ class InputImpl : public InferContext::Input {
   // reallocs that could invalidate the pointer references into the
   // std::string objects.
   std::list<std::string> str_bufs_;
+
+  // Used only if working with Shared Memory
+  enum IOType { NONE, RAW, SHARED_MEMORY };
+  IOType io_type_;
+  std::string shm_name_;
+  size_t shm_offset_;
+  size_t shm_byte_size_;
 };
 
 //==============================================================================
@@ -202,7 +219,8 @@ class InputImpl : public InferContext::Input {
 class OutputImpl : public InferContext::Output {
  public:
   OutputImpl(const ModelOutput& mio)
-      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW)
+      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW),
+        io_type_(RAW)
   {
   }
   ~OutputImpl() = default;
@@ -210,6 +228,7 @@ class OutputImpl : public InferContext::Output {
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {
@@ -220,9 +239,20 @@ class OutputImpl : public InferContext::Output {
     result_format_ = result_format;
   }
 
+  Error Reset() override;
+  Error SetSharedMemory(
+      const std::string& name, size_t offset, size_t byte_size) override;
+
  private:
   const ModelOutput mio_;
   InferContext::Result::ResultFormat result_format_;
+
+  // Used only if working with Shared Memory
+  enum IOType { NONE, RAW, SHARED_MEMORY };
+  IOType io_type_;
+  std::string shm_name_;
+  size_t shm_offset_;
+  size_t shm_byte_size_;
 };
 
 //==============================================================================
