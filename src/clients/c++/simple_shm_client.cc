@@ -428,12 +428,22 @@ main(int argc, char** argv)
 
   // Unregister and cleanup shared memory
   if (use_shm_input) {
-    shared_memory_ctx->UnregisterSharedMemory("input_data");
+    err = shared_memory_ctx->UnregisterSharedMemory("input_data");
+    if (!err.IsOk()) {
+      std::cerr << "error: unable to unregister shared memory input region: "
+                << err << std::endl;
+      exit(1);
+    }
     UnmapSharedMemory(input0_shm, input_byte_size * 2);
     UnlinkSharedMemoryRegion("/input_simple");
   }
   if (use_shm_output) {
-    shared_memory_ctx->UnregisterSharedMemory("output_data");
+    err = shared_memory_ctx->UnregisterSharedMemory("output_data");
+    if (!err.IsOk()) {
+      std::cerr << "error: unable to unregister shared memory output region: "
+                << err << std::endl;
+      exit(1);
+    }
     UnmapSharedMemory(output0_shm, output_byte_size * 2);
     UnlinkSharedMemoryRegion("/output_simple");
   }
