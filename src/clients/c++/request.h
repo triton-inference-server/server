@@ -277,14 +277,9 @@ class InferContext {
     /// -1.
     virtual const DimsList& Dims() const = 0;
 
-    virtual bool IsSharedMemory() const = 0;
-    virtual const std::string& GetSharedMemoryName() const = 0;
-    virtual size_t GetSharedMemoryOffset() const = 0;
-    virtual size_t GetSharedMemoryByteSize() const = 0;
-
     /// Prepare this input to receive new tensor values. Forget any
-    /// existing values that were set by previous calls to
-    /// SetRaw().
+    /// existing values that were set by previous calls to SetSharedMemory()
+    /// or SetRaw().
     /// \return Error object indicating success or failure.
     virtual Error Reset() = 0;
 
@@ -338,10 +333,9 @@ class InferContext {
     /// Set tensor values for this input by reference into a shared memory
     /// region. The values are not copied and so the shared memory region and
     /// its contents must not be modified or destroyed until this input is no
-    /// longer needed (that is until the Run()
-    //// call(s) that use the input have completed). For batched inputs this
-    /// function must be called batch-size times to provide all tensor values
-    /// for a batch of this input.
+    /// longer needed (that is until the Run() call(s) that use the input have
+    /// For batched inputs, all tensor values must be contiguous in a single
+    /// shared memory region.
     /// \param name The user-given name for the registered shared memory
     /// region where the tensor values for this input is stored.
     /// \param offset The offset into the shared memory region upto the start
@@ -370,20 +364,26 @@ class InferContext {
     /// -1.
     virtual const DimsList& Dims() const = 0;
 
-    /// The values for this output are set by reference in a shared memory
-    /// region. The values are not copied and so the shared memory region and
-    /// its contents must not be modified or destroyed until this output is
-    /// ready (that is until after the Run() call(s) have written the output
-    /// completely). For batched outputs this function must be called batch-size
-    /// times to copy all tensor values for a batch of this output. \param name
-    /// The user-given name for the registered shared memory region where the
-    /// tensor values for this output should be stored. \param offset The offset
-    /// into the shared memory region upto the start of the output tensor
-    /// values. \param byte_size The size, in bytes of the output tensor data.
-    /// Must match the size expected by the output. \return Error object
-    /// indicating success or failure.
+    /// Indicate that the result values for this output should be placed in a
+    /// shared memory region instead of being returned in the inference
+    /// response. The shared memory region must not be modified or destroyed
+    //  until this output is ready (that is until after the Run() call(s) have
+    /// written the output completely). For batched outputs, all tensor values
+    /// are copied into a contiguous space in a single shared memory region.
+    /// \param name The user-given name for the registered shared memory region
+    /// where the tensor values for this output should be stored.
+    /// \param offset The offset into the shared memory region upto the start
+    /// of the output tensor values.
+    /// \param byte_size The size, in bytes of the output tensor data.
+    /// Must match the size expected by the output.
+    /// \return Error object indicating success or failure.
     virtual Error SetSharedMemory(
         const std::string& name, size_t offset, size_t byte_size) = 0;
+
+    /// Prepare this output to store new tensor values. Forget any
+    /// existing values that were set by previous calls to SetSharedMemory()
+    /// \return Error object indicating success or failure.
+    virtual Error Reset() = 0;
   };
 
   //==============
@@ -811,8 +811,8 @@ class SharedMemoryControlContext {
   virtual ~SharedMemoryControlContext() = 0;
 
   /// Register a shared memory region on the inference server. If the shared
-  /// memory region is already registered, it will return an error message
-  /// with the error code 'TRTSERVER_ERROR_ALEADY_EXISTS'.
+  /// memory region is already registered, it will return error
+  /// 'TRTSERVER_ERROR_ALEADY_EXISTS'.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \param shm_key The unique name of the location in shared memory being

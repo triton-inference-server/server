@@ -525,7 +525,6 @@ class InferGrpcContextImpl : public InferContextImpl {
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
       const std::shared_ptr<Request>& async_request, bool wait) override;
-  bool HasSharedMemory(std::string output_name) const;
 
  protected:
   virtual Error AsyncRun(
@@ -630,7 +629,6 @@ GrpcRequestImpl::GetResults(
 
     std::unique_ptr<GrpcResultImpl> result(
         new GrpcResultImpl(grpc_response_, infer_output));
-    // Check if output uses shared memory. If so handle differently
     err = InitResult(infer_output, output, idx, result.get());
 
     if (!err.IsOk()) {
@@ -849,11 +847,11 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     }
 
     // set shared memory
-    if (io->IsSharedMemory()) {
+    if (reinterpret_cast<InputImpl*>(io.get())->IsSharedMemory()) {
       auto rshared_memory = rinput->mutable_shared_memory();
-      rshared_memory->set_name(io->GetSharedMemoryName());
-      rshared_memory->set_offset(io->GetSharedMemoryOffset());
-      rshared_memory->set_byte_size(io->GetSharedMemoryByteSize());
+      rshared_memory->set_name(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
+      rshared_memory->set_offset(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
+      rshared_memory->set_byte_size(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryByteSize());
     }
   }
 
@@ -982,20 +980,6 @@ InferGrpcContext::Create(
   }
 
   return err;
-}
-
-bool
-InferGrpcContextImpl::HasSharedMemory(std::string output_name) const
-{
-  size_t output_pos_idx = 0;
-  while (output_pos_idx < outputs_.size()) {
-    OutputImpl* io =
-        reinterpret_cast<OutputImpl*>(outputs_[output_pos_idx].get());
-    if (io->Name() == output_name) {
-      return io->IsSharedMemory();
-    }
-  }
-  return false;
 }
 
 //==============================================================================

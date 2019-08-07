@@ -125,7 +125,7 @@ InferContext::Options::Create(std::unique_ptr<InferContext::Options>* options)
 
 InputImpl::InputImpl(const ModelInput& mio)
     : mio_(mio), total_byte_size_(0), needs_shape_(false), batch_size_(0),
-      bufs_idx_(0), buf_pos_(0), use_shm_(false)
+      bufs_idx_(0), buf_pos_(0), io_type_(NONE)
 {
   if (GetElementCount(mio) == -1) {
     byte_size_ = -1;
@@ -140,8 +140,8 @@ InputImpl::InputImpl(const InputImpl& obj)
       total_byte_size_(obj.total_byte_size_), needs_shape_(obj.needs_shape_),
       shape_(obj.shape_), batch_size_(obj.batch_size_), bufs_idx_(0),
       buf_pos_(0), bufs_(obj.bufs_), buf_byte_sizes_(obj.buf_byte_sizes_),
-      str_bufs_(obj.str_bufs_), use_shm_(obj.use_shm_), name_(obj.name_),
-      offset_(obj.offset_), shm_byte_size_(obj.shm_byte_size_)
+      str_bufs_(obj.str_bufs_), io_type_(obj.io_type_), shm_name_(obj.shm_name_),
+      shm_offset_(obj.shm_offset_), shm_byte_size_(obj.shm_byte_size_)
 {
 }
 
@@ -205,7 +205,7 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
 
   bufs_.push_back(input);
   buf_byte_sizes_.push_back(input_byte_size);
-  use_shm_ = false;
+  io_type_ = RAW;
 
   return Error::Success;
 }
@@ -220,11 +220,10 @@ Error
 InputImpl::SetSharedMemory(
     const std::string& name, size_t offset, size_t byte_size)
 {
-  name_ = name;
-  offset_ = offset;
+  shm_name_ = name;
+  shm_offset_ = offset;
   shm_byte_size_ = byte_size;
-  use_shm_ = true;
-  // total_byte_size_ += byte_size;
+  io_type_ = SHARED_MEMORY;
   return Error::Success;
 }
 
@@ -330,7 +329,7 @@ InputImpl::Reset()
   bufs_idx_ = 0;
   buf_pos_ = 0;
   total_byte_size_ = 0;
-
+  io_type_= NONE;
   return Error::Success;
 }
 
@@ -357,10 +356,17 @@ Error
 OutputImpl::SetSharedMemory(
     const std::string& name, size_t offset, size_t byte_size)
 {
-  name_ = name;
-  offset_ = offset;
+  shm_name_ = name;
+  shm_offset_ = offset;
   shm_byte_size_ = byte_size;
-  use_shm_ = true;
+  io_type_ = SHARED_MEMORY;
+  return Error::Success;
+}
+
+Error
+OutputImpl::Reset()
+{
+  io_type_= NONE;
   return Error::Success;
 }
 

@@ -103,7 +103,6 @@ target_link_libraries(
   image_client
   PRIVATE request
   PRIVATE ${OpenCV_LIBS}
-  rt
 )
 install(
   TARGETS image_client
