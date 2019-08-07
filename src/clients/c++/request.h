@@ -334,8 +334,9 @@ class InferContext {
     /// region. The values are not copied and so the shared memory region and
     /// its contents must not be modified or destroyed until this input is no
     /// longer needed (that is until the Run() call(s) that use the input have
-    /// For batched inputs, all tensor values must be contiguous in a single
-    /// shared memory region.
+    /// completed. This function must be called a single time for an input that
+    /// is using shared memory. For batched inputs, the tensor values for the
+    /// entire batch must be contiguous in a single shared memory region.
     /// \param name The user-given name for the registered shared memory
     /// region where the tensor values for this input is stored.
     /// \param offset The offset into the shared memory region upto the start

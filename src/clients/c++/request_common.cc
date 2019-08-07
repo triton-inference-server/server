@@ -140,8 +140,9 @@ InputImpl::InputImpl(const InputImpl& obj)
       total_byte_size_(obj.total_byte_size_), needs_shape_(obj.needs_shape_),
       shape_(obj.shape_), batch_size_(obj.batch_size_), bufs_idx_(0),
       buf_pos_(0), bufs_(obj.bufs_), buf_byte_sizes_(obj.buf_byte_sizes_),
-      str_bufs_(obj.str_bufs_), io_type_(obj.io_type_), shm_name_(obj.shm_name_),
-      shm_offset_(obj.shm_offset_), shm_byte_size_(obj.shm_byte_size_)
+      str_bufs_(obj.str_bufs_), io_type_(obj.io_type_),
+      shm_name_(obj.shm_name_), shm_offset_(obj.shm_offset_),
+      shm_byte_size_(obj.shm_byte_size_)
 {
 }
 
@@ -169,6 +170,13 @@ InputImpl::SetShape(const std::vector<int64_t>& dims)
 Error
 InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
 {
+  // If SetSharedMemory was called on this input already, return an error
+  if (io_type_ == SHARED_MEMORY) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "The input '" + Name() + "' has already been set with SetSharedMemory");
+  }
+
   if (needs_shape_) {
     bufs_.clear();
     buf_byte_sizes_.clear();
@@ -220,6 +228,20 @@ Error
 InputImpl::SetSharedMemory(
     const std::string& name, size_t offset, size_t byte_size)
 {
+  // If SetRaw was called on this input already, return an error
+  if (io_type_ == RAW) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "The input '" + Name() + "' has already been set with SetRaw");
+  }
+
+  // If SetSharedMemory was called on this input already, return an error
+  if (io_type_ == SHARED_MEMORY) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "The input '" + Name() + "' can only be set once with SetSharedMemory");
+  }
+
   shm_name_ = name;
   shm_offset_ = offset;
   shm_byte_size_ = byte_size;
@@ -329,7 +351,7 @@ InputImpl::Reset()
   bufs_idx_ = 0;
   buf_pos_ = 0;
   total_byte_size_ = 0;
-  io_type_= NONE;
+  io_type_ = NONE;
   return Error::Success;
 }
 
@@ -356,6 +378,13 @@ Error
 OutputImpl::SetSharedMemory(
     const std::string& name, size_t offset, size_t byte_size)
 {
+  // If SetSharedMemory was called on this output already, return an error
+  if (io_type_ == SHARED_MEMORY) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "The input '" + Name() + "' can only be set once with SetSharedMemory");
+  }
+
   shm_name_ = name;
   shm_offset_ = offset;
   shm_byte_size_ = byte_size;
@@ -366,7 +395,7 @@ OutputImpl::SetSharedMemory(
 Error
 OutputImpl::Reset()
 {
-  io_type_= NONE;
+  io_type_ = NONE;
   return Error::Success;
 }
 

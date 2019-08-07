@@ -152,7 +152,7 @@ class InputImpl : public InferContext::Input {
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
-  bool IsSharedMemory() const { return (io_type_== SHARED_MEMORY); }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   const std::string& GetSharedMemoryName() const { return shm_name_; }
   size_t GetSharedMemoryOffset() const { return shm_offset_; }
   size_t GetSharedMemoryByteSize() const { return byte_size_; }
@@ -228,7 +228,7 @@ class OutputImpl : public InferContext::Output {
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
-  bool IsSharedMemory() const { return (io_type_==SHARED_MEMORY); }
+  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {

@@ -1159,7 +1159,6 @@ HttpRequestImpl::CreateResult(
   }
 
   std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
-  // Check if output uses shared memory. If so handle differently
   result->SetBatch1Shape(output.raw().dims());
   if (IsFixedSizeDataType(infer_output->DType())) {
     result->SetBatchnByteSize(output.raw().batch_byte_size());
@@ -1590,9 +1589,12 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     // set shared memory
     if (reinterpret_cast<InputImpl*>(io.get())->IsSharedMemory()) {
       auto rshared_memory = rinput->mutable_shared_memory();
-      rshared_memory->set_name(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
-      rshared_memory->set_offset(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
-      rshared_memory->set_byte_size(reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryByteSize());
+      rshared_memory->set_name(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
+      rshared_memory->set_offset(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
+      rshared_memory->set_byte_size(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryByteSize());
     }
   }
 
