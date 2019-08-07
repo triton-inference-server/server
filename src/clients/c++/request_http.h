@@ -144,18 +144,38 @@ class ProfileHttpContext {
 ///
 class ModelControlHttpContext {
  public:
-  /// Create context that controls models to be loaded on a server and
-  /// to be unloaded from a server using HTTP
-  /// protocol.
+  /// Create context that controls models to be loaded on a server and to be
+  /// unloaded from a server using HTTP protocol.
   /// \param ctx Returns the new ModelControlContext object.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the control
-  /// request. The map key/value indicates the header name/value.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
+  /// \param headers Map of HTTP headers to use with the control request.
+  /// The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting the
+  /// inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
+      const std::map<std::string, std::string>& headers, bool verbose = false);
+};
+
+//==============================================================================
+//// SharedMemoryControlHttpContext is the HTTP instantiation of
+//// SharedMemoryControlContext.
+////
+class SharedMemoryControlHttpContext {
+ public:
+  /// Create context that controls registration / unregistration of shared
+  /// memory regions on the server using HTTP.
+  /// \param ctx Returns the new SharedMemoryControlContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the control request.
+  /// The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting the
+  /// inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<SharedMemoryControlContext>* ctx,
+      const std::string& server_url,
       const std::map<std::string, std::string>& headers, bool verbose = false);
 };
 

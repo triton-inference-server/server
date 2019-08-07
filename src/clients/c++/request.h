@@ -278,8 +278,8 @@ class InferContext {
     virtual const DimsList& Dims() const = 0;
 
     /// Prepare this input to receive new tensor values. Forget any
-    /// existing values that were set by previous calls to
-    /// SetRaw().
+    /// existing values that were set by previous calls to SetSharedMemory()
+    /// or SetRaw().
     /// \return Error object indicating success or failure.
     virtual Error Reset() = 0;
 
@@ -329,6 +329,23 @@ class InferContext {
     /// \param input The vector holding tensor string values.
     /// \return Error object indicating success or failure.
     virtual Error SetFromString(const std::vector<std::string>& input) = 0;
+
+    /// Set tensor values for this input by reference into a shared memory
+    /// region. The values are not copied and so the shared memory region and
+    /// its contents must not be modified or destroyed until this input is no
+    /// longer needed (that is until the Run() call(s) that use the input have
+    /// completed. This function must be called a single time for an input that
+    /// is using shared memory. For batched inputs, the tensor values for the
+    /// entire batch must be contiguous in a single shared memory region.
+    /// \param name The user-given name for the registered shared memory
+    /// region where the tensor values for this input is stored.
+    /// \param offset The offset into the shared memory region upto the start
+    /// of the input tensor values.
+    /// \param byte_size The size, in bytes of the input tensor data. Must
+    /// match the size expected by the input.
+    /// \return Error object indicating success or failure.
+    virtual Error SetSharedMemory(
+        const std::string& name, size_t offset, size_t byte_size) = 0;
   };
 
   //==============
@@ -347,6 +364,27 @@ class InferContext {
     /// model configuration. Variable-size dimensions are reported as
     /// -1.
     virtual const DimsList& Dims() const = 0;
+
+    /// Indicate that the result values for this output should be placed in a
+    /// shared memory region instead of being returned in the inference
+    /// response. The shared memory region must not be modified or destroyed
+    //  until this output is ready (that is until after the Run() call(s) have
+    /// written the output completely). For batched outputs, all tensor values
+    /// are copied into a contiguous space in a single shared memory region.
+    /// \param name The user-given name for the registered shared memory region
+    /// where the tensor values for this output should be stored.
+    /// \param offset The offset into the shared memory region upto the start
+    /// of the output tensor values.
+    /// \param byte_size The size, in bytes of the output tensor data.
+    /// Must match the size expected by the output.
+    /// \return Error object indicating success or failure.
+    virtual Error SetSharedMemory(
+        const std::string& name, size_t offset, size_t byte_size) = 0;
+
+    /// Prepare this output to store new tensor values. Forget any
+    /// existing values that were set by previous calls to SetSharedMemory()
+    /// \return Error object indicating success or failure.
+    virtual Error Reset() = 0;
   };
 
   //==============
@@ -715,7 +753,7 @@ class ProfileContext {
 /// can be used repeatedly.
 ///
 /// A ModelControlContext object can use either HTTP protocol or GRPC protocol
-/// depending on the Create function (ControlHttpContext::Create or
+/// depending on the Create function (ModelControlHttpContext::Create or
 /// ModelControlGrpcContext::Create). For example:
 ///
 /// \code
@@ -743,6 +781,60 @@ class ModelControlContext {
   /// \param model_name The name of the model to be unloaded.
   /// \return Error object indicating success or failure.
   virtual Error Unload(const std::string& model_name) = 0;
+};
+
+//==============================================================================
+/// A SharedMemoryControlContext object is used to control the registration /
+/// unregistration and get the status of shared memory regions on the inference
+/// server. Once created, a SharedMemoryControlContext object can be used
+/// repeatedly.
+///
+/// A SharedMemoryControlContext object can use either HTTP protocol or GRPC
+/// protocol depending on the Create function
+/// (SharedMemoryControlHttpContext::Create or
+/// SharedMemoryControlGrpcContext::Create). For example:
+///
+/// \code
+///   std::unique_ptr<SharedMemoryControlContext> ctx;
+///   SharedMemoryControlGrpcContext::Create(&ctx, "localhost:8000");
+///   std::string name = "shared_memory";
+///   std::string shm_key = "/input";
+///   ctx->RegisterSharedMemory(name, shm_key, 0, 104);
+///   ...
+///   ctx->UnregisterSharedMemory(name);
+///   ...
+///   ctx->UnregisterAllSharedMemory();
+///   ...
+/// \endcode
+///
+class SharedMemoryControlContext {
+ public:
+  virtual ~SharedMemoryControlContext() = 0;
+
+  /// Register a shared memory region on the inference server. If the shared
+  /// memory region is already registered, it will return error
+  /// 'TRTSERVER_ERROR_ALEADY_EXISTS'.
+  /// \param name The user-given name for the shared memory region to be
+  /// registered.
+  /// \param shm_key The unique name of the location in shared memory being
+  /// registered.
+  /// \param offset The offset into the shared memory region.
+  /// \param byte_size The size, in bytes of the tensor data.
+  /// \return Error object indicating success or failure.
+  virtual Error RegisterSharedMemory(
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size) = 0;
+
+  /// Unregister a registered shared memory region on the inference server. If
+  /// the shared memory region is not registered, do nothing and return success.
+  /// \param name The user-given name for the shared memory region to be
+  /// unregistered.
+  /// \return Error object indicating success or failure.
+  virtual Error UnregisterSharedMemory(const std::string& name) = 0;
+
+  /// Unregisters all registered shared memory regions on the inference server.
+  /// \return Error object indicating success or failure.
+  virtual Error UnregisterAllSharedMemory() = 0;
 };
 
 //==============================================================================

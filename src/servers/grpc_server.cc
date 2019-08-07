@@ -317,8 +317,15 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       TRTSERVER_InferenceRequestProvider* request_provider)
   {
     // Make sure that the request is providing the same number of raw
-    // input tensor data.
-    if (request_header.input_size() != request.raw_input_size()) {
+    // + shared memory input tensor data.
+    int shared_memory_input_count = 0;
+    for (const auto& io : request_header.input()) {
+      if (io.has_shared_memory()) {
+        shared_memory_input_count++;
+      }
+    }
+    if (request_header.input_size() !=
+        (request.raw_input_size() + shared_memory_input_count)) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
           std::string(
@@ -336,6 +343,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       const void* base;
       size_t byte_size;
       if (io.has_shared_memory()) {
+        LOG_VERBOSE(1) << io.name() << " has shared memory";
         TRTSERVER_SharedMemoryBlock* smb = nullptr;
         RETURN_IF_ERR(this->GetResources()->SharedMemoryManager()->Get(
             &smb, io.shared_memory().name()));

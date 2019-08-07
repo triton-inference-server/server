@@ -366,6 +366,105 @@ ModelControlGrpcContext::Create(
 }
 
 //==============================================================================
+
+class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
+ public:
+  SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
+  Error RegisterSharedMemory(
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size) override;
+  Error UnregisterSharedMemory(const std::string& name) override;
+  Error UnregisterAllSharedMemory() override;
+
+ private:
+  Error SendRequest(
+      const std::string& name, const SharedMemoryControlRequest::Type action,
+      const std::string& shm_key, const size_t offset, const size_t byte_size);
+
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
+{
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
+    const std::string& name, const std::string& shm_key, const size_t offset,
+    const size_t byte_size)
+{
+  return SendRequest(
+      name, SharedMemoryControlRequest::REGISTER, shm_key, offset, byte_size);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
+    const std::string& name)
+{
+  return SendRequest(name, SharedMemoryControlRequest::UNREGISTER, "", 0, 0);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
+{
+  return SendRequest("", SharedMemoryControlRequest::UNREGISTER_ALL, "", 0, 0);
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::SendRequest(
+    const std::string& name, const SharedMemoryControlRequest::Type action,
+    const std::string& shm_key, const size_t offset, const size_t byte_size)
+{
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+
+  if (action == SharedMemoryControlRequest::REGISTER) {
+    auto rshm_region = request.mutable_shared_memory_region();
+    rshm_region->set_name(name);
+    rshm_region->set_shm_key(shm_key);
+    rshm_region->set_offset(offset);
+    rshm_region->set_byte_size(byte_size);
+    request.set_type(action);
+  } else if (action == SharedMemoryControlRequest::UNREGISTER) {
+    auto rshm_region = request.mutable_shared_memory_region();
+    rshm_region->set_name(name);
+    request.set_type(action);
+  } else if (action == SharedMemoryControlRequest::UNREGISTER_ALL) {
+    request.set_type(action);
+  }
+
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+
+Error
+SharedMemoryControlGrpcContext::Create(
+    std::unique_ptr<SharedMemoryControlContext>* ctx,
+    const std::string& server_url, bool verbose)
+{
+  ctx->reset(static_cast<SharedMemoryControlContext*>(
+      new SharedMemoryControlGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
 class GrpcResultImpl : public ResultImpl {
  public:
   GrpcResultImpl(
@@ -531,11 +630,11 @@ GrpcRequestImpl::GetResults(
     std::unique_ptr<GrpcResultImpl> result(
         new GrpcResultImpl(grpc_response_, infer_output));
     err = InitResult(infer_output, output, idx, result.get());
+
     if (!err.IsOk()) {
       results->clear();
       return err;
     }
-
     results->insert(std::make_pair(output.name(), std::move(result)));
     ++idx;
   }
@@ -746,6 +845,17 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     if (!IsFixedSizeDataType(io->DType())) {
       rinput->set_batch_byte_size(io->TotalByteSize());
     }
+
+    // set shared memory
+    if (reinterpret_cast<InputImpl*>(io.get())->IsSharedMemory()) {
+      auto rshared_memory = rinput->mutable_shared_memory();
+      rshared_memory->set_name(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
+      rshared_memory->set_offset(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
+      rshared_memory->set_byte_size(
+          reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryByteSize());
+    }
   }
 
   request_.Clear();
@@ -756,15 +866,17 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   size_t input_pos_idx = 0;
   while (input_pos_idx < inputs_.size()) {
     InputImpl* io = reinterpret_cast<InputImpl*>(inputs_[input_pos_idx].get());
-    std::string* new_input = request_.add_raw_input();
 
-    // Append all batches of one input together
-    for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
-      const uint8_t* data_ptr;
-      size_t data_byte_size;
-      io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
-      new_input->append(
-          reinterpret_cast<const char*>(data_ptr), data_byte_size);
+    // Append all batches of one input together (skip if using shared memory)
+    if (!io->IsSharedMemory()) {
+      std::string* new_input = request_.add_raw_input();
+      for (size_t batch_idx = 0; batch_idx < batch_size_; batch_idx++) {
+        const uint8_t* data_ptr;
+        size_t data_byte_size;
+        io->GetRaw(batch_idx, &data_ptr, &data_byte_size);
+        new_input->append(
+            reinterpret_cast<const char*>(data_ptr), data_byte_size);
+      }
     }
     input_pos_idx++;
   }
