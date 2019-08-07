@@ -27,14 +27,14 @@
 
 LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 
-DATADIR=/data/inferenceserver/libtorch_validation_store
+DATADIR=/data/inferenceserver/libtorch_model_store2
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-store=$DATADIR
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-/opt/tensorrtserver/bin/trtserver --model-store=/data/inferenceserver/libtorch_validation_store &
+/opt/tensorrtserver/bin/trtserver --model-store=/data/inferenceserver/libtorch_model_store2 &
 SERVER_PID=$!
 sleep 30
 
