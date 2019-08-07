@@ -130,6 +130,10 @@ under-development version)::
 Ubuntu 16.04 / Ubuntu 18.04
 ...........................
 
+For Ubuntu, the dependencies and how to install them can be found in
+Dockerfile.client. Also note that the dependency name may be different
+depending on the version of the system.
+
 To build on Ubuntu, change to the build/ directory and run the
 following to configure and build::
 
@@ -138,12 +142,32 @@ following to configure and build::
   $ make -j8 trtis-clients
 
 When the build completes the libraries and examples can be found in
-trtis-clients/install.
+trtis-clients/install. To use the examples, you need to include the path to
+the client library in environment variable "LD_LIBRARY_PATH", by default it is
+/path/to/tensorrtserver/repo/build/trtis-clients/install/lib. In addition to
+that, you also need to install the tensorrtserver Python package and
+other packages required by the examples::
+
+  $ pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
 
 Windows 10
 ..........
 
-If you are building the client for Windows, as there are no default
+For Windows, the dependencies can be installed using pip
+and `vcpkg<https://github.com/Microsoft/vcpkg>`_ which is a C++ library
+management tool on Windows. The following shows how to install the dependencies
+using them, and you can also install the dependencies in other ways that you
+prefer::
+
+  > .\vcpkg.exe install curl[openssl]:x64-windows
+  > pip install grpcio-tools wheel
+
+The vcpkg step above installs curl and openssl, ":x64-windows" specifies the
+target and it is optional. The path to the libraries should be added to
+environment variable "PATH", by default it is
+\path\to\vcpkg\installed\<target>\bin.
+
+To build the client for Windows, as there is no default
 build system available, you will need to specify the generator for
 CMake to match the build system you are using. For instance, if you
 are using Microsoft Visual Studio, you should do the following::
@@ -155,7 +179,11 @@ are using Microsoft Visual Studio, you should do the following::
 When the build completes the libraries and examples can be found in
 trtis-clients/install. The C++ client examples will not be generated
 as those examples have not yet been ported to Windows. However, you
-can use the Python examples to test if the build is successful.
+can use the Python examples to test if the build is successful. To use
+the Python examples, you need to install the tensorrtserver Python package
+and other packages required by the examples::
+
+  > pip install trtis-clients/install/python/tensorrtserver-*.whl numpy pillow
 
 .. build-client-end-marker-do-not-remove
 
