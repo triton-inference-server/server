@@ -111,19 +111,6 @@ else()
 endif()
 
 #
-# Build zlib project from grpc-repo
-#
-ExternalProject_Add(zlib
-  PREFIX zlib
-  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc-repo/src/grpc/third_party/zlib"
-  DOWNLOAD_COMMAND ""
-  CMAKE_CACHE_ARGS
-    -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/zlib
-  DEPENDS grpc-repo
-)
-
-#
 # Build c-area project from grpc-repo
 #
 ExternalProject_Add(c-ares
@@ -153,14 +140,13 @@ ExternalProject_Add(grpc
     -DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -DgRPC_ZLIB_PROVIDER:STRING=package
-    -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     -DgRPC_CARES_PROVIDER:STRING=package
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     -DgRPC_SSL_PROVIDER:STRING=package
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
-  DEPENDS grpc-repo c-ares protobuf zlib
+  DEPENDS grpc-repo c-ares protobuf
 )
 
 #
@@ -296,7 +282,6 @@ ExternalProject_Add(trtis-custom-backends
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
@@ -323,7 +308,6 @@ ExternalProject_Add(trtis-clients
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DTRTIS_ENABLE_METRICS:BOOL=OFF
@@ -363,7 +347,6 @@ ExternalProject_Add(trtis
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
-    -DZLIB_ROOT:STRING=${CMAKE_CURRENT_BINARY_DIR}/zlib
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
