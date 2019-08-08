@@ -268,6 +268,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
                   -DTRTIS_ENABLE_GCS=ON\
+                  -DTRTIS_ENABLE_S3=ON\
                   -DTRTIS_ENABLE_CUSTOM=ON \
                   -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=ON \
@@ -283,6 +284,8 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
+            # Copy aws-sdk-cpp libs to opt/tensorrtserver/lib
+            cp aws-sdk-cpp/install/lib/lib* /opt/tensorrtserver/lib/ && \
     (cd /opt/tensorrtserver && ln -sf /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
