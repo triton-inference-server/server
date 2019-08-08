@@ -59,6 +59,9 @@ rm -fr ./custom_models && mkdir ./custom_models && \
 
 PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
     [ $PERF_CLIENT_PROTOCOL != "grpc" ] && PERF_CLIENT_PROTOCOL_ARGS=""
+PERF_CLIENT_PERCENTILE_ARGS="" &&
+    (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
+    PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
 
 #
 # Use "identity" model for all model types.
@@ -115,7 +118,7 @@ for BACKEND in $BACKENDS; do
     $PERF_CLIENT -v -d \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                 --percentile=${PERF_CLIENT_PERCENTILE} \
+                 ${PERF_CLIENT_PERCENTILE_ARGS} \
                  ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -l${MAX_LATENCY} -c${MAX_CONCURRENCY} \
                  -f ${RESULTDIR}/${NAME}.csv >> ${RESULTDIR}/${NAME}.log 2>&1

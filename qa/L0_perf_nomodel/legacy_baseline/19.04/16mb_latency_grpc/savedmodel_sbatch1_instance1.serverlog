@@ -1,0 +1,51 @@
+I0808 18:24:46.961933 7399 main.cc:138] Starting endpoints, 'inference:0' listening on
+I0808 18:24:46.962011 7399 main.cc:142]  localhost:8001 for gRPC requests
+I0808 18:24:46.962127 7399 grpc_server.cc:258] Building nvrpc server
+I0808 18:24:46.962140 7399 grpc_server.cc:264] Register TensorRT GRPCService
+I0808 18:24:46.962149 7399 grpc_server.cc:267] Register Infer RPC
+I0808 18:24:46.962154 7399 grpc_server.cc:271] Register StreamInfer RPC
+I0808 18:24:46.962159 7399 grpc_server.cc:276] Register Status RPC
+I0808 18:24:46.962164 7399 grpc_server.cc:280] Register Profile RPC
+I0808 18:24:46.962169 7399 grpc_server.cc:284] Register Health RPC
+I0808 18:24:46.962174 7399 grpc_server.cc:296] Register Executor
+I0808 18:24:46.964803 7399 main.cc:153]  localhost:8000 for HTTP requests
+I0808 18:24:47.006613 7399 main.cc:165]  localhost:8002 for metric reporting
+I0808 18:24:47.010338 7399 metrics.cc:150] found 1 GPUs supporting NVML metrics
+I0808 18:24:47.016520 7399 metrics.cc:159]   GPU 0: TITAN RTX
+I0808 18:24:47.017182 7399 server.cc:241] Initializing TensorRT Inference Server
+I0808 18:24:47.042750 7399 server_status.cc:105] New status tracking for model 'savedmodel_zero_1_float32'
+I0808 18:24:47.042866 7399 server_core.cc:465] Adding/updating models.
+I0808 18:24:47.042877 7399 server_core.cc:562]  (Re-)adding model: savedmodel_zero_1_float32
+I0808 18:24:47.143272 7399 basic_manager.cc:739] Successfully reserved resources to load servable {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:24:47.143324 7399 loader_harness.cc:66] Approving load for servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:24:47.143350 7399 loader_harness.cc:74] Loading servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:24:47.144568 7399 base_bundle.cc:162] Creating instance savedmodel_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.savedmodel
+I0808 18:24:47.144627 7399 reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+I0808 18:24:47.144791 7399 reader.cc:54] Reading meta graph with tags { serve }
+I0808 18:24:47.244725 7399 gpu_device.cc:1433] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+totalMemory: 23.62GiB freeMemory: 23.45GiB
+I0808 18:24:47.244756 7399 gpu_device.cc:1512] Adding visible gpu devices: 0
+I0808 18:24:49.363403 7399 gpu_device.cc:984] Device interconnect StreamExecutor with strength 1 edge matrix:
+I0808 18:24:49.363431 7399 gpu_device.cc:990]      0 
+I0808 18:24:49.363437 7399 gpu_device.cc:1003] 0:   N 
+I0808 18:24:49.363561 7399 gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22389 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0808 18:24:49.380507 7399 service.cc:161] XLA service 0x7ff215c85d20 executing computations on platform CUDA. Devices:
+I0808 18:24:49.380524 7399 service.cc:168]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+I0808 18:24:49.382821 7399 cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+I0808 18:24:49.383499 7399 service.cc:161] XLA service 0x7ff215ce6ca0 executing computations on platform Host. Devices:
+I0808 18:24:49.383512 7399 service.cc:168]   StreamExecutor device (0): <undefined>, <undefined>
+I0808 18:24:49.384680 7399 loader.cc:183] Restoring SavedModel bundle.
+I0808 18:24:49.384756 7399 loader.cc:193] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+I0808 18:24:49.384785 7399 loader.cc:298] SavedModel load for tags { serve }; Status: success. Took 2240160 microseconds.
+I0808 18:24:49.384959 7399 loader_harness.cc:86] Successfully loaded servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:25:25.975631 7399 main.cc:86] Interrupt signal (15) received.
+I0808 18:25:25.975680 7399 server.cc:349] Waiting for in-flight inferences to complete.
+I0808 18:25:25.975717 7399 server_core.cc:465] Adding/updating models.
+I0808 18:25:25.975743 7399 server.cc:368] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 18:25:25.980382 7399 loader_harness.cc:137] Quiescing servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:25:25.980412 7399 loader_harness.cc:144] Done quiescing servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:25:25.980423 7399 loader_harness.cc:119] Unloading servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:25:25.980541 7399 loader_harness.cc:127] Done unloading servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 18:25:26.975867 7399 server.cc:368] Timeout 29: Found 0 live models and 0 in-flight requests

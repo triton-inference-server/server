@@ -26,13 +26,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Descriptive name for the current results
-UNDERTEST_NAME=${TENSORRT_SERVER_VERSION}
+UNDERTEST_NAME=${NVIDIA_TENSORRT_SERVER_VERSION}
 
 # Subdirectory containing results to compare against.
 BASELINE_DIR=baseline
 
-# Confidence percentile to use when stabilizing and reporting results.
-PERF_CLIENT_PERCENTILE=95
+# Confidence percentile to use when stabilizing and reporting
+# results. A value of 0 indicates that average value should be used
+# for stabilizing results.
+PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 
 # Threshold, as a percentage, to mark any performance change as a
 # speedup or a slowdown.

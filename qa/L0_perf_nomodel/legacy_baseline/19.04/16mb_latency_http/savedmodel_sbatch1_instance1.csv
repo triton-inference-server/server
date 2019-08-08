@@ -1,0 +1,3 @@
+Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute,Client Recv
+1,9,16656,9057,44,19508,61943
+2,17,16383,13750,4137,17337,63546

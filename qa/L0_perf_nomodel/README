@@ -1,0 +1,28 @@
+The test.sh script collects performance results using the trtserver in
+this container and then compares it against the results in the
+'baseline' directory.
+
+
+Legacy Comparison
+-----------------
+
+The results shown in directory 'legacy_baseline' are for older
+versions of trtserver and so may not contain complete results or may
+require special handling for comparison.
+
+legacy_baseline/19.04:
+
+  Results from 1.1.0 / 19.04 release. ONNX and PyTorch were not
+  available in this release and so are not available. 19.04
+  perf_client was used to generate the results and so latencies are
+  average and so cannot be compared directly to 'baseline' results
+  (which are generated with p95 by default). To compare to this
+  baseline need to use PERF_CLIENT_PERCENTILE=0 to generate under-test
+  results that stabilize using average latency.
+
+  $ # generate results using average latency to stabilize
+  $ # ignore analysis results
+  $ PERF_CLIENT_PERCENTILE=0 bash -x test.sh
+
+  $ # Show for min_latency_grpc, repeat for others...
+  $ perf_analysis.py --name='Compare to 19.04' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.04 --baseline=legacy_baseline/19.04/min_latency_grpc --undertest-name=${NVIDIA_TENSORRT_SERVER_VERSION} --undertest=min_latency_grpc
