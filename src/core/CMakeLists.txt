@@ -204,4 +204,4 @@ if(${TRTIS_ENABLE_S3})
     server-library
     PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-s3,INTERFACE_INCLUDE_DIRECTORIES>
   )
-endif() # TRTIS_ENABLE_S3>>>>>>> Add support for S3 filesystem
+endif() # TRTIS_ENABLE_S3
