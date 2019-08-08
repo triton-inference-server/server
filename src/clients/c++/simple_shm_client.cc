@@ -63,7 +63,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-      << "If neither -I and -O are set shared memory is used for both."
+      << "If neither -I or -O are set, use shared memory only for inputs."
       << std::endl;
 
   exit(1);
@@ -125,7 +125,7 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
 int
 main(int argc, char** argv)
 {
-  bool verbose = false, use_shm_input = true, use_shm_output = true;
+  bool verbose = false, use_shm_input = true, use_shm_output = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
   std::map<std::string, std::string> http_headers;
@@ -144,14 +144,10 @@ main(int argc, char** argv)
         url = optarg;
         break;
       case 'I':
-        use_shm_output = false;
+        use_shm_input = true;
         break;
       case 'O': {
-        use_shm_input = false;
-        if (!use_shm_output) {
-          use_shm_input = true;
-          use_shm_output = true;
-        }
+        use_shm_output = true;
         break;
       }
       case '?':
