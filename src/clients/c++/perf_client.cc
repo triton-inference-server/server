@@ -570,6 +570,7 @@ main(int argc, char** argv)
       err = perfclient::Report(
           status_summary, concurrent_request_count, percentile, protocol,
           verbose);
+      summary.push_back(status_summary);
     }
   } else {
     for (size_t count = concurrent_request_count;
