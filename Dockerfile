@@ -284,8 +284,6 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
-            # Copy aws-sdk-cpp libs to opt/tensorrtserver/lib
-            cp aws-sdk-cpp/install/lib/lib* /opt/tensorrtserver/lib/ && \
     (cd /opt/tensorrtserver && ln -sf /workspace/qa qa)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}

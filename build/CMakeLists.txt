@@ -268,7 +268,7 @@ ExternalProject_Add(aws-sdk-cpp
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/src/aws-sdk-cpp"
   CMAKE_CACHE_ARGS
     -DBUILD_ONLY:STRING=s3
-    -DBUILD_SHARED_LIBS:BOOL=ON
+    -DBUILD_SHARED_LIBS:BOOL=OFF
     -DMINIMIZE_SIZE:BOOL=ON
     -DENABLE_TESTING:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
@@ -363,6 +363,9 @@ set(TRTIS_DEPENDS protobuf)
 if(${TRTIS_ENABLE_GCS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} google-cloud-cpp)
 endif() # TRTIS_ENABLE_GCS
+if(${TRTIS_ENABLE_S3})
+  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
+endif() # TRTIS_ENABLE_S3
 if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} libevent libevhtp)
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
@@ -373,14 +376,9 @@ if(${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
 endif() # TRTIS_ENABLE_METRICS
 
-if(${TRTIS_ENABLE_S3})
-  set(TRTIS_DEPENDS ${TRTIS_DEPENDS} aws-sdk-cpp)
-endif() # TRTIS_ENABLE_S3
-
 set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
     ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib
-    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-s3
-    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-core)
+    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake)
 
 ExternalProject_Add(trtis
   PREFIX trtis
@@ -398,7 +396,6 @@ ExternalProject_Add(trtis
     -Dprometheus-cpp_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/prometheus-cpp/install/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
-    -DAWSSDK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/AWSSDK
     -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
     -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}

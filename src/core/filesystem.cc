@@ -837,7 +837,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #endif  // TRTIS_ENABLE_GCS
   }
 
-  // Check if this is a GCS path (gs://$BUCKET_NAME)
+  // Check if this is an S3 path (s3://$BUCKET_NAME)
   if (!path.empty() && !path.rfind("s3://", 0)) {
 #ifndef TRTIS_ENABLE_S3
     return Status(
@@ -854,7 +854,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #endif  // TRTIS_ENABLE_S3
   }
 
-  // For now assume all paths are local...
+  // Assume path is for local filesystem
   static LocalFileSystem local_fs;
   *file_system = &local_fs;
 

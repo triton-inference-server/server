@@ -30,7 +30,7 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
-# Google cloud variables (Point to bucket when testing cloud storage)
+# S3 bucket path (Point to bucket when testing cloud storage)
 
 BUCKET_URL="s3://bucket"
 
