@@ -1,0 +1,51 @@
+I0808 20:37:54.058937 2500 main.cc:267] Starting endpoints, 'inference:0' listening on
+I0808 20:37:54.059011 2500 main.cc:271]  localhost:8001 for gRPC requests
+I0808 20:37:54.059139 2500 grpc_server.cc:265] Building nvrpc server
+I0808 20:37:54.059151 2500 grpc_server.cc:272] Register TensorRT GRPCService
+I0808 20:37:54.059166 2500 grpc_server.cc:275] Register Infer RPC
+I0808 20:37:54.059170 2500 grpc_server.cc:279] Register StreamInfer RPC
+I0808 20:37:54.059175 2500 grpc_server.cc:284] Register Status RPC
+I0808 20:37:54.059179 2500 grpc_server.cc:288] Register Profile RPC
+I0808 20:37:54.059183 2500 grpc_server.cc:292] Register Health RPC
+I0808 20:37:54.059188 2500 grpc_server.cc:304] Register Executor
+I0808 20:37:54.064332 2500 main.cc:282]  localhost:8000 for HTTP requests
+I0808 20:37:54.105787 2500 main.cc:294]  localhost:8002 for metric reporting
+I0808 20:37:54.108457 2500 metrics.cc:149] found 1 GPUs supporting NVML metrics
+I0808 20:37:54.114372 2500 metrics.cc:158]   GPU 0: TITAN RTX
+I0808 20:37:54.115035 2500 server.cc:243] Initializing TensorRT Inference Server
+I0808 20:37:54.140260 2500 server_status.cc:106] New status tracking for model 'savedmodel_zero_1_float32'
+2019-08-08 20:37:54.140401: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+2019-08-08 20:37:54.140428: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:562]  (Re-)adding model: savedmodel_zero_1_float32
+2019-08-08 20:37:54.240812: I external/tf_serving/tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: savedmodel_zero_1_float32 version: 1}
+2019-08-08 20:37:54.240874: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: savedmodel_zero_1_float32 version: 1}
+2019-08-08 20:37:54.240909: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 20:37:54.242137 2500 base_bundle.cc:162] Creating instance savedmodel_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-08-08 20:37:54.242206: I external/org_tensorflow/tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-08-08 20:37:54.242409: I external/org_tensorflow/tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-08-08 20:37:54.337262: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1433] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+totalMemory: 23.62GiB freeMemory: 23.45GiB
+2019-08-08 20:37:54.337301: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1512] Adding visible gpu devices: 0
+2019-08-08 20:37:56.381128: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:984] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-08-08 20:37:56.381176: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:990]      0 
+2019-08-08 20:37:56.381183: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1003] 0:   N 
+2019-08-08 20:37:56.381329: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22387 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-08-08 20:37:56.396732: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:161] XLA service 0x7fa96a0cd530 executing computations on platform CUDA. Devices:
+2019-08-08 20:37:56.396756: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:168]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+2019-08-08 20:37:56.398862: I external/org_tensorflow/tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+2019-08-08 20:37:56.399442: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:161] XLA service 0x7fa96a134070 executing computations on platform Host. Devices:
+2019-08-08 20:37:56.399467: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:168]   StreamExecutor device (0): <undefined>, <undefined>
+2019-08-08 20:37:56.401595: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:183] Restoring SavedModel bundle.
+2019-08-08 20:37:56.402231: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:193] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-08-08 20:37:56.402259: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:298] SavedModel load for tags { serve }; Status: success. Took 2160057 microseconds.
+2019-08-08 20:37:56.402371: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:86] Successfully loaded servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 20:38:33.024853 2500 main.cc:213] Interrupt signal (15) received.
+I0808 20:38:33.024909 2500 server.cc:351] Waiting for in-flight inferences to complete.
+2019-08-08 20:38:33.024943: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+I0808 20:38:33.025018 2500 server.cc:370] Timeout 30: Found 1 live models and 0 in-flight requests
+2019-08-08 20:38:33.073103: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:137] Quiescing servable version {name: savedmodel_zero_1_float32 version: 1}
+2019-08-08 20:38:33.073160: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:144] Done quiescing servable version {name: savedmodel_zero_1_float32 version: 1}
+2019-08-08 20:38:33.073177: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:119] Unloading servable version {name: savedmodel_zero_1_float32 version: 1}
+2019-08-08 20:38:33.073332: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:127] Done unloading servable version {name: savedmodel_zero_1_float32 version: 1}
+I0808 20:38:34.025177 2500 server.cc:370] Timeout 29: Found 0 live models and 0 in-flight requests

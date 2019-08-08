@@ -1,0 +1,39 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Reporting 95-th percentile latency
+
+Request concurrency: 1
+  Pass [1] throughput: 6589 infer/sec. 95-th percentile latency: 166 usec
+  Pass [2] throughput: 6558 infer/sec. 95-th percentile latency: 173 usec
+  Pass [3] throughput: 6731 infer/sec. 95-th percentile latency: 159 usec
+  Client: 
+    Request count: 33657
+    Throughput: 6731 infer/sec
+    95-th percentile latency: 159 usec
+    Avg gRPC time: 143 usec (marshal 1 usec + response wait 140 usec + unmarshal 2 usec)
+  Server: 
+    Request count: 40213
+    Avg request latency: 80 usec (overhead 8 usec + queue 8 usec + compute 64 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 12888 infer/sec. 95-th percentile latency: 187 usec
+  Pass [2] throughput: 12718 infer/sec. 95-th percentile latency: 186 usec
+  Pass [3] throughput: 12830 infer/sec. 95-th percentile latency: 181 usec
+  Client: 
+    Request count: 64154
+    Throughput: 12830 infer/sec
+    95-th percentile latency: 181 usec
+    Avg gRPC time: 147 usec (marshal 1 usec + response wait 145 usec + unmarshal 1 usec)
+  Server: 
+    Request count: 77638
+    Avg request latency: 77 usec (overhead 6 usec + queue 19 usec + compute 52 usec)
+
+Inferences/Second vs. Client 95-th Percentile Batch Latency
+Concurrency: 1, 6731 infer/sec, latency 159 usec
+Concurrency: 2, 12830 infer/sec, latency 181 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4915  100  4915    0     0  4485k      0 --:--:-- --:--:-- --:--:-- 4799k
