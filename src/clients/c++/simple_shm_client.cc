@@ -58,12 +58,9 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
-  std::cerr << "\t-I use shared memory for Inputs" << std::endl;
-  std::cerr << "\t-O use shared memory for Outputs" << std::endl;
   std::cerr << std::endl;
   std::cerr
       << "For -i, available protocols are 'grpc' and 'http'. Default is 'http."
-      << "If neither -I or -O are set, use shared memory only for inputs."
       << std::endl;
 
   exit(1);
@@ -125,14 +122,14 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
 int
 main(int argc, char** argv)
 {
-  bool verbose = false, use_shm_input = true, use_shm_output = false;
+  bool verbose = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
   std::map<std::string, std::string> http_headers;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:IO")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -143,13 +140,6 @@ main(int argc, char** argv)
       case 'u':
         url = optarg;
         break;
-      case 'I':
-        use_shm_input = true;
-        break;
-      case 'O': {
-        use_shm_output = true;
-        break;
-      }
       case '?':
         Usage(argv);
         break;
@@ -246,19 +236,17 @@ main(int argc, char** argv)
 
   // Create the shared memory control context
   std::unique_ptr<nic::SharedMemoryControlContext> shared_memory_ctx;
-  if (use_shm_input || use_shm_output) {
-    if (protocol == "http") {
-      err = nic::SharedMemoryControlHttpContext::Create(
-          &shared_memory_ctx, url, http_headers, verbose);
-    } else {
-      err = nic::SharedMemoryControlGrpcContext::Create(
-          &shared_memory_ctx, url, verbose);
-    }
-    if (!err.IsOk()) {
-      std::cerr << "error: unable to create shared memory control context: "
-                << err << std::endl;
-      exit(1);
-    }
+  if (protocol == "http") {
+    err = nic::SharedMemoryControlHttpContext::Create(
+        &shared_memory_ctx, url, http_headers, verbose);
+  } else {
+    err = nic::SharedMemoryControlGrpcContext::Create(
+        &shared_memory_ctx, url, verbose);
+  }
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to create shared memory control context: "
+              << err << std::endl;
+    exit(1);
   }
 
   std::shared_ptr<nic::InferContext::Input> input0, input1;
@@ -276,90 +264,64 @@ main(int argc, char** argv)
   size_t input_byte_size = 16 * sizeof(int32_t);
   size_t output_byte_size = 16 * sizeof(int32_t);
 
-  std::vector<int32_t> input0_data(16);
-  std::vector<int32_t> input1_data(16);
-  int *input0_shm = nullptr, *input1_shm = nullptr;
-  int *output0_shm = nullptr, *output1_shm = nullptr;
-  int shm_fd_ip, shm_fd_op;
-
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
-  if (use_shm_input) {
-    std::string shm_key = "/input_simple";
-    shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
-    input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
-    input1_shm = (int*)(input0_shm + 16);
-    for (size_t i = 0; i < 16; ++i) {
-      *(input0_shm + i) = i;
-      *(input1_shm + i) = 1;
-    }
-    // Register Input shared memory with TRTIS
-    err = shared_memory_ctx->RegisterSharedMemory(
-        "input_data", "/input_simple", 0, input_byte_size * 2);
-    if (!err.IsOk()) {
-      std::cerr << "error: unable to register shared memory input region: "
-                << err << std::endl;
-      exit(1);
-    }
-
-    // Set the shared memory region for Inputs
-    err = input0->SetSharedMemory("input_data", 0, input_byte_size);
-    if (!err.IsOk()) {
-      std::cerr << "failed setting shared memory input: " << err << std::endl;
-      exit(1);
-    }
-    err =
-        input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
-    if (!err.IsOk()) {
-      std::cerr << "failed setting shared memory input: " << err << std::endl;
-      exit(1);
-    }
-  } else {
-    for (size_t i = 0; i < 16; ++i) {
-      input0_data[i] = i;
-      input1_data[i] = 1;
-    }
-
-    FAIL_IF_ERR(
-        input0->SetRaw(
-            reinterpret_cast<uint8_t*>(&input0_data[0]),
-            input0_data.size() * sizeof(int32_t)),
-        "unable to set data for INPUT0");
-    FAIL_IF_ERR(
-        input1->SetRaw(
-            reinterpret_cast<uint8_t*>(&input1_data[0]),
-            input1_data.size() * sizeof(int32_t)),
-        "unable to set data for INPUT1");
+  std::string shm_key = "/input_simple";
+  int shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
+  int* input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
+  int* input1_shm = (int*)(input0_shm + 16);
+  for (size_t i = 0; i < 16; ++i) {
+    *(input0_shm + i) = i;
+    *(input1_shm + i) = 1;
+  }
+  // Register Input shared memory with TRTIS
+  err = shared_memory_ctx->RegisterSharedMemory(
+      "input_data", "/input_simple", 0, input_byte_size * 2);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to register shared memory input region: " << err
+              << std::endl;
+    exit(1);
   }
 
-  if (use_shm_output) {
-    // Create Output0 and Output1 in Shared Memory
-    std::string shm_key = "/output_simple";
-    shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
-    output0_shm = (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
-    output1_shm = (int*)(output0_shm + 16);
+  // Set the shared memory region for Inputs
+  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory input: " << err << std::endl;
+    exit(1);
+  }
+  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory input: " << err << std::endl;
+    exit(1);
+  }
 
-    // Register Output shared memory with TRTIS
-    err = shared_memory_ctx->RegisterSharedMemory(
-        "output_data", "/output_simple", 0, output_byte_size * 2);
-    if (!err.IsOk()) {
-      std::cerr << "error: unable to register shared memory output region: "
-                << err << std::endl;
-      exit(1);
-    }
+  // Create Output0 and Output1 in Shared Memory
+  shm_key = "/output_simple";
+  int shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
+  int* output0_shm =
+      (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
+  int* output1_shm = (int*)(output0_shm + 16);
 
-    // Set the shared memory region for Outputs
-    err = output0->SetSharedMemory("output_data", 0, output_byte_size);
-    if (!err.IsOk()) {
-      std::cerr << "failed setting shared memory output: " << err << std::endl;
-      exit(1);
-    }
-    err = output1->SetSharedMemory(
-        "output_data", output_byte_size, output_byte_size);
-    if (!err.IsOk()) {
-      std::cerr << "failed setting shared memory output: " << err << std::endl;
-      exit(1);
-    }
+  // Register Output shared memory with TRTIS
+  err = shared_memory_ctx->RegisterSharedMemory(
+      "output_data", "/output_simple", 0, output_byte_size * 2);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to register shared memory output region: "
+              << err << std::endl;
+    exit(1);
+  }
+
+  // Set the shared memory region for Outputs
+  err = output0->SetSharedMemory("output_data", 0, output_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory output: " << err << std::endl;
+    exit(1);
+  }
+  err = output1->SetSharedMemory(
+      "output_data", output_byte_size, output_byte_size);
+  if (!err.IsOk()) {
+    std::cerr << "failed setting shared memory output: " << err << std::endl;
+    exit(1);
   }
 
   // Set the context options to do batch-size 1 requests. Also request that
@@ -390,24 +352,21 @@ main(int argc, char** argv)
 
   for (size_t i = 0; i < 16; ++i) {
     int32_t ip0, ip1, r0, r1;
-    if (use_shm_input) {
-      ip0 = input0_shm[i];
-      ip1 = input1_shm[i];
-    } else {
-      ip0 = input0_data[i];
-      ip1 = input1_data[i];
+    ip0 = input0_shm[i];
+    ip1 = input1_shm[i];
+
+    FAIL_IF_ERR(
+        results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
+        "unable to get OUTPUT0 result at idx " + std::to_string(i));
+    FAIL_IF_ERR(
+        results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
+        "unable to get OUTPUT1 result at idx " + std::to_string(i));
+
+    if ((r0 != output0_shm[i]) || (r1 != output1_shm[i])) {
+      std::cerr << "Output not updated in shared memory" << std::endl;
+      exit(1);
     }
-    // if (use_shm_output) {
-      r0 = output0_shm[i];
-      r1 = output1_shm[i];
-    // } else {
-      FAIL_IF_ERR(
-          results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
-          "unable to get OUTPUT0 result at idx " + std::to_string(i));
-      FAIL_IF_ERR(
-          results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
-          "unable to get OUTPUT1 result at idx " + std::to_string(i));
-    // }
+
     std::cout << ip0 << " + " << ip1 << " = " << r0 << std::endl;
     std::cout << ip0 << " - " << ip1 << " = " << r1 << std::endl;
 
@@ -422,25 +381,22 @@ main(int argc, char** argv)
   }
 
   // Unregister and cleanup shared memory
-  if (use_shm_input) {
-    err = shared_memory_ctx->UnregisterSharedMemory("input_data");
-    if (!err.IsOk()) {
-      std::cerr << "error: unable to unregister shared memory input region: "
-                << err << std::endl;
-      exit(1);
-    }
-    UnmapSharedMemory(input0_shm, input_byte_size * 2);
-    UnlinkSharedMemoryRegion("/input_simple");
+  err = shared_memory_ctx->UnregisterSharedMemory("input_data");
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to unregister shared memory input region: "
+              << err << std::endl;
+    exit(1);
   }
-  if (use_shm_output) {
-    err = shared_memory_ctx->UnregisterSharedMemory("output_data");
-    if (!err.IsOk()) {
-      std::cerr << "error: unable to unregister shared memory output region: "
-                << err << std::endl;
-      exit(1);
-    }
-    UnmapSharedMemory(output0_shm, output_byte_size * 2);
-    UnlinkSharedMemoryRegion("/output_simple");
+  UnmapSharedMemory(input0_shm, input_byte_size * 2);
+  UnlinkSharedMemoryRegion("/input_simple");
+
+  err = shared_memory_ctx->UnregisterSharedMemory("output_data");
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to unregister shared memory output region: "
+              << err << std::endl;
+    exit(1);
   }
+  UnmapSharedMemory(output0_shm, output_byte_size * 2);
+  UnlinkSharedMemoryRegion("/output_simple");
   return 0;
 }

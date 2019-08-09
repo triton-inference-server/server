@@ -1600,7 +1600,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
 
   for (const auto& io : outputs_) {
     if (reinterpret_cast<OutputImpl*>(io.get())->IsSharedMemory()) {
-      for (int i=0; i<infer_request_.output_size(); i++) {
+      for (int i = 0; i < infer_request_.output_size(); i++) {
         auto routput = infer_request_.mutable_output(i);
         if (routput->name() == io->Name()) {
           auto rshared_memory = routput->mutable_shared_memory();
@@ -1609,7 +1609,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
           rshared_memory->set_offset(
               reinterpret_cast<OutputImpl*>(io.get())->GetSharedMemoryOffset());
           rshared_memory->set_byte_size(
-              reinterpret_cast<OutputImpl*>(io.get())->GetSharedMemoryByteSize());
+              reinterpret_cast<OutputImpl*>(io.get())->ByteSize());
         }
       }
     }

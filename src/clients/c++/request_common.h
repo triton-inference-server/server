@@ -224,8 +224,8 @@ class OutputImpl : public InferContext::Output {
   {
   }
   OutputImpl(const OutputImpl& obj)
-  : mio_(obj.mio_), io_type_(obj.io_type_), shm_name_(obj.shm_name_), shm_offset_(obj.shm_offset_),
-    shm_byte_size_(obj.shm_byte_size_)
+      : mio_(obj.mio_), io_type_(obj.io_type_), shm_name_(obj.shm_name_),
+        shm_offset_(obj.shm_offset_), byte_size_(obj.byte_size_)
   {
   }
   ~OutputImpl() = default;
@@ -236,7 +236,7 @@ class OutputImpl : public InferContext::Output {
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   const std::string& GetSharedMemoryName() const { return shm_name_; }
   size_t GetSharedMemoryOffset() const { return shm_offset_; }
-  size_t GetSharedMemoryByteSize() const { return shm_byte_size_; }
+  size_t ByteSize() const { return byte_size_; }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {
