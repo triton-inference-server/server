@@ -71,7 +71,7 @@ namespace {
 
 void
 BuildBackendConfigMap(
-    const std::string& version, const std::string& model_store_path,
+    const std::string& version, const std::string& model_repository_path,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
     const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
@@ -164,7 +164,7 @@ BuildBackendConfigMap(
   {
     auto custom_config = std::make_shared<CustomBackendFactory::Config>();
     custom_config->inference_server_version = version;
-    custom_config->model_repository_path = model_store_path;
+    custom_config->model_repository_path = model_repository_path;
     (*backend_configs)[kCustomPlatform] = custom_config;
   }
 #endif  // TRTIS_ENABLE_CUSTOM

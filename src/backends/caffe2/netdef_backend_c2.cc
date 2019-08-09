@@ -67,7 +67,7 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
   // The Caffe2 workspace.
   std::unique_ptr<caffe2::Workspace> ws_;
 
-  // The name of the model in the model store. This is not necessarily
+  // The name of the model in the model repository. This is not necessarily
   // the name in the Caffe2 NetDef protobuf.
   std::string model_name_;
 
@@ -76,7 +76,7 @@ class Caffe2WorkspaceImpl : public Caffe2Workspace {
   int max_batch_size_;
 
   // The name of the model in the Caffe2 NetDef. This does not
-  // necessarily match the model-store name of the model.
+  // necessarily match the model-repository name of the model.
   std::string netdef_model_name_;
 
   // Names of all possible inputs and outputs for the model. These are

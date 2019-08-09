@@ -182,7 +182,8 @@ std::vector<Option> options_{
     {OPTION_MODEL_REPOSITORY, "model-store",
      "Path to model repository directory. This option is deprecated, the "
      "prefer usage is --model-repository"},
-    {OPTION_MODEL_REPOSITORY, "model-repository", "Path to model repository directory"},
+    {OPTION_MODEL_REPOSITORY, "model-repository",
+     "Path to model repository directory"},
     {OPTION_EXIT_ON_ERROR, "exit-on-error",
      "Exit the inference server if an error occurs during initialization."},
     {OPTION_STRICT_MODEL_CONFIG, "strict-model-config",
