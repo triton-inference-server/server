@@ -241,9 +241,6 @@ InputImpl::SetSharedMemory(
         "The input '" + Name() + "' can only be set once with SetSharedMemory");
   }
 
-  shm_name_ = name;
-  shm_offset_ = offset;
-
   // verify byte size of shared memory matches that of expected byte size
   if ((int64_t)byte_size != byte_size_) {
     return Error(
@@ -253,6 +250,8 @@ InputImpl::SetSharedMemory(
             std::to_string(byte_size_) + " bytes");
   }
 
+  shm_name_ = name;
+  shm_offset_ = offset;
   io_type_ = SHARED_MEMORY;
   return Error::Success;
 }
