@@ -115,6 +115,15 @@ OptionsImpl::AddClassResult(
 }
 
 Error
+OptionsImpl::AddSharedMemoryResult(const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size)
+{
+  outputs_.emplace_back(std::make_pair(
+      output, OutputOptions(InferContext::Result::ResultFormat::SHARED_MEMORY, 0, name, offset, byte_size)));
+  return Error::Success;
+}
+
+
+Error
 InferContext::Options::Create(std::unique_ptr<InferContext::Options>* options)
 {
   options->reset(new OptionsImpl());
@@ -388,33 +397,6 @@ InputImpl::PrepareForRequest()
 
 //==============================================================================
 
-Error
-OutputImpl::SetSharedMemory(
-    const std::string& name, size_t offset, size_t byte_size)
-{
-  // If SetSharedMemory was called on this output already, return an error
-  if (io_type_ == SHARED_MEMORY) {
-    return Error(
-        RequestStatusCode::INVALID_ARG,
-        "The input '" + Name() + "' can only be set once with SetSharedMemory");
-  }
-
-  shm_name_ = name;
-  shm_offset_ = offset;
-  byte_size_ = byte_size;
-  io_type_ = SHARED_MEMORY;
-  return Error::Success;
-}
-
-Error
-OutputImpl::Reset()
-{
-  io_type_ = NONE;
-  return Error::Success;
-}
-
-//==============================================================================
-
 ResultImpl::ResultImpl(
     const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size)
     : output_(output),
@@ -432,10 +414,10 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 {
   shape->clear();
 
-  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw shape not available for non-RAW output '" + output_->Name() + "'");
+        "raw shape not available for CLASS output '" + output_->Name() + "'");
   }
 
   *shape = shape_;
@@ -445,10 +427,10 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 Error
 ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 {
-  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() +
+        "raw result not available for CLASS output '" + output_->Name() +
             "'");
   }
 
@@ -476,10 +458,10 @@ Error
 ResultImpl::GetRaw(
     size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
 {
-  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() +
+        "raw result not available for CLASS output '" + output_->Name() +
             "'");
   }
 
@@ -506,10 +488,10 @@ Error
 ResultImpl::GetRawAtCursor(
     size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
 {
-  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
+  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() +
+        "raw result not available for CLASS output '" + output_->Name() +
             "'");
   }
 
@@ -793,6 +775,10 @@ RequestImpl::PostRunProcessing(
         r->ResetCursors();
         break;
 
+    case InferContext::Result::ResultFormat::SHARED_MEMORY:
+      r->ResetCursors();
+      break;
+
       case InferContext::Result::ResultFormat::CLASS: {
         for (const auto& ir : infer_response.output()) {
           if (ir.name() == r->GetOutput()->Name()) {
@@ -923,6 +909,12 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
+    if (ooptions.result_format == Result::ResultFormat::SHARED_MEMORY) {
+      auto rshared_memory = routput->mutable_shared_memory();
+      rshared_memory->set_name(ooptions.shm_name);
+      rshared_memory->set_offset(ooptions.shm_offset);
+      rshared_memory->set_byte_size(ooptions.shm_byte_size);
+    }
     if (ooptions.result_format == Result::ResultFormat::CLASS) {
       routput->mutable_cls()->set_count(ooptions.u64);
     }

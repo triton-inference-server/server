@@ -311,30 +311,29 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Set the shared memory region for Outputs
-  err = output0->SetSharedMemory("output_data", 0, output_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory output: " << err << std::endl;
-    exit(1);
-  }
-  err = output1->SetSharedMemory(
-      "output_data", output_byte_size, output_byte_size);
-  if (!err.IsOk()) {
-    std::cerr << "failed setting shared memory output: " << err << std::endl;
-    exit(1);
-  }
+  // // Set the shared memory region for Outputs
+  // err = output0->SetSharedMemory("output_data", 0, output_byte_size);
+  // if (!err.IsOk()) {
+  //   std::cerr << "failed setting shared memory output: " << err << std::endl;
+  //   exit(1);
+  // }
+  // err = output1->SetSharedMemory(
+  //     "output_data", output_byte_size, output_byte_size);
+  // if (!err.IsOk()) {
+  //   std::cerr << "failed setting shared memory output: " << err << std::endl;
+  //   exit(1);
+  // }
 
   // Set the context options to do batch-size 1 requests. Also request that
-  // all output tensors be returned.
+  // all output tensors be returned using shared memory.
   std::unique_ptr<nic::InferContext::Options> options;
   FAIL_IF_ERR(
       nic::InferContext::Options::Create(&options),
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  for (const auto& output : infer_ctx->Outputs()) {
-    options->AddRawResult(output);
-  }
+  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
+  options->AddSharedMemoryResult(output1, "output_data", output_byte_size, output_byte_size);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");

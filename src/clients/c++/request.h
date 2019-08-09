@@ -364,27 +364,6 @@ class InferContext {
     /// model configuration. Variable-size dimensions are reported as
     /// -1.
     virtual const DimsList& Dims() const = 0;
-
-    /// Indicate that the result values for this output should be placed in a
-    /// shared memory region instead of being returned in the inference
-    /// response. The shared memory region must not be modified or destroyed
-    //  until this output is ready (that is until after the Run() call(s) have
-    /// written the output completely). For batched outputs, all tensor values
-    /// are copied into a contiguous space in a single shared memory region.
-    /// \param name The user-given name for the registered shared memory region
-    /// where the tensor values for this output should be stored.
-    /// \param offset The offset into the shared memory region upto the start
-    /// of the output tensor values.
-    /// \param byte_size The size, in bytes of the output tensor data.
-    /// Must match the size expected by the output.
-    /// \return Error object indicating success or failure.
-    virtual Error SetSharedMemory(
-        const std::string& name, size_t offset, size_t byte_size) = 0;
-
-    /// Prepare this output to store new tensor values. Forget any
-    /// existing values that were set by previous calls to SetSharedMemory()
-    /// \return Error object indicating success or failure.
-    virtual Error Reset() = 0;
   };
 
   //==============
@@ -401,7 +380,11 @@ class InferContext {
       /// CLASS format is the top-k highest probability values of the
       /// result and the associated class label (if provided by the
       /// model).
-      CLASS = 1
+      CLASS = 1,
+
+      /// SHARED_MEMORY format, the entire result tensor of values are written
+      /// into a location in shared memory.
+      SHARED_MEMORY = 2
     };
 
     /// \return The name of the model that produced this result.
@@ -553,6 +536,22 @@ class InferContext {
     /// \return Error object indicating success or failure.
     virtual Error AddClassResult(
         const std::shared_ptr<InferContext::Output>& output, uint64_t k) = 0;
+
+    /// Indicate that the result values for this output should be placed in a
+    /// shared memory region instead of being returned in the inference
+    /// response. The shared memory region must not be modified or destroyed
+    //  until this output is ready (that is until after the Run() call(s) have
+    /// written the output completely). For batched outputs, all tensor values
+    /// are copied into a contiguous space in a single shared memory region.
+    /// \param name The user-given name for the registered shared memory region
+    /// where the tensor values for this output should be stored.
+    /// \param offset The offset into the shared memory region upto the start
+    /// of the output tensor values.
+    /// \param byte_size The size, in bytes of the output tensor data.
+    /// Must match the size expected by the output.
+    /// \return Error object indicating success or failure.
+    virtual Error AddSharedMemoryResult(
+        const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size) = 0;
   };
 
   //==============

@@ -116,15 +116,18 @@ class OptionsImpl : public InferContext::Options {
       const std::shared_ptr<InferContext::Output>& output) override;
   Error AddClassResult(
       const std::shared_ptr<InferContext::Output>& output, uint64_t k) override;
+  Error AddSharedMemoryResult(const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size) override;
 
   // Options for an output
   struct OutputOptions {
-    OutputOptions(InferContext::Result::ResultFormat f, uint64_t n = 0)
-        : result_format(f), u64(n)
+    OutputOptions(InferContext::Result::ResultFormat f, uint64_t n = 0, std::string name = "", size_t offset = 0, size_t byte_size = 0)
+        : result_format(f), u64(n), shm_name(name), shm_offset(offset), shm_byte_size(byte_size)
     {
     }
     InferContext::Result::ResultFormat result_format;
     uint64_t u64;
+    std::string shm_name;
+    size_t shm_offset, shm_byte_size;
   };
 
   using OutputOptionsPair =
@@ -219,13 +222,7 @@ class InputImpl : public InferContext::Input {
 class OutputImpl : public InferContext::Output {
  public:
   OutputImpl(const ModelOutput& mio)
-      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW),
-        io_type_(RAW)
-  {
-  }
-  OutputImpl(const OutputImpl& obj)
-      : mio_(obj.mio_), io_type_(obj.io_type_), shm_name_(obj.shm_name_),
-        shm_offset_(obj.shm_offset_), byte_size_(obj.byte_size_)
+      : mio_(mio), result_format_(InferContext::Result::ResultFormat::RAW)
   {
   }
   ~OutputImpl() = default;
@@ -233,10 +230,7 @@ class OutputImpl : public InferContext::Output {
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
-  bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
-  const std::string& GetSharedMemoryName() const { return shm_name_; }
-  size_t GetSharedMemoryOffset() const { return shm_offset_; }
-  size_t ByteSize() const { return byte_size_; }
+  bool IsSharedMemory() const { return (result_format_ == InferContext::Result::ResultFormat::SHARED_MEMORY); }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {
@@ -247,20 +241,9 @@ class OutputImpl : public InferContext::Output {
     result_format_ = result_format;
   }
 
-  Error Reset() override;
-  Error SetSharedMemory(
-      const std::string& name, size_t offset, size_t byte_size) override;
-
  private:
   const ModelOutput mio_;
   InferContext::Result::ResultFormat result_format_;
-
-  // Used only if working with Shared Memory
-  enum IOType { NONE, RAW, SHARED_MEMORY };
-  IOType io_type_;
-  std::string shm_name_;
-  size_t shm_offset_;
-  size_t byte_size_;
 };
 
 //==============================================================================
