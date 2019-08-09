@@ -119,7 +119,7 @@ enum OptionId {
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
   OPTION_ID,
-  OPTION_MODEL_STORE,
+  OPTION_MODEL_REPOSITORY,
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
@@ -179,7 +179,10 @@ std::vector<Option> options_{
     {OPTION_LOG_WARNING, "log-warning", "Enable/disable warning-level logging"},
     {OPTION_LOG_ERROR, "log-error", "Enable/disable error-level logging"},
     {OPTION_ID, "id", "Identifier for this server"},
-    {OPTION_MODEL_STORE, "model-store", "Path to model repository directory"},
+    {OPTION_MODEL_REPOSITORY, "model-store",
+     "Path to model repository directory. This option is deprecated, the "
+     "prefer usage is --model-repository"},
+    {OPTION_MODEL_REPOSITORY, "model-repository", "Path to model repository directory"},
     {OPTION_EXIT_ON_ERROR, "exit-on-error",
      "Exit the inference server if an error occurs during initialization."},
     {OPTION_STRICT_MODEL_CONFIG, "strict-model-config",
@@ -622,7 +625,7 @@ bool
 Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 {
   std::string server_id("inference:0");
-  std::string model_store_path;
+  std::string model_repository_path;
   bool exit_on_error = true;
   bool strict_model_config = true;
   bool strict_readiness = true;
@@ -689,8 +692,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_ID:
         server_id = optarg;
         break;
-      case OPTION_MODEL_STORE:
-        model_store_path = optarg;
+      case OPTION_MODEL_REPOSITORY:
+        model_repository_path = optarg;
         break;
 
       case OPTION_EXIT_ON_ERROR:
@@ -838,7 +841,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       "setting server ID");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetModelRepositoryPath(
-          server_options, model_store_path.c_str()),
+          server_options, model_repository_path.c_str()),
       "setting model repository path");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetModelControlMode(server_options, control_mode),
