@@ -261,22 +261,6 @@ main(int argc, char** argv)
     }
   }
 
-  // Set the context options to do batch-size 1 requests. Also request that
-  // all output tensors be returned.
-  std::unique_ptr<nic::InferContext::Options> options;
-  FAIL_IF_ERR(
-      nic::InferContext::Options::Create(&options),
-      "unable to create inference options");
-
-  options->SetBatchSize(1);
-  if (!use_shm_output) {
-    for (const auto& output : infer_ctx->Outputs()) {
-      options->AddRawResult(output);
-    }
-  }
-  FAIL_IF_ERR(
-      infer_ctx->SetRunOptions(*options), "unable to set inference options");
-
   std::shared_ptr<nic::InferContext::Input> input0, input1;
   std::shared_ptr<nic::InferContext::Output> output0, output1;
   FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
@@ -378,6 +362,21 @@ main(int argc, char** argv)
     }
   }
 
+  // Set the context options to do batch-size 1 requests. Also request that
+  // all output tensors be returned.
+  std::unique_ptr<nic::InferContext::Options> options;
+  FAIL_IF_ERR(
+      nic::InferContext::Options::Create(&options),
+      "unable to create inference options");
+
+  options->SetBatchSize(1);
+  for (const auto& output : infer_ctx->Outputs()) {
+    options->AddRawResult(output);
+  }
+
+  FAIL_IF_ERR(
+      infer_ctx->SetRunOptions(*options), "unable to set inference options");
+
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(infer_ctx->Run(&results), "unable to run model");
@@ -398,17 +397,17 @@ main(int argc, char** argv)
       ip0 = input0_data[i];
       ip1 = input1_data[i];
     }
-    if (use_shm_output) {
+    // if (use_shm_output) {
       r0 = output0_shm[i];
       r1 = output1_shm[i];
-    } else {
+    // } else {
       FAIL_IF_ERR(
           results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
           "unable to get OUTPUT0 result at idx " + std::to_string(i));
       FAIL_IF_ERR(
           results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
           "unable to get OUTPUT1 result at idx " + std::to_string(i));
-    }
+    // }
     std::cout << ip0 << " + " << ip1 << " = " << r0 << std::endl;
     std::cout << ip0 << " - " << ip1 << " = " << r1 << std::endl;
 

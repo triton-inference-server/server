@@ -353,6 +353,11 @@ TRTSERVER_InferenceRequestProviderSetInputData(
     TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
     const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type);
 
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_InferenceRequestProviderSetSharedMemoryOutputBuffer(
+    TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
+    const void* base, size_t byte_size);
+
 /// TRTSERVER_InferenceResponse
 ///
 /// Object representing the response for an inference request. The

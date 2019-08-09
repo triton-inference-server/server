@@ -1598,6 +1598,22 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     }
   }
 
+  for (const auto& io : outputs_) {
+    if (reinterpret_cast<OutputImpl*>(io.get())->IsSharedMemory()) {
+      for (int i=0; i<infer_request_.output_size(); i++) {
+        auto routput = infer_request_.mutable_output(i);
+        if (routput->name() == io->Name()) {
+          auto rshared_memory = routput->mutable_shared_memory();
+          rshared_memory->set_name(
+              reinterpret_cast<OutputImpl*>(io.get())->GetSharedMemoryName());
+          rshared_memory->set_offset(
+              reinterpret_cast<OutputImpl*>(io.get())->GetSharedMemoryOffset());
+          rshared_memory->set_byte_size(
+              reinterpret_cast<OutputImpl*>(io.get())->GetSharedMemoryByteSize());
+        }
+      }
+    }
+  }
   // Set the expected POST size. If you want to POST large amounts of
   // data, consider CURLOPT_POSTFIELDSIZE_LARGE
   curl_easy_setopt(

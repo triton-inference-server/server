@@ -245,7 +245,6 @@ SharedMemoryManager::SharedMemoryAddress(
         "Unable to find shared memory region: '" + name + "'");
   }
 
-  LOG_VERBOSE(1) << "offset from request: " << offset;
   *shm_mapped_addr =
       (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
   return Status::Success;

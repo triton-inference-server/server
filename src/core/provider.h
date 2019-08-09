@@ -240,7 +240,7 @@ class InferResponseProvider {
 
   InferResponseProvider(
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider);
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer);
   virtual ~InferResponseProvider() = default;
 
   // Get the full response header for this inference request.
@@ -323,6 +323,10 @@ class InferResponseProvider {
   // label provider used to generate classification results.
   std::shared_ptr<LabelProvider> label_provider_;
 
+  // Map from output name to the location in shared memory of the content.
+  // It contains the buffer and the expected size of the named output.
+  std::unordered_map<std::string, std::pair<std::shared_ptr<SystemMemory>, size_t>> output_shm_buffer_;
+
   // Map from output name to external label provider and name for that provider.
   // This map should only be non-empty if the response provider is for models
   // that doesn't provide labels directly, i.e. ensemble models.
@@ -337,7 +341,7 @@ class InternalInferResponseProvider : public InferResponseProvider {
   // Create a InternalInferResponseProvider object.
   static Status Create(
       const InferenceBackend& is, const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider,
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer,
       std::shared_ptr<InternalInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -355,7 +359,7 @@ class InternalInferResponseProvider : public InferResponseProvider {
  private:
   InternalInferResponseProvider(
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider);
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer);
 
   InferResponseHeader response_header_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
@@ -370,7 +374,7 @@ class GRPCInferResponseProvider : public InferResponseProvider {
   // Initialize based on gRPC request
   static Status Create(
       const InferRequestHeader& request_header, InferResponse* response,
-      const std::shared_ptr<LabelProvider>& label_provider,
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer,
       std::shared_ptr<GRPCInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -384,8 +388,8 @@ class GRPCInferResponseProvider : public InferResponseProvider {
  private:
   GRPCInferResponseProvider(
       const InferRequestHeader& request_header, InferResponse* response,
-      const std::shared_ptr<LabelProvider>& label_provider)
-      : InferResponseProvider(request_header, label_provider),
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer)
+      : InferResponseProvider(request_header, label_provider, output_shm_buffer),
         response_(response)
   {
   }
@@ -401,7 +405,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
   static Status Create(
       evbuffer* output_buffer, const InferenceBackend& is,
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider,
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer,
       std::shared_ptr<HTTPInferResponseProvider>* infer_provider);
 
   const InferResponseHeader& ResponseHeader() const override;
@@ -415,7 +419,7 @@ class HTTPInferResponseProvider : public InferResponseProvider {
  private:
   HTTPInferResponseProvider(
       evbuffer* output_buffer, const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider);
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer);
 
   InferResponseHeader response_header_;
   evbuffer* output_buffer_;
@@ -429,7 +433,7 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
  public:
   static Status Create(
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider,
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
@@ -448,11 +452,11 @@ class DelegatingInferResponseProvider : public InferResponseProvider {
  private:
   DelegatingInferResponseProvider(
       const InferRequestHeader& request_header,
-      const std::shared_ptr<LabelProvider>& label_provider,
+      const std::shared_ptr<LabelProvider>& label_provider, const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>& output_shm_buffer,
       TRTSERVER_ResponseAllocator* allocator,
       TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
       TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
-      : InferResponseProvider(request_header, label_provider),
+      : InferResponseProvider(request_header, label_provider, output_shm_buffer),
         allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
         release_fn_(release_fn)
   {
