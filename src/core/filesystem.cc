@@ -27,9 +27,20 @@
 #include "src/core/filesystem.h"
 
 #include <dirent.h>
+
 #ifdef TRTIS_ENABLE_GCS
 #include <google/cloud/storage/client.h>
 #endif  // TRTIS_ENABLE_GCS
+
+#ifdef TRTIS_ENABLE_S3
+#include <aws/core/Aws.h>
+#include <aws/s3/S3Client.h>
+#include <aws/s3/model/GetObjectRequest.h>
+#include <aws/s3/model/HeadBucketRequest.h>
+#include <aws/s3/model/HeadObjectRequest.h>
+#include <aws/s3/model/ListObjectsRequest.h>
+#endif  // TRTIS_ENABLE_S3
+
 #include <google/protobuf/text_format.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -310,7 +321,13 @@ GCSFileSystem::FileExists(const std::string& path, bool* exists)
 
   if (object_metadata) {
     *exists = true;
+    return Status::Success;
   }
+
+  // GCS doesn't make objects for directories, so it could still be a directory
+  bool is_dir;
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  *exists = is_dir;
 
   return Status::Success;
 }
@@ -497,31 +514,310 @@ Status
 GCSFileSystem::WriteTextFile(
     const std::string& path, const std::string& contents)
 {
-  std::string bucket, object;
-  ParsePath(path, &bucket, &object);
+  return Status(
+      RequestStatusCode::INTERNAL,
+      "Write text file operation not yet implemented " + path);
+}
 
-  gcs::ObjectWriteStream stream = client_->WriteObject(bucket, object);
+#endif  // TRTIS_ENABLE_GCS
 
-  if (!stream) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to open object write stream for " + path);
+#ifdef TRTIS_ENABLE_S3
+
+namespace s3 = Aws::S3;
+
+class S3FileSystem : public FileSystem {
+ public:
+  S3FileSystem(const Aws::SDKOptions& options);
+  ~S3FileSystem();
+  Status FileExists(const std::string& path, bool* exists) override;
+  Status IsDirectory(const std::string& path, bool* is_dir) override;
+  Status FileModificationTime(
+      const std::string& path, int64_t* mtime_ns) override;
+  Status GetDirectoryContents(
+      const std::string& path, std::set<std::string>* contents) override;
+  Status GetDirectorySubdirs(
+      const std::string& path, std::set<std::string>* subdirs) override;
+  Status GetDirectoryFiles(
+      const std::string& path, std::set<std::string>* files) override;
+  Status ReadTextFile(const std::string& path, std::string* contents) override;
+  Status WriteTextFile(
+      const std::string& path, const std::string& contents) override;
+
+ private:
+  Status ParsePath(
+      const std::string& path, std::string* bucket, std::string* object);
+  Aws::SDKOptions options_;
+  s3::S3Client client_;
+};
+
+Status
+S3FileSystem::ParsePath(
+    const std::string& path, std::string* bucket, std::string* object)
+{
+  // Get the bucket name and the object path. Return error if input is malformed
+  int bucket_start = path.find("s3://") + 5;
+  int bucket_end = path.find("/", bucket_start);
+
+  // If there isn't a second slash, the address has only the bucket
+  if (bucket_end > bucket_start) {
+    *bucket = path.substr(bucket_start, bucket_end - bucket_start);
+    *object = path.substr(bucket_end + 1);
+  } else {
+    *bucket = path.substr(bucket_start);
+    *object = "";
   }
 
-  stream.Close();
-
-  google::cloud::StatusOr<gcs::ObjectMetadata> metadata =
-      std::move(stream).metadata();
-
-  if (!metadata) {
+  if (bucket->empty()) {
     return Status(
-        RequestStatusCode::INTERNAL, "Error writing to object at " + path);
+        RequestStatusCode::INTERNAL, "No bucket name found in path: " + path);
   }
 
   return Status::Success;
 }
 
-#endif  // TRTIS_ENABLE_GCS
+
+S3FileSystem::S3FileSystem(const Aws::SDKOptions& options) : options_(options)
+{
+  if (const char* profile_name = std::getenv("AWS_PROFILE")) {
+    Aws::Client::ClientConfiguration config(profile_name);
+    client_ = s3::S3Client(config);
+  } else {
+    Aws::Client::ClientConfiguration config("default");
+    client_ = s3::S3Client(config);
+  }
+}
+
+S3FileSystem::~S3FileSystem()
+{
+  Aws::ShutdownAPI(options_);
+}
+
+Status
+S3FileSystem::FileExists(const std::string& path, bool* exists)
+{
+  *exists = false;
+
+  std::string bucket, object;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+  // Construct request for object metadata
+  s3::Model::HeadObjectRequest head_request;
+  head_request.SetBucket(bucket.c_str());
+  head_request.SetKey(object.c_str());
+
+  auto head_object_outcome = client_.HeadObject(head_request);
+  if (head_object_outcome.IsSuccess()) {
+    *exists = true;
+    return Status::Success;
+  }
+
+  // S3 doesn't make objects for directories, so it could still be a directory
+  bool is_dir;
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  *exists = is_dir;
+
+  return Status::Success;
+}
+
+Status
+S3FileSystem::IsDirectory(const std::string& path, bool* is_dir)
+{
+  *is_dir = false;
+  std::string bucket, object_path;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &object_path));
+
+  // Check if the bucket exists
+  s3::Model::HeadBucketRequest head_request;
+  head_request.WithBucket(bucket.c_str());
+
+  auto head_bucket_outcome = client_.HeadBucket(head_request);
+  if (!head_bucket_outcome.IsSuccess()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Could not get MetaData for bucket with name " + bucket);
+  }
+
+  // Root case - bucket exists and object path is empty
+  if (object_path.empty()) {
+    *is_dir = true;
+    return Status::Success;
+  }
+
+  // List the objects in the bucket
+  s3::Model::ListObjectsRequest list_objects_request;
+  list_objects_request.SetBucket(bucket.c_str());
+  list_objects_request.SetPrefix(AppendSlash(object_path).c_str());
+  auto list_objects_outcome = client_.ListObjects(list_objects_request);
+
+  if (list_objects_outcome.IsSuccess()) {
+    *is_dir = !list_objects_outcome.GetResult().GetContents().empty();
+  } else {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Failed to list objects with prefix " + path);
+  }
+  return Status::Success;
+}
+
+Status
+S3FileSystem::FileModificationTime(const std::string& path, int64_t* mtime_ns)
+{
+  // We don't need to worry about the case when this is a GCS directory
+  bool is_dir;
+
+  RETURN_IF_ERROR(IsDirectory(path, &is_dir));
+  if (is_dir) {
+    return Status::Success;
+  }
+
+  std::string bucket, object;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+  // Send a request for the objects metadata
+  s3::Model::HeadObjectRequest head_request;
+  head_request.SetBucket(bucket.c_str());
+  head_request.SetKey(object.c_str());
+
+  // If request succeeds, copy over the modification time
+  auto head_object_outcome = client_.HeadObject(head_request);
+  if (head_object_outcome.IsSuccess()) {
+    *mtime_ns = head_object_outcome.GetResult().GetLastModified().Millis();
+  } else {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Failed to get modification time for object at " + path);
+  }
+  return Status::Success;
+}
+Status
+S3FileSystem::GetDirectoryContents(
+    const std::string& path, std::set<std::string>* contents)
+{
+  // Parse bucket and dir_path
+  std::string bucket, dir_path, full_dir;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &dir_path));
+
+  // Capture the full path to facilitate content listing
+  full_dir = AppendSlash(dir_path);
+
+  // Issue request for objects with prefix
+  s3::Model::ListObjectsRequest objects_request;
+  objects_request.SetBucket(bucket.c_str());
+  objects_request.SetPrefix(full_dir.c_str());
+  auto list_objects_outcome = client_.ListObjects(objects_request);
+
+  if (list_objects_outcome.IsSuccess()) {
+    Aws::Vector<Aws::S3::Model::Object> object_list =
+        list_objects_outcome.GetResult().GetContents();
+    for (auto const& s3_object : object_list) {
+      // In the case of empty directories, the directory itself will appear here
+      if (s3_object.GetKey().c_str() == full_dir) {
+        continue;
+      }
+
+      // We have to make sure that subdirectory contents do not appear here
+      std::string name(s3_object.GetKey().c_str());
+      int item_start = name.find(full_dir) + full_dir.size();
+      int item_end = name.find(
+          "/", item_start);  // GCS response prepends parent directory name
+
+      // Let set take care of subdirectory contents
+      std::string item = name.substr(item_start, item_end - item_start);
+      contents->insert(item);
+    }
+  } else {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Failed to list directory contents with at " + path);
+  }
+  return Status::Success;
+}
+Status
+S3FileSystem::GetDirectorySubdirs(
+    const std::string& path, std::set<std::string>* subdirs)
+{
+  RETURN_IF_ERROR(GetDirectoryContents(path, subdirs));
+
+  // Erase non-directory entries...
+  for (auto iter = subdirs->begin(); iter != subdirs->end();) {
+    bool is_dir;
+    RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+    if (!is_dir) {
+      iter = subdirs->erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+
+  return Status::Success;
+}
+Status
+S3FileSystem::GetDirectoryFiles(
+    const std::string& path, std::set<std::string>* files)
+{
+  RETURN_IF_ERROR(GetDirectoryContents(path, files));
+
+  // Erase directory entries...
+  for (auto iter = files->begin(); iter != files->end();) {
+    bool is_dir;
+    RETURN_IF_ERROR(IsDirectory(JoinPath({path, *iter}), &is_dir));
+    if (is_dir) {
+      iter = files->erase(iter);
+    } else {
+      ++iter;
+    }
+  }
+
+  return Status::Success;
+}
+Status
+S3FileSystem::ReadTextFile(const std::string& path, std::string* contents)
+{
+  bool exists;
+  RETURN_IF_ERROR(FileExists(path, &exists));
+
+  if (!exists) {
+    return Status(
+        RequestStatusCode::INTERNAL, "File does not exist at " + path);
+  }
+
+  std::string bucket, object;
+  RETURN_IF_ERROR(ParsePath(path, &bucket, &object));
+
+  // Send a request for the objects metadata
+  s3::Model::GetObjectRequest object_request;
+  object_request.SetBucket(bucket.c_str());
+  object_request.SetKey(object.c_str());
+
+  auto get_object_outcome = client_.GetObject(object_request);
+  if (get_object_outcome.IsSuccess()) {
+    auto& object_result = get_object_outcome.GetResultWithOwnership().GetBody();
+
+    std::string data = "";
+    char c;
+    while (object_result.get(c)) {
+      data += c;
+    }
+
+    *contents = data;
+  } else {
+    return Status(
+        RequestStatusCode::INTERNAL, "Failed to get object at " + path);
+  }
+
+  return Status::Success;
+}
+Status
+S3FileSystem::WriteTextFile(
+    const std::string& path, const std::string& contents)
+{
+  return Status(
+      RequestStatusCode::INTERNAL,
+      "Write text file operation not yet implemented " + path);
+}
+
+
+#endif
 
 Status
 GetFileSystem(const std::string& path, FileSystem** file_system)
@@ -531,7 +827,7 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #ifndef TRTIS_ENABLE_GCS
     return Status(
         RequestStatusCode::INTERNAL,
-        "gs:// file-system not supported. To enable build with "
+        "gs:// file-system not supported. To enable, build with "
         "-DTRTIS_ENABLE_GCS=ON.");
 #else
     static GCSFileSystem gcs_fs;
@@ -541,7 +837,24 @@ GetFileSystem(const std::string& path, FileSystem** file_system)
 #endif  // TRTIS_ENABLE_GCS
   }
 
-  // For now assume all paths are local...
+  // Check if this is an S3 path (s3://$BUCKET_NAME)
+  if (!path.empty() && !path.rfind("s3://", 0)) {
+#ifndef TRTIS_ENABLE_S3
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "s3:// file-system not supported. To enable, build with "
+        "-DTRTIS_ENABLE_S3=ON.");
+#else
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    static S3FileSystem s3_fs(options);
+    // RETURN_IF_ERROR(s3_fs.CheckClient());
+    *file_system = &s3_fs;
+    return Status::Success;
+#endif  // TRTIS_ENABLE_S3
+  }
+
+  // Assume path is for local filesystem
   static LocalFileSystem local_fs;
   *file_system = &local_fs;
 

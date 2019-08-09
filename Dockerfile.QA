@@ -191,7 +191,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     python get-pip.py && \
     rm get-pip.py
-RUN pip install --upgrade numpy pillow future grpcio requests gsutil
+RUN pip install --upgrade numpy pillow future grpcio requests gsutil awscli
 
 # CI expects tests in /opt/tensorrtserver/qa
 WORKDIR /opt/tensorrtserver

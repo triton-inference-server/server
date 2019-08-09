@@ -115,6 +115,11 @@ if(${TRTIS_ENABLE_GCS})
   set_source_files_properties(filesystem.cc PROPERTIES COMPILE_FLAGS -Wno-missing-field-initializers)
 endif() # TRTIS_ENABLE_GCS
 
+if(${TRTIS_ENABLE_S3})
+  find_package(AWSSDK REQUIRED COMPONENTS s3)
+  message(STATUS "Using aws-sdk-cpp ${AWSSDK_VERSION}")
+endif()
+
 set(
   SERVER_SRCS
   autofill.cc
@@ -193,3 +198,10 @@ if(${TRTIS_ENABLE_GCS})
     PRIVATE $<TARGET_PROPERTY:storage_client,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRTIS_ENABLE_GCS
+
+if(${TRTIS_ENABLE_S3})
+  target_include_directories(
+    server-library
+    PRIVATE $<TARGET_PROPERTY:aws-cpp-sdk-s3,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+endif() # TRTIS_ENABLE_S3

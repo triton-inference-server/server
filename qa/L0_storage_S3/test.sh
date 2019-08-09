@@ -30,9 +30,9 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
-# Google cloud variables (Point to bucket when testing GCS)
+# S3 bucket path (Point to bucket when testing cloud storage)
 
-BUCKET_URL="gs://bucket"
+BUCKET_URL="s3://bucket"
 
 # Remove Slash in BUCKET_URL
 BUCKET_URL=${BUCKET_URL%/}
@@ -79,7 +79,7 @@ for MAYBE_SLASH in "" "/"; do
 
     # run with a non-root empty model repo
     touch models/dummy
-    gsutil cp -r models/ "$BUCKET_URL_SLASH"
+    aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
 
     SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
 
@@ -93,7 +93,7 @@ for MAYBE_SLASH in "" "/"; do
     kill $SERVER_PID
     wait $SERVER_PID
 
-    gsutil -m rm "${BUCKET_URL_SLASH}**"
+    aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
     rm models/dummy
 
     # Now start model tests
@@ -112,7 +112,7 @@ for MAYBE_SLASH in "" "/"; do
         done
     done
 
-    # now traverse the tree and create empty version directories that gsutil skips
+    # now traverse the tree and create empty version directories that the CLI skips
     for dir in `ls models/`; do
         for subdir in `ls models/$dir`; do
             if [ -d models/$dir/$subdir ] && [ -z "$(ls models/$dir/$subdir)" ]; then
@@ -122,12 +122,12 @@ for MAYBE_SLASH in "" "/"; do
     done
 
     # Perform test with model repository variants
-    for repo in "models/**" "models" ; do
+    for src in "models/" "."  ; do
 
         # copy contents of /models into GCS bucket.
-        gsutil -m cp -r $repo $BUCKET_URL_SLASH
+        aws s3 cp $src $BUCKET_URL_SLASH --recursive --include "*"
 
-        if [ "$repo" == "models" ]; then
+        if [ "$src" == "." ]; then
             # set server arguments
             SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
         else
@@ -167,7 +167,7 @@ for MAYBE_SLASH in "" "/"; do
         wait $SERVER_PID
 
         # Clean up bucket
-        gsutil -m rm "${BUCKET_URL_SLASH}**"
+        aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
     done
 done 
