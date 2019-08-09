@@ -1,0 +1,48 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Pass [1] throughput: 3966 infer/sec. p95 latency: 273 usec
+  Pass [2] throughput: 3997 infer/sec. p95 latency: 267 usec
+  Pass [3] throughput: 3948 infer/sec. p95 latency: 289 usec
+  Client: 
+    Request count: 19740
+    Throughput: 3948 infer/sec
+    p50 latency: 238 usec
+    p90 latency: 268 usec
+    p95 latency: 289 usec
+    p99 latency: 341 usec
+    Avg HTTP time: 213 usec (send 33 usec + response wait 177 usec + receive 3 usec)
+  Server: 
+    Request count: 23796
+    Avg request latency: 111 usec (overhead 18 usec + queue 11 usec + compute 82 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 8119 infer/sec. p95 latency: 316 usec
+  Pass [2] throughput: 8384 infer/sec. p95 latency: 268 usec
+  Pass [3] throughput: 7999 infer/sec. p95 latency: 312 usec
+  Pass [4] throughput: 8246 infer/sec. p95 latency: 284 usec
+  Pass [5] throughput: 8314 infer/sec. p95 latency: 285 usec
+  Pass [6] throughput: 8388 infer/sec. p95 latency: 289 usec
+  Client: 
+    Request count: 41943
+    Throughput: 8388 infer/sec
+    p50 latency: 222 usec
+    p90 latency: 265 usec
+    p95 latency: 289 usec
+    p99 latency: 330 usec
+    Avg HTTP time: 199 usec (send 34 usec + response wait 162 usec + receive 3 usec)
+  Server: 
+    Request count: 50196
+    Avg request latency: 98 usec (overhead 18 usec + queue 16 usec + compute 64 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, 3948 infer/sec, latency 289 usec
+Concurrency: 2, 8388 infer/sec, latency 289 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4278  100  4278    0     0  4177k      0 --:--:-- --:--:-- --:--:-- 4177k

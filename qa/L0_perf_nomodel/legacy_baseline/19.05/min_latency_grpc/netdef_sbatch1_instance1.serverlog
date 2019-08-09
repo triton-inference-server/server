@@ -1,0 +1,35 @@
+I0808 20:28:50.578679 788 main.cc:267] Starting endpoints, 'inference:0' listening on
+I0808 20:28:50.578759 788 main.cc:271]  localhost:8001 for gRPC requests
+I0808 20:28:50.578898 788 grpc_server.cc:265] Building nvrpc server
+I0808 20:28:50.578911 788 grpc_server.cc:272] Register TensorRT GRPCService
+I0808 20:28:50.578926 788 grpc_server.cc:275] Register Infer RPC
+I0808 20:28:50.578931 788 grpc_server.cc:279] Register StreamInfer RPC
+I0808 20:28:50.578936 788 grpc_server.cc:284] Register Status RPC
+I0808 20:28:50.578940 788 grpc_server.cc:288] Register Profile RPC
+I0808 20:28:50.578945 788 grpc_server.cc:292] Register Health RPC
+I0808 20:28:50.578950 788 grpc_server.cc:304] Register Executor
+I0808 20:28:50.584344 788 main.cc:282]  localhost:8000 for HTTP requests
+I0808 20:28:50.626315 788 main.cc:294]  localhost:8002 for metric reporting
+I0808 20:28:50.630019 788 metrics.cc:149] found 1 GPUs supporting NVML metrics
+I0808 20:28:50.636200 788 metrics.cc:158]   GPU 0: TITAN RTX
+I0808 20:28:50.636824 788 server.cc:243] Initializing TensorRT Inference Server
+I0808 20:28:50.667464 788 server_status.cc:106] New status tracking for model 'netdef_zero_1_float32'
+2019-08-08 20:28:50.667784: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+2019-08-08 20:28:50.667844: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:562]  (Re-)adding model: netdef_zero_1_float32
+2019-08-08 20:28:50.768147: I external/tf_serving/tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: netdef_zero_1_float32 version: 1}
+2019-08-08 20:28:50.768214: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: netdef_zero_1_float32 version: 1}
+2019-08-08 20:28:50.768245: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: netdef_zero_1_float32 version: 1}
+I0808 20:28:50.769384 788 netdef_bundle.cc:214] Creating instance netdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+[E init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+2019-08-08 20:28:52.920064: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:86] Successfully loaded servable version {name: netdef_zero_1_float32 version: 1}
+I0808 20:29:29.480071 788 main.cc:213] Interrupt signal (15) received.
+I0808 20:29:29.480101 788 server.cc:351] Waiting for in-flight inferences to complete.
+2019-08-08 20:29:29.480127: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+I0808 20:29:29.480185 788 server.cc:370] Timeout 30: Found 1 live models and 0 in-flight requests
+2019-08-08 20:29:29.498855: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:137] Quiescing servable version {name: netdef_zero_1_float32 version: 1}
+2019-08-08 20:29:29.498898: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:144] Done quiescing servable version {name: netdef_zero_1_float32 version: 1}
+2019-08-08 20:29:29.498909: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:119] Unloading servable version {name: netdef_zero_1_float32 version: 1}
+2019-08-08 20:29:29.500123: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:127] Done unloading servable version {name: netdef_zero_1_float32 version: 1}
+I0808 20:29:30.480309 788 server.cc:370] Timeout 29: Found 0 live models and 0 in-flight requests

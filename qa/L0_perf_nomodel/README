@@ -1,0 +1,72 @@
+#!/bin/bash
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The test.sh script collects performance results using the trtserver in
+this container and then compares it against the results in the
+'baseline' directory.
+
+
+Legacy Comparison
+-----------------
+
+The results shown in directory 'legacy_baseline' are for older
+versions of trtserver and so may not contain complete results or may
+require special handling for comparison.
+
+legacy_baseline/19.04:
+
+  Results from 1.1.0 / 19.04 release. ONNX and PyTorch were not
+  available in this release and so are not available. 19.04
+  perf_client was used to generate the results and so latencies are
+  average and so cannot be compared directly to 'baseline' results
+  (which are generated with p95 by default). To compare to this
+  baseline need to use PERF_CLIENT_PERCENTILE=0 to generate under-test
+  results that stabilize using average latency.
+
+  $ # generate results using average latency to stabilize
+  $ # ignore analysis results
+  $ PERF_CLIENT_PERCENTILE=0 bash -x test.sh
+
+  $ # Show for min_latency_grpc, repeat for others...
+  $ perf_analysis.py --name='Compare to 19.04' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.04 --baseline=legacy_baseline/19.04/min_latency_grpc --undertest-name=${NVIDIA_TENSORRT_SERVER_VERSION} --undertest=min_latency_grpc
+
+legacy_baseline/19.05:
+
+  Results from 1.2.0 / 19.05 release. ONNX and PyTorch were not
+  available in this release and so are not available. 19.05
+  perf_client was used to generate the results and so latencies are
+  average and so cannot be compared directly to 'baseline' results
+  (which are generated with p95 by default). To compare to this
+  baseline need to use PERF_CLIENT_PERCENTILE=0 to generate under-test
+  results that stabilize using average latency.
+
+  $ # generate results using average latency to stabilize
+  $ # ignore analysis results
+  $ PERF_CLIENT_PERCENTILE=0 bash -x test.sh
+
+  $ # Show for min_latency_grpc, repeat for others...
+  $ perf_analysis.py --name='Compare to 19.05' --latency --slowdown-threshold=5.0 --speedup-threshold=5.0 --baseline-name=19.05 --baseline=legacy_baseline/19.05/min_latency_grpc --undertest-name=${NVIDIA_TENSORRT_SERVER_VERSION} --undertest=min_latency_grpc

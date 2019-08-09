@@ -1,0 +1,24 @@
+I0808 00:51:58.428640 14027 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 00:51:58.428818 14027 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 00:51:58.428831 14027 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 00:51:58.428844 14027 grpc_server.cc:281] Register Infer RPC
+I0808 00:51:58.428849 14027 grpc_server.cc:285] Register StreamInfer RPC
+I0808 00:51:58.428853 14027 grpc_server.cc:290] Register Status RPC
+I0808 00:51:58.428858 14027 grpc_server.cc:294] Register Profile RPC
+I0808 00:51:58.428863 14027 grpc_server.cc:298] Register Health RPC
+I0808 00:51:58.428868 14027 grpc_server.cc:310] Register Executor
+I0808 00:51:58.433087 14027 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 00:51:58.475018 14027 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 00:51:58.478627 14027 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 00:51:58.484733 14027 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 00:51:58.490465 14027 server.cc:111] Initializing TensorRT Inference Server
+I0808 00:51:58.523148 14027 server_status.cc:83] New status tracking for model 'libtorch_zero_1_float32'
+I0808 00:51:58.523213 14027 model_repository_manager.cc:633] loading: libtorch_zero_1_float32:1
+I0808 00:51:58.524559 14027 libtorch_backend.cc:220] Creating instance libtorch_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.pt
+I0808 00:51:58.536385 14027 model_repository_manager.cc:776] successfully loaded 'libtorch_zero_1_float32' version 1
+I0808 00:53:17.380573 14027 main.cc:229] Interrupt signal (15) received.
+I0808 00:53:17.380601 14027 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 00:53:17.380611 14027 model_repository_manager.cc:659] unloading: libtorch_zero_1_float32:1
+I0808 00:53:17.380688 14027 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 00:53:17.380701 14027 model_repository_manager.cc:761] successfully unloaded 'libtorch_zero_1_float32' version 1
+I0808 00:53:18.380820 14027 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests

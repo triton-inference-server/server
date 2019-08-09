@@ -1,0 +1,46 @@
+I0808 18:26:12.232822 7668 main.cc:138] Starting endpoints, 'inference:0' listening on
+I0808 18:26:12.232906 7668 main.cc:142]  localhost:8001 for gRPC requests
+I0808 18:26:12.233047 7668 grpc_server.cc:258] Building nvrpc server
+I0808 18:26:12.233060 7668 grpc_server.cc:264] Register TensorRT GRPCService
+I0808 18:26:12.233076 7668 grpc_server.cc:267] Register Infer RPC
+I0808 18:26:12.233081 7668 grpc_server.cc:271] Register StreamInfer RPC
+I0808 18:26:12.233086 7668 grpc_server.cc:276] Register Status RPC
+I0808 18:26:12.233090 7668 grpc_server.cc:280] Register Profile RPC
+I0808 18:26:12.233095 7668 grpc_server.cc:284] Register Health RPC
+I0808 18:26:12.233100 7668 grpc_server.cc:296] Register Executor
+I0808 18:26:12.235560 7668 main.cc:153]  localhost:8000 for HTTP requests
+I0808 18:26:12.277338 7668 main.cc:165]  localhost:8002 for metric reporting
+I0808 18:26:12.280853 7668 metrics.cc:150] found 1 GPUs supporting NVML metrics
+I0808 18:26:12.287066 7668 metrics.cc:159]   GPU 0: TITAN RTX
+I0808 18:26:12.287844 7668 server.cc:241] Initializing TensorRT Inference Server
+I0808 18:26:12.312771 7668 server_status.cc:105] New status tracking for model 'graphdef_zero_1_float32'
+I0808 18:26:12.312880 7668 server_core.cc:465] Adding/updating models.
+I0808 18:26:12.312890 7668 server_core.cc:562]  (Re-)adding model: graphdef_zero_1_float32
+I0808 18:26:12.413169 7668 basic_manager.cc:739] Successfully reserved resources to load servable {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:12.413214 7668 loader_harness.cc:66] Approving load for servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:12.413239 7668 loader_harness.cc:74] Loading servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:12.414409 7668 base_bundle.cc:162] Creating instance graphdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.graphdef
+I0808 18:26:12.510949 7668 gpu_device.cc:1433] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+totalMemory: 23.62GiB freeMemory: 23.45GiB
+I0808 18:26:12.510980 7668 gpu_device.cc:1512] Adding visible gpu devices: 0
+I0808 18:26:14.549914 7668 gpu_device.cc:984] Device interconnect StreamExecutor with strength 1 edge matrix:
+I0808 18:26:14.549942 7668 gpu_device.cc:990]      0 
+I0808 18:26:14.549948 7668 gpu_device.cc:1003] 0:   N 
+I0808 18:26:14.550083 7668 gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22389 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0808 18:26:14.566490 7668 service.cc:161] XLA service 0x7f0559e03d20 executing computations on platform CUDA. Devices:
+I0808 18:26:14.566505 7668 service.cc:168]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+I0808 18:26:14.568420 7668 cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+I0808 18:26:14.568992 7668 service.cc:161] XLA service 0x7f0559e64ca0 executing computations on platform Host. Devices:
+I0808 18:26:14.569004 7668 service.cc:168]   StreamExecutor device (0): <undefined>, <undefined>
+I0808 18:26:14.570077 7668 loader_harness.cc:86] Successfully loaded servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:51.273949 7668 main.cc:86] Interrupt signal (15) received.
+I0808 18:26:51.274004 7668 server.cc:349] Waiting for in-flight inferences to complete.
+I0808 18:26:51.274030 7668 server_core.cc:465] Adding/updating models.
+I0808 18:26:51.274066 7668 server.cc:368] Timeout 30: Found 1 live models and 1 in-flight requests
+I0808 18:26:51.342064 7668 loader_harness.cc:137] Quiescing servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:51.342121 7668 loader_harness.cc:144] Done quiescing servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:51.342142 7668 loader_harness.cc:119] Unloading servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:51.342321 7668 loader_harness.cc:127] Done unloading servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 18:26:52.274197 7668 server.cc:368] Timeout 29: Found 0 live models and 0 in-flight requests

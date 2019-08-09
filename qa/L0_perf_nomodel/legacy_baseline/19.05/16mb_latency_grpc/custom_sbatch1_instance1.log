@@ -1,0 +1,45 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Reporting 95-th percentile latency
+
+Request concurrency: 1
+  Pass [1] throughput: 19 infer/sec. 95-th percentile latency: 57009 usec
+  Pass [2] throughput: 20 infer/sec. 95-th percentile latency: 52598 usec
+  Pass [3] throughput: 19 infer/sec. 95-th percentile latency: 54303 usec
+  Client: 
+    Request count: 99
+    Throughput: 19 infer/sec
+    95-th percentile latency: 54303 usec
+    Avg gRPC time: 50347 usec (marshal 1822 usec + response wait 48520 usec + unmarshal 5 usec)
+  Server: 
+    Request count: 119
+    Avg request latency: 15123 usec (overhead 36 usec + queue 53 usec + compute 15034 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 37 infer/sec. 95-th percentile latency: 63610 usec
+  Pass [2] throughput: 36 infer/sec. 95-th percentile latency: 63331 usec
+  Pass [3] throughput: 22 infer/sec. 95-th percentile latency: 184859 usec
+  Pass [4] throughput: 12 infer/sec. 95-th percentile latency: 386271 usec
+  Pass [5] throughput: 5 infer/sec. 95-th percentile latency: 611488 usec
+  Pass [6] throughput: 5 infer/sec. 95-th percentile latency: 568042 usec
+  Pass [7] throughput: 5 infer/sec. 95-th percentile latency: 562539 usec
+  Pass [8] throughput: 5 infer/sec. 95-th percentile latency: 596080 usec
+  Client: 
+    Request count: 27
+    Throughput: 5 infer/sec
+    95-th percentile latency: 596080 usec
+    Avg gRPC time: 367987 usec (marshal 1842 usec + response wait 366138 usec + unmarshal 7 usec)
+  Server: 
+    Request count: 33
+    Avg request latency: 165961 usec (overhead 47 usec + queue 580 usec + compute 165334 usec)
+
+[ 0] SUCCESS
+Inferences/Second vs. Client 95-th Percentile Batch Latency
+Concurrency: 1, 19 infer/sec, latency 54303 usec
+Concurrency: 2, 5 infer/sec, latency 596080 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4095  100  4095    0     0  51219      0 --:--:-- --:--:-- --:--:-- 51835

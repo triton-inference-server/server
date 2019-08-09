@@ -1,0 +1,32 @@
+I0808 20:26:50.663093 391 main.cc:267] Starting endpoints, 'inference:0' listening on
+I0808 20:26:50.663168 391 main.cc:271]  localhost:8001 for gRPC requests
+I0808 20:26:50.663282 391 grpc_server.cc:265] Building nvrpc server
+I0808 20:26:50.663309 391 grpc_server.cc:272] Register TensorRT GRPCService
+I0808 20:26:50.663324 391 grpc_server.cc:275] Register Infer RPC
+I0808 20:26:50.663329 391 grpc_server.cc:279] Register StreamInfer RPC
+I0808 20:26:50.663333 391 grpc_server.cc:284] Register Status RPC
+I0808 20:26:50.663338 391 grpc_server.cc:288] Register Profile RPC
+I0808 20:26:50.663342 391 grpc_server.cc:292] Register Health RPC
+I0808 20:26:50.663347 391 grpc_server.cc:304] Register Executor
+I0808 20:26:50.668303 391 main.cc:282]  localhost:8000 for HTTP requests
+I0808 20:26:50.710216 391 main.cc:294]  localhost:8002 for metric reporting
+I0808 20:26:50.713898 391 metrics.cc:149] found 1 GPUs supporting NVML metrics
+I0808 20:26:50.720070 391 metrics.cc:158]   GPU 0: TITAN RTX
+I0808 20:26:50.720958 391 server.cc:243] Initializing TensorRT Inference Server
+I0808 20:26:50.752995 391 server_status.cc:106] New status tracking for model 'custom_zero_1_float32'
+2019-08-08 20:26:50.753168: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+2019-08-08 20:26:50.753196: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:562]  (Re-)adding model: custom_zero_1_float32
+2019-08-08 20:26:50.853548: I external/tf_serving/tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: custom_zero_1_float32 version: 1}
+2019-08-08 20:26:50.853615: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: custom_zero_1_float32 version: 1}
+2019-08-08 20:26:50.853647: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: custom_zero_1_float32 version: 1}
+I0808 20:26:50.853807 391 custom_bundle.cc:161] Creating instance custom_zero_1_float32_0_0_cpu on CPU using libcustom.so
+2019-08-08 20:26:50.860364: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:86] Successfully loaded servable version {name: custom_zero_1_float32 version: 1}
+I0808 20:27:27.546611 391 main.cc:213] Interrupt signal (15) received.
+I0808 20:27:27.546655 391 server.cc:351] Waiting for in-flight inferences to complete.
+2019-08-08 20:27:27.546686: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+I0808 20:27:27.546742 391 server.cc:370] Timeout 30: Found 1 live models and 0 in-flight requests
+2019-08-08 20:27:27.579095: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:137] Quiescing servable version {name: custom_zero_1_float32 version: 1}
+2019-08-08 20:27:27.579147: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:144] Done quiescing servable version {name: custom_zero_1_float32 version: 1}
+2019-08-08 20:27:27.579162: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:119] Unloading servable version {name: custom_zero_1_float32 version: 1}
+2019-08-08 20:27:27.579486: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:127] Done unloading servable version {name: custom_zero_1_float32 version: 1}
+I0808 20:27:28.546877 391 server.cc:370] Timeout 29: Found 0 live models and 0 in-flight requests

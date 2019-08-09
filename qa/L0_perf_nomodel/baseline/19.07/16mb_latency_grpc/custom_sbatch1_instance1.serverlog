@@ -1,0 +1,24 @@
+I0808 01:00:25.156460 14727 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 01:00:25.156819 14727 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 01:00:25.156850 14727 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 01:00:25.156876 14727 grpc_server.cc:281] Register Infer RPC
+I0808 01:00:25.156890 14727 grpc_server.cc:285] Register StreamInfer RPC
+I0808 01:00:25.156904 14727 grpc_server.cc:290] Register Status RPC
+I0808 01:00:25.156918 14727 grpc_server.cc:294] Register Profile RPC
+I0808 01:00:25.156932 14727 grpc_server.cc:298] Register Health RPC
+I0808 01:00:25.156946 14727 grpc_server.cc:310] Register Executor
+I0808 01:00:25.168891 14727 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 01:00:25.211182 14727 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 01:00:25.214182 14727 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 01:00:25.220226 14727 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 01:00:25.226276 14727 server.cc:111] Initializing TensorRT Inference Server
+I0808 01:00:25.260061 14727 server_status.cc:83] New status tracking for model 'custom_zero_1_float32'
+I0808 01:00:25.260140 14727 model_repository_manager.cc:633] loading: custom_zero_1_float32:1
+I0808 01:00:25.260360 14727 custom_backend.cc:166] Creating instance custom_zero_1_float32_0_0_cpu on CPU using libcustom.so
+I0808 01:00:25.261070 14727 model_repository_manager.cc:776] successfully loaded 'custom_zero_1_float32' version 1
+I0808 01:01:02.160852 14727 main.cc:229] Interrupt signal (15) received.
+I0808 01:01:02.160911 14727 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 01:01:02.160930 14727 model_repository_manager.cc:659] unloading: custom_zero_1_float32:1
+I0808 01:01:02.161128 14727 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 01:01:02.161129 14727 model_repository_manager.cc:761] successfully unloaded 'custom_zero_1_float32' version 1
+I0808 01:01:03.161240 14727 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,35 @@
+I0808 20:29:31.321382 898 main.cc:267] Starting endpoints, 'inference:0' listening on
+I0808 20:29:31.321465 898 main.cc:271]  localhost:8001 for gRPC requests
+I0808 20:29:31.321584 898 grpc_server.cc:265] Building nvrpc server
+I0808 20:29:31.321596 898 grpc_server.cc:272] Register TensorRT GRPCService
+I0808 20:29:31.321608 898 grpc_server.cc:275] Register Infer RPC
+I0808 20:29:31.321613 898 grpc_server.cc:279] Register StreamInfer RPC
+I0808 20:29:31.321617 898 grpc_server.cc:284] Register Status RPC
+I0808 20:29:31.321622 898 grpc_server.cc:288] Register Profile RPC
+I0808 20:29:31.321626 898 grpc_server.cc:292] Register Health RPC
+I0808 20:29:31.321631 898 grpc_server.cc:304] Register Executor
+I0808 20:29:31.326872 898 main.cc:282]  localhost:8000 for HTTP requests
+I0808 20:29:31.368732 898 main.cc:294]  localhost:8002 for metric reporting
+I0808 20:29:31.372408 898 metrics.cc:149] found 1 GPUs supporting NVML metrics
+I0808 20:29:31.378569 898 metrics.cc:158]   GPU 0: TITAN RTX
+I0808 20:29:31.379345 898 server.cc:243] Initializing TensorRT Inference Server
+I0808 20:29:31.404672 898 server_status.cc:106] New status tracking for model 'plan_zero_1_float32'
+2019-08-08 20:29:31.404812: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+2019-08-08 20:29:31.404840: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:562]  (Re-)adding model: plan_zero_1_float32
+2019-08-08 20:29:31.505242: I external/tf_serving/tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: plan_zero_1_float32 version: 1}
+2019-08-08 20:29:31.505306: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: plan_zero_1_float32 version: 1}
+2019-08-08 20:29:31.505339: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: plan_zero_1_float32 version: 1}
+I0808 20:29:31.506575 898 plan_bundle.cc:209] Creating instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.plan
+I0808 20:29:33.642980 898 logging.cc:49] Glob Size is 0 bytes.
+I0808 20:29:35.050326 898 logging.cc:49] Deserialize required 1407862 microseconds.
+I0808 20:29:35.052115 898 plan_bundle.cc:317] Created instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) with stream priority 0
+2019-08-08 20:29:35.052209: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:86] Successfully loaded servable version {name: plan_zero_1_float32 version: 1}
+I0808 20:30:11.278159 898 main.cc:213] Interrupt signal (15) received.
+I0808 20:30:11.278196 898 server.cc:351] Waiting for in-flight inferences to complete.
+2019-08-08 20:30:11.278225: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+I0808 20:30:11.278279 898 server.cc:370] Timeout 30: Found 1 live models and 0 in-flight requests
+2019-08-08 20:30:11.334664: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:137] Quiescing servable version {name: plan_zero_1_float32 version: 1}
+2019-08-08 20:30:11.334710: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:144] Done quiescing servable version {name: plan_zero_1_float32 version: 1}
+2019-08-08 20:30:11.334724: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:119] Unloading servable version {name: plan_zero_1_float32 version: 1}
+2019-08-08 20:30:11.336546: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:127] Done unloading servable version {name: plan_zero_1_float32 version: 1}
+I0808 20:30:12.278415 898 server.cc:370] Timeout 29: Found 0 live models and 0 in-flight requests
