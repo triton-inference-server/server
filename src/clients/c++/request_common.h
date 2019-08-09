@@ -155,7 +155,6 @@ class InputImpl : public InferContext::Input {
   bool IsSharedMemory() const { return (io_type_ == SHARED_MEMORY); }
   const std::string& GetSharedMemoryName() const { return shm_name_; }
   size_t GetSharedMemoryOffset() const { return shm_offset_; }
-  size_t GetSharedMemoryByteSize() const { return byte_size_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
 
@@ -211,7 +210,6 @@ class InputImpl : public InferContext::Input {
   IOType io_type_;
   std::string shm_name_;
   size_t shm_offset_;
-  size_t shm_byte_size_;
 };
 
 //==============================================================================
@@ -252,7 +250,7 @@ class OutputImpl : public InferContext::Output {
   IOType io_type_;
   std::string shm_name_;
   size_t shm_offset_;
-  size_t shm_byte_size_;
+  size_t byte_size_;
 };
 
 //==============================================================================
