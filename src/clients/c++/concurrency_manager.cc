@@ -26,6 +26,8 @@
 
 #include "src/clients/c++/concurrency_manager.h"
 
+#include "src/core/model_config.h"
+
 namespace perfclient {
 
 ConcurrencyManager::~ConcurrencyManager()
@@ -62,30 +64,17 @@ ConcurrencyManager::Create(
 
   // Validate user provided shape
   if (!input_shapes.empty()) {
-    // Get all input names
     for (const auto& input : ctx->Inputs()) {
       auto it = input_shapes.find(input->Name());
       if (it != input_shapes.end()) {
-        bool valid = true;
-
         const auto& dims = it->second;
         const auto& config_dims = input->Dims();
-        if (((int64_t)dims.size()) != config_dims.size()) {
-          valid = false;
-        } else {
-          for (size_t idx = 0; idx < dims.size(); idx++) {
-            if ((dims[idx] <= 0) ||
-                ((dims[idx] != config_dims[idx]) && (config_dims[idx] != -1))) {
-              valid = false;
-              break;
-            }
-          }
-        }
-        if (!valid) {
+        if (!ni::CompareDimsWithWildcard(config_dims, dims)) {
           return nic::Error(
               ni::RequestStatusCode::INVALID_ARG,
-              "input shape set for '" + input->Name() +
-                  "' does not match model config shape");
+              "input '" + input->Name() + "' expects shape " +
+                  ni::DimsListToString(config_dims) +
+                  " and user supplied shape " + ni::DimsListToString(dims));
         }
       }
     }
@@ -94,7 +83,6 @@ ConcurrencyManager::Create(
 
   // Read provided data
   if (!data_directory.empty()) {
-    // Get all input names
     for (const auto& input : ctx->Inputs()) {
       const auto file_path = data_directory + "/" + input->Name();
       auto it =

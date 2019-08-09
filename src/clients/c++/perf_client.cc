@@ -343,10 +343,11 @@ Usage(char** argv, const std::string& msg = std::string())
       << " of latency will also be reported and used to detemine if the"
       << " measurement is stable instead of average latency."
       << " Default is -1 to indicate no percentile will be used." << std::endl;
-  std::cerr << "For --shape, it set the shape used for the specified input. The"
+  std::cerr << "For --shape, the shape used for the specified input. The"
                " argument must be specified as 'name:shape' where the shape is"
-               " separated by comma. --shape may be specified multiple times to"
-               " specify shapes for different inputs."
+               " a comma-separated list for dimension sizes, for example"
+               " '--shape input_name:1,2,3'. --shape may be specified multiple"
+               " times to specify shapes for different inputs."
             << std::endl;
   std::cerr
       << "For --data-directory, it indicates that the perf client will use user"
@@ -426,18 +427,22 @@ main(int argc, char** argv)
         try {
           while (pos != std::string::npos) {
             size_t comma_pos = shape_str.find(",", pos);
+            int64_t dim;
             if (comma_pos == std::string::npos) {
-              shape.emplace_back(std::stoll(shape_str.substr(pos, comma_pos)));
+              dim = std::stoll(shape_str.substr(pos, comma_pos));
               pos = comma_pos;
             } else {
-              shape.emplace_back(
-                  std::stoll(shape_str.substr(pos, comma_pos - pos)));
+              dim = std::stoll(shape_str.substr(pos, comma_pos - pos));
               pos = comma_pos + 1;
             }
+            if (dim <= 0) {
+              Usage(argv, "input shape must be > 0");
+            }
+            shape.emplace_back(dim);
           }
         }
         catch (const std::invalid_argument& ia) {
-          Usage(argv, "failed to parse input shape");
+          Usage(argv, "failed to parse input shape: " + std::string(optarg));
         }
         input_shapes[name] = shape;
         break;
