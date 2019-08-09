@@ -376,10 +376,6 @@ if(${TRTIS_ENABLE_METRICS})
   set(TRTIS_DEPENDS ${TRTIS_DEPENDS} prometheus-cpp)
 endif() # TRTIS_ENABLE_METRICS
 
-set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
-    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib
-    ${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake)
-
 ExternalProject_Add(trtis
   PREFIX trtis
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis"
@@ -397,6 +393,12 @@ ExternalProject_Add(trtis
     -Dstorage_client_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/storage_client
     -Dgoogle_cloud_cpp_common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/google-cloud-cpp/install/lib/cmake/google_cloud_cpp_common
     -DCrc32c_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
+    -DAWSSDK_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/AWSSDK
+    -Daws-cpp-sdk-core_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-core
+    -Daws-cpp-sdk-s3_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/cmake/aws-cpp-sdk-s3
+    -Daws-c-event-stream_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-event-stream/cmake
+    -Daws-c-common_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-c-common/cmake
+    -Daws-checksums_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/aws-sdk-cpp/install/lib/aws-checksums/cmake
     -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRTIS_ONNXRUNTIME_INCLUDE_PATHS}
     -DTRTIS_PYTORCH_INCLUDE_PATHS:PATH=${TRTIS_PYTORCH_INCLUDE_PATHS}
     -DTRTIS_EXTRA_LIB_PATHS:PATH=${TRTIS_EXTRA_LIB_PATHS}
@@ -416,7 +418,6 @@ ExternalProject_Add(trtis
     -DTRTIS_ENABLE_CUSTOM:BOOL=${TRTIS_ENABLE_CUSTOM}
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_INSTALL_PREFIX}
-    -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
   DEPENDS ${TRTIS_DEPENDS}
 )
 
