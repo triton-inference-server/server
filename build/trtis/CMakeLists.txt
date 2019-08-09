@@ -67,6 +67,10 @@ if(${TRTIS_ENABLE_GCS})
   add_definitions(-DTRTIS_ENABLE_GCS=1)
 endif() # TRTIS_ENABLE_GCS
 
+if(${TRTIS_ENABLE_S3})
+  add_definitions(-DTRTIS_ENABLE_S3=1)
+endif() # TRTIS_ENABLE_S3
+
 if(${TRTIS_ENABLE_TENSORFLOW})
   add_definitions(-DTRTIS_ENABLE_TENSORFLOW=1)
 endif() # TRTIS_ENABLE_TENSORFLOW
