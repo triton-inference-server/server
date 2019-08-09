@@ -1,0 +1,38 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+
+Request concurrency: 1
+  Pass [1] throughput: 9 infer/sec. Avg latency: 104854 usec (std 2325 usec)
+  Pass [2] throughput: 9 infer/sec. Avg latency: 104872 usec (std 2344 usec)
+  Pass [3] throughput: 9 infer/sec. Avg latency: 105684 usec (std 2799 usec)
+  Client: 
+    Request count: 48
+    Throughput: 9 infer/sec
+    Avg latency: 105684 usec (standard deviation 2799 usec)
+    Avg HTTP time: 105373 usec (send 16355 usec + response wait 27255 usec + receive 61763 usec)
+  Server: 
+    Request count: 57
+    Avg request latency: 18963 usec (overhead 473 usec + queue 36 usec + compute 18454 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 17 infer/sec. Avg latency: 114667 usec (std 5563 usec)
+  Pass [2] throughput: 18 infer/sec. Avg latency: 107206 usec (std 7494 usec)
+  Pass [3] throughput: 17 infer/sec. Avg latency: 113930 usec (std 6978 usec)
+  Client: 
+    Request count: 88
+    Throughput: 17 infer/sec
+    Avg latency: 113930 usec (standard deviation 6978 usec)
+    Avg HTTP time: 114079 usec (send 16095 usec + response wait 34900 usec + receive 63084 usec)
+  Server: 
+    Request count: 104
+    Avg request latency: 21347 usec (overhead 656 usec + queue 3966 usec + compute 16725 usec)
+
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, 9 infer/sec, latency 105684 usec
+Concurrency: 2, 17 infer/sec, latency 113930 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4914  100  4914    0     0  5830k      0 --:--:-- --:--:-- --:--:-- 4798k

@@ -1,0 +1,50 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Pass [1] throughput: 4200 infer/sec. p95 latency: 255 usec
+  Pass [2] throughput: 5478 infer/sec. p95 latency: 237 usec
+  Pass [3] throughput: 5720 infer/sec. p95 latency: 220 usec
+  Pass [4] throughput: 5066 infer/sec. p95 latency: 240 usec
+  Pass [5] throughput: 5553 infer/sec. p95 latency: 210 usec
+  Pass [6] throughput: 4616 infer/sec. p95 latency: 254 usec
+  Pass [7] throughput: 4955 infer/sec. p95 latency: 246 usec
+  Pass [8] throughput: 4841 infer/sec. p95 latency: 252 usec
+  Client: 
+    Request count: 24209
+    Throughput: 4841 infer/sec
+    p50 latency: 195 usec
+    p90 latency: 243 usec
+    p95 latency: 252 usec
+    p99 latency: 278 usec
+    Avg gRPC time: 189 usec (marshal 3 usec + response wait 180 usec + unmarshal 6 usec)
+  Server: 
+    Request count: 28341
+    Avg request latency: 96 usec (overhead 6 usec + queue 11 usec + compute 79 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 7808 infer/sec. p95 latency: 332 usec
+  Pass [2] throughput: 7673 infer/sec. p95 latency: 340 usec
+  Pass [3] throughput: 7712 infer/sec. p95 latency: 348 usec
+  Client: 
+    Request count: 38564
+    Throughput: 7712 infer/sec
+    p50 latency: 238 usec
+    p90 latency: 320 usec
+    p95 latency: 348 usec
+    p99 latency: 402 usec
+    Avg gRPC time: 234 usec (marshal 3 usec + response wait 224 usec + unmarshal 7 usec)
+  Server: 
+    Request count: 46208
+    Avg request latency: 91 usec (overhead 6 usec + queue 14 usec + compute 71 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, 4841 infer/sec, latency 252 usec
+Concurrency: 2, 7712 infer/sec, latency 348 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4283  100  4283    0     0   836k      0 --:--:-- --:--:-- --:--:--  836k

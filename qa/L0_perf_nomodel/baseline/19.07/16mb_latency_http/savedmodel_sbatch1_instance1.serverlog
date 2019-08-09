@@ -1,0 +1,44 @@
+I0808 01:06:18.288482 15425 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 01:06:18.288662 15425 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 01:06:18.288679 15425 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 01:06:18.288696 15425 grpc_server.cc:281] Register Infer RPC
+I0808 01:06:18.288701 15425 grpc_server.cc:285] Register StreamInfer RPC
+I0808 01:06:18.288706 15425 grpc_server.cc:290] Register Status RPC
+I0808 01:06:18.288711 15425 grpc_server.cc:294] Register Profile RPC
+I0808 01:06:18.288716 15425 grpc_server.cc:298] Register Health RPC
+I0808 01:06:18.288721 15425 grpc_server.cc:310] Register Executor
+I0808 01:06:18.293439 15425 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 01:06:18.335344 15425 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 01:06:18.339018 15425 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 01:06:18.345246 15425 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 01:06:18.351011 15425 server.cc:111] Initializing TensorRT Inference Server
+I0808 01:06:18.386576 15425 server_status.cc:83] New status tracking for model 'savedmodel_zero_1_float32'
+I0808 01:06:18.386650 15425 model_repository_manager.cc:633] loading: savedmodel_zero_1_float32:1
+I0808 01:06:18.387899 15425 base_backend.cc:146] Creating instance savedmodel_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-08-08 01:06:18.387980: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-08-08 01:06:18.388194: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-08-08 01:06:18.413273: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+2019-08-08 01:06:18.414011: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f6d80071a30 executing computations on platform Host. Devices:
+2019-08-08 01:06:18.414034: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2019-08-08 01:06:18.414151: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+2019-08-08 01:06:18.415535: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-08-08 01:06:18.415553: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-08-08 01:06:18.418103: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-08-08 01:06:20.698817: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-08-08 01:06:20.698864: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-08-08 01:06:20.698872: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-08-08 01:06:20.702669: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22364 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-08-08 01:06:20.704112: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f6c7b72a520 executing computations on platform CUDA. Devices:
+2019-08-08 01:06:20.704131: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+2019-08-08 01:06:20.705163: I tensorflow/cc/saved_model/loader.cc:203] Restoring SavedModel bundle.
+2019-08-08 01:06:20.705623: I tensorflow/cc/saved_model/loader.cc:213] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-08-08 01:06:20.705670: I tensorflow/cc/saved_model/loader.cc:324] SavedModel load for tags { serve }; Status: success. Took 2317706 microseconds.
+I0808 01:06:20.705827 15425 model_repository_manager.cc:776] successfully loaded 'savedmodel_zero_1_float32' version 1
+I0808 01:06:57.384166 15425 main.cc:229] Interrupt signal (15) received.
+I0808 01:06:57.384218 15425 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 01:06:57.384236 15425 model_repository_manager.cc:659] unloading: savedmodel_zero_1_float32:1
+I0808 01:06:57.384301 15425 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 01:06:57.384304 15425 model_repository_manager.cc:761] successfully unloaded 'savedmodel_zero_1_float32' version 1
+I0808 01:06:58.384429 15425 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,35 @@
+I0808 18:27:33.354483 7996 main.cc:138] Starting endpoints, 'inference:0' listening on
+I0808 18:27:33.354574 7996 main.cc:142]  localhost:8001 for gRPC requests
+I0808 18:27:33.354713 7996 grpc_server.cc:258] Building nvrpc server
+I0808 18:27:33.354726 7996 grpc_server.cc:264] Register TensorRT GRPCService
+I0808 18:27:33.354735 7996 grpc_server.cc:267] Register Infer RPC
+I0808 18:27:33.354740 7996 grpc_server.cc:271] Register StreamInfer RPC
+I0808 18:27:33.354745 7996 grpc_server.cc:276] Register Status RPC
+I0808 18:27:33.354750 7996 grpc_server.cc:280] Register Profile RPC
+I0808 18:27:33.354755 7996 grpc_server.cc:284] Register Health RPC
+I0808 18:27:33.354760 7996 grpc_server.cc:296] Register Executor
+I0808 18:27:33.357431 7996 main.cc:153]  localhost:8000 for HTTP requests
+I0808 18:27:33.398698 7996 main.cc:165]  localhost:8002 for metric reporting
+I0808 18:27:33.401833 7996 metrics.cc:150] found 1 GPUs supporting NVML metrics
+I0808 18:27:33.407771 7996 metrics.cc:159]   GPU 0: TITAN RTX
+I0808 18:27:33.408430 7996 server.cc:241] Initializing TensorRT Inference Server
+I0808 18:27:33.436524 7996 server_status.cc:105] New status tracking for model 'netdef_zero_1_float32'
+I0808 18:27:33.436651 7996 server_core.cc:465] Adding/updating models.
+I0808 18:27:33.436663 7996 server_core.cc:562]  (Re-)adding model: netdef_zero_1_float32
+I0808 18:27:33.537069 7996 basic_manager.cc:739] Successfully reserved resources to load servable {name: netdef_zero_1_float32 version: 1}
+I0808 18:27:33.537093 7996 loader_harness.cc:66] Approving load for servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:27:33.537106 7996 loader_harness.cc:74] Loading servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:27:33.537749 7996 netdef_bundle.cc:214] Creating instance netdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+E0808 18:27:33.538042 7996 init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+E0808 18:27:33.538061 7996 init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+E0808 18:27:33.538068 7996 init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+I0808 18:27:35.656695 7996 loader_harness.cc:86] Successfully loaded servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:28:12.384608 7996 main.cc:86] Interrupt signal (15) received.
+I0808 18:28:12.384648 7996 server.cc:349] Waiting for in-flight inferences to complete.
+I0808 18:28:12.384676 7996 server_core.cc:465] Adding/updating models.
+I0808 18:28:12.384706 7996 server.cc:368] Timeout 30: Found 1 live models and 1 in-flight requests
+I0808 18:28:12.470155 7996 loader_harness.cc:137] Quiescing servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:28:12.470209 7996 loader_harness.cc:144] Done quiescing servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:28:12.470229 7996 loader_harness.cc:119] Unloading servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:28:12.477719 7996 loader_harness.cc:127] Done unloading servable version {name: netdef_zero_1_float32 version: 1}
+I0808 18:28:13.384829 7996 server.cc:368] Timeout 29: Found 0 live models and 0 in-flight requests

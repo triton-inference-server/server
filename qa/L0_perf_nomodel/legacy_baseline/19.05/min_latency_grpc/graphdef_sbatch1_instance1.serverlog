@@ -1,0 +1,46 @@
+I0808 20:27:29.230658 484 main.cc:267] Starting endpoints, 'inference:0' listening on
+I0808 20:27:29.230743 484 main.cc:271]  localhost:8001 for gRPC requests
+I0808 20:27:29.230871 484 grpc_server.cc:265] Building nvrpc server
+I0808 20:27:29.230884 484 grpc_server.cc:272] Register TensorRT GRPCService
+I0808 20:27:29.230895 484 grpc_server.cc:275] Register Infer RPC
+I0808 20:27:29.230901 484 grpc_server.cc:279] Register StreamInfer RPC
+I0808 20:27:29.230905 484 grpc_server.cc:284] Register Status RPC
+I0808 20:27:29.230910 484 grpc_server.cc:288] Register Profile RPC
+I0808 20:27:29.230914 484 grpc_server.cc:292] Register Health RPC
+I0808 20:27:29.230919 484 grpc_server.cc:304] Register Executor
+I0808 20:27:29.236370 484 main.cc:282]  localhost:8000 for HTTP requests
+I0808 20:27:29.278331 484 main.cc:294]  localhost:8002 for metric reporting
+I0808 20:27:29.282079 484 metrics.cc:149] found 1 GPUs supporting NVML metrics
+I0808 20:27:29.288314 484 metrics.cc:158]   GPU 0: TITAN RTX
+I0808 20:27:29.289131 484 server.cc:243] Initializing TensorRT Inference Server
+I0808 20:27:29.319933 484 server_status.cc:106] New status tracking for model 'graphdef_zero_1_float32'
+2019-08-08 20:27:29.320094: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+2019-08-08 20:27:29.320125: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:562]  (Re-)adding model: graphdef_zero_1_float32
+2019-08-08 20:27:29.420515: I external/tf_serving/tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: graphdef_zero_1_float32 version: 1}
+2019-08-08 20:27:29.420580: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: graphdef_zero_1_float32 version: 1}
+2019-08-08 20:27:29.420612: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 20:27:29.421932 484 base_bundle.cc:162] Creating instance graphdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-08-08 20:27:29.537410: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1433] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+totalMemory: 23.62GiB freeMemory: 23.45GiB
+2019-08-08 20:27:29.537447: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1512] Adding visible gpu devices: 0
+2019-08-08 20:27:31.584508: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:984] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-08-08 20:27:31.584553: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:990]      0 
+2019-08-08 20:27:31.584560: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1003] 0:   N 
+2019-08-08 20:27:31.586827: I external/org_tensorflow/tensorflow/core/common_runtime/gpu/gpu_device.cc:1115] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22387 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-08-08 20:27:31.608062: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:161] XLA service 0x7faf5ccd6530 executing computations on platform CUDA. Devices:
+2019-08-08 20:27:31.608485: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:168]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+2019-08-08 20:27:31.620384: I external/org_tensorflow/tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+2019-08-08 20:27:31.621096: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:161] XLA service 0x7faf5cd3d070 executing computations on platform Host. Devices:
+2019-08-08 20:27:31.621117: I external/org_tensorflow/tensorflow/compiler/xla/service/service.cc:168]   StreamExecutor device (0): <undefined>, <undefined>
+2019-08-08 20:27:31.624152: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:86] Successfully loaded servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 20:28:08.111322 484 main.cc:213] Interrupt signal (15) received.
+I0808 20:28:08.111352 484 server.cc:351] Waiting for in-flight inferences to complete.
+2019-08-08 20:28:08.111371: I external/tf_serving/tensorflow_serving/model_servers/server_core.cc:465] Adding/updating models.
+I0808 20:28:08.111420 484 server.cc:370] Timeout 30: Found 1 live models and 0 in-flight requests
+2019-08-08 20:28:08.145524: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:137] Quiescing servable version {name: graphdef_zero_1_float32 version: 1}
+2019-08-08 20:28:08.145595: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:144] Done quiescing servable version {name: graphdef_zero_1_float32 version: 1}
+2019-08-08 20:28:08.145617: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:119] Unloading servable version {name: graphdef_zero_1_float32 version: 1}
+2019-08-08 20:28:08.145782: I external/tf_serving/tensorflow_serving/core/loader_harness.cc:127] Done unloading servable version {name: graphdef_zero_1_float32 version: 1}
+I0808 20:28:09.111506 484 server.cc:370] Timeout 29: Found 0 live models and 0 in-flight requests

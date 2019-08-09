@@ -1,0 +1,39 @@
+I0808 01:05:25.762973 15310 main.cc:346] Starting endpoints, 'inference:0' listening on
+I0808 01:05:25.763152 15310 grpc_server.cc:272] Starting a GRPCService at 0.0.0.0:8001
+I0808 01:05:25.763168 15310 grpc_server.cc:278] Register TensorRT GRPCService
+I0808 01:05:25.763180 15310 grpc_server.cc:281] Register Infer RPC
+I0808 01:05:25.763185 15310 grpc_server.cc:285] Register StreamInfer RPC
+I0808 01:05:25.763190 15310 grpc_server.cc:290] Register Status RPC
+I0808 01:05:25.763194 15310 grpc_server.cc:294] Register Profile RPC
+I0808 01:05:25.763199 15310 grpc_server.cc:298] Register Health RPC
+I0808 01:05:25.763204 15310 grpc_server.cc:310] Register Executor
+I0808 01:05:25.767665 15310 http_server.cc:632] Starting HTTPService at 0.0.0.0:8000
+I0808 01:05:25.809571 15310 http_server.cc:646] Starting Metrics Service at 0.0.0.0:8002
+I0808 01:05:25.813171 15310 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0808 01:05:25.819403 15310 metrics.cc:169]   GPU 0: TITAN RTX
+I0808 01:05:25.825360 15310 server.cc:111] Initializing TensorRT Inference Server
+I0808 01:05:25.858937 15310 server_status.cc:83] New status tracking for model 'graphdef_zero_1_float32'
+I0808 01:05:25.859000 15310 model_repository_manager.cc:633] loading: graphdef_zero_1_float32:1
+I0808 01:05:25.860227 15310 base_backend.cc:146] Creating instance graphdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-08-08 01:05:25.887239: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3598660000 Hz
+2019-08-08 01:05:25.888196: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7fc360040a60 executing computations on platform Host. Devices:
+2019-08-08 01:05:25.888231: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2019-08-08 01:05:25.889819: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+2019-08-08 01:05:25.891609: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-08-08 01:05:25.891626: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-08-08 01:05:25.894492: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-08-08 01:05:28.248213: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-08-08 01:05:28.248265: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-08-08 01:05:28.248273: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-08-08 01:05:28.251902: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22364 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-08-08 01:05:28.253535: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7fc257019e80 executing computations on platform CUDA. Devices:
+2019-08-08 01:05:28.253554: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+I0808 01:05:28.259100 15310 model_repository_manager.cc:776] successfully loaded 'graphdef_zero_1_float32' version 1
+I0808 01:06:16.837301 15310 main.cc:229] Interrupt signal (15) received.
+I0808 01:06:16.837363 15310 server.cc:160] Waiting for in-flight inferences to complete.
+I0808 01:06:16.837384 15310 model_repository_manager.cc:659] unloading: graphdef_zero_1_float32:1
+I0808 01:06:16.837473 15310 server.cc:175] Timeout 30: Found 1 live models and 0 in-flight requests
+I0808 01:06:16.837480 15310 model_repository_manager.cc:761] successfully unloaded 'graphdef_zero_1_float32' version 1
+I0808 01:06:17.837633 15310 server.cc:175] Timeout 29: Found 0 live models and 0 in-flight requests
