@@ -387,11 +387,8 @@ InferResponseProvider::InferResponseProvider(
     output_map_.emplace(std::make_pair(output.name(), output));
   }
 
-  // Create a copy of the output_shm_buffer map
-  for (auto& output : output_shm_buffer_) {
-    output_shm_buffer_.emplace(std::make_pair(output.first, output.second));
-  }
-  // output_shm_buffer_.insert(output_shm_buffer.begin(), output_shm_buffer.end());
+  // Create a copy of the output_shm_buffer map for the response provider
+  output_shm_buffer_.insert(output_shm_buffer.begin(), output_shm_buffer.end());
 }
 
 bool
@@ -441,13 +438,11 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   auto shm_pr = output_shm_buffer_.find(name);
   size_t byte_size;
   if (shm_pr != output_shm_buffer_.end()) {
-    *content = const_cast<void*>(reinterpret_cast<const void*>(shm_pr->second.first->BufferAt(0, &byte_size)));
-    // *content = shm_pr->second.first->BufferAt(0, &byte_size);
-    // verify content_byte_size == byte_size
+    *content = const_cast<void*>(reinterpret_cast<const void*>(shm_pr->second->BufferAt(0, &byte_size)));
+    // TODO verify content_byte_size == byte_size
     loutput->ptr_ = content;
   }
   else {
-    LOG_VERBOSE(1) << "Unable to find in output_shm_buffer of name:" << name;
     loutput->ptr_ = nullptr;
   }
 
@@ -825,7 +820,6 @@ HTTPInferResponseProvider::AllocateOutputBuffer(
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
-  LOG_VERBOSE(1) << "Seg fault after CheckAndSetIfBufferedOutput";
 
   if ((output->ptr_ == nullptr) && (content_byte_size > 0)) {
     // Reserve requested space in evbuffer...

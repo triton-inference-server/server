@@ -325,7 +325,7 @@ class InferResponseProvider {
 
   // Map from output name to the location in shared memory of the content.
   // It contains the buffer and the expected size of the named output.
-  std::unordered_map<std::string, std::pair<std::shared_ptr<SystemMemory>, size_t>> output_shm_buffer_;
+  std::unordered_map<std::string, std::shared_ptr<SystemMemory>> output_shm_buffer_;
 
   // Map from output name to external label provider and name for that provider.
   // This map should only be non-empty if the response provider is for models
