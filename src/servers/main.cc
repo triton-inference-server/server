@@ -99,11 +99,13 @@ int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_GRPC
-// The number of threads to initialize for handling GRPC infer requests.
-int grpc_infer_thread_cnt_ = 1000;
+// The number of threads to initialize for handling GRPC infer
+// requests.
+int grpc_infer_thread_cnt_ = 8;
 
-// The number of threads to initialize for handling GRPC stream infer requests.
-int grpc_stream_infer_thread_cnt_ = 1000;
+// The number of threads to initialize for handling GRPC stream infer
+// requests.
+int grpc_stream_infer_thread_cnt_ = 8;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_HTTP
