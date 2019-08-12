@@ -26,6 +26,8 @@
 
 #include "src/clients/c++/concurrency_manager.h"
 
+#include "src/core/model_config.h"
+
 namespace perfclient {
 
 ConcurrencyManager::~ConcurrencyManager()
@@ -49,28 +51,48 @@ nic::Error
 ConcurrencyManager::Create(
     const int32_t batch_size, const size_t max_threads,
     const size_t sequence_length, const bool zero_input,
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
     const std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager>* manager)
 {
-  manager->reset(new ConcurrencyManager(
+  std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
       batch_size, max_threads, sequence_length, zero_input, factory));
+
+  std::unique_ptr<nic::InferContext> ctx;
+  RETURN_IF_ERROR(local_manager->factory_->CreateInferContext(&ctx));
+
+  // Validate user provided shape
+  if (!input_shapes.empty()) {
+    for (const auto& input : ctx->Inputs()) {
+      auto it = input_shapes.find(input->Name());
+      if (it != input_shapes.end()) {
+        const auto& dims = it->second;
+        const auto& config_dims = input->Dims();
+        if (!ni::CompareDimsWithWildcard(config_dims, dims)) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "input '" + input->Name() + "' expects shape " +
+                  ni::DimsListToString(config_dims) +
+                  " and user supplied shape " + ni::DimsListToString(dims));
+        }
+      }
+    }
+    local_manager->input_shapes_ = input_shapes;
+  }
 
   // Read provided data
   if (!data_directory.empty()) {
-    // Get all input names
-    std::unique_ptr<nic::InferContext> ctx;
-    RETURN_IF_ERROR((static_cast<ConcurrencyManager*>(manager->get()))
-                        ->factory_->CreateInferContext(&ctx));
     for (const auto& input : ctx->Inputs()) {
       const auto file_path = data_directory + "/" + input->Name();
-      auto it = (static_cast<ConcurrencyManager*>(manager->get()))
-                    ->input_data_.emplace(input->Name(), std::vector<char>())
-                    .first;
+      auto it =
+          local_manager->input_data_.emplace(input->Name(), std::vector<char>())
+              .first;
       RETURN_IF_ERROR(ReadFile(file_path, &it->second));
     }
   }
 
+  *manager = std::move(local_manager);
   return nic::Error::Success;
 }
 
@@ -203,12 +225,26 @@ ConcurrencyManager::PrepareInfer(
   // needed input. We (re)use this buffer for all input values.
   size_t max_input_byte_size = 0;
   for (const auto& input : (*ctx)->Inputs()) {
+    // For variable shape, first set the shape if specified
+    if (input->Shape().empty()) {
+      auto it = input_shapes_.find(input->Name());
+      if (it != input_shapes_.end()) {
+        input->SetShape(it->second);
+      }
+    }
     const int64_t bs = input->ByteSize();
     if (bs < 0) {
+      std::string error_detail;
+      if (input->Shape().empty()) {
+        error_detail =
+            "has variable-size shape and the shape to be used is not specified";
+      } else {
+        error_detail = "has STRING data type";
+      }
       return nic::Error(
           ni::RequestStatusCode::INVALID_ARG,
-          "input '" + input->Name() +
-              "' has variable-size shape, unable to create input values for "
+          "input '" + input->Name() + "' " + error_detail +
+              ", unable to create input values for "
               "model '" +
               (*ctx)->ModelName() + "'");
     }

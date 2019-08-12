@@ -65,6 +65,7 @@ class ConcurrencyManager : public LoadManager {
   static nic::Error Create(
       const int32_t batch_size, const size_t max_threads,
       const size_t sequence_length, const bool zero_input,
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager>* manager);
@@ -151,6 +152,9 @@ class ConcurrencyManager : public LoadManager {
   bool on_sequence_model_;
 
   std::shared_ptr<ContextFactory> factory_;
+
+  // User provided input shape
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes_;
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
