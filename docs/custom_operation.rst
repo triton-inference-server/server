@@ -50,7 +50,7 @@ compiled into libtrtcustom.so, starting the inference server with the
 following command makes those custom layers available to all TensorRT
 models loaded into the server::
 
-  $ LD_PRELOAD=libtrtcustom.so trtserver --model-store=/tmp/models ...
+  $ LD_PRELOAD=libtrtcustom.so trtserver --model-repository=/tmp/models ...
 
 A limitation of this approach is that the custom layers must be
 managed separately from the model repository itself. And more
@@ -69,7 +69,7 @@ libtfcustom.so, starting the inference server with the following
 command makes those operations available to all TensorFlow models
 loaded into the server::
 
-  $ LD_PRELOAD=libtfcustom.so trtserver --model-store=/tmp/models ...
+  $ LD_PRELOAD=libtfcustom.so trtserver --model-repository=/tmp/models ...
 
 A limitation of this approach is that the custom operations must be
 managed separately from the model repository itself. And more
