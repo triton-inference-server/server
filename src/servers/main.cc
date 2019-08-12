@@ -181,7 +181,7 @@ std::vector<Option> options_{
     {OPTION_ID, "id", "Identifier for this server"},
     {OPTION_MODEL_REPOSITORY, "model-store",
      "Path to model repository directory. This option is deprecated, the "
-     "prefer usage is --model-repository"},
+     "preferred usage is --model-repository"},
     {OPTION_MODEL_REPOSITORY, "model-repository",
      "Path to model repository directory"},
     {OPTION_EXIT_ON_ERROR, "exit-on-error",
