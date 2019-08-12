@@ -418,10 +418,10 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 {
   shape->clear();
 
-  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw shape not available for CLASS output '" + output_->Name() + "'");
+        "raw shape not available for non-RAW output '" + output_->Name() + "'");
   }
 
   *shape = shape_;
@@ -431,10 +431,10 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 Error
 ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 {
-  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -461,10 +461,10 @@ Error
 ResultImpl::GetRaw(
     size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
 {
-  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -490,10 +490,10 @@ Error
 ResultImpl::GetRawAtCursor(
     size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
 {
-  if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
+  if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -577,7 +577,7 @@ ResultImpl::GetClassAtCursor(
   if (class_pos_[batch_idx] >= (size_t)classes.cls().size()) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "attempt to read beyond end of result for output output '" +
+        "attempt to read beyond end of result for output '" +
             output_->Name() + "'");
   }
 
@@ -906,7 +906,7 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
-    if (ooptions.shm_name != "") {
+    if (!ooptions.shm_name.empty()) {
       auto rshared_memory = routput->mutable_shared_memory();
       rshared_memory->set_name(ooptions.shm_name);
       rshared_memory->set_offset(ooptions.shm_offset);
