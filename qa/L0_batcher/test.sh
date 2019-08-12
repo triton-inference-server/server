@@ -39,7 +39,7 @@ RET=0
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
-# Setup non-variable-size model store
+# Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
 for m in \
         $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 \
@@ -56,7 +56,7 @@ for m in \
                 echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 done
 
-# Setup variable-size model store
+# Setup variable-size model repository
 rm -fr var_models && mkdir var_models
 for m in \
         $DATADIR/qa_variable_model_repository/savedmodel_float32_float32_float32 \
@@ -95,7 +95,7 @@ for model_type in FIXED VARIABLE; do
             test_multi_same_output1 \
             test_multi_different_outputs \
             test_multi_different_output_order ; do
-        SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -127,7 +127,7 @@ for model_type in FIXED VARIABLE; do
         export TRTSERVER_DELAY_SCHEDULER=6 &&
             [[ "$i" != "test_multi_batch_use_biggest_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=3 &&
             [[ "$i" != "test_multi_batch_use_best_preferred" ]] && export TRTSERVER_DELAY_SCHEDULER=2
-        SERVER_ARGS="--model-store=`pwd`/$MODEL_PATH"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_PATH"
         SERVER_LOG="./$i.$model_type.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -158,7 +158,7 @@ for i in \
         test_multi_batch_not_preferred_different_shape \
         test_multi_batch_preferred_different_shape \
         test_multi_batch_different_shape ; do
-    SERVER_ARGS="--model-store=`pwd`/var_models"
+    SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -188,7 +188,7 @@ export BATCHER_TYPE=VARIABLE
 for i in \
         test_multi_batch_delayed_preferred_different_shape ; do
     export TRTSERVER_DELAY_SCHEDULER=4
-    SERVER_ARGS="--model-store=`pwd`/var_models"
+    SERVER_ARGS="--model-repository=`pwd`/var_models"
     SERVER_LOG="./$i.VARIABLE.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then

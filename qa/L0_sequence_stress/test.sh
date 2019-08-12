@@ -33,7 +33,7 @@ source ../common/util.sh
 
 RET=0
 
-# Setup model store.
+# Setup model repository.
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
@@ -59,10 +59,10 @@ for m in ../custom_models/custom_sequence_int32 ; do
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-# Stress-test each model store
+# Stress-test each model repository
 for model_trial in 1 2 4 ; do
     MODEL_DIR=models${model_trial}
-    SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
+    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
     SERVER_LOG="./$MODEL_DIR.serverlog"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
