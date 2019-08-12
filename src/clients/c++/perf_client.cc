@@ -275,6 +275,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << "\t--sequence-length <length>" << std::endl;
   std::cerr << "\t--percentile <percentile>" << std::endl;
+  std::cerr << "\t--shape <name:shape>" << std::endl;
   std::cerr << "\t--data-directory <path>" << std::endl;
   std::cerr << std::endl;
   std::cerr
@@ -342,6 +343,12 @@ Usage(char** argv, const std::string& msg = std::string())
       << " of latency will also be reported and used to detemine if the"
       << " measurement is stable instead of average latency."
       << " Default is -1 to indicate no percentile will be used." << std::endl;
+  std::cerr << "For --shape, the shape used for the specified input. The"
+               " argument must be specified as 'name:shape' where the shape is"
+               " a comma-separated list for dimension sizes, for example"
+               " '--shape input_name:1,2,3'. --shape may be specified multiple"
+               " times to specify shapes for different inputs."
+            << std::endl;
   std::cerr
       << "For --data-directory, it indicates that the perf client will use user"
       << " provided data instead of synthetic data for model inputs. There must"
@@ -379,12 +386,16 @@ main(int argc, char** argv)
   std::string data_directory("");
   perfclient::ProtocolType protocol = perfclient::ProtocolType::HTTP;
   std::map<std::string, std::string> http_headers;
+  std::unordered_map<std::string, std::vector<int64_t>> input_shapes;
 
   // {name, has_arg, *flag, val}
-  static struct option long_options[] = {
-      {"streaming", 0, 0, 0},       {"max-threads", 1, 0, 1},
-      {"sequence-length", 1, 0, 2}, {"percentile", 1, 0, 3},
-      {"data-directory", 1, 0, 4},  {0, 0, 0, 0}};
+  static struct option long_options[] = {{"streaming", 0, 0, 0},
+                                         {"max-threads", 1, 0, 1},
+                                         {"sequence-length", 1, 0, 2},
+                                         {"percentile", 1, 0, 3},
+                                         {"data-directory", 1, 0, 4},
+                                         {"shape", 1, 0, 5},
+                                         {0, 0, 0, 0}};
 
   // Parse commandline...
   int opt;
@@ -407,6 +418,35 @@ main(int argc, char** argv)
       case 4:
         data_directory = optarg;
         break;
+      case 5: {
+        std::string arg = optarg;
+        std::string name = arg.substr(0, arg.rfind(":"));
+        std::string shape_str = arg.substr(name.size() + 1);
+        size_t pos = 0;
+        std::vector<int64_t> shape;
+        try {
+          while (pos != std::string::npos) {
+            size_t comma_pos = shape_str.find(",", pos);
+            int64_t dim;
+            if (comma_pos == std::string::npos) {
+              dim = std::stoll(shape_str.substr(pos, comma_pos));
+              pos = comma_pos;
+            } else {
+              dim = std::stoll(shape_str.substr(pos, comma_pos - pos));
+              pos = comma_pos + 1;
+            }
+            if (dim <= 0) {
+              Usage(argv, "input shape must be > 0");
+            }
+            shape.emplace_back(dim);
+          }
+        }
+        catch (const std::invalid_argument& ia) {
+          Usage(argv, "failed to parse input shape: " + std::string(optarg));
+        }
+        input_shapes[name] = shape;
+        break;
+      }
       case 'v':
         verbose = true;
         break;
@@ -525,8 +565,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = perfclient::ConcurrencyManager::Create(
-      batch_size, max_threads, sequence_length, zero_input, data_directory,
-      factory, &manager);
+      batch_size, max_threads, sequence_length, zero_input, input_shapes,
+      data_directory, factory, &manager);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
