@@ -115,10 +115,14 @@ OptionsImpl::AddClassResult(
 }
 
 Error
-OptionsImpl::AddSharedMemoryResult(const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size)
+OptionsImpl::AddSharedMemoryResult(
+    const std::shared_ptr<InferContext::Output>& output,
+    const std::string& name, size_t offset, size_t byte_size)
 {
   outputs_.emplace_back(std::make_pair(
-      output, OutputOptions(InferContext::Result::ResultFormat::SHARED_MEMORY, 0, name, offset, byte_size)));
+      output, OutputOptions(
+                  InferContext::Result::ResultFormat::RAW, 0, name, offset,
+                  byte_size)));
   return Error::Success;
 }
 
@@ -430,8 +434,7 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
   if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() +
-            "'");
+        "raw result not available for CLASS output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -461,8 +464,7 @@ ResultImpl::GetRaw(
   if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() +
-            "'");
+        "raw result not available for CLASS output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -491,8 +493,7 @@ ResultImpl::GetRawAtCursor(
   if (result_format_ == InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for CLASS output '" + output_->Name() +
-            "'");
+        "raw result not available for CLASS output '" + output_->Name() + "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -775,10 +776,6 @@ RequestImpl::PostRunProcessing(
         r->ResetCursors();
         break;
 
-    case InferContext::Result::ResultFormat::SHARED_MEMORY:
-      r->ResetCursors();
-      break;
-
       case InferContext::Result::ResultFormat::CLASS: {
         for (const auto& ir : infer_response.output()) {
           if (ir.name() == r->GetOutput()->Name()) {
@@ -909,7 +906,7 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
-    if (ooptions.result_format == Result::ResultFormat::SHARED_MEMORY) {
+    if (ooptions.shm_name != "") {
       auto rshared_memory = routput->mutable_shared_memory();
       rshared_memory->set_name(ooptions.shm_name);
       rshared_memory->set_offset(ooptions.shm_offset);

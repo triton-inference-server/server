@@ -116,12 +116,17 @@ class OptionsImpl : public InferContext::Options {
       const std::shared_ptr<InferContext::Output>& output) override;
   Error AddClassResult(
       const std::shared_ptr<InferContext::Output>& output, uint64_t k) override;
-  Error AddSharedMemoryResult(const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size) override;
+  Error AddSharedMemoryResult(
+      const std::shared_ptr<InferContext::Output>& output,
+      const std::string& name, size_t offset, size_t byte_size) override;
 
   // Options for an output
   struct OutputOptions {
-    OutputOptions(InferContext::Result::ResultFormat f, uint64_t n = 0, std::string name = "", size_t offset = 0, size_t byte_size = 0)
-        : result_format(f), u64(n), shm_name(name), shm_offset(offset), shm_byte_size(byte_size)
+    OutputOptions(
+        InferContext::Result::ResultFormat f, uint64_t n = 0,
+        std::string name = "", size_t offset = 0, size_t byte_size = 0)
+        : result_format(f), u64(n), shm_name(name), shm_offset(offset),
+          shm_byte_size(byte_size)
     {
     }
     InferContext::Result::ResultFormat result_format;
@@ -230,7 +235,6 @@ class OutputImpl : public InferContext::Output {
   const std::string& Name() const override { return mio_.name(); }
   DataType DType() const override { return mio_.data_type(); }
   const DimsList& Dims() const override { return mio_.dims(); }
-  bool IsSharedMemory() const { return (result_format_ == InferContext::Result::ResultFormat::SHARED_MEMORY); }
 
   InferContext::Result::ResultFormat ResultFormat() const
   {

@@ -166,19 +166,6 @@ InferRequestProvider::Create(
     (*provider)->input_buffer_[io.name()] = std::make_pair(it->second, 0);
   }
 
-  // for (const auto& io : request_header.output()) {
-  //   auto it = output_shm_buffer.find(io.name());
-  //   if (it == output_shm_buffer.end()) {
-  //     return Status(
-  //         RequestStatusCode::INVALID_ARG,
-  //         "output '" + io.name() + "' is specified in request header but" +
-  //             " not found in memory block mapping for model '" +
-  //             (*provider)->model_name_ + "'");
-  //   }
-  //   (*provider)->output_shm_buffer_[io.name()] = std::make_pair(it->second,
-  //   0);
-  // }
-
   return Status::Success;
 }
 
@@ -443,7 +430,12 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   if (shm_pr != output_shm_buffer_.end()) {
     *content = const_cast<void*>(
         reinterpret_cast<const void*>(shm_pr->second->BufferAt(0, &byte_size)));
-    // TODO verify content_byte_size == byte_size
+    if (content_byte_size != byte_size) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected output byte size: " + std::to_string(content_byte_size) +
+              ", expecting " + std::to_string(byte_size) + " bytes");
+    }
     loutput->ptr_ = content;
   } else {
     loutput->ptr_ = nullptr;

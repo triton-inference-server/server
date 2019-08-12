@@ -429,7 +429,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       const void* base;
       size_t byte_size;
       if (io.has_shared_memory()) {
-        LOG_VERBOSE(1) << io.name() << " uses shared memory";
+        LOG_VERBOSE(1) << io.name() << " has shared memory";
         TRTSERVER_SharedMemoryBlock* smb = nullptr;
         RETURN_IF_ERR(this->GetResources()->SharedMemoryManager()->Get(
             &smb, io.shared_memory().name()));

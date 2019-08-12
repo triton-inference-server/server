@@ -766,7 +766,7 @@ HTTPAPIServer::EVBufferToInput(
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
       if (io.has_shared_memory()) {
-        LOG_VERBOSE(1) << io.name() << " uses shared memory";
+        LOG_VERBOSE(1) << io.name() << " has shared memory";
         if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
@@ -831,7 +831,7 @@ HTTPAPIServer::EVBufferToInput(
   // Initialize System Memory for Output if it uses shared memory
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
-      LOG_VERBOSE(1) << io.name() << " uses shared memory";
+      LOG_VERBOSE(1) << io.name() << " has shared memory";
       void* base;
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));

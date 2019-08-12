@@ -380,11 +380,7 @@ class InferContext {
       /// CLASS format is the top-k highest probability values of the
       /// result and the associated class label (if provided by the
       /// model).
-      CLASS = 1,
-
-      /// SHARED_MEMORY format, the entire result tensor of values are written
-      /// into a location in shared memory.
-      SHARED_MEMORY = 2
+      CLASS = 1
     };
 
     /// \return The name of the model that produced this result.
@@ -543,6 +539,7 @@ class InferContext {
     //  until this output is ready (that is until after the Run() call(s) have
     /// written the output completely). For batched outputs, all tensor values
     /// are copied into a contiguous space in a single shared memory region.
+    /// \param output The output.
     /// \param name The user-given name for the registered shared memory region
     /// where the tensor values for this output should be stored.
     /// \param offset The offset into the shared memory region upto the start
@@ -551,7 +548,8 @@ class InferContext {
     /// Must match the size expected by the output.
     /// \return Error object indicating success or failure.
     virtual Error AddSharedMemoryResult(
-        const std::shared_ptr<InferContext::Output>& output, const std::string& name, size_t offset, size_t byte_size) = 0;
+        const std::shared_ptr<InferContext::Output>& output,
+        const std::string& name, size_t offset, size_t byte_size) = 0;
   };
 
   //==============

@@ -333,7 +333,8 @@ main(int argc, char** argv)
 
   options->SetBatchSize(1);
   options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
-  options->AddSharedMemoryResult(output1, "output_data", output_byte_size, output_byte_size);
+  options->AddSharedMemoryResult(
+      output1, "output_data", output_byte_size, output_byte_size);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
