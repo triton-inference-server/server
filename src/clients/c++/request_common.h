@@ -157,6 +157,7 @@ class InputImpl : public InferContext::Input {
   size_t GetSharedMemoryOffset() const { return shm_offset_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
+  size_t BatchSize() const { return batch_size_; }
 
   const std::vector<int64_t>& Shape() const override { return shape_; }
   Error SetShape(const std::vector<int64_t>& dims) override;
