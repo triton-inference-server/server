@@ -129,7 +129,7 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u")) != -1) {
+  while ((opt = getopt(argc, argv, "vi:u:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
