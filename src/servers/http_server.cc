@@ -193,6 +193,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
         smb_manager_(smb_manager), endpoint_names_(endpoints),
+        allocator_(nullptr),
         api_regex_(
             R"(/api/(health|profile|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
@@ -206,9 +207,19 @@ class HTTPAPIServer : public HTTPServerImpl {
       server_id_ = "unknown:0";
       TRTSERVER_ErrorDelete(err);
     }
+
+    FAIL_IF_ERR(
+        TRTSERVER_ResponseAllocatorNew(
+            &allocator_, ResponseAlloc, ResponseRelease),
+        "creating response allocator");
   }
 
-  ~HTTPAPIServer() = default;
+  ~HTTPAPIServer()
+  {
+    LOG_IF_ERR(
+        TRTSERVER_ResponseAllocatorDelete(allocator_),
+        "deleting response allocator");
+  }
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -234,8 +245,16 @@ class HTTPAPIServer : public HTTPServerImpl {
   };
 
  private:
-  void Handle(evhtp_request_t* req) override;
+  static TRTSERVER_Error* ResponseAlloc(
+      TRTSERVER_ResponseAllocator* allocator, void** buffer,
+      void** buffer_userp, const char* tensor_name, size_t byte_size,
+      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+  static TRTSERVER_Error* ResponseRelease(
+      TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
 
+  void Handle(evhtp_request_t* req) override;
   void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
   void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
@@ -259,6 +278,10 @@ class HTTPAPIServer : public HTTPServerImpl {
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   std::vector<std::string> endpoint_names_;
 
+  // The allocator that will be used to allocate buffers for the
+  // inference result tensors.
+  TRTSERVER_ResponseAllocator* allocator_;
+
   re2::RE2 api_regex_;
   re2::RE2 health_regex_;
   re2::RE2 infer_regex_;
@@ -266,6 +289,82 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 modelcontrol_regex_;
   re2::RE2 sharedmemorycontrol_regex_;
 };
+
+TRTSERVER_Error*
+HTTPAPIServer::ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+{
+  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp);
+
+  *buffer = nullptr;
+  *buffer_userp = nullptr;
+
+  // Can't allocate for any memory type other than CPU.
+  if (memory_type != TRTSERVER_MEMORY_CPU) {
+    LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
+                   << " for " << tensor_name;
+    return nullptr;  // Success
+  }
+
+  // Don't need to do anything if no memory was requested.
+  if (byte_size > 0) {
+    // Reserve requested space in evbuffer...
+    struct evbuffer_iovec output_iovec;
+    if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
+        1) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          std::string(
+              "failed to reserve " + std::to_string(byte_size) +
+              " bytes in output tensor buffer")
+              .c_str());
+    }
+
+    if (output_iovec.iov_len < byte_size) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          std::string(
+              "reserved " + std::to_string(output_iovec.iov_len) +
+              " bytes in output tensor buffer, need " +
+              std::to_string(byte_size))
+              .c_str());
+    }
+
+    output_iovec.iov_len = byte_size;
+    *buffer = output_iovec.iov_base;
+
+    // Immediately commit the buffer space. We are relying on evbuffer
+    // not to relocate this space. Because we request a contiguous
+    // chunk every time (above by allowing only a single entry in
+    // output_iovec), this seems to be a valid assumption.
+    if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
+      *buffer = nullptr;
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          "failed to commit output tensors to output buffer");
+    }
+  }
+
+  LOG_VERBOSE(1) << "HTTP allocation: " << tensor_name << ", size " << byte_size
+                 << ", addr " << *buffer;
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+HTTPAPIServer::ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+{
+  LOG_VERBOSE(1) << "HTTP release: "
+                 << "size " << byte_size << ", addr " << buffer;
+
+  // Don't do anything when releasing a buffer since ResponseAlloc
+  // wrote directly into the response ebvuffer.
+  return nullptr;  // Success
+}
 
 void
 HTTPAPIServer::Handle(evhtp_request_t* req)
@@ -782,9 +881,9 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
           new InferRequest(req, request_header.id(), server_id_, unique_id);
 
       err = TRTSERVER_ServerInferAsync(
-          server_.get(), request_provider,
-          req->buffer_out /* http_response_provider_hack */, nullptr, nullptr,
-          InferRequest::InferComplete, reinterpret_cast<void*>(infer_request));
+          server_.get(), request_provider, allocator_,
+          reinterpret_cast<void*>(req->buffer_out), InferRequest::InferComplete,
+          reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
         delete infer_request;
         infer_request = nullptr;
@@ -865,6 +964,9 @@ HTTPAPIServer::InferRequest::InferComplete(
   } else {
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request->req_);
   }
+
+  LOG_IF_ERR(
+      TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
 }
 
 evhtp_res

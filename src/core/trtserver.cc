@@ -1166,7 +1166,6 @@ TRTSERVER_Error*
 TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    void* http_response_provider_hack,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
     void* complete_userp)
@@ -1194,14 +1193,7 @@ TRTSERVER_ServerInferAsync(
       lprovider->InputMap(), &infer_request_provider));
 
   std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
-  if (http_response_provider_hack != nullptr) {
-    std::shared_ptr<ni::HTTPInferResponseProvider> http_response_provider;
-    RETURN_IF_STATUS_ERROR(ni::HTTPInferResponseProvider::Create(
-        reinterpret_cast<evbuffer*>(http_response_provider_hack),
-        *(lprovider->Backend()), *request_header,
-        lprovider->Backend()->GetLabelProvider(), &http_response_provider));
-    infer_response_provider = http_response_provider;
-  } else {
+  {
     std::shared_ptr<ni::DelegatingInferResponseProvider> del_response_provider;
     RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
         *request_header, lprovider->Backend()->GetLabelProvider(),
