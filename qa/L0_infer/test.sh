@@ -69,13 +69,27 @@ for TARGET in cpu gpu; do
         cp -r /data/inferenceserver/qa_ensemble_model_repository/qa_model_repository/* models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
-        cp -r ../custom_models/custom_nobatch_* models/. && \
-        cp -r ../custom_models/custom_zero_1_float32 models/.
+        cp -r ../custom_models/custom_nobatch_* models/.
 
     create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
+    for EM in `ls ../ensemble_models`; do
+        mkdir -p ../ensemble_models/$EM/1
+    done
+    cp -r ../ensemble_models/* models/.
+
+    KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
+    for FW in graphdef savedmodel netdef onnx libtorch custom; do
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+    done
+
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
-    mkdir -p models/custom_zero_1_float32/1 && \
+    # This is done after the instance group change above so that identity custom backends
+    # are run on CPU
+    cp -r ../custom_models/custom_zero_1_float32 models/. &&\
+        mkdir -p models/custom_zero_1_float32/1 && \
         cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
         (cd models/custom_zero_1_float32 && \
             echo "default_model_filename: \"libidentity.so\"" >> config.pbtxt && \
@@ -88,19 +102,6 @@ for TARGET in cpu gpu; do
             sed -i "s/custom_zero_1_float32/custom_nobatch_zero_1_float32/" config.pbtxt && \
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
-
-    for EM in `ls ../ensemble_models`; do
-        mkdir -p ../ensemble_models/$EM/1
-    done
-    cp -r ../ensemble_models/* models/.
-
-    KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
-    # Onnx models are handled separately, see below
-    for FW in graphdef savedmodel netdef onnx libtorch custom; do
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} }]" >> $MC
-        done
-    done
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
