@@ -31,7 +31,7 @@ SIMPLE_CALLBACK_CLIENT_PY=../clients/simple_callback_client.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=`pwd`/models
+SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

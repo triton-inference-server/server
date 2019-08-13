@@ -111,7 +111,7 @@ for TRIAL in $TRIALS; do
     # Run all tests that require no autofill but that add the platform to
     # the model config before running the test
     for TARGET in `ls noautofill_platform`; do
-        SERVER_ARGS="--model-store=`pwd`/models --strict-model-config=true"
+        SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
         SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_${TARGET}.log
 
         rm -fr models && mkdir models
@@ -164,7 +164,7 @@ for TARGET_DIR in `ls -d autofill_noplatform/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
-    SERVER_ARGS="--model-store=`pwd`/models --strict-model-config=false"
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
     # If there is a config.pbtxt at the top-level of the test then
@@ -215,7 +215,7 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
-    SERVER_ARGS="--model-store=`pwd`/models --strict-model-config=false"
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
     # If there is a config.pbtxt at the top-level of the test then

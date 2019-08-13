@@ -95,7 +95,7 @@ Assuming the sample model repository is available in
 /path/to/model/repository, the following command runs the container
 you pulled from NGC or built locally::
 
-  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
+  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-repository=/models
 
 Where *<tensorrtserver image name>* will be something like
 **nvcr.io/nvidia/tensorrtserver:19.07-py3** if you :ref:`pulled the
@@ -104,7 +104,7 @@ container from the NGC registry
 you :ref:`built it from source <section-building>`.
 
 The nvidia-docker -v option maps /path/to/model/repository on the host
-into the container at /models, and the -\\-model-store option to the
+into the container at /models, and the -\\-model-repository option to the
 server is used to point to /models as the model repository.
 
 The -p flags expose the container ports where the inference server
@@ -128,7 +128,7 @@ On a system without GPUs, the inference server should be run using
 docker instead of nvidia-docker, but is otherwise identical to what is
 described in :ref:`section-running-the-inference-server`::
 
-  $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-store=/models
+  $ docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/path/to/model/repository:/models <tensorrtserver image name> trtserver --model-repository=/models
 
 Because a GPU is not available, the inference server will be unable to
 load any model configuration that requires a GPU or that specifies a

@@ -32,13 +32,13 @@ Model Repository
 
 The TensorRT Inference Server accesses models from a locally
 accessible file path or from Google Cloud Storage. This path is
-specified when the server is started using the -\\-model-store option.
+specified when the server is started using the -\\-model-repository option.
 
 For a locally accessible file-system the absolute path must be
-specified, for example, -\\-model-store=/path/to/model/repository. For
+specified, for example, -\\-model-repository=/path/to/model/repository. For
 a model repository residing in Google Cloud Storage, the path must be
 prefixed with gs://, for example,
--\\-model-store=gs://bucket/path/to/model/repository.
+-\\-model-repository=gs://bucket/path/to/model/repository.
 
 :ref:`section-example-model-repository` describes how to create an
 example repository with a couple of image classification models.

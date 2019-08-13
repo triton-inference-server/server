@@ -39,7 +39,7 @@ rm -fr *.log
 LOG_IDX=0
 
 # LifeCycleTest.test_parse_error_noexit_strict
-SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=true --exit-on-error=false"
+SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -64,7 +64,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_parse_error_noexit
-SERVER_ARGS="--model-store=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
+SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=false --exit-on-error=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
@@ -96,7 +96,7 @@ for i in graphdef savedmodel netdef plan ; do
 done
 rm models/graphdef_float32_float32_float32/*/*
 
-SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
@@ -129,7 +129,7 @@ cp -r ../custom_models/custom_int32_int32_int32 models/.
 sed -i "s/OUTPUT/_OUTPUT/" models/custom_sequence_int32/config.pbtxt
 sed -i "s/OUTPUT/_OUTPUT/" models/custom_int32_int32_int32/config.pbtxt
 
-SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
@@ -164,7 +164,7 @@ mkdir -p models/graphdef_float32_float32_float32
 cp $DATADIR/qa_model_repository/graphdef_float32_float32_float32/config.pbtxt \
     models/graphdef_float32_float32_float32/.
 
-SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
@@ -197,7 +197,7 @@ for i in savedmodel ; do
     mv models/${i}_float32_float32_float32/3 models/${i}_float32_float32_float32/003
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -233,7 +233,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -263,7 +263,7 @@ for i in graphdef netdef plan ; do
 done
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 .
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -293,7 +293,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -322,7 +322,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -359,7 +359,7 @@ for i in savedmodel plan ; do
         models/${i}_float32_float32_float32/wrong_output0_labels.txt
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -386,7 +386,7 @@ rm -fr models config.pbtxt.*
 mkdir models
 cp -r $DATADIR/qa_model_repository/savedmodel_float32_float32_float32 models/.
 
-SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
+SERVER_ARGS="--model-repository=`pwd`/models --repository-poll-secs=1 --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -417,7 +417,7 @@ for i in graphdef savedmodel ; do
     cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-model-control=true \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-model-control=true \
              --allow-poll-model-repository=false --exit-timeout-secs=5 \
              --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -457,7 +457,8 @@ for i in graphdef savedmodel netdef plan ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
 done
 
-# polling enabled (default), control API should not work
+# Polling enabled (default), control API should not work
+# This test also keeps using "--model-store" to ensure backward compatibility
 SERVER_ARGS="--model-store=`pwd`/models --repository-poll-secs=0 --exit-timeout-secs=5 --strict-model-config=false"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -518,7 +519,7 @@ for i in graphdef ; do
     cp -r $DATADIR/qa_model_repository/${i}_int32_int32_int32 models/.
 done
 
-SERVER_ARGS="--model-store=`pwd`/models --allow-poll-model-repository=false \
+SERVER_ARGS="--model-repository=`pwd`/models --allow-poll-model-repository=false \
              --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server

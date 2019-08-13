@@ -42,7 +42,7 @@ DATADIR=/data/inferenceserver
 RESULTDIR=${RESULTDIR:=.}
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=`pwd`/models
+SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference server

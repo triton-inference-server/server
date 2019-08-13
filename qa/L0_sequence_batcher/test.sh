@@ -39,8 +39,8 @@ RET=0
 # can fail when the requests are distributed to multiple devices.
 export CUDA_VISIBLE_DEVICES=0
 
-# Setup non-variable-size model stores. The same models are in each
-# store but they are configured as:
+# Setup non-variable-size model repositories. The same models are in each
+# repository but they are configured as:
 #   models0 - four instance with non-batching model
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
@@ -92,7 +92,7 @@ for m in \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-# Setup variable-size model store.
+# Setup variable-size model repository.
 #   modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 for m in \
@@ -140,7 +140,7 @@ for model_trial in v 0 1 2 4 ; do
             test_no_sequence_start2 \
             test_no_sequence_end \
             test_no_correlation_id ; do
-        SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -185,7 +185,7 @@ for model_trial in v 0 1 2 4 ; do
             [[ "$i" != "test_backlog_same_correlation_id_no_end" ]] && export TRTSERVER_DELAY_SCHEDULER=8 &&
             [[ "$i" != "test_half_batch" ]] && export TRTSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRTSERVER_DELAY_SCHEDULER=12
-        SERVER_ARGS="--model-store=`pwd`/$MODEL_DIR"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then

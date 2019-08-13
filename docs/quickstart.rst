@@ -157,7 +157,7 @@ Assuming the example model repository is available in
 /full/path/to/example/model/repository, if you build using Docker use
 the following command to run the inference server container::
 
-  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> trtserver --model-store=/models
+  $ nvidia-docker run --rm --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/example/model/repository:/models <docker image> trtserver --model-repository=/models
 
 Where <docker image> is *nvcr.io/nvidia/tensorrtserver:<xx.yy>-py3* if
 you pulled the inference server container from NGC, or is
@@ -165,7 +165,7 @@ you pulled the inference server container from NGC, or is
 
 If you built using CMake run the inference server directly on your host system::
 
-    $ trtserver --model-store=/full/path/to/example/model/repository
+    $ trtserver --model-repository=/full/path/to/example/model/repository
 
 For more information, see :ref:`section-running-the-inference-server`.
 

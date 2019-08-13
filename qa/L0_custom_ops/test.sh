@@ -30,7 +30,7 @@ ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-store=/data/inferenceserver/qa_custom_ops"
+SERVER_ARGS="--model-repository=/data/inferenceserver/qa_custom_ops"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

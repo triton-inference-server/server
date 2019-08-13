@@ -42,7 +42,7 @@ RET=0
 # HTTP Health w/o Main Port
 for (( n=0; n<$len; n++ )) ; do
   SERVER_ARGS_ADD_HTTP="--http-health-port ${HP_ARR[n]} --allow-http 1"
-  SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+  SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
   run_server_nowait
   sleep 5
@@ -69,7 +69,7 @@ for (( i=0; i<2; i++ )) ; do
   for (( n=0; n<$len; n++ )) ; do
     SERVER_ARGS_ADD_HTTP="--http-port ${P[i]} --http-health-port ${HP_ARR[n]} \
       --allow-http 1"
-    SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+    SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 
     set +e
     run_server_nowait
@@ -99,7 +99,7 @@ done
 
 # set http port to -1 after setting health to 8007
 SERVER_ARGS_ADD_HTTP="--http-health-port 8007 --http-port -1 --allow-http 1"
-SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 set +e
 run_server_nowait
 sleep 5
@@ -111,7 +111,7 @@ fi
 set -e
 # allow overrules - grpc still works
 SERVER_ARGS_ADD_HTTP="--http-port -1 --http-health-port 8007 --allow-http 0"
-SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then
@@ -123,7 +123,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 # overlap with grpc default
 SERVER_ARGS_ADD_HTTP="--http-health-port 8001"
-SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 set +e
 run_server_nowait
 sleep 5
@@ -136,7 +136,7 @@ set -e
 # overlap with metrics default
 SERVER_ARGS_ADD_HTTP="--http-status-port 8002 --http-health-port 8007 \
   --http-profile-port 8007 --http-infer-port 8007"
-SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 set +e
 run_server_nowait
 sleep 5
@@ -149,7 +149,7 @@ set -e
 
 # disable metrics - no overlap with metrics default
 SERVER_ARGS_ADD_HTTP="--http-health-port 8002 --allow-metrics 0"
-SERVER_ARGS="--model-store=$DATADIR $SERVER_ARGS_ADD_HTTP"
+SERVER_ARGS="--model-repository=$DATADIR $SERVER_ARGS_ADD_HTTP"
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then

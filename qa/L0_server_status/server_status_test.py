@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -226,7 +226,7 @@ class ModelStatusTest(unittest.TestCase):
     def test_model_versions_deleted(self):
         # Originally There were 3 versions of *_int32_int32_int32 and
         # version 3 was executed once. Version 2 and 3 models were
-        # deleted from the model store so now only expect version 1 to
+        # deleted from the model repository so now only expect version 1 to
         # be ready and version 3 to show stats but not be ready.
         for platform in ('graphdef', 'netdef'):
             model_name = platform + "_int32_int32_int32"
