@@ -436,7 +436,7 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
           "unexpected output byte size: " + std::to_string(content_byte_size) +
               ", expecting " + std::to_string(byte_size) + " bytes");
     }
-    loutput->ptr_ = content;
+    loutput->ptr_ = *content;
   } else {
     loutput->ptr_ = nullptr;
   }
@@ -763,11 +763,14 @@ GRPCInferResponseProvider::AllocateOutputBuffer(
   // Must always add a raw output into the list so that the number and
   // order of raw output entries equals the output meta-data. But
   // leave empty if not returning raw result for the output.
-  std::string* raw_output = response_->add_raw_output();
   if (output->ptr_ == nullptr) {
+    std::string* raw_output = response_->add_raw_output();
     raw_output->resize(content_byte_size);
     *content = static_cast<void*>(&((*raw_output)[0]));
     output->ptr_ = *content;
+  }
+  else {
+    response_->add_raw_output(static_cast<char*>(output->ptr_), content_byte_size);
   }
 
   return Status::Success;
