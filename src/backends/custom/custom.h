@@ -203,7 +203,9 @@ typedef int (*CustomExecuteFn_t)(
 /// \param data The CustomInitializeData provided for initialization.
 /// \param custom_context Returns the opaque handle to the custom
 /// state associated with this initialization. Returns nullptr if
-/// no context associated with the initialization.
+/// no context associated with the initialization. Note that in the case
+/// of initialization failure, a context state needs to be returned to retrieve
+/// error string for a given code.
 /// \return An error code. Zero indicates success, all other values
 /// indicate failure. Use CustomErrorString to get the error string
 /// for an error code.

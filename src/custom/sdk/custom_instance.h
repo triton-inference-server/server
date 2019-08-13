@@ -49,7 +49,9 @@ class CustomInstance {
   /// CustomInitialization C-API method.
   ///
   /// \param instance A return pointer for the custom instance object created by
-  /// this method
+  /// this method. Note that the custom object pointer should be returned even
+  /// in the case of failure, so that the error string associated to the custom
+  /// backend can be retrieved.
   /// \param name The name of the custom instance
   /// \param model_config The model configuration
   /// \param gpu_device The GPU device ID

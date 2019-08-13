@@ -52,20 +52,18 @@ CustomInitialize(const CustomInitializeData* data, void** custom_instance)
 
   // Create the instance and validate that the model configuration is
   // something that we can handle.
-  CustomInstance* instance = nullptr;
+  *custom_instance = nullptr;
   int err = CustomInstance::Create(
-      &instance, std::string(data->instance_name), model_config,
-      data->gpu_device_id, data);
+      (CustomInstance**)custom_instance, std::string(data->instance_name),
+      model_config, data->gpu_device_id, data);
 
   if (ErrorCodes::Success != err) {
     return err;
   }
 
-  if (instance == nullptr) {
+  if (custom_instance == nullptr) {
     return ErrorCodes::CreationFailure;
   }
-
-  *custom_instance = static_cast<void*>(instance);
 
   return ErrorCodes::Success;
 }
