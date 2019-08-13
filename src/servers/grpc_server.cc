@@ -54,19 +54,11 @@ namespace nvidia { namespace inferenceserver {
 namespace {
 class AsyncResources : public nvrpc::Resources {
  public:
-  explicit AsyncResources(
+  AsyncResources(
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
-      int infer_threads, int mgmt_threads)
-      : server_(server), smb_manager_(smb_manager),
-        mgmt_thread_pool_(mgmt_threads), infer_thread_pool_(infer_threads)
-  {
-    TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
-    if (err != nullptr) {
-      server_id_ = "unknown:0";
-      TRTSERVER_ErrorDelete(err);
-    }
-  }
+      int infer_threads, int mgmt_threads);
+  ~AsyncResources();
 
   TRTSERVER_Server* Server() const { return server_.get(); }
   const char* ServerId() const { return server_id_; }
@@ -76,14 +68,29 @@ class AsyncResources : public nvrpc::Resources {
     return smb_manager_;
   }
 
+  TRTSERVER_ResponseAllocator* Allocator() const { return allocator_; }
+
   ThreadPool& GetMgmtThreadPool() { return mgmt_thread_pool_; }
   ThreadPool& GetInferThreadPool() { return infer_thread_pool_; }
 
  private:
+  static TRTSERVER_Error* ResponseAlloc(
+      TRTSERVER_ResponseAllocator* allocator, void** buffer,
+      void** buffer_userp, const char* tensor_name, size_t byte_size,
+      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+  static TRTSERVER_Error* ResponseRelease(
+      TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
+
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
 
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
+
+  // The allocator that will be used to allocate buffers for the
+  // inference result tensors.
+  TRTSERVER_ResponseAllocator* allocator_;
 
   // We can and should get specific on thread affinity.  It might not
   // be as important on the frontend, but the backend threadpool
@@ -91,6 +98,81 @@ class AsyncResources : public nvrpc::Resources {
   ThreadPool mgmt_thread_pool_;
   ThreadPool infer_thread_pool_;
 };
+
+AsyncResources::AsyncResources(
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
+    int infer_threads, int mgmt_threads)
+    : server_(server), smb_manager_(smb_manager), allocator_(nullptr),
+      mgmt_thread_pool_(mgmt_threads), infer_thread_pool_(infer_threads)
+{
+  TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
+  if (err != nullptr) {
+    server_id_ = "unknown:0";
+    TRTSERVER_ErrorDelete(err);
+  }
+
+  // Create the allocator that will be used to allocate buffers for
+  // the result tensors.
+  FAIL_IF_ERR(
+      TRTSERVER_ResponseAllocatorNew(
+          &allocator_, ResponseAlloc, ResponseRelease),
+      "creating response allocator");
+}
+
+AsyncResources::~AsyncResources()
+{
+  LOG_IF_ERR(
+      TRTSERVER_ResponseAllocatorDelete(allocator_),
+      "deleting response allocator");
+}
+
+TRTSERVER_Error*
+AsyncResources::ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+{
+  InferResponse* response = reinterpret_cast<InferResponse*>(userp);
+
+  *buffer = nullptr;
+  *buffer_userp = nullptr;
+
+  // Can't allocate for any memory type other than CPU.
+  if (memory_type != TRTSERVER_MEMORY_CPU) {
+    LOG_VERBOSE(1) << "GRPC allocation failed for type " << memory_type
+                   << " for " << tensor_name;
+    return nullptr;  // Success
+  }
+
+  // Called once for each result tensor in the inference request. Must
+  // always add a raw output into the response's list of outputs so
+  // that the number and order of raw output entries equals the output
+  // meta-data.
+  std::string* raw_output = response->add_raw_output();
+  if (byte_size > 0) {
+    raw_output->resize(byte_size);
+    *buffer = static_cast<void*>(&((*raw_output)[0]));
+  }
+
+  LOG_VERBOSE(1) << "GRPC allocation: " << tensor_name << ", size " << byte_size
+                 << ", addr " << *buffer;
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+AsyncResources::ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+{
+  LOG_VERBOSE(1) << "GRPC release: "
+                 << "size " << byte_size << ", addr " << buffer;
+
+  // Don't do anything when releasing a buffer since ResponseAlloc
+  // wrote directly into the response protobuf.
+  return nullptr;  // Success
+}
 
 static std::shared_ptr<AsyncResources> g_Resources;
 
@@ -294,6 +376,9 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           response_status, grpc_infer_request->unique_id_,
           grpc_infer_request->server_id_);
 
+      LOG_IF_ERR(
+          TRTSERVER_InferenceResponseDelete(response),
+          "deleting GRPC response");
       TRTSERVER_ErrorDelete(response_status);
 
       grpc_infer_request->response_.mutable_meta_data()->set_id(
@@ -411,7 +496,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           err = TRTSERVER_ServerInferAsync(
               server, request_provider,
               nullptr /* http_response_provider_hack */,
-              &response /* grpc_response_provider_hack */, nullptr, nullptr,
+              g_Resources->Allocator(),
+              &response /* response_allocator_userp */,
               GRPCInferRequest::InferComplete,
               reinterpret_cast<void*>(grpc_infer_request));
           if (err != nullptr) {
