@@ -307,8 +307,7 @@ main(int argc, char** argv)
 
   FAIL_IF_ERR(
       TRTSERVER_ServerInferAsync(
-          server.get(), request_provider,
-          nullptr /* http_response_provider_hack */, allocator,
+          server.get(), request_provider, allocator,
           nullptr /* response_allocator_userp */, InferComplete,
           reinterpret_cast<void*>(p)),
       "running inference");

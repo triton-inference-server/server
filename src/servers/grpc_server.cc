@@ -494,9 +494,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
               server_id, unique_id);
 
           err = TRTSERVER_ServerInferAsync(
-              server, request_provider,
-              nullptr /* http_response_provider_hack */,
-              g_Resources->Allocator(),
+              server, request_provider, g_Resources->Allocator(),
               &response /* response_allocator_userp */,
               GRPCInferRequest::InferComplete,
               reinterpret_cast<void*>(grpc_infer_request));
