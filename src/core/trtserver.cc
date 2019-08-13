@@ -929,7 +929,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 #endif  // TRTIS_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
-  lserver->SetModelStorePath(loptions->ModelRepositoryPath());
+  lserver->SetModelRepositoryPath(loptions->ModelRepositoryPath());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());

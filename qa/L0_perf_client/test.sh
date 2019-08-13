@@ -31,7 +31,7 @@ PERF_CLIENT=../clients/perf_client
 DATADIR=/data/inferenceserver/qa_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

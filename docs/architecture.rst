@@ -30,7 +30,7 @@ Architecture
 
 The following figure shows the TensorRT Inference Server high-level
 architecture. The :ref:`model repository <section-model-repository>`
-is a file-system based store of the models that the inference server
+is a file-system based repository of the models that the inference server
 will make available for inferencing. Inference requests arrive at the
 server via either :ref:`HTTP or GRPC <section-inference-server-api>`
 and are then routed to the appropriate per-model scheduler. The

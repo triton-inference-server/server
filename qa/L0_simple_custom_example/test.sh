@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@ SIMPLE_CLIENT_PY=../clients/simple_client.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=`pwd`/models
+SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

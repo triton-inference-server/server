@@ -31,7 +31,7 @@ INFER_TEST=infer_variable_test.py
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ############################################################################
-## This script generates the model store needed by some of the
+## This script generates the model repository needed by some of the
 ## tensorrtserver CI tests. Generating these models requires using
 ## the TensorFlow and PyTorch containers.
 ##
@@ -78,7 +78,7 @@ mkdir -p $HOST_NOSHAPEDESTDIR
 mkdir -p $HOST_PLGDESTDIR
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
-# are proper model stores
+# are proper model repositories
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_variable_model_repository
 mkdir -p $HOST_ENSEMBLEDESTDIR/qa_identity_model_repository

@@ -32,7 +32,7 @@ CLIENT_LOG_BASE="./client.log"
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=$DATADIR
+SERVER_ARGS=--model-repository=$DATADIR
 SERVER_LOG_BASE="./inference_server.log"
 source ../common/util.sh
 

@@ -32,7 +32,7 @@ DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS="--model-store=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
 SERVER_LOG_BASE="./server_saved_model_shape"
 source ../common/util.sh
 

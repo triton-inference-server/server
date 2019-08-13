@@ -1,4 +1,4 @@
-# Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -249,7 +249,7 @@ class LifeCycleTest(unittest.TestCase):
         netdef_name = tu.get_model_name('netdef', np.float32, np.float32, np.float32)
 
         # Make sure savedmodel model is not in the status (because
-        # initially it is not in the model store)
+        # initially it is not in the model repository)
         try:
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
@@ -260,7 +260,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(
                 ex.message().startswith("no status available for unknown model"))
 
-        # Add savedmodel model to the model store and give it time to
+        # Add savedmodel model to the model repository and give it time to
         # load. Make sure that it has a status and is ready.
         try:
             shutil.copytree(savedmodel_name, "models/" + savedmodel_name)
@@ -310,7 +310,7 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove savedmodel model from the model store and give it
+        # Remove savedmodel model from the model repository and give it
         # time to unload. Make sure that it has a status but is
         # unavailable.
         try:
@@ -366,7 +366,7 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove original model from the model store and give it time
+        # Remove original model from the model repository and give it time
         # to unload. Make sure that it has a status but is
         # unavailable.
         try:
@@ -408,7 +408,7 @@ class LifeCycleTest(unittest.TestCase):
         netdef_name = tu.get_model_name('netdef', np.float32, np.float32, np.float32)
 
         # Make sure savedmodel model is not in the status (because
-        # initially it is not in the model store)
+        # initially it is not in the model repository)
         try:
             for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
                 ctx = ServerStatusContext(pair[0], pair[1], savedmodel_name, True)
@@ -420,7 +420,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(
                 ex.message().startswith("no status available for unknown model"))
 
-        # Add savedmodel model to the model store and give it time to
+        # Add savedmodel model to the model repository and give it time to
         # load. But it shouldn't load because dynamic loading is disabled.
         try:
             shutil.copytree(savedmodel_name, "models/" + savedmodel_name)
@@ -446,9 +446,8 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(
                 ex.message().startswith("no status available for unknown model"))
 
-        # Remove one of the original models from the model
-        # store. Unloading is disabled so it should remain available
-        # in the status.
+        # Remove one of the original models from the model repository.
+        # Unloading is disabled so it should remain available in the status.
         try:
             shutil.rmtree("models/" + netdef_name)
             time.sleep(5) # wait for model to unload (but it shouldn't)
@@ -472,7 +471,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference to make sure model still being served even
-        # though deleted from model store
+        # though deleted from model repository
         try:
             iu.infer_exact(self, 'netdef', tensor_shape, 1,
                            np.float32, np.float32, np.float32, swap=True)
@@ -534,7 +533,7 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove version 1 from the model store and give it time to
+        # Remove version 1 from the model repository and give it time to
         # unload. Make sure that it has a status but is unavailable.
         try:
             shutil.rmtree("models/" + graphdef_name + "/1")
@@ -597,7 +596,7 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Add another version from the model store.
+        # Add another version from the model repository.
         try:
             shutil.copytree("models/" + graphdef_name + "/2",
                             "models/" + graphdef_name + "/7")
@@ -626,7 +625,7 @@ class LifeCycleTest(unittest.TestCase):
         tensor_shape = (input_size,)
         graphdef_name = tu.get_model_name('graphdef', np.int32, np.int32, np.int32)
 
-        # Add a new version to the model store and give it time to
+        # Add a new version to the model repository and give it time to
         # load. But it shouldn't load because dynamic loading is
         # disabled.
         try:
@@ -649,8 +648,8 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        # Remove one of the original versions from the model
-        # store. Unloading is disabled so it should remain available
+        # Remove one of the original versions from the model repository.
+        # Unloading is disabled so it should remain available
         # in the status.
         try:
             shutil.rmtree("models/" + graphdef_name + "/1")
@@ -675,7 +674,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Run inference to make sure model still being served even
-        # though version deleted from model store
+        # though version deleted from model repository
         try:
             iu.infer_exact(self, 'graphdef', tensor_shape, 1,
                            np.int32, np.int32, np.int32, swap=False,

@@ -30,7 +30,7 @@ INFER_TEST=infer_reshape_test.py
 
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-store=`pwd`/models
+SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 

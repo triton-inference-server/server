@@ -65,7 +65,7 @@ for MAYBE_SLASH in "" "/"; do
 
     # perform empty repo tests
 
-    SERVER_ARGS="--model-store=$ROOT_REPO --exit-timeout-secs=120"
+    SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -81,7 +81,7 @@ for MAYBE_SLASH in "" "/"; do
     touch models/dummy
     aws s3 cp . "$BUCKET_URL_SLASH" --recursive --include "*"
 
-    SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -129,10 +129,10 @@ for MAYBE_SLASH in "" "/"; do
 
         if [ "$src" == "." ]; then
             # set server arguments
-            SERVER_ARGS="--model-store=$MODEL_REPO --exit-timeout-secs=120"
+            SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
         else
             # set server arguments
-            SERVER_ARGS="--model-store=$ROOT_REPO --exit-timeout-secs=120"
+            SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
         fi
 
         run_server
