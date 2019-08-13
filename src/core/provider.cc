@@ -838,34 +838,41 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
       name, content, content_byte_size, content_shape, &output));
 
-  if (output->buffer_ == nullptr) {
-    void* buffer = nullptr;
-    void* buffer_userp = nullptr;
+  // If CheckAndSetIfBufferedOutput allocated a buffer then no
+  // additional buffer is needed here but still need to call the
+  // alloc_fn_ with byte-size == 0 since that is what the API
+  // requires.
+  const size_t alloc_byte_size = (*content != nullptr) ? 0 : content_byte_size;
 
-    TRTSERVER_Error* err = alloc_fn_(
-        allocator_, &buffer, &buffer_userp, name.c_str(), content_byte_size,
-        TRTSERVER_MEMORY_CPU, 0 /* region_id */, alloc_userp_);
-    if (err != nullptr) {
-      Status status = Status(
-          TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
-          TRTSERVER_ErrorMessage(err));
-      TRTSERVER_ErrorDelete(err);
-      return status;
-    }
+  void* buffer = nullptr;
+  void* buffer_userp = nullptr;
 
-    // If buffer size is zero the don't need to get a buffer back from
-    // the allocator, but if it sends one handle it correctly.
-    if ((content_byte_size > 0) && (buffer == nullptr)) {
-      return Status(
-          RequestStatusCode::UNAVAILABLE,
-          "unable to allocate memory for result tensor '" + name + "'");
-    }
+  TRTSERVER_Error* err = alloc_fn_(
+      allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
+      TRTSERVER_MEMORY_CPU, 0 /* region_id */, alloc_userp_);
+  if (err != nullptr) {
+    Status status = Status(
+        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+        TRTSERVER_ErrorMessage(err));
+    TRTSERVER_ErrorDelete(err);
+    return status;
+  }
 
+  // If the requested allocation size is zero then don't need to get a
+  // buffer back from the allocator.
+  if ((alloc_byte_size > 0) && (buffer == nullptr)) {
+    return Status(
+        RequestStatusCode::UNAVAILABLE,
+        "unable to allocate memory for result tensor '" + name + "'");
+  }
+
+  if (*content == nullptr) {
     *content = buffer;
     output->ptr_ = buffer;
-    output->release_buffer_ = buffer;
-    output->release_userp_ = buffer_userp;
   }
+
+  output->release_buffer_ = buffer;
+  output->release_userp_ = buffer_userp;
 
   return Status::Success;
 }

@@ -165,9 +165,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
 /// the buffer. This value will be provided in the call to
 /// TRTSERVER_ResponseAllocatorReleaseFn_t.
 ///
-/// The function will be called for each result tensor, even if the
-/// 'byte_size' required for that tensor is zero. When 'byte_size' is
-/// zero the function does not need to allocate any memory but may
+/// The function will be called once for each result tensor, even if
+/// the 'byte_size' required for that tensor is zero. When 'byte_size'
+/// is zero the function does not need to allocate any memory but may
 /// perform other tasks associated with the result tensor. In this
 /// case the function should return success and set 'buffer' ==
 /// nullptr.
@@ -759,7 +759,7 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    void* http_response_provider_hack, void* grpc_response_provider_hack,
+    void* http_response_provider_hack,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
     void* complete_userp);
