@@ -759,7 +759,6 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
     TRTSERVER_Server* server,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    void* http_response_provider_hack,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
     void* complete_userp);

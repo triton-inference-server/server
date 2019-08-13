@@ -119,7 +119,7 @@ class InferenceServer {
   {
     return model_repository_path_;
   }
-  
+
   void SetModelRepositoryPath(const std::string& p)
   {
     model_repository_path_ = p;
