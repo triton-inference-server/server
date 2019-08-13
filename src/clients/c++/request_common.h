@@ -149,6 +149,7 @@ class InputImpl : public InferContext::Input {
   const std::string& Name() const override { return mio_.name(); }
   int64_t ByteSize() const override { return byte_size_; }
   size_t TotalByteSize() const override { return total_byte_size_; }
+  size_t TotalSendByteSize() const { return total_send_byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
@@ -157,7 +158,6 @@ class InputImpl : public InferContext::Input {
   size_t GetSharedMemoryOffset() const { return shm_offset_; }
 
   void SetBatchSize(size_t batch_size) { batch_size_ = batch_size; }
-  size_t TotalSendByteSize() const { return total_send_byte_size_; }
 
   const std::vector<int64_t>& Shape() const override { return shape_; }
   Error SetShape(const std::vector<int64_t>& dims) override;
