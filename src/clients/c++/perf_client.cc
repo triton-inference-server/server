@@ -144,11 +144,21 @@ ReportServerSideStats(const ServerSideStats& stats)
                                 ? (cumm_avg_us - queue_avg_us - compute_avg_us)
                                 : 0;
   std::cout << "    Request count: " << cnt << std::endl
-            << "    Avg request latency: " << cumm_avg_us << " usec"
-            << " (overhead " << overhead << " usec + "
-            << "queue " << queue_avg_us << " usec + "
-            << "compute " << compute_avg_us << " usec)" << std::endl
-            << std::endl;
+            << "    Avg request latency: " << cumm_avg_us << " usec";
+  if (stats.composing_models_stat.empty()) {
+    std::cout << " (overhead " << overhead << " usec + "
+              << "queue " << queue_avg_us << " usec + "
+              << "compute " << compute_avg_us << " usec)" << std::endl
+              << std::endl;
+  } else {
+    std::cout << std::endl;
+    std::cout << "    Total avg compute time : " << compute_avg_us << " usec"
+              << std::endl;
+    std::cout << "    Total avg queue time : " << queue_avg_us << " usec"
+              << std::endl
+              << std::endl;
+  }
+
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
@@ -228,9 +238,9 @@ Report(
   std::cout << "  Server: " << std::endl;
   ReportServerSideStats(summary.server_stats);
 
-  if (!summary.server_composing_model_stats.empty()) {
+  if (!summary.server_stats.composing_models_stat.empty()) {
     std::cout << "  Composing models: " << std::endl;
-    for (const auto& model_stats : summary.server_composing_model_stats) {
+    for (const auto& model_stats : summary.server_stats.composing_models_stat) {
       const auto& model_info = model_stats.first;
       std::cout << "  " << model_info.first
                 << ", version: " << model_info.second << std::endl;
@@ -704,10 +714,11 @@ main(int argc, char** argv)
       ofs.close();
 
       // Record composing model stat in a separate file
-      if (!summary.front().server_composing_model_stats.empty()) {
+      if (!summary.front().server_stats.composing_models_stat.empty()) {
         // For each of the composing model, generate CSV file in the same format
         // as the one for ensemble.
-        for (const auto& model_info : summary[0].server_composing_model_stats) {
+        for (const auto& model_info :
+             summary[0].server_stats.composing_models_stat) {
           const auto& name = model_info.first.first;
           const auto& version = model_info.first.second;
           const auto name_ver = name + "_v" + std::to_string(version);
@@ -718,8 +729,8 @@ main(int argc, char** argv)
               << "Server Compute,Client Recv" << std::endl;
 
           for (perfclient::PerfStatus& status : summary) {
-            auto it =
-                status.server_composing_model_stats.find(model_info.first);
+            auto it = status.server_stats.composing_models_stat.find(
+                model_info.first);
             const auto& stats = it->second;
             uint64_t avg_queue_ns = stats.queue_time_ns / stats.request_count;
             uint64_t avg_compute_ns =

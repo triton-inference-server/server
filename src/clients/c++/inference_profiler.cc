@@ -268,23 +268,8 @@ InferenceProfiler::Summarize(
       start_stat, end_stat, valid_range.second - valid_range.first,
       latencies.size(), valid_sequence_count, summary));
 
-  {
-    const auto& model_start = start_status.find(model_name_)->second;
-    const auto& model_end = end_status.find(model_name_)->second;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_name_, model_version_, model_start, model_end,
-        &(summary.server_stats)));
-  }
-  for (const auto& model_info : composing_models_) {
-    const auto& model_start = start_status.find(model_info.first)->second;
-    const auto& model_end = end_status.find(model_info.first)->second;
-    auto it = summary.server_composing_model_stats
-                  .emplace(model_info, ServerSideStats())
-                  .first;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_info.first, model_info.second, model_start, model_end,
-        &(it->second)));
-  }
+  RETURN_IF_ERROR(
+      SummarizeServerStats(start_status, end_status, &(summary.server_stats)));
 
   return nic::Error::Success;
 }
@@ -450,7 +435,7 @@ InferenceProfiler::SummarizeClientStat(
 }
 
 nic::Error
-InferenceProfiler::SummarizeServerStats(
+InferenceProfiler::SummarizeServerModelStats(
     const std::string& model_name, const int64_t model_version,
     const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
     ServerSideStats* server_stats)
@@ -499,12 +484,49 @@ InferenceProfiler::SummarizeServerStats(
           end_itr->second.success().count() - start_cnt;
       server_stats->cumm_time_ns =
           end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      server_stats->queue_time_ns =
-          end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-      server_stats->compute_time_ns =
-          end_itr->second.compute().total_time_ns() - start_compute_time_ns;
+      if (server_stats->composing_models_stat.empty()) {
+        server_stats->queue_time_ns =
+            end_itr->second.queue().total_time_ns() - start_queue_time_ns;
+        server_stats->compute_time_ns =
+            end_itr->second.compute().total_time_ns() - start_compute_time_ns;
+      } else {
+        server_stats->queue_time_ns = 0;
+        server_stats->compute_time_ns = 0;
+        // The compute and queue times are calculated as a total of the
+        // composing models.
+        for (auto& composing_model_stat : server_stats->composing_models_stat) {
+          server_stats->queue_time_ns +=
+              composing_model_stat.second.queue_time_ns;
+          server_stats->compute_time_ns +=
+              composing_model_stat.second.compute_time_ns;
+        }
+      }
     }
   }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::SummarizeServerStats(
+    const std::map<std::string, ni::ModelStatus>& start_status,
+    const std::map<std::string, ni::ModelStatus>& end_status,
+    ServerSideStats* server_stats)
+{
+  // Summarize the composing models, if any.
+  for (const auto& model_info : composing_models_) {
+    auto it = server_stats->composing_models_stat
+                  .emplace(model_info, ServerSideStats())
+                  .first;
+    RETURN_IF_ERROR(SummarizeServerModelStats(
+        model_info.first, model_info.second,
+        start_status.find(model_info.first)->second,
+        end_status.find(model_info.first)->second, &(it->second)));
+  }
+
+  RETURN_IF_ERROR(SummarizeServerModelStats(
+      model_name_, model_version_, start_status.find(model_name_)->second,
+      end_status.find(model_name_)->second, server_stats));
 
   return nic::Error::Success;
 }

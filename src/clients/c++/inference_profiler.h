@@ -63,6 +63,9 @@ struct ServerSideStats {
   uint64_t cumm_time_ns;
   uint64_t queue_time_ns;
   uint64_t compute_time_ns;
+
+  std::map<std::pair<std::string, int64_t>, ServerSideStats>
+      composing_models_stat;
 };
 
 struct PerfStatus {
@@ -70,8 +73,6 @@ struct PerfStatus {
   size_t batch_size;
   // Request count and elapsed time measured by server
   ServerSideStats server_stats;
-  std::map<std::pair<std::string, int64_t>, ServerSideStats>
-      server_composing_model_stats;
 
   // Request count and elapsed time measured by client
   uint64_t client_request_count;
@@ -238,6 +239,12 @@ class InferenceProfiler {
       const size_t valid_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
+  nic::Error SummarizeServerStats(
+      const std::map<std::string, ni::ModelStatus>& start_status,
+      const std::map<std::string, ni::ModelStatus>& end_status,
+      ServerSideStats* server_stats);
+
+
   /// \param model_name The name of the model to summarize the server side stats
   /// \param model_version The version of the model
   /// \param start_status The model status at the start of the measurement.
@@ -245,7 +252,7 @@ class InferenceProfiler {
   /// \param server_stats Returns the summary that the fileds recorded by server
   /// are set.
   /// \return Error object indicating success or failure.
-  nic::Error SummarizeServerStats(
+  nic::Error SummarizeServerModelStats(
       const std::string& model_name, const int64_t model_version,
       const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
       ServerSideStats* server_stats);
