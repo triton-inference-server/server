@@ -45,7 +45,9 @@ struct Step {
 
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
-  std::shared_ptr<InternalInferResponseProvider> response_provider_;
+  std::shared_ptr<DelegatingInferResponseProvider> response_provider_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
+      output_map_;
   Status infer_status_;
 
   size_t step_idx_;
@@ -76,6 +78,15 @@ class EnsembleContext {
       const std::shared_ptr<Step>& completed_step = nullptr);
 
  private:
+  static TRTSERVER_Error* ResponseAlloc(
+      TRTSERVER_ResponseAllocator* allocator, void** buffer,
+      void** buffer_userp, const char* tensor_name, size_t byte_size,
+      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+  static TRTSERVER_Error* ResponseRelease(
+      TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
+
   using StepList = std::vector<std::shared_ptr<Step>>;
   using VersionMap =
       std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
@@ -155,6 +166,12 @@ class EnsembleContext {
 
   // Output tensors whose labels are not provided by the ensemble
   std::set<std::string> no_label_tensors_;
+
+  // The allocator that will be used to allocate buffers for the
+  // inference result tensors.
+  std::unique_ptr<
+      TRTSERVER_ResponseAllocator, decltype(&TRTSERVER_ResponseAllocatorDelete)>
+      allocator_;
 };
 
 EnsembleContext::EnsembleContext(
@@ -163,10 +180,10 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
-    : is_(is), info_(info), inflight_step_counter_(0),
-      stats_(stats),
+    : is_(is), info_(info), inflight_step_counter_(0), stats_(stats),
       request_provider_(request_provider),
-      response_provider_(response_provider), OnComplete_(OnComplete)
+      response_provider_(response_provider), OnComplete_(OnComplete),
+      allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
 {
   // Obtain backend handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
@@ -190,7 +207,7 @@ EnsembleContext::EnsembleContext(
     }
   }
 
-  for (const auto& pair : info_->tensor_to_step_){
+  for (const auto& pair : info_->tensor_to_step_) {
     tensor_data_.emplace(pair.first, TensorData());
   }
 
@@ -228,6 +245,69 @@ EnsembleContext::EnsembleContext(
       }
     }
   }
+
+  TRTSERVER_ResponseAllocator* allocator;
+  TRTSERVER_Error* err = TRTSERVER_ResponseAllocatorNew(
+      &allocator, ResponseAlloc, ResponseRelease);
+  if (err != nullptr) {
+    ensemble_status_ = Status(
+        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+        TRTSERVER_ErrorMessage(err));
+    TRTSERVER_ErrorDelete(err);
+  } else {
+    allocator_.reset(allocator);
+  }
+}
+
+TRTSERVER_Error*
+EnsembleContext::ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+{
+  auto tensor_data_map = reinterpret_cast<
+      std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>*>(
+      userp);
+
+  *buffer = nullptr;
+  *buffer_userp = nullptr;
+
+  // [TODO] Response provider should be able to take hints (i.e. CPU / GPU
+  // memory) from alloc caller (i.e. backend). Can't allocate for any memory
+  // type other than CPU.
+  if (memory_type == TRTSERVER_MEMORY_GPU) {
+    // [TODO] support it with cudaMalloc
+    LOG_VERBOSE(1) << "Internal response allocation not supported for type "
+                   << memory_type << " for " << tensor_name;
+    return nullptr;  // Success
+  } else {
+    if (byte_size > 0) {
+      auto it = tensor_data_map
+                    ->emplace(
+                        tensor_name,
+                        std::make_shared<AllocatedSystemMemory>(byte_size))
+                    .first;
+      *buffer = static_cast<void*>(it->second->MutableBuffer());
+    }
+  }
+
+  LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name << ", size "
+                 << byte_size << ", addr " << *buffer;
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+EnsembleContext::ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+{
+  LOG_VERBOSE(1) << "Internal response release: "
+                 << "size " << byte_size << ", addr " << buffer;
+
+  // Don't do anything when releasing a buffer since ResponseAlloc
+  // passes the ownership of the data to ensemble context.
+  return nullptr;  // Success
 }
 
 void
@@ -309,8 +389,8 @@ EnsembleContext::UpdateEnsembleState(
 
           std::get<1>(tensor_data) = batch_size;
 
-          RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
-              it->first, &(std::get<2>(tensor_data))));
+          std::get<2>(tensor_data) =
+              std::move(completed_step->output_map_[it->first]);
           updated_tensors.push_back(it->second);
 
           auto tensor_it = no_label_tensors_.find(it->second);
@@ -427,9 +507,11 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
       &((*step)->request_provider_)));
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
-  RETURN_IF_ERROR(InternalInferResponseProvider::Create(
-      *((*step)->backend_), (*step)->request_provider_->RequestHeader(),
-      (*step)->backend_->GetLabelProvider(), &((*step)->response_provider_)));
+  RETURN_IF_ERROR(DelegatingInferResponseProvider::Create(
+      (*step)->request_provider_->RequestHeader(),
+      (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
+      &((*step)->output_map_), ResponseRelease,
+      &((*step)->response_provider_)));
 
   return Status::Success;
 }
@@ -625,7 +707,8 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
     for (const auto& pair : element.input_map()) {
       auto it = info_->tensor_to_step_.find(pair.second);
       if (it == info_->tensor_to_step_.end()) {
-        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>()).first;
+        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>())
+                 .first;
       }
       it->second.insert(step_idx);
       info_->steps_[step_idx].input_to_tensor_.emplace(
@@ -635,7 +718,8 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
     for (const auto& pair : element.output_map()) {
       auto it = info_->tensor_to_step_.find(pair.second);
       if (it == info_->tensor_to_step_.end()) {
-        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>()).first;
+        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>())
+                 .first;
       }
       info_->steps_[step_idx].output_to_tensor_.emplace(
           std::make_pair(pair.first, pair.second));
