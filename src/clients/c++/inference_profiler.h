@@ -239,22 +239,26 @@ class InferenceProfiler {
       const size_t valid_request_count, const size_t valid_sequence_count,
       PerfStatus& summary);
 
-  nic::Error SummarizeServerStats(
-      const std::map<std::string, ni::ModelStatus>& start_status,
-      const std::map<std::string, ni::ModelStatus>& end_status,
-      ServerSideStats* server_stats);
-
-
   /// \param model_name The name of the model to summarize the server side stats
   /// \param model_version The version of the model
   /// \param start_status The model status at the start of the measurement.
   /// \param end_status The model status at the end of the measurement.
-  /// \param server_stats Returns the summary that the fileds recorded by server
+  /// \param server_stats Returns the summary that the fields recorded by server
   /// are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeServerModelStats(
       const std::string& model_name, const int64_t model_version,
       const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
+      ServerSideStats* server_stats);
+
+  /// \param start_status The model status at the start of the measurement.
+  /// \param end_status The model status at the end of the measurement.
+  /// \param server_stats Returns the summary that the fields recorded by server
+  /// are set.
+  /// \return Error object indicating success or failure.
+  nic::Error SummarizeServerStats(
+      const std::map<std::string, ni::ModelStatus>& start_status,
+      const std::map<std::string, ni::ModelStatus>& end_status,
       ServerSideStats* server_stats);
 
   bool verbose_;
