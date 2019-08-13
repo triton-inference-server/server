@@ -164,7 +164,7 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
     : is_(is), info_(info), inflight_step_counter_(0),
-      tensor_data_(info_->tensor_to_step_.size()), stats_(stats),
+      stats_(stats),
       request_provider_(request_provider),
       response_provider_(response_provider), OnComplete_(OnComplete)
 {
@@ -188,6 +188,10 @@ EnsembleContext::EnsembleContext(
 
       it->second.emplace(std::make_pair(step_info.model_version_, backend));
     }
+  }
+
+  for (const auto& pair : info_->tensor_to_step_){
+    tensor_data_.emplace(pair.first, TensorData());
   }
 
   if (ensemble_status_.IsOk()) {
