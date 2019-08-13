@@ -45,8 +45,8 @@ struct EnsembleInfo {
 
     std::string model_name_;
     int64_t model_version_;
-    std::unordered_map<std::string, size_t> input_to_tensor_;
-    std::unordered_map<std::string, size_t> output_to_tensor_;
+    std::unordered_map<std::string, std::string> input_to_tensor_;
+    std::unordered_map<std::string, std::string> output_to_tensor_;
   };
 
   std::string ensemble_name_;
@@ -56,14 +56,10 @@ struct EnsembleInfo {
   // the ensemble output (re)shape expected by the ensemble
   std::unordered_map<std::string, DimsList> ensemble_output_shape_;
 
-  std::unordered_map<std::string, size_t> ensemble_input_to_tensor_;
-  std::unordered_map<std::string, size_t> ensemble_output_to_tensor_;
-
   std::vector<StepInfo> steps_;
 
   // Only include a step if the ensemble tensor is used as input in that step
-  // Representing ensemble tensor with index (name doesn't matter at this point)
-  std::vector<std::set<size_t>> tensor_to_step_;
+  std::unordered_map<std::string, std::set<size_t>> tensor_to_step_;
 };
 
 // Scheduler that implements ensemble scheduling.
