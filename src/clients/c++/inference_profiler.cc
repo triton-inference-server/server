@@ -484,23 +484,10 @@ InferenceProfiler::SummarizeServerModelStats(
           end_itr->second.success().count() - start_cnt;
       server_stats->cumm_time_ns =
           end_itr->second.success().total_time_ns() - start_cumm_time_ns;
-      if (server_stats->composing_models_stat.empty()) {
-        server_stats->queue_time_ns =
-            end_itr->second.queue().total_time_ns() - start_queue_time_ns;
-        server_stats->compute_time_ns =
-            end_itr->second.compute().total_time_ns() - start_compute_time_ns;
-      } else {
-        server_stats->queue_time_ns = 0;
-        server_stats->compute_time_ns = 0;
-        // The compute and queue times are calculated as a total of the
-        // composing models.
-        for (auto& composing_model_stat : server_stats->composing_models_stat) {
-          server_stats->queue_time_ns +=
-              composing_model_stat.second.queue_time_ns;
-          server_stats->compute_time_ns +=
-              composing_model_stat.second.compute_time_ns;
-        }
-      }
+      server_stats->queue_time_ns =
+          end_itr->second.queue().total_time_ns() - start_queue_time_ns;
+      server_stats->compute_time_ns =
+          end_itr->second.compute().total_time_ns() - start_compute_time_ns;
     }
   }
 
@@ -513,6 +500,10 @@ InferenceProfiler::SummarizeServerStats(
     const std::map<std::string, ni::ModelStatus>& end_status,
     ServerSideStats* server_stats)
 {
+  RETURN_IF_ERROR(SummarizeServerModelStats(
+      model_name_, model_version_, start_status.find(model_name_)->second,
+      end_status.find(model_name_)->second, server_stats));
+
   // Summarize the composing models, if any.
   for (const auto& model_info : composing_models_) {
     auto it = server_stats->composing_models_stat
@@ -523,10 +514,6 @@ InferenceProfiler::SummarizeServerStats(
         start_status.find(model_info.first)->second,
         end_status.find(model_info.first)->second, &(it->second)));
   }
-
-  RETURN_IF_ERROR(SummarizeServerModelStats(
-      model_name_, model_version_, start_status.find(model_name_)->second,
-      end_status.find(model_name_)->second, server_stats));
 
   return nic::Error::Success;
 }
