@@ -1574,7 +1574,8 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   infer_request_.mutable_input()->Clear();
   infer_request_.set_id(request->Id());
   for (const auto& io : inputs_) {
-    http_request->total_input_byte_size_ += io->TotalByteSize();
+    http_request->total_input_byte_size_ +=
+        reinterpret_cast<InputImpl*>(io.get())->TotalSendByteSize();
 
     auto rinput = infer_request_.add_input();
     rinput->set_name(io->Name());
@@ -1593,8 +1594,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
           reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
       rshared_memory->set_offset(
           reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
-      rshared_memory->set_byte_size(
-          reinterpret_cast<InputImpl*>(io.get())->ByteSize());
+      rshared_memory->set_byte_size(io->TotalByteSize());
     }
   }
 
