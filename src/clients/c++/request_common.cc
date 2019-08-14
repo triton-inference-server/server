@@ -434,7 +434,8 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -464,7 +465,8 @@ ResultImpl::GetRaw(
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -493,7 +495,8 @@ ResultImpl::GetRawAtCursor(
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for non-RAW output '" + output_->Name() + "'");
+        "raw result not available for non-RAW output '" + output_->Name() +
+            "'");
   }
 
   if (batch_idx >= batch_size_) {
@@ -577,8 +580,8 @@ ResultImpl::GetClassAtCursor(
   if (class_pos_[batch_idx] >= (size_t)classes.cls().size()) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "attempt to read beyond end of result for output '" +
-            output_->Name() + "'");
+        "attempt to read beyond end of result for output '" + output_->Name() +
+            "'");
   }
 
   const InferResponseHeader::Output::Class& cls =

@@ -366,9 +366,7 @@ AddClassResults(
 //
 InferResponseProvider::InferResponseProvider(
     const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer)
+    const std::shared_ptr<LabelProvider>& label_provider)
     : request_header_(request_header), label_provider_(label_provider)
 {
   // Create a map from output name to the InferRequestHeader::Output
@@ -376,9 +374,6 @@ InferResponseProvider::InferResponseProvider(
   for (const InferRequestHeader::Output& output : request_header.output()) {
     output_map_.emplace(std::make_pair(output.name(), output));
   }
-
-  // Create a copy of the output_shm_buffer map for the response provider
-  output_shm_buffer_.insert(output_shm_buffer.begin(), output_shm_buffer.end());
 }
 
 bool
@@ -422,24 +417,8 @@ InferResponseProvider::CheckAndSetIfBufferedOutput(
   loutput->name_ = name;
   loutput->shape_ = content_shape;
   loutput->cls_count_ = 0;
+  loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
-
-  // if output uses shared memory initialize pointer with appropriate address
-  auto shm_pr = output_shm_buffer_.find(name);
-  size_t byte_size;
-  if (shm_pr != output_shm_buffer_.end()) {
-    *content = const_cast<void*>(
-        reinterpret_cast<const void*>(shm_pr->second->BufferAt(0, &byte_size)));
-    if (content_byte_size != byte_size) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "unexpected output byte size: " + std::to_string(content_byte_size) +
-              ", expecting " + std::to_string(byte_size) + " bytes");
-    }
-    loutput->ptr_ = *content;
-  } else {
-    loutput->ptr_ = nullptr;
-  }
 
   if (pr->second.has_cls()) {
     loutput->cls_count_ = pr->second.cls().count();
@@ -637,12 +616,10 @@ Status
 InternalInferResponseProvider::Create(
     const InferenceBackend& is, const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer,
     std::shared_ptr<InternalInferResponseProvider>* infer_provider)
 {
-  auto provider = new InternalInferResponseProvider(
-      request_header, label_provider, output_shm_buffer);
+  auto provider =
+      new InternalInferResponseProvider(request_header, label_provider);
   infer_provider->reset(provider);
   return Status::Success;
 }
@@ -713,10 +690,8 @@ InternalInferResponseProvider::GetSystemMemory(
 
 InternalInferResponseProvider::InternalInferResponseProvider(
     const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer)
-    : InferResponseProvider(request_header, label_provider, output_shm_buffer)
+    const std::shared_ptr<LabelProvider>& label_provider)
+    : InferResponseProvider(request_header, label_provider)
 {
 }
 
@@ -727,12 +702,10 @@ Status
 GRPCInferResponseProvider::Create(
     const InferRequestHeader& request_header, InferResponse* response,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer,
     std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
 {
-  GRPCInferResponseProvider* provider = new GRPCInferResponseProvider(
-      request_header, response, label_provider, output_shm_buffer);
+  GRPCInferResponseProvider* provider =
+      new GRPCInferResponseProvider(request_header, response, label_provider);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -763,14 +736,11 @@ GRPCInferResponseProvider::AllocateOutputBuffer(
   // Must always add a raw output into the list so that the number and
   // order of raw output entries equals the output meta-data. But
   // leave empty if not returning raw result for the output.
+  std::string* raw_output = response_->add_raw_output();
   if (output->ptr_ == nullptr) {
-    std::string* raw_output = response_->add_raw_output();
     raw_output->resize(content_byte_size);
     *content = static_cast<void*>(&((*raw_output)[0]));
     output->ptr_ = *content;
-  }
-  else {
-    response_->add_raw_output(static_cast<char*>(output->ptr_), content_byte_size);
   }
 
   return Status::Success;
@@ -781,10 +751,8 @@ GRPCInferResponseProvider::AllocateOutputBuffer(
 //
 HTTPInferResponseProvider::HTTPInferResponseProvider(
     evbuffer* output_buffer, const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer)
-    : InferResponseProvider(request_header, label_provider, output_shm_buffer),
+    const std::shared_ptr<LabelProvider>& label_provider)
+    : InferResponseProvider(request_header, label_provider),
       output_buffer_(output_buffer)
 {
 }
@@ -794,12 +762,10 @@ HTTPInferResponseProvider::Create(
     evbuffer* output_buffer, const InferenceBackend& is,
     const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer,
     std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
 {
   HTTPInferResponseProvider* provider = new HTTPInferResponseProvider(
-      output_buffer, request_header, label_provider, output_shm_buffer);
+      output_buffer, request_header, label_provider);
   infer_provider->reset(provider);
 
   return Status::Success;
@@ -876,8 +842,6 @@ Status
 DelegatingInferResponseProvider::Create(
     const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
-    const std::unordered_map<std::string, std::shared_ptr<SystemMemory>>&
-        output_shm_buffer,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
@@ -885,8 +849,8 @@ DelegatingInferResponseProvider::Create(
 {
   DelegatingInferResponseProvider* provider =
       new DelegatingInferResponseProvider(
-          request_header, label_provider, output_shm_buffer, allocator,
-          alloc_fn, alloc_userp, release_fn);
+          request_header, label_provider, allocator, alloc_fn, alloc_userp,
+          release_fn);
   infer_provider->reset(provider);
 
   return Status::Success;

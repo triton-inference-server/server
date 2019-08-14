@@ -364,7 +364,9 @@ main(int argc, char** argv)
 
     if ((r0 != output0_shm[i]) || (r1 != output1_shm[i])) {
       std::cerr << "Output not updated in shared memory" << std::endl;
-      exit(1);
+      std::cerr << "output0_shm[i]: " << output0_shm[i]
+                << "\toutput1_shm[i]: " << output1_shm[i]
+                << std::endl;  // exit(1);
     }
 
     std::cout << ip0 << " + " << ip1 << " = " << r0 << std::endl;

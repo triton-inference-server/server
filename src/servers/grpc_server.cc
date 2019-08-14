@@ -133,7 +133,12 @@ AsyncResources::ResponseAlloc(
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
 {
-  InferResponse* response = reinterpret_cast<InferResponse*>(userp);
+  auto userp_pair = reinterpret_cast<std::pair<
+      InferResponse*,
+      std::unordered_map<std::string, std::pair<const char*, size_t>>>*>(userp);
+  InferResponse* response = reinterpret_cast<InferResponse*>(userp_pair->first);
+  std::unordered_map<std::string, std::pair<const char*, size_t>>
+      output_shm_map = userp_pair->second;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -151,9 +156,15 @@ AsyncResources::ResponseAlloc(
   // that the number and order of raw output entries equals the output
   // meta-data.
   std::string* raw_output = response->add_raw_output();
-  if (byte_size > 0) {
-    raw_output->resize(byte_size);
-    *buffer = static_cast<void*>(&((*raw_output)[0]));
+  auto pr = output_shm_map.find(tensor_name);
+  if (pr != output_shm_map.end()) {
+    *buffer =
+        const_cast<void*>(reinterpret_cast<const void*>(pr->second.first));
+  } else {
+    if (byte_size > 0) {
+      raw_output->resize(byte_size);
+      *buffer = static_cast<void*>(&((*raw_output)[0]));
+    }
   }
 
   LOG_VERBOSE(1) << "GRPC allocation: " << tensor_name << ", size " << byte_size
@@ -397,6 +408,12 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     const uint64_t unique_id_;
   };
 
+  std::unordered_map<std::string, std::pair<const char*, size_t>>
+      output_shm_map_;
+  std::pair<
+      InferResponse*,
+      std::unordered_map<std::string, std::pair<const char*, size_t>>>
+      response_pair_;
   TRTSERVER_Error* GRPCToInput(
       TRTSERVER_Server* server, const InferRequestHeader& request_header,
       const InferRequest& request,
@@ -474,10 +491,10 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
         RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
             server, smb, io.shared_memory().offset(),
             io.shared_memory().byte_size(), const_cast<void**>(&base)));
-        RETURN_IF_ERR(
-          TRTSERVER_InferenceRequestProviderSetSharedMemoryOutputBuffer(
-              request_provider, io.name().c_str(), base,
-              io.shared_memory().byte_size()));
+        output_shm_map_.emplace(
+            io.name(), std::make_pair(
+                           static_cast<const char*>(base),
+                           io.shared_memory().byte_size()));
       }
     }
 
@@ -513,9 +530,13 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
               this, execution_context, response, request.meta_data().id(),
               server_id, unique_id);
 
+          // send both InferResponse and output_shm_map as both are needed to
+          // allocate buffer appropriately
+          response_pair_ = std::make_pair(&response, output_shm_map_);
+
           err = TRTSERVER_ServerInferAsync(
               server, request_provider, g_Resources->Allocator(),
-              &response /* response_allocator_userp */,
+              &response_pair_ /* response_allocator_userp */,
               GRPCInferRequest::InferComplete,
               reinterpret_cast<void*>(grpc_infer_request));
           if (err != nullptr) {

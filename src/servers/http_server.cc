@@ -838,10 +838,10 @@ HTTPAPIServer::EVBufferToInput(
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           server_.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
-      RETURN_IF_ERR(
-          TRTSERVER_InferenceRequestProviderSetSharedMemoryOutputBuffer(
-              request_provider, io.name().c_str(), base,
-              io.shared_memory().byte_size()));
+      // RETURN_IF_ERR(
+      //     TRTSERVER_InferenceRequestProviderSetSharedMemoryOutputBuffer(
+      //         request_provider, io.name().c_str(), base,
+      //         io.shared_memory().byte_size()));
     }
   }
 
