@@ -414,6 +414,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       InferResponse*,
       std::unordered_map<std::string, std::pair<const char*, size_t>>>
       response_pair_;
+
   TRTSERVER_Error* GRPCToInput(
       TRTSERVER_Server* server, const InferRequestHeader& request_header,
       const InferRequest& request,
