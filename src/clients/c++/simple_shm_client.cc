@@ -264,9 +264,40 @@ main(int argc, char** argv)
   size_t input_byte_size = 16 * sizeof(int32_t);
   size_t output_byte_size = 16 * sizeof(int32_t);
 
+  // Create Output0 and Output1 in Shared Memory
+  std::string shm_key = "/output_simple";
+  int shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
+  int* output0_shm =
+      (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
+  int* output1_shm = (int*)(output0_shm + 16);
+
+  // Register Output shared memory with TRTIS
+  err = shared_memory_ctx->RegisterSharedMemory(
+      "output_data", "/output_simple", 0, output_byte_size * 2);
+  if (!err.IsOk()) {
+    std::cerr << "error: unable to register shared memory output region: "
+              << err << std::endl;
+    exit(1);
+  }
+
+  // Set the context options to do batch-size 1 requests. Also request that
+  // all output tensors be returned using shared memory.
+  std::unique_ptr<nic::InferContext::Options> options;
+  FAIL_IF_ERR(
+      nic::InferContext::Options::Create(&options),
+      "unable to create inference options");
+
+  options->SetBatchSize(1);
+  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
+  options->AddSharedMemoryResult(
+      output1, "output_data", output_byte_size, output_byte_size);
+
+  FAIL_IF_ERR(
+      infer_ctx->SetRunOptions(*options), "unable to set inference options");
+
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
-  std::string shm_key = "/input_simple";
+  shm_key = "/input_simple";
   int shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
   int* input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
   int* input1_shm = (int*)(input0_shm + 16);
@@ -294,50 +325,6 @@ main(int argc, char** argv)
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
-
-  // Create Output0 and Output1 in Shared Memory
-  shm_key = "/output_simple";
-  int shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
-  int* output0_shm =
-      (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
-  int* output1_shm = (int*)(output0_shm + 16);
-
-  // Register Output shared memory with TRTIS
-  err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, output_byte_size * 2);
-  if (!err.IsOk()) {
-    std::cerr << "error: unable to register shared memory output region: "
-              << err << std::endl;
-    exit(1);
-  }
-
-  // // Set the shared memory region for Outputs
-  // err = output0->SetSharedMemory("output_data", 0, output_byte_size);
-  // if (!err.IsOk()) {
-  //   std::cerr << "failed setting shared memory output: " << err << std::endl;
-  //   exit(1);
-  // }
-  // err = output1->SetSharedMemory(
-  //     "output_data", output_byte_size, output_byte_size);
-  // if (!err.IsOk()) {
-  //   std::cerr << "failed setting shared memory output: " << err << std::endl;
-  //   exit(1);
-  // }
-
-  // Set the context options to do batch-size 1 requests. Also request that
-  // all output tensors be returned using shared memory.
-  std::unique_ptr<nic::InferContext::Options> options;
-  FAIL_IF_ERR(
-      nic::InferContext::Options::Create(&options),
-      "unable to create inference options");
-
-  options->SetBatchSize(1);
-  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
-  options->AddSharedMemoryResult(
-      output1, "output_data", output_byte_size, output_byte_size);
-
-  FAIL_IF_ERR(
-      infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
