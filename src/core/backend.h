@@ -84,6 +84,50 @@ class InferenceBackend {
       std::function<void(const Status&)> OnCompleteHandleInfer);
 
  protected:
+  struct InferContext {
+    // GPU device number that indicates that no gpu is available for a
+    // context (which is an invalid state since TensorRT requires a
+    // GPU).
+    static constexpr int NO_GPU_DEVICE = -1;
+
+    // Max batch size value that indicates batching is not supported.
+    static constexpr int NO_BATCHING = 0;
+
+    InferContext(
+        const std::string& name, const int gpu_device,
+        const int max_batch_size);
+
+    virtual ~InferContext() = default;
+
+    // Helper function to batch input data from payloads into 'input_buffer'.
+    // 'input_buffer' must be a continuous block that can hold the sum of
+    // 'expected_byte_sizes' bytes. On byte size mismatch, the function will
+    // set the status of the payload accordingly.
+    // [TODO] for now, the 'input_buffer' must be on CPU memory, should support
+    // buffer on GPU memory and have additional parameters as hints to memory
+    // type and memory type id.
+    void SetInputBuffer(
+        const std::string& name, const std::vector<size_t>& expected_byte_sizes,
+        std::vector<Scheduler::Payload>* payloads, char* input_buffer);
+
+    // Helper function to set output buffer of fixed size data type to payloads
+    void SetFixedSizeOutputBuffer(
+        const std::string& name, const size_t batch1_byte_size,
+        const char* content, const std::vector<int64_t>& content_shape,
+        std::vector<Scheduler::Payload>* payloads);
+
+    // Name of the model instance
+    std::string name_;
+
+    // The GPU index active when this context was created.
+    int gpu_device_;
+
+    // Maximum batch size to allow. This is the minimum of what is
+    // supported by the model and what is requested in the
+    // configuration.
+    int max_batch_size_;
+  };
+
   // Set the configuration of the model being served.
   Status SetModelConfig(const std::string& path, const ModelConfig& config);
 
