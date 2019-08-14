@@ -281,12 +281,12 @@ EnsembleContext::ResponseAlloc(
                    << memory_type << " for " << tensor_name;
     return nullptr;  // Success
   } else {
+    auto it = tensor_data_map
+                  ->emplace(
+                      tensor_name,
+                      std::make_shared<AllocatedSystemMemory>(byte_size))
+                  .first;
     if (byte_size > 0) {
-      auto it = tensor_data_map
-                    ->emplace(
-                        tensor_name,
-                        std::make_shared<AllocatedSystemMemory>(byte_size))
-                    .first;
       *buffer = static_cast<void*>(it->second->MutableBuffer());
     }
   }
