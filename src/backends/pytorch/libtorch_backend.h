@@ -65,14 +65,7 @@ class LibTorchBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const LibTorchBackend&);
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context
-    static constexpr int NO_GPU_DEVICE = -1;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
-
+  struct Context : InferenceBackend::InferContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
@@ -131,15 +124,6 @@ class LibTorchBackend : public InferenceBackend {
     Status Execute(
         std::vector<torch::jit::IValue>* inputs_,
         std::vector<torch::Tensor>* outputs_);
-    // Name of the model instance
-    std::string name_;
-
-    // The GPU index active when this context was created.
-    int gpu_device_;
-
-    // Maximum batch size to allow. NO_BATCHING indicates that
-    // batching is not supported.
-    int max_batch_size_;
 
     std::shared_ptr<torch::jit::script::Module> torch_model_;
     torch::Device device_;

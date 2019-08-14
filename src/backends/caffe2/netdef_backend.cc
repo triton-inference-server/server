@@ -86,7 +86,7 @@ ConvertDataType(DataType dtype)
 
 NetDefBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
+    : InferContext(name, gpu_device, max_batch_size)
 {
 }
 
@@ -370,59 +370,17 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   input_buffers->emplace_back(new char[total_byte_size]);
   char* buffer = input_buffers->back().get();
 
-  size_t buffer_copy_offset = 0;
-
   // Visit the payloads in order and copy the input tensors to
   // 'buffer'.
+  std::vector<size_t> expected_byte_sizes;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    size_t copied_byte_size = 0;
-    while (payload.status_.IsOk()) {
-      const void* content;
-      size_t content_byte_size = expected_byte_size - copied_byte_size;
-      payload.status_ = payload.request_provider_->GetNextInputContent(
-          name, &content, &content_byte_size, false);
-      if (!payload.status_.IsOk()) {
-        break;
-      }
-
-      // No more input content available then done with copying...
-      if (content == nullptr) {
-        break;
-      }
-
-      if ((buffer_copy_offset + copied_byte_size + content_byte_size) >
-          total_byte_size) {
-        payload.status_ = Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected size " +
-                std::to_string(
-                    buffer_copy_offset + copied_byte_size + content_byte_size) +
-                " for inference input '" + name + "', expecting " +
-                std::to_string(total_byte_size));
-        break;
-      }
-
-      memcpy(
-          static_cast<char*>(buffer) + buffer_copy_offset + copied_byte_size,
-          content, content_byte_size);
-      copied_byte_size += content_byte_size;
-    }
-
-    if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
-      payload.status_ = Status(
-          RequestStatusCode::INTERNAL,
-          "expected " + std::to_string(expected_byte_size) +
-              " bytes of data for inference input '" + name + "', got " +
-              std::to_string(copied_byte_size));
-    }
-
-    buffer_copy_offset += expected_byte_size;
+    expected_byte_sizes.push_back(
+        request_header.batch_size() * batch1_byte_size);
   }
+
+  SetInputBuffer(name, expected_byte_sizes, payloads, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);

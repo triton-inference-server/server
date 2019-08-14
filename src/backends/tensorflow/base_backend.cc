@@ -44,7 +44,7 @@ namespace nvidia { namespace inferenceserver {
 
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
+    : InferContext(name, gpu_device, max_batch_size),
       trtistf_model_(nullptr, TRTISTF_ModelDelete)
 {
 }
@@ -269,67 +269,6 @@ BaseBackend::Run(
 }
 
 namespace {
-
-void
-SetFixedSizedInputTensor(
-    TRTISTF_Tensor* tensor, const std::string& input_name,
-    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
-{
-  size_t tensor_copy_offset = 0;
-
-  // Visit the payloads in order and copy the input values into the
-  // input tensor. Skip payloads that had errors since they are not
-  // included in the dynamic batch.
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    size_t copied_byte_size = 0;
-    while (payload.status_.IsOk()) {
-      const void* content;
-      size_t content_byte_size = expected_byte_size - copied_byte_size;
-      payload.status_ = payload.request_provider_->GetNextInputContent(
-          input_name, &content, &content_byte_size, false);
-      if (!payload.status_.IsOk()) {
-        break;
-      }
-
-      // No more input content available then done with copying...
-      if (content == nullptr) {
-        break;
-      }
-
-      if ((tensor_copy_offset + copied_byte_size + content_byte_size) >
-          TRTISTF_TensorDataByteSize(tensor)) {
-        payload.status_ = Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected size " +
-                std::to_string(
-                    tensor_copy_offset + copied_byte_size + content_byte_size) +
-                " for inference input '" + input_name + "', expecting " +
-                std::to_string(TRTISTF_TensorDataByteSize(tensor)));
-        break;
-      }
-
-      memcpy(
-          TRTISTF_TensorData(tensor) + tensor_copy_offset + copied_byte_size,
-          content, content_byte_size);
-      copied_byte_size += content_byte_size;
-    }
-
-    if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
-      payload.status_ = Status(
-          RequestStatusCode::INTERNAL,
-          "expected " + std::to_string(expected_byte_size) +
-              " bytes of data for inference input '" + input_name + "', got " +
-              std::to_string(copied_byte_size));
-    }
-
-    tensor_copy_offset += expected_byte_size;
-  }
-}
 
 void
 FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
@@ -569,12 +508,42 @@ BaseBackend::Context::SetInput(
   if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
     const size_t batch1_byte_size =
         batch1_element_cnt * TRTISTF_TensorDataTypeByteSize(tensor);
+    if ((batch1_byte_size * total_batch_size) !=
+        TRTISTF_TensorDataByteSize(tensor)) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to create input tensor '" + name +
+              "' with expected byte size " +
+              std::to_string(batch1_byte_size * total_batch_size) + ", got " +
+              std::to_string(TRTISTF_TensorDataByteSize(tensor)));
+    }
     SetFixedSizedInputTensor(tensor, name, batch1_byte_size, payloads);
   } else {
     SetStringInputTensor(tensor, name, batch1_element_cnt, payloads);
   }
 
   return Status::Success;
+}
+
+void
+BaseBackend::Context::SetFixedSizedInputTensor(
+    TRTISTF_Tensor* tensor, const std::string& input_name,
+    const size_t batch1_byte_size, std::vector<Scheduler::Payload>* payloads)
+{
+  char* buffer = TRTISTF_TensorData(tensor);
+
+  // Visit the payloads in order and copy the input values into the
+  // input tensor. Skip payloads that had errors since they are not
+  // included in the dynamic batch.
+  std::vector<size_t> expected_byte_sizes;
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    expected_byte_sizes.push_back(
+        request_header.batch_size() * batch1_byte_size);
+  }
+
+  SetInputBuffer(input_name, expected_byte_sizes, payloads, buffer);
 }
 
 Status
