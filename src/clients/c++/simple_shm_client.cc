@@ -338,32 +338,18 @@ main(int argc, char** argv)
   }
 
   for (size_t i = 0; i < 16; ++i) {
-    int32_t ip0, ip1, r0, r1;
+    int32_t ip0, ip1;
     ip0 = input0_shm[i];
     ip1 = input1_shm[i];
 
-    FAIL_IF_ERR(
-        results["OUTPUT0"]->GetRawAtCursor(0 /* batch idx */, &r0),
-        "unable to get OUTPUT0 result at idx " + std::to_string(i));
-    FAIL_IF_ERR(
-        results["OUTPUT1"]->GetRawAtCursor(0 /* batch idx */, &r1),
-        "unable to get OUTPUT1 result at idx " + std::to_string(i));
+    std::cout << ip0 << " + " << ip1 << " = " << output0_shm[i] << std::endl;
+    std::cout << ip0 << " - " << ip1 << " = " << output1_shm[i] << std::endl;
 
-    if ((r0 != output0_shm[i]) || (r1 != output1_shm[i])) {
-      std::cerr << "Output not updated in shared memory" << std::endl;
-      std::cerr << "output0_shm[i]: " << output0_shm[i]
-                << "\toutput1_shm[i]: " << output1_shm[i]
-                << std::endl;  // exit(1);
-    }
-
-    std::cout << ip0 << " + " << ip1 << " = " << r0 << std::endl;
-    std::cout << ip0 << " - " << ip1 << " = " << r1 << std::endl;
-
-    if ((ip0 + ip1) != r0) {
+    if ((ip0 + ip1) != output0_shm[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((ip0 - ip1) != r1) {
+    if ((ip0 - ip1) != output1_shm[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
