@@ -342,7 +342,7 @@ class InferContext {
     /// \param offset The offset into the shared memory region upto the start
     /// of the input tensor values.
     /// \param byte_size The size, in bytes of the input tensor data. Must
-    /// match the size expected by the input.
+    /// match the size expected for the input batch.
     /// \return Error object indicating success or failure.
     virtual Error SetSharedMemory(
         const std::string& name, size_t offset, size_t byte_size) = 0;

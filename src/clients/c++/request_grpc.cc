@@ -853,8 +853,7 @@ InferGrpcContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
           reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryName());
       rshared_memory->set_offset(
           reinterpret_cast<InputImpl*>(io.get())->GetSharedMemoryOffset());
-      rshared_memory->set_byte_size(
-          reinterpret_cast<InputImpl*>(io.get())->ByteSize());
+      rshared_memory->set_byte_size(io->TotalByteSize());
     }
   }
 

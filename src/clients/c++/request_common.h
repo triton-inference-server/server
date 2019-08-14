@@ -149,6 +149,7 @@ class InputImpl : public InferContext::Input {
   const std::string& Name() const override { return mio_.name(); }
   int64_t ByteSize() const override { return byte_size_; }
   size_t TotalByteSize() const override { return total_byte_size_; }
+  size_t TotalSendByteSize() const { return total_send_byte_size_; }
   DataType DType() const override { return mio_.data_type(); }
   ModelInput::Format Format() const override { return mio_.format(); }
   const DimsList& Dims() const override { return mio_.dims(); }
@@ -189,6 +190,7 @@ class InputImpl : public InferContext::Input {
 
   int64_t byte_size_;
   size_t total_byte_size_;
+  size_t total_send_byte_size_;
 
   bool needs_shape_;
   std::vector<int64_t> shape_;

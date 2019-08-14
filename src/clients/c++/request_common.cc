@@ -124,8 +124,9 @@ InferContext::Options::Create(std::unique_ptr<InferContext::Options>* options)
 //==============================================================================
 
 InputImpl::InputImpl(const ModelInput& mio)
-    : mio_(mio), total_byte_size_(0), needs_shape_(false), batch_size_(0),
-      bufs_idx_(0), buf_pos_(0), io_type_(NONE)
+    : mio_(mio), total_byte_size_(0), total_send_byte_size_(0),
+      needs_shape_(false), batch_size_(0), bufs_idx_(0), buf_pos_(0),
+      io_type_(NONE)
 {
   if (GetElementCount(mio) == -1) {
     byte_size_ = -1;
@@ -137,11 +138,13 @@ InputImpl::InputImpl(const ModelInput& mio)
 
 InputImpl::InputImpl(const InputImpl& obj)
     : mio_(obj.mio_), byte_size_(obj.byte_size_),
-      total_byte_size_(obj.total_byte_size_), needs_shape_(obj.needs_shape_),
-      shape_(obj.shape_), batch_size_(obj.batch_size_), bufs_idx_(0),
-      buf_pos_(0), bufs_(obj.bufs_), buf_byte_sizes_(obj.buf_byte_sizes_),
-      str_bufs_(obj.str_bufs_), io_type_(obj.io_type_),
-      shm_name_(obj.shm_name_), shm_offset_(obj.shm_offset_)
+      total_byte_size_(obj.total_byte_size_),
+      total_send_byte_size_(obj.total_send_byte_size_),
+      needs_shape_(obj.needs_shape_), shape_(obj.shape_),
+      batch_size_(obj.batch_size_), bufs_idx_(0), buf_pos_(0), bufs_(obj.bufs_),
+      buf_byte_sizes_(obj.buf_byte_sizes_), str_bufs_(obj.str_bufs_),
+      io_type_(obj.io_type_), shm_name_(obj.shm_name_),
+      shm_offset_(obj.shm_offset_)
 {
 }
 
@@ -209,6 +212,7 @@ InputImpl::SetRaw(const uint8_t* input, size_t input_byte_size)
   }
 
   total_byte_size_ += input_byte_size;
+  total_send_byte_size_ += input_byte_size;
 
   bufs_.push_back(input);
   buf_byte_sizes_.push_back(input_byte_size);
@@ -241,18 +245,20 @@ InputImpl::SetSharedMemory(
         "The input '" + Name() + "' can only be set once with SetSharedMemory");
   }
 
-  // verify byte size of shared memory matches that of expected byte size
-  if ((int64_t)byte_size != byte_size_) {
+  // verify byte size of shared memory equals that of expected batch byte size
+  if (byte_size != (batch_size_ * byte_size_)) {
     return Error(
         RequestStatusCode::INVALID_ARG,
         "The input '" + Name() + "' has shared memory of size " +
             std::to_string(byte_size) + " bytes while the expected size is " +
-            std::to_string(byte_size_) + " bytes");
+            std::to_string(batch_size_) + " * " + std::to_string(byte_size_) +
+            " = " + std::to_string(batch_size_ * byte_size_) + " bytes");
   }
 
+  io_type_ = SHARED_MEMORY;
   shm_name_ = name;
   shm_offset_ = offset;
-  io_type_ = SHARED_MEMORY;
+  total_byte_size_ = byte_size;
   return Error::Success;
 }
 
@@ -358,6 +364,7 @@ InputImpl::Reset()
   bufs_idx_ = 0;
   buf_pos_ = 0;
   total_byte_size_ = 0;
+  total_send_byte_size_ = 0;
   io_type_ = NONE;
   return Error::Success;
 }
