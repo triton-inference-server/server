@@ -45,7 +45,9 @@ struct Step {
 
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
-  std::shared_ptr<InternalInferResponseProvider> response_provider_;
+  std::shared_ptr<DelegatingInferResponseProvider> response_provider_;
+  std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
+      output_map_;
   Status infer_status_;
 
   size_t step_idx_;
@@ -76,6 +78,15 @@ class EnsembleContext {
       const std::shared_ptr<Step>& completed_step = nullptr);
 
  private:
+  static TRTSERVER_Error* ResponseAlloc(
+      TRTSERVER_ResponseAllocator* allocator, void** buffer,
+      void** buffer_userp, const char* tensor_name, size_t byte_size,
+      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+  static TRTSERVER_Error* ResponseRelease(
+      TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
+
   using StepList = std::vector<std::shared_ptr<Step>>;
   using VersionMap =
       std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
@@ -98,13 +109,13 @@ class EnsembleContext {
   // returns the list of updated tensors in 'updated_tensors'
   Status UpdateEnsembleState(
       const std::shared_ptr<Step>& completed_step,
-      std::vector<size_t>& updated_tensors);
+      std::vector<std::string>& updated_tensors);
 
   // Helper function that returns a list of 'steps' that should be run under
   // current ensemble state. 'updated_tensors' is used so that we don't need to
   // iterate all the tensors to determine which step can be run.
   Status GetNextSteps(
-      const std::vector<size_t>& updated_tensors, StepList& steps);
+      const std::vector<std::string>& updated_tensors, StepList& steps);
 
   // Helper function that completes the response of the ensemble request
   Status FinishEnsemble();
@@ -135,7 +146,7 @@ class EnsembleContext {
 
   size_t inflight_step_counter_;
 
-  std::vector<TensorData> tensor_data_;
+  std::unordered_map<std::string, TensorData> tensor_data_;
 
   // Handle to all backend that may be used in the ensemble
   std::unordered_map<std::string, VersionMap> handles_;
@@ -154,7 +165,13 @@ class EnsembleContext {
   std::function<void(const Status&)> OnComplete_;
 
   // Output tensors whose labels are not provided by the ensemble
-  std::unordered_map<size_t, std::string> no_label_tensors_;
+  std::set<std::string> no_label_tensors_;
+
+  // The allocator that will be used to allocate buffers for the
+  // inference result tensors.
+  std::unique_ptr<
+      TRTSERVER_ResponseAllocator, decltype(&TRTSERVER_ResponseAllocatorDelete)>
+      allocator_;
 };
 
 EnsembleContext::EnsembleContext(
@@ -163,10 +180,10 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
-    : is_(is), info_(info), inflight_step_counter_(0),
-      tensor_data_(info_->tensor_to_step_.size()), stats_(stats),
+    : is_(is), info_(info), inflight_step_counter_(0), stats_(stats),
       request_provider_(request_provider),
-      response_provider_(response_provider), OnComplete_(OnComplete)
+      response_provider_(response_provider), OnComplete_(OnComplete),
+      allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
 {
   // Obtain backend handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
@@ -190,6 +207,10 @@ EnsembleContext::EnsembleContext(
     }
   }
 
+  for (const auto& pair : info_->tensor_to_step_) {
+    tensor_data_.emplace(pair.first, TensorData());
+  }
+
   if (ensemble_status_.IsOk()) {
     const auto& request_header = request_provider_->RequestHeader();
 
@@ -198,9 +219,9 @@ EnsembleContext::EnsembleContext(
     flags_ = request_header.flags();
 
     for (const auto& input : request_header.input()) {
-      auto it = info_->ensemble_input_to_tensor_.find(input.name());
-      if (it != info_->ensemble_input_to_tensor_.end()) {
-        auto& tensor_data = tensor_data_[it->second];
+      auto it = tensor_data_.find(input.name());
+      if (it != tensor_data_.end()) {
+        auto& tensor_data = it->second;
         std::get<0>(tensor_data) = input;
         std::get<1>(tensor_data) = (info_->allow_batching_ ? batch_size_ : 0);
         request_provider_->GetSystemMemory(
@@ -217,13 +238,76 @@ EnsembleContext::EnsembleContext(
   if (ensemble_status_.IsOk()) {
     const std::shared_ptr<LabelProvider>& label_provider =
         response_provider_->GetLabelProvider();
-    for (const auto& pair : info_->ensemble_output_to_tensor_) {
+    for (const auto& pair : info_->ensemble_output_shape_) {
       const auto& label = label_provider->GetLabel(pair.first, 0);
       if (label == "") {
-        no_label_tensors_[pair.second] = pair.first;
+        no_label_tensors_.emplace(pair.first);
       }
     }
   }
+
+  TRTSERVER_ResponseAllocator* allocator;
+  TRTSERVER_Error* err = TRTSERVER_ResponseAllocatorNew(
+      &allocator, ResponseAlloc, ResponseRelease);
+  if (err != nullptr) {
+    ensemble_status_ = Status(
+        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+        TRTSERVER_ErrorMessage(err));
+    TRTSERVER_ErrorDelete(err);
+  } else {
+    allocator_.reset(allocator);
+  }
+}
+
+TRTSERVER_Error*
+EnsembleContext::ResponseAlloc(
+    TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
+    const char* tensor_name, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+{
+  auto tensor_data_map = reinterpret_cast<
+      std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>*>(
+      userp);
+
+  *buffer = nullptr;
+  *buffer_userp = nullptr;
+
+  // [TODO] Response provider should be able to take hints (i.e. CPU / GPU
+  // memory) from alloc caller (i.e. backend). Can't allocate for any memory
+  // type other than CPU.
+  if (memory_type == TRTSERVER_MEMORY_GPU) {
+    // [TODO] support it with cudaMalloc
+    LOG_VERBOSE(1) << "Internal response allocation not supported for type "
+                   << memory_type << " for " << tensor_name;
+    return nullptr;  // Success
+  } else {
+    auto it = tensor_data_map
+                  ->emplace(
+                      tensor_name,
+                      std::make_shared<AllocatedSystemMemory>(byte_size))
+                  .first;
+    if (byte_size > 0) {
+      *buffer = static_cast<void*>(it->second->MutableBuffer());
+    }
+  }
+
+  LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name << ", size "
+                 << byte_size << ", addr " << *buffer;
+
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+EnsembleContext::ResponseRelease(
+    TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
+    size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
+{
+  LOG_VERBOSE(1) << "Internal response release: "
+                 << "size " << byte_size << ", addr " << buffer;
+
+  // Don't do anything when releasing a buffer since ResponseAlloc
+  // passes the ownership of the data to ensemble context.
+  return nullptr;  // Success
 }
 
 void
@@ -252,7 +336,7 @@ EnsembleContext::PrepareSteps(
 
     if (ensemble_status_.IsOk()) {
       StepList res;
-      std::vector<size_t> updated_tensors;
+      std::vector<std::string> updated_tensors;
       ensemble_status_ = UpdateEnsembleState(completed_step, updated_tensors);
       if (ensemble_status_.IsOk()) {
         ensemble_status_ = GetNextSteps(updated_tensors, res);
@@ -272,13 +356,13 @@ EnsembleContext::PrepareSteps(
 Status
 EnsembleContext::UpdateEnsembleState(
     const std::shared_ptr<Step>& completed_step,
-    std::vector<size_t>& updated_tensors)
+    std::vector<std::string>& updated_tensors)
 {
   updated_tensors.clear();
   if (completed_step == nullptr) {
-    for (size_t i = 0; i < tensor_data_.size(); i++) {
-      if (std::get<2>(tensor_data_[i]) != nullptr) {
-        updated_tensors.push_back(i);
+    for (const auto& pair : tensor_data_) {
+      if (std::get<2>(pair.second) != nullptr) {
+        updated_tensors.push_back(pair.first);
       }
     }
   } else {
@@ -305,8 +389,8 @@ EnsembleContext::UpdateEnsembleState(
 
           std::get<1>(tensor_data) = batch_size;
 
-          RETURN_IF_ERROR(completed_step->response_provider_->GetSystemMemory(
-              it->first, &(std::get<2>(tensor_data))));
+          std::get<2>(tensor_data) =
+              std::move(completed_step->output_map_[it->first]);
           updated_tensors.push_back(it->second);
 
           auto tensor_it = no_label_tensors_.find(it->second);
@@ -318,12 +402,12 @@ EnsembleContext::UpdateEnsembleState(
             if (completed_step->response_provider_->GetSecondaryLabelProvider(
                     it->first, &provider)) {
               response_provider_->SetSecondaryLabelProvider(
-                  tensor_it->second, provider);
+                  *tensor_it, provider);
             } else {
               const std::shared_ptr<LabelProvider>& label_provider =
                   completed_step->response_provider_->GetLabelProvider();
               response_provider_->SetSecondaryLabelProvider(
-                  tensor_it->second, std::make_pair(it->first, label_provider));
+                  *tensor_it, std::make_pair(it->first, label_provider));
             }
             no_label_tensors_.erase(tensor_it);
           }
@@ -346,14 +430,14 @@ EnsembleContext::UpdateEnsembleState(
 
 Status
 EnsembleContext::GetNextSteps(
-    const std::vector<size_t>& updated_tensors, StepList& steps)
+    const std::vector<std::string>& updated_tensors, StepList& steps)
 {
   steps.clear();
 
   std::set<size_t> next_step_idx;
   // Get steps whose tensors used for input are set
-  for (const auto tensor_idx : updated_tensors) {
-    const auto& step_idx = info_->tensor_to_step_[tensor_idx];
+  for (const auto tensor_name : updated_tensors) {
+    const auto& step_idx = info_->tensor_to_step_[tensor_name];
     for (const auto& idx : step_idx) {
       bool ready = true;
       for (const auto& input_pair : info_->steps_[idx].input_to_tensor_) {
@@ -423,9 +507,11 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
       &((*step)->request_provider_)));
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
-  RETURN_IF_ERROR(InternalInferResponseProvider::Create(
-      *((*step)->backend_), (*step)->request_provider_->RequestHeader(),
-      (*step)->backend_->GetLabelProvider(), &((*step)->response_provider_)));
+  RETURN_IF_ERROR(DelegatingInferResponseProvider::Create(
+      (*step)->request_provider_->RequestHeader(),
+      (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
+      &((*step)->output_map_), ResponseRelease,
+      &((*step)->response_provider_)));
 
   return Status::Success;
 }
@@ -484,12 +570,12 @@ EnsembleContext::FinishEnsemble()
 Status
 EnsembleContext::CheckAndSetEnsembleOutput()
 {
-  for (const auto& output_pair : info_->ensemble_output_to_tensor_) {
+  for (const auto& output_pair : info_->ensemble_output_shape_) {
     if (!response_provider_->RequiresOutput(output_pair.first)) {
       continue;
     }
     // Check if output is ready
-    const auto& tensor_data = tensor_data_[output_pair.second];
+    const auto& tensor_data = tensor_data_[output_pair.first];
     const auto& meta_data = std::get<0>(tensor_data);
     const auto& memory_block = std::get<2>(tensor_data);
     if (memory_block == nullptr) {
@@ -509,9 +595,8 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     size_t expected_byte_size = meta_data.batch_byte_size();
     DimsList output_dims = meta_data.dims();
 
-    auto sit = info_->ensemble_output_shape_.find(output_pair.first);
     ReshapeTensorDims(
-        sit->second, info_->allow_batching_, std::get<1>(tensor_data),
+        output_pair.second, info_->allow_batching_, std::get<1>(tensor_data),
         &output_dims);
 
     std::vector<int64_t> shape;
@@ -603,19 +688,11 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
   info_->ensemble_name_ = config.name();
   info_->allow_batching_ = (config.max_batch_size() != 0);
 
-  std::unordered_map<std::string, size_t> name_to_idx;
-  // Reserve slot for ensemble inputs and outputs
   for (const auto& input : config.input()) {
-    size_t idx = info_->tensor_to_step_.size();
-    info_->ensemble_input_to_tensor_[input.name()] = idx;
-    name_to_idx[input.name()] = idx;
-    info_->tensor_to_step_.emplace_back();
+    info_->tensor_to_step_.emplace(input.name(), std::set<size_t>());
   }
   for (const auto& output : config.output()) {
-    size_t idx = info_->tensor_to_step_.size();
-    info_->ensemble_output_to_tensor_[output.name()] = idx;
-    name_to_idx[output.name()] = idx;
-    info_->tensor_to_step_.emplace_back();
+    info_->tensor_to_step_.emplace(output.name(), std::set<size_t>());
 
     if (output.has_reshape()) {
       info_->ensemble_output_shape_[output.name()] = output.reshape().shape();
@@ -628,30 +705,24 @@ EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
     size_t step_idx = info_->steps_.size();
     info_->steps_.emplace_back(element.model_name(), element.model_version());
     for (const auto& pair : element.input_map()) {
-      size_t idx = info_->tensor_to_step_.size();
-      auto it = name_to_idx.find(pair.second);
-      if (it == name_to_idx.end()) {
-        name_to_idx[pair.second] = idx;
-        info_->tensor_to_step_.emplace_back();
-      } else {
-        idx = it->second;
+      auto it = info_->tensor_to_step_.find(pair.second);
+      if (it == info_->tensor_to_step_.end()) {
+        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>())
+                 .first;
       }
-      info_->tensor_to_step_[idx].insert(step_idx);
+      it->second.insert(step_idx);
       info_->steps_[step_idx].input_to_tensor_.emplace(
-          std::make_pair(pair.first, idx));
+          std::make_pair(pair.first, pair.second));
     }
 
     for (const auto& pair : element.output_map()) {
-      size_t idx = info_->tensor_to_step_.size();
-      auto it = name_to_idx.find(pair.second);
-      if (it == name_to_idx.end()) {
-        name_to_idx[pair.second] = idx;
-        info_->tensor_to_step_.emplace_back();
-      } else {
-        idx = it->second;
+      auto it = info_->tensor_to_step_.find(pair.second);
+      if (it == info_->tensor_to_step_.end()) {
+        it = info_->tensor_to_step_.emplace(pair.second, std::set<size_t>())
+                 .first;
       }
       info_->steps_[step_idx].output_to_tensor_.emplace(
-          std::make_pair(pair.first, idx));
+          std::make_pair(pair.first, pair.second));
     }
   }
 }
