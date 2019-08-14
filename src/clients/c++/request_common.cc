@@ -364,6 +364,7 @@ InputImpl::Reset()
   bufs_idx_ = 0;
   buf_pos_ = 0;
   total_byte_size_ = 0;
+  total_send_byte_size_ = 0;
   io_type_ = NONE;
   return Error::Success;
 }
