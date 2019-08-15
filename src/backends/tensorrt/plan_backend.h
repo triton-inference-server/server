@@ -28,6 +28,7 @@
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -61,15 +62,7 @@ class PlanBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const PlanBackend&);
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context (which is an invalid state since TensorRT requires a
-    // GPU).
-    static constexpr int NO_GPU_DEVICE = -1;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
-
+  struct Context : BackendContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
@@ -101,17 +94,6 @@ class PlanBackend : public InferenceBackend {
     // it will be reported in that payload.
     Status Run(std::vector<Scheduler::Payload>* payloads);
 
-    // Name of the model instance
-    const std::string name_;
-
-    // The GPU index active when this context was created.
-    const int gpu_device_;
-
-    // Maximum batch size to allow. This is the minimum of what is
-    // supported by the model and what is requested in the
-    // configuration.
-    const int max_batch_size_;
-
     // TensorRT components for the model
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
@@ -122,9 +104,6 @@ class PlanBackend : public InferenceBackend {
     // tensor. These are arrays with size equal to number of bindings.
     uint64_t* byte_sizes_;
     void** buffers_;
-
-    // The stream where operations are executed.
-    cudaStream_t stream_;
 
     // The CUDA graphs captured for the model for different
     // batch-sizes.
