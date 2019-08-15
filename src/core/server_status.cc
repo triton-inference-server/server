@@ -418,6 +418,19 @@ ModelInferStats::~ModelInferStats()
   }
 }
 
+
+void
+ModelInferStats::IncrementQueueDuration(const uint64_t increment_value)
+{
+  queue_duration_ns_ += increment_value;
+}
+
+void
+ModelInferStats::IncrementComputeDuration(const uint64_t increment_value)
+{
+  compute_duration_ns_ += increment_value;
+}
+
 struct timespec
 ModelInferStats::StartRequestTimer(ScopedTimer* timer) const
 {
