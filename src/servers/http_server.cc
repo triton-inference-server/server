@@ -335,6 +335,7 @@ HTTPAPIServer::ResponseAlloc(
       }
 
       *buffer = const_cast<void*>(pr->second.first);
+      *buffer_userp = nullptr;
     }
   } else {
     // Don't need to do anything if no memory was requested.

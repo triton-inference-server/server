@@ -407,9 +407,10 @@ ResultImpl::ResultImpl(
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
       batch_size_(batch_size), has_fixed_batch1_byte_size_(false),
-      batch1_byte_size_(0), batch1_element_count_(0), inplace_(false),
-      inplace_ptrs_(batch_size), buffers_(batch_size), bufs_idx_(0),
-      bufs_pos_(batch_size), bufs_byte_size_(batch_size), class_pos_(batch_size)
+      batch1_byte_size_(0), batch1_element_count_(0), use_shm_(false),
+      inplace_(false), inplace_ptrs_(batch_size), buffers_(batch_size),
+      bufs_idx_(0), bufs_pos_(batch_size), bufs_byte_size_(batch_size),
+      class_pos_(batch_size)
 {
 }
 
@@ -872,6 +873,7 @@ Error
 InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 {
   const OptionsImpl& options = reinterpret_cast<const OptionsImpl&>(boptions);
+  shm_outputs_.clear();
 
   // If the model doesn't support batching (i.e. max_batch_size_ == 0)
   // then still allow batch size of 1 to be specified.
@@ -910,6 +912,7 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
     if (!ooptions.shm_name.empty()) {
+      shm_outputs_.push_back(output->Name());
       auto rshared_memory = routput->mutable_shared_memory();
       rshared_memory->set_name(ooptions.shm_name);
       rshared_memory->set_offset(ooptions.shm_offset);

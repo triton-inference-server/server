@@ -1127,8 +1127,9 @@ HttpRequestImpl::SetNextRawResult(
       }
     }
 
+    // std::cerr << "Output size - ob: " << size << " - " << ob << '\n';
     // If output couldn't accept any more bytes then move to the next.
-    if (ob == 0) {
+    if (ob == 0 || io->UsesSharedMemory()) {
       result_pos_idx_++;
     } else {
       *result_bytes += ob;
@@ -1159,9 +1160,15 @@ HttpRequestImpl::CreateResult(
   }
 
   std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
-  result->SetBatch1Shape(output.raw().dims());
-  if (IsFixedSizeDataType(infer_output->DType())) {
-    result->SetBatchnByteSize(output.raw().batch_byte_size());
+
+  if (!ctx.UsesSharedMemory(output.name())) {
+    result->SetBatch1Shape(output.raw().dims());
+    if (IsFixedSizeDataType(infer_output->DType())) {
+      result->SetBatchnByteSize(output.raw().batch_byte_size());
+    }
+    result->SetUsesSharedMemory(false);
+  } else {
+    result->SetUsesSharedMemory(true);
   }
 
   ordered_results_.emplace_back(std::move(result));
