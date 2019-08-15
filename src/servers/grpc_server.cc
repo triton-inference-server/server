@@ -135,9 +135,9 @@ AsyncResources::ResponseAlloc(
 {
   auto userp_pair = reinterpret_cast<std::pair<
       InferResponse*,
-      std::unordered_map<std::string, std::pair<const char*, size_t>>>*>(userp);
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>*>(userp);
   InferResponse* response = reinterpret_cast<InferResponse*>(userp_pair->first);
-  std::unordered_map<std::string, std::pair<const char*, size_t>>
+  const std::unordered_map<std::string, std::pair<const void*, size_t>>&
       output_shm_map = userp_pair->second;
 
   *buffer = nullptr;
@@ -158,8 +158,18 @@ AsyncResources::ResponseAlloc(
   std::string* raw_output = response->add_raw_output();
   auto pr = output_shm_map.find(tensor_name);
   if (pr != output_shm_map.end()) {
-    *buffer =
-        const_cast<void*>(reinterpret_cast<const void*>(pr->second.first));
+    // check for byte size mismatch
+    if (byte_size != pr->second.second) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          std::string(
+              "expected buffer size to be " +
+              std::to_string(pr->second.second) + "bytes but gets " +
+              std::to_string(byte_size) + " bytes in output tensor")
+              .c_str());
+    }
+
+    *buffer = const_cast<void*>(pr->second.first);
   } else {
     if (byte_size > 0) {
       raw_output->resize(byte_size);
@@ -408,11 +418,11 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
     const uint64_t unique_id_;
   };
 
-  std::unordered_map<std::string, std::pair<const char*, size_t>>
+  std::unordered_map<std::string, std::pair<const void*, size_t>>
       output_shm_map_;
   std::pair<
       InferResponse*,
-      std::unordered_map<std::string, std::pair<const char*, size_t>>>
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>
       response_pair_;
 
   TRTSERVER_Error* GRPCToInput(
@@ -494,7 +504,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
             io.shared_memory().byte_size(), const_cast<void**>(&base)));
         output_shm_map_.emplace(
             io.name(), std::make_pair(
-                           static_cast<const char*>(base),
+                           static_cast<const void*>(base),
                            io.shared_memory().byte_size()));
       }
     }

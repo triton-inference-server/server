@@ -288,11 +288,11 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 status_regex_;
   re2::RE2 modelcontrol_regex_;
   re2::RE2 sharedmemorycontrol_regex_;
-  std::unordered_map<std::string, std::pair<const char*, size_t>>
+  std::unordered_map<std::string, std::pair<const void*, size_t>>
       output_shm_map_;
   std::pair<
       evbuffer*,
-      std::unordered_map<std::string, std::pair<const char*, size_t>>>
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>
       evbuffer_pair_;
 };
 
@@ -304,20 +304,28 @@ HTTPAPIServer::ResponseAlloc(
 {
   auto userp_pair = reinterpret_cast<std::pair<
       evbuffer*,
-      std::unordered_map<std::string, std::pair<const char*, size_t>>>*>(userp);
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>*>(userp);
   evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
-  std::unordered_map<std::string, std::pair<const char*, size_t>>
+  const std::unordered_map<std::string, std::pair<const void*, size_t>>&
       output_shm_map = userp_pair->second;
-
-  LOG_VERBOSE(1) << "output_shm_map.size(): " << output_shm_map.size();
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
   auto pr = output_shm_map.find(tensor_name);
   if (pr != output_shm_map.end()) {
-    *buffer =
-        const_cast<void*>(reinterpret_cast<const void*>(pr->second.first));
+    // check for byte size mismatch
+    if (byte_size != pr->second.second) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          std::string(
+              "expected buffer size to be " +
+              std::to_string(pr->second.second) + "bytes but gets " +
+              std::to_string(byte_size) + " bytes in output tensor")
+              .c_str());
+    }
+
+    *buffer = const_cast<void*>(pr->second.first);
   } else {
     // Don't need to do anything if no memory was requested.
     if (byte_size > 0) {
@@ -861,7 +869,7 @@ HTTPAPIServer::EVBufferToInput(
       output_shm_map_.emplace(
           io.name(),
           std::make_pair(
-              static_cast<const char*>(base), io.shared_memory().byte_size()));
+              static_cast<const void*>(base), io.shared_memory().byte_size()));
     }
   }
 
@@ -922,7 +930,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
       evbuffer_pair_ = std::make_pair(req->buffer_out, output_shm_map_);
 
-      LOG_VERBOSE(1) << "output_shm_map_.size(): " << output_shm_map_.size();
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider, allocator_,
           reinterpret_cast<void*>(&evbuffer_pair_), InferRequest::InferComplete,
@@ -931,7 +938,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         delete infer_request;
         infer_request = nullptr;
       }
-      LOG_VERBOSE(1) << "After sending Infer Request";
 
       // The request provider can be deleted immediately after the
       // ServerInferAsync call returns.
