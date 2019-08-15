@@ -28,6 +28,7 @@
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -66,17 +67,10 @@ class BaseBackend : public InferenceBackend {
       IONameMap* input_name_map, IONameMap* output_name_map) = 0;
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context.
-    static constexpr int NO_GPU_DEVICE = -1;
-
+  struct Context : BackendContext {
     // GPU device number that indicates model will be loaded on GPUs
     // as specified in model graph
     static constexpr int MODEL_DEVICE = -2;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
 
     Context(
         const std::string& name, const int gpu_device,
@@ -98,6 +92,12 @@ class BaseBackend : public InferenceBackend {
         std::vector<Scheduler::Payload>* payloads,
         TRTISTF_TensorList** input_tensors);
 
+    // Helper function to set the input for fixed-sized data type
+    void SetFixedSizedInputTensor(
+        TRTISTF_Tensor* tensor, const std::string& input_name,
+        const size_t batch1_byte_size,
+        std::vector<Scheduler::Payload>* payloads);
+
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
     // is assigned to this context. A non-OK return status indicates
@@ -106,16 +106,6 @@ class BaseBackend : public InferenceBackend {
     // it will be reported in that payload.
     Status Run(
         const BaseBackend* base, std::vector<Scheduler::Payload>* payloads);
-
-    // Name of the model instance
-    std::string name_;
-
-    // The GPU index active when this context was created.
-    int gpu_device_;
-
-    // Maximum batch size to allow. NO_BATCHING indicates that
-    // batching is not supported.
-    int max_batch_size_;
 
     // Map from configuration name for an input to tensor name for
     // that input in the model.

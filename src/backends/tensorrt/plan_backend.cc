@@ -42,10 +42,11 @@ namespace nvidia { namespace inferenceserver {
 
 PlanBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
-      runtime_(nullptr), engine_(nullptr), context_(nullptr),
-      byte_sizes_(nullptr), buffers_(nullptr), stream_(nullptr)
+    : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
+      engine_(nullptr), context_(nullptr), byte_sizes_(nullptr),
+      buffers_(nullptr)
 {
+  stream_ = nullptr;
 }
 
 PlanBackend::Context::~Context()
@@ -672,70 +673,21 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
     const std::string& name = engine_->getBindingName(bindex);
     const size_t batch1_byte_size =
         byte_sizes_[bindex] / std::max(1, max_batch_size_);
-    size_t binding_copy_offset = 0;
 
     // Visit the payloads in order and copy the input tensors to
     // GPU. Skip payloads that had errors since they are not included
     // in the dynamic batch.
+    std::vector<size_t> expected_byte_sizes;
     for (auto& payload : *payloads) {
       const InferRequestHeader& request_header =
           payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      size_t copied_byte_size = 0;
-      while (payload.status_.IsOk()) {
-        const void* content;
-        size_t content_byte_size = expected_byte_size - copied_byte_size;
-        payload.status_ = payload.request_provider_->GetNextInputContent(
-            name, &content, &content_byte_size, false);
-        if (!payload.status_.IsOk()) {
-          break;
-        }
-
-        // No more input content available then done with copying...
-        if (content == nullptr) {
-          break;
-        }
-
-        if ((binding_copy_offset + copied_byte_size + content_byte_size) >
-            byte_sizes_[bindex]) {
-          payload.status_ = Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected size " +
-                  std::to_string(binding_copy_offset + copied_byte_size) +
-                  std::to_string(content_byte_size) + " for inference input '" +
-                  name + "', expecting " + std::to_string(byte_sizes_[bindex]));
-          break;
-        }
-
-        if (content_byte_size > 0) {
-          cudaError_t err = cudaMemcpyAsync(
-              static_cast<char*>(buffers_[bindex]) + binding_copy_offset +
-                  copied_byte_size,
-              content, content_byte_size, cudaMemcpyHostToDevice, stream_);
-          if (err != cudaSuccess) {
-            payload.status_ = Status(
-                RequestStatusCode::INTERNAL,
-                "failed to copy input values to GPU for input '" + name +
-                    "': " + std::string(cudaGetErrorString(err)));
-            break;
-          }
-        }
-
-        copied_byte_size += content_byte_size;
-      }
-
-      if (payload.status_.IsOk() && (copied_byte_size != expected_byte_size)) {
-        payload.status_ = Status(
-            RequestStatusCode::INTERNAL,
-            "expected " + std::to_string(expected_byte_size) +
-                " bytes of data for inference input '" + name + "', got " +
-                std::to_string(copied_byte_size));
-      }
-
-      binding_copy_offset += expected_byte_size;
+      expected_byte_sizes.push_back(
+          request_header.batch_size() * batch1_byte_size);
     }
+
+    SetInputBuffer(
+        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU,
+        static_cast<char*>(buffers_[bindex]));
   }
 
   // Async execute the inference using a CUDA graph if available for

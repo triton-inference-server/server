@@ -27,6 +27,7 @@
 
 #include "src/backends/custom/custom.h"
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -68,14 +69,7 @@ class CustomBackend : public InferenceBackend {
       void*, const char*, size_t, int64_t*, uint64_t, void**);
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context
-    static constexpr int NO_GPU_DEVICE = -1;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
-
+  struct Context : BackendContext {
     using IOSizeMap = std::unordered_map<std::string, size_t>;
 
     Context(
@@ -119,16 +113,6 @@ class CustomBackend : public InferenceBackend {
         GetInputOutputContext* output_context, const char* name,
         size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
         void** content);
-
-    // Name of the model instance
-    std::string name_;
-
-    // The GPU index active when this context was created.
-    int gpu_device_;
-
-    // Maximum batch size to allow. NO_BATCHING indicates that
-    // batching is not supported.
-    int max_batch_size_;
 
     // The handle to the shared library associated with this context.
     void* library_handle_;

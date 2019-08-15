@@ -43,7 +43,7 @@ namespace nvidia { namespace inferenceserver {
 
 CustomBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size),
+    : BackendContext(name, gpu_device, max_batch_size),
       library_handle_(nullptr), library_context_handle_(nullptr),
       InitializeFn_(nullptr), FinalizeFn_(nullptr), ErrorStringFn_(nullptr),
       ExecuteFn_(nullptr)
