@@ -755,8 +755,22 @@ OnnxBackend::Context::ReadOutputTensors(
       RETURN_IF_ORT_ERROR(
           OrtGetTensorMutableData(output_tensor, (void**)&content));
 
-      SetFixedSizeOutputBuffer(
-          name, batch1_byte_size, content, content_shape, payloads);
+      // [TODO] currently ONNX output data are always on CPU
+      // https://github.com/microsoft/onnxruntime/issues/1621
+      auto content_memory_type = TRTSERVER_MEMORY_CPU;
+      bool cuda_copy = SetFixedSizeOutputBuffer(
+          name, batch1_byte_size, content, content_shape, content_memory_type,
+          payloads);
+      if (cuda_copy) {
+#ifdef TRTIS_ENABLE_GPU
+        cudaStreamSynchronize(stream_);
+#else
+        return Status(
+            RequestStatusCode::INTERNAL, "unexpected CUDA copy for output '" +
+                                             name +
+                                             "' while GPU is not supported");
+#endif  // TRTIS_ENABLE_GPU
+      }
     }
   }
   return Status::Success;

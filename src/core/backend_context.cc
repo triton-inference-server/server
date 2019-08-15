@@ -126,12 +126,14 @@ BackendContext::SetInputBuffer(
   return cuda_copy;
 }  // namespace inferenceserver
 
-void
+bool
 BackendContext::SetFixedSizeOutputBuffer(
     const std::string& name, const size_t batch1_byte_size, const char* content,
     const std::vector<int64_t>& content_shape,
+    TRTSERVER_Memory_Type src_memory_type,
     std::vector<Scheduler::Payload>* payloads)
 {
+  bool cuda_copy = false;
   size_t content_offset = 0;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
@@ -139,18 +141,66 @@ BackendContext::SetFixedSizeOutputBuffer(
     const size_t expected_byte_size =
         request_header.batch_size() * batch1_byte_size;
 
-    // If 'payload' requested this output then copy it from
+    // If 'payload' should have valid output (status ok) and
+    // if 'payload' requested this output then copy it from
     // 'content'. If it did not request this output then just
     // skip it in the 'content'.
-    if ((payload.response_provider_ != nullptr) &&
+    if (payload.status_.IsOk() && (payload.response_provider_ != nullptr) &&
         payload.response_provider_->RequiresOutput(name)) {
-      void* buffer;
-      // [TODO] Try to allocate buffer with different memory type based
-      // on the device that the context is on
+      auto dst_memory_type = src_memory_type;
+      void* buffer = nullptr;
+
+      // try to get buffer with the same memory type as the output tensor
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape);
+          name, &buffer, expected_byte_size, content_shape, src_memory_type);
       if (status.IsOk()) {
-        memcpy(buffer, content + content_offset, expected_byte_size);
+        if (buffer == nullptr) {
+          // Use default (CPU memory type) if preferred type can't be fulfilled
+          status = payload.response_provider_->AllocateOutputBuffer(
+              name, &buffer, expected_byte_size, content_shape);
+          dst_memory_type = TRTSERVER_MEMORY_CPU;
+
+          // If 'expected_byte_size == 0', 'buffer == nullptr' is being expected
+          if (status.IsOk() && (buffer == nullptr) &&
+              (expected_byte_size != 0)) {
+            status = Status(
+                RequestStatusCode::INTERNAL,
+                "all attempts to allocate buffer for output '" + name +
+                    "' failed");
+          }
+        }
+      }
+
+      if (status.IsOk() && (expected_byte_size != 0)) {
+        if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
+            (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+          memcpy(buffer, content + content_offset, expected_byte_size);
+        } else {
+#ifdef TRTIS_ENABLE_GPU
+          cuda_copy = true;
+          // [TODO] use cudaMemcpyDefault if UVM is supported for the device
+          auto copy_kind = cudaMemcpyDeviceToDevice;
+          if (src_memory_type == TRTSERVER_MEMORY_CPU) {
+            copy_kind = cudaMemcpyHostToDevice;
+          } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
+            copy_kind = cudaMemcpyDeviceToHost;
+          }
+          cudaError_t err = cudaMemcpyAsync(
+              buffer, content + content_offset, expected_byte_size, copy_kind,
+              stream_);
+          if (err != cudaSuccess) {
+            payload.status_ = Status(
+                RequestStatusCode::INTERNAL,
+                "failed to use CUDA copy for output '" + name +
+                    "': " + std::string(cudaGetErrorString(err)));
+#else
+          payload.status_ = Status(
+              RequestStatusCode::INTERNAL,
+              "try to use CUDA copy for output '" + name +
+                  "' while GPU is not supported"));
+#endif  // TRTIS_ENABLE_GPU
+          }
+        }
       } else {
         payload.status_ = status;
       }
@@ -158,6 +208,8 @@ BackendContext::SetFixedSizeOutputBuffer(
 
     content_offset += expected_byte_size;
   }
-}
+
+  return cuda_copy;
+}  // namespace nvidia
 
 }}  // namespace nvidia::inferenceserver

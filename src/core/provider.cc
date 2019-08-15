@@ -636,7 +636,8 @@ InternalInferResponseProvider::MutableResponseHeader()
 Status
 InternalInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape,
+    const TRTSERVER_Memory_Type preferred_memory_type)
 {
   *content = nullptr;
 
@@ -722,7 +723,8 @@ GRPCInferResponseProvider::MutableResponseHeader()
 Status
 GRPCInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape,
+    const TRTSERVER_Memory_Type preferred_memory_type)
 {
   Output* output;
   RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
@@ -781,7 +783,8 @@ HTTPInferResponseProvider::MutableResponseHeader()
 Status
 HTTPInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape,
+    const TRTSERVER_Memory_Type preferred_memory_type)
 {
   *content = nullptr;
 
@@ -881,7 +884,8 @@ DelegatingInferResponseProvider::MutableResponseHeader()
 Status
 DelegatingInferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape)
+    const std::vector<int64_t>& content_shape,
+    const TRTSERVER_Memory_Type preferred_memory_type)
 {
   *content = nullptr;
 

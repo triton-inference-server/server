@@ -61,9 +61,12 @@ struct BackendContext {
       TRTSERVER_Memory_Type dst_memory_type, char* input_buffer);
 
   // Helper function to set output buffer of fixed size data type to payloads
-  void SetFixedSizeOutputBuffer(
+  // Return true if cudaMemcpyAsync is called, and the caller should call
+  // cudaStreamSynchronize before using the data. Otherwise, return false.
+  bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
       const char* content, const std::vector<int64_t>& content_shape,
+      TRTSERVER_Memory_Type src_memory_type,
       std::vector<Scheduler::Payload>* payloads);
 
   // Name of the model instance
