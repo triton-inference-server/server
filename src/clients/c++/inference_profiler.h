@@ -31,6 +31,8 @@
 
 
 namespace perfclient {
+using ModelInfo = std::pair<std::string, int64_t>;
+using ComposingModelMap = std::map<ModelInfo, std::set<ModelInfo>>;
 
 /// Constant parameters that determine the whether stopping criteria has met
 /// for the current phase of testing
@@ -64,8 +66,7 @@ struct ServerSideStats {
   uint64_t queue_time_ns;
   uint64_t compute_time_ns;
 
-  std::map<std::pair<std::string, int64_t>, ServerSideStats>
-      composing_models_stat;
+  std::map<ModelInfo, ServerSideStats> composing_models_stat;
 };
 
 struct PerfStatus {
@@ -168,6 +169,20 @@ class InferenceProfiler {
       std::unique_ptr<nic::ServerStatusContext> status_ctx,
       std::unique_ptr<LoadManager> manager);
 
+  /// A helper function to construct the map of ensemble models to its composing
+  /// models \param model_name The ensemble model to be added into the map
+  /// \param model_version The version of the model to be added
+  /// \server_status The server status response from TRTIS.
+  /// \return Error object indicating success or failure
+  nic::Error BuildComposingModelMap(
+      const std::string& model_name, const int64_t& model_version,
+      const ni::ServerStatus& server_status);
+
+  /// Constructs the composing_model_map_ which includes the details of ensemble
+  /// \param The server status response from TRTIS
+  /// \return Error object indicating success or failure
+  nic::Error BuildComposingModelMap(const ni::ServerStatus& server_status);
+
   nic::Error StartProfile() { return profile_ctx_->StartProfile(); }
 
   nic::Error StopProfile() { return profile_ctx_->StopProfile(); }
@@ -183,6 +198,12 @@ class InferenceProfiler {
   /// models will also be returned.
   /// \return Error object indicating success or failure.
   nic::Error GetServerSideStatus(
+      std::map<std::string, ni::ModelStatus>* model_status);
+
+  // A helper fuction for obtaining the status of the models provided by the
+  // server.
+  nic::Error GetServerSideStatus(
+      ni::ServerStatus& server_status, const ModelInfo model_info,
       std::map<std::string, ni::ModelStatus>* model_status);
 
   /// Sumarize the measurement with the provided statistics.
@@ -257,6 +278,18 @@ class InferenceProfiler {
   /// are set.
   /// \return Error object indicating success or failure.
   nic::Error SummarizeServerStats(
+      const ModelInfo model_info,
+      const std::map<std::string, ni::ModelStatus>& start_status,
+      const std::map<std::string, ni::ModelStatus>& end_status,
+      ServerSideStats* server_stats);
+
+
+  /// \param start_status The model status at the start of the measurement.
+  /// \param end_status The model status at the end of the measurement.
+  /// \param server_stats Returns the summary that the fields recorded by server
+  /// are set.
+  /// \return Error object indicating success or failure.
+  nic::Error SummarizeServerStats(
       const std::map<std::string, ni::ModelStatus>& start_status,
       const std::map<std::string, ni::ModelStatus>& end_status,
       ServerSideStats* server_stats);
@@ -271,7 +304,7 @@ class InferenceProfiler {
   ContextFactory::ModelSchedulerType scheduler_type_;
   std::string model_name_;
   int64_t model_version_;
-  std::set<std::pair<std::string, int64_t>> composing_models_;
+  ComposingModelMap composing_models_map_;
 
   std::unique_ptr<nic::ProfileContext> profile_ctx_;
   std::unique_ptr<nic::ServerStatusContext> status_ctx_;

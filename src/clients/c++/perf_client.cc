@@ -127,9 +127,14 @@ SignalHandler(int signum)
 //
 
 nic::Error
-ReportServerSideStats(const ServerSideStats& stats)
+ReportServerSideStats(const ServerSideStats& stats, const int iteration)
 {
+  const std::string ident = std::string(2 * iteration, ' ');
   const uint64_t cnt = stats.request_count;
+  if (cnt == 0) {
+    std::cout << ident << "  Request count: " << cnt << std::endl;
+    return nic::Error(ni::RequestStatusCode::SUCCESS);
+  }
 
   const uint64_t cumm_time_us = stats.cumm_time_ns / 1000;
   const uint64_t cumm_avg_us = cumm_time_us / cnt;
@@ -143,8 +148,8 @@ ReportServerSideStats(const ServerSideStats& stats)
   const uint64_t overhead = (cumm_avg_us > queue_avg_us + compute_avg_us)
                                 ? (cumm_avg_us - queue_avg_us - compute_avg_us)
                                 : 0;
-  std::cout << "    Request count: " << cnt << std::endl
-            << "    Avg request latency: " << cumm_avg_us << " usec";
+  std::cout << ident << "  Request count: " << cnt << std::endl
+            << ident << "  Avg request latency: " << cumm_avg_us << " usec";
   if (stats.composing_models_stat.empty()) {
     std::cout << " (overhead " << overhead << " usec + "
               << "queue " << queue_avg_us << " usec + "
@@ -152,13 +157,20 @@ ReportServerSideStats(const ServerSideStats& stats)
               << std::endl;
   } else {
     std::cout << std::endl;
-    std::cout << "    Total avg compute time : " << compute_avg_us << " usec"
-              << std::endl;
-    std::cout << "    Total avg queue time : " << queue_avg_us << " usec"
+    std::cout << ident << "  Total avg compute time : " << compute_avg_us
+              << " usec" << std::endl;
+    std::cout << ident << "  Total avg queue time : " << queue_avg_us << " usec"
               << std::endl
               << std::endl;
-  }
 
+    std::cout << ident << "Composing models: " << std::endl;
+    for (const auto& model_stats : stats.composing_models_stat) {
+      const auto& model_info = model_stats.first;
+      std::cout << ident << model_info.first
+                << ", version: " << model_info.second << std::endl;
+      ReportServerSideStats(model_stats.second, iteration + 1);
+    }
+  }
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
@@ -236,17 +248,7 @@ Report(
   std::cout << client_library_detail << std::endl;
 
   std::cout << "  Server: " << std::endl;
-  ReportServerSideStats(summary.server_stats);
-
-  if (!summary.server_stats.composing_models_stat.empty()) {
-    std::cout << "  Composing models: " << std::endl;
-    for (const auto& model_stats : summary.server_stats.composing_models_stat) {
-      const auto& model_info = model_stats.first;
-      std::cout << "  " << model_info.first
-                << ", version: " << model_info.second << std::endl;
-      ReportServerSideStats(model_stats.second);
-    }
-  }
+  ReportServerSideStats(summary.server_stats, 1);
 
   return nic::Error(ni::RequestStatusCode::SUCCESS);
 }
