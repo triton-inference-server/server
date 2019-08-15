@@ -721,7 +721,6 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
     const std::string& name = engine_->getBindingName(bindex);
     const size_t batch1_byte_size =
         (byte_sizes_[bindex] / std::max(1, max_batch_size_));
-    size_t binding_copy_offset = 0;
 
     // Get the shape of the output. If model supports batching then
     // prepend the batch dimension onto the output shape.
@@ -734,54 +733,18 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
       shape.push_back(dims.d[i]);
     }
 
-    for (auto& payload : *payloads) {
-      if (!payload.status_.IsOk()) {
-        continue;
-      }
-
-      const InferRequestHeader& request_header =
-          payload.request_provider_->RequestHeader();
-      const size_t expected_byte_size =
-          request_header.batch_size() * batch1_byte_size;
-
-      // If 'payload' requested this output then copy it from the
-      // GPU. If it did not request this output then just skip it in
-      // the output buffer.
-      if ((payload.response_provider_ != nullptr) &&
-          payload.response_provider_->RequiresOutput(name)) {
-        void* content = nullptr;
-        Status status = payload.response_provider_->AllocateOutputBuffer(
-            name, &content, expected_byte_size, shape);
-        if (status.IsOk()) {
-          if ((binding_copy_offset + expected_byte_size) >
-              byte_sizes_[bindex]) {
-            status = Status(
-                RequestStatusCode::INVALID_ARG,
-                "unexpected size " +
-                    std::to_string(binding_copy_offset + expected_byte_size) +
-                    " for inference output '" + name + "', expecting maximum" +
-                    std::to_string(byte_sizes_[bindex]));
-          } else if (expected_byte_size > 0) {
-            cudaError_t err = cudaMemcpyAsync(
-                content,
-                static_cast<char*>(buffers_[bindex]) + binding_copy_offset,
-                expected_byte_size, cudaMemcpyDeviceToHost, stream_);
-            if (err != cudaSuccess) {
-              status = Status(
-                  RequestStatusCode::INTERNAL,
-                  "failed to copy output values from GPU for output '" + name +
-                      "': " + cudaGetErrorString(err));
-            }
-          }
-        }
-
-        if (!status.IsOk()) {
-          payload.status_ = status;
-        }
-      }
-
-      binding_copy_offset += expected_byte_size;
+    if (byte_sizes_[bindex] < (batch1_byte_size * total_batch_size)) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "unexpected size for output '" + name + "', byte-size " +
+              std::to_string(byte_sizes_[bindex]) + " is less than " +
+              std::to_string(total_batch_size) + " * " +
+              std::to_string(batch1_byte_size));
     }
+
+    SetFixedSizeOutputBuffer(
+        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
+        TRTSERVER_MEMORY_GPU /* src_memory_type */, payloads);
   }
 
   // Wait for the copy-out to complete

@@ -98,6 +98,12 @@ class BaseBackend : public InferenceBackend {
         const size_t batch1_byte_size,
         std::vector<Scheduler::Payload>* payloads);
 
+    // Helper function to set the output with fixed-sized data type in payload
+    void ReadFixedSizedOutputTensor(
+        TRTISTF_Tensor* tensor, const std::string& output_name,
+        const std::vector<int64_t>& shape, const size_t batch1_byte_size,
+        std::vector<Scheduler::Payload>* payloads);
+
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
     // is assigned to this context. A non-OK return status indicates

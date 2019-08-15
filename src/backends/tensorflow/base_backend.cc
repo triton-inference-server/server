@@ -389,51 +389,6 @@ SetStringInputTensor(
 }
 
 void
-ReadFixedSizedOutputTensor(
-    TRTISTF_Tensor* tensor, const std::string& output_name,
-    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-    std::vector<Scheduler::Payload>* payloads)
-{
-  size_t tensor_copy_offset = 0;
-
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    // If 'payload' requested this output then copy it from the
-    // GPU. If it did not request this output then just skip it in
-    // the output buffer.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(output_name)) {
-      void* content = nullptr;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, expected_byte_size, shape);
-      if (!status.IsOk()) {
-        payload.status_ = status;
-      } else {
-        if ((tensor_copy_offset + expected_byte_size) >
-            TRTISTF_TensorDataByteSize(tensor)) {
-          payload.status_ = Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected size " +
-                  std::to_string(tensor_copy_offset + expected_byte_size) +
-                  " for inference output '" + output_name + "', expecting " +
-                  std::to_string(TRTISTF_TensorDataByteSize(tensor)));
-        } else {
-          memcpy(
-              content, TRTISTF_TensorData(tensor) + tensor_copy_offset,
-              expected_byte_size);
-        }
-      }
-    }
-
-    tensor_copy_offset += expected_byte_size;
-  }
-}
-
-void
 ReadStringOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
     const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
@@ -567,6 +522,32 @@ BaseBackend::Context::SetFixedSizedInputTensor(
 
   SetInputBuffer(
       input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+}
+
+void
+BaseBackend::Context::ReadFixedSizedOutputTensor(
+    TRTISTF_Tensor* tensor, const std::string& output_name,
+    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
+    std::vector<Scheduler::Payload>* payloads)
+{
+  // [TODO] use the following statement. Right now we always create
+  // output tensor with default constructor that uses CPU allocator
+  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
+  //                                ? TRTSERVER_MEMORY_CPU
+  //                                : TRTSERVER_MEMORY_GPU;
+  auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  bool cuda_copy = SetFixedSizeOutputBuffer(
+      output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
+      content_memory_type, payloads);
+  if (cuda_copy) {
+#ifdef TRTIS_ENABLE_GPU
+    cudaStreamSynchronize(stream_);
+#else
+    return Status(
+        RequestStatusCode::INTERNAL, "unexpected CUDA copy for output '" +
+                                         name + "' while GPU is not supported");
+#endif  // TRTIS_ENABLE_GPU
+  }
 }
 
 Status
@@ -755,6 +736,15 @@ BaseBackend::Context::Run(
     if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
       const size_t batch1_byte_size =
           batch1_element_cnt * TRTISTF_TensorDataTypeByteSize(output_tensor);
+      if ((batch1_byte_size * total_batch_size) !=
+          TRTISTF_TensorDataByteSize(output_tensor)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size for output '" + name + "', byte-size " +
+                std::to_string(TRTISTF_TensorDataByteSize(output_tensor)) +
+                " does not equal " + std::to_string(total_batch_size) + " * " +
+                std::to_string(batch1_byte_size));
+      }
       ReadFixedSizedOutputTensor(
           output_tensor, name, shapevec, batch1_byte_size, payloads);
     } else {

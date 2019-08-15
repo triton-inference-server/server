@@ -436,32 +436,23 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  size_t content_offset = 0;
-
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    // If 'payload' requested this output then copy it from
-    // 'content'. If it did not request this output then just
-    // skip it in the 'content'.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(name)) {
-      void* buffer;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape);
-      if (status.IsOk()) {
-        memcpy(buffer, content + content_offset, expected_byte_size);
-      }
-
-      if (!status.IsOk()) {
-        payload.status_ = status;
-      }
-    }
-
-    content_offset += expected_byte_size;
+  // [TODO] use the following statement. Right now we always create
+  // netdef workspace with inputs / outputs on CPU node
+  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
+  //                                ? TRTSERVER_MEMORY_CPU
+  //                                : TRTSERVER_MEMORY_GPU;
+  auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  bool cuda_copy = SetFixedSizeOutputBuffer(
+      name, batch1_byte_size, content, content_shape, content_memory_type,
+      payloads);
+  if (cuda_copy) {
+#ifdef TRTIS_ENABLE_GPU
+    cudaStreamSynchronize(stream_);
+#else
+    return Status(
+        RequestStatusCode::INTERNAL, "unexpected CUDA copy for output '" +
+                                         name + "' while GPU is not supported");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   return Status::Success;
