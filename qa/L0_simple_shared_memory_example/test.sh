@@ -45,8 +45,13 @@ RET=0
 
 set +e
 
-# Run with shared memory only for input for now
-$SIMPLE_SHM_CLIENT -I -v >>client_c++.log 2>&1
+# Run using shared memory for both inputs and outputs (GRPC then HTTP)
+$SIMPLE_SHM_CLIENT -i grpc -u localhost:8001 -v >>client_c++.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_SHM_CLIENT -v >>client_c++.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
