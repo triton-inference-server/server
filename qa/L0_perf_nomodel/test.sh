@@ -72,82 +72,113 @@ ANALYZE_LOG_EXT=analysis
 # by 4.
 TENSOR_SIZE_16MB=$((4*1024*1024))
 
-LATENCY_NAMES=(
+TEST_NAMES=(
     "${UNDERTEST_NAME} Minimum Latency GRPC"
     "${UNDERTEST_NAME} Minimum Latency HTTP"
     "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Latency HTTP")
-LATENCY_DIRS=(
+    "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
+    "${UNDERTEST_NAME} Maximum Throughput GRPC"
+    "${UNDERTEST_NAME} Maximum Throughput HTTP")
+TEST_ANALYSIS_ARGS=(
+    --latency
+    --latency
+    --latency
+    --latency
+    "--throughput --concurrency 4"
+    "--throughput --concurrency 4")
+TEST_DIRS=(
     min_latency_grpc
     min_latency_http
     16mb_latency_grpc
-    16mb_latency_http)
-LATENCY_PROTOCOLS=(
+    16mb_latency_http
+    max_throughput_grpc
+    max_throughput_http)
+TEST_PROTOCOLS=(
+    grpc
+    http
     grpc
     http
     grpc
     http)
-LATENCY_TENSOR_SIZES=(
+TEST_TENSOR_SIZES=(
     1
     1
     ${TENSOR_SIZE_16MB}
-    ${TENSOR_SIZE_16MB})
+    ${TENSOR_SIZE_16MB}
+    1
+    1)
+TEST_INSTANCE_COUNTS=(
+    1
+    1
+    1
+    1
+    8
+    8)
 # If TensorRT adds support for variable-size tensors can fix identity
 # model to allow TENSOR_SIZE > 1. For libtorch we need to create an
 # identity model with variable-size input.
-LATENCY_BACKENDS=(
+TEST_BACKENDS=(
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "plan custom graphdef savedmodel onnx libtorch netdef"
     "custom graphdef savedmodel onnx netdef"
     "custom graphdef savedmodel onnx netdef"
-)
+    "plan custom graphdef savedmodel onnx libtorch netdef"
+    "plan custom graphdef savedmodel onnx libtorch netdef")
 
-# Remove any exiting data collection and analysis
+# If the top-level output dir exists then assume that data has already
+# been collected and so just perform the analysis.
 rm -f *.${ANALYZE_LOG_EXT}
-for idx in "${!LATENCY_NAMES[@]}"; do
-    LATENCY_DIR=${LATENCY_DIRS[$idx]}
-    rm -fr ${LATENCY_DIR}
-done
+
+skip_data=0
+if [ -e ${REPO_VERSION} ]; then
+    echo -e "\n***\n*** Data Collection Skipped\n***"
+    skip_data=1
+else
+    mkdir -p ${REPO_VERSION}
+fi
 
 #
 # Data Collection
 #
 
-RET=0
-set +e
+if (( $skip_data != 1 )); then
 
-for idx in "${!LATENCY_NAMES[@]}"; do
-    LATENCY_NAME=${LATENCY_NAMES[$idx]}
-    LATENCY_DIR=${LATENCY_DIRS[$idx]}
-    LATENCY_PROTOCOL=${LATENCY_PROTOCOLS[$idx]}
-    LATENCY_TENSOR_SIZE=${LATENCY_TENSOR_SIZES[$idx]}
-    LATENCY_BACKEND=${LATENCY_BACKENDS[$idx]}
+    RET=0
+    set +e
 
-    RESULTNAME=${LATENCY_NAME} \
-              RESULTDIR=${LATENCY_DIR} \
-              PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
-              PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
-              PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
-              PERF_CLIENT_PROTOCOL=${LATENCY_PROTOCOL} \
-              TENSOR_SIZE=${LATENCY_TENSOR_SIZE} \
-              BACKENDS=${LATENCY_BACKEND} \
-              STATIC_BATCH_SIZES=1 \
-              DYNAMIC_BATCH_SIZES=1 \
-              INSTANCE_COUNTS=1 \
-              REQUIRED_MAX_CONCURRENCY=1 \
-              bash -x ${RUNTEST} ${REPO_VERSION}
-    if (( $? != 0 )); then
-        RET=1
+    for idx in "${!TEST_NAMES[@]}"; do
+        TEST_NAME=${TEST_NAMES[$idx]}
+        TEST_DIR=${TEST_DIRS[$idx]}
+        TEST_PROTOCOL=${TEST_PROTOCOLS[$idx]}
+        TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
+        TEST_BACKEND=${TEST_BACKENDS[$idx]}
+        TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
+
+        RESULTNAME=${TEST_NAME} \
+                  RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
+                  PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
+                  PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
+                  PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
+                  PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
+                  TENSOR_SIZE=${TEST_TENSOR_SIZE} \
+                  BACKENDS=${TEST_BACKEND} \
+                  STATIC_BATCH_SIZES=1 \
+                  DYNAMIC_BATCH_SIZES=1 \
+                  INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
+                  bash -x ${RUNTEST} ${REPO_VERSION}
+        if (( $? != 0 )); then
+            RET=1
+        fi
+    done
+
+    set -e
+
+    if (( $RET == 0 )); then
+        echo -e "\n***\n*** Data Collection Passed\n***"
+    else
+        echo -e "\n***\n*** Data Collection FAILED\n***"
+        exit $RET
     fi
-done
-
-set -e
-
-if (( $RET == 0 )); then
-    echo -e "\n***\n*** Data Collection Passed\n***"
-else
-    echo -e "\n***\n*** Data Collection FAILED\n***"
-    exit $RET
 fi
 
 #
@@ -160,20 +191,21 @@ set +e
 for BASELINE_NAME in $(ls ${BASELINE_DIR}); do
     ANALYZE_LOG=${BASELINE_NAME}.${ANALYZE_LOG_EXT}
 
-    for idx in "${!LATENCY_NAMES[@]}"; do
-        LATENCY_NAME=${LATENCY_NAMES[$idx]}
-        LATENCY_DIR=${LATENCY_DIRS[$idx]}
+    for idx in "${!TEST_NAMES[@]}"; do
+        TEST_NAME=${TEST_NAMES[$idx]}
+        TEST_DIR=${TEST_DIRS[$idx]}
+        TEST_ANALYSIS_ARG=${TEST_ANALYSIS_ARGS[$idx]}
 
-        $ANALYZE --name="${LATENCY_NAME}" \
-                 --latency \
+        $ANALYZE --name="${TEST_NAME}" \
+                 ${TEST_ANALYSIS_ARG} \
                  --slowdown-threshold=${PERF_CLIENT_SLOWDOWN_THRESHOLD} \
                  --speedup-threshold=${PERF_CLIENT_SPEEDUP_THRESHOLD} \
                  --baseline-name=${BASELINE_NAME} \
-                 --baseline=${BASELINE_DIR}/${BASELINE_NAME}/${LATENCY_DIR} \
+                 --baseline=${BASELINE_DIR}/${BASELINE_NAME}/${TEST_DIR} \
                  --undertest-name=${UNDERTEST_NAME} \
-                 --undertest=${LATENCY_DIR} >> ${ANALYZE_LOG} 2>&1
+                 --undertest=${REPO_VERSION}/${TEST_DIR} >> ${ANALYZE_LOG} 2>&1
         if (( $? != 0 )); then
-            echo -e "** ${LATENCY_NAME} Analysis Failed"
+            echo -e "** ${TEST_NAME} Analysis Failed"
             RET=1
         else
             cat ${ANALYZE_LOG}
