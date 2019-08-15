@@ -38,7 +38,7 @@ class GRPCServer {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       int32_t port, int infer_thread_cnt, int stream_infer_thread_cnt,
-      std::unique_ptr<GRPCServer>* grpc_server);
+      int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server);
 
   ~GRPCServer();
 
@@ -56,7 +56,8 @@ class GRPCServer {
       const std::shared_ptr<TRTSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const char* server_id, const std::string& server_addr,
-      const int infer_thread_cnt, const int stream_infer_thread_cnt);
+      const int infer_thread_cnt, const int stream_infer_thread_cnt,
+      const int infer_allocation_pool_size);
 
   std::shared_ptr<TRTSERVER_Server> server_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
@@ -65,10 +66,12 @@ class GRPCServer {
 
   const int infer_thread_cnt_;
   const int stream_infer_thread_cnt_;
+  const int infer_allocation_pool_size_;
 
   std::unique_ptr<grpc::ServerCompletionQueue> health_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> status_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> infer_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> profile_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> shmcontrol_cq_;
@@ -79,6 +82,7 @@ class GRPCServer {
   std::unique_ptr<HandlerBase> health_handler_;
   std::unique_ptr<HandlerBase> status_handler_;
   std::unique_ptr<HandlerBase> infer_handler_;
+  std::unique_ptr<HandlerBase> stream_infer_handler_;
   std::unique_ptr<HandlerBase> profile_handler_;
   std::unique_ptr<HandlerBase> modelcontrol_handler_;
   std::unique_ptr<HandlerBase> shmcontrol_handler_;

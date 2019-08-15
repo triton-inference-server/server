@@ -68,7 +68,7 @@ class ServerStatusTest(unittest.TestCase):
                                 "expected status for model " + model_name1)
 
                 self.assertGreater(uptime1, uptime0)
-                self.assertEqual(req_id1, req_id0 + 1)
+                self.assertNotEqual(req_id0, req_id1)
 
                 server_status2, req_id2 = _get_server_status(pair[0], pair[1])
                 self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"],
