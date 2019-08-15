@@ -28,6 +28,7 @@
 #include "src/backends/tensorflow/graphdef_backend_factory.h"
 #include "src/backends/tensorflow/tensorflow_backend_tf.h"
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -66,7 +67,7 @@ class BaseBackend : public InferenceBackend {
       IONameMap* input_name_map, IONameMap* output_name_map) = 0;
 
   // For each model instance there is a context.
-  struct Context : InferenceBackend::InferContext {
+  struct Context : BackendContext {
     // GPU device number that indicates model will be loaded on GPUs
     // as specified in model graph
     static constexpr int MODEL_DEVICE = -2;

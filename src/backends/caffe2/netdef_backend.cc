@@ -86,7 +86,7 @@ ConvertDataType(DataType dtype)
 
 NetDefBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : InferContext(name, gpu_device, max_batch_size)
+    : BackendContext(name, gpu_device, max_batch_size)
 {
 }
 
@@ -380,7 +380,8 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(name, expected_byte_sizes, payloads, buffer);
+  SetInputBuffer(
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);

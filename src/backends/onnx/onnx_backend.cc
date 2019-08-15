@@ -46,7 +46,7 @@ namespace nvidia { namespace inferenceserver {
 
 OnnxBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : InferContext(name, gpu_device, max_batch_size), session_(nullptr),
+    : BackendContext(name, gpu_device, max_batch_size), session_(nullptr),
       allocator_(nullptr)
 {
 }
@@ -580,7 +580,8 @@ OnnxBackend::Context::SetInputTensor(
   char* buffer = input_buffers->back().get();
 
   // Store data into input buffer
-  SetInputBuffer(name, expected_byte_sizes, payloads, buffer);
+  SetInputBuffer(
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   if (data_type != TYPE_STRING) {
     const OrtAllocatorInfo* allocator_info;

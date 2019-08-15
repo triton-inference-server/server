@@ -44,7 +44,7 @@ namespace nvidia { namespace inferenceserver {
 
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : InferContext(name, gpu_device, max_batch_size),
+    : BackendContext(name, gpu_device, max_batch_size),
       device_(torch::Device(torch::kCPU))
 {
 }
@@ -388,7 +388,8 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(name, expected_byte_sizes, payloads, buffer);
+  SetInputBuffer(
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   RETURN_IF_ERROR(SetInputTensor(
       inputs_, name, ip_index, shape, dtype, static_cast<char*>(buffer),

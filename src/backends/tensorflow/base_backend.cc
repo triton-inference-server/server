@@ -44,7 +44,7 @@ namespace nvidia { namespace inferenceserver {
 
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
-    : InferContext(name, gpu_device, max_batch_size),
+    : BackendContext(name, gpu_device, max_batch_size),
       trtistf_model_(nullptr, TRTISTF_ModelDelete)
 {
 }
@@ -543,7 +543,8 @@ BaseBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(input_name, expected_byte_sizes, payloads, buffer);
+  SetInputBuffer(
+      input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 }
 
 Status

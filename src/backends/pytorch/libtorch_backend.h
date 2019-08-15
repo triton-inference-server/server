@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
@@ -65,7 +66,7 @@ class LibTorchBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const LibTorchBackend&);
 
   // For each model instance there is a context.
-  struct Context : InferenceBackend::InferContext {
+  struct Context : BackendContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);

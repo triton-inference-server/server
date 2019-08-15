@@ -27,6 +27,7 @@
 
 #include <onnxruntime_c_api.h>
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -67,7 +68,7 @@ class OnnxBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const OnnxBackend&);
 
   // For each model instance there is a context.
-  struct Context : InferenceBackend::InferContext {
+  struct Context : BackendContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);

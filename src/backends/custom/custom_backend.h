@@ -27,6 +27,7 @@
 
 #include "src/backends/custom/custom.h"
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -68,7 +69,7 @@ class CustomBackend : public InferenceBackend {
       void*, const char*, size_t, int64_t*, uint64_t, void**);
 
   // For each model instance there is a context.
-  struct Context : InferenceBackend::InferContext {
+  struct Context : BackendContext {
     using IOSizeMap = std::unordered_map<std::string, size_t>;
 
     Context(
