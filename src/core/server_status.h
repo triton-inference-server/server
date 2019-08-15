@@ -137,11 +137,22 @@ class ModelInferStats {
   // Set CUDA GPU device index where inference was performed.
   void SetGPUDevice(int idx) { gpu_device_ = idx; }
 
+  // Increments the queue_duration by specified value
+  void IncrementQueueDuration(const uint64_t increment_value);
+  // Increments the compute duration by specified value
+  void IncrementComputeDuration(const uint64_t increment_value);
+
   // Set the number of model executions that were performed for this
   // inference request. Can be zero if this request was dynamically
   // batched with another request (in dynamic batch case only one of
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
+
+  // Returns the current queue_duration in nanoseconds
+  uint64_t GetQueueDuration() const { return queue_duration_ns_; }
+
+  // Returns the current compute_duration in nanoseconds
+  uint64_t GetComputeDuration() const { return compute_duration_ns_; }
 
   // Get a ScopedTimer that measures entire inference request-response
   // duration. The lifetime of 'timer' must not exceed the

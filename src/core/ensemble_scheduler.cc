@@ -650,6 +650,12 @@ EnsembleContext::ScheduleSteps(
           }
 
           timer.reset();
+          // Accumulate the queue and compute durations from this composing
+          // model
+          context->stats_->IncrementQueueDuration(
+              infer_stats->GetQueueDuration());
+          context->stats_->IncrementComputeDuration(
+              infer_stats->GetComputeDuration());
           infer_stats.reset();
           step->infer_status_ = status;
           Proceed(context, step);

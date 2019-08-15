@@ -50,16 +50,45 @@ InferenceProfiler::Create(
       std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
 
   if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
-    std::map<std::string, ni::ModelStatus> model_status;
-    RETURN_IF_ERROR(local_profiler->GetServerSideStatus(&model_status));
-    const auto& it = model_status.find(local_profiler->model_name_);
-    for (const auto& step : it->second.config().ensemble_scheduling().step()) {
-      local_profiler->composing_models_.emplace(
-          step.model_name(), step.model_version());
-    }
+    ni::ServerStatus server_status;
+    RETURN_IF_ERROR(
+        local_profiler->status_ctx_->GetServerStatus(&server_status));
+    RETURN_IF_ERROR(local_profiler->BuildComposingModelMap(server_status));
   }
 
   *profiler = std::move(local_profiler);
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::BuildComposingModelMap(const ni::ServerStatus& server_status)
+{
+  RETURN_IF_ERROR(
+      BuildComposingModelMap(model_name_, model_version_, server_status));
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::BuildComposingModelMap(
+    const std::string& model_name, const int64_t& model_version,
+    const ni::ServerStatus& server_status)
+{
+  const auto& itr = server_status.model_status().find(model_name);
+  if (itr == server_status.model_status().end()) {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find status for model" + model_name);
+  } else {
+    if (itr->second.config().platform() == "ensemble") {
+      for (const auto& step :
+           itr->second.config().ensemble_scheduling().step()) {
+        this->composing_models_map_[std::make_pair(model_name, model_version)]
+            .emplace(step.model_name(), step.model_version());
+        this->BuildComposingModelMap(
+            step.model_name(), step.model_version(), server_status);
+      }
+    }
+  }
   return nic::Error::Success;
 }
 
@@ -181,27 +210,45 @@ InferenceProfiler::GetServerSideStatus(
 
   ni::ServerStatus server_status;
   RETURN_IF_ERROR(status_ctx_->GetServerStatus(&server_status));
-  const auto& itr = server_status.model_status().find(model_name_);
+  RETURN_IF_ERROR(GetServerSideStatus(
+      server_status, std::make_pair(model_name_, model_version_),
+      model_status));
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::GetServerSideStatus(
+    ni::ServerStatus& server_status, const ModelInfo model_info,
+    std::map<std::string, ni::ModelStatus>* model_status)
+{
+  const auto& itr = server_status.model_status().find(model_info.first);
   if (itr == server_status.model_status().end()) {
     return nic::Error(
         ni::RequestStatusCode::INTERNAL,
-        "unable to find status for model" + model_name_);
+        "unable to find status for model" + model_info.first);
   } else {
-    model_status->emplace(model_name_, itr->second);
+    model_status->emplace(model_info.first, itr->second);
   }
 
   // Also get status for composing models if any
-  for (const auto& model_info : composing_models_) {
-    const auto& itr = server_status.model_status().find(model_info.first);
-    if (itr == server_status.model_status().end()) {
-      return nic::Error(
-          ni::RequestStatusCode::INTERNAL,
-          "unable to find status for composing model" + model_info.first);
+  for (const auto& composing_model_info : composing_models_map_[model_info]) {
+    if (composing_models_map_.find(composing_model_info) !=
+        composing_models_map_.end()) {
+      RETURN_IF_ERROR(GetServerSideStatus(
+          server_status, composing_model_info, model_status));
     } else {
-      model_status->emplace(model_info.first, itr->second);
+      const auto& itr =
+          server_status.model_status().find(composing_model_info.first);
+      if (itr == server_status.model_status().end()) {
+        return nic::Error(
+            ni::RequestStatusCode::INTERNAL,
+            "unable to find status for composing model" +
+                composing_model_info.first);
+      } else {
+        model_status->emplace(composing_model_info.first, itr->second);
+      }
     }
   }
-
   return nic::Error::Success;
 }
 
@@ -268,23 +315,8 @@ InferenceProfiler::Summarize(
       start_stat, end_stat, valid_range.second - valid_range.first,
       latencies.size(), valid_sequence_count, summary));
 
-  {
-    const auto& model_start = start_status.find(model_name_)->second;
-    const auto& model_end = end_status.find(model_name_)->second;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_name_, model_version_, model_start, model_end,
-        &(summary.server_stats)));
-  }
-  for (const auto& model_info : composing_models_) {
-    const auto& model_start = start_status.find(model_info.first)->second;
-    const auto& model_end = end_status.find(model_info.first)->second;
-    auto it = summary.server_composing_model_stats
-                  .emplace(model_info, ServerSideStats())
-                  .first;
-    RETURN_IF_ERROR(SummarizeServerStats(
-        model_info.first, model_info.second, model_start, model_end,
-        &(it->second)));
-  }
+  RETURN_IF_ERROR(
+      SummarizeServerStats(start_status, end_status, &(summary.server_stats)));
 
   return nic::Error::Success;
 }
@@ -450,7 +482,7 @@ InferenceProfiler::SummarizeClientStat(
 }
 
 nic::Error
-InferenceProfiler::SummarizeServerStats(
+InferenceProfiler::SummarizeServerModelStats(
     const std::string& model_name, const int64_t model_version,
     const ni::ModelStatus& start_status, const ni::ModelStatus& end_status,
     ServerSideStats* server_stats)
@@ -506,6 +538,50 @@ InferenceProfiler::SummarizeServerStats(
     }
   }
 
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::SummarizeServerStats(
+    const ModelInfo model_info,
+    const std::map<std::string, ni::ModelStatus>& start_status,
+    const std::map<std::string, ni::ModelStatus>& end_status,
+    ServerSideStats* server_stats)
+{
+  RETURN_IF_ERROR(SummarizeServerModelStats(
+      model_info.first, model_info.second,
+      start_status.find(model_info.first)->second,
+      end_status.find(model_info.first)->second, server_stats));
+
+  // Summarize the composing models, if any.
+  for (const auto& composing_model_info : composing_models_map_[model_info]) {
+    auto it = server_stats->composing_models_stat
+                  .emplace(composing_model_info, ServerSideStats())
+                  .first;
+    if (composing_models_map_.find(composing_model_info) !=
+        composing_models_map_.end()) {
+      RETURN_IF_ERROR(SummarizeServerStats(
+          composing_model_info, start_status, end_status, &(it->second)));
+    } else {
+      RETURN_IF_ERROR(SummarizeServerModelStats(
+          composing_model_info.first, composing_model_info.second,
+          start_status.find(composing_model_info.first)->second,
+          end_status.find(composing_model_info.first)->second, &(it->second)));
+    }
+  }
+
+  return nic::Error::Success;
+}
+
+nic::Error
+InferenceProfiler::SummarizeServerStats(
+    const std::map<std::string, ni::ModelStatus>& start_status,
+    const std::map<std::string, ni::ModelStatus>& end_status,
+    ServerSideStats* server_stats)
+{
+  RETURN_IF_ERROR(SummarizeServerStats(
+      std::make_pair(model_name_, model_version_), start_status, end_status,
+      server_stats));
   return nic::Error::Success;
 }
 
