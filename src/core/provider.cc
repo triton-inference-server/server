@@ -904,7 +904,7 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
 
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      TRTSERVER_MEMORY_CPU, 0 /* region_id */, alloc_userp_);
+      preferred_memory_type, 0 /* region_id */, alloc_userp_);
   if (err != nullptr) {
     Status status = Status(
         TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
