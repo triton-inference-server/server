@@ -28,13 +28,14 @@ import sys
 import numpy as np
 from tensorrtserver.api import *
 import test_util as tu
+from sets import Set
 
 # unicode() doesn't exist on python3, for how we use it the
 # corresponding function is bytes()
 if sys.version_info.major == 3:
     unicode = bytes
 
-_last_request_id = 0
+_seen_request_ids = Set()
 
 def _range_repr_dtype(dtype):
     if dtype == np.float64:
@@ -162,11 +163,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 output_req, batch_size)
 
         if not skip_request_id_check:
-            global _last_request_id
-            min_request_id = _last_request_id + 1
+            global _seen_request_ids
             request_id = ctx.get_last_request_id()
-            _last_request_id = request_id
-            tester.assertGreaterEqual(request_id, min_request_id)
+            tester.assertFalse(request_id in _seen_request_ids)
+            _seen_request_ids.add(request_id)
 
         tester.assertEqual(ctx.get_last_request_model_name(), model_name)
         if model_version is not None:
