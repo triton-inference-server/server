@@ -27,6 +27,7 @@
 
 #include <onnxruntime_c_api.h>
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -67,15 +68,7 @@ class OnnxBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const OnnxBackend&);
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context (which is an invalid state since TensorRT requires a
-    // GPU).
-    static constexpr int NO_GPU_DEVICE = -1;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
-
+  struct Context : BackendContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
@@ -111,11 +104,6 @@ class OnnxBackend : public InferenceBackend {
         std::vector<std::unique_ptr<char[]>>* input_buffers,
         std::vector<const char*>* input_names);
 
-    // Helper function to batch input data from payloads into one 'input_buffer'
-    void SetInputBuffer(
-        const std::string& name, const std::vector<size_t>& expected_byte_sizes,
-        std::vector<Scheduler::Payload>* payloads, char* input_buffer);
-
     // Helper function to modify 'input_buffer' into format needed for creating
     // Onnx String tensor and to set meta data 'string_data'
     void SetStringInputBuffer(
@@ -133,12 +121,6 @@ class OnnxBackend : public InferenceBackend {
         const std::vector<const char*>& output_names,
         std::vector<Scheduler::Payload>* payloads);
 
-    // Helper function to set output buffer of fixed size data type to payloads
-    void SetFixedSizeOutputBuffer(
-        const std::string& name, const size_t batch1_byte_size,
-        const char* content, const std::vector<int64_t>& content_shape,
-        std::vector<Scheduler::Payload>* payloads);
-
     // Helper function to set output buffer of string data type to payloads
     void SetStringOutputBuffer(
         const std::string& name, const size_t batch1_element_cnt,
@@ -147,17 +129,6 @@ class OnnxBackend : public InferenceBackend {
 
     // Release the Onnx Runtime resources allocated for the run, if any.
     void ReleaseOrtRunResources();
-
-    // Name of the model instance
-    std::string name_;
-
-    // The GPU index active when this context was created.
-    int gpu_device_;
-
-    // Maximum batch size to allow. This is the minimum of what is
-    // supported by the model and what is requested in the
-    // configuration.
-    int max_batch_size_;
 
     // Onnx Runtime variables that are used across runs
     OrtSession* session_;

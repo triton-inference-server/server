@@ -27,6 +27,7 @@
 
 #include "src/backends/caffe2/netdef_backend_c2.h"
 #include "src/core/backend.h"
+#include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
@@ -64,14 +65,7 @@ class NetDefBackend : public InferenceBackend {
   friend std::ostream& operator<<(std::ostream&, const NetDefBackend&);
 
   // For each model instance there is a context.
-  struct Context {
-    // GPU device number that indicates that no gpu is available for a
-    // context
-    static constexpr int NO_GPU_DEVICE = -1;
-
-    // Max batch size value that indicates batching is not supported.
-    static constexpr int NO_BATCHING = 0;
-
+  struct Context : BackendContext {
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
@@ -113,16 +107,6 @@ class NetDefBackend : public InferenceBackend {
         const std::string& name, const Caffe2Workspace::DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
-
-    // Name of the model instance
-    std::string name_;
-
-    // The GPU index active when this context was created.
-    int gpu_device_;
-
-    // Maximum batch size to allow. NO_BATCHING indicates that
-    // batching is not supported.
-    int max_batch_size_;
 
     // Caffe2 workspace.
     std::unique_ptr<Caffe2Workspace> workspace_;

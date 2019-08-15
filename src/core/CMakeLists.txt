@@ -124,6 +124,7 @@ set(
   SERVER_SRCS
   autofill.cc
   backend.cc
+  backend_context.cc
   dynamic_batch_scheduler.cc
   ensemble_scheduler.cc
   ensemble_utils.cc
@@ -149,6 +150,7 @@ set(
   SERVER_HDRS
   autofill.h
   backend.h
+  backend_context.h
   constants.h
   dynamic_batch_scheduler.h
   ensemble_scheduler.h
