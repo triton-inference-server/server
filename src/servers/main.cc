@@ -101,11 +101,19 @@ int32_t metrics_port_ = 8002;
 #ifdef TRTIS_ENABLE_GRPC
 // The number of threads to initialize for handling GRPC infer
 // requests.
-int grpc_infer_thread_cnt_ = 8;
+int grpc_infer_thread_cnt_ = 4;
 
 // The number of threads to initialize for handling GRPC stream infer
 // requests.
-int grpc_stream_infer_thread_cnt_ = 8;
+int grpc_stream_infer_thread_cnt_ = 4;
+
+// The maximum number of inference request/response objects that
+// remain allocated for reuse. As long as the number of in-flight
+// requests doesn't exceed this value there will be no
+// allocation/deallocation of request/response objects. Higher values
+// trade-off increased memory usage for higher performance.
+int grpc_infer_allocation_pool_size_ = 128;
+
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_HTTP
@@ -137,6 +145,7 @@ enum OptionId {
   OPTION_GRPC_PORT,
   OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_STREAM_INFER_THREAD_COUNT,
+  OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
 #endif  // TRTIS_ENABLE_GRPC
 #ifdef TRTIS_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
@@ -218,6 +227,12 @@ std::vector<Option> options_{
      "Number of threads handling GRPC inference requests."},
     {OPTION_GRPC_STREAM_INFER_THREAD_COUNT, "grpc-stream-infer-thread-count",
      "Number of threads handling GRPC stream inference requests."},
+    {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE, "grpc-infer-allocation-pool-size",
+     "The maximum number of inference request/response objects that remain "
+     "allocated for reuse. As long as the number of in-flight requests doesn't "
+     "exceed this value there will be no allocation/deallocation of "
+     "request/response objects. Higher values trade-off increased memory usage "
+     "for higher performance."},
 #endif  // TRTIS_ENABLE_GRPC
 #ifdef TRTIS_ENABLE_METRICS
     {OPTION_ALLOW_METRICS, "allow-metrics",
@@ -255,12 +270,9 @@ std::vector<Option> options_{
      "Add a tensorflow virtual GPU instances on a physical GPU. Input "
      "should be 2 integers and 1 float separated by semicolons in the format "
      "<physical GPU>;<number of virtual GPUs>;<memory limit per VGPU in "
-     "megabytes>. "
-     "This option can be used multiple times, but only once per physical GPU "
-     "device. "
-     "Subsequent uses will overwrite previous uses with the same physical "
-     "device. "
-     "By default, no VGPUs are enabled. "}};
+     "megabytes>. This option can be used multiple times, but only once per "
+     "physical GPU device. Subsequent uses will overwrite previous uses with "
+     "the same physical device. By default, no VGPUs are enabled."}};
 
 void
 SignalHandler(int signum)
@@ -329,7 +341,7 @@ StartGrpcService(
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
-      grpc_stream_infer_thread_cnt_, service);
+      grpc_stream_infer_thread_cnt_, grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -650,6 +662,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t grpc_port = grpc_port_;
   int32_t grpc_infer_thread_cnt = grpc_infer_thread_cnt_;
   int32_t grpc_stream_infer_thread_cnt = grpc_stream_infer_thread_cnt_;
+  int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
@@ -742,6 +755,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_GRPC_STREAM_INFER_THREAD_COUNT:
         grpc_stream_infer_thread_cnt = ParseIntOption(optarg);
         break;
+      case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
+        grpc_infer_allocation_pool_size = ParseIntOption(optarg);
+        break;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
@@ -828,6 +844,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   grpc_port_ = grpc_port;
   grpc_infer_thread_cnt_ = grpc_infer_thread_cnt;
   grpc_stream_infer_thread_cnt_ = grpc_stream_infer_thread_cnt;
+  grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_METRICS
