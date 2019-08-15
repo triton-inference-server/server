@@ -318,7 +318,7 @@ HTTPAPIServer::ResponseAlloc(
     if (memory_type != TRTSERVER_MEMORY_CPU) {
       LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
                      << " for " << tensor_name;
-      return nullptr;  // Success
+      return nullptr;
     }
 
     auto pr = output_shm_map.find(tensor_name);

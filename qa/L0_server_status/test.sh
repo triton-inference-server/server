@@ -47,6 +47,8 @@ fi
 
 RET=0
 
+set +e
+
 rm -f $CLIENT_LOG
 python $SERVER_STATUS_TEST ServerStatusTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -55,10 +57,14 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+set -e
+
 rm -fr models/graphdef_int32_int32_int32/2 models/graphdef_int32_int32_int32/3
 rm -fr models/netdef_int32_int32_int32/2 models/netdef_int32_int32_int32/3
 cp -r models/graphdef_float16_float32_float32/1 models/graphdef_float16_float32_float32/7
 sleep 3
+
+set +e
 
 python $SERVER_STATUS_TEST ModelStatusTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -76,6 +82,8 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed To Run\n***"
     RET=1
 fi
+
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

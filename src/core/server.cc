@@ -192,7 +192,7 @@ InferenceServer::Stop()
     if (LOG_VERBOSE_IS_ON(1)) {
       for (const auto& m : live_models) {
         for (const auto& v : m.second) {
-          LOG_VERBOSE(1) << m.first << "v" << v.first << ": " << v.second;
+          LOG_VERBOSE(1) << m.first << " v" << v.first << ": " << v.second;
         }
       }
     }
