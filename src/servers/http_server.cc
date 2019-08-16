@@ -245,7 +245,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   };
 
   struct evbuffer_pair {
-    evbuffer* ev_buf_;
+    evbuffer** ev_buf_;
     std::map<std::string, std::pair<const void*, size_t>>* op_shm_map_;
     evbuffer_pair() : ev_buf_(nullptr), op_shm_map_(nullptr) {}
   };
@@ -304,7 +304,7 @@ HTTPAPIServer::ResponseAlloc(
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
 {
   auto userp_pair = reinterpret_cast<evbuffer_pair*>(userp);
-  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->ev_buf_);
+  evbuffer** evhttp_buffer = reinterpret_cast<evbuffer**>(userp_pair->ev_buf_);
   const std::map<std::string, std::pair<const void*, size_t>>* output_shm_map =
       userp_pair->op_shm_map_;
 
@@ -350,7 +350,7 @@ HTTPAPIServer::ResponseAlloc(
 
       // Reserve requested space in evbuffer...
       struct evbuffer_iovec output_iovec;
-      if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
+      if (evbuffer_reserve_space(*evhttp_buffer, byte_size, &output_iovec, 1) !=
           1) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
@@ -377,7 +377,7 @@ HTTPAPIServer::ResponseAlloc(
       // not to relocate this space. Because we request a contiguous
       // chunk every time (above by allowing only a single entry in
       // output_iovec), this seems to be a valid assumption.
-      if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
+      if (evbuffer_commit_space(*evhttp_buffer, &output_iovec, 1) != 0) {
         *buffer = nullptr;
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
@@ -949,7 +949,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
       evbuffer_pair* response_pair = new evbuffer_pair();
       response_pair->op_shm_map_ = output_shm_map;
-      response_pair->ev_buf_ = req->buffer_out;
+      response_pair->ev_buf_ = &req->buffer_out;
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider, allocator_,

@@ -419,6 +419,12 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 {
   shape->clear();
 
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw shape not available for shared memory output '" + output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -432,6 +438,12 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 Error
 ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" + output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -463,6 +475,12 @@ Error
 ResultImpl::GetRaw(
     size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" + output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -493,6 +511,12 @@ Error
 ResultImpl::GetRawAtCursor(
     size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" + output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -557,6 +581,12 @@ Error
 ResultImpl::GetClassAtCursor(
     size_t batch_idx, InferContext::Result::ClassResult* result)
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "class result not available for shared memory output '" + output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,

@@ -337,6 +337,8 @@ class InferContext {
     /// completed. This function must be called a single time for an input that
     /// is using shared memory. For batched inputs, the tensor values for the
     /// entire batch must be contiguous in a single shared memory region.
+    /// It is important to not that the options should be set using SetRunOptions
+    /// before calling the SetSharedMemory function because the batch size is needed for validation
     /// \param name The user-given name for the registered shared memory
     /// region where the tensor values for this input is stored.
     /// \param offset The offset into the shared memory region upto the start

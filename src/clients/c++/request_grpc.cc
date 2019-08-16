@@ -565,7 +565,7 @@ GrpcRequestImpl::InitResult(
     result->SetBatchnByteSize(output.raw().batch_byte_size());
   }
 
-  if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
+  if ((result->ResultFormat() == InferContext::Result::ResultFormat::RAW) && (!result->UsesSharedMemory())) {
     if (grpc_response_->raw_output_size() <= (int)idx) {
       return Error(
           RequestStatusCode::INVALID,
