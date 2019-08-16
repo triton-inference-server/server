@@ -26,8 +26,8 @@
 
 #include "src/core/backend_context.h"
 
-#include "src/core/provider.h"
 #include "src/core/logging.h"
+#include "src/core/provider.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -78,37 +78,11 @@ BackendContext::SetInputBuffer(
       }
 
       if (content_byte_size > 0) {
-        if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-            (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
-          memcpy(
-              input_buffer + buffer_copy_offset + copied_byte_size, content,
-              content_byte_size);
-        } else {
-#ifdef TRTIS_ENABLE_GPU
-          cuda_copy = true;
-          // [TODO] use cudaMemcpyDefault if UVM is supported for the device
-          auto copy_kind = cudaMemcpyDeviceToDevice;
-          if (src_memory_type == TRTSERVER_MEMORY_CPU) {
-            copy_kind = cudaMemcpyHostToDevice;
-          } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
-            copy_kind = cudaMemcpyDeviceToHost;
-          }
-          cudaError_t err = cudaMemcpyAsync(
-              input_buffer + buffer_copy_offset + copied_byte_size, content,
-              content_byte_size, copy_kind, stream_);
-          if (err != cudaSuccess) {
-            payload.status_ = Status(
-                RequestStatusCode::INTERNAL,
-                "failed to use CUDA copy for input '" + name +
-                    "': " + std::string(cudaGetErrorString(err)));
-          }
-#else
-          payload.status_ = Status(
-              RequestStatusCode::INTERNAL,
-              "try to use CUDA copy for input '" + name +
-                  "' while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
-        }
+        bool cuda_used = false;
+        payload.status_ = CopyBuffer(
+            name, src_memory_type, dst_memory_type, content_byte_size, content,
+            input_buffer + buffer_copy_offset + copied_byte_size, &cuda_used);
+        cuda_copy |= cuda_used;
       }
       copied_byte_size += content_byte_size;
     }
@@ -125,7 +99,7 @@ BackendContext::SetInputBuffer(
   }
 
   return cuda_copy;
-}  // namespace inferenceserver
+}
 
 bool
 BackendContext::SetFixedSizeOutputBuffer(
@@ -173,36 +147,11 @@ BackendContext::SetFixedSizeOutputBuffer(
       }
 
       if (status.IsOk() && (expected_byte_size != 0)) {
-        if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-            (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
-          memcpy(buffer, content + content_offset, expected_byte_size);
-        } else {
-#ifdef TRTIS_ENABLE_GPU
-          // [TODO] use cudaMemcpyDefault if UVM is supported for the device
-          auto copy_kind = cudaMemcpyDeviceToDevice;
-          if (src_memory_type == TRTSERVER_MEMORY_CPU) {
-            copy_kind = cudaMemcpyHostToDevice;
-          } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
-            copy_kind = cudaMemcpyDeviceToHost;
-          }
-          cudaError_t err = cudaMemcpyAsync(
-              buffer, content + content_offset, expected_byte_size, copy_kind,
-              stream_);
-          if (err != cudaSuccess) {
-            payload.status_ = Status(
-                RequestStatusCode::INTERNAL,
-                "failed to use CUDA copy for output '" + name +
-                    "': " + std::string(cudaGetErrorString(err)));
-          } else {
-            cuda_copy = true;
-          }
-#else
-          payload.status_ = Status(
-              RequestStatusCode::INTERNAL,
-              "try to use CUDA copy for output '" + name +
-                  "' while GPU is not supported"));
-#endif  // TRTIS_ENABLE_GPU
-        }
+        bool cuda_used = false;
+        payload.status_ = CopyBuffer(
+            name, src_memory_type, dst_memory_type, expected_byte_size,
+            content + content_offset, buffer, &cuda_used);
+        cuda_copy |= cuda_used;
       } else {
         payload.status_ = status;
       }
@@ -212,6 +161,44 @@ BackendContext::SetFixedSizeOutputBuffer(
   }
 
   return cuda_copy;
-}  // namespace nvidia
+}
+
+Status BackendContext::CopyBuffer(
+    const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
+    const TRTSERVER_Memory_Type dst_memory_type, const size_t byte_size,
+    const void* src, void* dst, bool* cuda_used)
+{
+  *cuda_used = false;
+
+  if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
+      (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+    memcpy(dst, src, byte_size);
+  } else {
+#ifdef TRTIS_ENABLE_GPU
+    // [TODO] use cudaMemcpyDefault if UVM is supported for the device
+    auto copy_kind = cudaMemcpyDeviceToDevice;
+    if (src_memory_type == TRTSERVER_MEMORY_CPU) {
+      copy_kind = cudaMemcpyHostToDevice;
+    } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
+      copy_kind = cudaMemcpyDeviceToHost;
+    }
+    cudaError_t err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, stream_);
+    if (err != cudaSuccess) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to use CUDA copy for input '" + name +
+              "': " + std::string(cudaGetErrorString(err)));
+    } else {
+      *cuda_used = true;
+    }
+#else
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "try to use CUDA copy for input '" + name +
+            "' while GPU is not supported"));
+#endif  // TRTIS_ENABLE_GPU
+  }
+  return Status::Success;
+}
 
 }}  // namespace nvidia::inferenceserver

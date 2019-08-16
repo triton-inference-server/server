@@ -69,6 +69,11 @@ struct BackendContext {
       TRTSERVER_Memory_Type src_memory_type,
       std::vector<Scheduler::Payload>* payloads);
 
+  Status CopyBuffer(
+      const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
+      const TRTSERVER_Memory_Type dst_memory_type, const size_t byte_size,
+      const void* src, void* dst, bool* cuda_used);
+
   // Name of the model instance
   std::string name_;
 
@@ -81,8 +86,9 @@ struct BackendContext {
   int max_batch_size_;
 
 #ifdef TRTIS_ENABLE_GPU
-  // The stream where data transfer operations are executed.
-  // nullptr if the context is created on CPU.
+  // The stream where data transfer operations are executed on.
+  // It must be set explicitly after the context instance is created,
+  // the default is nullptr.
   cudaStream_t stream_;
 #endif  // TRTIS_ENABLE_GPU
 };
