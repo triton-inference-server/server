@@ -889,36 +889,66 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
 {
   *content = nullptr;
 
-  Output* output;
-  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
-
-  // If CheckAndSetIfBufferedOutput allocated a buffer then no
-  // additional buffer is needed here but still need to call the
-  // alloc_fn_ with byte-size == 0 since that is what the API
-  // requires.
-  const size_t alloc_byte_size = (*content != nullptr) ? 0 : content_byte_size;
-
-  void* buffer = nullptr;
-  void* buffer_userp = nullptr;
-
-  TRTSERVER_Error* err = alloc_fn_(
-      allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, 0 /* region_id */, alloc_userp_);
-  if (err != nullptr) {
-    Status status = Status(
-        TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
-        TRTSERVER_ErrorMessage(err));
-    TRTSERVER_ErrorDelete(err);
-    return status;
+  const auto& pr = output_map_.find(name);
+  if (pr == output_map_.end()) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
   }
 
-  // If the requested allocation size is zero then don't need to get a
-  // buffer back from the allocator.
-  if ((alloc_byte_size > 0) && (buffer == nullptr)) {
-    return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "unable to allocate memory for result tensor '" + name + "'");
+  outputs_.emplace_back();
+  Output* loutput = &(outputs_.back());
+  loutput->name_ = name;
+  loutput->shape_ = content_shape;
+  loutput->cls_count_ = 0;
+  loutput->ptr_ = nullptr;
+  loutput->byte_size_ = content_byte_size;
+
+  // [TODO] update doc
+  // For cls result, the preferred memory type must be CPU
+  // return success and nullptr to align with the behavior of
+  // 'TRTSERVER_ResponseAllocatorAllocFn_t'
+  Status status = Status::Success;
+  if (pr->second.has_cls()) {
+    if (preferred_memory_type == TRTSERVER_MEMORY_CPU) {
+      loutput->cls_count_ = pr->second.cls().count();
+      char* buffer = new char[content_byte_size];
+      *content = static_cast<void*>(buffer);
+      loutput->ptr_ = static_cast<void*>(buffer);
+      loutput->buffer_.reset(buffer);
+
+      // If a buffer has been allocated then no additional buffer is needed here
+      // but still need to call the alloc_fn_ with byte-size == 0
+      // since that is what the API requires.
+      void* alloc_buffer = nullptr;
+      void* alloc_buffer_userp = nullptr;
+      TRTSERVER_Error* err = alloc_fn_(
+        allocator_, &alloc_buffer, &alloc_buffer_userp, name.c_str(), 0,
+        preferred_memory_type, 0 /* region_id */, alloc_userp_);
+      if (err != nullptr) {
+        status = Status(
+            TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+            TRTSERVER_ErrorMessage(err));
+        TRTSERVER_ErrorDelete(err);
+      }
+    }
+  } else {
+    void* buffer = nullptr;
+    void* buffer_userp = nullptr;
+
+    TRTSERVER_Error* err = alloc_fn_(
+        allocator_, &buffer, &buffer_userp, name.c_str(), content_byte_size,
+        preferred_memory_type, 0 /* region_id */, alloc_userp_);
+    if (err != nullptr) {
+      status = Status(
+          TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
+          TRTSERVER_ErrorMessage(err));
+      TRTSERVER_ErrorDelete(err);
+    } else {
+      *content = buffer;
+      loutput->ptr_ = buffer;
+      loutput->release_buffer_ = buffer;
+      loutput->release_userp_ = buffer_userp;
+    }
   }
 
   if (*content == nullptr) {
@@ -928,9 +958,6 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
     // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
     output->memory_type_ = TRTSERVER_MEMORY_CPU;
   }
-
-  output->release_buffer_ = buffer;
-  output->release_userp_ = buffer_userp;
 
   return Status::Success;
 }

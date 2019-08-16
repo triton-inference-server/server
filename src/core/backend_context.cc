@@ -27,6 +27,7 @@
 #include "src/core/backend_context.h"
 
 #include "src/core/provider.h"
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -177,7 +178,6 @@ BackendContext::SetFixedSizeOutputBuffer(
           memcpy(buffer, content + content_offset, expected_byte_size);
         } else {
 #ifdef TRTIS_ENABLE_GPU
-          cuda_copy = true;
           // [TODO] use cudaMemcpyDefault if UVM is supported for the device
           auto copy_kind = cudaMemcpyDeviceToDevice;
           if (src_memory_type == TRTSERVER_MEMORY_CPU) {
@@ -193,13 +193,15 @@ BackendContext::SetFixedSizeOutputBuffer(
                 RequestStatusCode::INTERNAL,
                 "failed to use CUDA copy for output '" + name +
                     "': " + std::string(cudaGetErrorString(err)));
+          } else {
+            cuda_copy = true;
+          }
 #else
           payload.status_ = Status(
               RequestStatusCode::INTERNAL,
               "try to use CUDA copy for output '" + name +
                   "' while GPU is not supported"));
 #endif  // TRTIS_ENABLE_GPU
-          }
         }
       } else {
         payload.status_ = status;
