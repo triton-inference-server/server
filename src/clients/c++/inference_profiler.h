@@ -170,7 +170,8 @@ class InferenceProfiler {
       std::unique_ptr<LoadManager> manager);
 
   /// A helper function to construct the map of ensemble models to its composing
-  /// models \param model_name The ensemble model to be added into the map
+  /// models.
+  /// \param model_name The ensemble model to be added into the map
   /// \param model_version The version of the model to be added
   /// \server_status The server status response from TRTIS.
   /// \return Error object indicating success or failure
