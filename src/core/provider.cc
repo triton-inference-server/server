@@ -333,12 +333,13 @@ InferResponseProvider::RequiresOutput(const std::string& name)
 Status
 InferResponseProvider::OutputBufferContents(
     const std::string& name, const void** content,
-    size_t* content_byte_size) const
+    size_t* content_byte_size, TRTSERVER_Memory_Type* memory_type) const
 {
   for (const auto& output : outputs_) {
     if ((name == output.name_) && (output.cls_count_ == 0)) {
       *content = output.ptr_;
       *content_byte_size = output.byte_size_;
+      *memory_type = output.memory_type_;
       return Status::Success;
     }
   }
@@ -869,6 +870,9 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   if (*content == nullptr) {
     *content = buffer;
     output->ptr_ = buffer;
+    // [TODO] actually set it after output may be allocated on non-CPU
+    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
+    output->memory_type_ = TRTSERVER_MEMORY_CPU;
   }
 
   output->release_buffer_ = buffer;

@@ -251,7 +251,7 @@ class InferResponseProvider {
   // returned if the buffer is not already allocated.
   Status OutputBufferContents(
       const std::string& name, const void** content,
-      size_t* content_byte_size) const;
+      size_t* content_byte_size, TRTSERVER_Memory_Type* memory_type) const;
 
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
@@ -294,6 +294,7 @@ class InferResponseProvider {
     size_t cls_count_;
     void* ptr_;
     size_t byte_size_;
+    TRTSERVER_Memory_Type memory_type_;
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;

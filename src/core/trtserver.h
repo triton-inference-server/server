@@ -392,10 +392,11 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
 /// \param name The name of the output.
 /// \param base Returns the result data for the named output.
 /// \param byte_size Returns the size, in bytes, of the output data.
+/// \param memory_type Returns the memory type of the output data.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
-    size_t* byte_size);
+    size_t* byte_size, TRTSERVER_Memory_Type* memory_type);
 
 /// TRTSERVER_ServerOptions
 ///

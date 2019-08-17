@@ -413,7 +413,8 @@ class TrtServerResponse {
   TRTSERVER_Error* Status() const;
   const ni::InferResponseHeader& Header() const;
   TRTSERVER_Error* OutputData(
-      const char* name, const void** base, size_t* byte_size) const;
+      const char* name, const void** base, size_t* byte_size,
+      TRTSERVER_Memory_Type* memory_type) const;
 
  private:
   const ni::Status infer_status_;
@@ -441,10 +442,11 @@ TrtServerResponse::Header() const
 
 TRTSERVER_Error*
 TrtServerResponse::OutputData(
-    const char* name, const void** base, size_t* byte_size) const
+    const char* name, const void** base, size_t* byte_size,
+    TRTSERVER_Memory_Type* memory_type) const
 {
-  RETURN_IF_STATUS_ERROR(
-      response_provider_->OutputBufferContents(name, base, byte_size));
+  RETURN_IF_STATUS_ERROR(response_provider_->OutputBufferContents(
+      name, base, byte_size, memory_type));
   return nullptr;  // Success
 }
 
@@ -702,10 +704,10 @@ TRTSERVER_InferenceResponseHeader(
 TRTSERVER_Error*
 TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
-    size_t* byte_size)
+    size_t* byte_size, TRTSERVER_Memory_Type* memory_type)
 {
   TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
-  return lresponse->OutputData(name, base, byte_size);
+  return lresponse->OutputData(name, base, byte_size, memory_type);
 }
 
 //
