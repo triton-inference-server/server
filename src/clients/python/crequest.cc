@@ -372,8 +372,8 @@ SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx)
 
 nic::Error*
 SharedMemoryControlContextRegister(
-    SharedMemoryControlContextCtx* ctx, const char* name,
-    const char* shm_key, const int offset, const int byte_size)
+    SharedMemoryControlContextCtx* ctx, const char* name, const char* shm_key,
+    const int offset, const int byte_size)
 {
   nic::Error err = ctx->ctx->RegisterSharedMemory(
       std::string(name), std::string(shm_key), (size_t)offset,
@@ -644,20 +644,6 @@ InferContextInputSetSharedMemory(
   return new nic::Error(err);
 }
 
-//==============================================================================
-struct InferContextOutputCtx {
-  std::shared_ptr<nic::InferContext::Output> output;
-};
-
- nic::Error*
-InferContextOutputSetSharedMemory(
-    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
-    size_t byte_size)
-{
-  nic::Error err =
-      ctx->output->SetSharedMemory(std::string(shm_key), offset, byte_size);
-  return new nic::Error(err);
-}
 //==============================================================================
 struct InferContextResultCtx {
   std::unique_ptr<nic::InferContext::Result> result;

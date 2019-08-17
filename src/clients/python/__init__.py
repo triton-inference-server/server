@@ -50,10 +50,12 @@ class _utf8(object):
 import os
 _request_lib = "request" if os.name == 'nt' else 'librequest.so'
 _crequest_lib = "crequest" if os.name == 'nt' else 'libcrequest.so'
+_cshmwrap_lib = "shmwrap" if os.name == 'nt' else 'libshmwrap.so'
 _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_lib)
 _request = cdll.LoadLibrary(_request_path)
 _crequest_path = pkg_resources.resource_filename('tensorrtserver.api', _crequest_lib)
 _crequest = cdll.LoadLibrary(_crequest_path)
+_cshmwrap = cdll.LoadLibrary("libshmwrap.so")
 
 _crequest_error_new = _crequest.ErrorNew
 _crequest_error_new.restype = c_void_p
@@ -179,13 +181,6 @@ _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetShar
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
 _crequest_infer_ctx_input_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
 
- _crequest_infer_ctx_output_set_shared_memory = _crequest.InferContextOutputSetSharedMemory
-_crequest_infer_ctx_output_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_output_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
-
- _crequest_infer_ctx_output_set_shared_memory = _crequest.InferContextOutputSetSharedMemory
-_crequest_infer_ctx_output_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_output_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
 _crequest_infer_ctx_result_new.argtypes = [POINTER(c_void_p), c_void_p, _utf8]
@@ -220,6 +215,29 @@ _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
 
+_cshmwrap_create_shared_memory_region = _cshmwrap.CreateSharedMemoryRegion
+_cshmwrap_create_shared_memory_region.restype = c_int
+_cshmwrap_create_shared_memory_region.argtypes = [POINTER(c_char_p), c_uint64]
+
+_cshmwrap_open_shared_memory_region = _cshmwrap.OpenSharedMemoryRegion
+_cshmwrap_open_shared_memory_region.restype = c_int
+_cshmwrap_open_shared_memory_region.argtypes = [POINTER(c_char_p)]
+
+_cshmwrap_close_shared_memory_region = _cshmwrap.CloseSharedMemoryRegion
+_cshmwrap_close_shared_memory_region.restype = c_int
+_cshmwrap_close_shared_memory_region.argtypes = [c_uint64]
+
+_cshmwrap_create_shared_memory_region = _cshmwrap.MapSharedMemory
+_cshmwrap_create_shared_memory_region.restype = c_void_p
+_cshmwrap_create_shared_memory_region.argtypes = [c_int, c_uint64, c_uint64]
+
+_cshmwrap_unlink_shared_memory_region = _cshmwrap.UnlinkSharedMemoryRegion
+_cshmwrap_unlink_shared_memory_region.restype = c_int
+_cshmwrap_unlink_shared_memory_region.argtypes = [c_char_p]
+
+# _cshmwrap_unmap_shared_memory_region = _cshmwrap.UnmapSharedMemory
+# _cshmwrap_unmap_shared_memory_region.restype = c_int
+# _cshmwrap_unmap_shared_memory_region.argtypes = [c_void_p, c_uint64]
 
 def _raise_if_error(err):
     """
@@ -691,30 +709,17 @@ class SharedMemoryControlContext:
     verbose : bool
         If True generate verbose output.
 
-    http_headers : list of strings
-        HTTP headers to send with request. Ignored for GRPC
-        protocol. Each header must be specified as "Header:Value".
-
     """
-    def __init__(self, url, protocol, verbose=False, http_headers=[]):
+    def __init__(self, url, protocol, verbose=False):
         self._last_request_id = 0
         self._ctx = c_void_p()
-
-        if http_headers is None:
-            http_headers = list()
-
-        http_headers_arr = (c_char_p * len(http_headers))()
-        http_headers_arr[:] = http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_shm_control_ctx_new(
-                    byref(self._ctx), url, int(protocol),
-                    http_headers_arr, len(http_headers), verbose)))
+                    byref(self._ctx), url, int(protocol), verbose)))
 
     def __del__(self):
-        # when module is unloading may get called after
-        # _crequest_model_control_ctx_del has been released
         if _crequest_shm_control_ctx_del is not None:
             self.close()
 
@@ -1033,7 +1038,7 @@ class InferContext:
                                     flattened += s
                                 input_value = np.asarray(flattened)
 
-                             if not input_value.flags['C_CONTIGUOUS']:
+                            if not input_value.flags['C_CONTIGUOUS']:
                                 input_value = np.ascontiguousarray(input_value)
                             contiguous_input_values.append(input_value)
                             _raise_if_error(

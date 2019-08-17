@@ -88,7 +88,8 @@ nic::Error* SharedMemoryControlContextNew(
     const char** headers, int num_headers, bool verbose);
 void SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx);
 nic::Error* SharedMemoryControlContextRegister(
-    SharedMemoryControlContextCtx* ctx, const char* model_name);
+    SharedMemoryControlContextCtx* ctx, const char* name, const char* shm_key,
+    const int offset, const int byte_size);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, const char* model_name);
 
@@ -137,13 +138,6 @@ nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
 nic::Error* InferContextInputSetSharedMemory(
     InferContextInputCtx* ctx, const char* shm_key, size_t offset,
-    size_t byte_size);
-
- //==============================================================================
-// InferContext::Output
-typedef struct InferContextOutputCtx InferContextOutputCtx;
-nic::Error* InferContextOutputSetSharedMemory(
-    InferContextOutputCtx* ctx, const char* shm_key, size_t offset,
     size_t byte_size);
 
 //==============================================================================
