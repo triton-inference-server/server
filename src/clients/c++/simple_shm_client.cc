@@ -80,7 +80,7 @@ CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
   // extend shared memory object as by default it's initialized with size 0
   int res = ftruncate(shm_fd, batch_byte_size);
   if (res == -1) {
-    std::cerr << "error: unable to get initialize size";
+    std::cerr << "error: unable to initialize the size";
     exit(1);
   }
   return shm_fd;

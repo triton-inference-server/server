@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 int
-CreateSharedMemoryRegion(char* shm_key, size_t batch_byte_size)
+CreateSharedMemoryRegion(const char* shm_key, size_t batch_byte_size)
 {
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -25,7 +25,7 @@ CreateSharedMemoryRegion(char* shm_key, size_t batch_byte_size)
 }
 
 int
-OpenSharedMemoryRegion(char* shm_key)
+OpenSharedMemoryRegion(const char* shm_key)
 {
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key, O_RDWR, S_IRUSR | S_IWUSR);
@@ -59,7 +59,7 @@ MapSharedMemory(int shm_fd, size_t offset, size_t batch_byte_size)
 }
 
 int
-UnlinkSharedMemoryRegion(char* shm_key)
+UnlinkSharedMemoryRegion(const char* shm_key)
 {
   int shm_fd = shm_unlink(shm_key);
   if (shm_fd == -1) {

@@ -92,6 +92,14 @@ nic::Error* SharedMemoryControlContextRegister(
     const int offset, const int byte_size);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, const char* model_name);
+nic::Error* CreateSharedMemoryRegion(
+    const char* shm_key, size_t batch_byte_size, int* shm_fd);
+nic::Error* OpenSharedMemoryRegion(const char* shm_key, int* shm_fd);
+nic::Error* CloseSharedMemoryRegion(int shm_fd);
+nic::Error* MapSharedMemory(
+    int shm_fd, size_t offset, size_t batch_byte_size, void** shm_addr);
+nic::Error* UnlinkSharedMemoryRegion(const char* shm_key);
+nic::Error* UnmapSharedMemory(void* shm_addr, size_t byte_size);
 
 //==============================================================================
 // InferContext
@@ -124,6 +132,10 @@ nic::Error* InferContextOptionsAddRaw(
 nic::Error* InferContextOptionsAddClass(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
     const char* output_name, uint64_t count);
+nic::Error* InferContextOptionsAddSharedMemory(
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, const char* shm_name, uint64_t offset,
+    uint64_t byte_size);
 
 //==============================================================================
 // InferContext::Input

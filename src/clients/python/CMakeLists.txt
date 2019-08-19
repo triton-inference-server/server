@@ -33,6 +33,7 @@ add_library(crequest SHARED crequest.cc)
 target_link_libraries(
   crequest
   PUBLIC request
+  rt
 )
 
 #
