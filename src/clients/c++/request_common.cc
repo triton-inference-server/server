@@ -422,7 +422,8 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
   if (use_shm_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw shape not available for shared memory output '" + output_->Name() + "'");
+        "raw shape not available for shared memory output '" + output_->Name() +
+            "'");
   }
 
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
@@ -441,7 +442,8 @@ ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
   if (use_shm_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for shared memory output '" + output_->Name() + "'");
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
   }
 
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
@@ -478,7 +480,8 @@ ResultImpl::GetRaw(
   if (use_shm_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for shared memory output '" + output_->Name() + "'");
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
   }
 
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
@@ -514,7 +517,8 @@ ResultImpl::GetRawAtCursor(
   if (use_shm_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "raw result not available for shared memory output '" + output_->Name() + "'");
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
   }
 
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
@@ -584,7 +588,8 @@ ResultImpl::GetClassAtCursor(
   if (use_shm_) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "class result not available for shared memory output '" + output_->Name() + "'");
+        "class result not available for shared memory output '" +
+            output_->Name() + "'");
   }
 
   if (result_format_ != InferContext::Result::ResultFormat::CLASS) {
