@@ -293,12 +293,12 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input0->name().c_str(), &input0_data[0],
-          input0_data.size() * sizeof(int32_t)),
+          input0_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input1->name().c_str(), &input1_data[0],
-          input1_data.size() * sizeof(int32_t)),
+          input1_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -364,7 +364,8 @@ main(int argc, char** argv)
   } else if (output0_memory_type != TRTSERVER_MEMORY_CPU) {
     FAIL(
         "unexpected output0 memory type, expected to be allocated "
-        "on CPU memory (" + std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
+        "on CPU memory (" +
+        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
         std::to_string(output0_memory_type) + ")");
   }
 
@@ -384,7 +385,8 @@ main(int argc, char** argv)
   } else if (output1_memory_type != TRTSERVER_MEMORY_CPU) {
     FAIL(
         "unexpected output1 memory type, expected to be allocated "
-        "on CPU memory (" + std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
+        "on CPU memory (" +
+        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
         std::to_string(output1_memory_type) + ")");
   }
 

@@ -334,7 +334,9 @@ class TrtServerRequestProvider {
   const std::unordered_map<std::string, std::shared_ptr<ni::SystemMemory>>&
   InputMap() const;
 
-  void SetInputData(const char* input_name, const void* base, size_t byte_size);
+  void SetInputData(
+      const char* input_name, const void* base, size_t byte_size,
+      TRTSERVER_Memory_Type memory_type);
 
  private:
   const std::string model_name_;
@@ -386,7 +388,8 @@ TrtServerRequestProvider::InputMap() const
 
 void
 TrtServerRequestProvider::SetInputData(
-    const char* input_name, const void* base, size_t byte_size)
+    const char* input_name, const void* base, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type)
 {
   auto pr = input_map_.emplace(input_name, nullptr);
   std::shared_ptr<ni::SystemMemory>& smem = pr.first->second;
@@ -396,7 +399,7 @@ TrtServerRequestProvider::SetInputData(
 
   if (byte_size > 0) {
     std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
-        static_cast<const char*>(base), byte_size);
+        static_cast<const char*>(base), byte_size, memory_type);
   }
 }
 
@@ -660,11 +663,12 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
 TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
     TRTSERVER_InferenceRequestProvider* request_provider,
-    const char* input_name, const void* base, size_t byte_size)
+    const char* input_name, const void* base, size_t byte_size,
+    TRTSERVER_Memory_Type memory_type)
 {
   TrtServerRequestProvider* lprovider =
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
-  lprovider->SetInputData(input_name, base, byte_size);
+  lprovider->SetInputData(input_name, base, byte_size, memory_type);
   return nullptr;  // Success
 }
 
