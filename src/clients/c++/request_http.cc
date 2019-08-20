@@ -1160,11 +1160,11 @@ HttpRequestImpl::CreateResult(
 
   std::unique_ptr<ResultImpl> result(new ResultImpl(infer_output, batch_size));
 
+  result->SetBatch1Shape(output.raw().dims());
+  if (IsFixedSizeDataType(infer_output->DType())) {
+    result->SetBatchnByteSize(output.raw().batch_byte_size());
+  }
   if (!ctx.UsesSharedMemory(output.name())) {
-    result->SetBatch1Shape(output.raw().dims());
-    if (IsFixedSizeDataType(infer_output->DType())) {
-      result->SetBatchnByteSize(output.raw().batch_byte_size());
-    }
     result->SetUsesSharedMemory(false);
   } else {
     result->SetUsesSharedMemory(true);

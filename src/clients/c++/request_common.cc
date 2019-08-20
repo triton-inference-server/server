@@ -715,6 +715,13 @@ ResultImpl::SetNextRawResult(
 
   inplace_ = inplace;
 
+  // If output uses shared memory then byte size doen't count against response
+  // byte size calculation.
+  if (use_shm_) {
+    *result_bytes = 0;
+    return Error::Success;
+  }
+
   // If output has a known batch1-byte-size (which is the same for
   // every item in the batch) then can directly assign the results to
   // the appropriate per-batch buffers.

@@ -339,7 +339,6 @@ HTTPAPIServer::ResponseAlloc(
   } else {
     // Don't need to do anything if no memory was requested.
     if (byte_size > 0) {
-
       // Can't allocate for any memory type other than CPU.
       if (memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type

@@ -560,12 +560,12 @@ GrpcRequestImpl::InitResult(
     const InferResponseHeader::Output& output, const size_t idx,
     GrpcResultImpl* result) const
 {
-  if (!result->UsesSharedMemory()) {
-    result->SetBatch1Shape(output.raw().dims());
-    if (IsFixedSizeDataType(infer_output->DType())) {
-      result->SetBatchnByteSize(output.raw().batch_byte_size());
-    }
+  result->SetBatch1Shape(output.raw().dims());
+  if (IsFixedSizeDataType(infer_output->DType())) {
+    result->SetBatchnByteSize(output.raw().batch_byte_size());
+  }
 
+  if (!result->UsesSharedMemory()) {
     if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
       if (grpc_response_->raw_output_size() <= (int)idx) {
         return Error(
