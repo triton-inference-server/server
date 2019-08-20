@@ -34,6 +34,10 @@
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -272,27 +276,20 @@ EnsembleContext::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  // [TODO] Response provider should be able to take hints (i.e. CPU / GPU
-  // memory) from alloc caller (i.e. backend). Can't allocate for any memory
-  // type other than CPU.
-  if (memory_type == TRTSERVER_MEMORY_GPU) {
-    // [TODO] support it with cudaMalloc
-    LOG_VERBOSE(1) << "Internal response allocation not supported for type "
-                   << memory_type << " for " << tensor_name;
-    return nullptr;  // Success
-  } else {
-    auto it =
-        tensor_data_map
-            ->emplace(
-                tensor_name, std::make_shared<AllocatedSystemMemory>(byte_size))
-            .first;
-    if (byte_size > 0) {
-      *buffer = static_cast<void*>(it->second->MutableBuffer());
-    }
+  TRTSERVER_Memory_Type allocated_memory_type;
+  auto it = tensor_data_map
+                ->emplace(
+                    tensor_name, std::make_shared<AllocatedSystemMemory>(
+                                     byte_size, memory_type))
+                .first;
+  if (byte_size > 0) {
+    *buffer =
+        static_cast<void*>(it->second->MutableBuffer(&allocated_memory_type));
   }
 
   LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name << ", size "
-                 << byte_size << ", addr " << *buffer;
+                 << byte_size << ", addr " << *buffer << ", memory type "
+                 << allocated_memory_type;
 
   return nullptr;  // Success
 }
@@ -607,6 +604,10 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       shape.push_back(dim);
     }
 
+    // [TODO] modify this to use the whole "request for allocation" procedure
+    // after output may be allocated on non-CPU
+    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
+    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_CPU;
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape));
@@ -614,12 +615,43 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     size_t content_offset = 0;
     size_t content_idx = 0;
     size_t content_size;
-    const char* content = memory_block->BufferAt(content_idx, &content_size);
+    TRTSERVER_Memory_Type src_memory_type;
+
+    const char* content =
+        memory_block->BufferAt(content_idx, &content_size, &src_memory_type);
     while (content != nullptr) {
-      memcpy(((char*)buffer) + content_offset, content, content_size);
+      if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
+          (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+        memcpy(((char*)buffer) + content_offset, content, content_size);
+      } else {
+#ifdef TRTIS_ENABLE_GPU
+        auto copy_type = cudaMemcpyDeviceToDevice;
+        if (src_memory_type == TRTSERVER_MEMORY_CPU) {
+          copy_type = cudaMemcpyHostToDevice;
+        } else {
+          copy_type = cudaMemcpyDeviceToHost;
+        }
+        // [TODO] create stream for EnsembleContext for using async call
+        cudaError_t err = cudaMemcpy(
+            ((char*)buffer) + content_offset, content, content_size, copy_type);
+        if (err != cudaSuccess) {
+          return Status(
+              RequestStatusCode::INTERNAL,
+              "failed to use CUDA copy for output '" + output_pair.first +
+                  "': " + std::string(cudaGetErrorString(err)));
+        }
+#else
+        return Status(
+                RequestStatusCode::INTERNAL,
+                "try to use CUDA copy for output '" + output_pair.first +
+                  "' while GPU is not supported"));
+#endif  // TRTIS_ENABLE_GPU
+      }
+
       content_offset += content_size;
       content_idx++;
-      content = memory_block->BufferAt(content_idx, &content_size);
+      content =
+          memory_block->BufferAt(content_idx, &content_size, &src_memory_type);
     }
   }
   return Status::Success;

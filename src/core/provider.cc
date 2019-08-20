@@ -34,6 +34,10 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 //
@@ -42,46 +46,86 @@ namespace nvidia { namespace inferenceserver {
 SystemMemoryReference::SystemMemoryReference() : SystemMemory() {}
 
 const char*
-SystemMemoryReference::BufferAt(size_t idx, size_t* byte_size) const
+SystemMemoryReference::BufferAt(
+    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type) const
 {
   if (idx >= buffer_.size()) {
     *byte_size = 0;
+    *memory_type = TRTSERVER_MEMORY_CPU;
     return nullptr;
   }
-  *byte_size = buffer_[idx].second;
-  return buffer_[idx].first;
+  *memory_type = std::get<2>(buffer_[idx]);
+  *byte_size = std::get<1>(buffer_[idx]);
+  return std::get<0>(buffer_[idx]);
 }
 
 size_t
-SystemMemoryReference::AddBuffer(const char* buffer, size_t byte_size)
+SystemMemoryReference::AddBuffer(
+    const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type)
 {
   total_byte_size_ += byte_size;
-  buffer_.emplace_back(std::make_pair(buffer, byte_size));
+  buffer_.emplace_back(std::make_tuple(buffer, byte_size, memory_type));
   return buffer_.size() - 1;
 }
 
-AllocatedSystemMemory::AllocatedSystemMemory(size_t byte_size) : SystemMemory()
+AllocatedSystemMemory::AllocatedSystemMemory(
+    size_t byte_size, TRTSERVER_Memory_Type memory_type)
+    : SystemMemory(), memory_type_(memory_type)
 {
   total_byte_size_ = byte_size;
-  char* buffer = new char[byte_size];
-  buffer_.reset(buffer);
+  if (memory_type_ == TRTSERVER_MEMORY_CPU) {
+    buffer_ = new char[byte_size];
+  } else {
+#ifdef TRTIS_ENABLE_GPU
+    cudaError_t err = cudaMalloc((void**)&buffer_, byte_size);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "failed to allocate GPU memory with byte size" << byte_size
+                << ": " << std::string(cudaGetErrorString(err));
+      buffer_ = nullptr;
+    }
+#else
+    buffer_ = nullptr;
+#endif  // TRTIS_ENABLE_GPU
+  }
+}
+
+AllocatedSystemMemory::~AllocatedSystemMemory()
+{
+  if (buffer_ != nullptr) {
+    if (memory_type_ == TRTSERVER_MEMORY_CPU) {
+      delete buffer_;
+    } else {
+#ifdef TRTIS_ENABLE_GPU
+      cudaError_t err = cudaFree(buffer_);
+      if (err != cudaSuccess) {
+        LOG_ERROR << "failed to free GPU memory at address " << buffer_ << ": "
+                  << std::string(cudaGetErrorString(err));
+      }
+#endif  // TRTIS_ENABLE_GPU
+    }
+    buffer_ = nullptr;
+  }
 }
 
 const char*
-AllocatedSystemMemory::BufferAt(size_t idx, size_t* byte_size) const
+AllocatedSystemMemory::BufferAt(
+    size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type) const
 {
   if (idx != 0) {
     *byte_size = 0;
+    *memory_type = TRTSERVER_MEMORY_CPU;
     return nullptr;
   }
   *byte_size = total_byte_size_;
-  return buffer_.get();
+  *memory_type = memory_type_;
+  return buffer_;
 }
 
 char*
-AllocatedSystemMemory::MutableBuffer()
+AllocatedSystemMemory::MutableBuffer(TRTSERVER_Memory_Type* memory_type)
 {
-  return buffer_.get();
+  *memory_type = memory_type_;
+  return buffer_;
 }
 
 //
@@ -164,7 +208,7 @@ InferRequestProvider::GetInputOverrideContent(
 Status
 InferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
-    bool force_contiguous)
+    TRTSERVER_Memory_Type* memory_type, bool force_contiguous)
 {
   if (*content_byte_size == 0) {
     *content = nullptr;
@@ -182,16 +226,17 @@ InferRequestProvider::GetNextInputContent(
 
     bool isLastChunk =
         (input_content.first->BufferAt(
-             input_content.second + 1, content_byte_size) == nullptr);
+             input_content.second + 1, content_byte_size, memory_type) ==
+         nullptr);
     if (!force_contiguous || isLastChunk) {
       *content = input_content.first->BufferAt(
-          input_content.second++, content_byte_size);
+          input_content.second++, content_byte_size, memory_type);
     } else {
       size_t total_size = 0;
       size_t start_idx = input_content.second;
       do {
         *content = input_content.first->BufferAt(
-            input_content.second++, content_byte_size);
+            input_content.second++, content_byte_size, memory_type);
         total_size += *content_byte_size;
       } while (*content != nullptr);
 
@@ -199,8 +244,11 @@ InferRequestProvider::GetNextInputContent(
       std::vector<char>& buf = contiguous_buffers_.back();
       buf.reserve(total_size);
 
+      // [TODO] on 'force_contiguous', need to be careful as the data block
+      // may be on GPU
       for (size_t i = start_idx; i < input_content.second; i++) {
-        const auto& block = input_content.first->BufferAt(i, content_byte_size);
+        const auto& block =
+            input_content.first->BufferAt(i, content_byte_size, memory_type);
         buf.insert(buf.end(), block, block + *content_byte_size);
       }
 
@@ -239,8 +287,9 @@ std::mutex NULLInferRequestProvider::mu_;
 Status
 NULLInferRequestProvider::GetNextInputContent(
     const std::string& name, const void** content, size_t* content_byte_size,
-    bool force_contiguous)
+    TRTSERVER_Memory_Type* memory_type, bool force_contiguous)
 {
+  *memory_type = TRTSERVER_MEMORY_CPU;
   if (*content_byte_size == 0) {
     *content = nullptr;
     return Status::Success;
@@ -332,13 +381,14 @@ InferResponseProvider::RequiresOutput(const std::string& name)
 
 Status
 InferResponseProvider::OutputBufferContents(
-    const std::string& name, const void** content,
-    size_t* content_byte_size) const
+    const std::string& name, const void** content, size_t* content_byte_size,
+    TRTSERVER_Memory_Type* memory_type) const
 {
   for (const auto& output : outputs_) {
     if ((name == output.name_) && (output.cls_count_ == 0)) {
       *content = output.ptr_;
       *content_byte_size = output.byte_size_;
+      *memory_type = output.memory_type_;
       return Status::Success;
     }
   }
@@ -600,8 +650,8 @@ InternalInferResponseProvider::AllocateOutputBuffer(
   if (it == output_buffer_.end()) {
     it = output_buffer_
              .emplace(std::make_pair(
-                 name,
-                 std::make_shared<AllocatedSystemMemory>(content_byte_size)))
+                 name, std::make_shared<AllocatedSystemMemory>(
+                           content_byte_size, TRTSERVER_MEMORY_CPU)))
              .first;
   }
 
@@ -613,7 +663,8 @@ InternalInferResponseProvider::AllocateOutputBuffer(
             std::to_string(content_byte_size));
   }
 
-  *content = it->second->MutableBuffer();
+  TRTSERVER_Memory_Type memory_type;
+  *content = it->second->MutableBuffer(&memory_type);
   output->ptr_ = *content;
 
   return Status::Success;
@@ -869,6 +920,9 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   if (*content == nullptr) {
     *content = buffer;
     output->ptr_ = buffer;
+    // [TODO] actually set it after output may be allocated on non-CPU
+    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
+    output->memory_type_ = TRTSERVER_MEMORY_CPU;
   }
 
   output->release_buffer_ = buffer;

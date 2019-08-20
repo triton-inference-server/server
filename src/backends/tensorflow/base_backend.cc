@@ -295,18 +295,40 @@ SetStringInputTensor(
         request_header.batch_size() * batch1_element_cnt;
     size_t element_idx = 0;
 
+    // For string data type, we always need to copy the data to CPU so that
+    // we can read string length and construct the string properly.
+    TRTSERVER_Memory_Type src_memory_type;
     const void* vcontent;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
     payload.status_ = payload.request_provider_->GetNextInputContent(
-        input_name, &vcontent, &content_byte_size, true);
+        input_name, &vcontent, &content_byte_size, &src_memory_type, true);
+
+    const char* content = reinterpret_cast<const char*>(vcontent);
+#ifdef TRTIS_ENABLE_GPU
+    std::unique_ptr<char[]> cpu_buffer;
+    if (src_memory_type != TRTSERVER_MEMORY_CPU) {
+      cpu_buffer.reset(new char[content_byte_size]);
+      // [TODO] move this to context member function and use async
+      cudaError_t err = cudaMemcpy(
+          cpu_buffer.get(), vcontent, content_byte_size,
+          cudaMemcpyDeviceToHost);
+      if (err != cudaSuccess) {
+        payload.status_ = Status(
+            RequestStatusCode::INTERNAL,
+            "input '" + input_name + "' is in GPU memory and failed to use" +
+                " CUDA copy to CPU memory for setting String input data: " +
+                std::string(cudaGetErrorString(err)));
+      }
+      content = cpu_buffer.get();
+    }
+#endif  // TRTIS_ENABLE_GPU
+
     if (!payload.status_.IsOk()) {
       FillStringTensor(
           tensor, tensor_element_idx + element_idx,
           expected_element_cnt - element_idx);
       continue;
     }
-
-    const char* content = reinterpret_cast<const char*>(vcontent);
 
     // Parse content and assign them to the 'tensor'. Each string
     // in 'content' is a 4-byte length followed by the string
