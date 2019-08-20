@@ -103,13 +103,13 @@ BackendContext::SetInputBuffer(
                 RequestStatusCode::INTERNAL,
                 "failed to use CUDA copy for input '" + name +
                     "': " + std::string(cudaGetErrorString(err)));
+          }
 #else
           payload.status_ = Status(
               RequestStatusCode::INTERNAL,
               "try to use CUDA copy for input '" + name +
-                  "' while GPU is not supported"));
+                  "' while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
-          }
         }
       }
       copied_byte_size += content_byte_size;
