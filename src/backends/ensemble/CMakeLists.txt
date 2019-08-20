@@ -46,3 +46,7 @@ add_library(
   ${ENSEMBLE_SRCS} ${ENSEMBLE_HDRS}
 )
 add_dependencies(ensemble-backend-library proto-library)
+
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(ensemble-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU

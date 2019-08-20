@@ -50,16 +50,13 @@ BackendContext::SetInputBuffer(
     auto& payload = (*payloads)[idx];
     const size_t expected_byte_size = expected_byte_sizes[idx];
 
-    // [TODO] should also be able to get where the tensor data reside
-    // then we can set cudaMemcpy type properly
-    auto src_memory_type = TRTSERVER_MEMORY_CPU;
-
     size_t copied_byte_size = 0;
     while (payload.status_.IsOk()) {
+      TRTSERVER_Memory_Type src_memory_type;
       const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
       payload.status_ = payload.request_provider_->GetNextInputContent(
-          name, &content, &content_byte_size, false);
+          name, &content, &content_byte_size, &src_memory_type, false);
       if (!payload.status_.IsOk()) {
         break;
       }
