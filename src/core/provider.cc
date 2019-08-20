@@ -72,21 +72,24 @@ AllocatedSystemMemory::AllocatedSystemMemory(
     size_t byte_size, TRTSERVER_Memory_Type memory_type)
     : SystemMemory(), memory_type_(memory_type)
 {
-  total_byte_size_ = byte_size;
-  if (memory_type_ == TRTSERVER_MEMORY_CPU) {
-    buffer_ = new char[byte_size];
-  } else {
+  buffer_ = nullptr;
+  if (byte_size != 0) {
+    if (memory_type_ == TRTSERVER_MEMORY_CPU) {
+      buffer_ = new char[byte_size];
+    } else {
 #ifdef TRTIS_ENABLE_GPU
-    cudaError_t err = cudaMalloc((void**)&buffer_, byte_size);
-    if (err != cudaSuccess) {
-      LOG_ERROR << "failed to allocate GPU memory with byte size" << byte_size
-                << ": " << std::string(cudaGetErrorString(err));
-      buffer_ = nullptr;
-    }
+      cudaError_t err = cudaMalloc((void**)&buffer_, byte_size);
+      if (err != cudaSuccess) {
+        LOG_ERROR << "failed to allocate GPU memory with byte size" << byte_size
+                  << ": " << std::string(cudaGetErrorString(err));
+        buffer_ = nullptr;
+      }
 #else
-    buffer_ = nullptr;
+      buffer_ = nullptr;
 #endif  // TRTIS_ENABLE_GPU
+    }
   }
+  total_byte_size_ = (buffer_ == nullptr) ? 0 : byte_size;
 }
 
 AllocatedSystemMemory::~AllocatedSystemMemory()
