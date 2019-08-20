@@ -914,6 +914,12 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   // return success and nullptr to align with the behavior of
   // 'TRTSERVER_ResponseAllocatorAllocFn_t'
   if (pr->second.has_cls()) {
+    if (content_byte_size == 0) {
+      Status(
+          RequestStatusCode::INVALID_ARG,
+          "Classification result is requested for output '" + name + "'" +
+              " while its output buffer size is 0");
+    }
     if (preferred_memory_type == TRTSERVER_MEMORY_CPU) {
       loutput->cls_count_ = pr->second.cls().count();
       char* buffer = new char[content_byte_size];
