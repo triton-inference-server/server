@@ -750,6 +750,11 @@ class SharedMemoryControlContext:
         byte_size : int
             The size in bytes of the data to be read / written in the shared memory region.
 
+        Returns
+        -------
+        shm_fd : int
+            The unique shared memory region descriptor
+
         Raises
         ------
         InferenceServerException
@@ -772,6 +777,11 @@ class SharedMemoryControlContext:
         ----------
         shm_key : str
             The unique key of the shared memory object.
+
+        Returns
+        -------
+        shm_fd : int
+            The unique shared memory region descriptor
 
         Raises
         ------
@@ -814,6 +824,11 @@ class SharedMemoryControlContext:
             The offset from the start of the shared shared memory region.
         byte_size : int
             The size in bytes of the data to be read / written in the shared memory region.
+
+        Returns
+        -------
+        shm_addr : void*
+            The base address of the shared memory region
 
         Raises
         ------
