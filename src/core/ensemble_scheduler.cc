@@ -604,13 +604,26 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       shape.push_back(dim);
     }
 
-    // [TODO] modify this to use the whole "request for allocation" procedure
-    // after output may be allocated on non-CPU
-    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
-    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_CPU;
+    
+    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_GPU;
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
-        output_pair.first, &buffer, expected_byte_size, shape));
+        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
+    
+    // Done with this output if 'expected_byte_size' is 0
+    if (expected_byte_size == 0) {
+      continue;
+    } else if (buffer == nullptr) {
+      dst_memory_type = TRTSERVER_MEMORY_CPU;
+      RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
+        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
+      if (buffer == nullptr) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "all attempts to allocate buffer for output '" + output_pair.first +
+                "' failed");
+      }
+    }
 
     size_t content_offset = 0;
     size_t content_idx = 0;

@@ -906,6 +906,7 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
   loutput->cls_count_ = 0;
   loutput->ptr_ = nullptr;
   loutput->byte_size_ = content_byte_size;
+  loutput->memory_type_ = preferred_memory_type;
 
   // For cls result, the provider will be responsible for allocating
   // the requested memory. The user-provided allocator should only be invoked
@@ -953,10 +954,7 @@ DelegatingInferResponseProvider::AllocateOutputBuffer(
 
   if (*content == nullptr) {
     *content = buffer;
-    output->ptr_ = buffer;
-    // [TODO] actually set it after output may be allocated on non-CPU
-    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
-    output->memory_type_ = TRTSERVER_MEMORY_CPU;
+    loutput->ptr_ = buffer;
   }
 
   loutput->release_buffer_ = buffer;
