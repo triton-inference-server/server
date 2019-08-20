@@ -1127,9 +1127,8 @@ HttpRequestImpl::SetNextRawResult(
       }
     }
 
-    // std::cerr << "Output size - ob: " << size << " - " << ob << '\n';
     // If output couldn't accept any more bytes then move to the next.
-    if (ob == 0 || io->UsesSharedMemory()) {
+    if (ob == 0) {
       result_pos_idx_++;
     } else {
       *result_bytes += ob;

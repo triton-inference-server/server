@@ -331,6 +331,10 @@ class SharedMemoryControlContext final
 
 template <class LifeCycle>
 class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
+  using ResponsePair = std::pair<
+      InferResponse*,
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>;
+
   class GRPCInferRequest {
    public:
     GRPCInferRequest(
@@ -408,7 +412,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           grpc_infer_request->exec_ctx_);
     }
 
-    void* response_pair_;
+    std::unique_ptr<ResponsePair> response_pair_;
 
    private:
     InferBaseContext<LifeCycle>* ctx_;
@@ -530,13 +534,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           request.model_version(), request_header_serialized.c_str(),
           request_header_serialized.size());
       if (err == nullptr) {
-        std::pair<
-            InferResponse*,
-            std::unordered_map<std::string, std::pair<const void*, size_t>>>*
-        response_pair(new std::pair<
-                      InferResponse*,
-                      std::unordered_map<
-                          std::string, std::pair<const void*, size_t>>>());
+        ResponsePair* response_pair(new ResponsePair());
         response_pair->first = &response;
         err = GRPCToInput(
             server, request.meta_data(), request, request_provider,
@@ -545,7 +543,7 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
           GRPCInferRequest* grpc_infer_request = new GRPCInferRequest(
               this, execution_context, response, request.meta_data().id(),
               server_id, unique_id);
-          grpc_infer_request->response_pair_ = response_pair;
+          grpc_infer_request->response_pair_.reset(response_pair);
 
           // send both InferResponse and output_shm_map as both are needed to
           // allocate buffer appropriately
