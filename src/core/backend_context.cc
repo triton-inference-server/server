@@ -224,8 +224,8 @@ Status BackendContext::CopyBuffer(
 #else
     return Status(
         RequestStatusCode::INTERNAL,
-        "try to use CUDA copy for input '" + name +
-            "' while GPU is not supported"));
+        "try to use CUDA copy for tensor '" + name +
+            "' while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
   return Status::Success;

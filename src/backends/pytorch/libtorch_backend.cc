@@ -26,7 +26,6 @@
 
 #include "src/backends/pytorch/libtorch_backend.h"
 
-#include <c10/cuda/CUDACachingAllocator.h>
 #include <stdint.h>
 #include <exception>
 #include "src/core/constants.h"
@@ -37,6 +36,7 @@
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
@@ -52,7 +52,9 @@ LibTorchBackend::Context::Context(
 LibTorchBackend::Context::~Context()
 {
   torch_model_.reset();
+#ifdef TRTIS_ENABLE_GPU
   c10::cuda::CUDACachingAllocator::emptyCache();
+#endif  // TRTIS_ENABLE_GPU
   LOG_VERBOSE(1) << "~LibTorchBackend::Context ";
 }
 
