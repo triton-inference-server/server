@@ -128,27 +128,29 @@ BackendContext::SetFixedSizeOutputBuffer(
       // try to get buffer with the same memory type as the output tensor
       Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape, src_memory_type);
-      if (status.IsOk() && (buffer == nullptr) && (src_memory_type != TRTSERVER_MEMORY_CPU)) {
-        // Use default (CPU memory type) if preferred type can't be fulfilled
-        status = payload.response_provider_->AllocateOutputBuffer(
-            name, &buffer, expected_byte_size, content_shape);
-        dst_memory_type = TRTSERVER_MEMORY_CPU;
-      }
-
-      // If 'expected_byte_size == 0', 'buffer == nullptr' is being expected
-      if (status.IsOk() && (buffer == nullptr) && (expected_byte_size != 0)) {
-        status = Status(
-            RequestStatusCode::INTERNAL,
-            "all attempts to allocate buffer for output '" + name +
-                "' failed");
-      }
 
       if (status.IsOk() && (expected_byte_size != 0)) {
-        bool cuda_used = false;
-        status = CopyBuffer(
-            name, src_memory_type, dst_memory_type, expected_byte_size,
-            content + content_offset, buffer, &cuda_used);
-        cuda_copy |= cuda_used;
+        if ((buffer == nullptr) && (src_memory_type != TRTSERVER_MEMORY_CPU)) {
+          // Use default (CPU memory type) if preferred type can't be fulfilled
+          status = payload.response_provider_->AllocateOutputBuffer(
+              name, &buffer, expected_byte_size, content_shape);
+          dst_memory_type = TRTSERVER_MEMORY_CPU;
+        }
+
+        if (status.IsOk()) {
+          if (buffer == nullptr) {
+            status = Status(
+                RequestStatusCode::INTERNAL,
+                "all attempts to allocate buffer for output '" + name +
+                    "' failed");
+          } else {
+            bool cuda_used = false;
+            status = CopyBuffer(
+                name, src_memory_type, dst_memory_type, expected_byte_size,
+                content + content_offset, buffer, &cuda_used);
+            cuda_copy |= cuda_used;
+            }
+        } 
       }
 
       payload.status_ = status;
