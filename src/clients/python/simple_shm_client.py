@@ -92,43 +92,34 @@ if __name__ == '__main__':
     shm_key = "/output_simple"
     shm_fd_op = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
 
-    # TODO pythonize
-    output0_shm = shared_memory_ctx.map_shared_memory_region(shm_fd_op, 0, output_byte_size * 2)
-    output1_shm = (int*)(output0_shm + 16)
-
     # Register Output shared memory with TRTIS
     shared_memory_ctx.register("output_data", "/output_simple", 0, output_byte_size * 2)
 
     shm_key = "/input_simple"
-    int shm_fd_ip = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
+    shm_fd_ip = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
 
-    # TODO pythonize
-    input0_shm = shared_memory_ctx.map_shared_memory_region(shm_fd_ip, 0, input_byte_size * 2)
-    input1_shm = (int*)(input0_shm + 16)
+    # Put input data values into shared memory
+    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, input0_data)
+    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, input1_data)
 
     # Register Input shared memory with TRTIS
     shared_memory_ctx.register("input_data", "/input_simple", 0, input_byte_size * 2)
 
-    # TODO put input data values into shared memory
-    err = input0->SetSharedMemory("input_data", 0, input_byte_size)
-    err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size)
-
     # Send inference request to the inference server. Get results for
     # both output tensors.
-    result = infer_ctx.run({ 'INPUT0' : (input0_data,),
-                             'INPUT1' : (input1_data,) },
-                           { 'OUTPUT0' : InferContext.ResultFormat.RAW,
-                             'OUTPUT1' : InferContext.ResultFormat.RAW },
+    result = infer_ctx.run({ 'INPUT0' : ("input_data", 0, input_byte_size),
+                             'INPUT1' : ("input_data", input_byte_size, input_byte_size), },
+                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, "output_data", 0, output_byte_size),
+                             'OUTPUT1' : (InferContext.ResultFormat.RAW, "output_data", output_byte_size, output_byte_size) },
                            batch_size)
+
+    # Read output from shared memory ([TODO] Convert return buffer to numpy array of respective datatype)
+    output0_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, 0, output_byte_size)
+    output1_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, output_byte_size, output_byte_size)
 
     # We expect there to be 2 results (each with batch-size 1). Walk
     # over all 16 result elements and print the sum and difference
     # calculated by the model.
-    
-    # TODO read from shared memory
-    output0_data = result['OUTPUT0'][0]
-    output1_data = result['OUTPUT1'][0]
-
     for i in range(16):
         print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
         print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
