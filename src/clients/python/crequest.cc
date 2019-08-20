@@ -26,9 +26,6 @@
 
 #include "src/clients/python/crequest.h"
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #include <iostream>
 #include "src/clients/c++/request_grpc.h"
 #include "src/clients/c++/request_http.h"
@@ -398,93 +395,6 @@ SharedMemoryControlContextUnregister(
   }
 
   return new nic::Error(err);
-}
-
-nic::Error*
-CreateSharedMemoryRegion(
-    const char* shm_key, size_t batch_byte_size, int* shm_fd)
-{
-  // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
-    return ErrorNew(
-        ("unable to get shared memory descriptor for: " + std::string(shm_key))
-            .c_str());
-  }
-  // extend shared memory object as by default it's initialized with size 0
-  int res = ftruncate(*shm_fd, batch_byte_size);
-  if (res == -1) {
-    return ErrorNew(
-        ("unable to initialize the size for: " + std::string(shm_key)).c_str());
-  }
-
-  return nullptr;
-}
-
-nic::Error*
-OpenSharedMemoryRegion(const char* shm_key, int* shm_fd)
-{
-  // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key, O_RDWR, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
-    return ErrorNew(
-        ("unable to open the shared memory region: " + std::string(shm_key))
-            .c_str());
-  }
-
-  return nullptr;
-}
-
-nic::Error*
-CloseSharedMemoryRegion(int shm_fd)
-{
-  int tmp = close(shm_fd);
-  if (tmp == -1) {
-    return ErrorNew(
-        ("unable to close the shared memory region: " + std::to_string(shm_fd))
-            .c_str());
-  }
-
-  return nullptr;
-}
-
-nic::Error*
-MapSharedMemory(
-    int shm_fd, size_t offset, size_t batch_byte_size, void** shm_addr)
-{
-  // map shared memory to process address space
-  *shm_addr =
-      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (*shm_addr == MAP_FAILED) {
-    return ErrorNew(
-        ("unable to mmap the shared memory region: " + std::to_string(shm_fd))
-            .c_str());
-  }
-
-  return nullptr;
-}
-
-nic::Error*
-UnlinkSharedMemoryRegion(const char* shm_key)
-{
-  int shm_fd = shm_unlink(shm_key);
-  if (shm_fd == -1) {
-    return ErrorNew(
-        ("unable to unlink the shared memory region: " + std::string(shm_key))
-            .c_str());
-  }
-  return nullptr;
-}
-
-nic::Error*
-UnmapSharedMemory(void* shm_addr, size_t byte_size)
-{
-  int tmp_fd = munmap(shm_addr, byte_size);
-  if (tmp_fd == -1) {
-    return ErrorNew("unable to mmap the shared memory region");
-  }
-
-  return nullptr;
 }
 
 //==============================================================================

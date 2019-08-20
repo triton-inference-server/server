@@ -33,6 +33,14 @@ add_library(crequest SHARED crequest.cc)
 target_link_libraries(
   crequest
   PUBLIC request
+)
+
+#
+# libcshmwrap.so
+#
+add_library(cshmwrap SHARED shared_memory_wrapper.cc)
+target_link_libraries(
+  cshmwrap
   rt
 )
 

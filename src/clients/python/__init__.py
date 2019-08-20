@@ -50,12 +50,14 @@ class _utf8(object):
 import os
 _request_lib = "request" if os.name == 'nt' else 'librequest.so'
 _crequest_lib = "crequest" if os.name == 'nt' else 'libcrequest.so'
-# _cshmwrap_lib = "shmwrap" if os.name == 'nt' else 'libshmwrap.so'
+_cshmwrap_lib = "shmwrap" if os.name == 'nt' else 'libcshmwrap.so'
 _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_lib)
 _request = cdll.LoadLibrary(_request_path)
 _crequest_path = pkg_resources.resource_filename('tensorrtserver.api', _crequest_lib)
 _crequest = cdll.LoadLibrary(_crequest_path)
-# _cshmwrap = cdll.LoadLibrary("libshmwrap.so")
+# _cshmwrap_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _crequest_lib)
+_cshmwrap = cdll.LoadLibrary("/workspace/build/trtis-clients/src/clients/python/libcshmwrap.so")
+# _cshmwrap = cdll.LoadLibrary(_cshmwrap_path)
 
 _crequest_error_new = _crequest.ErrorNew
 _crequest_error_new.restype = c_void_p
@@ -218,29 +220,28 @@ _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
 
-_crequest_create_shared_memory_region = _crequest.CreateSharedMemoryRegion
-_crequest_create_shared_memory_region.restype = c_void_p
-_crequest_create_shared_memory_region.argtypes = [POINTER(c_char_p), c_uint64, POINTER(c_int)]
+_cshmwrap_create_shared_memory_region = _crequest.CreateSharedMemoryRegion
+_cshmwrap_create_shared_memory_region.restype = c_void_p
+_cshmwrap_create_shared_memory_region.argtypes = [POINTER(c_char_p), c_uint64, POINTER(c_int)]
+_cshmwrap_open_shared_memory_region = _crequest.OpenSharedMemoryRegion
+_cshmwrap_open_shared_memory_region.restype = c_void_p
+_cshmwrap_open_shared_memory_region.argtypes = [POINTER(c_char_p), POINTER(c_int)]
+_cshmwrap_close_shared_memory_region = _crequest.CloseSharedMemoryRegion
+_cshmwrap_close_shared_memory_region.restype = c_void_p
+_cshmwrap_close_shared_memory_region.argtypes = [c_uint64]
+_cshmwrap_set_shared_memory_region_data = _crequest.SetSharedMemoryRegionData
+_cshmwrap_set_shared_memory_region_data.restype = c_void_p
+_cshmwrap_set_shared_memory_region_data.argtypes = [c_int, c_uint64, c_uint64, POINTER(c_void_p)]
+_cshmwrap_read_shared_memory_region_data = _crequest.ReadSharedMemoryRegionData
+_cshmwrap_read_shared_memory_region_data.restype = c_void_p
+_cshmwrap_read_shared_memory_region_data.argtypes = [c_int, c_uint64, c_uint64, POINTER(c_void_p)]
+_cshmwrap_unlink_shared_memory_region = _crequest.UnlinkSharedMemoryRegion
+_cshmwrap_unlink_shared_memory_region.restype = c_void_p
+_cshmwrap_unlink_shared_memory_region.argtypes = [POINTER(c_char_p)]
 
-_crequest_open_shared_memory_region = _crequest.OpenSharedMemoryRegion
-_crequest_open_shared_memory_region.restype = c_void_p
-_crequest_open_shared_memory_region.argtypes = [POINTER(c_char_p), POINTER(c_int)]
-
-_crequest_close_shared_memory_region = _crequest.CloseSharedMemoryRegion
-_crequest_close_shared_memory_region.restype = c_void_p
-_crequest_close_shared_memory_region.argtypes = [c_uint64]
-
-_crequest_map_shared_memory_region = _crequest.MapSharedMemory
-_crequest_map_shared_memory_region.restype = c_void_p
-_crequest_map_shared_memory_region.argtypes = [c_int, c_uint64, c_uint64, POINTER(c_void_p)]
-
-_crequest_unlink_shared_memory_region = _crequest.UnlinkSharedMemoryRegion
-_crequest_unlink_shared_memory_region.restype = c_void_p
-_crequest_unlink_shared_memory_region.argtypes = [POINTER(c_char_p)]
-
-_crequest_unmap_shared_memory_region = _crequest.UnmapSharedMemory
-_crequest_unmap_shared_memory_region.restype = c_void_p
-_crequest_unmap_shared_memory_region.argtypes = [c_void_p, c_uint64]
+_cshmwrap_unmap_shared_memory_region = _crequest.UnmapSharedMemory
+_cshmwrap_unmap_shared_memory_region.restype = c_void_p
+_cshmwrap_unmap_shared_memory_region.argtypes = [c_void_p, c_uint64]
 
 def _raise_if_error(err):
     """
@@ -733,8 +734,8 @@ class SharedMemoryControlContext:
         self.close()
 
     def close(self):
-        """Close the context. Any future calls to register() or unregister() will
-        result in an Error.
+        """Close the context. Any future calls to register() or unregister()
+        will result in an Error.
 
         """
         _crequest_shm_control_ctx_del(self._ctx)
@@ -748,12 +749,12 @@ class SharedMemoryControlContext:
         shm_key : str
             The unique key of the shared memory object.
         byte_size : int
-            The size in bytes of the data to be read / written in the shared memory region.
+            The size in bytes of the shared memory region to be created.
 
         Returns
         -------
         shm_fd : int
-            The unique shared memory region descriptor
+            The unique shared memory region identifier.
 
         Raises
         ------
@@ -766,12 +767,12 @@ class SharedMemoryControlContext:
 
         shm_fd = _utf8()
         _raise_if_error(
-            c_int(_crequest_create_shared_memory_region(shm_key, byte_size, byref(shm_fd))))
+            c_int(_cshmwrap_create_shared_memory_region(shm_key, byte_size, byref(shm_fd))))
 
         return shm_fd
 
-    def open_shared_memory_region(self, shm_key, byte_size):
-        """Creates a shared memory region with the specified name and size.
+    def open_shared_memory_region(self, shm_key):
+        """Opens a shared memory region with the specified name.
 
         Parameters
         ----------
@@ -781,7 +782,7 @@ class SharedMemoryControlContext:
         Returns
         -------
         shm_fd : int
-            The unique shared memory region descriptor
+            The unique shared memory region descriptor.
 
         Raises
         ------
@@ -791,17 +792,17 @@ class SharedMemoryControlContext:
 
         shm_fd = _utf8()
         _raise_if_error(
-            c_int(_crequest_open_shared_memory_region(shm_key, byref(shm_fd))))
+            c_int(_cshmwrap_open_shared_memory_region(shm_key, byref(shm_fd))))
 
         return shm_fd
 
     def close_shared_memory_region(self, shm_fd):
-        """Creates a shared memory region with the specified name and size.
+        """Closes a shared memory region with the specified identifier.
 
         Parameters
         ----------
         shm_fd : int
-            The unique shared memory region descriptor
+            The unique shared memory region identifier.
 
         Raises
         ------
@@ -810,43 +811,71 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_crequest_close_shared_memory_region(shm_fd)))
+            c_int(_cshmwrap_close_shared_memory_region(shm_fd)))
         return
 
-    def map_shared_memory_region(self, shm_fd, offset, byte_size):
-        """Creates a shared memory region with the specified name and size.
+    def set_shared_memory_region_data(self, shm_fd, offset, input_values):
+        """Copy the contents of the numpy array into a shared memory region with
+        the specified identifier, offset and size.
 
         Parameters
         ----------
         shm_fd : int
-            The unique shared memory region descriptor
+            The unique shared memory region identifier.
         offset : int
             The offset from the start of the shared shared memory region.
-        byte_size : int
-            The size in bytes of the data to be read / written in the shared memory region.
-
-        Returns
-        -------
-        shm_addr : void*
-            The base address of the shared memory region
+        input_values : void*
+            The pointer to the values in the numpy array to be copied into the
+            shared memory region.
 
         Raises
         ------
         InferenceServerException
-            If unable to mmap the shared memory region.
+            If unable to mmap or set values in the shared memory region.
         """
 
-        if self._ctx is None:
-            _raise_error("SharedMemoryControlContext is closed")
+        if not isinstance(input_values, (np.ndarray,)):
+            _raise_error("input values must be specified as a list of numpy arrays")
 
-        shm_addr = c_void_p()
         _raise_if_error(
-            c_int(_crequest_map_shared_memory_region(shmfd, offset, byte_size, byref(shm_addr))))
+            c_int(_cshmwrap_set_shared_memory_region_data(shm_fd, offset, input_values.nbytes, byref(input_values))))
+        return
 
-        return shm_addr
+    def read_shared_memory_region_data(self, shm_fd, offset, byte_size):
+        """Copy the contents of the numpy array into a shared memory region with
+        the specified identifier, offset and size.
+
+        Parameters
+        ----------
+        shm_fd : int
+            The unique shared memory region identifier.
+        offset : int
+            The offset from the start of the shared shared memory region.
+        byte_size : int
+            The size in bytes of the data to be read from the shared memory region.
+
+        Returns
+        -------
+        output_values : void*
+            The pointer to the values in the numpy array to read from the shared
+            memory region.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to mmap or set values in the shared memory region.
+        """
+
+        if not isinstance(input_values, (np.ndarray,)):
+            _raise_error("input values must be specified as a list of numpy arrays")
+
+        output_values = c_void_p()
+        _raise_if_error(
+            c_int(_cshmwrap_read_shared_memory_region_data(shm_fd, offset, byte_size, byref(output_values))))
+        return
 
     def unlink_shared_memory_region(self, shm_key):
-        """Creates a shared memory region with the specified name and size.
+        """Unlink a shared memory region with the specified name.
 
         Parameters
         ----------
@@ -860,18 +889,18 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_crequest_unlink_shared_memory_region(shm_key)))
+            c_int(_cshmwrap_unlink_shared_memory_region(shm_key)))
         return
 
     def unmap_shared_memory_region(self, shm_addr, byte_size):
-        """Creates a shared memory region with the specified name and size.
+        """Unmap a shared memory region with the specified name and size.
 
         Parameters
         ----------
         shm_addr : void*
-            The base address of the shared memory region
+            The base address of the shared memory region.
         byte_size : int
-            The size in bytes of the data to be read / written in the shared memory region.
+            The size in bytes of the data in the shared memory region.
 
         Raises
         ------
@@ -880,7 +909,7 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_crequest_unmap_shared_memory_region(shm_addr, byte_size)))
+            c_int(_cshmwrap_unmap_shared_memory_region(shm_addr, byte_size)))
         return
 
     def register(self, name, shm_key, offset, byte_size):
@@ -895,7 +924,8 @@ class SharedMemoryControlContext:
         offset : int
             The offset from the start of the shared shared memory region.
         byte_size : int
-            The size in bytes of the data to be read / written in the shared memory region.
+            The size in bytes of the data to be read / written in the shared
+            memory region.
 
         Raises
         ------
