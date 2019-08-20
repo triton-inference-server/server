@@ -364,7 +364,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
     const std::string& name, const std::vector<int64_t>& shape,
     const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
@@ -382,7 +382,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(
+  *cuda_copy |= SetInputBuffer(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
@@ -455,7 +455,7 @@ Status
 NetDefBackend::Context::SetInput(
     const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -482,7 +482,7 @@ NetDefBackend::Context::SetInput(
 
   return SetFixedSizedInputTensor(
       name, shape, dtype, batch1_byte_size, total_byte_size, payloads,
-      input_buffers);
+      input_buffers, cuda_copy);
 }
 
 Status
@@ -539,6 +539,7 @@ NetDefBackend::Context::Run(
   // into the corresponding tensor.
 
   // Inputs from the request...
+  bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
 
@@ -547,7 +548,7 @@ NetDefBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         name, input_config->data_type(), input.dims(), total_batch_size,
-        payloads, &input_buffers));
+        payloads, &input_buffers, &cuda_copy));
   }
 
   // Additional inputs added to the provider...
@@ -560,9 +561,14 @@ NetDefBackend::Context::Run(
           pr.second;
       RETURN_IF_ERROR(SetInput(
           name, override->datatype_, override->dims_, total_batch_size,
-          payloads, &input_buffers));
+          payloads, &input_buffers, &cuda_copy));
     }
   }
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   // Run...
   Caffe2Workspace::Error err = workspace_->Run();
@@ -572,7 +578,7 @@ NetDefBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
-  bool cuda_copy = false;
+  cuda_copy = false;
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
 

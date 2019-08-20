@@ -375,7 +375,7 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
     const int& ip_index, const std::vector<int64_t>& shape,
     const DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
@@ -392,7 +392,7 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(
+  *cuda_copy |= SetInputBuffer(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   RETURN_IF_ERROR(SetInputTensor(
@@ -523,7 +523,7 @@ LibTorchBackend::Context::SetInput(
     std::vector<torch::jit::IValue>* inputs_, const std::string& name,
     const int& ip_index, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -549,7 +549,7 @@ LibTorchBackend::Context::SetInput(
 
   return SetFixedSizedInputTensor(
       inputs_, name, ip_index, shape, datatype, batch1_byte_size,
-      total_byte_size, payloads, input_buffers);
+      total_byte_size, payloads, input_buffers, cuda_copy);
 }
 
 Status
@@ -616,6 +616,7 @@ LibTorchBackend::Context::Run(
   std::vector<torch::Tensor> outputs_;
 
   // Inputs from the request...
+  bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
     int ip_index = input_index_map_[name];
@@ -624,7 +625,7 @@ LibTorchBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         &inputs_, name, ip_index, input_config->data_type(), input.dims(),
-        total_batch_size, payloads, &input_buffers));
+        total_batch_size, payloads, &input_buffers, &cuda_copy));
   }
 
   std::string deliminator = "__";
@@ -654,9 +655,14 @@ LibTorchBackend::Context::Run(
       input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
-          total_batch_size, payloads, &input_buffers));
+          total_batch_size, payloads, &input_buffers, &cuda_copy));
     }
   }
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
@@ -686,7 +692,7 @@ LibTorchBackend::Context::Run(
   }
 
   // Ensure outputs have the expected size and copy it to the payload responses.
-  bool cuda_copy = false;
+  cuda_copy = false;
   for (const auto& name : required_outputs) {
     int op_index = output_index_map_[name];
     const ModelOutput* output_config;
