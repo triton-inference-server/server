@@ -301,15 +301,15 @@ HTTPAPIServer::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  // Can't allocate for any memory type other than CPU.
-  if (memory_type != TRTSERVER_MEMORY_CPU) {
-    LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
-                   << " for " << tensor_name;
-    return nullptr;  // Success
-  }
-
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
+    // Can't allocate for any memory type other than CPU.
+    if (memory_type != TRTSERVER_MEMORY_CPU) {
+      LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
+                    << " for " << tensor_name;
+      return nullptr;  // Success
+    }
+    
     // Reserve requested space in evbuffer...
     struct evbuffer_iovec output_iovec;
     if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=

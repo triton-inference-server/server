@@ -138,8 +138,9 @@ AsyncResources::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  // Can't allocate for any memory type other than CPU.
-  if (memory_type != TRTSERVER_MEMORY_CPU) {
+  // Can't allocate for any memory type other than CPU. If byte size is 0,
+  // proceed regardless of memory type as no allocation is required.
+  if ((memory_type != TRTSERVER_MEMORY_CPU) && (byte_size != 0)) {
     LOG_VERBOSE(1) << "GRPC allocation failed for type " << memory_type
                    << " for " << tensor_name;
     return nullptr;  // Success
