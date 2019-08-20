@@ -84,6 +84,59 @@ CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
   return true;
 }
 
+bool
+CompareDimsWithWildcard(const nvinfer1::Dims& model_dims, const DimsList& dims)
+{
+  if (model_dims.nbDims != dims.size()) {
+    std::cout << "size" << std::endl;
+    return false;
+  }
+
+  for (int i = 0; i < model_dims.nbDims; ++i) {
+    if ((model_dims.d[i] != WILDCARD_DIM) && (dims[i] != WILDCARD_DIM) &&
+        (model_dims.d[i] != dims[i])) {
+      std::cout << "elem" << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void
+DimsToVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)
+{
+  dims->clear();
+  for (int i = 0; i < model_dims.nbDims; ++i) {
+    dims->emplace_back(model_dims.d[i]);
+  }
+}
+
+bool
+DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
+{
+  if (dim_vec.size() > dims->MAX_DIMS) {
+    return false;
+  } else {
+    dims->nbDims = dim_vec.size();
+    for (int i = 0; i < dims->nbDims; ++i) {
+      dims->d[i] = (int)dim_vec[i];
+    }
+  }
+  return true;
+}
+
+bool
+ContainsWildcard(const nvinfer1::Dims& dims)
+{
+  for (int i = 0; i < dims.nbDims; ++i) {
+    if (dims.d[i] == WILDCARD_DIM) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const std::string
 DimsDebugString(const nvinfer1::Dims& dims)
 {
@@ -99,6 +152,51 @@ DimsDebugString(const nvinfer1::Dims& dims)
   }
   str.append("]");
   return str;
+}
+
+const std::string
+DimsDebugString(const std::vector<int64_t>& dims)
+{
+  bool first = true;
+  std::string str;
+  str.append("[");
+  for (uint32_t i = 0; i < dims.size(); ++i) {
+    if (!first) {
+      str.append(",");
+    }
+    str.append(std::to_string(dims[i]));
+    first = false;
+  }
+  str.append("]");
+  return str;
+}
+
+int
+CountElements(const std::vector<int64_t>& dims)
+{
+  if (dims.size() == 0) {
+    return 0;
+  } else {
+    size_t count = 1;
+    for (uint32_t i = 0; i < dims.size(); ++i) {
+      count *= dims[i];
+    }
+    return count;
+  }
+}
+
+int
+CountElements(const DimsList& dims)
+{
+  if (dims.size() == 0) {
+    return 0;
+  } else {
+    size_t count = 1;
+    for (int i = 0; i < dims.size(); ++i) {
+      count *= dims[i];
+    }
+    return count;
+  }
 }
 
 }}  // namespace nvidia::inferenceserver

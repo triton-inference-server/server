@@ -38,6 +38,21 @@ std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 
+bool CompareDimsWithWildcard(
+    const nvinfer1::Dims& model_dims, const DimsList& dims);
+
+void DimsToVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
+
+bool DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
+
+bool ContainsWildcard(const nvinfer1::Dims& dims);
+
 const std::string DimsDebugString(const nvinfer1::Dims& dims);
+
+const std::string DimsDebugString(const std::vector<int64_t>& dims);
+
+int CountElements(const DimsList& dims);
+
+int CountElements(const std::vector<int64_t>& dims);
 
 }}  // namespace nvidia::inferenceserver

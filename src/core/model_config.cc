@@ -290,6 +290,17 @@ CompareDims(const DimsList& dims0, const DimsList& dims1)
 }
 
 bool
+ContainsWildcard(const DimsList& dims)
+{
+  for (int i = 0; i < dims.size(); ++i) {
+    if (dims[i] == WILDCARD_DIM) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool
 CompareDimsWithWildcard(const DimsList& dims0, const DimsList& dims1)
 {
   if (dims0.size() != dims1.size()) {

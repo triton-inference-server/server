@@ -196,6 +196,12 @@ int GetCpuNiceLevel(const ModelConfig& config);
 /// \return True if the shapes are equal, false if not equal.
 bool CompareDims(const DimsList& dims0, const DimsList& dims1);
 
+/// Returns true if the specified dimensions contain the wildcard
+/// \param dims The target dimensions
+/// \return Whether or not the specified dimension contains the
+/// wildcard.
+bool ContainsWildcard(const DimsList& dims);
+
 /// Compare two model configuration shapes for equality. Wildcard
 /// dimensions (that is, dimensions with size WILDCARD_DIM) are
 /// allowed to match with any value. So, a dimension in one shape

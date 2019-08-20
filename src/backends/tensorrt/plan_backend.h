@@ -48,7 +48,8 @@ class PlanBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::vector<char>>& models,
+      const int profile_index);
 
  private:
   // Run model on the context associated with 'runner_idx' to
@@ -64,8 +65,8 @@ class PlanBackend : public InferenceBackend {
   // For each model instance there is a context.
   struct Context : BackendContext {
     Context(
-        const std::string& name, const int gpu_device,
-        const int max_batch_size);
+        const std::string& name, const int gpu_device, const int max_batch_size,
+        const int profile_index);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -86,6 +87,12 @@ class PlanBackend : public InferenceBackend {
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
     bool BuildCudaGraph(const int batch_size);
 
+    Status NormalizeDims(
+        const nvinfer1::Dims& max_dims, const DimsList& dims,
+        std::vector<int64_t>* normalized_dims);
+
+    void InitProfile();
+
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
     // is assigned to this context. A non-OK return status indicates
@@ -98,12 +105,17 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::IRuntime* runtime_;
     nvinfer1::ICudaEngine* engine_;
     nvinfer1::IExecutionContext* context_;
+    int profile_index_;
+    int num_expected_bindings_;
+    int binding_offset_;
+    bool is_dynamic_;
 
     // For each binding index of the TensorRT engine, the size of the
     // corresponding tensor and pointer to the CUDA buffer for the
     // tensor. These are arrays with size equal to number of bindings.
     uint64_t* byte_sizes_;
     void** buffers_;
+    uint64_t* max_elements_cnt_;
 
     // The CUDA graphs captured for the model for different
     // batch-sizes.

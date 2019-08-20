@@ -154,6 +154,16 @@ message ModelInstanceGroup
   //@@     available GPUs.
   //@@
   repeated int32 gpus = 3;
+
+  //@@  .. cpp:var:: int32 optimization_profile_index
+  //@@
+  //@@     For TensorRT Plan models, using inputs with dynamic shape, this
+  //@@     parameter specifies the index of an optimization profile to be set
+  //@@     for this instance group. This index should lie between 0 and
+  //@@     <TotalNumberOfOptimizationProfilesInPlanModel> - 1. This parameter
+  //@@     is ignored for other backends and TensorRT not using dynamic shapes.
+  //@@
+  int32 optimization_profile_index = 5;
 }
 
 //@@
