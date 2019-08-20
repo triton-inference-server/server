@@ -217,6 +217,8 @@ NetDefBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   // Extract input and output names from the config...
   std::vector<std::string> input_names;
   for (const auto& io : Config().input()) {

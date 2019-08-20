@@ -35,6 +35,37 @@ BackendContext::BackendContext(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : name_(name), gpu_device_(gpu_device), max_batch_size_(max_batch_size)
 {
+#ifdef TRTIS_ENABLE_GPU
+  stream_ = nullptr;
+#endif  // TRTIS_ENABLE_GPU
+}
+
+BackendContext::~BackendContext()
+{
+#ifdef TRTIS_ENABLE_GPU
+  if (stream_ != nullptr) {
+    cudaError_t err = cudaStreamDestroy(stream_);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+    stream_ = nullptr;
+  }
+#endif  // TRTIS_ENABLE_GPU
+}
+
+Status
+BackendContext::CreateCudaStream(const int cuda_stream_priority)
+{
+#ifdef TRTIS_ENABLE_GPU
+  auto cuerr = cudaStreamCreateWithPriority(
+      &stream_, cudaStreamDefault, cuda_stream_priority);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL, "unable to create stream for " + name_ +
+                                         ": " + cudaGetErrorString(cuerr));
+  }
+#endif  // TRTIS_ENABLE_GPU
+  return Status::Success;
 }
 
 bool

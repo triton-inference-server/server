@@ -196,6 +196,8 @@ OnnxBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   // Set Onnx session option with proper device
   OrtSessionOptions* session_options;
   RETURN_IF_ORT_ERROR(

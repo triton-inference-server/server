@@ -231,6 +231,8 @@ LibTorchBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   if (gpu_device == Context::NO_GPU_DEVICE) {
     context->device_ = torch::Device(torch::kCPU);
   } else {

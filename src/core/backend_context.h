@@ -47,7 +47,11 @@ struct BackendContext {
   BackendContext(
       const std::string& name, const int gpu_device, const int max_batch_size);
 
-  virtual ~BackendContext() = default;
+  virtual ~BackendContext();
+
+  // Create the CUDA stream for data transfer operations. Have no effect
+  // if GPU support is disabled.
+  Status CreateCudaStream(const int cuda_stream_priority = 0);
 
   // Helper function to batch input data from payloads into 'input_buffer'.
   // 'input_buffer' must be a continuous block that can hold the sum of
@@ -87,8 +91,6 @@ struct BackendContext {
 
 #ifdef TRTIS_ENABLE_GPU
   // The stream where data transfer operations are executed on.
-  // It must be set explicitly after the context instance is created,
-  // the default is nullptr.
   cudaStream_t stream_;
 #endif  // TRTIS_ENABLE_GPU
 };

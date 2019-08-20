@@ -183,6 +183,8 @@ BaseBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   auto graphdef_backend_config =
       std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 

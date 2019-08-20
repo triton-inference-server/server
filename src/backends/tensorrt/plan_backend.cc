@@ -292,13 +292,7 @@ PlanBackend::CreateExecutionContext(
   // Create CUDA stream associated with the execution context
   const int cuda_stream_priority =
       GetCudaStreamPriority(Config().optimization().priority());
-  cuerr = cudaStreamCreateWithPriority(
-      &context->stream_, cudaStreamDefault, cuda_stream_priority);
-  if (cuerr != cudaSuccess) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unable to create stream for " + Name() +
-                                         ": " + cudaGetErrorString(cuerr));
-  }
+  RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
 
   // If enabled, build CUDA graphs for a default set of graph
   // sizes. Graphs are most likely to help for small batch sizes so by
