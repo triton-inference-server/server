@@ -530,7 +530,7 @@ void
 BaseBackend::Context::ReadFixedSizedOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
     const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-    std::vector<Scheduler::Payload>* payloads)
+    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
   // [TODO] use the following statement. Right now we always create
   // output tensor with default constructor that uses CPU allocator
@@ -538,18 +538,9 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
   //                                ? TRTSERVER_MEMORY_CPU
   //                                : TRTSERVER_MEMORY_GPU;
   auto content_memory_type = TRTSERVER_MEMORY_CPU;
-  bool cuda_copy = SetFixedSizeOutputBuffer(
+  *cuda_copy |= SetFixedSizeOutputBuffer(
       output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
       content_memory_type, payloads);
-  if (cuda_copy) {
-#ifdef TRTIS_ENABLE_GPU
-    cudaStreamSynchronize(stream_);
-#else
-    return Status(
-        RequestStatusCode::INTERNAL, "unexpected CUDA copy for output '" +
-                                         name + "' while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
-  }
 }
 
 Status
@@ -681,6 +672,7 @@ BaseBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
+  bool cuda_copy = false;
   TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
   for (const auto& name : model_output_names) {
     const ModelOutput* output_config;
@@ -748,7 +740,7 @@ BaseBackend::Context::Run(
                 std::to_string(batch1_byte_size));
       }
       ReadFixedSizedOutputTensor(
-          output_tensor, name, shapevec, batch1_byte_size, payloads);
+          output_tensor, name, shapevec, batch1_byte_size, payloads, &cuda_copy);
     } else {
       ReadStringOutputTensor(
           output_tensor, name, shapevec, batch1_element_cnt, payloads);
@@ -756,6 +748,12 @@ BaseBackend::Context::Run(
 
     output_tensor_itr = output_tensor_itr->next_;
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }

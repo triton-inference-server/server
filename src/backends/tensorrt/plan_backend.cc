@@ -736,9 +736,14 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
               std::to_string(batch1_byte_size));
     }
 
-    SetFixedSizeOutputBuffer(
+    bool cuda_copy = SetFixedSizeOutputBuffer(
         name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, payloads);
+    if (!cuda_copy) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "no CUDA copy API is called for output '" + name + "'");
+    }
   }
 
   // Wait for the copy-out to complete

@@ -109,8 +109,8 @@ class LibTorchBackend : public InferenceBackend {
     Status ReadFixedSizedOutputTensor(
         std::vector<torch::Tensor>* outputs_, const std::string& name,
         const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-        const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
+        const size_t total_batch_size, const DimsList& dims,
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     Status SetInputTensor(
         std::vector<torch::jit::IValue>* inputs_, const std::string& name,

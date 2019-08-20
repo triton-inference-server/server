@@ -102,7 +102,7 @@ class BaseBackend : public InferenceBackend {
     void ReadFixedSizedOutputTensor(
         TRTISTF_Tensor* tensor, const std::string& output_name,
         const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-        std::vector<Scheduler::Payload>* payloads);
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that

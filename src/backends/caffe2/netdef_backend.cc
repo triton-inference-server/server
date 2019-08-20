@@ -398,7 +398,8 @@ Status
 NetDefBackend::Context::ReadFixedSizedOutputTensor(
     const std::string& name, const Caffe2Workspace::DataType dtype,
     const size_t dtype_byte_size, const size_t total_batch_size,
-    std::vector<Scheduler::Payload>* payloads, const DimsList& dims)
+    const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
+    bool* cuda_copy)
 {
   std::vector<int64_t> content_shape;
   const char* content = nullptr;
@@ -444,19 +445,9 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
   //                                ? TRTSERVER_MEMORY_CPU
   //                                : TRTSERVER_MEMORY_GPU;
   auto content_memory_type = TRTSERVER_MEMORY_CPU;
-  bool cuda_copy = SetFixedSizeOutputBuffer(
+  *cuda_copy |= SetFixedSizeOutputBuffer(
       name, batch1_byte_size, content, content_shape, content_memory_type,
       payloads);
-  if (cuda_copy) {
-#ifdef TRTIS_ENABLE_GPU
-    cudaStreamSynchronize(stream_);
-#else
-    return Status(
-        RequestStatusCode::INTERNAL, "unexpected CUDA copy for output '" +
-                                         name + "' while GPU is not supported");
-#endif  // TRTIS_ENABLE_GPU
-  }
-
   return Status::Success;
 }
 
@@ -581,6 +572,7 @@ NetDefBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.
+  bool cuda_copy = false;
   for (const auto& output : base->Config().output()) {
     const std::string& name = output.name();
 
@@ -598,8 +590,13 @@ NetDefBackend::Context::Run(
 
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         name, dtype, GetDataTypeByteSize(output_config->data_type()),
-        total_batch_size, payloads, output_dims));
+        total_batch_size, output_dims, payloads, &cuda_copy));
   }
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }
