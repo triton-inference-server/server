@@ -430,6 +430,10 @@ CustomBackend::Context::Run(
   int err = ExecuteFn_(
       library_context_handle_, custom_payloads.size(), &custom_payloads[0],
       CustomGetNextInput, CustomGetOutput);
+
+  // After execution, input buffer can be clean up if any
+  input_buffers_.clear();
+
   if (err != 0) {
     return Status(
         RequestStatusCode::INTERNAL, "execute error for '" + name_ + "': (" +
@@ -459,8 +463,25 @@ CustomBackend::Context::GetNextInput(
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
+  // If the memory type is on GPU, implicitly copying it to CPU memory
+  // to ensure backward capability
+  TRTSERVER_Memory_Type src_memory_type;
   Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, false);
+      name, content, content_byte_size, &src_memory_type, false);
+#ifdef TRTIS_ENABLE_GPU
+  if ((status.IsOk()) && (src_memory_type == TRTSERVER_MEMORY_GPU)) {
+    input_buffers_.emplace_back();
+    auto& buffer_unique_ptr = input_buffers_.back();
+    buffer_unique_ptr.reset(new char[*content_byte_size]);
+    cudaError_t err = cudaMemcpyAsync(
+        buffer_unique_ptr.get(), *content, *content_byte_size,
+        cudaMemcpyDeviceToHost, stream_);
+    if (err == cudaSuccess) {
+      *content = buffer_unique_ptr.get();
+    }
+    return (err == cudaSuccess);
+  }
+#endif  // TRTIS_ENABLE_GPU
   return status.IsOk();
 }
 

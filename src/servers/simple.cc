@@ -293,12 +293,12 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input0->name().c_str(), &input0_data[0],
-          input0_data.size() * sizeof(int32_t)),
+          input0_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input1->name().c_str(), &input1_data[0],
-          input1_data.size() * sizeof(int32_t)),
+          input1_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -350,30 +350,44 @@ main(int argc, char** argv)
   // Check the output tensor values...
   const void* output0_content;
   size_t output0_byte_size;
+  TRTSERVER_Memory_Type output0_memory_type;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output0->name().c_str(), &output0_content,
-          &output0_byte_size),
+          &output0_byte_size, &output0_memory_type),
       "getting output0 result");
   if (output0_byte_size != (16 * sizeof(int32_t))) {
     FAIL(
         "unexpected output0 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output0_byte_size));
+  } else if (output0_memory_type != TRTSERVER_MEMORY_CPU) {
+    FAIL(
+        "unexpected output0 memory type, expected to be allocated "
+        "on CPU memory (" +
+        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
+        std::to_string(output0_memory_type) + ")");
   }
 
   const void* output1_content;
   size_t output1_byte_size;
+  TRTSERVER_Memory_Type output1_memory_type;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output1->name().c_str(), &output1_content,
-          &output1_byte_size),
+          &output1_byte_size, &output1_memory_type),
       "getting output1 result");
   if (output1_byte_size != (16 * sizeof(int32_t))) {
     FAIL(
         "unexpected output1 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output1_byte_size));
+  } else if (output1_memory_type != TRTSERVER_MEMORY_CPU) {
+    FAIL(
+        "unexpected output1 memory type, expected to be allocated "
+        "on CPU memory (" +
+        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
+        std::to_string(output1_memory_type) + ")");
   }
 
   const int32_t* output0_result =

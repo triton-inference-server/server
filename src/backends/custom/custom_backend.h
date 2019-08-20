@@ -126,6 +126,8 @@ class CustomBackend : public InferenceBackend {
     CustomFinalizeFn_t FinalizeFn_;
     CustomErrorStringFn_t ErrorStringFn_;
     CustomExecuteFn_t ExecuteFn_;
+
+    std::vector<std::unique_ptr<char[]>> input_buffers_;
   };
 
   std::vector<std::string> server_params_;

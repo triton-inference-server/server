@@ -459,7 +459,8 @@ class InferBaseContext : public BaseContext<LifeCycle, AsyncResources> {
       }
 
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, io.name().c_str(), base, byte_size));
+          request_provider, io.name().c_str(), base, byte_size,
+          TRTSERVER_MEMORY_CPU));
     }
 
     return nullptr;  // success
