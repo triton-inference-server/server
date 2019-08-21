@@ -115,6 +115,19 @@ OptionsImpl::AddClassResult(
 }
 
 Error
+OptionsImpl::AddSharedMemoryResult(
+    const std::shared_ptr<InferContext::Output>& output,
+    const std::string& name, size_t offset, size_t byte_size)
+{
+  outputs_.emplace_back(std::make_pair(
+      output, OutputOptions(
+                  InferContext::Result::ResultFormat::RAW, 0, name, offset,
+                  byte_size)));
+  return Error::Success;
+}
+
+
+Error
 InferContext::Options::Create(std::unique_ptr<InferContext::Options>* options)
 {
   options->reset(new OptionsImpl());
@@ -388,42 +401,16 @@ InputImpl::PrepareForRequest()
 
 //==============================================================================
 
-Error
-OutputImpl::SetSharedMemory(
-    const std::string& name, size_t offset, size_t byte_size)
-{
-  // If SetSharedMemory was called on this output already, return an error
-  if (io_type_ == SHARED_MEMORY) {
-    return Error(
-        RequestStatusCode::INVALID_ARG,
-        "The input '" + Name() + "' can only be set once with SetSharedMemory");
-  }
-
-  shm_name_ = name;
-  shm_offset_ = offset;
-  byte_size_ = byte_size;
-  io_type_ = SHARED_MEMORY;
-  return Error::Success;
-}
-
-Error
-OutputImpl::Reset()
-{
-  io_type_ = NONE;
-  return Error::Success;
-}
-
-//==============================================================================
-
 ResultImpl::ResultImpl(
     const std::shared_ptr<InferContext::Output>& output, uint64_t batch_size)
     : output_(output),
       result_format_(
           reinterpret_cast<OutputImpl*>(output.get())->ResultFormat()),
       batch_size_(batch_size), has_fixed_batch1_byte_size_(false),
-      batch1_byte_size_(0), batch1_element_count_(0), inplace_(false),
-      inplace_ptrs_(batch_size), buffers_(batch_size), bufs_idx_(0),
-      bufs_pos_(batch_size), bufs_byte_size_(batch_size), class_pos_(batch_size)
+      batch1_byte_size_(0), batch1_element_count_(0), use_shm_(false),
+      inplace_(false), inplace_ptrs_(batch_size), buffers_(batch_size),
+      bufs_idx_(0), bufs_pos_(batch_size), bufs_byte_size_(batch_size),
+      class_pos_(batch_size)
 {
 }
 
@@ -445,6 +432,13 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 Error
 ResultImpl::GetRaw(size_t batch_idx, const std::vector<uint8_t>** buf) const
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -476,6 +470,13 @@ Error
 ResultImpl::GetRaw(
     size_t batch_idx, const uint8_t** buf, size_t* byte_size) const
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -506,6 +507,13 @@ Error
 ResultImpl::GetRawAtCursor(
     size_t batch_idx, const uint8_t** buf, size_t adv_byte_size)
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "raw result not available for shared memory output '" +
+            output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -570,6 +578,13 @@ Error
 ResultImpl::GetClassAtCursor(
     size_t batch_idx, InferContext::Result::ClassResult* result)
 {
+  if (use_shm_) {
+    return Error(
+        RequestStatusCode::UNSUPPORTED,
+        "class result not available for shared memory output '" +
+            output_->Name() + "'");
+  }
+
   if (result_format_ != InferContext::Result::ResultFormat::CLASS) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
@@ -594,8 +609,8 @@ ResultImpl::GetClassAtCursor(
   if (class_pos_[batch_idx] >= (size_t)classes.cls().size()) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
-        "attempt to read beyond end of result for output output '" +
-            output_->Name() + "'");
+        "attempt to read beyond end of result for output '" + output_->Name() +
+            "'");
   }
 
   const InferResponseHeader::Output::Class& cls =
@@ -692,6 +707,13 @@ ResultImpl::SetNextRawResult(
   }
 
   inplace_ = inplace;
+
+  // If output uses shared memory then byte size doen't count against response
+  // byte size calculation.
+  if (use_shm_) {
+    *result_bytes = 0;
+    return Error::Success;
+  }
 
   // If output has a known batch1-byte-size (which is the same for
   // every item in the batch) then can directly assign the results to
@@ -886,6 +908,7 @@ Error
 InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 {
   const OptionsImpl& options = reinterpret_cast<const OptionsImpl&>(boptions);
+  shm_outputs_.clear();
 
   // If the model doesn't support batching (i.e. max_batch_size_ == 0)
   // then still allow batch size of 1 to be specified.
@@ -923,6 +946,13 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 
     auto routput = infer_request_.add_output();
     routput->set_name(output->Name());
+    if (!ooptions.shm_name.empty()) {
+      shm_outputs_.push_back(output->Name());
+      auto rshared_memory = routput->mutable_shared_memory();
+      rshared_memory->set_name(ooptions.shm_name);
+      rshared_memory->set_offset(ooptions.shm_offset);
+      rshared_memory->set_byte_size(ooptions.shm_byte_size);
+    }
     if (ooptions.result_format == Result::ResultFormat::CLASS) {
       routput->mutable_cls()->set_count(ooptions.u64);
     }

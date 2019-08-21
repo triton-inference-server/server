@@ -565,29 +565,31 @@ GrpcRequestImpl::InitResult(
     result->SetBatchnByteSize(output.raw().batch_byte_size());
   }
 
-  if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
-    if (grpc_response_->raw_output_size() <= (int)idx) {
-      return Error(
-          RequestStatusCode::INVALID,
-          "Expected RAW output for result '" + output.name() + "'");
-    }
+  if (!result->UsesSharedMemory()) {
+    if (result->ResultFormat() == InferContext::Result::ResultFormat::RAW) {
+      if (grpc_response_->raw_output_size() <= (int)idx) {
+        return Error(
+            RequestStatusCode::INVALID,
+            "Expected RAW output for result '" + output.name() + "'");
+      }
 
-    const std::string& raw_output = grpc_response_->raw_output(idx);
-    const uint8_t* buf = reinterpret_cast<const uint8_t*>(&raw_output[0]);
-    size_t size = raw_output.size();
-    size_t result_bytes = 0;
+      const std::string& raw_output = grpc_response_->raw_output(idx);
+      const uint8_t* buf = reinterpret_cast<const uint8_t*>(&raw_output[0]);
+      size_t size = raw_output.size();
+      size_t result_bytes = 0;
 
-    Error err =
-        result->SetNextRawResult(buf, size, true /* inplace */, &result_bytes);
-    if (!err.IsOk()) {
-      return err;
-    }
+      Error err = result->SetNextRawResult(
+          buf, size, true /* inplace */, &result_bytes);
+      if (!err.IsOk()) {
+        return err;
+      }
 
-    if (result_bytes != size) {
-      return Error(
-          RequestStatusCode::INVALID,
-          "Written bytes doesn't match received bytes for result '" +
-              output.name() + "'");
+      if (result_bytes != size) {
+        return Error(
+            RequestStatusCode::INVALID,
+            "Written bytes doesn't match received bytes for result '" +
+                output.name() + "'");
+      }
     }
   }
 
@@ -629,6 +631,12 @@ GrpcRequestImpl::GetResults(
 
     std::unique_ptr<GrpcResultImpl> result(
         new GrpcResultImpl(grpc_response_, infer_output));
+    if (!ctx.UsesSharedMemory(output.name())) {
+      result->SetUsesSharedMemory(false);
+    } else {
+      result->SetUsesSharedMemory(true);
+    }
+
     err = InitResult(infer_output, output, idx, result.get());
 
     if (!err.IsOk()) {

@@ -221,6 +221,10 @@ class HTTPAPIServer : public HTTPServerImpl {
         "deleting response allocator");
   }
 
+  using EVBufferPair = std::pair<
+      evbuffer*,
+      std::unordered_map<std::string, std::pair<const void*, size_t>>>;
+
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
   // corresponding thread send back the reply
@@ -235,6 +239,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
         void* userp);
     evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
+
+    std::unique_ptr<EVBufferPair> response_pair_;
 
    private:
     evhtp_request_t* req_;
@@ -267,7 +273,9 @@ class HTTPAPIServer : public HTTPServerImpl {
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
-      TRTSERVER_InferenceRequestProvider* request_provider);
+      TRTSERVER_InferenceRequestProvider* request_provider,
+      std::unordered_map<std::string, std::pair<const void*, size_t>>&
+          output_shm_map);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -296,7 +304,10 @@ HTTPAPIServer::ResponseAlloc(
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
 {
-  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp);
+  auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
+  evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
+  const std::unordered_map<std::string, std::pair<const void*, size_t>>&
+      output_shm_map = userp_pair->second;
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
@@ -306,44 +317,60 @@ HTTPAPIServer::ResponseAlloc(
     // Can't allocate for any memory type other than CPU.
     if (memory_type != TRTSERVER_MEMORY_CPU) {
       LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
-                    << " for " << tensor_name;
+                     << " for " << tensor_name;
       return nullptr;  // Success
     }
-    
-    // Reserve requested space in evbuffer...
-    struct evbuffer_iovec output_iovec;
-    if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
-        1) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
-          std::string(
-              "failed to reserve " + std::to_string(byte_size) +
-              " bytes in output tensor buffer")
-              .c_str());
-    }
 
-    if (output_iovec.iov_len < byte_size) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
-          std::string(
-              "reserved " + std::to_string(output_iovec.iov_len) +
-              " bytes in output tensor buffer, need " +
-              std::to_string(byte_size))
-              .c_str());
-    }
+    auto pr = output_shm_map.find(tensor_name);
+    if (pr != output_shm_map.end()) {
+      // check for byte size mismatch
+      if (byte_size != pr->second.second) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "expected buffer size to be " +
+                std::to_string(pr->second.second) + "bytes but gets " +
+                std::to_string(byte_size) + " bytes in output tensor")
+                .c_str());
+      }
 
-    output_iovec.iov_len = byte_size;
-    *buffer = output_iovec.iov_base;
+      *buffer = const_cast<void*>(pr->second.first);
+    } else {
+      // Reserve requested space in evbuffer...
+      struct evbuffer_iovec output_iovec;
+      if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
+          1) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "failed to reserve " + std::to_string(byte_size) +
+                " bytes in output tensor buffer")
+                .c_str());
+      }
 
-    // Immediately commit the buffer space. We are relying on evbuffer
-    // not to relocate this space. Because we request a contiguous
-    // chunk every time (above by allowing only a single entry in
-    // output_iovec), this seems to be a valid assumption.
-    if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
-      *buffer = nullptr;
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
-          "failed to commit output tensors to output buffer");
+      if (output_iovec.iov_len < byte_size) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "reserved " + std::to_string(output_iovec.iov_len) +
+                " bytes in output tensor buffer, need " +
+                std::to_string(byte_size))
+                .c_str());
+      }
+
+      output_iovec.iov_len = byte_size;
+      *buffer = output_iovec.iov_base;
+
+      // Immediately commit the buffer space. We are relying on evbuffer
+      // not to relocate this space. Because we request a contiguous
+      // chunk every time (above by allowing only a single entry in
+      // output_iovec), this seems to be a valid assumption.
+      if (evbuffer_commit_space(evhttp_buffer, &output_iovec, 1) != 0) {
+        *buffer = nullptr;
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            "failed to commit output tensors to output buffer");
+      }
     }
   }
 
@@ -726,7 +753,9 @@ TRTSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
-    TRTSERVER_InferenceRequestProvider* request_provider)
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    std::unordered_map<std::string, std::pair<const void*, size_t>>&
+        output_shm_map)
 {
   // Extract individual input data from HTTP body and register in
   // 'request_provider'. The input data from HTTP body is not
@@ -828,6 +857,23 @@ HTTPAPIServer::EVBufferToInput(
             .c_str());
   }
 
+  // Initialize System Memory for Output if it uses shared memory
+  for (const auto& io : request_header.output()) {
+    if (io.has_shared_memory()) {
+      LOG_VERBOSE(1) << io.name() << " has shared memory";
+      void* base;
+      TRTSERVER_SharedMemoryBlock* smb = nullptr;
+      RETURN_IF_ERR(smb_manager_->Get(&smb, io.shared_memory().name()));
+      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+          server_.get(), smb, io.shared_memory().offset(),
+          io.shared_memory().byte_size(), &base));
+      output_shm_map.emplace(
+          io.name(),
+          std::make_pair(
+              static_cast<const void*>(base), io.shared_memory().byte_size()));
+    }
+  }
+
   return nullptr;  // success
 }
 
@@ -877,15 +923,23 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       &request_provider, server_.get(), model_name.c_str(), model_version,
       request_header_serialized.c_str(), request_header_serialized.size());
   if (err == nullptr) {
+    EVBufferPair* response_pair(new EVBufferPair());
+    // std::map<std::string, std::pair<const void*, size_t>>* output_shm_map =
+    //     new std::map<std::string, std::pair<const void*, size_t>>;
     err = EVBufferToInput(
-        model_name, request_header, req->buffer_in, request_provider);
+        model_name, request_header, req->buffer_in, request_provider,
+        response_pair->second);
     if (err == nullptr) {
       InferRequest* infer_request =
           new InferRequest(req, request_header.id(), server_id_, unique_id);
 
+      response_pair->first = req->buffer_out;
+      infer_request->response_pair_.reset(response_pair);
+      // response_pair->op_shm_map_ = output_shm_map;
+
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider, allocator_,
-          reinterpret_cast<void*>(req->buffer_out), InferRequest::InferComplete,
+          reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
           reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
         delete infer_request;

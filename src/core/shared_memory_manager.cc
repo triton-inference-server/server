@@ -105,8 +105,6 @@ SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  LOG_VERBOSE(1) << "Register() shared memory region: '" << name << "'";
-
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
 
@@ -153,8 +151,6 @@ SharedMemoryManager::RegisterSharedMemory(
 Status
 SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
 {
-  LOG_VERBOSE(1) << "Unregister() shared memory region: '" << name << "'";
-
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
 
@@ -245,7 +241,6 @@ SharedMemoryManager::SharedMemoryAddress(
         "Unable to find shared memory region: '" + name + "'");
   }
 
-  LOG_VERBOSE(1) << "offset from request: " << offset;
   *shm_mapped_addr =
       (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
   return Status::Success;
