@@ -712,15 +712,26 @@ class SharedMemoryControlContext:
     verbose : bool
         If True generate verbose output.
 
+    http_headers : list of strings
+        HTTP headers to send with request. Ignored for GRPC
+        protocol. Each header must be specified as "Header:Value".
+
     """
-    def __init__(self, url, protocol, verbose=False):
+    def __init__(self, url, protocol, verbose=False, http_headers=[]):
         self._last_request_id = 0
         self._ctx = c_void_p()
+
+        if http_headers is None:
+            http_headers = list()
+
+        http_headers_arr = (c_char_p * len(http_headers))()
+        http_headers_arr[:] = http_headers
 
         _raise_if_error(
             c_void_p(
                 _crequest_shm_control_ctx_new(
-                    byref(self._ctx), url, int(protocol), verbose)))
+                    byref(self._ctx), url, int(protocol),
+                    http_headers_arr, len(http_headers), verbose)))
 
     def __del__(self):
         if _crequest_shm_control_ctx_del is not None:
@@ -869,29 +880,16 @@ class SharedMemoryControlContext:
 
         output_base_pointer = c_void_p()
         _raise_if_error(
-            c_int(_cshmwrap_read_shared_memory_region_data(shm_fd, offset, byte_size, byref(output_base_pointer))))
+            c_void_p(_cshmwrap_read_shared_memory_region_data(shm_fd, offset, byte_size, byref(output_base_pointer))))
 
         output_values = list()
-        # result_dtype = self._get_result_numpy_dtype(result)
-        # # Get the shape of each result tensor
-        # max_shape_dims = 16
-        # shape_array = np.zeros(max_shape_dims, dtype=np.int64)
-        # shape_len = c_uint64()
-        # _raise_if_error(
-        #     c_void_p(
-        #         _crequest_infer_ctx_result_shape(
-        #             result, c_uint64(max_shape_dims),
-        #             shape_array, byref(shape_len))))
-        # shape = np.resize(shape_array, shape_len.value).tolist()
-        shape = shape.tolist() # numoy to list
-
         for b in range(batch_size):
             # Get the result value into a 1-dim np array
             # of the appropriate type
             cval = output_base_pointer
             cval_len = byte_size
 
-            val_buf = cast(cval, POINTER(c_byte * cval_len.value))[0]
+            val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
 
             # If the result is not a string datatype
             # then convert directly. Otherwise parse
@@ -915,6 +913,9 @@ class SharedMemoryControlContext:
                 val = np.array(strs, dtype=object)
 
             # Reshape the result to the appropriate shape
+            # output_val = np.copy(val)
+            # del val
+            # del val_buf
             shaped = np.reshape(np.copy(val), shape)
             output_values.append(shaped)
 
@@ -935,7 +936,7 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_cshmwrap_unlink_shared_memory_region(shm_key)))
+            c_void_p(_cshmwrap_unlink_shared_memory_region(shm_key)))
         return
 
     def unmap_shared_memory_region(self, shm_addr, byte_size):
@@ -955,7 +956,7 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_cshmwrap_unmap_shared_memory_region(shm_addr, byte_size)))
+            c_void_p(_cshmwrap_unmap_shared_memory_region(shm_addr, byte_size)))
         return
 
     def register(self, name, shm_key, offset, byte_size):
@@ -1006,7 +1007,7 @@ class SharedMemoryControlContext:
             _raise_error("SharedMemoryControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, model_name)))
+            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, name)))
         return
 
     def get_last_request_id(self):
@@ -1386,8 +1387,19 @@ class InferContext:
                             classes.append((cidx.value, cprob.value, label))
                         results[output_name].append(classes)
                 elif (isinstance(output_format, (list, tuple)) and
-                      (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 4)):
-                      continue
+                    (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 4)):
+                    # Get the shape of each result tensor
+                    max_shape_dims = 16
+                    shape_array = np.zeros(max_shape_dims, dtype=np.int64)
+                    shape_len = c_uint64()
+                    _raise_if_error(
+                        c_void_p(
+                            _crequest_infer_ctx_result_shape(
+                                result, c_uint64(max_shape_dims),
+                                shape_array, byref(shape_len))))
+                    shape = np.resize(shape_array, shape_len.value).tolist()
+                    results[output_name].append(result_dtype)
+                    results[output_name].append(shape)
                 else:
                     _raise_error("unrecognized output format")
             finally:

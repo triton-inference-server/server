@@ -106,7 +106,6 @@ SetSharedMemoryRegionData(
 
   memcpy(shm_addr, data, batch_byte_size);
 
-  // memcpy(shm_addr, reinterpret_cast<const uint8_t*>(data), byte_size);
   return nullptr;
 }
 
@@ -145,7 +144,7 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
 {
   int tmp_fd = munmap(shm_addr, byte_size);
   if (tmp_fd == -1) {
-    return ErrorNew("unable to mmap the shared memory region");
+    return ErrorNew("unable to munmap the shared memory region");
   }
 
   return nullptr;
