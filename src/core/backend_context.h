@@ -47,7 +47,11 @@ struct BackendContext {
   BackendContext(
       const std::string& name, const int gpu_device, const int max_batch_size);
 
-  virtual ~BackendContext() = default;
+  virtual ~BackendContext();
+
+  // Create the CUDA stream for data transfer operations. Have no effect
+  // if GPU support is disabled.
+  Status CreateCudaStream(const int cuda_stream_priority = 0);
 
   // Helper function to batch input data from payloads into 'input_buffer'.
   // 'input_buffer' must be a continuous block that can hold the sum of
@@ -61,10 +65,18 @@ struct BackendContext {
       TRTSERVER_Memory_Type dst_memory_type, char* input_buffer);
 
   // Helper function to set output buffer of fixed size data type to payloads
-  void SetFixedSizeOutputBuffer(
+  // Return true if cudaMemcpyAsync is called, and the caller should call
+  // cudaStreamSynchronize before using the data. Otherwise, return false.
+  bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
       const char* content, const std::vector<int64_t>& content_shape,
+      TRTSERVER_Memory_Type src_memory_type,
       std::vector<Scheduler::Payload>* payloads);
+
+  Status CopyBuffer(
+      const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
+      const TRTSERVER_Memory_Type dst_memory_type, const size_t byte_size,
+      const void* src, void* dst, bool* cuda_used);
 
   // Name of the model instance
   std::string name_;
@@ -78,8 +90,7 @@ struct BackendContext {
   int max_batch_size_;
 
 #ifdef TRTIS_ENABLE_GPU
-  // The stream where data transfer operations are executed.
-  // nullptr if the context is created on CPU.
+  // The stream where data transfer operations are executed on.
   cudaStream_t stream_;
 #endif  // TRTIS_ENABLE_GPU
 };

@@ -86,7 +86,7 @@ class LibTorchBackend : public InferenceBackend {
         const int& ip_index, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
+        std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -103,14 +103,14 @@ class LibTorchBackend : public InferenceBackend {
         const int& ip_index, const std::vector<int64_t>& shape,
         const DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
+        std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
         std::vector<torch::Tensor>* outputs_, const std::string& name,
         const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-        const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
+        const size_t total_batch_size, const DimsList& dims,
+        std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
     Status SetInputTensor(
         std::vector<torch::jit::IValue>* inputs_, const std::string& name,

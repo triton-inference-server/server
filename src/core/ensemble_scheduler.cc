@@ -276,20 +276,20 @@ EnsembleContext::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
+  auto allocated_buffer = std::make_shared<AllocatedSystemMemory>(
+                              byte_size, memory_type);
+  
   TRTSERVER_Memory_Type allocated_memory_type;
-  auto it = tensor_data_map
-                ->emplace(
-                    tensor_name, std::make_shared<AllocatedSystemMemory>(
-                                     byte_size, memory_type))
-                .first;
-  if (byte_size > 0) {
-    *buffer =
-        static_cast<void*>(it->second->MutableBuffer(&allocated_memory_type));
+  auto mutable_buffer = allocated_buffer->MutableBuffer(&allocated_memory_type);
+  if ((mutable_buffer != nullptr) || (byte_size == 0)) {
+    if (byte_size != 0) {
+      *buffer =static_cast<void*>(mutable_buffer);
+    }
+    tensor_data_map->emplace(tensor_name, std::move(allocated_buffer));
+    LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name
+                   << ", size " << byte_size << ", addr " << *buffer
+                   << ", memory type " << allocated_memory_type;
   }
-
-  LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name << ", size "
-                 << byte_size << ", addr " << *buffer << ", memory type "
-                 << allocated_memory_type;
 
   return nullptr;  // Success
 }
@@ -604,13 +604,26 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       shape.push_back(dim);
     }
 
-    // [TODO] modify this to use the whole "request for allocation" procedure
-    // after output may be allocated on non-CPU
-    // https://github.com/NVIDIA/tensorrt-inference-server/pull/559
-    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_CPU;
+    
+    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_GPU;
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
-        output_pair.first, &buffer, expected_byte_size, shape));
+        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
+    
+    // Done with this output if 'expected_byte_size' is 0
+    if (expected_byte_size == 0) {
+      continue;
+    } else if (buffer == nullptr) {
+      dst_memory_type = TRTSERVER_MEMORY_CPU;
+      RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
+        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
+      if (buffer == nullptr) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "all attempts to allocate buffer for output '" + output_pair.first +
+                "' failed");
+      }
+    }
 
     size_t content_offset = 0;
     size_t content_idx = 0;
