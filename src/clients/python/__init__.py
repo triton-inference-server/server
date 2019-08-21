@@ -221,7 +221,7 @@ _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_
 
 _cshmwrap_create_shared_memory_region = _cshmwrap.CreateSharedMemoryRegion
 _cshmwrap_create_shared_memory_region.restype = c_void_p
-_cshmwrap_create_shared_memory_region.argtypes = [POINTER(c_char_p), c_uint64, POINTER(c_int)]
+_cshmwrap_create_shared_memory_region.argtypes = [_utf8, c_uint64, POINTER(c_int)]
 _cshmwrap_open_shared_memory_region = _cshmwrap.OpenSharedMemoryRegion
 _cshmwrap_open_shared_memory_region.restype = c_void_p
 _cshmwrap_open_shared_memory_region.argtypes = [POINTER(c_char_p), POINTER(c_int)]
@@ -764,9 +764,9 @@ class SharedMemoryControlContext:
         if self._ctx is None:
             _raise_error("SharedMemoryControlContext is closed")
 
-        shm_fd = _utf8()
+        shm_fd = c_int()
         _raise_if_error(
-            c_int(_cshmwrap_create_shared_memory_region(shm_key, byte_size, byref(shm_fd))))
+            c_void_p(_cshmwrap_create_shared_memory_region(shm_key, byte_size, byref(shm_fd))))
 
         return shm_fd
 
@@ -789,9 +789,9 @@ class SharedMemoryControlContext:
             If unable to open the shared memory region.
         """
 
-        shm_fd = _utf8()
+        shm_fd = c_int()
         _raise_if_error(
-            c_int(_cshmwrap_open_shared_memory_region(shm_key, byref(shm_fd))))
+            c_void_p(_cshmwrap_open_shared_memory_region(shm_key, byref(shm_fd))))
 
         return shm_fd
 
@@ -810,7 +810,7 @@ class SharedMemoryControlContext:
         """
 
         _raise_if_error(
-            c_int(_cshmwrap_close_shared_memory_region(shm_fd)))
+            c_void_p(_cshmwrap_close_shared_memory_region(shm_fd)))
         return
 
     def set_shared_memory_region_data(self, shm_fd, offset, input_values):
@@ -836,8 +836,11 @@ class SharedMemoryControlContext:
         if not isinstance(input_values, (np.ndarray,)):
             _raise_error("input values must be specified as a list of numpy arrays")
 
+        input_values = np.ascontiguousarray(input_values)
         _raise_if_error(
-            c_int(_cshmwrap_set_shared_memory_region_data(shm_fd, offset, input_values.nbytes, byref(input_values))))
+            c_void_p(_cshmwrap_set_shared_memory_region_data(shm_fd, offset,
+                c_uint64(input_values.size * input_values.itemsize),
+                input_values.ctypes.data_as(c_void_p))))
         return
 
     def read_shared_memory_region_data(self, shm_fd, offset, byte_size, result_dtype, shape, batch_size):
@@ -1166,13 +1169,19 @@ class InferContext:
         for inp_name, inp in inputs.items():
             if not isinstance(inp, (list, tuple)):
                 _raise_error("input '" + inp_name +
-                             "' values must be specified as a list of numpy arrays \
-                              or list of tuples representing location in shared memory")
-            for ip in inp:
-                if not isinstance(ip, (np.ndarray, tuple)):
-                    _raise_error("input '" + inp_name +
-                                 "' values must be specified as a list of numpy arrays \
-                                 or list of tuples representing location in shared memory")
+                             "' values must be specified as a list of numpy arrays" \
+                             " or list of tuples representing location in shared memory")
+            if isinstance(inp[0], (np.ndarray,)):
+                for ip in inp:
+                    if not isinstance(ip, (np.ndarray, tuple)):
+                        _raise_error("input '" + inp_name +
+                                     "' values must be specified as a list of numpy arrays" \
+                                     " or list of tuples representing location in shared memory")
+            else:
+                if (len(inp) != 3) or (type(inp[0]) != str) \
+                    or (type(inp[1]) != int) or (type(inp[2]) != int):
+                    _raise_error("shared memory requires tuple of size 3" \
+                        + " - shm_key (string), offset (int), size (int)")
         # Set run options using formats specified in 'outputs'
         options = c_void_p()
         try:
@@ -1220,14 +1229,14 @@ class InferContext:
                 if len(input_values) > 0:
                     if isinstance(input_values[0], (np.ndarray,)):
                         shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
-                    _raise_if_error(
-                        c_void_p(
-                            _crequest_infer_ctx_input_set_shape(
-                                   input, shape_value, c_uint64(shape_value.size))))
+                        _raise_if_error(
+                            c_void_p(
+                                _crequest_infer_ctx_input_set_shape(
+                                       input, shape_value, c_uint64(shape_value.size))))
 
-                for input_value in input_values:
-                    # use values if numpy array, reference if shared memory
-                    if isinstance(input_value, (np.ndarray,)):
+               # # use values if numpy array, reference if shared memory
+                if isinstance(input_values[0], (np.ndarray,)):
+                    for input_value in input_values:
                         # If the input tensor is empty then avoid going
                         # through the more complicated logic since
                         # creating the buffer for string objects results
@@ -1265,16 +1274,12 @@ class InferContext:
                                     _crequest_infer_ctx_input_set_raw(
                                         input, input_value.ctypes.data_as(c_void_p),
                                         c_uint64(input_value.size * input_value.itemsize))))
-                    else:
-                        if len(input_value) != 3 or (type(input_value[0]) != str) \
-                            or (type(input_value[1]) != int) or (type(input_value[2]) != int):
-                            _raise_error("shared memory requires tuple of size 3" \
-                                + " - shm_key (string), offset (int), size (int)")
-                        _raise_if_error(
-                            c_void_p(
-                                _crequest_infer_ctx_input_set_shared_memory(
-                                    input, input_value[0], c_uint64(input_value[1]),
-                                    c_uint64(input_value[2]))))
+                else:
+                    _raise_if_error(
+                        c_void_p(
+                            _crequest_infer_ctx_input_set_shared_memory(
+                                input, input_values[0], c_uint64(input_values[1]),
+                                c_uint64(input_values[2]))))
 
             finally:
                 _crequest_infer_ctx_input_del(input)
@@ -1380,6 +1385,9 @@ class InferContext:
                             label = None if clabel.value is None else clabel.value.decode('utf-8')
                             classes.append((cidx.value, cprob.value, label))
                         results[output_name].append(classes)
+                elif (isinstance(output_format, (list, tuple)) and
+                      (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 4)):
+                      continue
                 else:
                     _raise_error("unrecognized output format")
             finally:

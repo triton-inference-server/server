@@ -76,6 +76,7 @@ if __name__ == '__main__':
     infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
                              http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
+    print("checkpoint 1")
     # Create the shared memory control context
     shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, verbose=FLAGS.verbose)
 
@@ -87,6 +88,7 @@ if __name__ == '__main__':
     input_byte_size = input0_data.nbytes
     output_byte_size = input_byte_size
 
+    print("checkpoint 2")
     # Create Output0 and Output1 in Shared Memory
     shm_key = "/output_simple"
     shm_fd_op = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
