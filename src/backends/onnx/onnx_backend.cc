@@ -38,7 +38,7 @@
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
-#include <cuda_provider_factory.h>
+#include <core/providers/cuda/cuda_provider_factory.h>
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
