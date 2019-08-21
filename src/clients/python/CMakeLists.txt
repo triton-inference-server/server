@@ -41,6 +41,7 @@ target_link_libraries(
 add_library(cshmwrap SHARED shared_memory_wrapper.cc)
 target_link_libraries(
   cshmwrap
+  request
   rt
 )
 
@@ -79,6 +80,7 @@ install(
     simple_client.py
     simple_callback_client.py
     simple_string_client.py
+    simple_shm_client.py
     simple_sequence_client.py
   DESTINATION python
 )

@@ -58,10 +58,14 @@ function main() {
       "${WHLDIR}/tensorrtserver/api/."
     cp ../c++/librequest.so \
       "${WHLDIR}/tensorrtserver/api/."
+    cp libcshmwrap.so \
+      "${WHLDIR}/tensorrtserver/api/."
   else
     cp Release/crequest.dll \
       "${WHLDIR}/tensorrtserver/api/."
     cp ../c++/Release/request.dll \
+      "${WHLDIR}/tensorrtserver/api/."
+    cp Release/cshmwrap.dll \
       "${WHLDIR}/tensorrtserver/api/."
   fi
 

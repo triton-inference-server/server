@@ -55,9 +55,9 @@ _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_l
 _request = cdll.LoadLibrary(_request_path)
 _crequest_path = pkg_resources.resource_filename('tensorrtserver.api', _crequest_lib)
 _crequest = cdll.LoadLibrary(_crequest_path)
-# _cshmwrap_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _crequest_lib)
-_cshmwrap = cdll.LoadLibrary("/workspace/build/trtis-clients/src/clients/python/libcshmwrap.so")
-# _cshmwrap = cdll.LoadLibrary(_cshmwrap_path)
+_cshmwrap_path = pkg_resources.resource_filename('tensorrtserver.api', _cshmwrap_lib)
+# _cshmwrap = cdll.LoadLibrary("/workspace/build/trtis-clients/src/clients/python/libcshmwrap.so")
+_cshmwrap = cdll.LoadLibrary(_cshmwrap_path)
 
 _crequest_error_new = _crequest.ErrorNew
 _crequest_error_new.restype = c_void_p
@@ -115,8 +115,7 @@ _crequest_model_control_ctx_unload.argtypes = [c_void_p, _utf8]
 
 _crequest_shm_control_ctx_new = _crequest.SharedMemoryControlContextNew
 _crequest_shm_control_ctx_new.restype = c_void_p
-_crequest_shm_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int,
-                                     POINTER(c_char_p), c_int, c_bool]
+_crequest_shm_control_ctx_new.argtypes = [POINTER(c_void_p), _utf8, c_int, c_bool]
 _crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
 _crequest_shm_control_ctx_del.argtypes = [c_void_p]
 _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
@@ -220,26 +219,26 @@ _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
 
-_cshmwrap_create_shared_memory_region = _crequest.CreateSharedMemoryRegion
+_cshmwrap_create_shared_memory_region = _cshmwrap.CreateSharedMemoryRegion
 _cshmwrap_create_shared_memory_region.restype = c_void_p
 _cshmwrap_create_shared_memory_region.argtypes = [POINTER(c_char_p), c_uint64, POINTER(c_int)]
-_cshmwrap_open_shared_memory_region = _crequest.OpenSharedMemoryRegion
+_cshmwrap_open_shared_memory_region = _cshmwrap.OpenSharedMemoryRegion
 _cshmwrap_open_shared_memory_region.restype = c_void_p
 _cshmwrap_open_shared_memory_region.argtypes = [POINTER(c_char_p), POINTER(c_int)]
-_cshmwrap_close_shared_memory_region = _crequest.CloseSharedMemoryRegion
+_cshmwrap_close_shared_memory_region = _cshmwrap.CloseSharedMemoryRegion
 _cshmwrap_close_shared_memory_region.restype = c_void_p
 _cshmwrap_close_shared_memory_region.argtypes = [c_uint64]
-_cshmwrap_set_shared_memory_region_data = _crequest.SetSharedMemoryRegionData
+_cshmwrap_set_shared_memory_region_data = _cshmwrap.SetSharedMemoryRegionData
 _cshmwrap_set_shared_memory_region_data.restype = c_void_p
 _cshmwrap_set_shared_memory_region_data.argtypes = [c_int, c_uint64, c_uint64, POINTER(c_void_p)]
-_cshmwrap_read_shared_memory_region_data = _crequest.ReadSharedMemoryRegionData
+_cshmwrap_read_shared_memory_region_data = _cshmwrap.ReadSharedMemoryRegionData
 _cshmwrap_read_shared_memory_region_data.restype = c_void_p
 _cshmwrap_read_shared_memory_region_data.argtypes = [c_int, c_uint64, c_uint64, POINTER(c_void_p)]
-_cshmwrap_unlink_shared_memory_region = _crequest.UnlinkSharedMemoryRegion
+_cshmwrap_unlink_shared_memory_region = _cshmwrap.UnlinkSharedMemoryRegion
 _cshmwrap_unlink_shared_memory_region.restype = c_void_p
 _cshmwrap_unlink_shared_memory_region.argtypes = [POINTER(c_char_p)]
 
-_cshmwrap_unmap_shared_memory_region = _crequest.UnmapSharedMemory
+_cshmwrap_unmap_shared_memory_region = _cshmwrap.UnmapSharedMemory
 _cshmwrap_unmap_shared_memory_region.restype = c_void_p
 _cshmwrap_unmap_shared_memory_region.argtypes = [c_void_p, c_uint64]
 

@@ -77,8 +77,7 @@ if __name__ == '__main__':
                              http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
     # Create the shared memory control context
-    shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol,
-                             http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, verbose=FLAGS.verbose)
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -113,7 +112,7 @@ if __name__ == '__main__':
                              'OUTPUT1' : (InferContext.ResultFormat.RAW, "output_data", output_byte_size, output_byte_size) },
                            batch_size)
 
-    # Read output from shared memory ([TODO] Convert return buffer to numpy array of respective datatype)
+    # Read output from shared memory ([TODO] Convert return buffer to numpy array of respective datat)
     output0_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, 0, output_byte_size)
     output1_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, output_byte_size, output_byte_size)
 
