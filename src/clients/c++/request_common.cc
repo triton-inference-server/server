@@ -419,13 +419,6 @@ ResultImpl::GetRawShape(std::vector<int64_t>* shape) const
 {
   shape->clear();
 
-  if (use_shm_) {
-    return Error(
-        RequestStatusCode::UNSUPPORTED,
-        "raw shape not available for shared memory output '" + output_->Name() +
-            "'");
-  }
-
   if (result_format_ != InferContext::Result::ResultFormat::RAW) {
     return Error(
         RequestStatusCode::UNSUPPORTED,
