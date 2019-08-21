@@ -366,8 +366,13 @@ AddClassResults(
 //
 InferResponseProvider::InferResponseProvider(
     const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider)
-    : request_header_(request_header), label_provider_(label_provider)
+    const std::shared_ptr<LabelProvider>& label_provider,
+    TRTSERVER_ResponseAllocator* allocator,
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    : request_header_(request_header), label_provider_(label_provider),
+      allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
+      release_fn_(release_fn)
 {
   // Create a map from output name to the InferRequestHeader::Output
   // object for that output.
@@ -399,38 +404,6 @@ InferResponseProvider::OutputBufferContents(
   return Status(
       RequestStatusCode::UNAVAILABLE,
       "request for unallocated output '" + name + "'");
-}
-
-Status
-InferResponseProvider::CheckAndSetIfBufferedOutput(
-    const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape, Output** output)
-{
-  const auto& pr = output_map_.find(name);
-  if (pr == output_map_.end()) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
-  }
-
-  outputs_.emplace_back();
-  Output* loutput = &(outputs_.back());
-  loutput->name_ = name;
-  loutput->shape_ = content_shape;
-  loutput->cls_count_ = 0;
-  loutput->ptr_ = nullptr;
-  loutput->byte_size_ = content_byte_size;
-
-  if (pr->second.has_cls()) {
-    loutput->cls_count_ = pr->second.cls().count();
-    char* buffer = new char[content_byte_size];
-    *content = static_cast<void*>(buffer);
-    loutput->ptr_ = static_cast<void*>(buffer);
-    loutput->buffer_.reset(buffer);
-  }
-
-  *output = loutput;
-
-  return Status::Success;
 }
 
 bool
@@ -609,28 +582,24 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   return Status::Success;
 }
 
-//
-// DelegatingInferResponseProvider
-//
 Status
-DelegatingInferResponseProvider::Create(
+InferResponseProvider::Create(
     const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-    std::shared_ptr<DelegatingInferResponseProvider>* infer_provider)
+    std::shared_ptr<InferResponseProvider>* infer_provider)
 {
-  DelegatingInferResponseProvider* provider =
-      new DelegatingInferResponseProvider(
-          request_header, label_provider, allocator, alloc_fn, alloc_userp,
-          release_fn);
+  InferResponseProvider* provider = new InferResponseProvider(
+      request_header, label_provider, allocator, alloc_fn, alloc_userp,
+      release_fn);
   infer_provider->reset(provider);
 
   return Status::Success;
 }
 
-DelegatingInferResponseProvider::~DelegatingInferResponseProvider()
+InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
     if (output.release_buffer_ != nullptr) {
@@ -647,19 +616,19 @@ DelegatingInferResponseProvider::~DelegatingInferResponseProvider()
 }
 
 const InferResponseHeader&
-DelegatingInferResponseProvider::ResponseHeader() const
+InferResponseProvider::ResponseHeader() const
 {
   return response_header_;
 }
 
 InferResponseHeader*
-DelegatingInferResponseProvider::MutableResponseHeader()
+InferResponseProvider::MutableResponseHeader()
 {
   return &response_header_;
 }
 
 Status
-DelegatingInferResponseProvider::AllocateOutputBuffer(
+InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape,
     const TRTSERVER_Memory_Type preferred_memory_type)
