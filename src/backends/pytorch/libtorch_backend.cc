@@ -26,7 +26,6 @@
 
 #include "src/backends/pytorch/libtorch_backend.h"
 
-#include <c10/cuda/CUDACachingAllocator.h>
 #include <stdint.h>
 #include <exception>
 #include "src/core/constants.h"
@@ -37,6 +36,7 @@
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
+#include <c10/cuda/CUDACachingAllocator.h>
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
@@ -52,7 +52,9 @@ LibTorchBackend::Context::Context(
 LibTorchBackend::Context::~Context()
 {
   torch_model_.reset();
+#ifdef TRTIS_ENABLE_GPU
   c10::cuda::CUDACachingAllocator::emptyCache();
+#endif  // TRTIS_ENABLE_GPU
   LOG_VERBOSE(1) << "~LibTorchBackend::Context ";
 }
 
@@ -231,6 +233,8 @@ LibTorchBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   if (gpu_device == Context::NO_GPU_DEVICE) {
     context->device_ = torch::Device(torch::kCPU);
   } else {
@@ -371,7 +375,7 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
     const int& ip_index, const std::vector<int64_t>& shape,
     const DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
@@ -388,7 +392,7 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  SetInputBuffer(
+  *cuda_copy |= SetInputBuffer(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   RETURN_IF_ERROR(SetInputTensor(
@@ -430,8 +434,8 @@ Status
 LibTorchBackend::Context::ReadFixedSizedOutputTensor(
     std::vector<torch::Tensor>* outputs_, const std::string& name,
     const int& op_index, const DataType dtype, const size_t dtype_byte_size,
-    const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    const DimsList& dims)
+    const size_t total_batch_size, const DimsList& dims,
+    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
   std::vector<int64_t> content_shape;
   void* content = nullptr;
@@ -468,43 +472,11 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
             std::to_string(batch1_byte_size));
   }
 
-  size_t content_offset = 0;
-
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    // If 'payload' requested this output then copy it from 'content'. If it
-    // did not request this output then just skip it in the 'content'.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(name)) {
-      void* buffer;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape);
-      if (status.IsOk()) {
-        if (device_ == torch::kCPU) {
-          memcpy(buffer, (char*)content + content_offset, expected_byte_size);
-        } else {
-#ifdef TRTIS_ENABLE_GPU
-          cudaMemcpy(
-              buffer, (char*)content + content_offset, expected_byte_size,
-              cudaMemcpyDeviceToHost);
-#else
-          return Status(
-              RequestStatusCode::INTERNAL, "GPU instances not supported");
-#endif  // TRTIS_ENABLE_GPU
-        }
-      }
-
-      if (!status.IsOk()) {
-        payload.status_ = status;
-      }
-    }
-
-    content_offset += expected_byte_size;
-  }
+  auto content_memory_type =
+      (device_ == torch::kCPU) ? TRTSERVER_MEMORY_CPU : TRTSERVER_MEMORY_GPU;
+  *cuda_copy |= SetFixedSizeOutputBuffer(
+      name, batch1_byte_size, (char*)content, content_shape,
+      content_memory_type, payloads);
 
   return Status::Success;
 }
@@ -551,7 +523,7 @@ LibTorchBackend::Context::SetInput(
     std::vector<torch::jit::IValue>* inputs_, const std::string& name,
     const int& ip_index, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers)
+    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -577,7 +549,7 @@ LibTorchBackend::Context::SetInput(
 
   return SetFixedSizedInputTensor(
       inputs_, name, ip_index, shape, datatype, batch1_byte_size,
-      total_byte_size, payloads, input_buffers);
+      total_byte_size, payloads, input_buffers, cuda_copy);
 }
 
 Status
@@ -644,6 +616,7 @@ LibTorchBackend::Context::Run(
   std::vector<torch::Tensor> outputs_;
 
   // Inputs from the request...
+  bool cuda_copy = false;
   for (const auto& input : input_request_provider->RequestHeader().input()) {
     const std::string& name = input.name();
     int ip_index = input_index_map_[name];
@@ -652,7 +625,7 @@ LibTorchBackend::Context::Run(
 
     RETURN_IF_ERROR(SetInput(
         &inputs_, name, ip_index, input_config->data_type(), input.dims(),
-        total_batch_size, payloads, &input_buffers));
+        total_batch_size, payloads, &input_buffers, &cuda_copy));
   }
 
   std::string deliminator = "__";
@@ -682,9 +655,14 @@ LibTorchBackend::Context::Run(
       input_index_map_[name] = ip_index;
       RETURN_IF_ERROR(SetInput(
           &inputs_, name, ip_index, override->datatype_, override->dims_,
-          total_batch_size, payloads, &input_buffers));
+          total_batch_size, payloads, &input_buffers, &cuda_copy));
     }
   }
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
@@ -714,6 +692,7 @@ LibTorchBackend::Context::Run(
   }
 
   // Ensure outputs have the expected size and copy it to the payload responses.
+  cuda_copy = false;
   for (const auto& name : required_outputs) {
     int op_index = output_index_map_[name];
     const ModelOutput* output_config;
@@ -732,8 +711,14 @@ LibTorchBackend::Context::Run(
     RETURN_IF_ERROR(ReadFixedSizedOutputTensor(
         &outputs_, name, op_index, dtype,
         GetDataTypeByteSize(output_config->data_type()), total_batch_size,
-        payloads, output_dims));
+        output_dims, payloads, &cuda_copy));
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }

@@ -84,7 +84,7 @@ class NetDefBackend : public InferenceBackend {
         const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
         std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
+        std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy);
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -100,13 +100,14 @@ class NetDefBackend : public InferenceBackend {
         const std::string& input_name, const std::vector<int64_t>& shape,
         const Caffe2Workspace::DataType dtype, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<char[]>>* input_buffers);
+        std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
         const std::string& name, const Caffe2Workspace::DataType dtype,
         const size_t dtype_byte_size, const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads, const DimsList& dims);
+        const DimsList& dims, std::vector<Scheduler::Payload>* payloads,
+        bool* cuda_copy);
 
     // Caffe2 workspace.
     std::unique_ptr<Caffe2Workspace> workspace_;

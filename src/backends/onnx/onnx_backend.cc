@@ -196,6 +196,8 @@ OnnxBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   Context* context = contexts_.back().get();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   // Set Onnx session option with proper device
   OrtSessionOptions* session_options;
   RETURN_IF_ORT_ERROR(
@@ -685,6 +687,7 @@ OnnxBackend::Context::ReadOutputTensors(
     const std::vector<const char*>& output_names,
     std::vector<Scheduler::Payload>* payloads)
 {
+  bool cuda_copy = false;
   for (size_t idx = 0; idx < output_names.size(); idx++) {
     std::string name = std::string(output_names[idx]);
 
@@ -755,10 +758,21 @@ OnnxBackend::Context::ReadOutputTensors(
       RETURN_IF_ORT_ERROR(
           OrtGetTensorMutableData(output_tensor, (void**)&content));
 
-      SetFixedSizeOutputBuffer(
-          name, batch1_byte_size, content, content_shape, payloads);
+      // [TODO] currently ONNX output data are always on CPU
+      // https://github.com/microsoft/onnxruntime/issues/1621
+      auto content_memory_type = TRTSERVER_MEMORY_CPU;
+      cuda_copy |= SetFixedSizeOutputBuffer(
+          name, batch1_byte_size, content, content_shape, content_memory_type,
+          payloads);
     }
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
+
   return Status::Success;
 }
 

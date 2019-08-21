@@ -183,6 +183,8 @@ BaseBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   auto graphdef_backend_config =
       std::static_pointer_cast<GraphDefBackendFactory::Config>(backend_config);
 
@@ -389,51 +391,6 @@ SetStringInputTensor(
 }
 
 void
-ReadFixedSizedOutputTensor(
-    TRTISTF_Tensor* tensor, const std::string& output_name,
-    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
-    std::vector<Scheduler::Payload>* payloads)
-{
-  size_t tensor_copy_offset = 0;
-
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_byte_size =
-        request_header.batch_size() * batch1_byte_size;
-
-    // If 'payload' requested this output then copy it from the
-    // GPU. If it did not request this output then just skip it in
-    // the output buffer.
-    if ((payload.response_provider_ != nullptr) &&
-        payload.response_provider_->RequiresOutput(output_name)) {
-      void* content = nullptr;
-      Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, expected_byte_size, shape);
-      if (!status.IsOk()) {
-        payload.status_ = status;
-      } else {
-        if ((tensor_copy_offset + expected_byte_size) >
-            TRTISTF_TensorDataByteSize(tensor)) {
-          payload.status_ = Status(
-              RequestStatusCode::INVALID_ARG,
-              "unexpected size " +
-                  std::to_string(tensor_copy_offset + expected_byte_size) +
-                  " for inference output '" + output_name + "', expecting " +
-                  std::to_string(TRTISTF_TensorDataByteSize(tensor)));
-        } else {
-          memcpy(
-              content, TRTISTF_TensorData(tensor) + tensor_copy_offset,
-              expected_byte_size);
-        }
-      }
-    }
-
-    tensor_copy_offset += expected_byte_size;
-  }
-}
-
-void
 ReadStringOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
     const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
@@ -569,6 +526,23 @@ BaseBackend::Context::SetFixedSizedInputTensor(
       input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 }
 
+void
+BaseBackend::Context::ReadFixedSizedOutputTensor(
+    TRTISTF_Tensor* tensor, const std::string& output_name,
+    const std::vector<int64_t>& shape, const size_t batch1_byte_size,
+    std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
+{
+  // [TODO] use the following statement. Right now we always create
+  // output tensor with default constructor that uses CPU allocator
+  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
+  //                                ? TRTSERVER_MEMORY_CPU
+  //                                : TRTSERVER_MEMORY_GPU;
+  auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  *cuda_copy |= SetFixedSizeOutputBuffer(
+      output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
+      content_memory_type, payloads);
+}
+
 Status
 BaseBackend::Context::Run(
     const BaseBackend* base, std::vector<Scheduler::Payload>* payloads)
@@ -698,6 +672,7 @@ BaseBackend::Context::Run(
 
   // Make sure each output is of the expected size and copy it into
   // the appropriate response providers.
+  bool cuda_copy = false;
   TRTISTF_TensorList* output_tensor_itr = output_tensors.get();
   for (const auto& name : model_output_names) {
     const ModelOutput* output_config;
@@ -755,8 +730,17 @@ BaseBackend::Context::Run(
     if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
       const size_t batch1_byte_size =
           batch1_element_cnt * TRTISTF_TensorDataTypeByteSize(output_tensor);
+      if ((batch1_byte_size * total_batch_size) !=
+          TRTISTF_TensorDataByteSize(output_tensor)) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected size for output '" + name + "', byte-size " +
+                std::to_string(TRTISTF_TensorDataByteSize(output_tensor)) +
+                " does not equal " + std::to_string(total_batch_size) + " * " +
+                std::to_string(batch1_byte_size));
+      }
       ReadFixedSizedOutputTensor(
-          output_tensor, name, shapevec, batch1_byte_size, payloads);
+          output_tensor, name, shapevec, batch1_byte_size, payloads, &cuda_copy);
     } else {
       ReadStringOutputTensor(
           output_tensor, name, shapevec, batch1_element_cnt, payloads);
@@ -764,6 +748,12 @@ BaseBackend::Context::Run(
 
     output_tensor_itr = output_tensor_itr->next_;
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }
