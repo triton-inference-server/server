@@ -156,22 +156,22 @@ AsyncResources::ResponseAlloc(
   // that the number and order of raw output entries equals the output
   // meta-data.
   std::string* raw_output = response->add_raw_output();
-  auto pr = output_shm_map.find(tensor_name);
-  if (pr != output_shm_map.end()) {
-    // check for byte size mismatch
-    if (byte_size != pr->second.second) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INTERNAL,
-          std::string(
-              "expected buffer size to be " +
-              std::to_string(pr->second.second) + "bytes but gets " +
-              std::to_string(byte_size) + " bytes in output tensor")
-              .c_str());
-    }
+  if (byte_size > 0) {
+    auto pr = output_shm_map.find(tensor_name);
+    if (pr != output_shm_map.end()) {
+      // check for byte size mismatch
+      if (byte_size != pr->second.second) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "expected buffer size to be " +
+                std::to_string(pr->second.second) + "bytes but gets " +
+                std::to_string(byte_size) + " bytes in output tensor")
+                .c_str());
+      }
 
-    *buffer = const_cast<void*>(pr->second.first);
-  } else {
-    if (byte_size > 0) {
+      *buffer = const_cast<void*>(pr->second.first);
+    } else {
       raw_output->resize(byte_size);
       *buffer = static_cast<void*>(&((*raw_output)[0]));
     }

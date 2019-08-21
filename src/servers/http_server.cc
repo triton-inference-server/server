@@ -312,15 +312,15 @@ HTTPAPIServer::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  // Can't allocate for any memory type other than CPU.
-  if (memory_type != TRTSERVER_MEMORY_CPU) {
-    LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
-                   << " for " << tensor_name;
-    return nullptr;  // Success
-  }
+  // Don't need to do anything if no memory was requested.
+  if (byte_size > 0) {
+    // Can't allocate for any memory type other than CPU.
+    if (memory_type != TRTSERVER_MEMORY_CPU) {
+      LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
+                     << " for " << tensor_name;
+      return nullptr;  // Success
+    }
 
-
-  if (!output_shm_map.empty()) {
     auto pr = output_shm_map.find(tensor_name);
     if (pr != output_shm_map.end()) {
       // check for byte size mismatch
@@ -335,10 +335,7 @@ HTTPAPIServer::ResponseAlloc(
       }
 
       *buffer = const_cast<void*>(pr->second.first);
-    }
-  } else {
-    // Don't need to do anything if no memory was requested.
-    if (byte_size > 0) {
+    } else {
       // Reserve requested space in evbuffer...
       struct evbuffer_iovec output_iovec;
       if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
