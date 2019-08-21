@@ -104,8 +104,8 @@ more information about running the inference server)::
   $ docker run -it --rm --net=host tensorrtserver_client
 
 In the tensorrtserver_client image you can find the example
-executables in /workspace/build/trtis-clients/install/bin, and the
-Python examples in /workspace/build/trtis-clients/install/python. A
+executables in /workspace/install/bin, and the
+Python examples in /workspace/install/python. A
 tar file containing all the library and example binaries and Python
 scripts is at /workspace/v<version>.clients.tar.gz.
 
