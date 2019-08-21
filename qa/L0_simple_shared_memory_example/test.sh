@@ -45,14 +45,19 @@ RET=0
 
 set +e
 
-# Run with shared memory only for input for now
-$SIMPLE_SHM_CLIENT -I -v >>client_c++.log 2>&1
+# Run using shared memory for both inputs and outputs (GRPC then HTTP)
+$SIMPLE_SHM_CLIENT -i grpc -u localhost:8001 -v >>client_c++.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "localhost:8000" client_c++.log` != "7" ]; then
-    echo -e "\n***\n*** Failed. Expected 7 Host:localhost:8000 headers for C++ client\n***"
+$SIMPLE_SHM_CLIENT -v >>client_c++.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c "localhost:8000" client_c++.log` != "9" ]; then
+    echo -e "\n***\n*** Failed. Expected 9 Host: localhost:8000 headers for C++ client\n***"
     RET=1
 fi
 
