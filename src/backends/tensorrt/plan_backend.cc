@@ -707,6 +707,7 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
   // For each requested output verify that the output can accept the
   // actual model output and then copy that output from the GPU
+  bool cuda_copy = false;
   for (int bindex = 0; bindex < engine_->getNbBindings(); ++bindex) {
     if (engine_->bindingIsInput(bindex)) {
       continue;
@@ -736,18 +737,15 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
               std::to_string(batch1_byte_size));
     }
 
-    bool cuda_copy = SetFixedSizeOutputBuffer(
+    cuda_copy |= SetFixedSizeOutputBuffer(
         name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, payloads);
-    if (!cuda_copy) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "no CUDA copy API is called for output '" + name + "'");
-    }
   }
 
   // Wait for the copy-out to complete
-  cudaStreamSynchronize(stream_);
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
   return Status::Success;
 }
 
