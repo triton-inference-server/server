@@ -111,7 +111,8 @@ SetSharedMemoryRegionData(
 }
 
 nic::Error*
-ReadSharedMemoryRegionData(int shm_fd, size_t offset, size_t batch_byte_size, const void** data)
+ReadSharedMemoryRegionData(
+    int shm_fd, size_t offset, size_t batch_byte_size, const void** data)
 {
   // map shared memory to process address space
   void* shm_addr =

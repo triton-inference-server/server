@@ -184,7 +184,7 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 
 _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_input_set_shared_memory.argtypes = [_utf8, c_uint64, c_uint64]
+_crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, _utf8, c_uint64, c_uint64]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -841,7 +841,7 @@ class SharedMemoryControlContext:
             c_int(_cshmwrap_set_shared_memory_region_data(shm_fd, offset, input_values.nbytes, byref(input_values))))
         return
 
-    def read_shared_memory_region_data(self, shm_fd, offset, byte_size):
+    def read_shared_memory_region_data(self, shm_fd, offset, byte_size, result_dtype, shape, batch_size):
         """Copy the contents of the numpy array into a shared memory region with
         the specified identifier, offset and size.
 
@@ -856,9 +856,8 @@ class SharedMemoryControlContext:
 
         Returns
         -------
-        output_values : void*
-            The pointer to the values in the numpy array to read from the shared
-            memory region.
+        output_values : list
+            The list of numpy arrays read from the shared memory region.
 
         Raises
         ------
@@ -866,13 +865,58 @@ class SharedMemoryControlContext:
             If unable to mmap or set values in the shared memory region.
         """
 
-        if not isinstance(input_values, (np.ndarray,)):
-            _raise_error("input values must be specified as a list of numpy arrays")
-
-        output_values = c_void_p()
+        output_base_pointer = c_void_p()
         _raise_if_error(
-            c_int(_cshmwrap_read_shared_memory_region_data(shm_fd, offset, byte_size, byref(output_values))))
-        return
+            c_int(_cshmwrap_read_shared_memory_region_data(shm_fd, offset, byte_size, byref(output_base_pointer))))
+
+        output_values = list()
+        # result_dtype = self._get_result_numpy_dtype(result)
+        # # Get the shape of each result tensor
+        # max_shape_dims = 16
+        # shape_array = np.zeros(max_shape_dims, dtype=np.int64)
+        # shape_len = c_uint64()
+        # _raise_if_error(
+        #     c_void_p(
+        #         _crequest_infer_ctx_result_shape(
+        #             result, c_uint64(max_shape_dims),
+        #             shape_array, byref(shape_len))))
+        # shape = np.resize(shape_array, shape_len.value).tolist()
+        shape = shape.tolist() # numoy to list
+
+        for b in range(batch_size):
+            # Get the result value into a 1-dim np array
+            # of the appropriate type
+            cval = output_base_pointer
+            cval_len = byte_size
+
+            val_buf = cast(cval, POINTER(c_byte * cval_len.value))[0]
+
+            # If the result is not a string datatype
+            # then convert directly. Otherwise parse
+            # 'val_buf' into an array of strings and
+            # from that into a numpy array of string
+            # objects.
+            if result_dtype != np.object:
+                val = np.frombuffer(val_buf, dtype=result_dtype)
+            else:
+                # String results contain a 4-byte
+                # string length followed by the actual
+                # string characters.
+                strs = list()
+                offset = 0
+                while offset < len(val_buf):
+                    l = struct.unpack_from("<I", val_buf, offset)[0]
+                    offset += 4
+                    sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
+                    offset += l
+                    strs.append(sb)
+                val = np.array(strs, dtype=object)
+
+            # Reshape the result to the appropriate shape
+            shaped = np.reshape(np.copy(val), shape)
+            output_values.append(shaped)
+
+        return output_values
 
     def unlink_shared_memory_region(self, shm_key):
         """Unlink a shared memory region with the specified name.
@@ -1137,17 +1181,17 @@ class InferContext:
                 _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
-                if output_format == InferContext.ResultFormat.RAW \
-                    and isinstance(output_format, (list, tuple)) and len(output_format) == 3:
-                    if (type(output_format[0]) != str) or (type(output_format[1]) != int) \
-                        or (type(output_format[2]) != int):
-                        _raise_error("shared memory requires tuple of size 3" \
-                            + " - shm_key (string), offset (int), size (int)")
+                if len(output_format) == 4 and isinstance(output_format, (list, tuple)):
+                    if output_format[0] != InferContext.ResultFormat.RAW \
+                    or (type(output_format[1]) != str) or (type(output_format[2]) != int) \
+                        or (type(output_format[3]) != int):
+                        _raise_error("shared memory requires tuple of size 4" \
+                            + " - output_format(RAW), shm_key (string), offset (int), size (int)")
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_shared_memory(
-                                self._ctx, options, output_name, output_format[0], c_uint64(output_format[1]),
-                                c_uint64(output_format[2]))))
+                                self._ctx, options, output_name, output_format[1], c_uint64(output_format[2]),
+                                c_uint64(output_format[3]))))
                 elif output_format == InferContext.ResultFormat.RAW:
                     _raise_if_error(
                         c_void_p(
