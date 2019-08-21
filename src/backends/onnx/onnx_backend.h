@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <onnxruntime_c_api.h>
+#include <core/session/onnxruntime_c_api.h>
 #include "src/core/backend.h"
 #include "src/core/backend_context.h"
 #include "src/core/model_config.pb.h"
