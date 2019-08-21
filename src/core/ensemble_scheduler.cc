@@ -34,10 +34,6 @@
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -73,7 +69,7 @@ class EnsembleContext {
       const std::shared_ptr<ModelInferStats>& stats,
       const std::shared_ptr<InferRequestProvider>& request_provider,
       const std::shared_ptr<InferResponseProvider>& response_provider,
-      std::function<void(const Status&)> OnComplete);
+      std::function<void(const Status&)> OnComplete, cudaStream_t stream);
 
   // Perform transition on 'context' state given the information of
   // 'completed_step'
@@ -144,6 +140,10 @@ class EnsembleContext {
 
   EnsembleInfo* info_;
 
+  // All EnsembleContext will use the same CUDA stream managed by
+  // the ensemble scheduler
+  cudaStream_t stream_;
+
   // Mutex to avoid concurrent call on 'PrepareSteps' where ensemble state
   // are being modified
   std::mutex mutex_;
@@ -183,9 +183,9 @@ EnsembleContext::EnsembleContext(
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
-    std::function<void(const Status&)> OnComplete)
-    : is_(is), info_(info), inflight_step_counter_(0), stats_(stats),
-      request_provider_(request_provider),
+    std::function<void(const Status&)> OnComplete, cudaStream_t stream)
+    : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
+      stats_(stats), request_provider_(request_provider),
       response_provider_(response_provider), OnComplete_(OnComplete),
       allocator_(nullptr, TRTSERVER_ResponseAllocatorDelete)
 {
@@ -567,6 +567,7 @@ EnsembleContext::FinishEnsemble()
 Status
 EnsembleContext::CheckAndSetEnsembleOutput()
 {
+  bool cuda_async_copy = false;
   for (const auto& output_pair : info_->ensemble_output_shape_) {
     if (!response_provider_->RequiresOutput(output_pair.first)) {
       continue;
@@ -646,9 +647,20 @@ EnsembleContext::CheckAndSetEnsembleOutput()
         } else {
           copy_type = cudaMemcpyDeviceToHost;
         }
-        // [TODO] create stream for EnsembleContext for using async call
-        cudaError_t err = cudaMemcpy(
-            ((char*)buffer) + content_offset, content, content_size, copy_type);
+
+        cudaError_t err;
+        // use default stream if no CUDA stream is created for the ensemble
+        if (stream_ == nullptr) {
+          err = cudaMemcpy(
+              ((char*)buffer) + content_offset, content, content_size,
+              copy_type);
+        } else {
+          err = cudaMemcpyAsync(
+              ((char*)buffer) + content_offset, content, content_size,
+              copy_type, stream_);
+          cuda_async_copy |= (err == cudaSuccess);
+        }
+
         if (err != cudaSuccess) {
           return Status(
               RequestStatusCode::INTERNAL,
@@ -657,9 +669,9 @@ EnsembleContext::CheckAndSetEnsembleOutput()
         }
 #else
         return Status(
-                RequestStatusCode::INTERNAL,
-                "try to use CUDA copy for output '" + output_pair.first +
-                  "' while GPU is not supported"));
+            RequestStatusCode::INTERNAL, "try to use CUDA copy for output '" +
+                                             output_pair.first +
+                                             "' while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
       }
 
@@ -669,6 +681,17 @@ EnsembleContext::CheckAndSetEnsembleOutput()
           memory_block->BufferAt(content_idx, &content_size, &src_memory_type);
     }
   }
+
+  if (cuda_async_copy) {
+#ifdef TRTIS_ENABLE_GPU
+    cudaStreamSynchronize(stream_);
+#else
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected CUDA copy flag set while GPU is not supported");
+#endif  // TRTIS_ENABLE_GPU
+  }
+
   return Status::Success;
 }
 
@@ -729,15 +752,25 @@ EnsembleScheduler::Enqueue(
     std::function<void(const Status&)> OnComplete)
 {
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
-      is_, info_.get(), stats, request_provider, response_provider,
-      OnComplete));
+      is_, info_.get(), stats, request_provider, response_provider, OnComplete,
+      stream_));
   EnsembleContext::Proceed(context);
 }
 
 EnsembleScheduler::EnsembleScheduler(
     InferenceServer* const server, const ModelConfig& config)
-    : is_(server)
+    : is_(server), stream_(nullptr)
 {
+#ifdef TRTIS_ENABLE_GPU
+  // create CUDA stream
+  auto cuerr = cudaStreamCreate(&stream_);
+  if (cuerr != cudaSuccess) {
+    stream_ = nullptr;
+    LOG_ERROR << "unable to create stream for " << config.name() << ": "
+              << cudaGetErrorString(cuerr);
+  }
+#endif  // TRTIS_ENABLE_GPU
+
   // Set 'info_' based on 'config'
   info_.reset(new EnsembleInfo());
 
@@ -781,6 +814,18 @@ EnsembleScheduler::EnsembleScheduler(
           std::make_pair(pair.first, pair.second));
     }
   }
+}
+
+EnsembleScheduler::~EnsembleScheduler()
+{
+#ifdef TRTIS_ENABLE_GPU
+  if (stream_ != nullptr) {
+    cudaError_t err = cudaStreamDestroy(stream_);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "Failed to destroy cuda stream: " << cudaGetErrorString(err);
+    }
+  }
+#endif  // TRTIS_ENABLE_GPU
 }
 
 }}  // namespace nvidia::inferenceserver
