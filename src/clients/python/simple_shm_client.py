@@ -76,7 +76,6 @@ if __name__ == '__main__':
     infer_ctx = InferContext(FLAGS.url, protocol, model_name, model_version,
                              http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
-    print("checkpoint 1")
     # Create the shared memory control context
     shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
@@ -88,7 +87,6 @@ if __name__ == '__main__':
     input_byte_size = input0_data.nbytes
     output_byte_size = input_byte_size
 
-    print("checkpoint 2")
     # Create Output0 and Output1 in Shared Memory
     shm_key = "/output_simple"
     shm_fd_op = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
@@ -100,8 +98,7 @@ if __name__ == '__main__':
     shm_fd_ip = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
 
     # Put input data values into shared memory
-    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, input0_data)
-    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, input1_data)
+    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, np.append(input0_data, input1_data))
 
     # Register Input shared memory with TRTIS
     shared_memory_ctx.register("input_data", "/input_simple", 0, input_byte_size * 2)
@@ -117,23 +114,22 @@ if __name__ == '__main__':
 
     # Read output from shared memory
     # [TODO] Fix segfault caused due to read and incorrect results
-    # output0_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, 0, output_byte_size, results['OUTPUT0'][0], results['OUTPUT0'][1], batch_size)
-    # print(output0_data)
+    output0_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, 0, output_byte_size, results['OUTPUT0'][0], results['OUTPUT0'][1], batch_size)[0]
     # output1_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, output_byte_size, output_byte_size, results['OUTPUT1'][0], results['OUTPUT1'][1], batch_size)
     # print(output1_data)
 
-    # # We expect there to be 2 results (each with batch-size 1). Walk
-    # # over all 16 result elements and print the sum and difference
-    # # calculated by the model.
-    # for i in range(16):
-    #     print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
-    #     print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
-    #     if (input0_data[i] + input1_data[i]) != output0_data[i]:
-    #         print("error: incorrect sum");
-    #         sys.exit(1);
-    #     if (input0_data[i] - input1_data[i]) != output1_data[i]:
-    #         print("error: incorrect difference");
-    #         sys.exit(1);
+    # We expect there to be 2 results (each with batch-size 1). Walk
+    # over all 16 result elements and print the sum and difference
+    # calculated by the model.
+    for i in range(16):
+        print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
+        # print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
+        if (input0_data[i] + input1_data[i]) != output0_data[i]:
+            print("error: incorrect sum");
+            sys.exit(1);
+        # if (input0_data[i] - input1_data[i]) != output1_data[i]:
+        #     print("error: incorrect difference");
+        #     sys.exit(1);
 
     shared_memory_ctx.unregister("input_data")
     shared_memory_ctx.unregister("output_data")

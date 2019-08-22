@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "src/clients/python/shared_memory_wrapper.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -99,9 +100,10 @@ SetSharedMemoryRegionData(
   void* shm_addr =
       mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if (shm_addr == MAP_FAILED) {
-    return ErrorNew(
-        ("unable to mmap the shared memory region: " + std::to_string(shm_fd))
-            .c_str());
+    return ErrorNew(("unable to set/mmap the shared memory region: " +
+                     std::to_string(shm_fd) +
+                     ", errno: " + std::to_string(errno))
+                        .c_str());
   }
 
   memcpy(shm_addr, data, batch_byte_size);
@@ -111,18 +113,16 @@ SetSharedMemoryRegionData(
 
 nic::Error*
 ReadSharedMemoryRegionData(
-    int shm_fd, size_t offset, size_t batch_byte_size, const void* data)
+    int shm_fd, size_t offset, size_t batch_byte_size, const void** shm_addr)
 {
   // map shared memory to process address space
-  void* shm_addr =
-      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (shm_addr == MAP_FAILED) {
-    return ErrorNew(
-        ("unable to mmap the shared memory region: " + std::to_string(shm_fd))
-            .c_str());
+  *shm_addr =
+      mmap(NULL, batch_byte_size, PROT_READ, MAP_SHARED, shm_fd, offset);
+  if (*shm_addr == MAP_FAILED) {
+    return ErrorNew(("unable to read/mmap the shared memory region: " +
+                     std::to_string(shm_fd))
+                        .c_str());
   }
-
-  memcpy(const_cast<void*>(data), shm_addr, batch_byte_size);
 
   return nullptr;
 }
