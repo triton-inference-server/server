@@ -28,6 +28,7 @@
 
 #include <stdint.h>
 #include <exception>
+#include <memory>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_cuda.h"
@@ -375,13 +376,18 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
     const int& ip_index, const std::vector<int64_t>& shape,
     const DataType dtype, const size_t batch1_byte_size,
     const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    bool* cuda_copy)
 {
   // The entire input tensor must be delivered as a single
   // contiguous chunk so create a buffer large enough to hold the
   // entire dynamic batched input.
-  input_buffers->emplace_back(new char[total_byte_size]);
-  char* buffer = input_buffers->back().get();
+  auto memory_type = (gpu_device_ == NO_GPU_DEVICE) ? TRTSERVER_MEMORY_CPU
+                                                    : TRTSERVER_MEMORY_GPU;
+  input_buffers->emplace_back();
+  input_buffers->back().reset(
+      new AllocatedSystemMemory(total_byte_size, memory_type));
+  char* buffer = input_buffers->back()->MutableBuffer(&memory_type);
 
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
@@ -392,12 +398,12 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+  *cuda_copy |=
+      SetInputBuffer(name, expected_byte_sizes, payloads, memory_type, buffer);
 
   RETURN_IF_ERROR(SetInputTensor(
       inputs_, name, ip_index, shape, dtype, static_cast<char*>(buffer),
-      total_byte_size));
+      total_byte_size, memory_type));
   return Status::Success;
 }
 
@@ -405,7 +411,8 @@ Status
 LibTorchBackend::Context::SetInputTensor(
     std::vector<torch::jit::IValue>* inputs_, const std::string& name,
     const int& ip_index, const std::vector<int64_t>& shape,
-    const DataType dtype, char* content, size_t byte_size)
+    const DataType dtype, char* content, const size_t byte_size,
+    const TRTSERVER_Memory_Type memory_type)
 {
   const auto pr = ConvertDataTypeToTorchType(dtype);
   if (!pr.first) {
@@ -414,8 +421,11 @@ LibTorchBackend::Context::SetInputTensor(
                                          DataType_Name(dtype) +
                                          "' to Torch datatype");
   }
-
-  torch::Tensor input_tensor = torch::from_blob(content, shape, pr.second);
+  torch::TensorOptions options{pr.second};
+  auto updated_options = options.device(
+      (memory_type == TRTSERVER_MEMORY_CPU) ? torch::kCPU : torch::kCUDA);
+  torch::Tensor input_tensor =
+      torch::from_blob(content, shape, updated_options);
   input_tensor = input_tensor.to(device_);
 
   if (input_tensor.nbytes() != byte_size) {
@@ -523,7 +533,8 @@ LibTorchBackend::Context::SetInput(
     std::vector<torch::jit::IValue>* inputs_, const std::string& name,
     const int& ip_index, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<char[]>>* input_buffers, bool* cuda_copy)
+    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+    bool* cuda_copy)
 {
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
@@ -603,7 +614,7 @@ LibTorchBackend::Context::Run(
 
   // Hold reference to each buffer of input data to that it stays
   // until the inference has completed.
-  std::vector<std::unique_ptr<char[]>> input_buffers;
+  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
 
   size_t overide_inputs = 0;
   if (input_override_map != nullptr) {
