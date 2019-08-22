@@ -49,7 +49,7 @@ struct Step {
 
   std::shared_ptr<InferenceBackend> backend_;
   std::shared_ptr<InferRequestProvider> request_provider_;
-  std::shared_ptr<DelegatingInferResponseProvider> response_provider_;
+  std::shared_ptr<InferResponseProvider> response_provider_;
   std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>
       output_map_;
   Status infer_status_;
@@ -504,7 +504,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
       &((*step)->request_provider_)));
   // Request header is stored in response provider as reference, so use
   // header from request provider as the providers have same lifetime
-  RETURN_IF_ERROR(DelegatingInferResponseProvider::Create(
+  RETURN_IF_ERROR(InferResponseProvider::Create(
       (*step)->request_provider_->RequestHeader(),
       (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
       &((*step)->output_map_), ResponseRelease,
