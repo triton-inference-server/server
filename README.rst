@@ -35,3 +35,9 @@ NVIDIA TensorRT Inference Server
     during stabilization.**
 
 .. overview-begin-marker-do-not-remove
+
+.. overview-end-marker-do-not-remove
+
+.. |License| image:: https://img.shields.io/badge/License-BSD3-lightgrey.svg
+   :target: https://opensource.org/licenses/BSD-3-Clause
+   
