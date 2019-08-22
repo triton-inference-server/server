@@ -31,6 +31,7 @@ import numpy as np
 import os
 from builtins import range
 from tensorrtserver.api import *
+from ctypes import *
 
 FLAGS = None
 
@@ -91,6 +92,9 @@ if __name__ == '__main__':
     shm_key = "/output_simple"
     shm_fd_op = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
 
+    # Get base address of shared memory region
+    shm_ptr = shared_memory_ctx.map_shared_memory_region(shm_fd_op, 0, output_byte_size)
+
     # Register Output shared memory with TRTIS
     shared_memory_ctx.register("output_data", "/output_simple", 0, output_byte_size * 2)
 
@@ -107,30 +111,26 @@ if __name__ == '__main__':
     # both output tensors.
     results = infer_ctx.run({ 'INPUT0' : ("input_data", 0, input_byte_size),
                              'INPUT1' : ("input_data", input_byte_size, input_byte_size), },
-                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, "output_data", 0, output_byte_size),
-                             'OUTPUT1' : (InferContext.ResultFormat.RAW, "output_data", output_byte_size, output_byte_size) },
+                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, ["output_data", shm_ptr], 0, output_byte_size),
+                             'OUTPUT1' : (InferContext.ResultFormat.RAW, ["output_data", shm_ptr], output_byte_size, output_byte_size) },
                            batch_size)
-    print(results)
 
     # Read output from shared memory
-    # [TODO] Fix segfault caused due to read and incorrect results
-    output0_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, 0, output_byte_size, results['OUTPUT0'][0], results['OUTPUT0'][1], batch_size)[0]
-    # output1_data = shared_memory_ctx.read_shared_memory_region_data(shm_fd_op, output_byte_size, output_byte_size, results['OUTPUT1'][0], results['OUTPUT1'][1], batch_size)
-    # print(output1_data)
+    output0_data = results['OUTPUT0'][0]
+    output1_data = results['OUTPUT1'][0]
 
     # We expect there to be 2 results (each with batch-size 1). Walk
     # over all 16 result elements and print the sum and difference
     # calculated by the model.
     for i in range(16):
         print(str(input0_data[i]) + " + " + str(input1_data[i]) + " = " + str(output0_data[i]))
-        # print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
+        print(str(input0_data[i]) + " - " + str(input1_data[i]) + " = " + str(output1_data[i]))
         if (input0_data[i] + input1_data[i]) != output0_data[i]:
             print("error: incorrect sum");
             sys.exit(1);
-        # if (input0_data[i] - input1_data[i]) != output1_data[i]:
-        #     print("error: incorrect difference");
-        #     sys.exit(1);
+        if (input0_data[i] - input1_data[i]) != output1_data[i]:
+            print("error: incorrect difference");
+            sys.exit(1);
 
     shared_memory_ctx.unregister("input_data")
     shared_memory_ctx.unregister("output_data")
-    shared_memory_ctx.close()

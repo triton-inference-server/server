@@ -112,7 +112,7 @@ SetSharedMemoryRegionData(
 }
 
 nic::Error*
-ReadSharedMemoryRegionData(
+MapSharedMemoryRegion(
     int shm_fd, size_t offset, size_t batch_byte_size, const void** shm_addr)
 {
   // map shared memory to process address space
@@ -140,7 +140,7 @@ UnlinkSharedMemoryRegion(const char* shm_key)
 }
 
 nic::Error*
-UnmapSharedMemory(void* shm_addr, size_t byte_size)
+UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size)
 {
   int tmp_fd = munmap(shm_addr, byte_size);
   if (tmp_fd == -1) {

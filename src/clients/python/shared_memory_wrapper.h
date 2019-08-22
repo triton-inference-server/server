@@ -51,10 +51,10 @@ nic::Error* OpenSharedMemoryRegion(const char* shm_key, int* shm_fd);
 nic::Error* CloseSharedMemoryRegion(int shm_fd);
 nic::Error* SetSharedMemoryRegionData(
     int shm_fd, size_t offset, size_t batch_byte_size, const void* data);
-nic::Error* ReadSharedMemoryRegionData(
+nic::Error* MapSharedMemoryRegion(
     int shm_fd, size_t offset, size_t batch_byte_size, const void** shm_addr);
 nic::Error* UnlinkSharedMemoryRegion(const char* shm_key);
-nic::Error* UnmapSharedMemory(void* shm_addr, size_t byte_size);
+nic::Error* UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size);
 
 //==============================================================================
 
