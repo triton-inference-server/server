@@ -1200,8 +1200,8 @@ TRTSERVER_ServerInferAsync(
 
   std::shared_ptr<ni::InferResponseProvider> infer_response_provider;
   {
-    std::shared_ptr<ni::DelegatingInferResponseProvider> del_response_provider;
-    RETURN_IF_STATUS_ERROR(ni::DelegatingInferResponseProvider::Create(
+    std::shared_ptr<ni::InferResponseProvider> del_response_provider;
+    RETURN_IF_STATUS_ERROR(ni::InferResponseProvider::Create(
         *request_header, lprovider->Backend()->GetLabelProvider(),
         response_allocator, lresponsealloc->AllocFn(), response_allocator_userp,
         lresponsealloc->ReleaseFn(), &del_response_provider));

@@ -366,8 +366,13 @@ AddClassResults(
 //
 InferResponseProvider::InferResponseProvider(
     const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider)
-    : request_header_(request_header), label_provider_(label_provider)
+    const std::shared_ptr<LabelProvider>& label_provider,
+    TRTSERVER_ResponseAllocator* allocator,
+    TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
+    TRTSERVER_ResponseAllocatorReleaseFn_t release_fn)
+    : request_header_(request_header), label_provider_(label_provider),
+      allocator_(allocator), alloc_fn_(alloc_fn), alloc_userp_(alloc_userp),
+      release_fn_(release_fn)
 {
   // Create a map from output name to the InferRequestHeader::Output
   // object for that output.
@@ -399,38 +404,6 @@ InferResponseProvider::OutputBufferContents(
   return Status(
       RequestStatusCode::UNAVAILABLE,
       "request for unallocated output '" + name + "'");
-}
-
-Status
-InferResponseProvider::CheckAndSetIfBufferedOutput(
-    const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape, Output** output)
-{
-  const auto& pr = output_map_.find(name);
-  if (pr == output_map_.end()) {
-    return Status(
-        RequestStatusCode::INTERNAL, "unexpected output '" + name + "'");
-  }
-
-  outputs_.emplace_back();
-  Output* loutput = &(outputs_.back());
-  loutput->name_ = name;
-  loutput->shape_ = content_shape;
-  loutput->cls_count_ = 0;
-  loutput->ptr_ = nullptr;
-  loutput->byte_size_ = content_byte_size;
-
-  if (pr->second.has_cls()) {
-    loutput->cls_count_ = pr->second.cls().count();
-    char* buffer = new char[content_byte_size];
-    *content = static_cast<void*>(buffer);
-    loutput->ptr_ = static_cast<void*>(buffer);
-    loutput->buffer_.reset(buffer);
-  }
-
-  *output = loutput;
-
-  return Status::Success;
 }
 
 bool
@@ -609,254 +582,24 @@ InferResponseProvider::FinalizeResponse(const InferenceBackend& is)
   return Status::Success;
 }
 
-//
-// InternalInferResponseProvider
-//
 Status
-InternalInferResponseProvider::Create(
-    const InferenceBackend& is, const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    std::shared_ptr<InternalInferResponseProvider>* infer_provider)
-{
-  auto provider =
-      new InternalInferResponseProvider(request_header, label_provider);
-  infer_provider->reset(provider);
-  return Status::Success;
-}
-
-const InferResponseHeader&
-InternalInferResponseProvider::ResponseHeader() const
-{
-  return response_header_;
-}
-
-InferResponseHeader*
-InternalInferResponseProvider::MutableResponseHeader()
-{
-  return &response_header_;
-}
-
-Status
-InternalInferResponseProvider::AllocateOutputBuffer(
-    const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape,
-    const TRTSERVER_Memory_Type preferred_memory_type)
-{
-  *content = nullptr;
-
-  Output* output;
-  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
-
-  // Always write output tensor to an output buffer no matter
-  // if output has cls field defined
-  auto it = output_buffer_.find(name);
-  if (it == output_buffer_.end()) {
-    it = output_buffer_
-             .emplace(std::make_pair(
-                 name, std::make_shared<AllocatedSystemMemory>(
-                           content_byte_size, TRTSERVER_MEMORY_CPU)))
-             .first;
-  }
-
-  if (content_byte_size != it->second->TotalByteSize()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "unexpected size " + std::to_string(it->second->TotalByteSize()) +
-            " for output '" + name + "', expecting " +
-            std::to_string(content_byte_size));
-  }
-
-  TRTSERVER_Memory_Type memory_type;
-  *content = it->second->MutableBuffer(&memory_type);
-  output->ptr_ = *content;
-
-  return Status::Success;
-}
-
-Status
-InternalInferResponseProvider::GetSystemMemory(
-    const std::string& name, std::shared_ptr<SystemMemory>* output_buffer)
-{
-  auto it = output_buffer_.find(name);
-  if (it == output_buffer_.end()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "output '" + name + "' is not found in response provider");
-  }
-  *output_buffer = std::static_pointer_cast<SystemMemory>(it->second);
-  return Status::Success;
-}
-
-InternalInferResponseProvider::InternalInferResponseProvider(
-    const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider)
-    : InferResponseProvider(request_header, label_provider)
-{
-}
-
-//
-// GRPCInferResponseProvider
-//
-Status
-GRPCInferResponseProvider::Create(
-    const InferRequestHeader& request_header, InferResponse* response,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    std::shared_ptr<GRPCInferResponseProvider>* infer_provider)
-{
-  GRPCInferResponseProvider* provider =
-      new GRPCInferResponseProvider(request_header, response, label_provider);
-  infer_provider->reset(provider);
-
-  return Status::Success;
-}
-
-const InferResponseHeader&
-GRPCInferResponseProvider::ResponseHeader() const
-{
-  return response_->meta_data();
-}
-
-InferResponseHeader*
-GRPCInferResponseProvider::MutableResponseHeader()
-{
-  return response_->mutable_meta_data();
-}
-
-Status
-GRPCInferResponseProvider::AllocateOutputBuffer(
-    const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape,
-    const TRTSERVER_Memory_Type preferred_memory_type)
-{
-  Output* output;
-  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
-
-  // Must always add a raw output into the list so that the number and
-  // order of raw output entries equals the output meta-data. But
-  // leave empty if not returning raw result for the output.
-  std::string* raw_output = response_->add_raw_output();
-  if (output->ptr_ == nullptr) {
-    raw_output->resize(content_byte_size);
-    *content = static_cast<void*>(&((*raw_output)[0]));
-    output->ptr_ = *content;
-  }
-
-  return Status::Success;
-}
-
-//
-// HTTPInferResponseProvider
-//
-HTTPInferResponseProvider::HTTPInferResponseProvider(
-    evbuffer* output_buffer, const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider)
-    : InferResponseProvider(request_header, label_provider),
-      output_buffer_(output_buffer)
-{
-}
-
-Status
-HTTPInferResponseProvider::Create(
-    evbuffer* output_buffer, const InferenceBackend& is,
-    const InferRequestHeader& request_header,
-    const std::shared_ptr<LabelProvider>& label_provider,
-    std::shared_ptr<HTTPInferResponseProvider>* infer_provider)
-{
-  HTTPInferResponseProvider* provider = new HTTPInferResponseProvider(
-      output_buffer, request_header, label_provider);
-  infer_provider->reset(provider);
-
-  return Status::Success;
-}
-
-const InferResponseHeader&
-HTTPInferResponseProvider::ResponseHeader() const
-{
-  return response_header_;
-}
-
-InferResponseHeader*
-HTTPInferResponseProvider::MutableResponseHeader()
-{
-  return &response_header_;
-}
-
-Status
-HTTPInferResponseProvider::AllocateOutputBuffer(
-    const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape,
-    const TRTSERVER_Memory_Type preferred_memory_type)
-{
-  *content = nullptr;
-
-  Output* output;
-  RETURN_IF_ERROR(CheckAndSetIfBufferedOutput(
-      name, content, content_byte_size, content_shape, &output));
-
-  if ((output->ptr_ == nullptr) && (content_byte_size > 0)) {
-    // Reserve requested space in evbuffer...
-    struct evbuffer_iovec output_iovec;
-    if (evbuffer_reserve_space(
-            output_buffer_, content_byte_size, &output_iovec, 1) != 1) {
-      return Status(
-          RequestStatusCode::INTERNAL, "failed to reserve " +
-                                           std::to_string(content_byte_size) +
-                                           " bytes in output tensor buffer");
-    }
-
-    if (output_iovec.iov_len < content_byte_size) {
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "reserved " + std::to_string(output_iovec.iov_len) +
-              " bytes in output tensor buffer, need " +
-              std::to_string(content_byte_size));
-    }
-
-    output_iovec.iov_len = content_byte_size;
-    *content = output_iovec.iov_base;
-    output->ptr_ = *content;
-
-    // Immediately commit the buffer space. Some backends will write
-    // async to the just allocated buffer space so we are relying on
-    // evbuffer not to relocate this space. Because we request a
-    // contiguous chunk every time (above by allowing only a single
-    // entry in output_iovec), this seems to be a valid assumption.
-    if (evbuffer_commit_space(output_buffer_, &output_iovec, 1) != 0) {
-      *content = nullptr;
-      output->ptr_ = nullptr;
-      return Status(
-          RequestStatusCode::INTERNAL,
-          "failed to commit output tensors to output buffer");
-    }
-  }
-
-  return Status::Success;
-}
-
-//
-// DelegatingInferResponseProvider
-//
-Status
-DelegatingInferResponseProvider::Create(
+InferResponseProvider::Create(
     const InferRequestHeader& request_header,
     const std::shared_ptr<LabelProvider>& label_provider,
     TRTSERVER_ResponseAllocator* allocator,
     TRTSERVER_ResponseAllocatorAllocFn_t alloc_fn, void* alloc_userp,
     TRTSERVER_ResponseAllocatorReleaseFn_t release_fn,
-    std::shared_ptr<DelegatingInferResponseProvider>* infer_provider)
+    std::shared_ptr<InferResponseProvider>* infer_provider)
 {
-  DelegatingInferResponseProvider* provider =
-      new DelegatingInferResponseProvider(
-          request_header, label_provider, allocator, alloc_fn, alloc_userp,
-          release_fn);
+  InferResponseProvider* provider = new InferResponseProvider(
+      request_header, label_provider, allocator, alloc_fn, alloc_userp,
+      release_fn);
   infer_provider->reset(provider);
 
   return Status::Success;
 }
 
-DelegatingInferResponseProvider::~DelegatingInferResponseProvider()
+InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
     if (output.release_buffer_ != nullptr) {
@@ -873,19 +616,19 @@ DelegatingInferResponseProvider::~DelegatingInferResponseProvider()
 }
 
 const InferResponseHeader&
-DelegatingInferResponseProvider::ResponseHeader() const
+InferResponseProvider::ResponseHeader() const
 {
   return response_header_;
 }
 
 InferResponseHeader*
-DelegatingInferResponseProvider::MutableResponseHeader()
+InferResponseProvider::MutableResponseHeader()
 {
   return &response_header_;
 }
 
 Status
-DelegatingInferResponseProvider::AllocateOutputBuffer(
+InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape,
     const TRTSERVER_Memory_Type preferred_memory_type)
