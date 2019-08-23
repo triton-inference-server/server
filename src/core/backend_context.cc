@@ -69,7 +69,7 @@ BackendContext::CreateCudaStream(const int cuda_stream_priority)
     if (cuerr != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL, "unable to create stream for " + name_ +
-                                          ": " + cudaGetErrorString(cuerr));
+                                           ": " + cudaGetErrorString(cuerr));
     }
   }
 #endif  // TRTIS_ENABLE_GPU
@@ -188,8 +188,8 @@ BackendContext::SetFixedSizeOutputBuffer(
                 name, src_memory_type, dst_memory_type, expected_byte_size,
                 content + content_offset, buffer, &cuda_used);
             cuda_copy |= cuda_used;
-            }
-        } 
+          }
+        }
       }
 
       payload.status_ = status;
@@ -201,7 +201,8 @@ BackendContext::SetFixedSizeOutputBuffer(
   return cuda_copy;
 }
 
-Status BackendContext::CopyBuffer(
+Status
+BackendContext::CopyBuffer(
     const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
     const TRTSERVER_Memory_Type dst_memory_type, const size_t byte_size,
     const void* src, void* dst, bool* cuda_used)
@@ -224,16 +225,15 @@ Status BackendContext::CopyBuffer(
     if (err != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "failed to use CUDA copy for input '" + name +
+          "failed to use CUDA copy for tensor '" + name +
               "': " + std::string(cudaGetErrorString(err)));
     } else {
       *cuda_used = true;
     }
 #else
     return Status(
-        RequestStatusCode::INTERNAL,
-        "try to use CUDA copy for tensor '" + name +
-            "' while GPU is not supported");
+        RequestStatusCode::INTERNAL, "try to use CUDA copy for tensor '" +
+                                         name + "' while GPU is not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
   return Status::Success;
