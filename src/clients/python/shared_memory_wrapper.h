@@ -58,7 +58,7 @@ nic::Error* UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size);
 nic::Error* CreateSharedMemoryHandle(
     void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle);
 nic::Error* GetSharedMemoryHandleInfo(
-    void* shm_handle, void** shm_addr, char** shm_key, int* shm_fd);
+    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd);
 
 //==============================================================================
 

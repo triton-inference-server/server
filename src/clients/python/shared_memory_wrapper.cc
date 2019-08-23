@@ -45,7 +45,7 @@ ErrorNew(const char* msg)
 // SharedMemoryControlContext
 struct shared_memory_handle {
   void* base_addr_;
-  char* shm_key_;
+  std::string shm_key_;
   int shm_fd_;
 };
 
@@ -53,14 +53,9 @@ nic::Error*
 CreateSharedMemoryHandle(
     void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle)
 {
-  shared_memory_handle* handle =
-      reinterpret_cast<shared_memory_handle*>(*shm_handle);
+  shared_memory_handle* handle = new shared_memory_handle();
   handle->base_addr_ = shm_addr;
-  int i;
-  for (i = 0; shm_key[i] != '\0'; i++) {
-    handle->shm_key_[i] = shm_key[i];
-  }
-  handle->shm_key_[i] = '\0';
+  handle->shm_key_ = std::string(shm_key);
   handle->shm_fd_ = shm_fd;
   *shm_handle = reinterpret_cast<void*>(handle);
   return nullptr;
@@ -68,12 +63,12 @@ CreateSharedMemoryHandle(
 
 nic::Error*
 GetSharedMemoryHandleInfo(
-    void* shm_handle, void** shm_addr, char** shm_key, int* shm_fd)
+    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd)
 {
   shared_memory_handle* handle =
       reinterpret_cast<shared_memory_handle*>(shm_handle);
   *shm_addr = handle->base_addr_;
-  *shm_key = handle->shm_key_;
+  *shm_key = handle->shm_key_.c_str();
   *shm_fd = handle->shm_fd_;
   return nullptr;
 }
