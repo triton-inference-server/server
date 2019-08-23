@@ -236,14 +236,22 @@ main(int argc, char** argv)
   const ni::CorrelationID correlation_id0 = 1;
   const ni::CorrelationID correlation_id1 = 2;
 
-  // Create two different contexts, one is using streaming while the other
-  // isn't. Then we can compare their difference in sync/async runs
+  // Create two different contexts, in the sync case we can use one
+  // streaming and one not streaming. In the async case must use
+  // streaming for both since async+non-streaming means that order of
+  // requests reaching inference server is not guaranteed.
   err = nic::InferGrpcStreamContext::Create(
       &ctx0, correlation_id0, url, model_name, -1 /* model_version */, verbose);
   if (err.IsOk()) {
-    err = nic::InferGrpcContext::Create(
-        &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
-        verbose);
+    if (async) {
+      err = nic::InferGrpcStreamContext::Create(
+          &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
+          verbose);
+    } else {
+      err = nic::InferGrpcContext::Create(
+          &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
+          verbose);
+    }
   }
 
   if (!err.IsOk()) {

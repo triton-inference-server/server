@@ -95,15 +95,19 @@ if __name__ == '__main__':
     # correlation ID.
     values = [11, 7, 5, 3, 2, 0, 1]
 
-    # For the two different contexts, one is using streaming while the other
-    # isn't. Then we can compare their difference in sync/async runs
+    # Create two different contexts, in the sync case we can use one
+    # streaming and one not streaming. In the async case must use
+    # streaming for both since async+non-streaming means that order of
+    # requests reaching inference server is not guaranteed.
     correlation_id0 = 1000
     ctx0 = InferContext(FLAGS.url, protocol, model_name, model_version,
-                        correlation_id=correlation_id0, verbose=FLAGS.verbose, streaming=True)
+                        correlation_id=correlation_id0, verbose=FLAGS.verbose,
+                        streaming=True)
 
     correlation_id1 = 1001
     ctx1 = InferContext(FLAGS.url, protocol, model_name, model_version,
-                        correlation_id=correlation_id1, verbose=FLAGS.verbose, streaming=False)
+                        correlation_id=correlation_id1, verbose=FLAGS.verbose,
+                        streaming=FLAGS.async_set)
 
     # Now send the inference sequences..
     ctxs = []
