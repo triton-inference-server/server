@@ -99,18 +99,14 @@ InputOutputInfos(
 
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
         typeinfo, &OrtReleaseTypeInfo);
-    const OrtTensorTypeAndShapeInfo* tensor_info;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &tensor_info));
+    const OrtTensorTypeAndShapeInfo* tensor_info = OrtCastTypeInfoToTensorInfo(typeinfo);
 
-    ONNXTensorElementDataType type;
-    RETURN_IF_ORT_ERROR(OrtGetTensorElementType(tensor_info, &type));
+    ONNXTensorElementDataType type = OrtGetTensorElementType(tensor_info);
 
-    size_t num_dims;
-    RETURN_IF_ORT_ERROR(OrtGetDimensionsCount(tensor_info, &num_dims));
+    size_t num_dims = OrtGetNumOfDimensions(tensor_info);
 
     std::vector<int64_t> dims(num_dims);
-    RETURN_IF_ORT_ERROR(
-        OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims));
+    OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims);
 
     infos.emplace(name, OnnxTensorInfo(type, dims));
   }

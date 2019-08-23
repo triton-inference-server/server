@@ -80,14 +80,13 @@ OnnxBackend::CreateExecutionContexts(
   // [TODO] configurable like optimization policy in Tensorflow models
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
-  OrtSessionOptions* session_options;
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+  OrtSessionOptions* session_options = OrtCreateSessionOptions();
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+  OrtSetSessionThreadPoolSize(session_options, 1);
   // disable graph optimization
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  OrtSetSessionGraphOptimizationLevel(session_options, 0);
 
   Status status = CreateExecutionContextsHelper(session_options, models);
 
@@ -199,9 +198,7 @@ OnnxBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->CreateCudaStream());
 
   // Set Onnx session option with proper device
-  OrtSessionOptions* session_options;
-  RETURN_IF_ORT_ERROR(
-      OrtCloneSessionOptions(base_session_options, &session_options));
+  OrtSessionOptions* session_options = OrtCloneSessionOptions(base_session_options);
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
@@ -586,8 +583,7 @@ OnnxBackend::Context::SetInputTensor(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   if (data_type != TYPE_STRING) {
-    const OrtAllocatorInfo* allocator_info;
-    RETURN_IF_ORT_ERROR(OrtAllocatorGetInfo(allocator_, &allocator_info));
+    const OrtAllocatorInfo* allocator_info = OrtAllocatorGetInfo(allocator_);
     RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
         allocator_info, (void*)input_buffers->back().get(), total_byte_size,
         input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
@@ -707,21 +703,18 @@ OnnxBackend::Context::ReadOutputTensors(
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
         typeinfo, &OrtReleaseTypeInfo);
 
-    const OrtTensorTypeAndShapeInfo* type_and_shape;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
+    const OrtTensorTypeAndShapeInfo* type_and_shape = OrtCastTypeInfoToTensorInfo(typeinfo);
 
     std::vector<int64_t> content_shape;
 
-    size_t num_dims;
-    RETURN_IF_ORT_ERROR(OrtGetDimensionsCount(type_and_shape, &num_dims));
+    size_t num_dims = OrtGetNumOfDimensions(type_and_shape);
 
     content_shape.resize(num_dims);
-    RETURN_IF_ORT_ERROR(OrtGetDimensions(
-        type_and_shape, content_shape.data(), content_shape.size()));
+    OrtGetDimensions(
+        type_and_shape, content_shape.data(), content_shape.size());
     const size_t element_count = GetElementCount(content_shape);
 
-    ONNXTensorElementDataType type;
-    RETURN_IF_ORT_ERROR(OrtGetTensorElementType(type_and_shape, &type));
+    ONNXTensorElementDataType type = OrtGetTensorElementType(type_and_shape);
 
     if (type == ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING) {
       const size_t batch1_element_cnt = element_count / total_batch_size;

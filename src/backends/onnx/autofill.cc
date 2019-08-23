@@ -308,14 +308,12 @@ AutoFillOnnx::Create(
   }
 
   // Create resource wrapper to manage release of resource
-  OrtSessionOptions* session_options;
-
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+  OrtSessionOptions* session_options = OrtCreateSessionOptions();
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  OrtSetSessionThreadPoolSize(session_options, 1);
+  OrtSetSessionGraphOptimizationLevel(session_options, 0);
 
   OrtSession* session;
 
