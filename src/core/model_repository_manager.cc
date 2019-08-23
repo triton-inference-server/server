@@ -319,7 +319,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(InferenceServer* server, const std::string& repository_path);
+  BackendLifeCycle(const std::string& repository_path);
 
   // Function called after backend state / next action is updated.
   // Caller must obtain the mutex of 'backend_info' before calling this function
@@ -346,7 +346,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  InferenceServer* server_;
   const std::string& repository_path_;
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
@@ -371,8 +370,8 @@ class ModelRepositoryManager::BackendLifeCycle {
 };
 
 ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
-    InferenceServer* server, const std::string& repository_path)
-    : server_(server), repository_path_(repository_path)
+    const std::string& repository_path)
+    : repository_path_(repository_path)
 {
 }
 
@@ -383,7 +382,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
   std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(server, repository_path));
+      new BackendLifeCycle(repository_path));
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
@@ -443,7 +442,7 @@ ModelRepositoryManager::BackendLifeCycle::Create(
     const std::shared_ptr<BackendConfig>& config =
         backend_map.find(kEnsemblePlatform)->second;
     RETURN_IF_ERROR(EnsembleBackendFactory::Create(
-        config, &(local_life_cycle->ensemble_factory_)));
+        server, config, &(local_life_cycle->ensemble_factory_)));
   }
 
   *life_cycle = std::move(local_life_cycle);
@@ -784,7 +783,6 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
               << version << " while it is being served";
   } else {
     if (status.IsOk()) {
-      is->SetInferenceServer(server_);
       backend_info->state_ = ModelReadyState::MODEL_READY;
       // Unless the handle is nullptr, always reset handle out of the mutex,
       // otherwise the handle's destructor will try to acquire the mutex and
