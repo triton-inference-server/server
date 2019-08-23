@@ -88,22 +88,18 @@ if __name__ == '__main__':
     input_byte_size = input0_data.nbytes
     output_byte_size = input_byte_size
 
-    # Create Output0 and Output1 in Shared Memory
+    # Create Output0 and Output1 in Shared Memory and store shared memory handle
     shm_key = "/output_simple"
-    shm_fd_op = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
-
-    # Get base address of shared memory region
-    shm_ptr = shared_memory_ctx.map_shared_memory_region(shm_fd_op, 0, output_byte_size)
+    shm_op_handle = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
 
     # Register Output shared memory with TRTIS
     shared_memory_ctx.register("output_data", "/output_simple", 0, output_byte_size * 2)
 
     shm_key = "/input_simple"
-    shm_fd_ip = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
+    shm_ip_handle = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
 
     # Put input data values into shared memory
-    shared_memory_ctx.set_shared_memory_region_data(shm_fd_ip, 0, np.append(input0_data, input1_data))
-
+    shared_memory_ctx.set_shared_memory_region_data(shm_ip_handle, 0, [input0_data, input1_data])
     # Register Input shared memory with TRTIS
     shared_memory_ctx.register("input_data", "/input_simple", 0, input_byte_size * 2)
 
@@ -111,8 +107,10 @@ if __name__ == '__main__':
     # both output tensors.
     results = infer_ctx.run({ 'INPUT0' : ("input_data", 0, input_byte_size),
                              'INPUT1' : ("input_data", input_byte_size, input_byte_size), },
-                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, ["output_data", shm_ptr], 0, output_byte_size),
-                             'OUTPUT1' : (InferContext.ResultFormat.RAW, ["output_data", shm_ptr], output_byte_size, output_byte_size) },
+                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, \
+                                        ["output_data", shm_op_handle], 0, output_byte_size),
+                             'OUTPUT1' : (InferContext.ResultFormat.RAW, \
+                                        ["output_data", shm_op_handle], output_byte_size, output_byte_size) },
                            batch_size)
 
     # Read output from shared memory
@@ -132,5 +130,8 @@ if __name__ == '__main__':
             print("error: incorrect difference");
             sys.exit(1);
 
+    del results
     shared_memory_ctx.unregister("input_data")
+    shared_memory_ctx.unlink_shared_memory_region("/input_simple")
     shared_memory_ctx.unregister("output_data")
+    shared_memory_ctx.unlink_shared_memory_region("/output_simple")

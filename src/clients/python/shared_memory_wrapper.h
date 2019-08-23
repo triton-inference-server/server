@@ -46,15 +46,19 @@ nic::Error* ErrorNew(const char* msg);
 //==============================================================================
 // SharedMemoryControlContext
 nic::Error* CreateSharedMemoryRegion(
-    const char* shm_key, size_t batch_byte_size, int* shm_fd);
+    const char* shm_key, size_t byte_size, int* shm_fd);
 nic::Error* OpenSharedMemoryRegion(const char* shm_key, int* shm_fd);
 nic::Error* CloseSharedMemoryRegion(int shm_fd);
 nic::Error* SetSharedMemoryRegionData(
-    int shm_fd, size_t offset, size_t batch_byte_size, const void* data);
+    void* shm_addr, size_t offset, size_t byte_size, const void* data);
 nic::Error* MapSharedMemoryRegion(
-    int shm_fd, size_t offset, size_t batch_byte_size, const void** shm_addr);
+    int shm_fd, size_t offset, size_t byte_size, const void** shm_addr);
 nic::Error* UnlinkSharedMemoryRegion(const char* shm_key);
 nic::Error* UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size);
+nic::Error* CreateSharedMemoryHandle(
+    void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle);
+nic::Error* GetSharedMemoryHandleInfo(
+    void* shm_handle, void** shm_addr, char** shm_key, int* shm_fd);
 
 //==============================================================================
 

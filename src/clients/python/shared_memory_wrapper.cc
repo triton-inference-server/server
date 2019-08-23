@@ -43,10 +43,43 @@ ErrorNew(const char* msg)
 
 //==============================================================================
 // SharedMemoryControlContext
+struct shared_memory_handle {
+  void* base_addr_;
+  char* shm_key_;
+  int shm_fd_;
+};
 
 nic::Error*
-CreateSharedMemoryRegion(
-    const char* shm_key, size_t batch_byte_size, int* shm_fd)
+CreateSharedMemoryHandle(
+    void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle)
+{
+  shared_memory_handle* handle =
+      reinterpret_cast<shared_memory_handle*>(*shm_handle);
+  handle->base_addr_ = shm_addr;
+  int i;
+  for (i = 0; shm_key[i] != '\0'; i++) {
+    handle->shm_key_[i] = shm_key[i];
+  }
+  handle->shm_key_[i] = '\0';
+  handle->shm_fd_ = shm_fd;
+  *shm_handle = reinterpret_cast<void*>(handle);
+  return nullptr;
+}
+
+nic::Error*
+GetSharedMemoryHandleInfo(
+    void* shm_handle, void** shm_addr, char** shm_key, int* shm_fd)
+{
+  shared_memory_handle* handle =
+      reinterpret_cast<shared_memory_handle*>(shm_handle);
+  *shm_addr = handle->base_addr_;
+  *shm_key = handle->shm_key_;
+  *shm_fd = handle->shm_fd_;
+  return nullptr;
+}
+
+nic::Error*
+CreateSharedMemoryRegion(const char* shm_key, size_t byte_size, int* shm_fd)
 {
   // get shared memory region descriptor
   *shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -56,7 +89,7 @@ CreateSharedMemoryRegion(
             .c_str());
   }
   // extend shared memory object as by default it's initialized with size 0
-  int res = ftruncate(*shm_fd, batch_byte_size);
+  int res = ftruncate(*shm_fd, byte_size);
   if (res == -1) {
     return ErrorNew(
         ("unable to initialize the size for: " + std::string(shm_key)).c_str());
@@ -94,30 +127,19 @@ CloseSharedMemoryRegion(int shm_fd)
 
 nic::Error*
 SetSharedMemoryRegionData(
-    int shm_fd, size_t offset, size_t batch_byte_size, const void* data)
+    void* shm_addr, size_t offset, size_t byte_size, const void* data)
 {
-  // map shared memory to process address space
-  void* shm_addr =
-      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (shm_addr == MAP_FAILED) {
-    return ErrorNew(("unable to set/mmap the shared memory region: " +
-                     std::to_string(shm_fd) +
-                     ", errno: " + std::to_string(errno))
-                        .c_str());
-  }
-
-  memcpy(shm_addr, data, batch_byte_size);
-
+  char* shm_addr_offset = reinterpret_cast<char*>(shm_addr);
+  memcpy(shm_addr_offset + offset, data, byte_size);
   return nullptr;
 }
 
 nic::Error*
 MapSharedMemoryRegion(
-    int shm_fd, size_t offset, size_t batch_byte_size, const void** shm_addr)
+    int shm_fd, size_t offset, size_t byte_size, const void** shm_addr)
 {
   // map shared memory to process address space
-  *shm_addr =
-      mmap(NULL, batch_byte_size, PROT_READ, MAP_SHARED, shm_fd, offset);
+  *shm_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if (*shm_addr == MAP_FAILED) {
     return ErrorNew(("unable to read/mmap the shared memory region: " +
                      std::to_string(shm_fd))
