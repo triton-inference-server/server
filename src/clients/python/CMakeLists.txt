@@ -51,6 +51,7 @@ target_link_libraries(
 set(wheel_stamp_file "stamp.whl")
 configure_file(../../../VERSION VERSION COPYONLY)
 configure_file(__init__.py __init__.py COPYONLY)
+configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
 
 add_custom_command(

@@ -44,6 +44,7 @@ function main() {
 
   echo $(date) : "=== Using builddir: ${WHLDIR}"
   mkdir -p ${WHLDIR}/tensorrtserver/api
+  mkdir -p ${WHLDIR}/tensorrtserver/shared_memory
 
   echo "Adding package files"
   cp ../../core/*_pb2.py \
@@ -59,18 +60,21 @@ function main() {
     cp ../c++/librequest.so \
       "${WHLDIR}/tensorrtserver/api/."
     cp libcshmwrap.so \
-      "${WHLDIR}/tensorrtserver/api/."
+      "${WHLDIR}/tensorrtserver/shared_memory/."
   else
     cp Release/crequest.dll \
       "${WHLDIR}/tensorrtserver/api/."
     cp ../c++/Release/request.dll \
       "${WHLDIR}/tensorrtserver/api/."
     cp Release/cshmwrap.dll \
-      "${WHLDIR}/tensorrtserver/api/."
+      "${WHLDIR}/tensorrtserver/shared_memory/."
   fi
 
   cp __init__.py \
     "${WHLDIR}/tensorrtserver/api/."
+
+  cp shared_memory/__init__.py \
+    "${WHLDIR}/tensorrtserver/shared_memory/."
 
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserver/__init__.py

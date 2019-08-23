@@ -31,6 +31,7 @@ import numpy as np
 import os
 from builtins import range
 from tensorrtserver.api import *
+from tensorrtserver.shared_memory import *
 from ctypes import *
 
 FLAGS = None
@@ -89,17 +90,18 @@ if __name__ == '__main__':
     output_byte_size = input_byte_size
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handle
+    shm_helper = SharedMemoryHelper()
     shm_key = "/output_simple"
-    shm_op_handle = shared_memory_ctx.create_shared_memory_region(shm_key, output_byte_size * 2)
+    shm_op_handle = shm_helper.create_shared_memory_region(shm_key, output_byte_size * 2)
 
     # Register Output shared memory with TRTIS
     shared_memory_ctx.register("output_data", "/output_simple", 0, output_byte_size * 2)
 
     shm_key = "/input_simple"
-    shm_ip_handle = shared_memory_ctx.create_shared_memory_region(shm_key, input_byte_size * 2)
+    shm_ip_handle = shm_helper.create_shared_memory_region(shm_key, input_byte_size * 2)
 
     # Put input data values into shared memory
-    shared_memory_ctx.set_shared_memory_region_data(shm_ip_handle, 0, [input0_data, input1_data])
+    shm_helper.set_shared_memory_region_data(shm_ip_handle, 0, [input0_data, input1_data])
     # Register Input shared memory with TRTIS
     shared_memory_ctx.register("input_data", "/input_simple", 0, input_byte_size * 2)
 
@@ -132,6 +134,6 @@ if __name__ == '__main__':
 
     del results
     shared_memory_ctx.unregister("input_data")
-    shared_memory_ctx.unlink_shared_memory_region("/input_simple")
+    shm_helper.unlink_shared_memory_region("/input_simple")
     shared_memory_ctx.unregister("output_data")
-    shared_memory_ctx.unlink_shared_memory_region("/output_simple")
+    shm_helper.unlink_shared_memory_region("/output_simple")
