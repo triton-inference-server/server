@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cuda_runtime_api.h>
 #include <unistd.h>
 #include <chrono>
 #include <future>
@@ -40,6 +41,26 @@ namespace ni = nvidia::inferenceserver;
 
 namespace {
 
+#define FAIL_IF_CUDA_ERR(X, MSG)                                          \
+  do {                                                                    \
+    cudaError_t err = (X);                                                \
+    if (err != cudaSuccess) {                                             \
+      LOG_ERROR << "error: " << (MSG) << ": " << cudaGetErrorString(err); \
+      exit(1);                                                            \
+    }                                                                     \
+  } while (false)
+
+
+static auto gpu_data_deleter = [](void* data) {
+  if (data != nullptr) {
+    auto err = cudaFree(data);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "error: failed to cudaFree " << data << ": "
+                << cudaGetErrorString(err);
+    }
+  }
+};
+
 void
 Usage(char** argv, const std::string& msg = std::string())
 {
@@ -48,6 +69,7 @@ Usage(char** argv, const std::string& msg = std::string())
   }
 
   LOG_ERROR << "Usage: " << argv[0] << " [options]";
+  LOG_ERROR << "\t-g store input data in GPU";
   LOG_ERROR << "\t-r [model repository absolute path]";
 
   exit(1);
@@ -63,18 +85,35 @@ ResponseAlloc(
   // releasing the buffer.
 
   // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
-  // need to do any other book-keeping. Only handle allocation in the
-  // CPU region.
-  if ((byte_size == 0) || (memory_type == TRTSERVER_MEMORY_CPU)) {
-    *buffer = (byte_size == 0) ? nullptr : malloc(byte_size);
+  // need to do any other book-keeping.
+  if (byte_size == 0) {
+    *buffer = nullptr;
     *buffer_userp = new std::string(tensor_name);
     LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
              << tensor_name;
   } else {
-    *buffer = nullptr;
-    *buffer_userp = nullptr;
-    LOG_INFO << "failed to allocated " << byte_size
-             << " bytes for result tensor " << tensor_name;
+    void* allocated_ptr = nullptr;
+    if (memory_type == TRTSERVER_MEMORY_CPU) {
+      allocated_ptr = malloc(byte_size);
+    } else {
+      auto err = cudaMalloc(&allocated_ptr, byte_size);
+      if (err != cudaSuccess) {
+        LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
+        allocated_ptr = nullptr;
+      }
+    }
+
+    if (allocated_ptr != nullptr) {
+      *buffer = allocated_ptr;
+      *buffer_userp = new std::string(tensor_name);
+      LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
+               << tensor_name;
+    } else {
+      *buffer = nullptr;
+      *buffer_userp = nullptr;
+      LOG_INFO << "failed to allocated " << byte_size
+               << " bytes for result tensor " << tensor_name;
+    }
   }
 
   return nullptr;  // Success
@@ -92,9 +131,19 @@ ResponseRelease(
     name = new std::string("<unknown>");
   }
 
-  LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
-           << " for result '" << *name << "'";
-  free(buffer);
+  std::string memory_type_str =
+      (memory_type == TRTSERVER_MEMORY_CPU) ? "CPU" : "GPU";
+  LOG_INFO << "Releasing " << memory_type_str << " buffer " << buffer
+           << " of size " << byte_size << " for result '" << *name << "'";
+  if (memory_type == TRTSERVER_MEMORY_CPU) {
+    free(buffer);
+  } else {
+    auto err = cudaFree(buffer);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
+                << cudaGetErrorString(err);
+    }
+  }
 
   delete name;
 
@@ -118,11 +167,15 @@ int
 main(int argc, char** argv)
 {
   std::string model_repository_path;
+  bool gpu_input = false;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "r:")) != -1) {
+  while ((opt = getopt(argc, argv, "gr:")) != -1) {
     switch (opt) {
+      case 'g':
+        gpu_input = true;
+        break;
       case 'r':
         model_repository_path = optarg;
         break;
@@ -290,15 +343,42 @@ main(int argc, char** argv)
     input1_data[i] = 1;
   }
 
+  size_t input0_size = input0_data.size() * sizeof(int32_t);
+  size_t input1_size = input1_data.size() * sizeof(int32_t);
+
+  std::unique_ptr<void, decltype(gpu_data_deleter)> input0_gpu(
+      nullptr, gpu_data_deleter);
+  std::unique_ptr<void, decltype(gpu_data_deleter)> input1_gpu(
+      nullptr, gpu_data_deleter);
+  if (gpu_input) {
+    void* dst;
+    FAIL_IF_CUDA_ERR(
+        cudaMalloc(&dst, input0_size), "allocating GPU memory for INPUT0 data");
+    input0_gpu.reset(dst);
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(dst, &input0_data[0], input0_size, cudaMemcpyHostToDevice),
+        "setting INPUT0 data in GPU memory");
+    FAIL_IF_CUDA_ERR(
+        cudaMalloc(&dst, input1_size), "allocating GPU memory for INPUT1 data");
+    input1_gpu.reset(dst);
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(dst, &input1_data[0], input1_size, cudaMemcpyHostToDevice),
+        "setting INPUT1 data in GPU memory");
+  }
+
+  const void* input0_base = gpu_input ? input0_gpu.get() : &input0_data[0];
+  const void* input1_base = gpu_input ? input1_gpu.get() : &input1_data[0];
+  auto memory_type = gpu_input ? TRTSERVER_MEMORY_GPU : TRTSERVER_MEMORY_CPU;
+
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input0->name().c_str(), &input0_data[0],
-          input0_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
+          request_provider, input0->name().c_str(), input0_base, input0_size,
+          memory_type),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input1->name().c_str(), &input1_data[0],
-          input1_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
+          request_provider, input1->name().c_str(), input1_base, input1_size,
+          memory_type),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -361,12 +441,6 @@ main(int argc, char** argv)
         "unexpected output0 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output0_byte_size));
-  } else if (output0_memory_type != TRTSERVER_MEMORY_CPU) {
-    FAIL(
-        "unexpected output0 memory type, expected to be allocated "
-        "on CPU memory (" +
-        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
-        std::to_string(output0_memory_type) + ")");
   }
 
   const void* output1_content;
@@ -382,18 +456,40 @@ main(int argc, char** argv)
         "unexpected output1 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output1_byte_size));
-  } else if (output1_memory_type != TRTSERVER_MEMORY_CPU) {
-    FAIL(
-        "unexpected output1 memory type, expected to be allocated "
-        "on CPU memory (" +
-        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
-        std::to_string(output1_memory_type) + ")");
   }
 
-  const int32_t* output0_result =
-      reinterpret_cast<const int32_t*>(output0_content);
-  const int32_t* output1_result =
-      reinterpret_cast<const int32_t*>(output1_content);
+  const int32_t* output0_result;
+  const int32_t* output1_result;
+
+  // Different from CPU memory, outputs in GPU memory must be copied to CPU
+  // memory to be read directly.
+  std::vector<int32_t> output0_data(16);
+  std::vector<int32_t> output1_data(16);
+  if (output0_memory_type == TRTSERVER_MEMORY_CPU) {
+    LOG_INFO << "OUTPUT0 are stored in CPU memory";
+    output0_result = reinterpret_cast<const int32_t*>(output0_content);
+  } else {
+    LOG_INFO << "OUTPUT0 are stored in GPU memory";
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(
+            &output0_data[0], output0_content, input0_size,
+            cudaMemcpyDeviceToHost),
+        "setting INPUT0 data in GPU memory");
+    output0_result = reinterpret_cast<const int32_t*>(&output0_data[0]);
+  }
+
+  if (output1_memory_type == TRTSERVER_MEMORY_CPU) {
+    LOG_INFO << "OUTPUT1 are stored in CPU memory";
+    output1_result = reinterpret_cast<const int32_t*>(output1_content);
+  } else {
+    LOG_INFO << "OUTPUT1 are stored in GPU memory";
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(
+            &output1_data[0], output1_content, input1_size,
+            cudaMemcpyDeviceToHost),
+        "setting INPUT0 data in GPU memory");
+    output1_result = reinterpret_cast<const int32_t*>(&output1_data[0]);
+  }
 
   for (size_t i = 0; i < 16; ++i) {
     LOG_INFO << input0_data[i] << " + " << input1_data[i] << " = "

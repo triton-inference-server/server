@@ -159,8 +159,12 @@ add_executable(
   ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
 )
+target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   simple
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
   PRIVATE trtserver
   PRIVATE protobuf::libprotobuf
 )
