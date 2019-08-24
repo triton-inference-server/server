@@ -28,6 +28,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include "src/clients/python/shared_memory_handle.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -43,11 +44,6 @@ ErrorNew(const char* msg)
 
 //==============================================================================
 // SharedMemoryControlContext
-struct shared_memory_handle {
-  void* base_addr_;
-  std::string shm_key_;
-  int shm_fd_;
-};
 
 nic::Error*
 CreateSharedMemoryHandle(

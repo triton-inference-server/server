@@ -92,7 +92,8 @@ nic::Error* SharedMemoryControlContextRegister(
     const int offset, const int byte_size);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, const char* model_name);
-
+nic::Error* GetSharedMemoryHandleInfo(
+    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd);
 //==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;

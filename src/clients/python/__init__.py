@@ -50,13 +50,10 @@ class _utf8(object):
 import os
 _request_lib = "request" if os.name == 'nt' else 'librequest.so'
 _crequest_lib = "crequest" if os.name == 'nt' else 'libcrequest.so'
-_cshmwrap_lib = "shmwrap" if os.name == 'nt' else 'libcshmwrap.so'
 _request_path = pkg_resources.resource_filename('tensorrtserver.api', _request_lib)
 _request = cdll.LoadLibrary(_request_path)
 _crequest_path = pkg_resources.resource_filename('tensorrtserver.api', _crequest_lib)
 _crequest = cdll.LoadLibrary(_crequest_path)
-_cshmwrap_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _cshmwrap_lib)
-_cshmwrap = cdll.LoadLibrary(_cshmwrap_path)
 
 _crequest_error_new = _crequest.ErrorNew
 _crequest_error_new.restype = c_void_p
@@ -217,9 +214,9 @@ _crequest_infer_ctx_result_next_class = _crequest.InferContextResultNextClass
 _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
-_cshmwrap_get_shared_memory_handle_info = _cshmwrap.GetSharedMemoryHandleInfo
-_cshmwrap_get_shared_memory_handle_info.restype = c_void_p
-_cshmwrap_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int)]
+_crequest_get_shared_memory_handle_info = _crequest.GetSharedMemoryHandleInfo
+_crequest_get_shared_memory_handle_info.restype = c_void_p
+_crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int)]
 
 def _raise_if_error(err):
     """
@@ -1176,7 +1173,7 @@ class InferContext:
                         shm_addr = c_void_p()
                         shm_key = c_char_p()
                         _raise_if_error(
-                            c_void_p(_cshmwrap_get_shared_memory_handle_info(output_format[1][1], byref(shm_addr), byref(shm_key), byref(shm_fd))))
+                            c_void_p(_crequest_get_shared_memory_handle_info(output_format[1][1], byref(shm_addr), byref(shm_key), byref(shm_fd))))
                         cval = shm_addr
                         # offset + byte_size
                         cval_len = output_format[3] + output_format[2]
