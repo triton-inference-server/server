@@ -26,7 +26,7 @@
 
 #pragma once
 
-#include <onnxruntime_c_api.h>
+#include <core/session/onnxruntime_c_api.h>
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 
