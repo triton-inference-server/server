@@ -34,7 +34,8 @@ The inference server *client libraries* make it easy to communicate
 with the TensorRT Inference Server from your C++ or Python
 application. Using these libraries you can send either HTTP or GRPC
 requests to the server to check status or health and to make inference
-requests.
+requests. These libraries support using Shared Memory for passing
+inputs as well as receiving outputs from the inference server.
 
 A couple of example applications show how to use the client libraries
 to perform image classification and to test performance:
@@ -98,8 +99,13 @@ configured with all the dependencies required to run those examples
 within the container. The easiest way to try the examples described in
 the following sections is to run the client image with -\\-net=host so
 that the client examples can access the inference server running in
-its own container (see :ref:`section-running-the-inference-server` for
-more information about running the inference server)::
+its own container. To be able to use shared memory you need to run the
+client and server image with -\\-ipc=host so that the inference server
+can access the shared memory in the client container. Additionally, to
+create shared memory regions that are larger than 64MB, the
+-\\-shm-size=1g flag is needed while running the client image.
+(see :ref:`section-running-the-inference-server` for more information
+about running the inference server)::
 
   $ docker run -it --rm --net=host tensorrtserver_client
 
@@ -617,6 +623,35 @@ download it as described in
 the tensorrtserver whl, then::
 
   $ python3 simple_client.py
+
+A simple C++ example application using shared memory at `src/clients/c++/simple\_shm\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_shm_client.cc>`_
+and a Python version at `src/clients/python/simple\_shm\_client.py
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_shm_client.py>`_
+demonstrate the usage of shared memory with the client API.
+
+To run the the C++ version of the simple shared memory example,
+first build or download it as described in
+:ref:`section-getting-the-client-libraries-and-examples` and then::
+
+  $ simple_shm_client
+  0 + 1 = 1
+  0 - 1 = -1
+  1 + 1 = 2
+  1 - 1 = 0
+  2 + 1 = 3
+  2 - 1 = 1
+  ...
+  14 - 1 = 13
+  15 + 1 = 16
+  15 - 1 = 14
+
+To run the the Python version of the simple shared memory example,
+first build or download it as described in
+:ref:`section-getting-the-client-libraries-and-examples` and install
+the tensorrtserver whl, then::
+
+  $ python simple_shm_client.py
 
 String Datatype
 ^^^^^^^^^^^^^^^
