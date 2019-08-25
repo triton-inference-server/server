@@ -48,7 +48,8 @@ class PlanBackend : public InferenceBackend {
       const std::unordered_map<std::string, std::vector<char>>& models);
   Status CreateExecutionContext(
       const std::string& instance_name, const int gpu_device,
-      const std::unordered_map<std::string, std::vector<char>>& models);
+      const std::unordered_map<std::string, std::vector<char>>& models,
+      const std::string profile_index);
 
  private:
   // Run model on the context associated with 'runner_idx' to
@@ -64,8 +65,8 @@ class PlanBackend : public InferenceBackend {
   // For each model instance there is a context.
   struct Context : BackendContext {
     Context(
-        const std::string& name, const int gpu_device,
-        const int max_batch_size);
+        const std::string& name, const int gpu_device, const int max_batch_size,
+        const int profile_index);
     ~Context();
 
     DISALLOW_MOVE(Context);
@@ -78,13 +79,18 @@ class PlanBackend : public InferenceBackend {
 
     Status InitializeInputBinding(
         const std::string& input_name, const DataType input_datatype,
-        const DimsList& input_dims);
-    Status InitializeSequenceControlInputBindings(const ModelConfig& config);
+        const DimsList& input_dims, const bool support_batching);
+    Status InitializeSequenceControlInputBindings(
+        const ModelConfig& config, const bool support_batching);
     Status InitializeConfigInputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios);
+        const ::google::protobuf::RepeatedPtrField<ModelInput>& ios,
+        const bool support_batching);
     Status InitializeConfigOutputBindings(
-        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
+        const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios,
+        const bool support_batching);
     bool BuildCudaGraph(const int batch_size);
+
+    void InitProfile();
 
     // Run model to execute for one or more requests. This function
     // assumes that it is only called by the single runner thread that
@@ -99,9 +105,25 @@ class PlanBackend : public InferenceBackend {
     nvinfer1::ICudaEngine* engine_;
     nvinfer1::IExecutionContext* context_;
 
+    // Is set true if the loaded model has one or more dynamic shaped inputs
+    bool is_dynamic_;
+    // The configured optimization profile index
+    int profile_index_;
+    // Offset used for addressing bindings from the configured optmization
+    // profile
+    int binding_offset_;
+    // Stores the minimum of the maximum possible value of the first dimension
+    int max_dynamic_batch_size_;
+
+    // The number of expected bindings to the model. In case of dynamic shapes,
+    // it is the number of expected bindings to the configured optimization
+    // profile.
+    int num_expected_bindings_;
+
     // For each binding index of the TensorRT engine, the size of the
     // corresponding tensor and pointer to the CUDA buffer for the
-    // tensor. These are arrays with size equal to number of bindings.
+    // tensor. These are arrays with size equal to
+    // Context::num_expected_bindings_
     uint64_t* byte_sizes_;
     void** buffers_;
 

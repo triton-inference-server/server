@@ -68,6 +68,20 @@ ConvertDataTypeToTrtType(const DataType& dtype)
   return std::make_pair(true, trt_type);
 }
 
+int
+GetProfileIndex(const std::string profile_name)
+{
+  if (profile_name.empty()) {
+    // if no optimization profile is given then be default
+    // TRTIS selects the first optimization profile for execution.
+    return 0;
+  } else {
+    // TRT doesn't support optimization profile names as of now,
+    // the profile is hence expected to be index itself.
+    return stoi(profile_name);
+  }
+}
+
 bool
 CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
 {
@@ -84,21 +98,131 @@ CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims)
   return true;
 }
 
+Status
+CompareDimsSupported(
+    const std::string& model_name, const std::string& binding_name,
+    const nvinfer1::Dims& model_dims, const DimsList& dims,
+    const bool supports_batching, const bool is_dynamic)
+{
+  // If the model configuration expects batching support in the model,
+  // then the first dimension must be -1.
+  if (supports_batching && is_dynamic &&
+      ((model_dims.nbDims == 0) || (model_dims.d[0] != -1))) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name +
+            "', model configuration supports batching but first dimension of "
+            "binding '" +
+            binding_name +
+            "' expected by framework is not a variable-size batch dimension: " +
+            DimsDebugString(model_dims) +
+            " whereas model configuration shape is: " + DimsListToString(dims));
+  }
+
+  const int nonbatch_start_idx = (supports_batching && is_dynamic ? 1 : 0);
+
+  if (model_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unable to load model '" + model_name + "', binding '" + binding_name +
+            "' shape expected by framework " + DimsDebugString(model_dims) +
+            " doesn't match model configuration shape " +
+            DimsListToString(dims));
+  }
+
+  for (int i = 0; i < dims.size(); ++i) {
+    int64_t model_dim = model_dims.d[i + nonbatch_start_idx];
+    if (model_dim == -1) {
+      continue;
+    }
+
+    if (model_dim != dims[i]) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load model '" + model_name + "', binding '" +
+              binding_name + "' shape expected by framework " +
+              DimsDebugString(model_dims) +
+              " doesn't match model configuration shape " +
+              DimsListToString(dims));
+    }
+  }
+
+  return Status::Success;
+}
+
+Status
+MaximumDims(
+    const nvinfer1::Dims& max_profile_dims, const DimsList& dims,
+    std::vector<int64_t>* max_dims, const bool support_batching)
+{
+  const int nonbatch_start_idx = (support_batching ? 1 : 0);
+  if (max_profile_dims.nbDims != (dims.size() + nonbatch_start_idx)) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "can not maximize dimension " + DimsListToString(dims) + " to " +
+            DimsDebugString(max_profile_dims) + " due to  incompatibility.");
+  }
+
+  if (support_batching) {
+    max_dims->emplace_back(max_profile_dims.d[0]);
+  }
+
+  for (int i = 0; i < dims.size(); ++i) {
+    if (dims[i] == WILDCARD_DIM) {
+      max_dims->emplace_back(max_profile_dims.d[i + nonbatch_start_idx]);
+    } else if (dims[i] <= max_profile_dims.d[i + nonbatch_start_idx]) {
+      max_dims->emplace_back(dims[i]);
+    } else {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "can not maximize dimension " + DimsListToString(dims) + " to " +
+              DimsDebugString(max_profile_dims) + " due to  incompatibility.");
+    }
+  }
+  return Status::Success;
+}
+
+
+void
+DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)
+{
+  dims->clear();
+  for (int i = 0; i < model_dims.nbDims; ++i) {
+    dims->emplace_back(model_dims.d[i]);
+  }
+}
+
+bool
+DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims)
+{
+  if (dim_vec.size() > dims->MAX_DIMS) {
+    return false;
+  } else {
+    dims->nbDims = dim_vec.size();
+    for (int i = 0; i < dims->nbDims; ++i) {
+      dims->d[i] = (int)dim_vec[i];
+    }
+  }
+  return true;
+}
+
+bool
+ContainsWildcard(const nvinfer1::Dims& dims)
+{
+  for (int i = 0; i < dims.nbDims; ++i) {
+    if (dims.d[i] == WILDCARD_DIM) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const std::string
 DimsDebugString(const nvinfer1::Dims& dims)
 {
-  bool first = true;
-  std::string str;
-  str.append("[");
-  for (int i = 0; i < dims.nbDims; ++i) {
-    if (!first) {
-      str.append(",");
-    }
-    str.append(std::to_string(dims.d[i]));
-    first = false;
-  }
-  str.append("]");
-  return str;
+  std::vector<int64_t> dims_vec;
+  DimsToDimVec(dims, &dims_vec);
+  return DimsListToString(dims_vec);
 }
 
 }}  // namespace nvidia::inferenceserver
