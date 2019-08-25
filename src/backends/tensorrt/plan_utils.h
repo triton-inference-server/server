@@ -28,6 +28,7 @@
 
 #include <NvInfer.h>
 #include "src/core/model_config.h"
+#include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -36,7 +37,24 @@ DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
     const DataType& dtype);
 
+int GetProfileIndex(const std::string profile_name);
+
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
+
+Status CompareDimsSupported(
+    const std::string& model_name, const std::string& tensor_name,
+    const nvinfer1::Dims& model_dims, const DimsList& dims,
+    const bool supports_batching, const bool is_dynamic);
+
+Status MaximumDims(
+    const nvinfer1::Dims& max_dims, const DimsList& dims,
+    std::vector<int64_t>* normalized_dims, const bool support_batching);
+
+void DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims);
+
+bool DimVecToDims(const std::vector<int64_t>& dim_vec, nvinfer1::Dims* dims);
+
+bool ContainsWildcard(const nvinfer1::Dims& dims);
 
 const std::string DimsDebugString(const nvinfer1::Dims& dims);
 
