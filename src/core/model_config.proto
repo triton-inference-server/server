@@ -154,6 +154,16 @@ message ModelInstanceGroup
   //@@     available GPUs.
   //@@
   repeated int32 gpus = 3;
+
+  //@@  .. cpp:var:: string profile
+  //@@
+  //@@     For TensorRT models, using inputs with dynamic shape, this
+  //@@     parameter specifies the optimization profile to be set for this
+  //@@     instance group. This field should lie between 0 and
+  //@@     <TotalNumberOfOptimizationProfilesInPlanModel> - 1 and be specified
+  //@@     only for TensorRT backend, otherwise an error will be generated.
+  //@@
+  string profile = 5;
 }
 
 //@@

@@ -535,6 +535,27 @@ ValidateModelConfig(
                                              " of model " + config.name() +
                                              " has unexpected kind KIND_AUTO");
       }
+
+      if (config.platform() != kTensorRTPlanPlatform &&
+          !group.profile().empty()) {
+        return Status(
+            RequestStatusCode::INVALID_ARG,
+            "instance group " + group.name() + " of model " + config.name() +
+                " and platform " + config.platform() +
+                "specifies profile field which is only supported for "
+                "TensorRT models");
+      } else if (!group.profile().empty()) {
+        char* end_ptr;
+        long profile_index = strtol(group.profile().c_str(), &end_ptr, 10);
+        if (*end_ptr != '\0' || profile_index < 0) {
+          return Status(
+              RequestStatusCode::INVALID_ARG,
+              "instance group " + group.name() + " of model " + config.name() +
+                  " and platform " + config.platform() +
+                  " specifies invalid profile " + group.profile() +
+                  ". The field should contain a non-negative integer.");
+        }
+      }
     }
   }
 
@@ -827,8 +848,8 @@ ValidateIOShape(
         return Status(
             RequestStatusCode::INVALID_ARG,
             message_prefix +
-                "has different number of variable-size dimensions for dims and "
-                "reshape");
+                "has different number of variable-size dimensions for dims "
+                "and reshape");
       }
       for (size_t idx = 0; idx < dim_element_cnts.size(); idx++) {
         if (dim_element_cnts[idx] != reshape_element_cnts[idx]) {
@@ -966,5 +987,4 @@ GetSupportedGPUs(std::set<int>& supported_gpus)
 }
 
 #endif
-
 }}  // namespace nvidia::inferenceserver
