@@ -605,7 +605,7 @@ InferResponseProvider::~InferResponseProvider()
     if (output.release_buffer_ != nullptr) {
       TRTSERVER_Error* err = release_fn_(
           allocator_, output.release_buffer_, output.release_userp_,
-          output.byte_size_, TRTSERVER_MEMORY_CPU, 0);
+          output.byte_size_, output.memory_type_, 0);
       if (err != nullptr) {
         LOG_ERROR << "failed to release result tensor '" << output.name_
                   << "': " << TRTSERVER_ErrorMessage(err);
