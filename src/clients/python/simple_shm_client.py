@@ -101,7 +101,7 @@ if __name__ == '__main__':
     shm_ip_handle = shm_helper.create_shared_memory_region(shm_key, input_byte_size * 2)
 
     # Put input data values into shared memory
-    shm_helper.set_shared_memory_region_data(shm_ip_handle, 0, [input0_data, input1_data])
+    shm_helper.set_shared_memory_region(shm_ip_handle, 0, [input0_data, input1_data])
     # Register Input shared memory with TRTIS
     shared_memory_ctx.register("input_data", "/input_simple", 0, input_byte_size * 2)
 
@@ -134,6 +134,6 @@ if __name__ == '__main__':
 
     del results
     shared_memory_ctx.unregister("input_data")
-    shm_helper.unlink_shared_memory_region("/input_simple")
+    shm_helper.destroy_shared_memory_region("/input_simple")
     shared_memory_ctx.unregister("output_data")
-    shm_helper.unlink_shared_memory_region("/output_simple")
+    shm_helper.destroy_shared_memory_region("/output_simple")

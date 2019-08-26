@@ -23,12 +23,13 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#include "src/clients/python/shared_memory_wrapper.h"
+#include "src/clients/python/shared_memory/shared_memory.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "src/clients/python/shared_memory_handle.h"
+#include <iostream>
+#include "src/clients/python/shared_memory/shared_memory_handle.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -42,106 +43,111 @@ ErrorNew(const char* msg)
   return new nic::Error(ni::RequestStatusCode::INTERNAL, std::string(msg));
 }
 
+void
+ErrorDelete(nic::Error* ctx)
+{
+  delete ctx;
+}
+
+bool
+ErrorIsOk(nic::Error* ctx)
+{
+  return ctx->IsOk();
+}
+
+const char*
+ErrorMessage(nic::Error* ctx)
+{
+  return ctx->Message().c_str();
+}
+
+const char*
+ErrorServerId(nic::Error* ctx)
+{
+  return ctx->ServerId().c_str();
+}
+
+uint64_t
+ErrorRequestId(nic::Error* ctx)
+{
+  return ctx->RequestId();
+}
+
 //==============================================================================
 // SharedMemoryControlContext
 
-nic::Error*
-CreateSharedMemoryHandle(
-    void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle)
+void*
+SharedMemoryHandleCreate(void* shm_addr, std::string shm_key, int shm_fd)
 {
-  shared_memory_handle* handle = new shared_memory_handle();
+  SharedMemoryHandle* handle = new SharedMemoryHandle();
   handle->base_addr_ = shm_addr;
-  handle->shm_key_ = std::string(shm_key);
+  handle->shm_key_ = shm_key;
   handle->shm_fd_ = shm_fd;
-  *shm_handle = reinterpret_cast<void*>(handle);
-  return nullptr;
+  std::cout << handle << '\n';
+  return reinterpret_cast<void*>(handle);
 }
 
-nic::Error*
-GetSharedMemoryHandleInfo(
-    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd)
+nic::Error
+SharedMemoryRegionMap(
+    int shm_fd, size_t offset, size_t byte_size, void** shm_addr)
 {
-  shared_memory_handle* handle =
-      reinterpret_cast<shared_memory_handle*>(shm_handle);
-  *shm_addr = handle->base_addr_;
-  *shm_key = handle->shm_key_.c_str();
-  *shm_fd = handle->shm_fd_;
-  return nullptr;
+  // map shared memory to process address space
+  *shm_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  if (*shm_addr == MAP_FAILED) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        ("unable to read/mmap the shared memory region: " +
+         std::to_string(shm_fd))
+            .c_str());
+  }
+
+  return nic::Error::Success;
 }
 
 nic::Error*
-CreateSharedMemoryRegion(const char* shm_key, size_t byte_size, int* shm_fd)
+SharedMemoryRegionCreate(
+    const char* shm_key, size_t byte_size, void** shm_handle)
 {
   // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
+  int shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+  if (shm_fd == -1) {
     return ErrorNew(
         ("unable to get shared memory descriptor for: " + std::string(shm_key))
             .c_str());
   }
   // extend shared memory object as by default it's initialized with size 0
-  int res = ftruncate(*shm_fd, byte_size);
+  int res = ftruncate(shm_fd, byte_size);
   if (res == -1) {
     return ErrorNew(
         ("unable to initialize the size for: " + std::string(shm_key)).c_str());
   }
 
-  return nullptr;
-}
-
-nic::Error*
-OpenSharedMemoryRegion(const char* shm_key, int* shm_fd)
-{
-  // get shared memory region descriptor
-  *shm_fd = shm_open(shm_key, O_RDWR, S_IRUSR | S_IWUSR);
-  if (*shm_fd == -1) {
-    return ErrorNew(
-        ("unable to open the shared memory region: " + std::string(shm_key))
-            .c_str());
+  void* shm_addr = nullptr;
+  nic::Error err = SharedMemoryRegionMap(shm_fd, 0, byte_size, &shm_addr);
+  if (err.IsOk()) {
+    return new nic::Error(err);
   }
 
+  *shm_handle =
+      SharedMemoryHandleCreate(shm_addr, std::string(shm_key), shm_fd);
+
   return nullptr;
 }
 
 nic::Error*
-CloseSharedMemoryRegion(int shm_fd)
+SharedMemoryRegionSet(
+    void* shm_handle, size_t offset, size_t byte_size, const void* data)
 {
-  int tmp = close(shm_fd);
-  if (tmp == -1) {
-    return ErrorNew(
-        ("unable to close the shared memory region: " + std::to_string(shm_fd))
-            .c_str());
-  }
-
+  std::cout << shm_handle << '\n';
+  // void* shm_addr =
+  // reinterpret_cast<SharedMemoryHandle*>(shm_handle)->base_addr_; char*
+  // shm_addr_offset = reinterpret_cast<char*>(shm_addr); memcpy(shm_addr_offset
+  // + offset, data, byte_size);
   return nullptr;
 }
 
 nic::Error*
-SetSharedMemoryRegionData(
-    void* shm_addr, size_t offset, size_t byte_size, const void* data)
-{
-  char* shm_addr_offset = reinterpret_cast<char*>(shm_addr);
-  memcpy(shm_addr_offset + offset, data, byte_size);
-  return nullptr;
-}
-
-nic::Error*
-MapSharedMemoryRegion(
-    int shm_fd, size_t offset, size_t byte_size, const void** shm_addr)
-{
-  // map shared memory to process address space
-  *shm_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (*shm_addr == MAP_FAILED) {
-    return ErrorNew(("unable to read/mmap the shared memory region: " +
-                     std::to_string(shm_fd))
-                        .c_str());
-  }
-
-  return nullptr;
-}
-
-nic::Error*
-UnlinkSharedMemoryRegion(const char* shm_key)
+SharedMemoryRegionDestroy(const char* shm_key)
 {
   int shm_fd = shm_unlink(shm_key);
   if (shm_fd == -1) {
@@ -149,17 +155,6 @@ UnlinkSharedMemoryRegion(const char* shm_key)
         ("unable to unlink the shared memory region: " + std::string(shm_key))
             .c_str());
   }
-  return nullptr;
-}
-
-nic::Error*
-UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size)
-{
-  int tmp_fd = munmap(shm_addr, byte_size);
-  if (tmp_fd == -1) {
-    return ErrorNew("unable to munmap the shared memory region");
-  }
-
   return nullptr;
 }
 

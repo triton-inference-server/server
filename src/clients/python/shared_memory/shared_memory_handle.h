@@ -23,45 +23,11 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
-#include <fcntl.h>
-#include <stddef.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include "src/clients/c++/request.h"
-
-namespace ni = nvidia::inferenceserver;
-namespace nic = nvidia::inferenceserver::client;
-
-#ifdef __cplusplus
-
-extern "C" {
-#endif
-
-//==============================================================================
-// Error
-nic::Error* ErrorNew(const char* msg);
-
-//==============================================================================
-// SharedMemoryControlContext
-nic::Error* CreateSharedMemoryRegion(
-    const char* shm_key, size_t byte_size, int* shm_fd);
-nic::Error* OpenSharedMemoryRegion(const char* shm_key, int* shm_fd);
-nic::Error* CloseSharedMemoryRegion(int shm_fd);
-nic::Error* SetSharedMemoryRegionData(
-    void* shm_addr, size_t offset, size_t byte_size, const void* data);
-nic::Error* MapSharedMemoryRegion(
-    int shm_fd, size_t offset, size_t byte_size, const void** shm_addr);
-nic::Error* UnlinkSharedMemoryRegion(const char* shm_key);
-nic::Error* UnmapSharedMemoryRegion(void* shm_addr, size_t byte_size);
-nic::Error* CreateSharedMemoryHandle(
-    void* shm_addr, const char* shm_key, int shm_fd, void** shm_handle);
-nic::Error* GetSharedMemoryHandleInfo(
-    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd);
-
-//==============================================================================
-
-#ifdef __cplusplus
-}
-#endif
+struct SharedMemoryHandle {
+  void* base_addr_;
+  std::string shm_key_;
+  int shm_fd_;
+};

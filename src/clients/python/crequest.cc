@@ -29,7 +29,7 @@
 #include <iostream>
 #include "src/clients/c++/request_grpc.h"
 #include "src/clients/c++/request_http.h"
-#include "src/clients/python/shared_memory_handle.h"
+#include "src/clients/python/shared_memory/shared_memory_handle.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -402,8 +402,8 @@ nic::Error*
 GetSharedMemoryHandleInfo(
     void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd)
 {
-  shared_memory_handle* handle =
-      reinterpret_cast<shared_memory_handle*>(shm_handle);
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
   *shm_addr = handle->base_addr_;
   *shm_key = handle->shm_key_.c_str();
   *shm_fd = handle->shm_fd_;

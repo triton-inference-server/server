@@ -59,15 +59,13 @@ function main() {
       "${WHLDIR}/tensorrtserver/api/."
     cp ../c++/librequest.so \
       "${WHLDIR}/tensorrtserver/api/."
-    cp libcshmwrap.so \
+    cp libcshm.so \
       "${WHLDIR}/tensorrtserver/shared_memory/."
   else
     cp Release/crequest.dll \
       "${WHLDIR}/tensorrtserver/api/."
     cp ../c++/Release/request.dll \
       "${WHLDIR}/tensorrtserver/api/."
-    cp Release/cshmwrap.dll \
-      "${WHLDIR}/tensorrtserver/shared_memory/."
   fi
 
   cp __init__.py \

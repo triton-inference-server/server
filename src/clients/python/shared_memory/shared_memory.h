@@ -23,8 +23,42 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-struct shared_memory_handle {
-  void* base_addr_;
-  std::string shm_key_;
-  int shm_fd_;
-};
+#pragma once
+
+#include <fcntl.h>
+#include <stddef.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include "src/clients/c++/request.h"
+
+namespace ni = nvidia::inferenceserver;
+namespace nic = nvidia::inferenceserver::client;
+
+#ifdef __cplusplus
+
+extern "C" {
+#endif
+
+//==============================================================================
+// Error
+nic::Error* ErrorNew(const char* msg);
+void ErrorDelete(nic::Error* ctx);
+bool ErrorIsOk(nic::Error* ctx);
+bool ErrorIsUnavailable(nic::Error* ctx);
+const char* ErrorMessage(nic::Error* ctx);
+const char* ErrorServerId(nic::Error* ctx);
+uint64_t ErrorRequestId(nic::Error* ctx);
+
+//==============================================================================
+// SharedMemoryControlContext
+nic::Error* SharedMemoryRegionCreate(
+    const char* shm_key, size_t byte_size, void** shm_handle);
+nic::Error* SharedMemoryRegionSet(
+    void* shm_addr, size_t offset, size_t byte_size, const void* data);
+nic::Error* SharedMemoryRegionDestroy(const char* shm_key);
+
+//==============================================================================
+
+#ifdef __cplusplus
+}
+#endif

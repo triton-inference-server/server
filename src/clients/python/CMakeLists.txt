@@ -36,11 +36,11 @@ target_link_libraries(
 )
 
 #
-# libcshmwrap.so
+# libcshm.so
 #
-add_library(cshmwrap SHARED shared_memory_wrapper.cc)
+add_library(cshm SHARED shared_memory/shared_memory.cc)
 target_link_libraries(
-  cshmwrap
+  cshm
   request
   rt
 )

@@ -55,9 +55,9 @@ except ImportError:
     bdist_wheel = None
 
 if os.name == 'nt':
-    platform_package_data = [ 'crequest.dll', 'request.dll', 'libcshmwrap.dll', ]
+    platform_package_data = [ 'crequest.dll', 'request.dll']
 else:
-    platform_package_data = [ 'libcrequest.so', 'librequest.so', 'libcshmwrap.so', ]
+    platform_package_data = [ 'libcrequest.so', 'librequest.so', 'libcshm.so' ]
 
 setup(
     name='tensorrtserver',
