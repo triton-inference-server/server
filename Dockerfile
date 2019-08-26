@@ -225,11 +225,11 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 # operations link against libtensorflow_framework.so so it must be
 # present (and its functionality is provided by libtensorflow_cc.so).
 COPY --from=trtserver_tf \
-     /usr/local/lib/tensorflow/libtensorflow_cc.so /opt/tensorrtserver/lib/
+     /usr/local/lib/tensorflow/libtensorflow_cc.so.1 /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
-    ln -sf libtensorflow_cc.so libtensorflow_framework.so.1 && \
-    ln -sf libtensorflow_cc.so libtensorflow_framework.so && \
-    ln -sf libtensorflow_cc.so libtensorflow_cc.so.1
+    ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so.1 && \
+    ln -sf libtensorflow_cc.so.1 libtensorflow_framework.so && \
+    ln -sf libtensorflow_cc.so.1 libtensorflow_cc.so
 
 # Caffe2 libraries
 COPY --from=trtserver_caffe2 \
