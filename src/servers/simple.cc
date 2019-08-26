@@ -36,9 +36,37 @@
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace ni = nvidia::inferenceserver;
 
 namespace {
+
+bool use_gpu_memory = false;
+
+#ifdef TRTIS_ENABLE_GPU
+#define FAIL_IF_CUDA_ERR(X, MSG)                                          \
+  do {                                                                    \
+    cudaError_t err = (X);                                                \
+    if (err != cudaSuccess) {                                             \
+      LOG_ERROR << "error: " << (MSG) << ": " << cudaGetErrorString(err); \
+      exit(1);                                                            \
+    }                                                                     \
+  } while (false)
+
+
+static auto gpu_data_deleter = [](void* data) {
+  if (data != nullptr) {
+    auto err = cudaFree(data);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "error: failed to cudaFree " << data << ": "
+                << cudaGetErrorString(err);
+    }
+  }
+};
+#endif  // TRTIS_ENABLE_GPU
 
 void
 Usage(char** argv, const std::string& msg = std::string())
@@ -48,9 +76,16 @@ Usage(char** argv, const std::string& msg = std::string())
   }
 
   LOG_ERROR << "Usage: " << argv[0] << " [options]";
+  LOG_ERROR << "\t-g Use GPU memory for input and output tensors";
   LOG_ERROR << "\t-r [model repository absolute path]";
 
   exit(1);
+}
+
+std::string
+MemoryTypeString(TRTSERVER_Memory_Type memory_type)
+{
+  return (memory_type == TRTSERVER_MEMORY_CPU) ? "CPU memory" : "GPU memory";
 }
 
 TRTSERVER_Error*
@@ -63,18 +98,33 @@ ResponseAlloc(
   // releasing the buffer.
 
   // If 'byte_size' is zero just return 'buffer'==nullptr, we don't
-  // need to do any other book-keeping. Only handle allocation in the
-  // CPU region.
-  if ((byte_size == 0) || (memory_type == TRTSERVER_MEMORY_CPU)) {
-    *buffer = (byte_size == 0) ? nullptr : malloc(byte_size);
-    *buffer_userp = new std::string(tensor_name);
+  // need to do any other book-keeping.
+  if (byte_size == 0) {
+    *buffer = nullptr;
+    *buffer_userp = nullptr;
     LOG_INFO << "allocated " << byte_size << " bytes for result tensor "
              << tensor_name;
   } else {
-    *buffer = nullptr;
-    *buffer_userp = nullptr;
-    LOG_INFO << "failed to allocated " << byte_size
-             << " bytes for result tensor " << tensor_name;
+    void* allocated_ptr = nullptr;
+    if (memory_type == TRTSERVER_MEMORY_CPU) {
+      allocated_ptr = malloc(byte_size);
+#ifdef TRTIS_ENABLE_GPU
+    } else if (use_gpu_memory) {
+      auto err = cudaMalloc(&allocated_ptr, byte_size);
+      if (err != cudaSuccess) {
+        LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
+        allocated_ptr = nullptr;
+      }
+#endif  // TRTIS_ENABLE_GPU
+    }
+
+    if (allocated_ptr != nullptr) {
+      *buffer = allocated_ptr;
+      *buffer_userp = new std::string(tensor_name);
+      LOG_INFO << "allocated " << byte_size << " bytes in "
+               << MemoryTypeString(memory_type) << " for result tensor "
+               << tensor_name;
+    }
   }
 
   return nullptr;  // Success
@@ -93,8 +143,21 @@ ResponseRelease(
   }
 
   LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
-           << " for result '" << *name << "'";
-  free(buffer);
+           << " in " << MemoryTypeString(memory_type) << " for result '"
+           << *name << "'";
+  if (memory_type == TRTSERVER_MEMORY_CPU) {
+    free(buffer);
+#ifdef TRTIS_ENABLE_GPU
+  } else if (use_gpu_memory) {
+    auto err = cudaFree(buffer);
+    if (err != cudaSuccess) {
+      LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
+                << cudaGetErrorString(err);
+    }
+#endif  // TRTIS_ENABLE_GPU
+  } else {
+    LOG_ERROR << "error: unexpected buffer allocated in GPU memory";
+  }
 
   delete name;
 
@@ -121,8 +184,11 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "r:")) != -1) {
+  while ((opt = getopt(argc, argv, "gr:")) != -1) {
     switch (opt) {
+      case 'g':
+        use_gpu_memory = true;
+        break;
       case 'r':
         model_repository_path = optarg;
         break;
@@ -135,6 +201,11 @@ main(int argc, char** argv)
   if (model_repository_path.empty()) {
     Usage(argv, "-r must be used to specify model repository path");
   }
+#ifndef TRTIS_ENABLE_GPU
+  if (use_gpu_memory) {
+    Usage(argv, "-g can not be used without enabling GPU");
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   // Create the server...
   TRTSERVER_ServerOptions* server_options = nullptr;
@@ -290,15 +361,47 @@ main(int argc, char** argv)
     input1_data[i] = 1;
   }
 
+  size_t input0_size = input0_data.size() * sizeof(int32_t);
+  size_t input1_size = input1_data.size() * sizeof(int32_t);
+
+  const void* input0_base = &input0_data[0];
+  const void* input1_base = &input1_data[0];
+  auto memory_type = TRTSERVER_MEMORY_CPU;
+#ifdef TRTIS_ENABLE_GPU
+  std::unique_ptr<void, decltype(gpu_data_deleter)> input0_gpu(
+      nullptr, gpu_data_deleter);
+  std::unique_ptr<void, decltype(gpu_data_deleter)> input1_gpu(
+      nullptr, gpu_data_deleter);
+  if (use_gpu_memory) {
+    void* dst;
+    FAIL_IF_CUDA_ERR(
+        cudaMalloc(&dst, input0_size), "allocating GPU memory for INPUT0 data");
+    input0_gpu.reset(dst);
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(dst, &input0_data[0], input0_size, cudaMemcpyHostToDevice),
+        "setting INPUT0 data in GPU memory");
+    FAIL_IF_CUDA_ERR(
+        cudaMalloc(&dst, input1_size), "allocating GPU memory for INPUT1 data");
+    input1_gpu.reset(dst);
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(dst, &input1_data[0], input1_size, cudaMemcpyHostToDevice),
+        "setting INPUT1 data in GPU memory");
+  }
+
+  input0_base = use_gpu_memory ? input0_gpu.get() : &input0_data[0];
+  input1_base = use_gpu_memory ? input1_gpu.get() : &input1_data[0];
+  memory_type = use_gpu_memory ? TRTSERVER_MEMORY_GPU : TRTSERVER_MEMORY_CPU;
+#endif  // TRTIS_ENABLE_GPU
+
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input0->name().c_str(), &input0_data[0],
-          input0_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
+          request_provider, input0->name().c_str(), input0_base, input0_size,
+          memory_type),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
-          request_provider, input1->name().c_str(), &input1_data[0],
-          input1_data.size() * sizeof(int32_t), TRTSERVER_MEMORY_CPU),
+          request_provider, input1->name().c_str(), input1_base, input1_size,
+          memory_type),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -348,6 +451,8 @@ main(int argc, char** argv)
   }
 
   // Check the output tensor values...
+  // Note that depending on whether the backend supports outputs in GPU memory,
+  // the output tensor may be in CPU memory even if -g flag is set.
   const void* output0_content;
   size_t output0_byte_size;
   TRTSERVER_Memory_Type output0_memory_type;
@@ -361,12 +466,13 @@ main(int argc, char** argv)
         "unexpected output0 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output0_byte_size));
-  } else if (output0_memory_type != TRTSERVER_MEMORY_CPU) {
+  } else if (
+      (!use_gpu_memory) && (output0_memory_type == TRTSERVER_MEMORY_GPU)) {
     FAIL(
         "unexpected output0 memory type, expected to be allocated "
-        "on CPU memory (" +
-        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
-        std::to_string(output0_memory_type) + ")");
+        "in " +
+        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
+        MemoryTypeString(output0_memory_type));
   }
 
   const void* output1_content;
@@ -382,18 +488,47 @@ main(int argc, char** argv)
         "unexpected output1 byte-size, expected " +
         std::to_string(16 * sizeof(int32_t)) + ", got " +
         std::to_string(output1_byte_size));
-  } else if (output1_memory_type != TRTSERVER_MEMORY_CPU) {
+  } else if (
+      (!use_gpu_memory) && (output1_memory_type == TRTSERVER_MEMORY_GPU)) {
     FAIL(
         "unexpected output1 memory type, expected to be allocated "
-        "on CPU memory (" +
-        std::to_string(TRTSERVER_MEMORY_CPU) + "), got (" +
-        std::to_string(output1_memory_type) + ")");
+        "in " +
+        MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
+        MemoryTypeString(output1_memory_type));
   }
 
-  const int32_t* output0_result =
-      reinterpret_cast<const int32_t*>(output0_content);
-  const int32_t* output1_result =
-      reinterpret_cast<const int32_t*>(output1_content);
+  const int32_t* output0_result = reinterpret_cast<const int32_t*>(output0_content);
+  const int32_t* output1_result = reinterpret_cast<const int32_t*>(output1_content);
+
+#ifdef TRTIS_ENABLE_GPU
+  // Different from CPU memory, outputs in GPU memory must be copied to CPU
+  // memory to be read directly.
+  std::vector<int32_t> output0_data(16);
+  std::vector<int32_t> output1_data(16);
+  if (output0_memory_type == TRTSERVER_MEMORY_CPU) {
+    LOG_INFO << "OUTPUT0 are stored in CPU memory";
+  } else {
+    LOG_INFO << "OUTPUT0 are stored in GPU memory";
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(
+            &output0_data[0], output0_content, output0_byte_size,
+            cudaMemcpyDeviceToHost),
+        "setting INPUT0 data in GPU memory");
+    output0_result = reinterpret_cast<const int32_t*>(&output0_data[0]);
+  }
+
+  if (output1_memory_type == TRTSERVER_MEMORY_CPU) {
+    LOG_INFO << "OUTPUT1 are stored in CPU memory";
+  } else {
+    LOG_INFO << "OUTPUT1 are stored in GPU memory";
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(
+            &output1_data[0], output1_content, output1_byte_size,
+            cudaMemcpyDeviceToHost),
+        "setting INPUT0 data in GPU memory");
+    output1_result = reinterpret_cast<const int32_t*>(&output1_data[0]);
+  }
+#endif  // TRTIS_ENABLE_GPU
 
   for (size_t i = 0; i < 16; ++i) {
     LOG_INFO << input0_data[i] << " + " << input1_data[i] << " = "

@@ -42,6 +42,12 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Set input data in GPU memory
+$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
