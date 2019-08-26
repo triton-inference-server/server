@@ -3,4 +3,4 @@
 b32b813bc6f44916710bd230df573146dab50502  /opt/tensorflow/tensorflow-source/tensorflow/tf_version_script.lds
 60bfa649087f293bda03e6dfe27420932877fa88  /opt/tensorflow/nvbuild.sh
 bc67c9d5ce461f4ae9873eb19f1c8811197ea11b  /opt/tensorflow/nvbuildopts
-39dbfe9b20698bc8b0f4f73707fca5cfc01e8fc6  /opt/tensorflow/bazel_build.sh
+af802c812978b045f5fa14b00fd5414530e150d7  /opt/tensorflow/bazel_build.sh
