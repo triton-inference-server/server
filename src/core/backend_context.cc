@@ -92,7 +92,7 @@ BackendContext::SetInputBuffer(
 
     size_t copied_byte_size = 0;
     while (payload.status_.IsOk()) {
-      TRTSERVER_Memory_Type src_memory_type;
+      auto src_memory_type = dst_memory_type;
       const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
       payload.status_ = payload.request_provider_->GetNextInputContent(
