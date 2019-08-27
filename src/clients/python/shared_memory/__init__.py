@@ -97,110 +97,85 @@ def _raise_error(msg):
     _cshm_error_del(err)
     raise ex
 
+def create_shared_memory_region(shm_key, byte_size):
+    """Creates a shared memory region with the specified name and size.
 
-class SharedMemoryHelper:
-    """Client helper functions for using shared memory in python.
+    Parameters
+    ----------
+    shm_key : str
+        The unique key of the shared memory object.
+    byte_size : int
+        The size in bytes of the shared memory region to be created.
+
+    Returns
+    -------
+    shm_handle : c_void_p
+        The handle for the shared memory region.
+
+    Raises
+    ------
+    InferenceServerException
+        If unable to create the shared memory region.
     """
 
-    def create_shared_memory_region(self, shm_key, byte_size):
-        """Creates a shared memory region with the specified name and size.
+    shm_handle = c_void_p()
+    _raise_if_error(
+        c_void_p(_cshm_shared_memory_region_create(shm_key, byte_size, byref(shm_handle))))
 
-        Parameters
-        ----------
-        shm_key : str
-            The unique key of the shared memory object.
-        byte_size : int
-            The size in bytes of the shared memory region to be created.
+    return shm_handle
 
-        Returns
-        -------
-        shm_handle : c_void_p
-            The handle for the shared memory region.
+def set_shared_memory_region(shm_handle, offset, input_values):
+    """Copy the contents of the numpy array into a shared memory region with
+    the specified identifier, offset and size.
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to create the shared memory region.
-        """
+    Parameters
+    ----------
+    shm_handle : c_void_p
+        The handle for the shared memory region.
+    offset : int
+        The offset from the start of the shared shared memory region.
+    input_values : np.array
+        The list of numpy arrays to be copied into the shared memory region.
 
-        shm_handle = c_void_p()
+    Raises
+    ------
+    InferenceServerException
+        If unable to mmap or set values in the shared memory region.
+    """
+
+    if not isinstance(input_values, (list,tuple)):
+        _raise_error("input_values must be specified as a numpy array")
+    for input_value in input_values:
+        if not isinstance(input_value, (np.ndarray,)):
+            _raise_error("input_values must be specified as a list/tuple of numpy arrays")
+
+    offset_current = offset
+    for input_value in input_values:
+        input_value = np.ascontiguousarray(input_value).flatten()
+        byte_size = input_value.size * input_value.itemsize
         _raise_if_error(
-            c_void_p(_cshm_shared_memory_region_create(shm_key, byte_size, byref(shm_handle))))
+            c_void_p(_cshm_shared_memory_region_set(shm_handle, c_uint64(offset_current), \
+                c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
+        offset_current += byte_size
+    return
 
-        return shm_handle
+def destroy_shared_memory_region(shm_key):
+    """Unlink a shared memory region with the specified name.
 
-    def set_shared_memory_region(self, shm_handle, offset, input_values):
-        """Copy the contents of the numpy array into a shared memory region with
-        the specified identifier, offset and size.
+    Parameters
+    ----------
+    shm_key : str
+        The unique key of the shared memory object.
 
-        Parameters
-        ----------
-        shm_handle : c_void_p
-            The handle for the shared memory region.
-        offset : int
-            The offset from the start of the shared shared memory region.
-        input_values : np.array
-            The list of numpy arrays to be copied into the shared memory region.
+    Raises
+    ------
+    InferenceServerException
+        If unable to unlink the shared memory region.
+    """
 
-        Raises
-        ------
-        InferenceServerException
-            If unable to mmap or set values in the shared memory region.
-        """
-
-        if not isinstance(input_values, (list,tuple)):
-            _raise_error("input_values must be specified as a numpy array")
-        for input_value in input_values:
-            if not isinstance(input_value, (np.ndarray,)):
-                _raise_error("input_values must be specified as a list/tuple of numpy arrays")
-
-        offset_current = offset
-        for input_value in input_values:
-            input_value = np.ascontiguousarray(input_value).flatten()
-            byte_size = input_value.size * input_value.itemsize
-            _raise_if_error(
-                c_void_p(_cshm_shared_memory_region_set(shm_handle, c_uint64(offset_current), \
-                    c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
-            offset_current += byte_size
-        return
-
-    def destroy_shared_memory_region(self, shm_key):
-        """Unlink a shared memory region with the specified name.
-
-        Parameters
-        ----------
-        shm_key : str
-            The unique key of the shared memory object.
-
-        Raises
-        ------
-        InferenceServerException
-            If unable to unlink the shared memory region.
-        """
-
-        _raise_if_error(
-            c_void_p(_cshm_shared_memory_region_destroy(shm_key)))
-        return
-
-    def unmap_shared_memory_region(self, shm_addr, byte_size):
-        """Unmap a shared memory region with the specified name and size.
-
-        Parameters
-        ----------
-        shm_addr : void*
-            The base address of the shared memory region.
-        byte_size : int
-            The size in bytes of the data in the shared memory region.
-
-        Raises
-        ------
-        InferenceServerException
-            If unable to munmap the shared memory region.
-        """
-
-        _raise_if_error(
-            c_void_p(_cshm_unmap_shared_memory_region(shm_addr, byte_size)))
-        return
+    _raise_if_error(
+        c_void_p(_cshm_shared_memory_region_destroy(shm_key)))
+    return
 
 
 class InferenceServerException(Exception):

@@ -373,12 +373,13 @@ SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx)
 
 nic::Error*
 SharedMemoryControlContextRegister(
-    SharedMemoryControlContextCtx* ctx, const char* name, const char* shm_key,
+    SharedMemoryControlContextCtx* ctx, const char* name, void* shm_handle,
     const int offset, const int byte_size)
 {
   nic::Error err = ctx->ctx->RegisterSharedMemory(
-      std::string(name), std::string(shm_key), (size_t)offset,
-      size_t(byte_size));
+      std::string(name),
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle)->shm_key_,
+      (size_t)offset, size_t(byte_size));
   if (err.IsOk()) {
     return nullptr;
   }
@@ -399,7 +400,7 @@ SharedMemoryControlContextUnregister(
 }
 
 nic::Error*
-GetSharedMemoryHandleInfo(
+SharedMemoryControlContextGetSharedMemoryHandle(
     void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd)
 {
   SharedMemoryHandle* handle =

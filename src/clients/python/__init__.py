@@ -116,7 +116,7 @@ _crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
 _crequest_shm_control_ctx_del.argtypes = [c_void_p]
 _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
 _crequest_shm_control_ctx_register.restype = c_void_p
-_crequest_shm_control_ctx_register.argtypes = [c_void_p, _utf8]
+_crequest_shm_control_ctx_register.argtypes = [c_void_p, _utf8, c_void_p, c_uint64, c_uint64]
 _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
 _crequest_shm_control_ctx_unregister.restype = c_void_p
 _crequest_shm_control_ctx_unregister.argtypes = [c_void_p, _utf8]
@@ -214,7 +214,7 @@ _crequest_infer_ctx_result_next_class = _crequest.InferContextResultNextClass
 _crequest_infer_ctx_result_next_class.restype = c_void_p
 _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_uint64),
                                                   POINTER(c_float), POINTER(c_char_p)]
-_crequest_get_shared_memory_handle_info = _crequest.GetSharedMemoryHandleInfo
+_crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandle
 _crequest_get_shared_memory_handle_info.restype = c_void_p
 _crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int)]
 
@@ -727,15 +727,15 @@ class SharedMemoryControlContext:
         _crequest_shm_control_ctx_del(self._ctx)
         self._ctx = None
 
-    def register(self, name, shm_key, offset, byte_size):
+    def register(self, name, shm_handle, offset, byte_size):
         """Request the inference server to register specified shared memory region.
 
         Parameters
         ----------
         name : str
             The name of the shared memory region to be registered.
-        shm_key : str
-            The unique key of the shared memory object.
+        shm_handle : c_void_p
+            The handle for the shared memory region.
         offset : int
             The offset from the start of the shared shared memory region.
         byte_size : int
@@ -753,7 +753,7 @@ class SharedMemoryControlContext:
             _raise_error("SharedMemoryControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_register(self._ctx, name, shm_key, offset, byte_size)))
+            c_void_p(_crequest_shm_control_ctx_register(self._ctx, name, shm_handle, offset, byte_size)))
         return
 
     def unregister(self, name):
@@ -963,7 +963,7 @@ class InferContext:
                     or (not isinstance(output_format[1], (list, tuple))) or (type(output_format[2]) != int) \
                         or (type(output_format[3]) != int):
                         _raise_error("shared memory requires tuple of size 4" \
-                            + " - output_format(RAW), [shm_key (string), base address(c_void_p)], offset (int), size (int)")
+                            + " - output_format(RAW), [shm_key (string), shm_handle(c_void_p)], offset (int), size (int)")
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_shared_memory(

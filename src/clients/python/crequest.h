@@ -88,11 +88,11 @@ nic::Error* SharedMemoryControlContextNew(
     const char** headers, int num_headers, bool verbose);
 void SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx);
 nic::Error* SharedMemoryControlContextRegister(
-    SharedMemoryControlContextCtx* ctx, const char* name, const char* shm_key,
+    SharedMemoryControlContextCtx* ctx, const char* name, void* shm_handle,
     const int offset, const int byte_size);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, const char* model_name);
-nic::Error* GetSharedMemoryHandleInfo(
+nic::Error* SharedMemoryControlContextGetSharedMemoryHandle(
     void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd);
 //==============================================================================
 // InferContext

@@ -139,10 +139,10 @@ SharedMemoryRegionSet(
     void* shm_handle, size_t offset, size_t byte_size, const void* data)
 {
   std::cout << shm_handle << '\n';
-  // void* shm_addr =
-  // reinterpret_cast<SharedMemoryHandle*>(shm_handle)->base_addr_; char*
-  // shm_addr_offset = reinterpret_cast<char*>(shm_addr); memcpy(shm_addr_offset
-  // + offset, data, byte_size);
+  void* shm_addr =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle)->base_addr_;
+  char* shm_addr_offset = reinterpret_cast<char*>(shm_addr);
+  memcpy(shm_addr_offset + offset, data, byte_size);
   return nullptr;
 }
 
