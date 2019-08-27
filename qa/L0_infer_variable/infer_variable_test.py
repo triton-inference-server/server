@@ -83,6 +83,13 @@ class InferVariableTest(unittest.TestCase):
                                     input_dtype, output0_dtype, output1_dtype,
                                     output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
+        if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                                    input_shape, output0_shape, output1_shape):
+            for prefix in ensemble_prefix:
+                _infer_exact_helper(self, prefix + 'plan', input_shape + (1, 1), 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+
         if tu.validate_for_c2_model(input_dtype, output0_dtype, output1_dtype,
                                     input_shape, output0_shape, output1_shape):
             for prefix in ensemble_prefix:
