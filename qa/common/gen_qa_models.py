@@ -571,16 +571,82 @@ output [
         for l in range(output0_label_cnt):
             lfile.write("label" + str(l) + "\n")
 
-
-def create_plan_modelfile(
-        models_dir, max_batch, model_version,
+def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype, swap=False):
+    trt_input_dtype = np_to_trt_dtype(input_dtype)
+    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
+    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
-    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
-                                     input_shape, output0_shape, output1_shape):
-        return
+    # Create the model
+    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
+    builder = trt.infer.create_infer_builder(G_LOGGER)
+    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    if max_batch == 0:
+        input_with_batchsize = [i for i in input_shape]
+    else:
+        input_with_batchsize = [-1] + [i for i in input_shape] 
+    
+    in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
+    in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
+    add = network.add_elementwise(in0, in1, trt.infer.ElementWiseOperation.SUM)
+    sub = network.add_elementwise(in0, in1, trt.infer.ElementWiseOperation.SUB)
 
+    out0 = add if not swap else sub
+    out1 = sub if not swap else add
+
+    out0.get_output(0).set_name("OUTPUT0")
+    out1.get_output(0).set_name("OUTPUT1")
+    network.mark_output(out0.get_output(0))
+    network.mark_output(out1.get_output(0))
+
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in input_shape:
+        if i == -1:
+            # Generating a very generous optimization profile
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [8]
+            max_shape = max_shape + [32]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
+    config = builder.create_builder_config()
+    config.add_optimization_profile(profile)
+    builder.set_max_workspace_size(1 << 20)
+    engine = builder.build_engine(network,config)
+
+
+    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
+                                   input_dtype, output0_dtype, output1_dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    engine.destroy()
+    builder.destroy()
+    
+    
+def create_plan_fixed_modelfile( models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
+        input_dtype, output0_dtype, output1_dtype, swap=False):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
@@ -621,6 +687,29 @@ def create_plan_modelfile(
     lengine.save(model_version_dir + "/model.plan")
     engine.destroy()
     builder.destroy()
+
+
+def create_plan_modelfile(
+        models_dir, max_batch, model_version,
+        input_shape, output0_shape, output1_shape,
+        input_dtype, output0_dtype, output1_dtype, swap=False):
+
+    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
+                                     input_shape, output0_shape, output1_shape):
+        return
+
+    if (not tu.shape_is_fixed(input_shape) or
+        not tu.shape_is_fixed(output0_shape) or
+        not tu.shape_is_fixed(output1_shape)):
+        create_plan_dynamic_modelfile(
+            models_dir, max_batch, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype, swap)
+    else:
+        create_plan_fixed_modelfile(
+            models_dir, max_batch, model_version,
+            input_shape, output0_shape, output1_shape,
+            input_dtype, output0_dtype, output1_dtype, swap)
 
 
 def create_plan_modelconfig(
@@ -1006,22 +1095,22 @@ def create_models(
         # max-batch 8
         create_plan_modelconfig(
             models_dir, 8, model_version,
-            input_shape, output0_shape, output1_shape,
+            input_shape + (1, 1), output0_shape + (1, 1), output1_shape + (1, 1),
             input_dtype, output0_dtype, output1_dtype,
             output0_label_cnt, version_policy)
         create_plan_modelfile(
             models_dir, 8, model_version,
-            input_shape, output0_shape, output1_shape,
+            input_shape + (1, 1), output0_shape + (1, 1), output1_shape + (1, 1),
             input_dtype, output0_dtype, output1_dtype)
         # max-batch 0
         create_plan_modelconfig(
             models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
+            input_shape + (1, 1), output0_shape + (1, 1), output1_shape + (1, 1),
             input_dtype, output0_dtype, output1_dtype,
             output0_label_cnt, version_policy)
         create_plan_modelfile(
             models_dir, 0, model_version,
-            input_shape, output0_shape, output1_shape,
+            input_shape + (1, 1), output0_shape + (1, 1), output1_shape + (1, 1),
             input_dtype, output0_dtype, output1_dtype)
 
     if FLAGS.onnx:
@@ -1105,16 +1194,10 @@ def create_models(
 
 def create_fixed_models(
         models_dir, input_dtype, output0_dtype, output1_dtype, version_policy=None):
-    input_size = 16
-
-    if FLAGS.tensorrt:
-        create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
-                      (input_size, 1, 1), (input_size, 1, 1), (input_size, 1, 1),
-                      input_size, version_policy)
-    else:
-        create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
-                      (input_size,), (input_size,), (input_size,),
-                      input_size, version_policy)
+    input_size = 16  
+    create_models(models_dir, input_dtype, output0_dtype, output1_dtype,
+            (input_size,), (input_size,), (input_size,),
+            input_size, version_policy)
 
 
 if __name__ == '__main__':
