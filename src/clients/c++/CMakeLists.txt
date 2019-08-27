@@ -40,7 +40,7 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
 )
-
+set_target_properties(request PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/EXPORT_SYMBOLS")
 target_link_libraries(
   request
   PRIVATE gRPC::grpc++

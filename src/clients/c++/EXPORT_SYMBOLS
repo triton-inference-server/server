@@ -1,0 +1,7 @@
+{
+  global:
+    extern "C++" {
+      nvidia::inferenceserver*
+    };
+  local: *;
+};
