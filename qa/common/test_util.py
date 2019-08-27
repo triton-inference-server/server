@@ -118,12 +118,6 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
     if (output0_dtype != np.float32) or (output1_dtype != np.float32):
         return False
 
-    # Input and output shapes must be fixed-size.
-    if (not shape_is_fixed(input_shape) or
-        not shape_is_fixed(output0_shape) or
-        not shape_is_fixed(output1_shape)):
-        return False
-
     return True
 
 def validate_for_custom_model(input_dtype, output0_dtype, output1_dtype,
