@@ -92,6 +92,11 @@ the Ubuntu version that you want the client library built
 for. Supported values for *<ver>* are 16.04 and 18.04, with 16.04
 being the default.
 
+The generated Python wheel file works with both Python2 and Python3,
+but you can control which version of Python (and pip) are used to
+generate the wheel file by editing PYVER in Dockerfile.client. The
+default is Python3 and pip3.
+
 After the build completes the tensorrtserver_client docker image will
 contain the built client libraries and examples, and will also be
 configured with all the dependencies required to run those examples
@@ -274,7 +279,7 @@ directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python3 image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
+  $ python image_client.py -m resnet50_netdef -s INCEPTION qa/images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
@@ -388,7 +393,7 @@ directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python3 ensemble_image_client.py qa/images/mug.jpg
+  $ python ensemble_image_client.py qa/images/mug.jpg
   Image 'qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
 
@@ -616,7 +621,7 @@ download it as described in
 :ref:`section-getting-the-client-libraries-and-examples` and install
 the tensorrtserver whl, then::
 
-  $ python3 simple_client.py
+  $ python simple_client.py
 
 String Datatype
 ^^^^^^^^^^^^^^^

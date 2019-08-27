@@ -29,8 +29,12 @@ ARG UBUNTU_VERSION=18.04
 
 FROM ubuntu:${UBUNTU_VERSION}
 
+# Default to use Python3. Allowed values are "2" and "3".
+ARG PYVER=3
+
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYVER=$PYVER
 
 # install platform specific packages
 RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
@@ -46,7 +50,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
         exit 1; \
     fi
 
-RUN apt-get update && \
+RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
             autoconf \
@@ -60,14 +65,14 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             pkg-config \
-            python \
-            python-dev
+            python${PYSFX} \
+            python${PYSFX}-pip \
+            python${PYSFX}-dev && \
+    pip${PYSFX} install --upgrade wheel setuptools grpcio-tools
 
-RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
-    python get-pip.py && \
-    rm get-pip.py
-
-RUN pip install --upgrade setuptools grpcio-tools
+# Build expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python$PYVER /usr/bin/python
 
 # Build the client library and examples
 WORKDIR /workspace
@@ -88,8 +93,11 @@ COPY qa/images/mug.jpg images/mug.jpg
 
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
-# be used to run the client examples.
-RUN pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow
+# be used to run the client examples. The special upgrade and handling
+# of pip is needed to get numpy to install correctly with python2 on
+# ubuntu 16.04.
+RUN python -m pip install --user --upgrade pip && \
+    python -m pip install --upgrade install/python/tensorrtserver-*.whl numpy pillow
 
 ENV PATH //workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
