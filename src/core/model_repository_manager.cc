@@ -1448,12 +1448,18 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
         // Add the node to missing node's downstream so that when the missing
         // node is added, the downstreams can be found easily.
         mit->second->downstreams_.emplace(updated_node);
-        updated_node->upstreams_.emplace(
-            mit->second.get(), step.model_version());
+        auto res = updated_node->upstreams_.emplace(
+            mit->second.get(), std::set<int64_t>({step.model_version()}));
+        if (!res.second) {
+          res.first->second.insert(step.model_version());
+        }
       } else {
         dit->second->downstreams_.emplace(updated_node);
-        updated_node->upstreams_.emplace(
-            dit->second.get(), step.model_version());
+        auto res = updated_node->upstreams_.emplace(
+            dit->second.get(), std::set<int64_t>({step.model_version()}));
+        if (!res.second) {
+          res.first->second.insert(step.model_version());
+        }
       }
     }
     return true;
@@ -1545,14 +1551,20 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
             RequestStatusCode::INVALID_ARG,
             "ensemble '" + node->model_name_ + "' depends on '" +
                 upstream.first->model_name_ + "' which has no loaded version");
-      } else if (upstream.second != -1) {
-        auto it = upstream.first->loaded_versions_.find(upstream.second);
-        if (it == upstream.first->loaded_versions_.end()) {
-          node->status_ = Status(
-              RequestStatusCode::INVALID_ARG,
-              "ensemble '" + node->model_name_ + "' depends on '" +
-                  upstream.first->model_name_ +
-                  "' whose required version is not loaded");
+      } else {
+        for (const auto& required_version : upstream.second) {
+          if (required_version == -1) {
+            continue;
+          }
+
+          auto it = upstream.first->loaded_versions_.find(required_version);
+          if (it == upstream.first->loaded_versions_.end()) {
+            node->status_ = Status(
+                RequestStatusCode::INVALID_ARG,
+                "ensemble '" + node->model_name_ + "' depends on '" +
+                    upstream.first->model_name_ +
+                    "' whose required version is not loaded");
+          }
         }
       }
       if (!node->status_.IsOk()) {

@@ -62,7 +62,7 @@ class ModelRepositoryManager {
     ModelConfig model_config_;
     std::set<int64_t> loaded_versions_;
     std::set<DependencyNode*> missing_upstreams_;
-    std::unordered_map<DependencyNode*, int64_t> upstreams_;
+    std::unordered_map<DependencyNode*, std::set<int64_t>> upstreams_;
     std::set<DependencyNode*> downstreams_;
   };
 
