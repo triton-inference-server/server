@@ -270,12 +270,12 @@ ConcurrencyManager::PrepareInfer(
     // if available, use provided data instead
     auto it = input_data_.find(input->Name());
     if (it != input_data_.end()) {
-      if (batch1_size > it->second.size()) {
+      if (batch1_size != it->second.size()) {
         return nic::Error(
             ni::RequestStatusCode::INVALID_ARG,
             "input '" + input->Name() + "' requires " +
                 std::to_string(batch1_size) +
-                " bytes for each batch, but provided data only has " +
+                " bytes for each batch, but provided data has " +
                 std::to_string(it->second.size()) + " bytes");
       }
       data = (const uint8_t*)&(it->second)[0];
