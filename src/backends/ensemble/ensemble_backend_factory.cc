@@ -40,6 +40,7 @@ namespace nvidia { namespace inferenceserver {
 
 Status
 EnsembleBackendFactory::Create(
+    InferenceServer* const server,
     const std::shared_ptr<BackendConfig>& backend_config,
     std::unique_ptr<EnsembleBackendFactory>* factory)
 {
@@ -47,7 +48,7 @@ EnsembleBackendFactory::Create(
 
   auto ensemble_backend_config =
       std::static_pointer_cast<Config>(backend_config);
-  factory->reset(new EnsembleBackendFactory(ensemble_backend_config));
+  factory->reset(new EnsembleBackendFactory(server, ensemble_backend_config));
   return Status::Success;
 }
 
@@ -59,7 +60,7 @@ EnsembleBackendFactory::CreateBackend(
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<EnsembleBackend> local_backend(new EnsembleBackend);
-  RETURN_IF_ERROR(local_backend->Init(path, model_config));
+  RETURN_IF_ERROR(local_backend->Init(server_, path, model_config));
 
   *backend = std::move(local_backend);
   return Status::Success;

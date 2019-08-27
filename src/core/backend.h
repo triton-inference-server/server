@@ -44,9 +44,6 @@ class InferenceBackend {
   InferenceBackend() = default;
   virtual ~InferenceBackend() {}
 
-  // Set reference to the inference server.
-  virtual Status SetInferenceServer(void* inference_server);
-
   // Get the name of model being served.
   const std::string& Name() const { return config_.name(); }
 

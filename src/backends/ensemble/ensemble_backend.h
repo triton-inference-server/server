@@ -37,9 +37,9 @@ class EnsembleBackend : public InferenceBackend {
   EnsembleBackend() = default;
   EnsembleBackend(EnsembleBackend&&) = default;
 
-  Status Init(const std::string& path, const ModelConfig& config);
-
-  Status SetInferenceServer(void* inference_server) override;
+  Status Init(
+      InferenceServer* const server, const std::string& path,
+      const ModelConfig& config);
 
  private:
   // Run model on the context associated with 'runner_idx' to

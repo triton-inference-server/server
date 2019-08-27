@@ -38,6 +38,7 @@ class EnsembleBackendFactory {
   };
 
   static Status Create(
+      InferenceServer* const server,
       const std::shared_ptr<BackendConfig>& backend_config,
       std::unique_ptr<EnsembleBackendFactory>* factory);
 
@@ -50,11 +51,14 @@ class EnsembleBackendFactory {
  private:
   DISALLOW_COPY_AND_ASSIGN(EnsembleBackendFactory);
 
-  EnsembleBackendFactory(const std::shared_ptr<Config>& backend_config)
-      : backend_config_(backend_config)
+  EnsembleBackendFactory(
+      InferenceServer* const server,
+      const std::shared_ptr<Config>& backend_config)
+      : server_(server), backend_config_(backend_config)
   {
   }
 
+  InferenceServer* const server_;
   const std::shared_ptr<Config> backend_config_;
 };
 

@@ -36,28 +36,20 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-EnsembleBackend::Init(const std::string& path, const ModelConfig& config)
+EnsembleBackend::Init(
+    InferenceServer* const server, const std::string& path,
+    const ModelConfig& config)
 {
   RETURN_IF_ERROR(ValidateModelConfig(config, kEnsemblePlatform));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 
   std::unique_ptr<Scheduler> scheduler;
-  RETURN_IF_ERROR(EnsembleScheduler::Create(config, &scheduler));
+  RETURN_IF_ERROR(EnsembleScheduler::Create(server, config, &scheduler));
   RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
 
   LOG_VERBOSE(1) << "ensemble backend for " << Name() << std::endl << *this;
 
   return Status::Success;
-}
-
-Status
-EnsembleBackend::SetInferenceServer(void* inference_server)
-{
-  // [TODO] update this since we can determine inference server on
-  // backend creation
-  EnsembleScheduler* scheduler =
-      static_cast<EnsembleScheduler*>(BackendScheduler());
-  return scheduler->SetInferenceServer(inference_server);
 }
 
 void

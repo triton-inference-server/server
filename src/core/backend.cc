@@ -68,12 +68,6 @@ InferenceBackend::GetOutput(
 }
 
 Status
-InferenceBackend::SetInferenceServer(void* inference_server)
-{
-  return Status::Success;
-}
-
-Status
 InferenceBackend::SetModelConfig(
     const std::string& path, const ModelConfig& config)
 {
