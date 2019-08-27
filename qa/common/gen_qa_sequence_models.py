@@ -434,14 +434,8 @@ instance_group [
         cfile.write(config)
 
 
-def create_plan_modelfile(
-        models_dir, model_version, max_batch, dtype, shape):
-
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
-        return
-
+def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
-
     # Create the model. For now don't implement a proper accumulator
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
@@ -476,6 +470,92 @@ def create_plan_modelfile(
     lengine.save(model_version_dir + "/model.plan")
     engine.destroy()
     builder.destroy()
+
+def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, shape):
+    trt_dtype = np_to_trt_dtype(dtype)
+    # Create the model. For now don't implement a proper accumulator
+    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
+    # tests know to expect this.
+    G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
+    builder = trt.infer.create_infer_builder(G_LOGGER)
+    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+
+    if max_batch == 0:
+        header = []
+    else:
+        header =  [-1]
+
+    in0 = network.add_input("INPUT", trt_dtype, header + [i for i in shape])
+    start0 = network.add_input("START", trt_dtype, header + [1, 1, 1])
+    ready0 = network.add_input("READY", trt_dtype, header + [1, 1, 1])
+    add = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
+    out0 = network.add_elementwise(add.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
+
+    out0.get_output(0).set_name("OUTPUT")
+    network.mark_output(out0.get_output(0))
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in shape:
+        if i == -1:
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [8]
+            max_shape = max_shape + [32]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
+    if max_shape != 0:
+        profile.set_shape("START", [1,1,1,1], [max(1, max_batch),1,1,1], [max(1, max_batch),1,1,1])
+        profile.set_shape("READY", [1,1,1,1], [max(1, max_batch),1,1,1], [max(1, max_batch),1,1,1])
+    else:
+        profile.set_shape("START", [1,1,1], [1,1,1], [1,1,1])
+        profile.set_shape("READY", [1,1,1], [1,1,1], [1,1,1])
+    config = builder.create_builder_config()
+    config.add_optimization_profile(profile)
+
+    builder.set_max_workspace_size(1 << 20)
+    engine = builder.build_engine(network,config)
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine.serialize())
+
+    engine.destroy()
+    builder.destroy()
+
+
+
+
+
+def create_plan_modelfile(
+        models_dir, model_version, max_batch, dtype, shape):
+
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    if (not tu.shape_is_fixed(shape)):
+        create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, shape)
+    else:
+        create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape)
+
 
 
 def create_plan_modelconfig(
