@@ -42,10 +42,7 @@ import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 from ctypes import *
 
-if os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef", "custom", "libtorch", "onnx")
-else:
-    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
+_trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
 
 TEST_SHARED_MEMORY = int(os.environ.get('TEST_SHARED_MEMORY', 0))
 
