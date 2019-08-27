@@ -93,12 +93,13 @@ BuildBackendConfigMap(
 #ifdef TRTIS_ENABLE_GPU
     int device_cnt = 0;
     cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-    if (cuerr == cudaErrorNoDevice) {
+    if ((cuerr == cudaErrorNoDevice) ||
+        (cuerr == cudaErrorInsufficientDriver)) {
       device_cnt = 0;
     } else if (cuerr != cudaSuccess) {
       LOG_ERROR << "unable to get number of CUDA devices while building "
-                   "BackendConfigMap: "
-                << cudaGetErrorString(cuerr);
+                   "BackendConfigMap: ("
+                << cuerr << ") " << cudaGetErrorString(cuerr);
       device_cnt = 0;
     }
 

@@ -46,9 +46,7 @@ if [[ "$(find /usr -name libcuda.so.1 | grep -v "compat") " == " " || "$(ls /dev
   echo "WARNING: The NVIDIA Driver was not detected.  GPU functionality will not be available."
   echo "   Use 'nvidia-docker run' to start this container; see"
   echo "   https://github.com/NVIDIA/nvidia-docker/wiki/nvidia-docker ."
-  ln -s `find / -name libcuda.so.1 -print -quit` /opt/tensorrtserver/lib/libcuda.so.1
   ln -s `find / -name libnvidia-ml.so -print -quit` /opt/tensorrtserver/lib/libnvidia-ml.so.1
-  ln -s `find / -name libnvidia-fatbinaryloader.so.${CUDA_DRIVER_VERSION} -print -quit` /opt/tensorrtserver/lib/libnvidia-fatbinaryloader.so.${CUDA_DRIVER_VERSION}
   export TENSORRT_SERVER_CPU_ONLY=1
 else
   ( /usr/local/bin/checkSMVER.sh )

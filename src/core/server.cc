@@ -44,7 +44,6 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/profile.h"
 #include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
@@ -114,14 +113,6 @@ InferenceServer::Init()
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return Status(
         RequestStatusCode::INVALID_ARG, "--model-repository must be specified");
-  }
-
-  // Disable profiling at server start. Server API can be used to
-  // start/stop profiling.
-  status = ProfileStopAll();
-  if (!status.IsOk()) {
-    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
-    return status;
   }
 
   // Create the shared memory manager that registers / unregisters and returns
