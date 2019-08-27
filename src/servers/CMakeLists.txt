@@ -53,7 +53,6 @@ if(${TRTIS_ENABLE_GRPC})
     GRPC_ENDPOINT_OBJECTS
     $<TARGET_OBJECTS:grpc-endpoint-library>
     $<TARGET_OBJECTS:grpc-library>
-    $<TARGET_OBJECTS:nvrpc-library>
     $<TARGET_OBJECTS:proto-library>
   )
   set(
@@ -228,7 +227,6 @@ target_link_libraries(
   trtserver
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
-  PRIVATE ${LIBEVENT_LIBRARIES}   # FIXME remove after TRTSERVER API finalized
 )
 
 if(${TRTIS_ENABLE_TENSORRT})

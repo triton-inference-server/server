@@ -135,7 +135,6 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 
 add_subdirectory(../../src/core src/core)
-add_subdirectory(../../src/nvrpc src/nvrpc)
 add_subdirectory(../../src/backends/caffe2 src/backends/caffe2)
 add_subdirectory(../../src/backends/custom src/backends/custom)
 add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
