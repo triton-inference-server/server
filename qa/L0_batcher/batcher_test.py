@@ -40,10 +40,7 @@ import test_util as tu
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
-if os.environ['BATCHER_TYPE'] == "VARIABLE":
-    _trials = ("savedmodel", "graphdef", "netdef", "custom", "libtorch", "onnx")
-else:
-    _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
+_trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
 
 _max_queue_delay_ms = 10000
 _check_exception = None
