@@ -367,7 +367,9 @@ Usage(char** argv, const std::string& msg = std::string())
       << " be a binary file for each input required by the model."
       << " The file must be named the same as the input and must contain data"
       << " required for sending the input in a batch-1 request. The perf client"
-      << " will reuse the data to match the specified batch size." << std::endl;
+      << " will reuse the data to match the specified batch size."
+      << " Note that the files should contain only the raw binary"
+      << " representation of the data in row major order." << std::endl;
 
   exit(1);
 }
