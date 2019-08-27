@@ -276,14 +276,14 @@ EnsembleContext::ResponseAlloc(
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
-  auto allocated_buffer = std::make_shared<AllocatedSystemMemory>(
-                              byte_size, memory_type);
-  
+  auto allocated_buffer =
+      std::make_shared<AllocatedSystemMemory>(byte_size, memory_type);
+
   TRTSERVER_Memory_Type allocated_memory_type;
   auto mutable_buffer = allocated_buffer->MutableBuffer(&allocated_memory_type);
   if ((mutable_buffer != nullptr) || (byte_size == 0)) {
     if (byte_size != 0) {
-      *buffer =static_cast<void*>(mutable_buffer);
+      *buffer = static_cast<void*>(mutable_buffer);
     }
     tensor_data_map->emplace(tensor_name, std::move(allocated_buffer));
     LOG_VERBOSE(1) << "Internal response allocation: " << tensor_name
@@ -604,19 +604,21 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       shape.push_back(dim);
     }
 
-    
+
     TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_GPU;
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
-        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
-    
+        output_pair.first, &buffer, expected_byte_size, shape,
+        dst_memory_type));
+
     // Done with this output if 'expected_byte_size' is 0
     if (expected_byte_size == 0) {
       continue;
     } else if (buffer == nullptr) {
       dst_memory_type = TRTSERVER_MEMORY_CPU;
       RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
-        output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type));
+          output_pair.first, &buffer, expected_byte_size, shape,
+          dst_memory_type));
       if (buffer == nullptr) {
         return Status(
             RequestStatusCode::INTERNAL,
@@ -712,9 +714,10 @@ EnsembleContext::ScheduleSteps(
 
 Status
 EnsembleScheduler::Create(
-    const ModelConfig& config, std::unique_ptr<Scheduler>* scheduler)
+    InferenceServer* const server, const ModelConfig& config,
+    std::unique_ptr<Scheduler>* scheduler)
 {
-  scheduler->reset(new EnsembleScheduler(config));
+  scheduler->reset(new EnsembleScheduler(server, config));
   return Status::Success;
 }
 
@@ -731,7 +734,9 @@ EnsembleScheduler::Enqueue(
   EnsembleContext::Proceed(context);
 }
 
-EnsembleScheduler::EnsembleScheduler(const ModelConfig& config)
+EnsembleScheduler::EnsembleScheduler(
+    InferenceServer* const server, const ModelConfig& config)
+    : is_(server)
 {
   // Set 'info_' based on 'config'
   info_.reset(new EnsembleInfo());

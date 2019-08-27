@@ -68,7 +68,8 @@ class EnsembleScheduler : public Scheduler {
   // Create a scheduler to process ensemble requests and
   // to dispatch requests to models in ensemble internally.
   static Status Create(
-      const ModelConfig& config, std::unique_ptr<Scheduler>* scheduler);
+      InferenceServer* const server, const ModelConfig& config,
+      std::unique_ptr<Scheduler>* scheduler);
 
   // \see Scheduler::Enqueue()
   void Enqueue(
@@ -77,17 +78,10 @@ class EnsembleScheduler : public Scheduler {
       const std::shared_ptr<InferResponseProvider>& response_provider,
       std::function<void(const Status&)> OnComplete) override;
 
-  // Set the inference server that the scheduler is communicating with
-  Status SetInferenceServer(void* inference_server)
-  {
-    is_ = (InferenceServer*)inference_server;
-    return Status::Success;
-  }
-
  private:
-  EnsembleScheduler(const ModelConfig& config);
+  EnsembleScheduler(InferenceServer* const server, const ModelConfig& config);
 
-  InferenceServer* is_;
+  InferenceServer* const is_;
 
   // Ensemble information that is built from model config
   std::unique_ptr<EnsembleInfo> info_;
