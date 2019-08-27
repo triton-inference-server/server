@@ -199,7 +199,7 @@ COPY --from=cbe /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.
-RUN rm -fr qa/L0_copyrights qa/L0_unit_test && \
+RUN rm -fr qa/L0_copyrights && \
     pip install --upgrade qa/pkgs/tensorrtserver-*.whl
 
 ENV LD_LIBRARY_PATH /opt/tensorrtserver/qa/clients:${LD_LIBRARY_PATH}

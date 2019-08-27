@@ -80,7 +80,7 @@ function main() {
 
   pushd "${WHLDIR}"
   echo $(date) : "=== Building wheel"
-  VERSION=$VERSION python setup.py bdist_wheel
+  VERSION=$VERSION python${PYVER} setup.py bdist_wheel
   mkdir -p "${DEST}"
   cp dist/* "${DEST}"
   popd

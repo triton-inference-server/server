@@ -257,7 +257,7 @@ example model repository for an image from the qa/images directory::
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python3 /tmp/client/python/image_client.py -m resnet50_netdef -s INCEPTION images/mug.jpg
+  $ python /tmp/client/python/image_client.py -m resnet50_netdef -s INCEPTION images/mug.jpg
   Request 0, batch size 1
   Image '../qa/images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
