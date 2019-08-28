@@ -132,15 +132,16 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             input1_list.append(in1)
 
         if use_shared_memory:
-            input_byte_size = input0_list[0].nbytes * batch_size
-            output_byte_size = expected0_val_list[0].nbytes * batch_size
+            input0_byte_size = input0_list[0].nbytes * batch_size
+            output0_byte_size = expected0_val_list[0].nbytes * batch_size
+            output1_byte_size = expected1_val_list[0].nbytes * batch_size
             # create and register shared memory region for inputs and outputs
-            shm_ip_handle = shm.create_shared_memory_region("/inputs", input_byte_size * 2)
-            shm_op_handle = shm.create_shared_memory_region("/outputs", output_byte_size * 2)
+            shm_ip_handle = shm.create_shared_memory_region("/inputs", input0_byte_size * 2)
+            shm_op_handle = shm.create_shared_memory_region("/outputs", output0_byte_size + output1_byte_size)
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip_handle, 0, input0_list + input1_list)
-            shm.register("output_data", "/outputs", 0, output_byte_size * 2)
-            shm.register("input_data", "/inputs", 0, input_byte_size * 2)
+            shm.register("output_data", "/outputs", 0, output0_byte_size + output1_byte_size)
+            shm.register("input_data", "/inputs", 0, input0_byte_size * 2)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
@@ -158,10 +159,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if use_shared_memory:
             if "OUTPUT0" in outputs:
                     output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                        0, output_byte_size)
+                        0, output0_byte_size)
             if "OUTPUT1" in outputs:
                     output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                        output_byte_size, output_byte_size)
+                        output0_byte_size, output1_byte_size)
         else:
             if "OUTPUT0" in outputs:
                 if output0_raw:
@@ -180,8 +181,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            verbose=True)
         if use_shared_memory:
             results = ctx.run(
-                    { INPUT0 : ("input_data", 0, input_byte_size), INPUT1 : \
-                    ("input_data", input_byte_size, input_byte_size), },
+                    { INPUT0 : ("input_data", 0, input0_byte_size), INPUT1 : \
+                    ("input_data", input0_byte_size, input0_byte_size), },
                     output_req, batch_size)
         else:
             results = ctx.run(

@@ -42,14 +42,14 @@ np_dtype_string = np.dtype(object)
 
 class InferTest(unittest.TestCase):
     def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
-                    output0_raw, output1_raw, swap):
+                    output0_raw, output1_raw, swap, use_shared_memory=False):
         def _infer_exact_helper(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
                 output0_raw=True, output1_raw=True,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0):
+                correlation_id=0, use_shared_memory=False):
             for bs in (1, batch_size):
                 # model that does not support batching
                 if bs == 1:
@@ -59,14 +59,14 @@ class InferTest(unittest.TestCase):
                                     model_version, swap,
                                     outputs, use_http, use_grpc,
                                     skip_request_id_check, use_streaming,
-                                    correlation_id)
+                                    correlation_id, use_shared_memory)
                 # model that supports batching
                 iu.infer_exact(tester, pf, tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,
                                skip_request_id_check, use_streaming,
-                               correlation_id)
+                               correlation_id, use_shared_memory)
 
         input_size = 16
 
@@ -116,7 +116,7 @@ class InferTest(unittest.TestCase):
             _infer_exact_helper(self, 'onnx', (input_size,), 8,
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
-            
+
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):
             # No basic ensemble models are created wuth libtorch models for now [TODO]
@@ -127,12 +127,21 @@ class InferTest(unittest.TestCase):
     def test_raw_bbb(self):
         self._full_exact(np.int8, np.int8, np.int8,
                          output0_raw=True, output1_raw=True, swap=True)
+    def test_raw_bbb_shm(self):
+        self._full_exact(np.int8, np.int8, np.int8,
+                         output0_raw=True, output1_raw=True, swap=True, use_shared_memory=True)
     def test_raw_sss(self):
         self._full_exact(np.int16, np.int16, np.int16,
                          output0_raw=True, output1_raw=True, swap=True)
+    def test_raw_sss_shm(self):
+        self._full_exact(np.int16, np.int16, np.int16,
+                         output0_raw=True, output1_raw=True, swap=True, use_shared_memory=True)
     def test_raw_iii(self):
         self._full_exact(np.int32, np.int32, np.int32,
                          output0_raw=True, output1_raw=True, swap=True)
+    def test_raw_iii_shm(self):
+        self._full_exact(np.int32, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=True, use_shared_memory=True)
     def test_raw_lll(self):
         self._full_exact(np.int64, np.int64, np.int64,
                          output0_raw=True, output1_raw=True, swap=False)
@@ -142,6 +151,9 @@ class InferTest(unittest.TestCase):
     def test_raw_fff(self):
         self._full_exact(np.float32, np.float32, np.float32,
                          output0_raw=True, output1_raw=True, swap=True)
+    def test_raw_fff_shm(self):
+        self._full_exact(np.float32, np.float32, np.float32,
+                         output0_raw=True, output1_raw=True, swap=True, use_shared_memory=True)
     def test_raw_hff(self):
         self._full_exact(np.float16, np.float32, np.float32,
                          output0_raw=True, output1_raw=True, swap=False)
@@ -152,6 +164,9 @@ class InferTest(unittest.TestCase):
         self._full_exact(np.int32, np.int8, np.int8,
                          output0_raw=True, output1_raw=True, swap=False)
     def test_raw_ibs(self):
+        self._full_exact(np.int32, np.int8, np.int16,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ibs_shm(self):
         self._full_exact(np.int32, np.int8, np.int16,
                          output0_raw=True, output1_raw=True, swap=False)
     def test_raw_iff(self):
