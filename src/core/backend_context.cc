@@ -61,7 +61,7 @@ BackendContext::CreateCudaStream(const int cuda_stream_priority)
   auto cuerr = cudaGetDeviceCount(&device_cnt);
   // Do nothing if there is no CUDA device since all data transfer will be done
   // within CPU memory
-  if (cuerr != cudaErrorNoDevice) {
+  if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaErrorInsufficientDriver)) {
     if (cuerr == cudaSuccess) {
       cuerr = cudaStreamCreateWithPriority(
           &stream_, cudaStreamDefault, cuda_stream_priority);

@@ -946,12 +946,12 @@ GetSupportedGPUs(std::set<int>& supported_gpus)
 
   int device_cnt;
   cudaError_t cuerr = cudaGetDeviceCount(&device_cnt);
-  if (cuerr == cudaErrorNoDevice) {
+  if ((cuerr == cudaErrorNoDevice) || (cuerr == cudaErrorInsufficientDriver)) {
     device_cnt = 0;
   } else if (cuerr != cudaSuccess) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "unable to get number of CUDA devices" +
+        "unable to get number of CUDA devices: " +
             std::string(cudaGetErrorString(cuerr)));
   }
 
