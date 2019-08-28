@@ -32,7 +32,15 @@
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
+
+#ifndef TRTIS_ENABLE_GPU
+using cudaStream_t = void*;
+#endif  // TRTIS_ENABLE_GPU
 
 class InferenceServer;
 
@@ -71,6 +79,8 @@ class EnsembleScheduler : public Scheduler {
       InferenceServer* const server, const ModelConfig& config,
       std::unique_ptr<Scheduler>* scheduler);
 
+  ~EnsembleScheduler();
+
   // \see Scheduler::Enqueue()
   void Enqueue(
       const std::shared_ptr<ModelInferStats>& stats,
@@ -85,6 +95,9 @@ class EnsembleScheduler : public Scheduler {
 
   // Ensemble information that is built from model config
   std::unique_ptr<EnsembleInfo> info_;
+
+  // The stream used for data transfer.
+  cudaStream_t stream_;
 };
 
 }}  // namespace nvidia::inferenceserver

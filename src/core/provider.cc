@@ -218,7 +218,9 @@ InferRequestProvider::GetNextInputContent(
     return Status::Success;
   }
 
-  if (!GetInputOverrideContent(name, content, content_byte_size)) {
+  if (GetInputOverrideContent(name, content, content_byte_size)) {
+    *memory_type = TRTSERVER_MEMORY_CPU;
+  } else {
     const auto& pr = input_buffer_.find(name);
     if (pr == input_buffer_.end()) {
       return Status(

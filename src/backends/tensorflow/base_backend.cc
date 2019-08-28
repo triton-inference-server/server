@@ -299,7 +299,7 @@ SetStringInputTensor(
 
     // For string data type, we always need to copy the data to CPU so that
     // we can read string length and construct the string properly.
-    TRTSERVER_Memory_Type src_memory_type;
+    auto src_memory_type = TRTSERVER_MEMORY_CPU;
     const void* vcontent;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
     payload.status_ = payload.request_provider_->GetNextInputContent(

@@ -131,13 +131,19 @@ class InferRequestProvider {
 
   // Get the next contiguous chunk of bytes for the 'name'd
   // input. Return a pointer to the chunk in 'content'.
+  // If there are no more bytes for the input return 'content' == nullptr.
   // 'content_byte_size' acts as both input and output. On input
   // 'content_byte_size' is a hint of the maximum chunk size that
   // should be returned in 'content' and must be non-zero unless no
   // additional input is expected. On return 'content_byte_size' gives
-  // the actual size of the chunk pointed to by 'content'. If there
-  // are no more bytes for the input return 'content' == nullptr. If
-  // 'force_contiguous' is true then the entire (remaining) input will
+  // the actual size of the chunk pointed to by 'content'.
+  // 'memory_type' acts as both input and output. On input 'memory_type'
+  // is the buffer memory type preferred by the function caller, it will
+  // not affect the function behavior, but it will be propagated to the
+  // buffer and the buffer owner may collect such information for other use.
+  // On return 'memory_type' gives the actual memory type of the chunk
+  // pointed to by 'content'.
+  // If 'force_contiguous' is true then the entire (remaining) input will
   // be returned as a single chunk. In some cases this will require
   // copying the data.
   virtual Status GetNextInputContent(
