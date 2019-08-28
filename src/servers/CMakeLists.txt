@@ -225,6 +225,8 @@ set_target_properties(
 )
 target_link_libraries(
   trtserver
+  PRIVATE -ldl
+  PRIVATE -lrt
   PRIVATE ${TRTIS_EXTRA_LDFLAGS}
   PRIVATE protobuf::libprotobuf
 )
