@@ -83,7 +83,6 @@ SharedMemoryHandleCreate(void* shm_addr, std::string shm_key, int shm_fd)
   handle->base_addr_ = shm_addr;
   handle->shm_key_ = shm_key;
   handle->shm_fd_ = shm_fd;
-  std::cout << handle << '\n';
   return reinterpret_cast<void*>(handle);
 }
 
@@ -122,15 +121,16 @@ SharedMemoryRegionCreate(
         ("unable to initialize the size for: " + std::string(shm_key)).c_str());
   }
 
+  // get base address of shared memory region
   void* shm_addr = nullptr;
   nic::Error err = SharedMemoryRegionMap(shm_fd, 0, byte_size, &shm_addr);
-  if (err.IsOk()) {
+  if (!err.IsOk()) {
     return new nic::Error(err);
   }
 
+  // create a handle for the shared memory region
   *shm_handle =
       SharedMemoryHandleCreate(shm_addr, std::string(shm_key), shm_fd);
-
   return nullptr;
 }
 
@@ -138,7 +138,6 @@ nic::Error*
 SharedMemoryRegionSet(
     void* shm_handle, size_t offset, size_t byte_size, const void* data)
 {
-  std::cout << shm_handle << '\n';
   void* shm_addr =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle)->base_addr_;
   char* shm_addr_offset = reinterpret_cast<char*>(shm_addr);
