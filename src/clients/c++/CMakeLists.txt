@@ -153,7 +153,7 @@ else()
 add_executable(ensemble_image_client ensemble_image_client.cc)
 target_link_libraries(
   ensemble_image_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS ensemble_image_client
@@ -168,7 +168,7 @@ add_executable(image_client image_client.cc)
 target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(
   image_client
-  PRIVATE request
+  PRIVATE request_static
   PRIVATE ${OpenCV_LIBS}
 )
 install(
@@ -200,7 +200,7 @@ add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_link_libraries(
   perf_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS perf_client
@@ -213,7 +213,7 @@ install(
 add_executable(simple_client simple_client.cc)
 target_link_libraries(
   simple_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS simple_client
@@ -226,7 +226,7 @@ install(
 add_executable(simple_shm_client simple_shm_client.cc)
 target_link_libraries(
   simple_shm_client
-  PRIVATE request
+  PRIVATE request_static
   rt
 )
 install(
@@ -240,7 +240,7 @@ install(
 add_executable(simple_callback_client simple_callback_client.cc)
 target_link_libraries(
   simple_callback_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS simple_callback_client
@@ -253,7 +253,7 @@ install(
 add_executable(simple_sequence_client simple_sequence_client.cc)
 target_link_libraries(
   simple_sequence_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS simple_sequence_client
@@ -266,7 +266,7 @@ install(
 add_executable(simple_string_client simple_string_client.cc)
 target_link_libraries(
   simple_string_client
-  PRIVATE request
+  PRIVATE request_static
 )
 install(
   TARGETS simple_string_client
