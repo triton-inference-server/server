@@ -35,6 +35,11 @@ supported GPUs, as explained in
 also be run on non-CUDA, non-GPU systems as described in
 :ref:`section-running-the-inference-server-without-gpu`.
 
+If you :ref:`build the inference server outside of Docker
+<section-building-the-server-with-cmake>`, you can then run the
+inference server without Docker, as explained in
+:ref:`section-running-the-inference-server-without-docker`.
+
 .. _section-example-model-repository:
 
 Example Model Repository
@@ -134,6 +139,21 @@ Because a GPU is not available, the inference server will be unable to
 load any model configuration that requires a GPU or that specifies a
 GPU instance by an :ref:`instance-group <section-instance-groups>`
 configuration.
+
+.. _section-running-the-inference-server-without-docker:
+
+Running The Inference Server Without Docker
+-------------------------------------------
+
+After :ref:`building the inference server outside of Docker
+<section-building-the-server-with-cmake>`, the *trtserver* binary will
+be in builddir/trtis/install/bin and the required shared libraries
+will be in builddir/trtis/install/lib. To run make sure that
+builddir/trtis/install/lib is on your library path (for example, by
+adding it to LD_LIBRARY_PATH), and then execute *trtserver* with the
+desired arguments::
+
+  $ builddir/trtis/install/bin/trtserver --model-repository=/models
 
 .. _section-checking-inference-server-status:
 
