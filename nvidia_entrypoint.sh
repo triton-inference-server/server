@@ -70,6 +70,15 @@ else
   fi
 fi
 
+if ! cat /proc/cpuinfo | grep flags | sort -u | grep avx >& /dev/null; then
+  echo
+  echo "ERROR: This container was built for CPUs supporting at least the AVX instruction set, but"
+  echo "       the CPU detected was $(cat /proc/cpuinfo |grep "model name" | sed 's/^.*: //' | sort -u), which does not report"
+  echo "       support for AVX.  An Illegal Instrution exception at runtime is likely to result."
+  echo "       See https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#CPUs_with_AVX ."
+  sleep 2
+fi
+
 if [[ "$(df -k /dev/shm |grep ^shm |awk '{print $2}') " == "65536 " ]]; then
   echo
   echo "NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be"
