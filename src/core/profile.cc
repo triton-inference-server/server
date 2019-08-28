@@ -39,7 +39,7 @@ ProfileStartAll()
 #ifdef TRTIS_ENABLE_GPU
   int dcnt;
   cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
+  if ((cuerr == cudaErrorNoDevice) || (cuerr == cudaErrorInsufficientDriver)) {
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
     return Status(
@@ -76,7 +76,7 @@ ProfileStopAll()
 #ifdef TRTIS_ENABLE_GPU
   int dcnt;
   cudaError_t cuerr = cudaGetDeviceCount(&dcnt);
-  if (cuerr == cudaErrorNoDevice) {
+  if ((cuerr == cudaErrorNoDevice) || (cuerr == cudaErrorInsufficientDriver)) {
     dcnt = 0;
   } else if (cuerr != cudaSuccess) {
     return Status(
