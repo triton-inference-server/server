@@ -160,7 +160,7 @@ AsyncSend(
   // Send inference request to the inference server.
   FAIL_IF_ERR(ctx->AsyncRun(&request), "unable to run model");
 
-  return std::move(request);
+  return request;
 }
 
 int32_t
