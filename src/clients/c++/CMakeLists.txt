@@ -33,15 +33,41 @@ find_package(CURL REQUIRED)
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
 
+set(
+  REQUEST_SRCS
+  request.cc request_common.cc request_http.cc request_grpc.cc
+)
+
+set(
+  REQUEST_HDRS
+  request.h request_common.h
+)
+
 add_library(
-  request SHARED
-  request.cc request.h
-  request_common.cc request_common.h
-  request_http.cc request_grpc.cc
+  request-library EXCLUDE_FROM_ALL OBJECT
+  ${REQUEST_SRCS} ${REQUEST_HDRS}
+)
+add_dependencies(
+  request-library
+  model-config-library grpc-library proto-library
+)
+
+add_library(
+  request_static STATIC
+  $<TARGET_OBJECTS:grpc-library>
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
-  $<TARGET_OBJECTS:grpc-library>
+  $<TARGET_OBJECTS:request-library>
 )
+
+add_library(
+  request SHARED
+  $<TARGET_OBJECTS:grpc-library>
+  $<TARGET_OBJECTS:model-config-library>
+  $<TARGET_OBJECTS:proto-library>
+  $<TARGET_OBJECTS:request-library>
+)
+target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
 set_target_properties(
   request
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
@@ -50,7 +76,6 @@ set_target_properties(
   request
   PROPERTIES LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
-
 target_link_libraries(
   request
   PRIVATE gRPC::grpc++
@@ -58,19 +83,20 @@ target_link_libraries(
   PUBLIC protobuf::libprotobuf
   PUBLIC ${CURL_LIBRARY}
 )
-# use different syntax for Windows
 if(NOT WIN32)
   target_link_libraries(
     request
     PUBLIC -lpthread
   )
 endif()
-target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
-
 
 install(
   TARGETS request
   LIBRARY DESTINATION lib
+)
+install(
+  TARGETS request_static
+  ARCHIVE DESTINATION lib
 )
 install(
   FILES request.h request_grpc.h request_http.h
@@ -88,7 +114,7 @@ install(
 if(WIN32)
   message("Currently, CMake will only build client library and skip example "
           "clients in Windows. Because the examples use functionalities that "
-		  "are UNIX specific.")
+		      "are UNIX specific.")
 else()
 #
 # ensemble_image_client
