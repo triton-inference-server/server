@@ -116,10 +116,10 @@ _crequest_shm_control_ctx_del = _crequest.SharedMemoryControlContextDelete
 _crequest_shm_control_ctx_del.argtypes = [c_void_p]
 _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
 _crequest_shm_control_ctx_register.restype = c_void_p
-_crequest_shm_control_ctx_register.argtypes = [c_void_p, _utf8, c_void_p, c_uint64, c_uint64]
+_crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
 _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
 _crequest_shm_control_ctx_unregister.restype = c_void_p
-_crequest_shm_control_ctx_unregister.argtypes = [c_void_p, _utf8]
+_crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
@@ -161,7 +161,7 @@ _crequest_infer_ctx_options_add_class.restype = c_void_p
 _crequest_infer_ctx_options_add_class.argtypes = [c_void_p, c_void_p, _utf8, c_uint64]
 _crequest_infer_ctx_options_add_shared_memory = _crequest.InferContextOptionsAddSharedMemory
 _crequest_infer_ctx_options_add_shared_memory.restype = c_void_p
-_crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, _utf8, c_uint64, c_uint64]
+_crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
 
 _crequest_infer_ctx_input_new = _crequest.InferContextInputNew
 _crequest_infer_ctx_input_new.restype = c_void_p
@@ -179,7 +179,7 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 
 _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
-_crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, _utf8, c_uint64, c_uint64]
+_crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, c_void_p]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -216,7 +216,7 @@ _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_
                                                   POINTER(c_float), POINTER(c_char_p)]
 _crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandle
 _crequest_get_shared_memory_handle_info.restype = c_void_p
-_crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int)]
+_crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
 
 def _raise_if_error(err):
     """
@@ -727,7 +727,7 @@ class SharedMemoryControlContext:
         _crequest_shm_control_ctx_del(self._ctx)
         self._ctx = None
 
-    def register(self, name, shm_handle, offset, byte_size):
+    def register(self, shm_handle):
         """Request the inference server to register specified shared memory region.
 
         Parameters
@@ -753,16 +753,16 @@ class SharedMemoryControlContext:
             _raise_error("SharedMemoryControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_register(self._ctx, name, shm_handle, offset, byte_size)))
+            c_void_p(_crequest_shm_control_ctx_register(self._ctx, shm_handle)))
         return
 
-    def unregister(self, name):
+    def unregister(self, shm_handle):
         """Request the inference server to unregister specified shared memory region.
 
         Parameters
         ----------
-        name : str
-            The name of the shared memory region to be unregistered.
+        shm_handle : c_void_p
+            The handle for the shared memory region.
 
         Raises
         ------
@@ -775,7 +775,7 @@ class SharedMemoryControlContext:
             _raise_error("SharedMemoryControlContext is closed")
 
         self._last_request_id = _raise_if_error(
-            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, name)))
+            c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, shm_handle)))
         return
 
     def get_last_request_id(self):
@@ -936,21 +936,16 @@ class InferContext:
         # Each element in the list must be a 'numpy array' if inputs are being
         # passed directly and a 'tuple' if passing a reference to shared memory
         for inp_name, inp in inputs.items():
-            if not isinstance(inp, (list, tuple)):
+            if not isinstance(inp, (list, tuple)) and type(inp) != c_void_p:
                 _raise_error("input '" + inp_name +
                              "' values must be specified as a list of numpy arrays" \
-                             " or list of tuples representing location in shared memory")
-            if isinstance(inp[0], (np.ndarray,)):
+                             " or c_void_p representing the shared memory handle")
+            if type(inp) != c_void_p:
                 for ip in inp:
                     if not isinstance(ip, (np.ndarray, tuple)):
                         _raise_error("input '" + inp_name +
                                      "' values must be specified as a list of numpy arrays" \
-                                     " or list of tuples representing location in shared memory")
-            else:
-                if (len(inp) != 3) or (type(inp[0]) != str) \
-                    or (type(inp[1]) != int) or (type(inp[2]) != int):
-                    _raise_error("shared memory requires tuple of size 3" \
-                        + " - shm_key (string), offset (int), size (int)")
+                                     " or c_void_p representing the shared memory handle")
         # Set run options using formats specified in 'outputs'
         options = c_void_p()
         try:
@@ -958,17 +953,15 @@ class InferContext:
                 _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
-                if len(output_format) == 4 and isinstance(output_format, (list, tuple)):
+                if len(output_format) == 2 and isinstance(output_format, (list, tuple)):
                     if output_format[0] != InferContext.ResultFormat.RAW \
-                    or (not isinstance(output_format[1], (list, tuple))) or (type(output_format[2]) != int) \
-                        or (type(output_format[3]) != int):
-                        _raise_error("shared memory requires tuple of size 4" \
-                            + " - output_format(RAW), [shm_key (string), shm_handle(c_void_p)], offset (int), size (int)")
+                    or (type(output_format[1]) != c_void_p):
+                        _raise_error("shared memory requires tuple of size 2" \
+                                    " - output_format(RAW), shm_handle(c_void_p)")
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_shared_memory(
-                                self._ctx, options, output_name, output_format[1][0], c_uint64(output_format[2]),
-                                c_uint64(output_format[3]))))
+                                self._ctx, options, output_name, output_format[1])))
                 elif output_format == InferContext.ResultFormat.RAW:
                     _raise_if_error(
                         c_void_p(
@@ -995,60 +988,60 @@ class InferContext:
                     c_void_p(_crequest_infer_ctx_input_new(byref(input), self._ctx, input_name)))
 
                 # Set the input shape
-                if len(input_values) > 0:
+                if isinstance(input_values, (list, tuple)):
+                    if len(input_values) > 0:
+                        if isinstance(input_values[0], (np.ndarray,)):
+                            shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
+                            _raise_if_error(
+                                c_void_p(
+                                    _crequest_infer_ctx_input_set_shape(
+                                           input, shape_value, c_uint64(shape_value.size))))
+
+                    # use values if numpy array, reference if shared memory
                     if isinstance(input_values[0], (np.ndarray,)):
-                        shape_value = np.asarray(input_values[0].shape, dtype=np.int64)
-                        _raise_if_error(
-                            c_void_p(
-                                _crequest_infer_ctx_input_set_shape(
-                                       input, shape_value, c_uint64(shape_value.size))))
+                        for input_value in input_values:
+                            # If the input tensor is empty then avoid going
+                            # through the more complicated logic since
+                            # creating the buffer for string objects results
+                            # is a size-1 array instead of 0.
+                            if input_value.size == 0:
+                                _raise_if_error(
+                                    c_void_p(
+                                        _crequest_infer_ctx_input_set_raw(input, 0, 0)))
+                            else:
+                                # If the input is a tensor of string objects,
+                                # then must flatten those into a 1-dimensional
+                                # array containing the 4-byte string length
+                                # followed by the actual string characters.
+                                # All strings are concatenated together in "C"
+                                # order.
+                                if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
+                                    flattened = bytes()
+                                    for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+                                        # If directly passing bytes to STRING type,
+                                        # don't convert it to str as Python will encode the
+                                        # bytes which may distort the meaning
+                                        if obj.dtype.type == np.bytes_:
+                                            s = bytes(obj)
+                                        else:
+                                            s = str(obj).encode('utf-8')
+                                        flattened += struct.pack("<I", len(s))
+                                        flattened += s
+                                    input_value = np.asarray(flattened)
 
-               # # use values if numpy array, reference if shared memory
-                if isinstance(input_values[0], (np.ndarray,)):
-                    for input_value in input_values:
-                        # If the input tensor is empty then avoid going
-                        # through the more complicated logic since
-                        # creating the buffer for string objects results
-                        # is a size-1 array instead of 0.
-                        if input_value.size == 0:
-                            _raise_if_error(
-                                c_void_p(
-                                    _crequest_infer_ctx_input_set_raw(input, 0, 0)))
-                        else:
-                            # If the input is a tensor of string objects,
-                            # then must flatten those into a 1-dimensional
-                            # array containing the 4-byte string length
-                            # followed by the actual string characters.
-                            # All strings are concatenated together in "C"
-                            # order.
-                            if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
-                                flattened = bytes()
-                                for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-                                    # If directly passing bytes to STRING type,
-                                    # don't convert it to str as Python will encode the
-                                    # bytes which may distort the meaning
-                                    if obj.dtype.type == np.bytes_:
-                                        s = bytes(obj)
-                                    else:
-                                        s = str(obj).encode('utf-8')
-                                    flattened += struct.pack("<I", len(s))
-                                    flattened += s
-                                input_value = np.asarray(flattened)
-
-                            if not input_value.flags['C_CONTIGUOUS']:
-                                input_value = np.ascontiguousarray(input_value)
-                            contiguous_input_values.append(input_value)
-                            _raise_if_error(
-                                c_void_p(
-                                    _crequest_infer_ctx_input_set_raw(
-                                        input, input_value.ctypes.data_as(c_void_p),
-                                        c_uint64(input_value.size * input_value.itemsize))))
+                                if not input_value.flags['C_CONTIGUOUS']:
+                                    input_value = np.ascontiguousarray(input_value)
+                                contiguous_input_values.append(input_value)
+                                _raise_if_error(
+                                    c_void_p(
+                                        _crequest_infer_ctx_input_set_raw(
+                                            input, input_value.ctypes.data_as(c_void_p),
+                                            c_uint64(input_value.size * input_value.itemsize))))
                 else:
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_input_set_shared_memory(
-                                input, input_values[0], c_uint64(input_values[1]),
-                                c_uint64(input_values[2]))))
+                                input, input_values)))
 
             finally:
                 _crequest_infer_ctx_input_del(input)
@@ -1155,7 +1148,7 @@ class InferContext:
                             classes.append((cidx.value, cprob.value, label))
                         results[output_name].append(classes)
                 elif (isinstance(output_format, (list, tuple)) and
-                    (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 4)):
+                    (output_format[0] == InferContext.ResultFormat.RAW) and (len(output_format) == 2)):
                     # Get the shape of each result tensor
                     max_shape_dims = 16
                     shape_array = np.zeros(max_shape_dims, dtype=np.int64)
@@ -1167,38 +1160,40 @@ class InferContext:
                                 shape_array, byref(shape_len))))
                     shape = np.resize(shape_array, shape_len.value).tolist()
 
-                    for b in range(batch_size):
-                        # base address of shared memory region
-                        shm_fd = c_int()
-                        shm_addr = c_void_p()
-                        shm_key = c_char_p()
-                        _raise_if_error(
-                            c_void_p(_crequest_get_shared_memory_handle_info(output_format[1][1], byref(shm_addr), byref(shm_key), byref(shm_fd))))
-                        cval = shm_addr
-                        # offset + byte_size
-                        cval_len = output_format[3] + output_format[2]
-                        if cval_len == 0:
-                            val = np.empty(shape, dtype=result_dtype)
-                            results[output_name].append(val)
+                    # get info for shared memory regions and read results
+                    shm_fd = c_int()
+                    offset = c_uint64()
+                    byte_size = c_uint64()
+                    shm_addr = c_void_p()
+                    shm_key = c_char_p()
+                    _raise_if_error(
+                        c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
+                                byref(shm_addr), byref(shm_key), byref(shm_fd), \
+                                byref(offset), byref(byte_size))))
+                    cval = shm_addr
+                    cval_len = offset.value + byte_size.value
+                    if cval_len == 0:
+                        val = np.empty(shape, dtype=result_dtype)
+                        results[output_name].append(val)
+                    else:
+                        val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
+
+                        if result_dtype != np.object:
+                            val = np.frombuffer(val_buf, dtype=result_dtype, offset=offset.value)
                         else:
-                            val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
+                            strs = list()
+                            offset = 0
+                            while offset < len(val_buf):
+                                l = struct.unpack_from("<I", val_buf, offset.value)[0]
+                                offset += 4
+                                sb = struct.unpack_from("<{}s".format(l), val_buf, offset.value)[0]
+                                offset += l
+                                strs.append(sb)
+                            val = np.array(strs, dtype=object)
 
-                            if result_dtype != np.object:
-                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=output_format[2])
-                            else:
-                                strs = list()
-                                offset = 0
-                                while offset < len(val_buf):
-                                    l = struct.unpack_from("<I", val_buf, offset)[0]
-                                    offset += 4
-                                    sb = struct.unpack_from("<{}s".format(l), val_buf, offset)[0]
-                                    offset += l
-                                    strs.append(sb)
-                                val = np.array(strs, dtype=object)
-
-                            # Reshape the result to the appropriate shape
-                            shaped = np.reshape(val, shape)
-                            results[output_name].append(shaped)
+                        # Reshape the result to the appropriate shape
+                        shaped = np.reshape(val, shape)
+                        results[output_name].append(shaped)
                 else:
                     _raise_error("unrecognized output format")
             finally:

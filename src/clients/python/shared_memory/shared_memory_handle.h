@@ -27,7 +27,10 @@
 #pragma once
 
 struct SharedMemoryHandle {
+  std::string trtis_shm_name_;
   void* base_addr_;
   std::string shm_key_;
   int shm_fd_;
+  size_t offset_;
+  size_t byte_size_;
 };

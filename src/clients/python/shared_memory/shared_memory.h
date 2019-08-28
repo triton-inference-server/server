@@ -52,10 +52,11 @@ uint64_t ErrorRequestId(nic::Error* ctx);
 //==============================================================================
 // SharedMemoryControlContext
 nic::Error* SharedMemoryRegionCreate(
-    const char* shm_key, size_t byte_size, void** shm_handle);
+    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
+    void** shm_handle);
 nic::Error* SharedMemoryRegionSet(
     void* shm_addr, size_t offset, size_t byte_size, const void* data);
-nic::Error* SharedMemoryRegionDestroy(const char* shm_key);
+nic::Error* SharedMemoryRegionDestroy(void* shm_handle);
 
 //==============================================================================
 

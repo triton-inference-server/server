@@ -23,6 +23,7 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #include "src/clients/python/shared_memory/shared_memory.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -77,12 +78,17 @@ ErrorRequestId(nic::Error* ctx)
 // SharedMemoryControlContext
 
 void*
-SharedMemoryHandleCreate(void* shm_addr, std::string shm_key, int shm_fd)
+SharedMemoryHandleCreate(
+    std::string trtis_shm_name, void* shm_addr, std::string shm_key, int shm_fd,
+    size_t offset, size_t byte_size)
 {
   SharedMemoryHandle* handle = new SharedMemoryHandle();
+  handle->trtis_shm_name_ = trtis_shm_name;
   handle->base_addr_ = shm_addr;
   handle->shm_key_ = shm_key;
   handle->shm_fd_ = shm_fd;
+  handle->offset_ = offset;
+  handle->byte_size_ = byte_size;
   return reinterpret_cast<void*>(handle);
 }
 
@@ -105,7 +111,8 @@ SharedMemoryRegionMap(
 
 nic::Error*
 SharedMemoryRegionCreate(
-    const char* shm_key, size_t byte_size, void** shm_handle)
+    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
+    void** shm_handle)
 {
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
@@ -129,8 +136,9 @@ SharedMemoryRegionCreate(
   }
 
   // create a handle for the shared memory region
-  *shm_handle =
-      SharedMemoryHandleCreate(shm_addr, std::string(shm_key), shm_fd);
+  *shm_handle = SharedMemoryHandleCreate(
+      std::string(trtis_shm_name), shm_addr, std::string(shm_key), shm_fd, 0,
+      byte_size);
   return nullptr;
 }
 
@@ -146,13 +154,14 @@ SharedMemoryRegionSet(
 }
 
 nic::Error*
-SharedMemoryRegionDestroy(const char* shm_key)
+SharedMemoryRegionDestroy(void* shm_handle)
 {
-  int shm_fd = shm_unlink(shm_key);
+  std::string shm_key =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle)->shm_key_;
+  int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
     return ErrorNew(
-        ("unable to unlink the shared memory region: " + std::string(shm_key))
-            .c_str());
+        ("unable to unlink the shared memory region: " + shm_key).c_str());
   }
   return nullptr;
 }

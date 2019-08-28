@@ -79,7 +79,8 @@ if __name__ == '__main__':
                              http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
     # Create the shared memory control context
-    shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
+    shared_memory_ctx = SharedMemoryControlContext(FLAGS.url, protocol, \
+                            http_headers=FLAGS.http_headers, verbose=FLAGS.verbose)
 
     # Create the data for the two input tensors. Initialize the first
     # to unique integers and the second to all ones.
@@ -90,29 +91,32 @@ if __name__ == '__main__':
     output_byte_size = input_byte_size
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handle
-    shm_key = "/output_simple"
-    shm_op_handle = shm.create_shared_memory_region(shm_key, output_byte_size * 2)
+    shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0_simple", output_byte_size)
+    shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1_simple", output_byte_size)
 
-    # Register Output shared memory with TRTIS
-    shared_memory_ctx.register("output_data", shm_op_handle, 0, output_byte_size * 2)
+    # Register Output0 and Output1 shared memory with TRTIS
+    shared_memory_ctx.register(shm_op0_handle)
+    shared_memory_ctx.register(shm_op1_handle)
 
-    shm_key = "/input_simple"
-    shm_ip_handle = shm.create_shared_memory_region(shm_key, input_byte_size * 2)
+    # Create Input0 and Input1 in Shared Memory and store shared memory handle
+    shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0_simple", input_byte_size)
+    shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1_simple", input_byte_size)
 
     # Put input data values into shared memory
-    shm.set_shared_memory_region(shm_ip_handle, 0, [input0_data, input1_data])
-    # Register Input shared memory with TRTIS
-    shared_memory_ctx.register("input_data", shm_ip_handle, 0, input_byte_size * 2)
+    shm.set_shared_memory_region(shm_ip0_handle, 0, [input0_data])
+    shm.set_shared_memory_region(shm_ip1_handle, 0, [input1_data])
+
+    # Register Input0 and Input1 shared memory with TRTIS
+    shared_memory_ctx.register(shm_ip0_handle)
+    shared_memory_ctx.register(shm_ip1_handle)
 
     # Send inference request to the inference server. Get results for
     # both output tensors.
-    results = infer_ctx.run({ 'INPUT0' : ("input_data", 0, input_byte_size),
-                             'INPUT1' : ("input_data", input_byte_size, input_byte_size), },
-                           { 'OUTPUT0' : (InferContext.ResultFormat.RAW, \
-                                        ["output_data", shm_op_handle], 0, output_byte_size),
-                             'OUTPUT1' : (InferContext.ResultFormat.RAW, \
-                                        ["output_data", shm_op_handle], output_byte_size, output_byte_size) },
-                           batch_size)
+    results = infer_ctx.run({ 'INPUT0' : shm_ip0_handle,
+                            'INPUT1' : shm_ip1_handle, },
+                            { 'OUTPUT0' : (InferContext.ResultFormat.RAW, shm_op0_handle),
+                            'OUTPUT1' : (InferContext.ResultFormat.RAW, shm_op1_handle) },
+                            batch_size)
 
     # Read output from shared memory
     output0_data = results['OUTPUT0'][0]
@@ -132,7 +136,11 @@ if __name__ == '__main__':
             sys.exit(1);
 
     del results
-    shared_memory_ctx.unregister("input_data")
-    shm.destroy_shared_memory_region("/input_simple")
-    shared_memory_ctx.unregister("output_data")
-    shm.destroy_shared_memory_region("/output_simple")
+    shared_memory_ctx.unregister(shm_ip0_handle)
+    shm.destroy_shared_memory_region(shm_ip0_handle)
+    shared_memory_ctx.unregister(shm_ip1_handle)
+    shm.destroy_shared_memory_region(shm_ip1_handle)
+    shared_memory_ctx.unregister(shm_op0_handle)
+    shm.destroy_shared_memory_region(shm_op0_handle)
+    shared_memory_ctx.unregister(shm_op1_handle)
+    shm.destroy_shared_memory_region(shm_op1_handle)

@@ -51,13 +51,13 @@ _cshm = cdll.LoadLibrary(_cshm_path)
 
 _cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate
 _cshm_shared_memory_region_create.restype = c_void_p
-_cshm_shared_memory_region_create.argtypes = [_utf8, c_uint64, POINTER(c_void_p)]
+_cshm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
 _cshm_shared_memory_region_set = _cshm.SharedMemoryRegionSet
 _cshm_shared_memory_region_set.restype = c_void_p
 _cshm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]
 _cshm_shared_memory_region_destroy = _cshm.SharedMemoryRegionDestroy
 _cshm_shared_memory_region_destroy.restype = c_void_p
-_cshm_shared_memory_region_destroy.argtypes = [c_char_p]
+_cshm_shared_memory_region_destroy.argtypes = [c_void_p]
 
 _cshm_error_new =  _cshm.ErrorNew
 _cshm_error_new.restype = c_void_p
@@ -79,11 +79,11 @@ _cshm_error_requestid.argtypes = [c_void_p]
 
 def _raise_if_error(err):
     """
-    Raise InferenceServerException if 'err' is non-success.
+    Raise SharedMemoryException if 'err' is non-success.
     Otherwise return the request ID.
     """
     if err.value is not None:
-        ex = InferenceServerException(err)
+        ex = SharedMemoryException(err)
         isok = _cshm_error_isok(err)
         _cshm_error_del(err)
         if not isok:
@@ -93,11 +93,11 @@ def _raise_if_error(err):
 
 def _raise_error(msg):
     err = c_void_p(_cshm_error_new(msg))
-    ex = InferenceServerException(err)
+    ex = SharedMemoryException(err)
     _cshm_error_del(err)
     raise ex
 
-def create_shared_memory_region(shm_key, byte_size):
+def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
     """Creates a shared memory region with the specified name and size.
 
     Parameters
@@ -114,13 +114,13 @@ def create_shared_memory_region(shm_key, byte_size):
 
     Raises
     ------
-    InferenceServerException
+    SharedMemoryException
         If unable to create the shared memory region.
     """
 
     shm_handle = c_void_p()
     _raise_if_error(
-        c_void_p(_cshm_shared_memory_region_create(shm_key, byte_size, byref(shm_handle))))
+        c_void_p(_cshm_shared_memory_region_create(trtis_shm_name, shm_key, byte_size, byref(shm_handle))))
 
     return shm_handle
 
@@ -139,7 +139,7 @@ def set_shared_memory_region(shm_handle, offset, input_values):
 
     Raises
     ------
-    InferenceServerException
+    SharedMemoryException
         If unable to mmap or set values in the shared memory region.
     """
 
@@ -159,26 +159,26 @@ def set_shared_memory_region(shm_handle, offset, input_values):
         offset_current += byte_size
     return
 
-def destroy_shared_memory_region(shm_key):
+def destroy_shared_memory_region(shm_handle):
     """Unlink a shared memory region with the specified name.
 
     Parameters
     ----------
-    shm_key : str
-        The unique key of the shared memory object.
+    shm_handle : c_void_p
+        The handle for the shared memory region.
 
     Raises
     ------
-    InferenceServerException
+    SharedMemoryException
         If unable to unlink the shared memory region.
     """
 
     _raise_if_error(
-        c_void_p(_cshm_shared_memory_region_destroy(shm_key)))
+        c_void_p(_cshm_shared_memory_region_destroy(shm_handle)))
     return
 
 
-class InferenceServerException(Exception):
+class SharedMemoryException(Exception):
     """Exception indicating non-Success status.
 
     Parameters
@@ -189,21 +189,13 @@ class InferenceServerException(Exception):
     """
     def __init__(self, err):
         self._msg = None
-        self._server_id = None
-        self._request_id = 0
         if (err is not None) and (err.value is not None):
             self._msg = _cshm_error_msg(err)
             if self._msg is not None:
                 self._msg = self._msg.decode('utf-8')
-            self._server_id = _cshm_error_serverid(err)
-            if self._server_id is not None:
-                self._server_id = self._server_id.decode('utf-8')
-            self._request_id = _cshm_error_requestid(err)
 
     def __str__(self):
         msg = super().__str__() if self._msg is None else self._msg
-        if self._server_id is not None:
-            msg = '[' + self._server_id + ' ' + str(self._request_id) + '] ' + msg
         return msg
 
     def message(self):
@@ -216,27 +208,3 @@ class InferenceServerException(Exception):
 
         """
         return self._msg
-
-    def server_id(self):
-        """Get the ID of the server associated with this exception.
-
-        Returns
-        -------
-        str
-            The ID of the server associated with this exception, or
-            None if no server is associated.
-
-        """
-        return self._server_id
-
-    def request_id(self):
-        """Get the ID of the request with this exception.
-
-        Returns
-        -------
-        int
-            The ID of the request associated with this exception, or
-            0 (zero) if no request is associated.
-
-        """
-        return self._request_id
