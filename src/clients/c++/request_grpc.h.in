@@ -27,18 +27,24 @@
 
 /// \file
 
+#cmakedefine TRTIS_CLIENT_HEADER_FLAT 1
+
+#ifdef TRTIS_CLIENT_HEADER_FLAT
+#include "request.h"
+#else
 #include "src/clients/c++/request.h"
+#endif
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
 //==============================================================================
-/// ServerHealthHttpContext is the HTTP instantiation of
+/// ServerHealthGrpcContext is the GRPC instantiation of
 /// ServerHealthContext.
 ///
-class ServerHealthHttpContext {
+class ServerHealthGrpcContext {
  public:
-  /// Create a context that returns health information.
-  /// \param ctx Returns a new ServerHealthHttpContext object.
+  /// Create a context that returns health information about server.
+  /// \param ctx Returns a new ServerHealthGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
@@ -46,29 +52,17 @@ class ServerHealthHttpContext {
   static Error Create(
       std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
       bool verbose = false);
-
-  /// Create a context that returns health information.
-  /// \param ctx Returns a new ServerHealthHttpContext object.
-  /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the health
-  /// request. The map key/value indicates the header name/value.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      std::unique_ptr<ServerHealthContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
 };
 
 //==============================================================================
-/// ServerStatusHttpContext is the HTTP instantiation of
+/// ServerStatusGrpcContext is the GRPC instantiation of
 /// ServerStatusContext.
 ///
-class ServerStatusHttpContext {
+class ServerStatusGrpcContext {
  public:
   /// Create a context that returns information about an inference
-  /// server and all models on the server using HTTP protocol.
-  /// \param ctx Returns a new ServerStatusHttpContext object.
+  /// server and all models on the server using GRPC protocol.
+  /// \param ctx Returns a new ServerStatusGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
@@ -78,22 +72,8 @@ class ServerStatusHttpContext {
       bool verbose = false);
 
   /// Create a context that returns information about an inference
-  /// server and all models on the server using HTTP protocol with
-  /// custom headers.
-  /// \param ctx Returns a new ServerStatusHttpContext object.
-  /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the status
-  /// request. The map key/value indicates the header name/value.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
-
-  /// Create a context that returns information about an inference
-  /// server and one model on the sever using HTTP protocol.
-  /// \param ctx Returns a new ServerStatusHttpContext object.
+  /// server and one model on the sever using GRPC protocol.
+  /// \param ctx Returns a new ServerStatusGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param model_name The name of the model to get status for.
   /// \param verbose If true generate verbose output when contacting
@@ -101,93 +81,70 @@ class ServerStatusHttpContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-      const std::string& model_name, bool verbose = false);
-
-  /// Create a context that returns information about an inference
-  /// server and one model on the sever using HTTP protocol with
-  /// custom headers.
-  /// \param ctx Returns a new ServerStatusHttpContext object.
-  /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the status
-  /// request. The map key/value indicates the header name/value.
-  /// \param model_name The name of the model to get status for.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      std::unique_ptr<ServerStatusContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers,
       const std::string& model_name, bool verbose = false);
 };
 
 //==============================================================================
-/// ProfileHttpContext is the HTTP instantiation of ProfileContext.
-///
-class ProfileHttpContext {
+//// ProfileGrpcContext is the GRPC instantiation of ProfileContext.
+////
+class ProfileGrpcContext {
  public:
-  /// Create context that controls profiling on a server using HTTP
+  /// Create context that controls profiling on a server using GRPC
   /// protocol.
   /// \param ctx Returns the new ProfileContext object.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the profile
-  /// request. The map key/value indicates the header name/value.
   /// \param verbose If true generate verbose output when contacting
   /// the inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
+      bool verbose = false);
 };
 
 //==============================================================================
-/// ModelControlHttpContext is the HTTP instantiation of ModelControlContext.
-///
-class ModelControlHttpContext {
+//// ModelControlGrpcContext is the GRPC instantiation of ModelControlContext.
+////
+class ModelControlGrpcContext {
  public:
   /// Create context that controls models to be loaded on a server and to be
-  /// unloaded from a server using HTTP protocol.
+  /// unloaded from a server using GRPC.
   /// \param ctx Returns the new ModelControlContext object.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the control request.
-  /// The map key/value indicates the header name/value.
   /// \param verbose If true generate verbose output when contacting the
   /// inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<ModelControlContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
+      bool verbose = false);
 };
 
 //==============================================================================
-//// SharedMemoryControlHttpContext is the HTTP instantiation of
+//// SharedMemoryControlGrpcContext is the GRPC instantiation of
 //// SharedMemoryControlContext.
 ////
-class SharedMemoryControlHttpContext {
+class SharedMemoryControlGrpcContext {
  public:
   /// Create context that controls registration / unregistration of shared
-  /// memory regions on the server using HTTP.
+  /// memory regions on the server using GRPC.
   /// \param ctx Returns the new SharedMemoryControlContext object.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the control request.
-  /// The map key/value indicates the header name/value.
   /// \param verbose If true generate verbose output when contacting the
   /// inference server.
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<SharedMemoryControlContext>* ctx,
-      const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
+      const std::string& server_url, bool verbose = false);
 };
 
 //==============================================================================
-/// InferHttpContext is the HTTP instantiation of InferContext.
+/// InferGrpcContext is the GRPC instantiation of InferContext.
 ///
-class InferHttpContext {
+class InferGrpcContext {
  public:
   /// Create context that performs inference for a non-sequence model
-  /// using HTTP protocol.
+  /// using the GRPC protocol.
   ///
-  /// \param ctx Returns a new InferHttpContext object.
+  /// \param ctx Returns a new InferGrpcContext object.
   /// \param server_url The inference server name and port.
   /// \param model_name The name of the model to get status for.
   /// \param model_version The version of the model to use for inference,
@@ -198,33 +155,13 @@ class InferHttpContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-      const std::string& model_name, int64_t model_version = -1,
-      bool verbose = false);
-
-  /// Create context that performs inference for a non-sequence model
-  /// using HTTP protocol and custom headers.
-  ///
-  /// \param ctx Returns a new InferHttpContext object.
-  /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the inference
-  /// request. The map key/value indicates the header name/value.
-  /// \param model_name The name of the model to get status for.
-  /// \param model_version The version of the model to use for inference,
-  /// or -1 to indicate that the latest (i.e. highest version number)
-  /// version should be used.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers,
       const std::string& model_name, int64_t model_version = -1,
       bool verbose = false);
 
   /// Create context that performs inference for a sequence model
-  /// using a given correlation ID and the HTTP protocol.
+  /// using a given correlation ID and the GRPC protocol.
   ///
-  /// \param ctx Returns a new InferHttpContext object.
+  /// \param ctx Returns a new InferGrpcContext object.
   /// \param correlation_id The correlation ID to use for all
   /// inferences performed with this context. A value of 0 (zero)
   /// indicates that no correlation ID should be used.
@@ -240,18 +177,40 @@ class InferHttpContext {
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
       const std::string& server_url, const std::string& model_name,
       int64_t model_version = -1, bool verbose = false);
+};
 
-  /// Create context that performs inference for a sequence model
-  /// using a given correlation ID and the HTTP protocol using custom
-  /// headers.
+//==============================================================================
+/// InferGrpcStreamContext is the streaming instantiation of InferGrpcContext.
+/// All synchronous and asynchronous requests sent from this context will be
+/// sent in the same stream.
+///
+class InferGrpcStreamContext {
+ public:
+  /// Create streaming context that performs inference for a non-sequence model
+  /// using the GRPC protocol.
   ///
-  /// \param ctx Returns a new InferHttpContext object.
+  /// \param ctx Returns a new InferGrpcContext object.
+  /// \param server_url The inference server name and port.
+  /// \param model_name The name of the model to get status for.
+  /// \param model_version The version of the model to use for inference,
+  /// or -1 to indicate that the latest (i.e. highest version number)
+  /// version should be used.
+  /// \param verbose If true generate verbose output when contacting
+  /// the inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<InferContext>* ctx, const std::string& server_url,
+      const std::string& model_name, int64_t model_version = -1,
+      bool verbose = false);
+
+  /// Create streaming context that performs inference for a sequence model
+  /// using a given correlation ID and the GRPC protocol.
+  ///
+  /// \param ctx Returns a new InferGrpcContext object.
   /// \param correlation_id The correlation ID to use for all
   /// inferences performed with this context. A value of 0 (zero)
   /// indicates that no correlation ID should be used.
   /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the inference
-  /// request. The map key/value indicates the header name/value.
   /// \param model_name The name of the model to get status for.
   /// \param model_version The version of the model to use for inference,
   /// or -1 to indicate that the latest (i.e. highest version number)
@@ -261,10 +220,8 @@ class InferHttpContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<InferContext>* ctx, CorrelationID correlation_id,
-      const std::string& server_url,
-      const std::map<std::string, std::string>& headers,
-      const std::string& model_name, int64_t model_version = -1,
-      bool verbose = false);
+      const std::string& server_url, const std::string& model_name,
+      int64_t model_version = -1, bool verbose = false);
 };
 
 }}}  // namespace nvidia::inferenceserver::client

@@ -27,11 +27,24 @@
 cmake_minimum_required (VERSION 3.5)
 
 #
-# librequest.so
+# librequest.so and librequest_static.a
 #
 find_package(CURL REQUIRED)
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
+
+# Headers with include paths adjusted to reflect that all headers are
+# in the same directory. These headers are used in the install.
+set(TRTIS_CLIENT_HEADER_FLAT 1)
+configure_file(request.h.in flat_include/request.h @ONLY)
+configure_file(request_grpc.h.in flat_include/request_grpc.h @ONLY)
+configure_file(request_http.h.in flat_include/request_http.h @ONLY)
+
+# Headers with full include paths needed for build.
+set(TRTIS_CLIENT_HEADER_FLAT 0)
+configure_file(request.h.in request.h @ONLY)
+configure_file(request_grpc.h.in request_grpc.h @ONLY)
+configure_file(request_http.h.in request_http.h @ONLY)
 
 set(
   REQUEST_SRCS
@@ -52,6 +65,7 @@ add_dependencies(
   model-config-library grpc-library proto-library
 )
 
+# librequest_static.a
 add_library(
   request_static STATIC
   $<TARGET_OBJECTS:grpc-library>
@@ -59,7 +73,21 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
+target_link_libraries(
+  request_static
+  PRIVATE gRPC::grpc++
+  PRIVATE gRPC::grpc
+  PUBLIC protobuf::libprotobuf
+  PUBLIC ${CURL_LIBRARY}
+)
+if(NOT WIN32)
+  target_link_libraries(
+    request_static
+    PUBLIC -lpthread
+  )
+endif()
 
+# librequest.so
 add_library(
   request SHARED
   $<TARGET_OBJECTS:grpc-library>
@@ -99,7 +127,10 @@ install(
   ARCHIVE DESTINATION lib
 )
 install(
-  FILES request.h request_grpc.h request_http.h
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_include/request.h
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_include/request_grpc.h
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_include/request_http.h
   DESTINATION include
 )
 install(

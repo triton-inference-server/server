@@ -37,12 +37,20 @@
 #define DECLSPEC
 #endif
 
+#cmakedefine TRTIS_CLIENT_HEADER_FLAT 1
+
 #include <functional>
 #include <string>
 #include <vector>
+#ifdef TRTIS_CLIENT_HEADER_FLAT
+#include "api.pb.h"
+#include "request_status.pb.h"
+#include "server_status.pb.h"
+#else
 #include "src/core/api.pb.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server_status.pb.h"
+#endif
 
 namespace nvidia { namespace inferenceserver {
 
