@@ -497,8 +497,10 @@ main(int argc, char** argv)
         MemoryTypeString(output1_memory_type));
   }
 
-  const int32_t* output0_result = reinterpret_cast<const int32_t*>(output0_content);
-  const int32_t* output1_result = reinterpret_cast<const int32_t*>(output1_content);
+  const int32_t* output0_result =
+      reinterpret_cast<const int32_t*>(output0_content);
+  const int32_t* output1_result =
+      reinterpret_cast<const int32_t*>(output1_content);
 
 #ifdef TRTIS_ENABLE_GPU
   // Different from CPU memory, outputs in GPU memory must be copied to CPU
