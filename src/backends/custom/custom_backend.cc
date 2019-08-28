@@ -465,7 +465,7 @@ CustomBackend::Context::GetNextInput(
 
   // If the memory type is on GPU, implicitly copying it to CPU memory
   // to ensure backward capability
-  TRTSERVER_Memory_Type src_memory_type;
+  auto src_memory_type = TRTSERVER_MEMORY_CPU;
   Status status = payload->request_provider_->GetNextInputContent(
       name, content, content_byte_size, &src_memory_type, false);
 #ifdef TRTIS_ENABLE_GPU
