@@ -740,7 +740,8 @@ BaseBackend::Context::Run(
                 std::to_string(batch1_byte_size));
       }
       ReadFixedSizedOutputTensor(
-          output_tensor, name, shapevec, batch1_byte_size, payloads, &cuda_copy);
+          output_tensor, name, shapevec, batch1_byte_size, payloads,
+          &cuda_copy);
     } else {
       ReadStringOutputTensor(
           output_tensor, name, shapevec, batch1_element_cnt, payloads);
