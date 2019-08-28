@@ -254,7 +254,7 @@ COPY . .
 # Build the server.
 #
 # - Need to find CUDA stubs if they are available since some backends
-# may need to link against them. This is identical to the login in TF
+# may need to link against them. This is identical to the logic in TF
 # container nvbuild.sh
 RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
     if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
@@ -266,8 +266,8 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
-                  -DTRTIS_ENABLE_GCS=ON\
-                  -DTRTIS_ENABLE_S3=ON\
+                  -DTRTIS_ENABLE_GCS=ON \
+                  -DTRTIS_ENABLE_S3=ON \
                   -DTRTIS_ENABLE_CUSTOM=ON \
                   -DTRTIS_ENABLE_TENSORFLOW=ON \
                   -DTRTIS_ENABLE_TENSORRT=ON \
