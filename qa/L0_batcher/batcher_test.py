@@ -58,7 +58,8 @@ class BatcherTest(unittest.TestCase):
             raise _check_exception
 
     def check_response(self, trial, bs, thresholds,
-                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16):
+                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16,
+                       use_shared_memory=False):
         global _check_exception
         try:
             start_ms = int(round(time.time() * 1000))
@@ -70,14 +71,14 @@ class BatcherTest(unittest.TestCase):
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False)
+                               use_streaming=False, use_shared_memory)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False)
+                               use_streaming=False, use_shared_memory)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -146,6 +147,26 @@ class BatcherTest(unittest.TestCase):
 
                 self.check_response(trial, 2, (3000, None))
                 self.check_response(trial, 6, (3000, None))
+                self.check_deferred_exception()
+                self.check_status(url, protocol, model_name, (2,6), 2, 8)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_static_batch_preferred_shm(self):
+        # Send two requests with static batch sizes == preferred
+        # size. This should cause the responses to be returned
+        # immediately
+        for trial in _trials:
+            try:
+                url = "localhost:8000"
+                protocol = ProtocolType.HTTP
+                model_name = tu.get_model_name(trial, np.float32, np.float32, np.float32)
+
+                self.check_setup(url, protocol, model_name)
+                self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
+
+                self.check_response(trial, 2, (3000, None), use_shared_memory=True)
+                self.check_response(trial, 6, (3000, None), use_shared_memory=True)
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (2,6), 2, 8)
             except InferenceServerException as ex:
