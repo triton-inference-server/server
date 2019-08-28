@@ -1170,30 +1170,33 @@ class InferContext:
                         c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
                                 byref(shm_addr), byref(shm_key), byref(shm_fd), \
                                 byref(offset), byref(byte_size))))
-                    cval = shm_addr
-                    cval_len = offset.value + byte_size.value
-                    if cval_len == 0:
-                        val = np.empty(shape, dtype=result_dtype)
-                        results[output_name].append(val)
-                    else:
-                        val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
-
-                        if result_dtype != np.object:
-                            val = np.frombuffer(val_buf, dtype=result_dtype, offset=offset.value)
+                    start_pos = offset.value
+                    for b in range(batch_size):
+                        cval = shm_addr
+                        cval_len = start_pos + (byte_size.value/batch_size)
+                        start_pos += (byte_size.value/batch_size)
+                        if cval_len == 0:
+                            val = np.empty(shape, dtype=result_dtype)
+                            results[output_name].append(val)
                         else:
-                            strs = list()
-                            offset = 0
-                            while offset < len(val_buf):
-                                l = struct.unpack_from("<I", val_buf, offset.value)[0]
-                                offset += 4
-                                sb = struct.unpack_from("<{}s".format(l), val_buf, offset.value)[0]
-                                offset += l
-                                strs.append(sb)
-                            val = np.array(strs, dtype=object)
+                            val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
 
-                        # Reshape the result to the appropriate shape
-                        shaped = np.reshape(val, shape)
-                        results[output_name].append(shaped)
+                            if result_dtype != np.object:
+                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=offset.value)
+                            else:
+                                strs = list()
+                                offset = 0
+                                while offset < len(val_buf):
+                                    l = struct.unpack_from("<I", val_buf, offset.value)[0]
+                                    offset += 4
+                                    sb = struct.unpack_from("<{}s".format(l), val_buf, offset.value)[0]
+                                    offset += l
+                                    strs.append(sb)
+                                val = np.array(strs, dtype=object)
+
+                            # Reshape the result to the appropriate shape
+                            shaped = np.reshape(val, shape)
+                            results[output_name].append(shaped)
                 else:
                     _raise_error("unrecognized output format")
             finally:
