@@ -31,6 +31,8 @@ cmake_minimum_required (VERSION 3.5)
 #
 find_package(CURL REQUIRED)
 
+configure_file(librequest.ldscript librequest.ldscript COPYONLY)
+
 add_library(
   request SHARED
   request.cc request.h
@@ -39,6 +41,14 @@ add_library(
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:grpc-library>
+)
+set_target_properties(
+  request
+  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
+)
+set_target_properties(
+  request
+  PROPERTIES LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
 
 target_link_libraries(
