@@ -613,11 +613,9 @@ main(int argc, char** argv)
 #endif  // TRTIS_ENABLE_GPU
 
   if (is_int) {
-    std::cerr << "Before compare" << std::endl;
     CompareResult<int32_t>(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
         output0_result, output1_result);
-    std::cerr << "After compare" << std::endl;
   } else {
     CompareResult<float>(
         output0->name(), output1->name(), &input0_data[0], &input1_data[0],
