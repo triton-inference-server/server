@@ -29,50 +29,9 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <cstring>
 #include <iostream>
 #include "src/clients/python/shared_memory/shared_memory_handle.h"
-
-namespace ni = nvidia::inferenceserver;
-namespace nic = nvidia::inferenceserver::client;
-
-//==============================================================================
-// Error
-
-nic::Error*
-ErrorNew(const char* msg)
-{
-  return new nic::Error(ni::RequestStatusCode::INTERNAL, std::string(msg));
-}
-
-void
-ErrorDelete(nic::Error* ctx)
-{
-  delete ctx;
-}
-
-bool
-ErrorIsOk(nic::Error* ctx)
-{
-  return ctx->IsOk();
-}
-
-const char*
-ErrorMessage(nic::Error* ctx)
-{
-  return ctx->Message().c_str();
-}
-
-const char*
-ErrorServerId(nic::Error* ctx)
-{
-  return ctx->ServerId().c_str();
-}
-
-uint64_t
-ErrorRequestId(nic::Error* ctx)
-{
-  return ctx->RequestId();
-}
 
 //==============================================================================
 // SharedMemoryControlContext
@@ -92,24 +51,19 @@ SharedMemoryHandleCreate(
   return reinterpret_cast<void*>(handle);
 }
 
-nic::Error
+int
 SharedMemoryRegionMap(
     int shm_fd, size_t offset, size_t byte_size, void** shm_addr)
 {
   // map shared memory to process address space
   *shm_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
   if (*shm_addr == MAP_FAILED) {
-    return nic::Error(
-        ni::RequestStatusCode::INVALID_ARG,
-        ("unable to read/mmap the shared memory region: " +
-         std::to_string(shm_fd))
-            .c_str());
+    return -1;
   }
-
-  return nic::Error::Success;
+  return 0;
 }
 
-nic::Error*
+int
 SharedMemoryRegionCreate(
     const char* trtis_shm_name, const char* shm_key, size_t byte_size,
     void** shm_handle)
@@ -117,53 +71,50 @@ SharedMemoryRegionCreate(
   // get shared memory region descriptor
   int shm_fd = shm_open(shm_key, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (shm_fd == -1) {
-    return ErrorNew(
-        ("unable to get shared memory descriptor for: " + std::string(shm_key))
-            .c_str());
+    return -2;
   }
+
   // extend shared memory object as by default it's initialized with size 0
   int res = ftruncate(shm_fd, byte_size);
   if (res == -1) {
-    return ErrorNew(
-        ("unable to initialize the size for: " + std::string(shm_key)).c_str());
+    return -3;
   }
 
   // get base address of shared memory region
   void* shm_addr = nullptr;
-  nic::Error err = SharedMemoryRegionMap(shm_fd, 0, byte_size, &shm_addr);
-  if (!err.IsOk()) {
-    return new nic::Error(err);
+  int err = SharedMemoryRegionMap(shm_fd, 0, byte_size, &shm_addr);
+  if (err == -1) {
+    return -4;
   }
 
   // create a handle for the shared memory region
   *shm_handle = SharedMemoryHandleCreate(
       std::string(trtis_shm_name), shm_addr, std::string(shm_key), shm_fd, 0,
       byte_size);
-  return nullptr;
+  return 0;
 }
 
-nic::Error*
+int
 SharedMemoryRegionSet(
     void* shm_handle, size_t offset, size_t byte_size, const void* data)
 {
   void* shm_addr =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle)->base_addr_;
   char* shm_addr_offset = reinterpret_cast<char*>(shm_addr);
-  memcpy(shm_addr_offset + offset, data, byte_size);
-  return nullptr;
+  std::memcpy(shm_addr_offset + offset, data, byte_size);
+  return 0;
 }
 
-nic::Error*
+int
 SharedMemoryRegionDestroy(void* shm_handle)
 {
   std::string shm_key =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle)->shm_key_;
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
-    return ErrorNew(
-        ("unable to unlink the shared memory region: " + shm_key).c_str());
+    return -5;
   }
-  return nullptr;
+  return 0;
 }
 
 //==============================================================================

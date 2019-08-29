@@ -953,9 +953,9 @@ class InferContext:
                 _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
 
             for (output_name, output_format) in iteritems(outputs):
-                if len(output_format) == 2 and isinstance(output_format, (list, tuple)):
-                    if output_format[0] != InferContext.ResultFormat.RAW \
-                    or (type(output_format[1]) != c_void_p):
+                if len(output_format) == 2 and isinstance(output_format, (list, tuple)) \
+                    and output_format[0] == InferContext.ResultFormat.RAW:
+                    if type(output_format[1]) != c_void_p:
                         _raise_error("shared memory requires tuple of size 2" \
                                     " - output_format(RAW), shm_handle(c_void_p)")
                     _raise_if_error(
@@ -1173,8 +1173,8 @@ class InferContext:
                     start_pos = offset.value
                     for b in range(batch_size):
                         cval = shm_addr
-                        cval_len = start_pos + (byte_size.value/batch_size)
-                        start_pos += (byte_size.value/batch_size)
+                        cval_len = start_pos + int(byte_size.value/batch_size)
+                        start_pos += int(byte_size.value/batch_size)
                         if cval_len == 0:
                             val = np.empty(shape, dtype=result_dtype)
                             results[output_name].append(val)

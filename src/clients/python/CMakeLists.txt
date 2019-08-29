@@ -41,7 +41,6 @@ target_link_libraries(
 add_library(cshm SHARED shared_memory/shared_memory.cc)
 target_link_libraries(
   cshm
-  request
   rt
 )
 

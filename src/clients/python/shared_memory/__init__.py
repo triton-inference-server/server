@@ -50,51 +50,27 @@ _cshm_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _cs
 _cshm = cdll.LoadLibrary(_cshm_path)
 
 _cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate
-_cshm_shared_memory_region_create.restype = c_void_p
+_cshm_shared_memory_region_create.restype = c_int
 _cshm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
 _cshm_shared_memory_region_set = _cshm.SharedMemoryRegionSet
-_cshm_shared_memory_region_set.restype = c_void_p
+_cshm_shared_memory_region_set.restype = c_int
 _cshm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]
 _cshm_shared_memory_region_destroy = _cshm.SharedMemoryRegionDestroy
-_cshm_shared_memory_region_destroy.restype = c_void_p
+_cshm_shared_memory_region_destroy.restype = c_int
 _cshm_shared_memory_region_destroy.argtypes = [c_void_p]
 
-_cshm_error_new =  _cshm.ErrorNew
-_cshm_error_new.restype = c_void_p
-_cshm_error_new.argtypes = [_utf8]
-_cshm_error_del =  _cshm.ErrorDelete
-_cshm_error_del.argtypes = [c_void_p]
-_cshm_error_isok =  _cshm.ErrorIsOk
-_cshm_error_isok.restype = c_bool
-_cshm_error_isok.argtypes = [c_void_p]
-_cshm_error_msg =  _cshm.ErrorMessage
-_cshm_error_msg.restype = c_char_p
-_cshm_error_msg.argtypes = [c_void_p]
-_cshm_error_serverid =  _cshm.ErrorServerId
-_cshm_error_serverid.restype = c_char_p
-_cshm_error_serverid.argtypes = [c_void_p]
-_cshm_error_requestid =  _cshm.ErrorRequestId
-_cshm_error_requestid.restype = c_int64
-_cshm_error_requestid.argtypes = [c_void_p]
-
-def _raise_if_error(err):
+def _raise_if_error(errno):
     """
     Raise SharedMemoryException if 'err' is non-success.
     Otherwise return the request ID.
     """
-    if err.value is not None:
-        ex = SharedMemoryException(err)
-        isok = _cshm_error_isok(err)
-        _cshm_error_del(err)
-        if not isok:
-            raise ex
-        return ex.request_id()
+    if errno.value != 0:
+        ex = SharedMemoryException(errno)
+        raise ex
     return 0
 
 def _raise_error(msg):
-    err = c_void_p(_cshm_error_new(msg))
-    ex = SharedMemoryException(err)
-    _cshm_error_del(err)
+    ex = SharedMemoryException(msg)
     raise ex
 
 def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
@@ -120,7 +96,7 @@ def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
 
     shm_handle = c_void_p()
     _raise_if_error(
-        c_void_p(_cshm_shared_memory_region_create(trtis_shm_name, shm_key, byte_size, byref(shm_handle))))
+        c_int(_cshm_shared_memory_region_create(trtis_shm_name, shm_key, byte_size, byref(shm_handle))))
 
     return shm_handle
 
@@ -154,7 +130,7 @@ def set_shared_memory_region(shm_handle, offset, input_values):
         input_value = np.ascontiguousarray(input_value).flatten()
         byte_size = input_value.size * input_value.itemsize
         _raise_if_error(
-            c_void_p(_cshm_shared_memory_region_set(shm_handle, c_uint64(offset_current), \
+            c_int(_cshm_shared_memory_region_set(shm_handle, c_uint64(offset_current), \
                 c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
         offset_current += byte_size
     return
@@ -174,9 +150,8 @@ def destroy_shared_memory_region(shm_handle):
     """
 
     _raise_if_error(
-        c_void_p(_cshm_shared_memory_region_destroy(shm_handle)))
+        c_int(_cshm_shared_memory_region_destroy(shm_handle)))
     return
-
 
 class SharedMemoryException(Exception):
     """Exception indicating non-Success status.
@@ -187,24 +162,18 @@ class SharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
+
+    err_code_map = { -2: "unable to get shared memory descriptor",
+                    -3: "unable to initialize the size",
+                    -4: "unable to read/mmap the shared memory region",
+                    -5: "unable to unlink the shared memory region"}
+
     def __init__(self, err):
         self._msg = None
-        if (err is not None) and (err.value is not None):
-            self._msg = _cshm_error_msg(err)
-            if self._msg is not None:
-                self._msg = self._msg.decode('utf-8')
+        if err.value != 0 and err.value in err_code_map:
+            self._msg = err_code_map[err.value]
+            self._msg = self._msg.decode('utf-8')
 
     def __str__(self):
         msg = super().__str__() if self._msg is None else self._msg
         return msg
-
-    def message(self):
-        """Get the exception message.
-
-        Returns
-        -------
-        str
-            The message associated with this exception, or None if no message.
-
-        """
-        return self._msg

@@ -29,10 +29,6 @@
 #include <stddef.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "src/clients/c++/request.h"
-
-namespace ni = nvidia::inferenceserver;
-namespace nic = nvidia::inferenceserver::client;
 
 #ifdef __cplusplus
 
@@ -40,23 +36,13 @@ extern "C" {
 #endif
 
 //==============================================================================
-// Error
-nic::Error* ErrorNew(const char* msg);
-void ErrorDelete(nic::Error* ctx);
-bool ErrorIsOk(nic::Error* ctx);
-bool ErrorIsUnavailable(nic::Error* ctx);
-const char* ErrorMessage(nic::Error* ctx);
-const char* ErrorServerId(nic::Error* ctx);
-uint64_t ErrorRequestId(nic::Error* ctx);
-
-//==============================================================================
 // SharedMemoryControlContext
-nic::Error* SharedMemoryRegionCreate(
+int SharedMemoryRegionCreate(
     const char* trtis_shm_name, const char* shm_key, size_t byte_size,
     void** shm_handle);
-nic::Error* SharedMemoryRegionSet(
+int SharedMemoryRegionSet(
     void* shm_addr, size_t offset, size_t byte_size, const void* data);
-nic::Error* SharedMemoryRegionDestroy(void* shm_handle);
+int SharedMemoryRegionDestroy(void* shm_handle);
 
 //==============================================================================
 
