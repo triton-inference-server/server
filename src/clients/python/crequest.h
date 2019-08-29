@@ -81,6 +81,20 @@ nic::Error* ModelControlContextUnload(
     ModelControlContextCtx* ctx, const char* model_name);
 
 //==============================================================================
+// SharedMemoryControlContext
+typedef struct SharedMemoryControlContextCtx SharedMemoryControlContextCtx;
+nic::Error* SharedMemoryControlContextNew(
+    SharedMemoryControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose);
+void SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx);
+nic::Error* SharedMemoryControlContextRegister(
+    SharedMemoryControlContextCtx* ctx, void* shm_handle);
+nic::Error* SharedMemoryControlContextUnregister(
+    SharedMemoryControlContextCtx* ctx, void* shm_handle);
+nic::Error* SharedMemoryControlContextGetSharedMemoryHandle(
+    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
+    size_t* offset, size_t* byte_size);
+//==============================================================================
 // InferContext
 typedef struct InferContextCtx InferContextCtx;
 nic::Error* InferContextNew(
@@ -111,6 +125,9 @@ nic::Error* InferContextOptionsAddRaw(
 nic::Error* InferContextOptionsAddClass(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
     const char* output_name, uint64_t count);
+nic::Error* InferContextOptionsAddSharedMemory(
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, void* shm_handle);
 
 //==============================================================================
 // InferContext::Input
@@ -123,6 +140,8 @@ nic::Error* InferContextInputSetShape(
     InferContextInputCtx* ctx, const int64_t* dims, uint64_t size);
 nic::Error* InferContextInputSetRaw(
     InferContextInputCtx* ctx, const void* data, uint64_t byte_size);
+nic::Error* InferContextInputSetSharedMemory(
+    InferContextInputCtx* ctx, void* shm_handle);
 
 //==============================================================================
 // InferContext::Result

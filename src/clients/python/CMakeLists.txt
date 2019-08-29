@@ -36,11 +36,21 @@ target_link_libraries(
 )
 
 #
+# libcshm.so
+#
+add_library(cshm SHARED shared_memory/shared_memory.cc)
+target_link_libraries(
+  cshm
+  rt
+)
+
+#
 # Wheel file
 #
 set(wheel_stamp_file "stamp.whl")
 configure_file(../../../VERSION VERSION COPYONLY)
 configure_file(__init__.py __init__.py COPYONLY)
+configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
 configure_file(setup.py setup.py COPYONLY)
 
 add_custom_command(
@@ -70,6 +80,7 @@ install(
     simple_client.py
     simple_callback_client.py
     simple_string_client.py
+    simple_shm_client.py
     simple_sequence_client.py
   DESTINATION python
 )

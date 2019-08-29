@@ -68,6 +68,14 @@ function main() {
   cp __init__.py \
     "${WHLDIR}/tensorrtserver/api/."
 
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    mkdir -p ${WHLDIR}/tensorrtserver/shared_memory
+    cp libcshm.so \
+      "${WHLDIR}/tensorrtserver/shared_memory/."
+    cp shared_memory/__init__.py \
+      "${WHLDIR}/tensorrtserver/shared_memory/."
+  fi
+
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserver/__init__.py
 
