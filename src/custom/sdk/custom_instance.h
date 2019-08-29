@@ -74,7 +74,10 @@ class CustomInstance {
   /// output (see CustomGetOutputFn_t).
   virtual int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) { return -1;}
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
+  {
+    return -1;
+  }
 
   /// Execute the custom instance. User should override this function
   /// if version 2 of the custom interface is used.
@@ -87,7 +90,10 @@ class CustomInstance {
   /// output (see CustomGetOutputVer2Fn_t).
   virtual int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputVer2Fn_t input_fn, CustomGetOutputVer2Fn_t output_fn) { return -1;}
+      CustomGetNextInputVer2Fn_t input_fn, CustomGetOutputVer2Fn_t output_fn)
+  {
+    return -1;
+  }
 
   /// Get the string for an error code.
   ///
