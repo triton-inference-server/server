@@ -29,6 +29,7 @@
 #include <iostream>
 #include "src/clients/c++/request_grpc.h"
 #include "src/clients/c++/request_http.h"
+#include "src/clients/python/shared_memory/shared_memory_handle.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -326,6 +327,96 @@ ModelControlContextUnload(ModelControlContextCtx* ctx, const char* model_name)
 }
 
 //==============================================================================
+struct SharedMemoryControlContextCtx {
+  std::unique_ptr<nic::SharedMemoryControlContext> ctx;
+};
+
+nic::Error*
+SharedMemoryControlContextNew(
+    SharedMemoryControlContextCtx** ctx, const char* url, int protocol_int,
+    const char** headers, int num_headers, bool verbose)
+{
+  nic::Error err;
+  ProtocolType protocol;
+  err = ParseProtocol(&protocol, protocol_int);
+  if (err.IsOk()) {
+    SharedMemoryControlContextCtx* lctx = new SharedMemoryControlContextCtx;
+    if (protocol == ProtocolType::HTTP) {
+      std::map<std::string, std::string> http_headers;
+      err = ParseHttpHeaders(&http_headers, headers, num_headers);
+      if (err.IsOk()) {
+        err = nic::SharedMemoryControlHttpContext::Create(
+            &(lctx->ctx), std::string(url), http_headers, verbose);
+      }
+    } else {
+      err = nic::SharedMemoryControlGrpcContext::Create(
+          &(lctx->ctx), std::string(url), verbose);
+    }
+
+    if (err.IsOk()) {
+      *ctx = lctx;
+      return nullptr;
+    }
+
+    delete lctx;
+  }
+
+  *ctx = nullptr;
+  return new nic::Error(err);
+}
+
+void
+SharedMemoryControlContextDelete(SharedMemoryControlContextCtx* ctx)
+{
+  delete ctx;
+}
+
+nic::Error*
+SharedMemoryControlContextRegister(
+    SharedMemoryControlContextCtx* ctx, void* shm_handle)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  nic::Error err = ctx->ctx->RegisterSharedMemory(
+      handle->trtis_shm_name_, handle->shm_key_, handle->offset_,
+      handle->byte_size_);
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+SharedMemoryControlContextUnregister(
+    SharedMemoryControlContextCtx* ctx, void* shm_handle)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  nic::Error err = ctx->ctx->UnregisterSharedMemory(handle->trtis_shm_name_);
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+SharedMemoryControlContextGetSharedMemoryHandle(
+    void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
+    size_t* offset, size_t* byte_size)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  *shm_addr = handle->base_addr_;
+  *shm_key = handle->shm_key_.c_str();
+  *shm_fd = handle->shm_fd_;
+  *offset = handle->offset_;
+  *byte_size = handle->byte_size_;
+  return nullptr;
+}
+
+//==============================================================================
 struct InferContextCtx {
   std::unique_ptr<nic::InferContext> ctx;
   nic::InferContext::ResultMap results;
@@ -513,6 +604,23 @@ InferContextOptionsAddClass(
   return new nic::Error(err);
 }
 
+nic::Error*
+InferContextOptionsAddSharedMemory(
+    InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
+    const char* output_name, void* shm_handle)
+{
+  std::shared_ptr<nic::InferContext::Output> output;
+  nic::Error err = infer_ctx->ctx->GetOutput(std::string(output_name), &output);
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  if (err.IsOk()) {
+    err = ctx->AddSharedMemoryResult(
+        output, handle->trtis_shm_name_, handle->offset_, handle->byte_size_);
+  }
+
+  return new nic::Error(err);
+}
+
 //==============================================================================
 struct InferContextInputCtx {
   std::shared_ptr<nic::InferContext::Input> input;
@@ -559,6 +667,16 @@ InferContextInputSetRaw(
 {
   nic::Error err =
       ctx->input->SetRaw(reinterpret_cast<const uint8_t*>(data), byte_size);
+  return new nic::Error(err);
+}
+
+nic::Error*
+InferContextInputSetSharedMemory(InferContextInputCtx* ctx, void* shm_handle)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(shm_handle);
+  nic::Error err = ctx->input->SetSharedMemory(
+      handle->trtis_shm_name_, handle->offset_, handle->byte_size_);
   return new nic::Error(err);
 }
 

@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SIMPLE_SHM_CLIENT=../clients/simple_shm_client
+SIMPLE_SHM_CLIENT_PY=../clients/simple_shm_client.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=`pwd`/models
@@ -52,6 +53,16 @@ if [ $? -ne 0 ]; then
 fi
 
 $SIMPLE_SHM_CLIENT -v >>client_c++.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $SIMPLE_SHM_CLIENT_PY -i grpc -u localhost:8001 -v >>client_py.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $SIMPLE_SHM_CLIENT_PY -v >>client_py.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
