@@ -148,8 +148,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             shm_op1_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
             shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
             # copy data into shared memory region for input values
-            shm.set_shared_memory_region(shm_ip0_handle, 0, input0_list)
-            shm.set_shared_memory_region(shm_ip1_handle, 0, input1_list)
+            shm.set_shared_memory_region(shm_ip0_handle, input0_list)
+            shm.set_shared_memory_region(shm_ip1_handle, input1_list)
 
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             shared_memory_ctx.register(shm_ip0_handle)
@@ -349,7 +349,7 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             expected_dict[output_name] = expected_list
             if config[3]:
                 # copy data into shared memory region for input values
-                shm.set_shared_memory_region(shm_ip_handles[io_num], 0, input_list)
+                shm.set_shared_memory_region(shm_ip_handles[io_num], input_list)
                 input_dict[input_name] = shm_ip_handles[io_num]
                 output_dict[output_name] = (InferContext.ResultFormat.RAW, shm_op_handles[io_num])
             else:
