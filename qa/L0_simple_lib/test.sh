@@ -29,22 +29,65 @@ SIMPLE_CLIENT=./simple
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
+DATADIR=/data/inferenceserver/qa_model_repository
+
 export CUDA_VISIBLE_DEVICES=0
 
 rm -f $CLIENT_LOG
 
 RET=0
 
+# Apply the same procedure to addsub models in other frameworks
+for trial in \
+        graphdef_float32_float32_float32 \
+        savedmodel_float32_float32_float32 \
+        netdef_float32_float32_float32 \
+        onnx_float32_float32_float32 \
+        libtorch_float32_float32_float32 \
+        plan_float32_float32_float32 ; do
+    rm -rf $MODELSDIR/simple
+    mkdir -p $MODELSDIR/simple/1 && \
+        cp -r $DATADIR/${trial}/1/* $MODELSDIR/simple/1/. && \
+        cp $DATADIR/${trial}/config.pbtxt $MODELSDIR/simple/. && \
+        (cd $MODELSDIR/simple && \
+                sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
+
+    set +e
+
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    set -e
+done
+
+rm -rf $MODELSDIR/simple/1/*
+cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/simple/1/.
+cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
+(cd $MODELSDIR/simple && \
+            sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+            sed -i "s/label_filename:.*//" config.pbtxt)
+
 set +e
 
 $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-# Set input data in GPU memory
 $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
