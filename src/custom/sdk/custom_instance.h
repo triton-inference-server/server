@@ -63,7 +63,8 @@ class CustomInstance {
 
   virtual ~CustomInstance() = default;
 
-  /// Execute the custom instance
+  /// Execute the custom instance. User should override this function if
+  /// version 1 of the custom interface is used or the version is not specified.
   ///
   /// \param payload_cnt The number of payloads to execute.
   /// \param payloads The payloads to execute.
@@ -73,7 +74,20 @@ class CustomInstance {
   /// output (see CustomGetOutputFn_t).
   virtual int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
-      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) = 0;
+      CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) { return -1;}
+
+  /// Execute the custom instance. User should override this function
+  /// if version 2 of the custom interface is used.
+  ///
+  /// \param payload_cnt The number of payloads to execute.
+  /// \param payloads The payloads to execute.
+  /// \param input_fn The callback function to get tensor input (see
+  /// CustomGetNextInputVer2Fn_t).
+  /// \param output_fn The callback function to get buffer for tensor
+  /// output (see CustomGetOutputVer2Fn_t).
+  virtual int Execute(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputVer2Fn_t input_fn, CustomGetOutputVer2Fn_t output_fn) { return -1;}
 
   /// Get the string for an error code.
   ///
