@@ -100,6 +100,12 @@ CustomExecute(
   return instance->Execute(payload_cnt, payloads, input_fn, output_fn);
 }
 
+int
+CustomVersion()
+{
+  return CUSTOM_VERSION;
+}
+
 }  // extern "C"
 
 }}}  // namespace nvidia::inferenceserver::custom

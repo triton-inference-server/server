@@ -40,6 +40,14 @@ extern "C" {
 #define TRTIS_CUSTOM_EXPORT
 #endif
 
+#ifndef CUSTOM_VERSION
+#define CUSTOM_VERSION 1
+#endif
+
+#if ((CUSTOM_VERSION < 1) || (CUSTOM_VERSION > 2))
+#error CUSTOM_VERSION is set to unknown value
+#endif
+
 /// GPU device number that indicates that no GPU is available for a
 /// context. In CustomInitializeData this value is used for
 /// 'gpu_device_id' to indicate that the model must execute on the
@@ -50,6 +58,9 @@ extern "C" {
 /// initialization. This must keep aligned with CustomServerParameter
 /// enum values.
 #define CUSTOM_SERVER_PARAMETER_CNT 2
+
+/// Types of memory recognized by TRTSERVER and custom backend.
+typedef enum custom_memorytype_enum { MEMORY_CPU, MEMORY_GPU } CustomMemoryType;
 
 /// The server parameter values provided to custom backends. New
 /// values must be added using the next greater integer value and
@@ -197,6 +208,33 @@ typedef int (*CustomExecuteFn_t)(
     void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
     CustomGetOutputFn_t);
 
+/// See CustomGetNextInputFn_t
+///
+/// \param memory_type Acts as both input and output. On input
+/// gives the buffer memory type preferred by the function caller.
+/// Returns the actual memory type of 'content'.
+typedef bool (*CustomGetNextInputVer2Fn_t)(
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size, CustomMemoryType* memory_type);
+
+/// See CustomGetOutputFn_t
+///
+/// \param memory_type Acts as both input and output. On input
+/// gives the buffer memory type preferred by the function caller.
+/// Returns the actual memory type of 'content'.
+typedef bool (*CustomGetOutputVer2Fn_t)(
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content,
+    CustomMemoryType* memory_type);
+
+/// Type for the CustomExecuteVer2 function.
+typedef int (*CustomExecuteVer2Fn_t)(
+    void*, uint32_t, CustomPayload*, CustomGetNextInputVer2Fn_t,
+    CustomGetOutputVer2Fn_t);
+
+/// Type for the CustomVersion function.
+typedef int (*CustomVersionFn_t)();
+
 /// Initialize the custom backend for a given model configuration and
 /// get the associated custom context.
 ///
@@ -248,6 +286,15 @@ TRTIS_CUSTOM_EXPORT const char* CustomErrorString(
 TRTIS_CUSTOM_EXPORT int CustomExecute(
     void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+
+/// See CustomExecute.
+TRTIS_CUSTOM_EXPORT int CustomExecuteVer2(
+    void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputVer2Fn_t input_fn, CustomGetOutputVer2Fn_t output_fn);
+
+/// Return the custom version. For custom backend that doesn't define this
+/// entry point, the callback function type in CUSTOM_VERSION 1 will be used.
+TRTIS_CUSTOM_EXPORT int CustomVersion();
 
 #ifdef __cplusplus
 }
