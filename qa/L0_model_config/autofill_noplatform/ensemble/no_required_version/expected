@@ -1,0 +1,1 @@
+ensemble 'no_required_version' depends on 'simple' whose required version 2 is not loaded

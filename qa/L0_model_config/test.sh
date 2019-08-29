@@ -88,6 +88,12 @@ for modelpath in \
        autofill_noplatform/ensemble/unmapped_input/fp32_dim1_batch4_input4/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency/1 \
        autofill_noplatform/ensemble/circular_dependency/circular_dependency_2/1 \
+       autofill_noplatform/ensemble/no_required_version/no_required_version/1 \
+       autofill_noplatform/ensemble/no_required_version/simple/1 \
+       autofill_noplatform/ensemble/no_required_version_2/no_required_version_2/1 \
+       autofill_noplatform/ensemble/no_required_version_2/simple/1 \
+       autofill_noplatform/ensemble/no_required_version_3/no_required_version_3/1 \
+       autofill_noplatform/ensemble/no_required_version_3/simple/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/embedded_ensemble/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/fp32_dim1_batch4/1 \
        autofill_noplatform_success/ensemble/embedded_ensemble/inner_ensemble/1 \
