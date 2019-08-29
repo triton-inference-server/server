@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -732,15 +732,8 @@ class SharedMemoryControlContext:
 
         Parameters
         ----------
-        name : str
-            The name of the shared memory region to be registered.
         shm_handle : c_void_p
             The handle for the shared memory region.
-        offset : int
-            The offset from the start of the shared shared memory region.
-        byte_size : int
-            The size in bytes of the data to be read / written in the shared
-            memory region.
 
         Raises
         ------
@@ -933,20 +926,22 @@ class InferContext:
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
         # containing one array.
-        # Each element in the list must be a 'numpy array' if inputs are being
-        # passed directly and a 'tuple' if passing a reference to shared memory
+        # An input's data may be specified as a list of numpy arrays,
+        # or as a shared memory handle.
         for inp_name, inp in inputs.items():
             if not isinstance(inp, (list, tuple)) and type(inp) != c_void_p:
                 _raise_error("input '" + inp_name +
                              "' values must be specified as a list of numpy arrays" \
-                             " or c_void_p representing the shared memory handle")
+                             " or as a single c_void_p representing the shared memory handle")
             if type(inp) != c_void_p:
                 for ip in inp:
                     if not isinstance(ip, (np.ndarray, tuple)):
                         _raise_error("input '" + inp_name +
                                      "' values must be specified as a list of numpy arrays" \
-                                     " or c_void_p representing the shared memory handle")
+                                     " or as a single c_void_p representing the shared memory handle")
         # Set run options using formats specified in 'outputs'
+        # An output format may be may be specified as a RAW or (CLASS, cnt)
+        # or as a (RAW, shared_memory_handle).
         options = c_void_p()
         try:
             _raise_if_error(c_void_p(
@@ -957,7 +952,7 @@ class InferContext:
                     and output_format[0] == InferContext.ResultFormat.RAW:
                     if type(output_format[1]) != c_void_p:
                         _raise_error("shared memory requires tuple of size 2" \
-                                    " - output_format(RAW), shm_handle(c_void_p)")
+                                    " - output_format(RAW), shared_memory_handle(c_void_p)")
                     _raise_if_error(
                         c_void_p(
                             _crequest_infer_ctx_options_add_shared_memory(

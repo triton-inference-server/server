@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,7 +45,7 @@ class _utf8(object):
             return value.encode('utf8')
 
 import os
-_cshm_lib = "shmwrap" if os.name == 'nt' else 'libcshm.so'
+_cshm_lib = "cshm" if os.name == 'nt' else 'libcshm.so'
 _cshm_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _cshm_lib)
 _cshm = cdll.LoadLibrary(_cshm_path)
 
@@ -67,7 +67,7 @@ def _raise_if_error(errno):
     if errno.value != 0:
         ex = SharedMemoryException(errno)
         raise ex
-    return 0
+    return
 
 def _raise_error(msg):
     ex = SharedMemoryException(msg)
@@ -100,7 +100,7 @@ def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
 
     return shm_handle
 
-def set_shared_memory_region(shm_handle, offset, input_values):
+def set_shared_memory_region(shm_handle, input_values):
     """Copy the contents of the numpy array into a shared memory region with
     the specified identifier, offset and size.
 
@@ -108,8 +108,6 @@ def set_shared_memory_region(shm_handle, offset, input_values):
     ----------
     shm_handle : c_void_p
         The handle for the shared memory region.
-    offset : int
-        The offset from the start of the shared shared memory region.
     input_values : np.array
         The list of numpy arrays to be copied into the shared memory region.
 
@@ -125,7 +123,7 @@ def set_shared_memory_region(shm_handle, offset, input_values):
         if not isinstance(input_value, (np.ndarray,)):
             _raise_error("input_values must be specified as a list/tuple of numpy arrays")
 
-    offset_current = offset
+    offset_current = 0
     for input_value in input_values:
         input_value = np.ascontiguousarray(input_value).flatten()
         byte_size = input_value.size * input_value.itemsize

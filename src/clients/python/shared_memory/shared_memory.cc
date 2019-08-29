@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/clients/python/shared_memory/shared_memory.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -35,6 +36,8 @@
 
 //==============================================================================
 // SharedMemoryControlContext
+
+namespace {
 
 void*
 SharedMemoryHandleCreate(
@@ -62,6 +65,8 @@ SharedMemoryRegionMap(
   }
   return 0;
 }
+
+} // namespace
 
 int
 SharedMemoryRegionCreate(
