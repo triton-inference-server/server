@@ -62,7 +62,7 @@ _cshm_shared_memory_region_destroy.argtypes = [c_void_p]
 def _raise_if_error(errno):
     """
     Raise SharedMemoryException if 'err' is non-success.
-    Otherwise return the request ID.
+    Otherwise return nothing.
     """
     if errno.value != 0:
         ex = SharedMemoryException(errno)
@@ -160,17 +160,14 @@ class SharedMemoryException(Exception):
         Pointer to an Error that should be used to initialize the exception.
 
     """
-
-    err_code_map = { -2: "unable to get shared memory descriptor",
-                    -3: "unable to initialize the size",
-                    -4: "unable to read/mmap the shared memory region",
-                    -5: "unable to unlink the shared memory region"}
-
     def __init__(self, err):
+        self.err_code_map = { -2: "unable to get shared memory descriptor",
+                            -3: "unable to initialize the size",
+                            -4: "unable to read/mmap the shared memory region",
+                            -5: "unable to unlink the shared memory region"}
         self._msg = None
-        if err.value != 0 and err.value in err_code_map:
-            self._msg = err_code_map[err.value]
-            self._msg = self._msg.decode('utf-8')
+        if err.value != 0 and err.value in self.err_code_map:
+            self._msg = self.err_code_map[err.value]
 
     def __str__(self):
         msg = super().__str__() if self._msg is None else self._msg
