@@ -72,6 +72,17 @@ add_custom_target(
     "${wheel_stamp_file}"
 )
 
+file(
+  GLOB generated-py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_pb2.py
+  ${CMAKE_CURRENT_BINARY_DIR}/../../core/*_grpc.py
+)
+
+install(
+  FILES ${generated-py}
+  DESTINATION python
+)
+
 install(
   PROGRAMS
     image_client.py
