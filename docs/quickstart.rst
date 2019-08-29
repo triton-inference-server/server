@@ -167,6 +167,16 @@ If you built using CMake run the inference server directly on your host system::
 
     $ trtserver --model-repository=/full/path/to/example/model/repository
 
+In either case, after you start the inference server you will see
+output on the console showing the server starting up and loading the
+model. When you see output like the following, the inference server is
+ready to accept inference requests::
+
+  I0828 23:42:45.635957 1 main.cc:417] Starting endpoints, 'inference:0' listening on
+  I0828 23:42:45.649580 1 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+  I0828 23:42:45.649647 1 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+  I0828 23:42:45.693758 1 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+
 For more information, see :ref:`section-running-the-inference-server`.
 
 .. _section-verify-inference-server-status:
@@ -247,19 +257,19 @@ image-client application to perform image classification using the
 example resnet50_netdef from the example model repository.
 
 To send a request for the resnet50_netdef (Caffe2) model from the
-example model repository for an image from the qa/images directory::
+example model repository for an image from the /workspace/images directory::
 
-  $ /tmp/client/bin/image_client -m resnet50_netdef -s INCEPTION images/mug.jpg
+  $ /workspace/install/bin/image_client -m resnet50_netdef -s INCEPTION /workspace/images/mug.jpg
   Request 0, batch size 1
-  Image '../qa/images/mug.jpg':
+  Image '../images/mug.jpg':
       504 (COFFEE MUG) = 0.723991
 
 The Python version of the application accepts the same command-line
 arguments::
 
-  $ python /tmp/client/python/image_client.py -m resnet50_netdef -s INCEPTION images/mug.jpg
+  $ python /workspace/install/python/image_client.py -m resnet50_netdef -s INCEPTION /workspace/images/mug.jpg
   Request 0, batch size 1
-  Image '../qa/images/mug.jpg':
+  Image '../images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
 
 For more information, see :ref:`section-image_classification_example`.
