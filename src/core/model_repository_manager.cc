@@ -1437,6 +1437,7 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
   if (updated_node->model_config_.has_ensemble_scheduling()) {
     for (const auto& step :
          updated_node->model_config_.ensemble_scheduling().step()) {
+      DependencyNode* upstream_node = nullptr;
       const auto& model_name = step.model_name();
       auto dit = dependency_graph_.find(model_name);
       if (dit == dependency_graph_.end()) {
@@ -1449,12 +1450,17 @@ ModelRepositoryManager::ConnectDependencyGraph(DependencyNode* updated_node)
         // Add the node to missing node's downstream so that when the missing
         // node is added, the downstreams can be found easily.
         mit->second->downstreams_.emplace(updated_node);
-        updated_node->upstreams_.emplace(
-            mit->second.get(), step.model_version());
+        upstream_node = mit->second.get();
       } else {
         dit->second->downstreams_.emplace(updated_node);
-        updated_node->upstreams_.emplace(
-            dit->second.get(), step.model_version());
+        upstream_node = dit->second.get();
+      }
+      auto res = updated_node->upstreams_.emplace(
+          upstream_node, std::set<int64_t>({step.model_version()}));
+      // If map insertion doesn't happen, the same model is required in
+      // different step, insert the version to existing required version set.
+      if (!res.second) {
+        res.first->second.insert(step.model_version());
       }
     }
     return true;
@@ -1546,14 +1552,20 @@ ModelRepositoryManager::CheckNode(DependencyNode* node)
             RequestStatusCode::INVALID_ARG,
             "ensemble '" + node->model_name_ + "' depends on '" +
                 upstream.first->model_name_ + "' which has no loaded version");
-      } else if (upstream.second != -1) {
-        auto it = upstream.first->loaded_versions_.find(upstream.second);
-        if (it == upstream.first->loaded_versions_.end()) {
-          node->status_ = Status(
-              RequestStatusCode::INVALID_ARG,
-              "ensemble '" + node->model_name_ + "' depends on '" +
-                  upstream.first->model_name_ +
-                  "' whose required version is not loaded");
+      } else {
+        for (const auto& required_version : upstream.second) {
+          if (required_version == -1) {
+            continue;
+          }
+
+          auto it = upstream.first->loaded_versions_.find(required_version);
+          if (it == upstream.first->loaded_versions_.end()) {
+            node->status_ = Status(
+                RequestStatusCode::INVALID_ARG,
+                "ensemble '" + node->model_name_ + "' depends on '" +
+                    upstream.first->model_name_ + "' whose required version " +
+                    std::to_string(required_version) + " is not loaded");
+          }
         }
       }
       if (!node->status_.IsOk()) {

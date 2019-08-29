@@ -1,0 +1,33 @@
+name: "simple"
+platform: "custom"
+max_batch_size: 8
+version_policy : { all {} }
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+  }
+]
