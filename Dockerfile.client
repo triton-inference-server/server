@@ -88,6 +88,11 @@ RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
+# For the container we remove the src/ directory from the install,
+# since that is confusing given that the container itself already has
+# the src/ as well as a build mechanism.
+RUN rm -fr install/src
+
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
