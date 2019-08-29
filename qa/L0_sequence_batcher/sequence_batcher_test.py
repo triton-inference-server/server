@@ -39,6 +39,7 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
+import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
@@ -76,7 +77,8 @@ class SequenceBatcherTest(unittest.TestCase):
 
     def check_sequence(self, trial, model_name, input_dtype, correlation_id,
                        sequence_thresholds, values, expected_result,
-                       protocol, batch_size=1, sequence_name="<unknown>"):
+                       protocol, batch_size=1, sequence_name="<unknown>",
+                       use_shared_memory=False):
         """Perform sequence of inferences. The 'values' holds a list of
         tuples, one for each inference with format:
 
@@ -98,11 +100,17 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False))
+            if use_shared_memory:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False))
+            if use_shared_memory:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True))
+            if use_shared_memory:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
         self.assertEqual(len(configs), 1)
 
@@ -135,15 +143,34 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    input_info = input_list
+                    output_info = InferContext.ResultFormat.RAW
+
+                    if config[3]:
+                        input_byte_size = input_list[0].nbytes * batch_size
+                        output_byte_size = np.dtype(input_dtype).itemsize
+                        # create and register shared memory region for inputs and outputs
+                        shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+                        # copy data into shared memory region for input values
+                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+
+                        shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+
+                        input_info = shm_ip_handle
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+
                     start_ms = int(round(time.time() * 1000))
                     if "libtorch" not in trial:
                         results = ctx.run(
-                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
                             batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT"
                     else:
                         results = ctx.run(
-                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
                             batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"
 
@@ -169,6 +196,12 @@ class SequenceBatcherTest(unittest.TestCase):
                         time.sleep(delay_ms[1] / 1000.0)
 
                 seq_end_ms = int(round(time.time() * 1000))
+
+                if config[3]:
+                    shared_memory_ctx.unregister(shm_ip_handle)
+                    shm.destroy_shared_memory_region(shm_ip_handle)
+                    shared_memory_ctx.unregister(shm_op_handle)
+                    shm.destroy_shared_memory_region(shm_op_handle)
 
                 if input_dtype == np.object:
                     self.assertEqual(int(result), expected_result)
@@ -213,12 +246,17 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False))
+            if use_shared_memory:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False))
+            if use_shared_memory:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True))
-
+            if use_shared_memory:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
         self.assertEqual(len(configs), 1)
 
         for config in configs:
@@ -248,17 +286,36 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    input_info = input_list
+                    output_info = InferContext.ResultFormat.RAW
+
+                    if config[3]:
+                        input_byte_size = input_list[0].nbytes * batch_size
+                        output_byte_size = np.dtype(input_dtype).itemsize
+                        # create and register shared memory region for inputs and outputs
+                        shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+                        # copy data into shared memory region for input values
+                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+
+                        shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+
+                        input_info = shm_ip_handle
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
 
                     if "libtorch" not in trial:
                         result_ids.append(ctx.async_run(
-                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
                             batch_size=batch_size, flags=flags))
                         OUTPUT = "OUTPUT"
                     else:
                         result_ids.append(ctx.async_run(
-                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
                             batch_size=batch_size, flags=flags))
                         OUTPUT = "OUTPUT__0"
 
@@ -272,6 +329,12 @@ class SequenceBatcherTest(unittest.TestCase):
                     print("{}: {}".format(sequence_name, result))
 
                 seq_end_ms = int(round(time.time() * 1000))
+
+                if config[3]:
+                    shared_memory_ctx.unregister(shm_ip_handle)
+                    shm.destroy_shared_memory_region(shm_ip_handle)
+                    shared_memory_ctx.unregister(shm_op_handle)
+                    shm.destroy_shared_memory_region(shm_op_handle)
 
                 if input_dtype == np.object:
                     self.assertEqual(int(result), expected_result)
