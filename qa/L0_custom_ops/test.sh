@@ -30,7 +30,7 @@ ZERO_OUT_TEST=zero_out_test.py
 CUDA_OP_TEST=cuda_op_test.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-repository=/data/inferenceserver/qa_custom_ops"
+SERVER_ARGS="--model-repository=/data/inferenceserver/$1/qa_custom_ops"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -38,7 +38,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-export LD_PRELOAD=/data/inferenceserver/qa_custom_ops/libzeroout.so:/data/inferenceserver/qa_custom_ops/libcudaop.so:/data/inferenceserver/qa_custom_ops/libbusyop.so
+export LD_PRELOAD=/data/inferenceserver/$1/qa_custom_ops/libzeroout.so:/data/inferenceserver/$1/qa_custom_ops/libcudaop.so:/data/inferenceserver/$1/qa_custom_ops/libbusyop.so
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

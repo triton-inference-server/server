@@ -29,7 +29,7 @@ OP_NAME_TEST_PY=output_name_test.py
 
 CLIENT_LOG="./client.log"
 
-DATADIR=/data/inferenceserver/qa_identity_model_repository
+DATADIR=/data/inferenceserver/$1/qa_identity_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR

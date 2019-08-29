@@ -30,9 +30,10 @@ DIRS=(../L*/)
 
 passed=0
 failed=0
+TRTIS_CONTAINER_VERSION=$1
 for dir in "${DIRS[@]}"; do
     echo -e "Running $dir...\n"
-    (cd $dir && ./test.sh)
+    (cd $dir && ./test.sh ${TRTIS_CONTAINER_VERSION})
     rc=$?
     if (( $rc == 0 )); then
         (( passed++ ))

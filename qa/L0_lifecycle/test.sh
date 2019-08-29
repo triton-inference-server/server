@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 LC_TEST=lifecycle_test.py
 
-DATADIR=/data/inferenceserver
+DATADIR=/data/inferenceserver/$1
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh

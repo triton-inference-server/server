@@ -99,11 +99,11 @@ for MAYBE_SLASH in "" "/"; do
     # Now start model tests
 
     for FW in graphdef savedmodel netdef onnx libtorch plan; do
-        cp -r /data/inferenceserver/qa_model_repository/${FW}_float32_float32_float32/ models/
+        cp -r /data/inferenceserver/$1/qa_model_repository/${FW}_float32_float32_float32/ models/
     done
 
     # Copy models with string inputs and remove nobatch (bs=1) models
-    cp -r /data/inferenceserver/qa_model_repository/*_object_object_object/ models/
+    cp -r /data/inferenceserver/$1/qa_model_repository/*_object_object_object/ models/
     rm -rf models/*nobatch*
 
     for FW in graphdef savedmodel netdef onnx libtorch plan; do

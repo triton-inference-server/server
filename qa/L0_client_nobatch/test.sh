@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 CLIENT_TEST=client_test.py
 
-DATADIR=/data/inferenceserver
+DATADIR=/data/inferenceserver/$1
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR/qa_model_repository

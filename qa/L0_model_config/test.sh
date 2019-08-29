@@ -53,7 +53,7 @@ for modelpath in \
         autofill_noplatform_success/tensorrt/incomplete_input/1 \
         autofill_noplatform_success/tensorrt/incomplete_output/1 ; do
     mkdir -p $modelpath
-    cp /data/inferenceserver/qa_model_repository/plan_float32_float32_float32/1/model.plan \
+    cp /data/inferenceserver/$1/qa_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
 done
 
