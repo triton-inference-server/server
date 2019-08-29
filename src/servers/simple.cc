@@ -175,6 +175,81 @@ InferComplete(
   delete p;
 }
 
+TRTSERVER_Error*
+ParseModelConfig(
+    const ni::ModelConfig& config, bool* is_int, bool* is_torch_model)
+{
+  auto data_type = ni::TYPE_INVALID;
+  for (const auto& input : config.input()) {
+    if ((input.data_type() != ni::TYPE_INT32) &&
+        (input.data_type() != ni::TYPE_FP32)) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNSUPPORTED,
+          "simple lib example only supports model with data type INT32 or "
+          "FP32");
+    }
+    if (data_type == ni::TYPE_INVALID) {
+      data_type = input.data_type();
+    } else if (input.data_type() != data_type) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          "the inputs and outputs of 'simple' model must have the data type");
+    }
+  }
+  for (const auto& output : config.output()) {
+    if ((output.data_type() != ni::TYPE_INT32) &&
+        (output.data_type() != ni::TYPE_FP32)) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNSUPPORTED,
+          "simple lib example only supports model with data type INT32 or "
+          "FP32");
+    } else if (output.data_type() != data_type) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INVALID_ARG,
+          "the inputs and outputs of 'simple' model must have the data type");
+    }
+  }
+
+  *is_int = (data_type == ni::TYPE_INT32);
+  *is_torch_model = (config.platform() == "pytorch_libtorch");
+  return nullptr;
+}
+
+template <typename T>
+void
+GenerateInputData(
+    std::vector<char>* input0_data, std::vector<char>* input1_data)
+{
+  input0_data->resize(16 * sizeof(T));
+  input1_data->resize(16 * sizeof(T));
+  for (size_t i = 0; i < 16; ++i) {
+    ((T*)input0_data->data())[i] = i;
+    ((T*)input1_data->data())[i] = 1;
+  }
+}
+
+template <typename T>
+void
+CompareResult(
+    const std::string& output0_name, const std::string& output1_name,
+    const void* input0, const void* input1, const void* output0,
+    const void* output1)
+{
+  for (size_t i = 0; i < 16; ++i) {
+    LOG_INFO << ((T*)input0)[i] << " + " << ((T*)input1)[i] << " = "
+             << ((T*)output0)[i];
+    LOG_INFO << ((T*)input0)[i] << " - " << ((T*)input1)[i] << " = "
+             << ((T*)output1)[i];
+
+    if ((((T*)input0)[i] + ((T*)input1)[i]) != ((T*)output0)[i]) {
+      FAIL("incorrect sum in " + output0_name);
+    }
+    if ((((T*)input0)[i] - ((T*)input1)[i]) != ((T*)output1)[i]) {
+      FAIL("incorrect difference in " + output1_name);
+    }
+  }
+}
+
 }  // namespace
 
 int
@@ -273,6 +348,8 @@ main(int argc, char** argv)
   }
 
   // Wait for the simple model to become available.
+  bool is_torch_model = false;
+  bool is_int = true;
   while (true) {
     TRTSERVER_Protobuf* model_status_protobuf;
     FAIL_IF_ERR(
@@ -303,9 +380,13 @@ main(int argc, char** argv)
     LOG_INFO << "'simple' model is "
              << ni::ModelReadyState_Name(vitr->second.ready_state());
     if (vitr->second.ready_state() == ni::ModelReadyState::MODEL_READY) {
+      FAIL_IF_ERR(
+          ParseModelConfig(itr->second.config(), &is_int, &is_torch_model),
+          "parsing model config");
       break;
     }
 
+    // [TODO] do so before break
     FAIL_IF_ERR(
         TRTSERVER_ProtobufDelete(model_status_protobuf),
         "deleting status protobuf");
@@ -331,14 +412,14 @@ main(int argc, char** argv)
   request_header.set_batch_size(1);
 
   auto input0 = request_header.add_input();
-  input0->set_name("INPUT0");
+  input0->set_name(is_torch_model ? "INPUT__0" : "INPUT0");
   auto input1 = request_header.add_input();
-  input1->set_name("INPUT1");
+  input1->set_name(is_torch_model ? "INPUT__1" : "INPUT1");
 
   auto output0 = request_header.add_output();
-  output0->set_name("OUTPUT0");
+  output0->set_name(is_torch_model ? "OUTPUT__0" : "OUTPUT0");
   auto output1 = request_header.add_output();
-  output1->set_name("OUTPUT1");
+  output1->set_name(is_torch_model ? "OUTPUT__1" : "OUTPUT1");
 
   std::string request_header_serialized;
   request_header.SerializeToString(&request_header_serialized);
@@ -354,15 +435,16 @@ main(int argc, char** argv)
 
   // Create the data for the two input tensors. Initialize the first
   // to unique integers and the second to all ones.
-  std::vector<int32_t> input0_data(16);
-  std::vector<int32_t> input1_data(16);
-  for (size_t i = 0; i < 16; ++i) {
-    input0_data[i] = i;
-    input1_data[i] = 1;
+  std::vector<char> input0_data;
+  std::vector<char> input1_data;
+  if (is_int) {
+    GenerateInputData<int32_t>(&input0_data, &input1_data);
+  } else {
+    GenerateInputData<float>(&input0_data, &input1_data);
   }
 
-  size_t input0_size = input0_data.size() * sizeof(int32_t);
-  size_t input1_size = input1_data.size() * sizeof(int32_t);
+  size_t input0_size = input0_data.size();
+  size_t input1_size = input1_data.size();
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
@@ -461,10 +543,10 @@ main(int argc, char** argv)
           response, output0->name().c_str(), &output0_content,
           &output0_byte_size, &output0_memory_type),
       "getting output0 result");
-  if (output0_byte_size != (16 * sizeof(int32_t))) {
+  if (output0_byte_size != input0_size) {
     FAIL(
         "unexpected output0 byte-size, expected " +
-        std::to_string(16 * sizeof(int32_t)) + ", got " +
+        std::to_string(input0_size) + ", got " +
         std::to_string(output0_byte_size));
   } else if (
       (!use_gpu_memory) && (output0_memory_type == TRTSERVER_MEMORY_GPU)) {
@@ -483,10 +565,10 @@ main(int argc, char** argv)
           response, output1->name().c_str(), &output1_content,
           &output1_byte_size, &output1_memory_type),
       "getting output1 result");
-  if (output1_byte_size != (16 * sizeof(int32_t))) {
+  if (output1_byte_size != input1_size) {
     FAIL(
         "unexpected output1 byte-size, expected " +
-        std::to_string(16 * sizeof(int32_t)) + ", got " +
+        std::to_string(input1_size) + ", got " +
         std::to_string(output1_byte_size));
   } else if (
       (!use_gpu_memory) && (output1_memory_type == TRTSERVER_MEMORY_GPU)) {
@@ -497,16 +579,14 @@ main(int argc, char** argv)
         MemoryTypeString(output1_memory_type));
   }
 
-  const int32_t* output0_result =
-      reinterpret_cast<const int32_t*>(output0_content);
-  const int32_t* output1_result =
-      reinterpret_cast<const int32_t*>(output1_content);
+  const void* output0_result = output0_content;
+  const void* output1_result = output1_content;
 
 #ifdef TRTIS_ENABLE_GPU
   // Different from CPU memory, outputs in GPU memory must be copied to CPU
   // memory to be read directly.
-  std::vector<int32_t> output0_data(16);
-  std::vector<int32_t> output1_data(16);
+  std::vector<char> output0_data(output0_byte_size);
+  std::vector<char> output1_data(output1_byte_size);
   if (output0_memory_type == TRTSERVER_MEMORY_CPU) {
     LOG_INFO << "OUTPUT0 are stored in CPU memory";
   } else {
@@ -516,7 +596,7 @@ main(int argc, char** argv)
             &output0_data[0], output0_content, output0_byte_size,
             cudaMemcpyDeviceToHost),
         "setting INPUT0 data in GPU memory");
-    output0_result = reinterpret_cast<const int32_t*>(&output0_data[0]);
+    output0_result = &output0_data[0];
   }
 
   if (output1_memory_type == TRTSERVER_MEMORY_CPU) {
@@ -528,22 +608,18 @@ main(int argc, char** argv)
             &output1_data[0], output1_content, output1_byte_size,
             cudaMemcpyDeviceToHost),
         "setting INPUT0 data in GPU memory");
-    output1_result = reinterpret_cast<const int32_t*>(&output1_data[0]);
+    output1_result = &output1_data[0];
   }
 #endif  // TRTIS_ENABLE_GPU
 
-  for (size_t i = 0; i < 16; ++i) {
-    LOG_INFO << input0_data[i] << " + " << input1_data[i] << " = "
-             << output0_result[i];
-    LOG_INFO << input0_data[i] << " - " << input1_data[i] << " = "
-             << output1_result[i];
-
-    if ((input0_data[i] + input1_data[i]) != output0_result[i]) {
-      FAIL("incorrect sum in " + output0->name());
-    }
-    if ((input0_data[i] - input1_data[i]) != output1_result[i]) {
-      FAIL("incorrect difference in " + output1->name());
-    }
+  if (is_int) {
+    CompareResult<int32_t>(
+        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
+        output0_result, output1_result);
+  } else {
+    CompareResult<float>(
+        output0->name(), output1->name(), &input0_data[0], &input1_data[0],
+        output0_result, output1_result);
   }
 
   FAIL_IF_ERR(
