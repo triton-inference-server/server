@@ -37,23 +37,6 @@ rm -f $CLIENT_LOG
 
 RET=0
 
-set +e
-
-$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-# Set input data in GPU memory
-$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-set -e
-
 # Apply the same procedure to addsub models in other frameworks
 for trial in \
         graphdef_float32_float32_float32 \
@@ -62,10 +45,11 @@ for trial in \
         onnx_float32_float32_float32 \
         libtorch_float32_float32_float32 \
         plan_float32_float32_float32 ; do
-    rm -rf $MODELSDIR/simple/1/*
-    cp -r $DATADIR/${trial}/1/* $MODELSDIR/simple/1/.
-    cp $DATADIR/${trial}/config.pbtxt $MODELSDIR/simple/.
-    (cd $MODELSDIR/simple && \
+    rm -rf $MODELSDIR/simple
+    mkdir -p $MODELSDIR/simple/1 && \
+        cp -r $DATADIR/${trial}/1/* $MODELSDIR/simple/1/. && \
+        cp $DATADIR/${trial}/config.pbtxt $MODELSDIR/simple/. && \
+        (cd $MODELSDIR/simple && \
                 sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
