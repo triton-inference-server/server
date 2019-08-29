@@ -224,7 +224,8 @@ class SequenceBatcherTest(unittest.TestCase):
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
-                             protocol, batch_size=1, sequence_name="<unknown>"):
+                             protocol, batch_size=1, sequence_name="<unknown>",
+                             use_shared_memory=False):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
 
@@ -443,10 +444,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(45, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 9 * (idx + 1), 9 * (idx + 1))
+                    self.check_status(model_name, (1,), 2 * 9 * (idx + 1), 2 * 9 * (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -470,10 +471,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                         (("start,end", 42, None, None),),
                                         self.get_expected_result(42, 42, trial, "start,end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), (idx + 1), (idx + 1))
+                    self.check_status(model_name, (1,), 2 * (idx + 1), 2 * (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -505,7 +506,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                         self.get_expected_result(10, 9, trial, "end"),
                                         protocol, batch_size=2,
                                         sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -547,7 +548,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(10, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -589,7 +590,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 3, None, None)),
                                         self.get_expected_result(6, 3, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -635,9 +636,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                          (None, 55, None, None)),
                                         self.get_expected_result(6, 3, trial, None),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
-                    self.check_status(model_name, (1,), 3 * (idx + 1), 3 * (idx + 1))
+                    self.check_status(model_name, (1,), 6 * (idx + 1), 6 * (idx + 1))
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
@@ -682,10 +683,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(51, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol))
+                                            self._testMethodName, protocol), use_shared_memory=True)
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 4 * (idx + 1), 4 * (idx + 1))
+                    self.check_status(model_name, (1,), 8 * (idx + 1), 8 * (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
