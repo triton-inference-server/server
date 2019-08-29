@@ -59,14 +59,14 @@ class InferTest(unittest.TestCase):
                                     model_version, swap,
                                     outputs, use_http, use_grpc,
                                     skip_request_id_check, use_streaming,
-                                    correlation_id, use_shared_memory)
+                                    correlation_id, use_shared_memory=use_shared_memory)
                 # model that supports batching
                 iu.infer_exact(tester, pf, tensor_shape, bs,
                                input_dtype, output0_dtype, output1_dtype,
                                output0_raw, output1_raw,
                                model_version, swap, outputs, use_http, use_grpc,
                                skip_request_id_check, use_streaming,
-                               correlation_id, use_shared_memory)
+                               correlation_id, use_shared_memory=use_shared_memory)
 
         input_size = 16
 

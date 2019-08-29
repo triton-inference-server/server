@@ -71,14 +71,14 @@ class BatcherTest(unittest.TestCase):
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, use_shared_memory)
+                               use_streaming=False, use_shared_memory=use_shared_memory)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, use_shared_memory)
+                               use_streaming=False, use_shared_memory=use_shared_memory)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
