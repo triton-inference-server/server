@@ -315,7 +315,7 @@ AutoFillOnnx::Create(
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
   RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
 
   OrtSession* session;
 
@@ -369,9 +369,7 @@ AutoFillOnnx::Create(
   RETURN_IF_ERROR(status);
 
   OrtAllocator* allocator;
-  OrtStatus* ort_status = OrtCreateDefaultAllocator(&allocator);
-  OrtResourceWrapper<OrtAllocator*> allocator_wrapper(
-      allocator, &OrtReleaseAllocator);
+  OrtStatus* ort_status = OrtGetAllocatorWithDefaultOptions(&allocator);
 
   if (ort_status == nullptr) {
     status = local_autofill->SetConfigFromOrtSession(session, allocator);

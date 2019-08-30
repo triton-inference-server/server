@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <core/session/onnxruntime_c_api.h>
+#include <onnxruntime_c_api.h>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {

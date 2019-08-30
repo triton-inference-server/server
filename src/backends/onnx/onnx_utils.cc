@@ -45,7 +45,7 @@ InputOutputNames(
 
   // iterate over all input / output nodes
   OrtAllocator* allocator;
-  RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&allocator));
+  RETURN_IF_ORT_ERROR(OrtGetAllocatorWithDefaultOptions(&allocator));
   OrtStatus* onnx_status = nullptr;
   for (size_t i = 0; i < num_nodes; i++) {
     char* node_name;
@@ -60,7 +60,6 @@ InputOutputNames(
     }
     names.emplace(node_name);
   }
-  OrtReleaseAllocator(allocator);
   RETURN_IF_ORT_ERROR(onnx_status);
 
   return Status::Success;
