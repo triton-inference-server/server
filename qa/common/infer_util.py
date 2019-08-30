@@ -57,19 +57,19 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0, use_shared_memory=False):
+                correlation_id=0, include_shared_memory_test=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
         configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
     if use_grpc:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
         configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
     if use_streaming:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
         configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
@@ -170,25 +170,24 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             OUTPUT1 = "OUTPUT__1"
             INPUT0 = "INPUT__0"
             INPUT1 = "INPUT__1"
-        if config[3]:
-            if "OUTPUT0" in outputs:
-                    output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                        0, output0_byte_size)
-            if "OUTPUT1" in outputs:
-                    output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                        output0_byte_size, output1_byte_size)
-        else:
-            if "OUTPUT0" in outputs:
+        if "OUTPUT0" in outputs:
+            if config[3]:
+                output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_op_handle, \
+                    0, output0_byte_size)
+            else:
                 if output0_raw:
                     output_req[OUTPUT0] = InferContext.ResultFormat.RAW
                 else:
                     output_req[OUTPUT0] = (InferContext.ResultFormat.CLASS, num_classes)
-            if "OUTPUT1" in outputs:
+        if "OUTPUT1" in outputs:
+            if config[3]:
+                output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_op_handle, \
+                    output0_byte_size, output1_byte_size)
+            else:
                 if output1_raw:
                     output_req[OUTPUT1] = InferContext.ResultFormat.RAW
                 else:
                     output_req[OUTPUT1] = (InferContext.ResultFormat.CLASS, num_classes)
-
 
         ctx = InferContext(config[0], config[1], model_name, model_version,
                            correlation_id=correlation_id, streaming=config[2],
@@ -272,19 +271,19 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 # zero-sized input/output tensor.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True, use_shared_memory=False):
+               use_streaming=True, include_shared_memory_test=False):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
         configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
     if use_grpc:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
         configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
     if use_streaming:
-        if use_shared_memory:
+        if include_shared_memory_test:
             configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
         configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
     tester.assertEqual(len(input_shapes), len(output_shapes))
