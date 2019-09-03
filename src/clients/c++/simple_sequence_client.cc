@@ -58,11 +58,14 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-a" << std::endl;
   std::cerr << "\t-u <URL for inference service and its gRPC port>"
             << std::endl;
+  std::cerr << "\t-o <offset for correlation ID>" << std::endl;
   std::cerr << std::endl;
   std::cerr << "For -r, the client will run non-streaming context first."
             << std::endl;
   std::cerr << "For -a, the client will send asynchronous requests."
             << std::endl;
+  std::cerr << "For -o, the client will use correlation ID <1 + 2 * offset> "
+            << "and <2 + 2 * offset>. Default offset is 0." << std::endl;
 
   exit(1);
 }
@@ -199,10 +202,11 @@ main(int argc, char** argv)
   bool reverse = false;
   std::string url("localhost:8001");
   std::string protocol = "grpc";
+  int correlation_id_offset = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vrau:")) != -1) {
+  while ((opt = getopt(argc, argv, "vrau:o:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -215,6 +219,9 @@ main(int argc, char** argv)
         break;
       case 'u':
         url = optarg;
+        break;
+      case 'o':
+        correlation_id_offset = std::stoi(optarg);
         break;
       case '?':
         Usage(argv);
@@ -233,8 +240,10 @@ main(int argc, char** argv)
   // use these to send to sequences of inference requests. Must use a
   // non-zero correlation ID since zero indicates no correlation ID.
   std::unique_ptr<nic::InferContext> ctx0, ctx1;
-  const ni::CorrelationID correlation_id0 = 1;
-  const ni::CorrelationID correlation_id1 = 2;
+  const ni::CorrelationID correlation_id0 = 1 + correlation_id_offset * 2;
+  const ni::CorrelationID correlation_id1 = 2 + correlation_id_offset * 2;
+  std::cout << "sequence 0 correlation ID " << correlation_id0 << " : "
+            << "sequence 1 correlation ID " << correlation_id1 << std::endl;
 
   // Create two different contexts, in the sync case we can use one
   // streaming and one not streaming. In the async case must use
@@ -303,12 +312,21 @@ main(int argc, char** argv)
   } else {
     // Send requests, first reset accumulator for the sequence.
     result0_list.push_back(Send(ctxs[0], 0, true /* start-of-sequence */));
-    result1_list.push_back(Send(ctxs[1], 100, true /* start-of-sequence */));
+
     // Now send a sequence of values...
     for (int32_t v : values) {
       result0_list.push_back(Send(
           ctxs[0], v, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
+    }
+
+    // Different from asynchronous setting, requests are sent sequence by
+    // sequence because the client will be blocked on each request. In the case
+    // where one sequence is waiting for available slot while the other sequence
+    // has started the sequence, the other sequence may be terminated due to
+    // idleness.
+    result1_list.push_back(Send(ctxs[1], 100, true /* start-of-sequence */));
+    for (int32_t v : values) {
       result1_list.push_back(Send(
           ctxs[1], -v, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
