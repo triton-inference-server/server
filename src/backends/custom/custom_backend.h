@@ -67,6 +67,11 @@ class CustomBackend : public InferenceBackend {
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
   friend bool CustomGetOutput(
       void*, const char*, size_t, int64_t*, uint64_t, void**);
+  friend bool CustomGetNextInputV2(
+      void*, const char*, const void**, uint64_t*, CustomMemoryType*);
+  friend bool CustomGetOutputV2(
+      void*, const char*, size_t, int64_t*, uint64_t, void**,
+      CustomMemoryType*);
 
   // For each model instance there is a context.
   struct Context : BackendContext {
@@ -102,17 +107,25 @@ class CustomBackend : public InferenceBackend {
     };
 
     // Callback used by custom backends to get the next block of input
-    // for a 'name'd input tensor.
+    // for a 'name'd input tensor. This function will enforce that
+    // the 'content' will be in CPU memory.
     bool GetNextInput(
         GetInputOutputContext* input_context, const char* name,
         const void** content, uint64_t* content_byte_size);
+
+    // Callback used by custom backends to get the next block of input
+    // for a 'name'd input tensor.
+    bool GetNextInput(
+        GetInputOutputContext* input_context, const char* name,
+        const void** content, uint64_t* content_byte_size,
+        CustomMemoryType* memory_type);
 
     // Callback used by custom backends to get the output buffer for a
     // 'name'd output tensor.
     bool GetOutput(
         GetInputOutputContext* output_context, const char* name,
         size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
-        void** content);
+        void** content, CustomMemoryType* memory_type);
 
     // The handle to the shared library associated with this context.
     void* library_handle_;
@@ -126,6 +139,10 @@ class CustomBackend : public InferenceBackend {
     CustomFinalizeFn_t FinalizeFn_;
     CustomErrorStringFn_t ErrorStringFn_;
     CustomExecuteFn_t ExecuteFn_;
+    CustomExecuteV2Fn_t ExecuteV2Fn_;
+
+    // The version of the custom interface.
+    int custom_version_;
 
     std::vector<std::unique_ptr<char[]>> input_buffers_;
   };
@@ -137,15 +154,32 @@ class CustomBackend : public InferenceBackend {
 std::ostream& operator<<(std::ostream& out, const CustomBackend& pb);
 
 // Callback used by custom backends to get the next block of input for
-// a 'name'd input tensor.
+// a 'name'd input tensor. The block will be guaranteed to be in CPU memory.
 bool CustomGetNextInput(
     void* input_context, const char* name, const void** content,
     uint64_t* content_byte_size);
 
 // Callback used by custom backends to get the output buffer for a
-// 'name'd output tensor.
+// 'name'd output tensor. The buffer will be in CPU memory.
 bool CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content);
+
+// See CustomGetNextInput, except that the block may not be in CPU memory.
+// Thus 'memory_type' Acts as both input and output. On input gives the buffer
+// memory type preferred by the function caller. On output returns
+// the actual memory type of 'content'.
+bool CustomGetNextInputV2(
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size, CustomMemoryType* memory_type);
+
+// See CustomGetOutput, except that the buffer is not limited to be
+// in CPU memory. 'memory_type' Acts as both input and output. On input
+// gives the buffer memory type preferred by the function caller. On output
+// returns the actual memory type of 'content'.
+bool CustomGetOutputV2(
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content,
+    CustomMemoryType* memory_type);
 
 }}  // namespace nvidia::inferenceserver

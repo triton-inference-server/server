@@ -100,6 +100,19 @@ CustomExecute(
   return instance->Execute(payload_cnt, payloads, input_fn, output_fn);
 }
 
+int
+CustomExecuteV2(
+    void* custom_instance, const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputV2Fn_t input_fn, CustomGetOutputV2Fn_t output_fn)
+{
+  if (custom_instance == nullptr) {
+    return ErrorCodes::Unknown;
+  }
+
+  CustomInstance* instance = static_cast<CustomInstance*>(custom_instance);
+  return instance->Execute(payload_cnt, payloads, input_fn, output_fn);
+}
+
 }  // extern "C"
 
 }}}  // namespace nvidia::inferenceserver::custom

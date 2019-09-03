@@ -41,12 +41,17 @@ namespace nvidia { namespace inferenceserver {
 /// \param ErrorStringFn Returns the error-string function from the
 /// custom library.
 /// \param ExecuteFn Returns the execute function from the custom
-/// library.
+/// library if the custom interface version is 1 or not set.
+/// \param ExecuteV2Fn Returns the execute function from the custom
+/// library if the custom interface version is 2.
+/// \param custom_version Returns the custom interface version from
+/// the custom library.
 /// \return Error status.
 Status LoadCustom(
     const std::string& path, void** dlhandle,
     CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
-    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn);
+    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn,
+    CustomExecuteV2Fn_t* ExecuteV2Fn, int* custom_version);
 
 /// Unload custom shared library.
 ///
