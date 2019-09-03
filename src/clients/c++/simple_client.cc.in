@@ -24,11 +24,18 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#cmakedefine TRTIS_CLIENT_HEADER_FLAT 1
+
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#ifdef TRTIS_CLIENT_HEADER_FLAT
+#include "request_grpc.h"
+#include "request_http.h"
+#else
 #include "src/clients/c++/request_grpc.h"
 #include "src/clients/c++/request_http.h"
+#endif
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
