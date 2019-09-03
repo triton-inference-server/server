@@ -110,6 +110,12 @@ if(${TRTIS_ENABLE_GPU})
   find_package(CUDA REQUIRED)
   message(STATUS "Using CUDA ${CUDA_VERSION}")
   set(CUDA_NVCC_FLAGS -std=c++11)
+
+  if(CUDA_VERSION VERSION_GREATER_EQUAL "10.1")
+    add_definitions(-DTRTIS_ENABLE_CUDA_GRAPH=1)
+  else()
+    message(WARNING "CUDA ${CUDA_VERSION} does not support CUDA graphs.")
+  endif()
 endif() # TRTIS_ENABLE_GPU
 
 #
