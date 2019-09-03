@@ -78,6 +78,8 @@ if __name__ == '__main__':
                         default=False, help='Enable asynchronous inference')
     parser.add_argument('-r', '--reverse', action="store_true", required=False, default=False,
                         help='Enable to run non-streaming context first')
+    parser.add_argument('-o', '--offset', type=int, required=False, default=0,
+                        help='Add offset to correlation ID used')
 
     FLAGS = parser.parse_args()
     protocol = ProtocolType.from_str("grpc")
@@ -99,12 +101,12 @@ if __name__ == '__main__':
     # streaming and one not streaming. In the async case must use
     # streaming for both since async+non-streaming means that order of
     # requests reaching inference server is not guaranteed.
-    correlation_id0 = 1000
+    correlation_id0 = 1000 + FLAGS.offset * 2
     ctx0 = InferContext(FLAGS.url, protocol, model_name, model_version,
                         correlation_id=correlation_id0, verbose=FLAGS.verbose,
                         streaming=True)
 
-    correlation_id1 = 1001
+    correlation_id1 = 1001 + FLAGS.offset * 2
     ctx1 = InferContext(FLAGS.url, protocol, model_name, model_version,
                         correlation_id=correlation_id1, verbose=FLAGS.verbose,
                         streaming=FLAGS.async_set)
@@ -136,10 +138,12 @@ if __name__ == '__main__':
             result1_list.append(async_receive(ctxs[1], request_id))
     else:
         result0_list.append(send(ctxs[0], value=0, start_of_sequence=True))
-        result1_list.append(send(ctxs[1], value=100, start_of_sequence=True))
         for v in values:
             result0_list.append(send(ctxs[0], value=v,
                                      start_of_sequence=False, end_of_sequence=(v == 1)))
+
+        result1_list.append(send(ctxs[1], value=100, start_of_sequence=True))
+        for v in values:
             result1_list.append(send(ctxs[1], value=-v,
                                      start_of_sequence=False, end_of_sequence=(v == 1)))
 
