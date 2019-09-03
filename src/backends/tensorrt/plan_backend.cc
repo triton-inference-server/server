@@ -294,10 +294,12 @@ PlanBackend::CreateExecutionContext(
       GetCudaStreamPriority(Config().optimization().priority());
   RETURN_IF_ERROR(context->CreateCudaStream(cuda_stream_priority));
 
+  // CUDA 10.1 starts to support CUDA graphs.
   // If enabled, build CUDA graphs for a default set of graph
   // sizes. Graphs are most likely to help for small batch sizes so by
   // default build for batch sizes 1, 2, 3, 4, 6, 8, 12, 16. If any
   // build fails don't attempt for any larger batch sizes.
+#ifdef TRTIS_ENABLE_CUDA_GRAPH
   const bool use_cuda_graphs = Config().optimization().cuda().graphs();
   if (use_cuda_graphs) {
     if (context->BuildCudaGraph(1)) {
@@ -310,6 +312,7 @@ PlanBackend::CreateExecutionContext(
       }
     }
   }
+#endif
 
   LOG_INFO << "Created instance " << instance_name << " on GPU " << gpu_device
            << " (" << cc << ") with stream priority " << cuda_stream_priority;
@@ -575,6 +578,8 @@ PlanBackend::Run(
   OnCompleteQueuedPayloads(status);
 }
 
+// CUDA 10.1 starts to support CUDA graphs.
+#ifdef TRTIS_ENABLE_CUDA_GRAPH
 bool
 PlanBackend::Context::BuildCudaGraph(const int batch_size)
 {
@@ -616,6 +621,7 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
 
   return captured;
 }
+#endif
 
 Status
 PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
