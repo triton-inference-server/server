@@ -63,14 +63,14 @@ LoadCustom(
     const std::string& path, void** dlhandle,
     CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
     CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn,
-    CustomExecuteVer2Fn_t* ExecuteVer2Fn, int* custom_version)
+    CustomExecuteV2Fn_t* ExecuteV2Fn, int* custom_version)
 {
   *dlhandle = nullptr;
   *InitializeFn = nullptr;
   *FinalizeFn = nullptr;
   *ErrorStringFn = nullptr;
   *ExecuteFn = nullptr;
-  *ExecuteVer2Fn = nullptr;
+  *ExecuteV2Fn = nullptr;
   *custom_version = 0;
 
   // Load the custom library
@@ -120,7 +120,7 @@ LoadCustom(
       status = GetEntrypoint(handle, "CustomExecute", &exec_fn);
       break;
     case 2:
-      status = GetEntrypoint(handle, "CustomExecuteVer2", &exec_fn);
+      status = GetEntrypoint(handle, "CustomExecuteV2", &exec_fn);
       break;
     default:
       status = Status(
@@ -142,7 +142,7 @@ LoadCustom(
   if (*custom_version == 1) {
     *ExecuteFn = (CustomExecuteFn_t)exec_fn;
   } else {
-    *ExecuteVer2Fn = (CustomExecuteVer2Fn_t)exec_fn;
+    *ExecuteV2Fn = (CustomExecuteV2Fn_t)exec_fn;
   }
 
   return Status::Success;

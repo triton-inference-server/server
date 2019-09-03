@@ -46,18 +46,18 @@ ToCustomMemoryType(TRTSERVER_Memory_Type memory_type)
 {
   switch (memory_type) {
     case TRTSERVER_MEMORY_GPU:
-      return MEMORY_GPU;
+      return CUSTOM_MEMORY_GPU;
     default:
       break;
   }
-  return MEMORY_CPU;
+  return CUSTOM_MEMORY_CPU;
 }
 
 TRTSERVER_Memory_Type
 ToTRTServerMemoryType(CustomMemoryType memory_type)
 {
   switch (memory_type) {
-    case MEMORY_GPU:
+    case CUSTOM_MEMORY_GPU:
       return TRTSERVER_MEMORY_GPU;
     default:
       break;
@@ -212,7 +212,7 @@ CustomBackend::CreateExecutionContext(
   RETURN_IF_ERROR(LoadCustom(
       mn_itr->second, &(context->library_handle_), &(context->InitializeFn_),
       &(context->FinalizeFn_), &(context->ErrorStringFn_),
-      &(context->ExecuteFn_), &(context->ExecuteVer2Fn_),
+      &(context->ExecuteFn_), &(context->ExecuteV2Fn_),
       &(context->custom_version_)));
 
   return Status::Success;
@@ -459,9 +459,9 @@ CustomBackend::Context::Run(
   int err = 0;
   switch (custom_version_) {
     case 2:
-      err = ExecuteVer2Fn_(
+      err = ExecuteV2Fn_(
           library_context_handle_, custom_payloads.size(), &custom_payloads[0],
-          CustomGetNextInputVer2, CustomGetOutputVer2);
+          CustomGetNextInputV2, CustomGetOutputV2);
       break;
     default:
       err = ExecuteFn_(
@@ -499,14 +499,14 @@ CustomBackend::Context::GetNextInput(
     GetInputOutputContext* input_context, const char* cname,
     const void** content, uint64_t* content_byte_size)
 {
-  auto src_memory_type = MEMORY_CPU;
+  auto src_memory_type = CUSTOM_MEMORY_CPU;
   bool ok = GetNextInput(
       input_context, cname, content, content_byte_size, &src_memory_type);
 
 #ifdef TRTIS_ENABLE_GPU
   // If the memory type is on GPU, implicitly copying it to CPU memory
   // to ensure backward capability
-  if (ok && (src_memory_type == MEMORY_GPU)) {
+  if (ok && (src_memory_type == CUSTOM_MEMORY_GPU)) {
     input_buffers_.emplace_back();
     auto& buffer_unique_ptr = input_buffers_.back();
     buffer_unique_ptr.reset(new char[*content_byte_size]);
@@ -628,16 +628,16 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
-  // internally call ver2 as CPU memory request is default option and will
+  // internally call V2 as CPU memory request is default option and will
   // always be permitted
-  auto memory_type = MEMORY_CPU;
-  return CustomGetOutputVer2(
+  auto memory_type = CUSTOM_MEMORY_CPU;
+  return CustomGetOutputV2(
       output_context, name, shape_dim_cnt, shape_dims, content_byte_size,
       content, &memory_type);
 }
 
 bool
-CustomGetNextInputVer2(
+CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
     uint64_t* content_byte_size, CustomMemoryType* memory_type)
 {
@@ -649,7 +649,7 @@ CustomGetNextInputVer2(
 }
 
 bool
-CustomGetOutputVer2(
+CustomGetOutputV2(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,
     CustomMemoryType* memory_type)

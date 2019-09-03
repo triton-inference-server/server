@@ -67,9 +67,9 @@ class CustomBackend : public InferenceBackend {
   friend bool CustomGetNextInput(void*, const char*, const void**, uint64_t*);
   friend bool CustomGetOutput(
       void*, const char*, size_t, int64_t*, uint64_t, void**);
-  friend bool CustomGetNextInputVer2(
+  friend bool CustomGetNextInputV2(
       void*, const char*, const void**, uint64_t*, CustomMemoryType*);
-  friend bool CustomGetOutputVer2(
+  friend bool CustomGetOutputV2(
       void*, const char*, size_t, int64_t*, uint64_t, void**,
       CustomMemoryType*);
 
@@ -139,7 +139,7 @@ class CustomBackend : public InferenceBackend {
     CustomFinalizeFn_t FinalizeFn_;
     CustomErrorStringFn_t ErrorStringFn_;
     CustomExecuteFn_t ExecuteFn_;
-    CustomExecuteVer2Fn_t ExecuteVer2Fn_;
+    CustomExecuteV2Fn_t ExecuteV2Fn_;
 
     // The version of the custom interface.
     int custom_version_;
@@ -169,7 +169,7 @@ bool CustomGetOutput(
 // Thus 'memory_type' Acts as both input and output. On input gives the buffer
 // memory type preferred by the function caller. On output returns
 // the actual memory type of 'content'.
-bool CustomGetNextInputVer2(
+bool CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
     uint64_t* content_byte_size, CustomMemoryType* memory_type);
 
@@ -177,7 +177,7 @@ bool CustomGetNextInputVer2(
 // in CPU memory. 'memory_type' Acts as both input and output. On input
 // gives the buffer memory type preferred by the function caller. On output
 // returns the actual memory type of 'content'.
-bool CustomGetOutputVer2(
+bool CustomGetOutputV2(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,
     CustomMemoryType* memory_type);
