@@ -1,5 +1,5 @@
 ..
-  # Copyright (c) 2018, NVIDIA CORPORATION. All rights reserved.
+  # Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
   #
   # Redistribution and use in source and binary forms, with or without
   # modification, are permitted provided that the following conditions
@@ -25,64 +25,25 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-NVIDIA TensorRT Inference Server
-================================
+Library API
+===========
 
-.. ifconfig:: "dev" in release
+The TensorRT Inference Server provides a backwards-compatible C API
+that allows the server to be linked directly into a C/C++
+application. The API is documented in `trtserver.h
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/trtserver.h>`_
+as well as in the API section of the documentation.
 
-   .. warning::
-     You are currently viewing unstable developer preview
-     of the documentation. To see the documentation for the latest
-     stable release click `here
-     <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_.
-
-.. include:: ../README.rst
-   :start-after: overview-begin-marker-do-not-remove
-   :end-before: overview-end-marker-do-not-remove
-
-.. toctree::
-   :hidden:
-
-   Documentation home <self>
-
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
-
-   quickstart
-   install
-   run
-   client
-   client_example
-   models_and_schedulers
-   model_repository
-   model_configuration
-   model_management
-   metrics
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Developer Guide
-
-   architecture
-   custom_operation
-   http_grpc_api
-   library_api
-   build
-   test
-   contribute
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Reference
-
-   capabilities
-   protobuf_api/protobuf_api_root
-   cpp_api/cpp_api_root
-   python_api
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
+A simple example of the library API can be found at
+`src/servers/simple.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servers/simple.cc>`_. A
+more complicated example can be found in the files that make up the
+inference server executable, *trtserver*. The trtserver executable
+implements the HTTP and GRPC endpoints and uses the library API to
+communicate with the inference server. The primary files composing
+*trtserver* are `src/servers/main.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servers/main.cc>`_,
+`src/servers/grpc_server.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servers/grpc_server.cc>`_,
+and `src/servers/http_server.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/servers/http_server.cc>`_.

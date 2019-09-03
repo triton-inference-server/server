@@ -40,7 +40,7 @@ NVIDIA TensorRT Inference Server
 
 The NVIDIA TensorRT Inference Server provides a cloud inferencing
 solution optimized for NVIDIA GPUs. The server provides an inference
-service via an HTTP or gRPC endpoint, allowing remote clients to
+service via an HTTP or GRPC endpoint, allowing remote clients to
 request inferencing for any model being managed by the server. The
 inference server provides the following features:
 
@@ -106,6 +106,9 @@ inference server provides the following features:
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_
   indicating GPU utilization, server throughput, and server latency.
 
+* `C library inferface`_ allows the full functionality of the
+  inference server to be included directly in an application.
+
 .. overview-end-marker-do-not-remove
 
 The current release of the TensorRT Inference Server is 1.5.0 and
@@ -144,12 +147,10 @@ ways. When they exit beta they will conform to the
 backwards-compatibility guarantees described above. Currently the
 following features are in beta:
 
-* In the model configuration defined in `model_config.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_
-  the sections related to model ensembling are currently in beta. In
-  particular, the ModelEnsembling message will potentially undergo
-  non-backwards-compatible changes.
-
+* The inference server library API as defined in `trtserver.h
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/trtserver.h>`_
+  is currently in beta and may undergo non-backwards-compatible
+  changes.
 
 Documentation
 -------------
