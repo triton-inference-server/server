@@ -93,6 +93,9 @@ RUN cd install && \
 # the src/ as well as a build mechanism.
 RUN rm -fr install/src
 
+# For CI testing need to install a test script.
+COPY qa/L0_client_tar/test.sh /tmp/test.sh
+
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
