@@ -94,8 +94,8 @@ inference server provides the following features:
 
 * `Model repositories
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
-  may reside on a locally accessible file system (e.g. NFS) or in
-  Google Cloud Storage.
+  may reside on a locally accessible file system (e.g. NFS), in Google
+  Cloud Storage or in Amazon S3.
 
 * Readiness and liveness `health endpoints
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/http_grpc_api.html#health>`_

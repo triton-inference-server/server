@@ -53,6 +53,7 @@ NVIDIA TensorRT Inference Server
    install
    run
    client
+   client_example
    models_and_schedulers
    model_repository
    model_configuration

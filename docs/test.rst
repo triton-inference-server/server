@@ -62,7 +62,7 @@ container. This container will contain the inference server, the QA
 tests, and all the dependencies needed to run the QA tests. You must
 first build the tensorrtserver_client, tensorrtserver_cbe,
 tensorrtserver_build and tensorrtserver containers as described in
-:ref:`section-getting-the-client-libraries-and-examples` and
+:ref:`section-getting-the-client-libraries` and
 :ref:`section-building` and then build the QA container::
 
   $ docker build -t tensorrtserver_qa -f Dockerfile.QA .
