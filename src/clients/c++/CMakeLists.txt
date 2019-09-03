@@ -33,19 +33,23 @@ find_package(CURL REQUIRED)
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
 
-# Headers with include paths adjusted to reflect that all headers are
-# in the same directory. These headers are used in the install.
+# Source with include paths adjusted to reflect that all headers are
+# in the same directory. These source versions are used in the client
+# container install.
 set(TRTIS_CLIENT_HEADER_FLAT 1)
 configure_file(request.h.in flat_include/request.h @ONLY)
 configure_file(request_grpc.h.in flat_include/request_grpc.h @ONLY)
 configure_file(request_http.h.in flat_include/request_http.h @ONLY)
+configure_file(simple_client.cc.in flat_src/simple_client.cc @ONLY)
 
-# Headers with full include paths needed for build.
+# Source with full include paths needed for build.
 set(TRTIS_CLIENT_HEADER_FLAT 0)
 configure_file(request.h.in request.h @ONLY)
 configure_file(request_grpc.h.in request_grpc.h @ONLY)
 configure_file(request_http.h.in request_http.h @ONLY)
+configure_file(simple_client.cc.in simple_client.cc @ONLY)
 
+# librequest object build
 set(
   REQUEST_SRCS
   request.cc request_common.cc request_http.cc request_grpc.cc
@@ -147,6 +151,19 @@ if(WIN32)
           "clients in Windows. Because the examples use functionalities that "
 		      "are UNIX specific.")
 else()
+# Install cmake files that builds the samples within the client install.
+install(
+  FILES
+    ${CMAKE_BINARY_DIR}/../CMakeLists.txt
+  DESTINATION src/cmake
+)
+install(
+  FILES
+    CMakeLists.example
+  DESTINATION src/cmake/trtis-clients
+  RENAME CMakeLists.txt
+)
+
 #
 # ensemble_image_client
 #
@@ -210,7 +227,10 @@ install(
 #
 # simple_client
 #
-add_executable(simple_client simple_client.cc)
+add_executable(
+  simple_client
+  ${CMAKE_CURRENT_BINARY_DIR}/simple_client.cc
+)
 target_link_libraries(
   simple_client
   PRIVATE request_static
@@ -218,6 +238,11 @@ target_link_libraries(
 install(
   TARGETS simple_client
   RUNTIME DESTINATION bin
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_src/simple_client.cc
+  DESTINATION src
 )
 
 #

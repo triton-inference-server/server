@@ -88,6 +88,14 @@ RUN cd install && \
     export VERSION=`cat /workspace/VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
+# For the container we remove the src/ directory from the install,
+# since that is confusing given that the container itself already has
+# the src/ as well as a build mechanism.
+RUN rm -fr install/src
+
+# For CI testing need to install a test script.
+COPY qa/L0_client_tar/test.sh /tmp/test.sh
+
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
