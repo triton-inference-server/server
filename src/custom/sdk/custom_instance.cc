@@ -101,9 +101,9 @@ CustomExecute(
 }
 
 int
-CustomExecuteVer2(
+CustomExecuteV2(
     void* custom_instance, const uint32_t payload_cnt, CustomPayload* payloads,
-    CustomGetNextInputVer2Fn_t input_fn, CustomGetOutputVer2Fn_t output_fn)
+    CustomGetNextInputV2Fn_t input_fn, CustomGetOutputV2Fn_t output_fn)
 {
   if (custom_instance == nullptr) {
     return ErrorCodes::Unknown;
@@ -111,12 +111,6 @@ CustomExecuteVer2(
 
   CustomInstance* instance = static_cast<CustomInstance*>(custom_instance);
   return instance->Execute(payload_cnt, payloads, input_fn, output_fn);
-}
-
-int
-CustomVersion()
-{
-  return CUSTOM_VERSION;
 }
 
 }  // extern "C"

@@ -47,8 +47,16 @@ class ErrorCodes {
   /// Error code when instance failed to load the model configuration.
   static const int InvalidModelConfig = 2;
 
+  /// Error code when V1 version of a function is called
+  /// while the custom backend is not V1.
+  static const int InvalidInvocationV1 = 3;
+
+  /// Error code when V2 version of a function is called
+  /// while the custom backend is not V2.
+  static const int InvalidInvocationV2 = 4;
+
   /// Error code for an unknown error.
-  static const int Unknown = 3;
+  static const int Unknown = 5;
 
   ErrorCodes();
   ~ErrorCodes() = default;
