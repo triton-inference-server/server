@@ -62,13 +62,16 @@ Status
 LoadCustom(
     const std::string& path, void** dlhandle,
     CustomInitializeFn_t* InitializeFn, CustomFinalizeFn_t* FinalizeFn,
-    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn)
+    CustomErrorStringFn_t* ErrorStringFn, CustomExecuteFn_t* ExecuteFn,
+    CustomExecuteV2Fn_t* ExecuteV2Fn, int* custom_version)
 {
   *dlhandle = nullptr;
   *InitializeFn = nullptr;
   *FinalizeFn = nullptr;
   *ErrorStringFn = nullptr;
   *ExecuteFn = nullptr;
+  *ExecuteV2Fn = nullptr;
+  *custom_version = 0;
 
   // Load the custom library
   void* handle = dlopen(path.c_str(), RTLD_LAZY);
@@ -102,8 +105,30 @@ LoadCustom(
     return status;
   }
 
+  void* ver_fn;
+  status = GetEntrypoint(handle, "CustomVersion", &ver_fn);
+  if (!status.IsOk()) {
+    *custom_version = 1;
+  } else {
+    *custom_version = ((CustomVersionFn_t)ver_fn)();
+  }
+
+  // Load version dependent symbols
   void* exec_fn;
-  status = GetEntrypoint(handle, "CustomExecute", &exec_fn);
+  switch (*custom_version) {
+    case 1:
+      status = GetEntrypoint(handle, "CustomExecute", &exec_fn);
+      break;
+    case 2:
+      status = GetEntrypoint(handle, "CustomExecuteV2", &exec_fn);
+      break;
+    default:
+      status = Status(
+          RequestStatusCode::INVALID_ARG,
+          "unable to load custom library: invalid custom version " +
+              std::to_string(*custom_version) + " is provided");
+      break;
+  }
   if (!status.IsOk()) {
     dlclose(handle);
     return status;
@@ -113,7 +138,12 @@ LoadCustom(
   *InitializeFn = (CustomInitializeFn_t)init_fn;
   *FinalizeFn = (CustomFinalizeFn_t)fini_fn;
   *ErrorStringFn = (CustomErrorStringFn_t)errstr_fn;
-  *ExecuteFn = (CustomExecuteFn_t)exec_fn;
+
+  if (*custom_version == 1) {
+    *ExecuteFn = (CustomExecuteFn_t)exec_fn;
+  } else {
+    *ExecuteV2Fn = (CustomExecuteV2Fn_t)exec_fn;
+  }
 
   return Status::Success;
 }

@@ -51,6 +51,12 @@ extern "C" {
 /// enum values.
 #define CUSTOM_SERVER_PARAMETER_CNT 2
 
+/// Types of memory recognized by TRTSERVER and custom backend.
+typedef enum custom_memorytype_enum {
+  CUSTOM_MEMORY_CPU,
+  CUSTOM_MEMORY_GPU
+} CustomMemoryType;
+
 /// The server parameter values provided to custom backends. New
 /// values must be added using the next greater integer value and
 /// CUSTOM_SERVER_PARAMETER_CNT must be updated to match.
@@ -183,6 +189,9 @@ typedef bool (*CustomGetOutputFn_t)(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content);
 
+/// Type for the CustomVersion function.
+typedef uint32_t (*CustomVersionFn_t)();
+
 /// Type for the CustomInitialize function.
 typedef int (*CustomInitializeFn_t)(const CustomInitializeData*, void**);
 
@@ -196,6 +205,48 @@ typedef char* (*CustomErrorStringFn_t)(void*, int);
 typedef int (*CustomExecuteFn_t)(
     void*, uint32_t, CustomPayload*, CustomGetNextInputFn_t,
     CustomGetOutputFn_t);
+
+/// See CustomGetNextInputFn_t
+///
+/// \param memory_type Acts as both input and output. On input
+/// gives the buffer memory type preferred by the function caller.
+/// Returns the actual memory type of 'content'.
+typedef bool (*CustomGetNextInputV2Fn_t)(
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size, CustomMemoryType* memory_type);
+
+/// See CustomGetOutputFn_t
+///
+/// \param memory_type Acts as both input and output. On input
+/// gives the buffer memory type preferred by the function caller.
+/// Returns the actual memory type of 'content'.
+typedef bool (*CustomGetOutputV2Fn_t)(
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content,
+    CustomMemoryType* memory_type);
+
+/// Type for the CustomExecuteV2 function.
+typedef int (*CustomExecuteV2Fn_t)(
+    void*, uint32_t, CustomPayload*, CustomGetNextInputV2Fn_t,
+    CustomGetOutputV2Fn_t);
+
+/// Get the custom version. For a custom backend that doesn't define this entry
+/// point, the inference server will assume the backend version is 1. The
+/// currently supported versions are defined below, returning any other version
+/// is an error:
+///
+/// Version 1: Input and output tensors must be communicated via system memory
+/// (i.e. CPU memory). The CustomExecute function must be defined and
+/// CustomGetNextInputFn_t and CustomGetOutputFn_t define the function signature
+/// for the input and output callbacks.
+///
+/// Version 2: Input and output tensors may be communicated by both system
+/// memory and GPU memory. The CustomExecuteV2 function must be defined and
+/// CustomGetNextInputV2Fn_t and CustomGetOutputV2Fn_t define the function
+/// signature for the input and output callbacks.
+///
+/// \return the custom version.
+TRTIS_CUSTOM_EXPORT uint32_t CustomVersion();
 
 /// Initialize the custom backend for a given model configuration and
 /// get the associated custom context.
@@ -232,7 +283,9 @@ TRTIS_CUSTOM_EXPORT int CustomFinalize(void* custom_context);
 TRTIS_CUSTOM_EXPORT const char* CustomErrorString(
     void* custom_context, int errcode);
 
-/// Execute the custom model.
+/// Execute the custom model using the version 1 implementation of the execute
+/// interface. This function must be defined when the custom backend returns 1
+/// from CustomVersion (or when CustomVersion is not defined)
 ///
 /// \param custom_context The custom state associated with the context
 /// that should execute. Can be nullptr if no custom state.
@@ -248,6 +301,13 @@ TRTIS_CUSTOM_EXPORT const char* CustomErrorString(
 TRTIS_CUSTOM_EXPORT int CustomExecute(
     void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn);
+
+/// Execute the custom model using the version 2 implementation of the execute
+/// interface. This function must be defined when the custom backend returns 2
+/// from CustomVersion. See CustomExecute for description of the parameters.
+TRTIS_CUSTOM_EXPORT int CustomExecuteV2(
+    void* custom_context, uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputV2Fn_t input_fn, CustomGetOutputV2Fn_t output_fn);
 
 #ifdef __cplusplus
 }

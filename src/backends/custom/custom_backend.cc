@@ -39,6 +39,34 @@
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
+namespace {
+
+CustomMemoryType
+ToCustomMemoryType(TRTSERVER_Memory_Type memory_type)
+{
+  switch (memory_type) {
+    case TRTSERVER_MEMORY_GPU:
+      return CUSTOM_MEMORY_GPU;
+    default:
+      break;
+  }
+  return CUSTOM_MEMORY_CPU;
+}
+
+TRTSERVER_Memory_Type
+ToTRTServerMemoryType(CustomMemoryType memory_type)
+{
+  switch (memory_type) {
+    case CUSTOM_MEMORY_GPU:
+      return TRTSERVER_MEMORY_GPU;
+    default:
+      break;
+  }
+  return TRTSERVER_MEMORY_CPU;
+}
+
+}  // namespace
+
 namespace nvidia { namespace inferenceserver {
 
 CustomBackend::Context::Context(
@@ -184,7 +212,8 @@ CustomBackend::CreateExecutionContext(
   RETURN_IF_ERROR(LoadCustom(
       mn_itr->second, &(context->library_handle_), &(context->InitializeFn_),
       &(context->FinalizeFn_), &(context->ErrorStringFn_),
-      &(context->ExecuteFn_)));
+      &(context->ExecuteFn_), &(context->ExecuteV2Fn_),
+      &(context->custom_version_)));
 
   return Status::Success;
 }
@@ -427,9 +456,19 @@ CustomBackend::Context::Run(
   // Execute the custom backend which will use CustomGetOutput to get
   // the output buffers into which it will write the results for the
   // requested outputs.
-  int err = ExecuteFn_(
-      library_context_handle_, custom_payloads.size(), &custom_payloads[0],
-      CustomGetNextInput, CustomGetOutput);
+  int err = 0;
+  switch (custom_version_) {
+    case 2:
+      err = ExecuteV2Fn_(
+          library_context_handle_, custom_payloads.size(), &custom_payloads[0],
+          CustomGetNextInputV2, CustomGetOutputV2);
+      break;
+    default:
+      err = ExecuteFn_(
+          library_context_handle_, custom_payloads.size(), &custom_payloads[0],
+          CustomGetNextInput, CustomGetOutput);
+      break;
+  }
 
   // After execution, input buffer can be clean up if any
   input_buffers_.clear();
@@ -460,16 +499,14 @@ CustomBackend::Context::GetNextInput(
     GetInputOutputContext* input_context, const char* cname,
     const void** content, uint64_t* content_byte_size)
 {
-  const std::string name(cname);
-  Scheduler::Payload* payload = input_context->payload_;
+  auto src_memory_type = CUSTOM_MEMORY_CPU;
+  bool ok = GetNextInput(
+      input_context, cname, content, content_byte_size, &src_memory_type);
 
+#ifdef TRTIS_ENABLE_GPU
   // If the memory type is on GPU, implicitly copying it to CPU memory
   // to ensure backward capability
-  auto src_memory_type = TRTSERVER_MEMORY_CPU;
-  Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, &src_memory_type, false);
-#ifdef TRTIS_ENABLE_GPU
-  if ((status.IsOk()) && (src_memory_type == TRTSERVER_MEMORY_GPU)) {
+  if (ok && (src_memory_type == CUSTOM_MEMORY_GPU)) {
     input_buffers_.emplace_back();
     auto& buffer_unique_ptr = input_buffers_.back();
     buffer_unique_ptr.reset(new char[*content_byte_size]);
@@ -482,6 +519,22 @@ CustomBackend::Context::GetNextInput(
     return (err == cudaSuccess);
   }
 #endif  // TRTIS_ENABLE_GPU
+  return ok;
+}
+
+bool
+CustomBackend::Context::GetNextInput(
+    GetInputOutputContext* input_context, const char* cname,
+    const void** content, uint64_t* content_byte_size,
+    CustomMemoryType* memory_type)
+{
+  const std::string name(cname);
+  Scheduler::Payload* payload = input_context->payload_;
+
+  auto src_memory_type = ToTRTServerMemoryType(*memory_type);
+  Status status = payload->request_provider_->GetNextInputContent(
+      name, content, content_byte_size, &src_memory_type, false);
+  *memory_type = ToCustomMemoryType(src_memory_type);
   return status.IsOk();
 }
 
@@ -489,7 +542,7 @@ bool
 CustomBackend::Context::GetOutput(
     GetInputOutputContext* output_context, const char* cname,
     size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
-    void** content)
+    void** content, CustomMemoryType* memory_type)
 {
   const std::string name(cname);
   Scheduler::Payload* payload = output_context->payload_;
@@ -505,8 +558,24 @@ CustomBackend::Context::GetOutput(
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
 
+    auto dst_memory_type = ToTRTServerMemoryType(*memory_type);
     Status status = payload->response_provider_->AllocateOutputBuffer(
-        name, content, content_byte_size, shape);
+        name, content, content_byte_size, shape, dst_memory_type);
+
+    // Done with this output if 'content_byte_size' is 0
+    if ((content_byte_size != 0) && (*content == nullptr)) {
+      // If first attempt is CPU and failed, then allocation failed
+      if ((!status.IsOk()) || (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+        return false;
+      }
+
+      dst_memory_type = TRTSERVER_MEMORY_CPU;
+      status = payload->response_provider_->AllocateOutputBuffer(
+          name, content, content_byte_size, shape, dst_memory_type);
+      if (*content == nullptr) {
+        return false;
+      }
+    }
     return status.IsOk();
   }
 
@@ -559,11 +628,38 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
+  // internally call V2 as CPU memory request is default option and will
+  // always be permitted
+  auto memory_type = CUSTOM_MEMORY_CPU;
+  return CustomGetOutputV2(
+      output_context, name, shape_dim_cnt, shape_dims, content_byte_size,
+      content, &memory_type);
+}
+
+bool
+CustomGetNextInputV2(
+    void* input_context, const char* name, const void** content,
+    uint64_t* content_byte_size, CustomMemoryType* memory_type)
+{
+  CustomBackend::Context::GetInputOutputContext* icontext =
+      static_cast<CustomBackend::Context::GetInputOutputContext*>(
+          input_context);
+  return icontext->context_->GetNextInput(
+      icontext, name, content, content_byte_size, memory_type);
+}
+
+bool
+CustomGetOutputV2(
+    void* output_context, const char* name, size_t shape_dim_cnt,
+    int64_t* shape_dims, uint64_t content_byte_size, void** content,
+    CustomMemoryType* memory_type)
+{
   CustomBackend::Context::GetInputOutputContext* ocontext =
       static_cast<CustomBackend::Context::GetInputOutputContext*>(
           output_context);
   return ocontext->context_->GetOutput(
-      ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content);
+      ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content,
+      memory_type);
 }
 
 }}  // namespace nvidia::inferenceserver

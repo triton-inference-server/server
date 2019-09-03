@@ -33,6 +33,12 @@ ErrorCodes::ErrorCodes()
   RegisterError(Success, "success");
   RegisterError(CreationFailure, "failed to create instance");
   RegisterError(InvalidModelConfig, "invalid model configuration");
+  RegisterError(
+      InvalidInvocationV1,
+      "invalid V1 function invocation while the custom backend is not V1");
+  RegisterError(
+      InvalidInvocationV2,
+      "invalid V2 function invocation while the custom backend is not V2");
   RegisterError(Unknown, "unknown error");
 }
 
