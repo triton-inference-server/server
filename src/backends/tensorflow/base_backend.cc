@@ -281,116 +281,6 @@ FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
 }
 
 void
-SetStringInputTensor(
-    TRTISTF_Tensor* tensor, const std::string& input_name,
-    const size_t batch1_element_cnt, std::vector<Scheduler::Payload>* payloads)
-{
-  size_t tensor_element_idx = 0;
-
-  // Visit the payloads in order and copy the input values into the
-  // input tensor. Skip payloads that had errors since they are not
-  // included in the dynamic batch.
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    const size_t expected_element_cnt =
-        request_header.batch_size() * batch1_element_cnt;
-    size_t element_idx = 0;
-
-    // For string data type, we always need to copy the data to CPU so that
-    // we can read string length and construct the string properly.
-    auto src_memory_type = TRTSERVER_MEMORY_CPU;
-    const void* vcontent;
-    size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
-    payload.status_ = payload.request_provider_->GetNextInputContent(
-        input_name, &vcontent, &content_byte_size, &src_memory_type, true);
-
-    const char* content = reinterpret_cast<const char*>(vcontent);
-#ifdef TRTIS_ENABLE_GPU
-    std::unique_ptr<char[]> cpu_buffer;
-    if (src_memory_type != TRTSERVER_MEMORY_CPU) {
-      cpu_buffer.reset(new char[content_byte_size]);
-      // [TODO] move this to context member function and use async
-      cudaError_t err = cudaMemcpy(
-          cpu_buffer.get(), vcontent, content_byte_size,
-          cudaMemcpyDeviceToHost);
-      if (err != cudaSuccess) {
-        payload.status_ = Status(
-            RequestStatusCode::INTERNAL,
-            "input '" + input_name + "' is in GPU memory and failed to use" +
-                " CUDA copy to CPU memory for setting String input data: " +
-                std::string(cudaGetErrorString(err)));
-      }
-      content = cpu_buffer.get();
-    }
-#endif  // TRTIS_ENABLE_GPU
-
-    if (!payload.status_.IsOk()) {
-      FillStringTensor(
-          tensor, tensor_element_idx + element_idx,
-          expected_element_cnt - element_idx);
-      continue;
-    }
-
-    // Parse content and assign them to the 'tensor'. Each string
-    // in 'content' is a 4-byte length followed by the string
-    // itself with no null-terminator.
-    while (content_byte_size >= sizeof(uint32_t)) {
-      if (element_idx >= expected_element_cnt) {
-        payload.status_ = Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected number of string elements " +
-                std::to_string(element_idx + 1) + " for inference input '" +
-                input_name + "', expecting " +
-                std::to_string(expected_element_cnt));
-        FillStringTensor(
-            tensor, tensor_element_idx + element_idx,
-            expected_element_cnt - element_idx);
-        break;
-      }
-
-      const uint32_t len = *(reinterpret_cast<const uint32_t*>(content));
-      content += sizeof(uint32_t);
-      content_byte_size -= sizeof(uint32_t);
-
-      if (content_byte_size < len) {
-        payload.status_ = Status(
-            RequestStatusCode::INVALID_ARG,
-            "incomplete string data for inference input '" + input_name +
-                "', expecting string of length " + std::to_string(len) +
-                " but only " + std::to_string(content_byte_size) +
-                " bytes available");
-        FillStringTensor(
-            tensor, tensor_element_idx + element_idx,
-            expected_element_cnt - element_idx);
-        break;
-      }
-
-      std::string str(content, len);
-      content += len;
-      content_byte_size -= len;
-
-      TRTISTF_TensorSetString(
-          tensor, tensor_element_idx + element_idx, str.c_str());
-      element_idx++;
-    }
-
-    if (payload.status_.IsOk() && (element_idx != expected_element_cnt)) {
-      payload.status_ = Status(
-          RequestStatusCode::INTERNAL,
-          "expected " + std::to_string(expected_element_cnt) +
-              " strings for inference input '" + input_name + "', got " +
-              std::to_string(element_idx));
-      FillStringTensor(
-          tensor, tensor_element_idx + element_idx,
-          expected_element_cnt - element_idx);
-    }
-
-    tensor_element_idx += expected_element_cnt;
-  }
-}
-
-void
 ReadStringOutputTensor(
     TRTISTF_Tensor* tensor, const std::string& output_name,
     const std::vector<int64_t>& shape, const size_t batch1_element_cnt,
@@ -524,6 +414,117 @@ BaseBackend::Context::SetFixedSizedInputTensor(
 
   SetInputBuffer(
       input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+}
+
+void
+BaseBackend::Context::SetStringInputTensor(
+    TRTISTF_Tensor* tensor, const std::string& input_name,
+    const size_t batch1_element_cnt, std::vector<Scheduler::Payload>* payloads)
+{
+  size_t tensor_element_idx = 0;
+
+  // Visit the payloads in order and copy the input values into the
+  // input tensor. Skip payloads that had errors since they are not
+  // included in the dynamic batch.
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    const size_t expected_element_cnt =
+        request_header.batch_size() * batch1_element_cnt;
+    size_t element_idx = 0;
+
+    // For string data type, we always need to copy the data to CPU so that
+    // we can read string length and construct the string properly.
+    auto src_memory_type = TRTSERVER_MEMORY_CPU;
+    const void* vcontent;
+    size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
+    payload.status_ = payload.request_provider_->GetNextInputContent(
+        input_name, &vcontent, &content_byte_size, &src_memory_type, true);
+
+    const char* content = reinterpret_cast<const char*>(vcontent);
+#ifdef TRTIS_ENABLE_GPU
+    std::unique_ptr<char[]> cpu_buffer;
+    if (src_memory_type != TRTSERVER_MEMORY_CPU) {
+      cpu_buffer.reset(new char[content_byte_size]);
+      cudaError_t err = cudaMemcpyAsync(
+          cpu_buffer.get(), vcontent, content_byte_size, cudaMemcpyDeviceToHost,
+          stream_);
+      if (err != cudaSuccess) {
+        payload.status_ = Status(
+            RequestStatusCode::INTERNAL,
+            "input '" + input_name + "' is in GPU memory and failed to use" +
+                " CUDA copy to CPU memory for setting String input data: " +
+                std::string(cudaGetErrorString(err)));
+      } else {
+        cudaStreamSynchronize(stream_);
+      }
+      content = cpu_buffer.get();
+    }
+#endif  // TRTIS_ENABLE_GPU
+
+    if (!payload.status_.IsOk()) {
+      FillStringTensor(
+          tensor, tensor_element_idx + element_idx,
+          expected_element_cnt - element_idx);
+      continue;
+    }
+
+    // Parse content and assign them to the 'tensor'. Each string
+    // in 'content' is a 4-byte length followed by the string
+    // itself with no null-terminator.
+    while (content_byte_size >= sizeof(uint32_t)) {
+      if (element_idx >= expected_element_cnt) {
+        payload.status_ = Status(
+            RequestStatusCode::INVALID_ARG,
+            "unexpected number of string elements " +
+                std::to_string(element_idx + 1) + " for inference input '" +
+                input_name + "', expecting " +
+                std::to_string(expected_element_cnt));
+        FillStringTensor(
+            tensor, tensor_element_idx + element_idx,
+            expected_element_cnt - element_idx);
+        break;
+      }
+
+      const uint32_t len = *(reinterpret_cast<const uint32_t*>(content));
+      content += sizeof(uint32_t);
+      content_byte_size -= sizeof(uint32_t);
+
+      if (content_byte_size < len) {
+        payload.status_ = Status(
+            RequestStatusCode::INVALID_ARG,
+            "incomplete string data for inference input '" + input_name +
+                "', expecting string of length " + std::to_string(len) +
+                " but only " + std::to_string(content_byte_size) +
+                " bytes available");
+        FillStringTensor(
+            tensor, tensor_element_idx + element_idx,
+            expected_element_cnt - element_idx);
+        break;
+      }
+
+      std::string str(content, len);
+      content += len;
+      content_byte_size -= len;
+
+      TRTISTF_TensorSetString(
+          tensor, tensor_element_idx + element_idx, str.c_str());
+      element_idx++;
+    }
+
+    if (payload.status_.IsOk() && (element_idx != expected_element_cnt)) {
+      payload.status_ = Status(
+          RequestStatusCode::INTERNAL,
+          "expected " + std::to_string(expected_element_cnt) +
+              " strings for inference input '" + input_name + "', got " +
+              std::to_string(element_idx));
+      FillStringTensor(
+          tensor, tensor_element_idx + element_idx,
+          expected_element_cnt - element_idx);
+    }
+
+    tensor_element_idx += expected_element_cnt;
+  }
 }
 
 void
