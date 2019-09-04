@@ -206,8 +206,6 @@ CustomBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
-  RETURN_IF_ERROR(context->CreateCudaStream());
-
   // 'mn_itr->second' is the path to the shared library file to use
   // for that context (e.g. model_name/1/libcustom.so). Load that
   // library as it provides the custom backend implementation.
@@ -216,6 +214,12 @@ CustomBackend::CreateExecutionContext(
       &(context->FinalizeFn_), &(context->ErrorStringFn_),
       &(context->ExecuteFn_), &(context->ExecuteV2Fn_),
       &(context->custom_version_)));
+
+  // Only create stream on V1 as backend is not aware of different memory
+  // types. For other version, the backend should handle this explicitly.
+  if (context->custom_version_ == 1) {
+    RETURN_IF_ERROR(context->CreateCudaStream());
+  }
 
   return Status::Success;
 }
