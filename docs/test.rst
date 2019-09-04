@@ -73,9 +73,9 @@ Run QA Container
 Now run the QA container and mount the QA model repositories into the
 container so the tests will be able to access them::
 
-  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tensorrtserver_qa
+  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver/<TRTIS_CONTAINER_VERSION> tensorrtserver_qa
 
 Within the container the QA tests are in /opt/tensorrtserver/qa. To run a test::
 
   $ cd <test directory>
-  $ ./test.sh
+  $ ./test.sh <TRTIS_CONTAINER_VERSION>

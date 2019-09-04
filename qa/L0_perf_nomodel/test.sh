@@ -125,7 +125,7 @@ for idx in "${!LATENCY_NAMES[@]}"; do
               DYNAMIC_BATCH_SIZES=1 \
               INSTANCE_COUNTS=1 \
               REQUIRED_MAX_CONCURRENCY=1 \
-              bash -x ${RUNTEST}
+              bash -x ${RUNTEST} $1
     if (( $? != 0 )); then
         RET=1
     fi

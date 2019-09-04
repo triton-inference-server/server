@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
 
-DATADIR=/data/inferenceserver/qa_trt_plugin_model_repository
+DATADIR=/data/inferenceserver/$1/qa_trt_plugin_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"

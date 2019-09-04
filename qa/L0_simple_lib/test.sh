@@ -29,7 +29,7 @@ SIMPLE_CLIENT=./simple
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
-DATADIR=/data/inferenceserver/qa_model_repository
+DATADIR=/data/inferenceserver/$1/qa_model_repository
 
 export CUDA_VISIBLE_DEVICES=0
 

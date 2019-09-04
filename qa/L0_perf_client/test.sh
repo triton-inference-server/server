@@ -28,7 +28,7 @@
 CLIENT_LOG="./perf_client.log"
 PERF_CLIENT=../clients/perf_client
 
-DATADIR=/data/inferenceserver/qa_model_repository
+DATADIR=/data/inferenceserver/$1/qa_model_repository
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR

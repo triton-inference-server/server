@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 BATCHER_TEST=sequence_batcher_test.py
 
-DATADIR=/data/inferenceserver
+DATADIR=/data/inferenceserver/$1
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 source ../common/util.sh
