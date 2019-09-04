@@ -206,6 +206,8 @@ CustomBackend::CreateExecutionContext(
   contexts_.emplace_back(new Context(instance_name, gpu_device, mbs));
   const std::unique_ptr<Context>& context = contexts_.back();
 
+  RETURN_IF_ERROR(context->CreateCudaStream());
+
   // 'mn_itr->second' is the path to the shared library file to use
   // for that context (e.g. model_name/1/libcustom.so). Load that
   // library as it provides the custom backend implementation.
@@ -515,6 +517,10 @@ CustomBackend::Context::GetNextInput(
         cudaMemcpyDeviceToHost, stream_);
     if (err == cudaSuccess) {
       *content = buffer_unique_ptr.get();
+      // Use cudaMemcpyAsync to avoid synchronization on default stream,
+      // but stream synchronization must be done per copy to ensure that
+      // the data is ready.
+      cudaStreamSynchronize(stream_);
     }
     return (err == cudaSuccess);
   }
