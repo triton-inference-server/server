@@ -25,10 +25,10 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. _section-inference-server-api:
+.. _section-http-and-grpc-api:
 
-Inference Server API
-====================
+HTTP and GRPC API
+=================
 
 The TensorRT Inference Server exposes both HTTP and GRPC
 endpoints. The following endpoints are exposed for each protocol.
@@ -53,13 +53,13 @@ only available when using the GRPC protocol:
   the requests are sent in the same connection until it is closed.
 
 The HTTP endpoints can be used directly as described in this section,
-but for most use-cases, the preferred way to access the inference
+but for most use-cases the preferred way to access the inference
 server is via the :ref:`C++ and Python Client libraries
-<section-client-libraries-and-examples>`.
+<section-client-libraries>`.
 
-The GRPC endpoints can also be used via the :ref:`C++ and Python Client
-libraries <section-client-libraries-and-examples>` or a GRPC-generated
-API can be used directly as shown in the grpc_image_client.py example.
+The GRPC endpoints can also be used via the :ref:`C++ and Python
+Client libraries <section-client-libraries>` or a GRPC-generated API
+can be used directly as shown in the grpc_image_client.py example.
 
 .. _section-api-health:
 
