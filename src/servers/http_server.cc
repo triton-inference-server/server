@@ -329,7 +329,7 @@ HTTPAPIServer::ResponseAlloc(
             TRTSERVER_ERROR_INTERNAL,
             std::string(
                 "expected buffer size to be " +
-                std::to_string(pr->second.second) + "bytes but gets " +
+                std::to_string(pr->second.second) + " bytes but gets " +
                 std::to_string(byte_size) + " bytes in output tensor")
                 .c_str());
       }
