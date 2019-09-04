@@ -28,7 +28,7 @@
 CLIENT_LOG="./client.log"
 SERVER_STATUS_TEST=server_status_test.py
 
-DATADIR=/data/inferenceserver
+DATADIR=/data/inferenceserver/$1
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--repository-poll-secs=1 --model-repository=`pwd`/models"

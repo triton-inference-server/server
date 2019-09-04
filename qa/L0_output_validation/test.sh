@@ -27,7 +27,7 @@
 
 LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 
-DATADIR=/data/inferenceserver/libtorch_model_store2
+DATADIR=/data/inferenceserver/$1/libtorch_model_store2
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR

@@ -36,8 +36,8 @@ source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
 rm -fr models && mkdir models
-cp -r /data/inferenceserver/qa_reshape_model_repository/* models/. && \
-    cp -r /data/inferenceserver/qa_ensemble_model_repository/qa_reshape_model_repository/* models/.
+cp -r /data/inferenceserver/$1/qa_reshape_model_repository/* models/. && \
+    cp -r /data/inferenceserver/$1/qa_ensemble_model_repository/qa_reshape_model_repository/* models/.
 for i in \
         nobatch_zero_3_float32 \
         nobatch_zero_4_float32 \

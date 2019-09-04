@@ -43,11 +43,11 @@ RET=0
 MODEL_SUFFIX=nobatch_zero_1_float32
 rm -fr models && \
     mkdir models && \
-    cp -r /data/inferenceserver/qa_identity_model_repository/graphdef_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/qa_identity_model_repository/netdef_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/qa_identity_model_repository/onnx_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/qa_identity_model_repository/libtorch_$MODEL_SUFFIX models/. 
+    cp -r /data/inferenceserver/$1/qa_identity_model_repository/graphdef_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/$1/qa_identity_model_repository/netdef_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/$1/qa_identity_model_repository/onnx_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/$1/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX models/. && \
+    cp -r /data/inferenceserver/$1/qa_identity_model_repository/libtorch_$MODEL_SUFFIX models/. 
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
     cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
