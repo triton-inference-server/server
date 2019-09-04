@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
 
@@ -65,8 +75,9 @@ for TARGET in cpu gpu; do
     CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
     rm -fr models && \
-        cp -r /data/inferenceserver/$1/qa_model_repository models && \
-        cp -r /data/inferenceserver/$1/qa_ensemble_model_repository/qa_model_repository/* models/. && \
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository models && \
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/* \
+           models/. && \
         cp -r ../custom_models/custom_float32_* models/. && \
         cp -r ../custom_models/custom_int32_* models/. && \
         cp -r ../custom_models/custom_nobatch_* models/.

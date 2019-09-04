@@ -37,13 +37,14 @@
 ##
 ############################################################################
 
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:19.08-py3}
+TRTIS_VERSION=19.08
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-py3}
 
 CUDA_DEVICE=0
 
 ###
 HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/qa_custom_ops
+HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_custom_ops
 
 rm -fr $HOST_DESTDIR
 mkdir -p $HOST_DESTDIR

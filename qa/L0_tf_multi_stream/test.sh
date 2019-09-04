@@ -25,10 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CLIENT_LOG_BASE="./client"
 
 DATADIR=`pwd`/models
-MODEL_SRCDIR=/data/inferenceserver/$1/qa_custom_ops
+MODEL_SRCDIR=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 # Allow more time to exit. Ensemble brings in too many models
@@ -49,7 +59,7 @@ NUM_DELAY_CYCLES=${NUM_DELAY_CYCLES:=2100000000}
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
-export LD_PRELOAD=/data/inferenceserver/$1/qa_custom_ops/libbusyop.so
+export LD_PRELOAD=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libbusyop.so
 
 for NUM_GPUS in $(seq 1 $TOTAL_GPUS); do
   export CUDA_VISIBLE_DEVICES=$(seq -s, 0 $(( NUM_GPUS - 1 )))

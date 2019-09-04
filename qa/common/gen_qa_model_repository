@@ -46,36 +46,40 @@
 ##
 ############################################################################
 
-PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:19.08-py3}
-TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:19.08-py3}
-TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:19.08-py3}
+TRTIS_VERSION=19.08
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRTIS_VERSION-py3}
+TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRTIS_VERSION-py3}
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRTIS_VERSION-py3}
 CUDA_DEVICE=0
 
 ###
 HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/qa_model_repository
-HOST_VARDESTDIR=/tmp/qa_variable_model_repository
-HOST_IDENTITYDESTDIR=/tmp/qa_identity_model_repository
-HOST_RESHAPEDESTDIR=/tmp/qa_reshape_model_repository
-HOST_SEQDESTDIR=/tmp/qa_sequence_model_repository
-HOST_VARSEQDESTDIR=/tmp/qa_variable_sequence_model_repository
-HOST_ENSEMBLEDESTDIR=/tmp/qa_ensemble_model_repository
-HOST_NOSHAPEDESTDIR=/tmp/qa_noshape_model_repository
-HOST_PLGDESTDIR=/tmp/qa_trt_plugin_model_repository
+HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_model_repository
+HOST_VARDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_model_repository
+HOST_IDENTITYDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_model_repository
+HOST_RESHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_reshape_model_repository
+HOST_SEQDESTDIR=/tmp/$TRTIS_VERSION/qa_sequence_model_repository
+HOST_VARSEQDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_sequence_model_repository
+HOST_ENSEMBLEDESTDIR=/tmp/$TRTIS_VERSION/qa_ensemble_model_repository
+HOST_NOSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_noshape_model_repository
+HOST_PLGDESTDIR=/tmp/$TRTIS_VERSION/qa_trt_plugin_model_repository
 
-rm -fr $HOST_DESTDIR $HOST_VARDESTDIR
+rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR
+mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
+mkdir -p $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_NOSHAPEDESTDIR
 mkdir -p $HOST_PLGDESTDIR
+
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
 # are proper model repositories
@@ -123,7 +127,7 @@ python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --models_dir=$DESTDI
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --onnx --netdef --libtorch --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --onnx --netdef --models_dir=$IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --onnx --netdef --libtorch --models_dir=$IDENTITYDESTDIR
 chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --onnx --netdef --libtorch --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR

@@ -25,15 +25,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CURRENT_DIR=$(pwd)
 DIRS=(../L*/)
 
 passed=0
 failed=0
-TRTIS_CONTAINER_VERSION=$1
 for dir in "${DIRS[@]}"; do
     echo -e "Running $dir...\n"
-    (cd $dir && ./test.sh ${TRTIS_CONTAINER_VERSION})
+    (cd $dir && ./test.sh ${REPO_VERSION})
     rc=$?
     if (( $rc == 0 )); then
         (( passed++ ))

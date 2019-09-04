@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
@@ -99,11 +109,11 @@ for MAYBE_SLASH in "" "/"; do
     # Now start model tests
 
     for FW in graphdef savedmodel netdef onnx libtorch plan; do
-        cp -r /data/inferenceserver/$1/qa_model_repository/${FW}_float32_float32_float32/ models/
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32/ models/
     done
 
     # Copy models with string inputs and remove nobatch (bs=1) models
-    cp -r /data/inferenceserver/$1/qa_model_repository/*_object_object_object/ models/
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object/ models/
     rm -rf models/*nobatch*
 
     for FW in graphdef savedmodel netdef onnx libtorch plan; do
