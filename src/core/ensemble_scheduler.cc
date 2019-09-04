@@ -609,7 +609,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     TRTSERVER_Memory_Type dst_memory_type;
     size_t content_size;
     memory_block->BufferAt(0, &content_size, &dst_memory_type);
-    
+
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape,

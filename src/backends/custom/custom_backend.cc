@@ -573,7 +573,9 @@ CustomBackend::Context::GetOutput(
         name, content, content_byte_size, shape, dst_memory_type);
 
     // Done with this output if 'content_byte_size' is 0
-    if ((content_byte_size != 0) && (*content == nullptr)) {
+    if (content_byte_size == 0) {
+      *content = nullptr;
+    } else if (*content == nullptr) {
       // If first attempt is CPU and failed, then allocation failed
       if ((!status.IsOk()) || (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
         return false;
