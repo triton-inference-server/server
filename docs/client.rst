@@ -152,7 +152,7 @@ prefer::
 The vcpkg step above installs curl and openssl, ":x64-windows" specifies the
 target and it is optional. The path to the libraries should be added to
 environment variable "PATH", by default it is
-\path\to\vcpkg\installed\<target>\bin.
+\\path\\to\\vcpkg\\installed\\<target>\\bin.
 
 To build the client for Windows, as there is no default
 build system available, you will need to specify the generator for
@@ -164,9 +164,9 @@ are using Microsoft Visual Studio, you should do the following::
   > MSBuild.exe trtis-clients.vcxproj -p:Configuration=Release
 
 When the build completes the libraries can be found in
-trtis-clients/install/lib, the corresponding headers in
-trtis-clients/install/include, and the Python wheel file in
-trtis-clients/install/python. The trtis-clients/install directory will
+trtis-clients\\install\\lib, the corresponding headers in
+trtis-clients\\install\\include, and the Python wheel file in
+trtis-clients\\install\\python. The trtis-clients\\install directory will
 also contain the built client Python examples that you can learn more
 about in :ref:`section-client-examples`. At this time the Windows
 build does not include the C++ examples.

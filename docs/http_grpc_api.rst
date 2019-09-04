@@ -25,10 +25,10 @@
   # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-.. _section-inference-server-api:
+.. _section-http-and-grpc-api:
 
-Inference Server API
-====================
+HTTP and GRPC API
+=================
 
 The TensorRT Inference Server exposes both HTTP and GRPC
 endpoints. The following endpoints are exposed for each protocol.

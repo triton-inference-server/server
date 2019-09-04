@@ -106,8 +106,10 @@ inference server provides the following features:
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/metrics.html>`_
   indicating GPU utilization, server throughput, and server latency.
 
-* `C library inferface`_ allows the full functionality of the
-  inference server to be included directly in an application.
+* `C library inferface
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/library_api.html>`_
+  allows the full functionality of the inference server to be included
+  directly in an application.
 
 .. overview-end-marker-do-not-remove
 
