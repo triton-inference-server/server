@@ -116,8 +116,7 @@ Context::Context(
   // within CPU memory
   if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaErrorInsufficientDriver)) {
     if (cuerr == cudaSuccess) {
-      cuerr = cudaStreamCreateWithPriority(
-          &stream_, cudaStreamDefault, cuda_stream_priority);
+      cuerr = cudaStreamCreate(&stream_);
     }
     if (cuerr != cudaSuccess) {
       stream_ = nullptr;
@@ -263,7 +262,7 @@ Context::Execute(
             copy_type = cudaMemcpyDeviceToDevice;
           }
         } else {
-          auto copy_type = (src_memory_type == CUSTOM_MEMORY_CPU)
+          copy_type = (src_memory_type == CUSTOM_MEMORY_CPU)
                                ? cudaMemcpyHostToDevice
                                : cudaMemcpyDeviceToHost;
         }
