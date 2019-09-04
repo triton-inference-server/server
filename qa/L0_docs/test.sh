@@ -38,8 +38,13 @@ apt-get update && \
 
 set +e
 
-(cd docs && \
+(cd docs && rm -f trtis_docs.zip && \
         make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+(cd build && zip -r ../trtis_docs.zip html)
 if [ $? -ne 0 ]; then
     RET=1
 fi

@@ -69,14 +69,13 @@ determine if any models failed to load successfully. The server's
 console log will also show the reason for any failures during startup.
 
 The name of the model directory (model_0 and model_1 in the above
-example) must match the name of the model specified in the
-:ref:`model configuration file <section-model-configuration>`,
-config.pbtxt. The model name is used in the :ref:`client API
-<section-client-api>` and :ref:`server API
-<section-inference-server-api>` to identify the model. Each model
-directory must have at least one numeric subdirectory. Each of these
-subdirectories holds a version of the model with the version number
-corresponding to the directory name.
+example) must match the name of the model specified in the :ref:`model
+configuration file <section-model-configuration>`, config.pbtxt. The
+model name is used in the :ref:`client API <section-client-api>` and
+:ref:`server API <section-http-and-grpc-api>` to identify the
+model. Each model directory must have at least one numeric
+subdirectory. Each of these subdirectories holds a version of the
+model with the version number corresponding to the directory name.
 
 For more information about how the model versions are handled by the
 server see :ref:`section-model-versions`.  Within each version

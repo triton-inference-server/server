@@ -99,7 +99,7 @@ and the example client applications.
 
 #. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
+#. :ref:`Get the example client applications <section-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
 .. _section-building-with-docker:
@@ -125,7 +125,7 @@ example client applications.
 
 #. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
+#. :ref:`Get the example client applications <section-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
 .. _section-building-with-cmake:
@@ -145,7 +145,7 @@ example client applications.
 
 #. :ref:`Run the inference server <section-run-tensorrt-inference-server>`.
 #. :ref:`Verify that the server is running correct <section-verify-inference-server-status>`.
-#. :ref:`Get the example client applications <section-getting-the-client-examples>`.
+#. :ref:`Get the example client applications <section-getting-the-examples>`.
 #. :ref:`Run the image classification example <section-running-the-image-classification-example>`.
 
 .. _section-run-tensorrt-inference-server:
@@ -217,7 +217,7 @@ the server is ready to receive inference requests.
 For more information, see
 :ref:`section-checking-inference-server-status`.
 
-.. _section-getting-the-client-examples:
+.. _section-getting-the-examples:
 
 Getting The Client Examples
 ---------------------------
@@ -244,8 +244,7 @@ so that the client examples can access the inference server::
 
 It is also possible to build the client examples without Docker and
 for some platforms pre-compiled client examples are available. For
-more information, see
-:ref:`section-getting-the-client-libraries-and-examples`.
+more information, see :ref:`section-getting-the-client-examples`.
 
 .. _section-running-the-image-classification-example:
 

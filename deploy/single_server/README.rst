@@ -128,7 +128,7 @@ from the HTTP endpoint::
   $ curl 35.232.176.113:8000/api/status
 
 Follow the `instructions
-<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/client.html#getting-the-client-libraries-and-examples>`_
+<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/client.html#getting-the-client-examples>`_
 to get the example image classification client that can be used to
 perform inferencing using image classification models being served by
 the inference server. For example::
