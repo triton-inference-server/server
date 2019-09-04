@@ -145,7 +145,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             # create and register shared memory region for inputs and outputs
             shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
             shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
-            shm_op1_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
+            shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
             shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip0_handle, input0_list)
@@ -172,8 +172,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             INPUT1 = "INPUT__1"
         if "OUTPUT0" in outputs:
             if config[3]:
-                output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                    0, output0_byte_size)
+                output_req[OUTPUT0] = (InferContext.ResultFormat.RAW, shm_op0_handle)
             else:
                 if output0_raw:
                     output_req[OUTPUT0] = InferContext.ResultFormat.RAW
@@ -181,8 +180,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     output_req[OUTPUT0] = (InferContext.ResultFormat.CLASS, num_classes)
         if "OUTPUT1" in outputs:
             if config[3]:
-                output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_op_handle, \
-                    output0_byte_size, output1_byte_size)
+                output_req[OUTPUT1] = (InferContext.ResultFormat.RAW, shm_op1_handle)
             else:
                 if output1_raw:
                     output_req[OUTPUT1] = InferContext.ResultFormat.RAW
@@ -194,8 +192,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            verbose=True)
         if config[3]:
             results = ctx.run(
-                    { INPUT0 : ("input_data", 0, input0_byte_size), INPUT1 : \
-                    ("input_data", input0_byte_size, input0_byte_size), },
+                    { INPUT0 : shm_ip0_handle, INPUT1 : shm_ip1_handle },
                     output_req, batch_size)
         else:
             results = ctx.run(
@@ -376,9 +373,9 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
                                       model_name, result_name, b, expected, result_val[b]))
         if config[3]:
             for io_num in range(io_cnt):
-                shared_memory_ctx.unregister(shm_ip0_handles[io_num])
-                shm.destroy_shared_memory_region(shm_ip0_handles[io_num])
-                shared_memory_ctx.unregister(shm_op0_handles[io_num])
-                shm.destroy_shared_memory_region(shm_op0_handles[io_num])
+                shared_memory_ctx.unregister(shm_ip_handles[io_num])
+                shm.destroy_shared_memory_region(shm_ip_handles[io_num])
+                shared_memory_ctx.unregister(shm_op_handles[io_num])
+                shm.destroy_shared_memory_region(shm_op_handles[io_num])
 
     return results
