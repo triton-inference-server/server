@@ -98,6 +98,12 @@ class BaseBackend : public InferenceBackend {
         const size_t batch1_byte_size,
         std::vector<Scheduler::Payload>* payloads);
 
+    // Helper function to set the input for String data type
+    void SetStringInputTensor(
+        TRTISTF_Tensor* tensor, const std::string& input_name,
+        const size_t batch1_element_cnt,
+        std::vector<Scheduler::Payload>* payloads);
+
     // Helper function to set the output with fixed-sized data type in payload
     void ReadFixedSizedOutputTensor(
         TRTISTF_Tensor* tensor, const std::string& output_name,
