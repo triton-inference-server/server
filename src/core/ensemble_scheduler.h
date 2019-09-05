@@ -68,6 +68,9 @@ struct EnsembleInfo {
 
   // Only include a step if the ensemble tensor is used as input in that step
   std::unordered_map<std::string, std::set<size_t>> tensor_to_step_;
+
+  // backward path, ensemble tensor to the step that provides its data
+  std::unordered_map<std::string, size_t> tensor_to_prev_step_;
 };
 
 // Scheduler that implements ensemble scheduling.
