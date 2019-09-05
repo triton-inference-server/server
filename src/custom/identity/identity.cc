@@ -32,6 +32,10 @@
 #include "src/core/model_config.pb.h"
 #include "src/custom/sdk/custom_instance.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 #define LOG_ERROR std::cerr
 #define LOG_INFO std::cout
 
@@ -56,15 +60,28 @@ class Context : public CustomInstance {
   // Validate the model configuration for the derived backend instance
   int Init();
 
+#ifdef TRTIS_ENABLE_GPU
+  // Version 2 interface may need to deal with data in GPU memory,
+  // which requires CUDA support.
+  int Execute(
+      const uint32_t payload_cnt, CustomPayload* payloads,
+      CustomGetNextInputV2Fn_t input_fn,
+      CustomGetOutputV2Fn_t output_fn) override;
+#else
   int Execute(
       const uint32_t payload_cnt, CustomPayload* payloads,
       CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn) override;
+#endif  // TRTIS_ENABLE_GPU
 
  private:
   struct CopyInfo {
     std::string input_name_;
     DataType datatype_;
   };
+
+#ifdef TRTIS_ENABLE_GPU
+  cudaStream_t stream_;
+#endif  // TRTIS_ENABLE_GPU
 
   // Map from output name to information needed to copy input into
   // that output.
@@ -84,6 +101,7 @@ class Context : public CustomInstance {
       RegisterError("inference request for unknown output");
   const int kOutputBuffer =
       RegisterError("unable to get buffer for output tensor values");
+  const int kCopyBuffer = RegisterError("unable to copy data to output buffer");
 };
 
 Context::Context(
@@ -91,6 +109,20 @@ Context::Context(
     const int gpu_device)
     : CustomInstance(instance_name, model_config, gpu_device)
 {
+#ifdef TRTIS_ENABLE_GPU
+  int device_cnt;
+  auto cuerr = cudaGetDeviceCount(&device_cnt);
+  // Do nothing if there is no CUDA device since all data transfer will be done
+  // within CPU memory
+  if ((cuerr != cudaErrorNoDevice) && (cuerr != cudaErrorInsufficientDriver)) {
+    if (cuerr == cudaSuccess) {
+      cuerr = cudaStreamCreate(&stream_);
+    }
+    if (cuerr != cudaSuccess) {
+      stream_ = nullptr;
+    }
+  }
+#endif  // TRTIS_ENABLE_GPU
 }
 
 int
@@ -98,6 +130,8 @@ Context::Init()
 {
   // Execution on GPUs not supported since only a trivial amount of
   // computation is required.
+  // Note that this is the use case where the context is on CPU but
+  // GPU input / output is possible.
   if (gpu_device_ != CUSTOM_NO_GPU_DEVICE) {
     return kGpuNotSupported;
   }
@@ -139,6 +173,131 @@ Context::Init()
   return ErrorCodes::Success;
 }
 
+#ifdef TRTIS_ENABLE_GPU
+int
+Context::Execute(
+    const uint32_t payload_cnt, CustomPayload* payloads,
+    CustomGetNextInputV2Fn_t input_fn, CustomGetOutputV2Fn_t output_fn)
+{
+  bool cuda_copy = false;
+  for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
+    CustomPayload& payload = payloads[pidx];
+
+    for (uint32_t output_idx = 0; output_idx < payload.output_cnt;
+         ++output_idx) {
+      if (payload.error_code != 0) {
+        break;
+      }
+
+      const char* output_cname = payload.required_output_names[output_idx];
+      const auto itr = copy_map_.find(output_cname);
+      if (itr == copy_map_.end()) {
+        payload.error_code = kRequestOutput;
+        break;
+      }
+
+      const std::string& input_name = itr->second.input_name_;
+      const DataType datatype = itr->second.datatype_;
+
+      std::vector<int64_t> shape;
+      if (model_config_.max_batch_size() != 0) {
+        shape.push_back(payload.batch_size);
+      }
+      for (uint32_t input_idx = 0; input_idx < payload.input_cnt; ++input_idx) {
+        if (!strcmp(payload.input_names[input_idx], input_name.c_str())) {
+          shape.insert(
+              shape.end(), payload.input_shape_dims[input_idx],
+              payload.input_shape_dims[input_idx] +
+                  payload.input_shape_dim_cnts[input_idx]);
+          break;
+        }
+      }
+
+      const int64_t batchn_byte_size = GetByteSize(datatype, shape);
+      if (batchn_byte_size < 0) {
+        payload.error_code = kOutputBuffer;
+        break;
+      }
+
+      // copy....
+      // Peek memory type of the input content and use it as preferred type
+      CustomMemoryType src_memory_type = CUSTOM_MEMORY_CPU;
+      const void* content;
+      uint64_t content_byte_size = 128 * 1024;
+      if (!input_fn(
+              payload.input_context, input_name.c_str(), &content,
+              &content_byte_size, &src_memory_type)) {
+        payload.error_code = kInputContents;
+        break;
+      }
+
+      auto dst_memory_type = src_memory_type;
+      void* obuffer;
+      if (!output_fn(
+              payload.output_context, output_cname, shape.size(), &shape[0],
+              batchn_byte_size, &obuffer, &dst_memory_type)) {
+        payload.error_code = kOutputBuffer;
+        break;
+      }
+
+      // If no error but the 'obuffer' is returned as nullptr, then
+      // skip writing this output.
+      if (obuffer == nullptr) {
+        continue;
+      }
+
+      char* output_buffer = reinterpret_cast<char*>(obuffer);
+
+      uint64_t total_byte_size = 0;
+      // first consume the content obtained from the peeking above
+      while (true) {
+        // If 'content' returns nullptr we have all the input.
+        if (content == nullptr) {
+          break;
+        }
+
+        auto copy_type = cudaMemcpyHostToHost;
+        if (src_memory_type == dst_memory_type) {
+          if (src_memory_type == CUSTOM_MEMORY_GPU) {
+            copy_type = cudaMemcpyDeviceToDevice;
+          }
+        } else {
+          copy_type = (src_memory_type == CUSTOM_MEMORY_CPU)
+                               ? cudaMemcpyHostToDevice
+                               : cudaMemcpyDeviceToHost;
+        }
+
+        if (copy_type == cudaMemcpyHostToHost) {
+          memcpy(output_buffer + total_byte_size, content, content_byte_size);
+        } else {
+          auto err = cudaMemcpyAsync(
+              output_buffer + total_byte_size, content, content_byte_size,
+              copy_type, stream_);
+          if (err != cudaSuccess) {
+            payload.error_code = kCopyBuffer;
+            break;
+          } else {
+            cuda_copy = true;
+          }
+        }
+        total_byte_size += content_byte_size;
+
+        if (!input_fn(
+                payload.input_context, input_name.c_str(), &content,
+                &content_byte_size, &src_memory_type)) {
+          payload.error_code = kInputContents;
+          break;
+        }
+      }
+    }
+  }
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+
+  return ErrorCodes::Success;
+}
+#else
 int
 Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
@@ -223,6 +382,8 @@ Context::Execute(
 
   return ErrorCodes::Success;
 }
+#endif  // TRTIS_ENABLE_GPU
+
 
 }  // namespace identity
 
@@ -244,5 +405,21 @@ CustomInstance::Create(
 
   return ctx->Init();
 }
+
+/////////////
+
+extern "C" {
+
+uint32_t
+CustomVersion()
+{
+#ifdef TRTIS_ENABLE_GPU
+  return 2;
+#else
+  return 1;
+#endif  // TRTIS_ENABLE_GPU
+}
+
+}  // extern "C"
 
 }}}  // namespace nvidia::inferenceserver::custom
