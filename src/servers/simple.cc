@@ -77,6 +77,7 @@ Usage(char** argv, const std::string& msg = std::string())
 
   LOG_ERROR << "Usage: " << argv[0] << " [options]";
   LOG_ERROR << "\t-g Use GPU memory for input and output tensors";
+  LOG_ERROR << "\t-v Enable verbose logging";
   LOG_ERROR << "\t-r [model repository absolute path]";
 
   exit(1);
@@ -256,16 +257,20 @@ int
 main(int argc, char** argv)
 {
   std::string model_repository_path;
+  int verbose_level = 0;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "gr:")) != -1) {
+  while ((opt = getopt(argc, argv, "vgr:")) != -1) {
     switch (opt) {
       case 'g':
         use_gpu_memory = true;
         break;
       case 'r':
         model_repository_path = optarg;
+        break;
+      case 'v':
+        verbose_level = 1;
         break;
       case '?':
         Usage(argv);
@@ -290,6 +295,9 @@ main(int argc, char** argv)
       TRTSERVER_ServerOptionsSetModelRepositoryPath(
           server_options, model_repository_path.c_str()),
       "setting model repository path");
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
+      "setting verbose logging level");
 
   TRTSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(
