@@ -536,7 +536,10 @@ ValidateModelConfig(
                                              " has unexpected kind KIND_AUTO");
       }
 
-      if (config.platform() != kTensorRTPlanPlatform &&
+      if (
+#ifdef TRTIS_ENABLE_TENSORRT
+          (config.platform() != kTensorRTPlanPlatform) &&
+#endif  // TRTIS_ENABLE_TENSORRT
           !group.profile().empty()) {
         return Status(
             RequestStatusCode::INVALID_ARG,
