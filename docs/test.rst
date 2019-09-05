@@ -48,11 +48,11 @@ model repositories::
   $ ./gen_qa_model_repository
   $ ./gen_qa_custom_ops
 
-This will create multiple model repositories in /tmp/qa_* (for example
-/tmp/qa_model_repository).  The TensorRT models will be created for
-the GPU on the system that CUDA considers device 0 (zero). If you have
-multiple GPUs on your system see the documentation in the scripts for
-how to target a specific GPU.
+This will create multiple model repositories in /tmp/<version>/qa_*
+(for example /tmp/19.08/qa_model_repository).  The TensorRT models
+will be created for the GPU on the system that CUDA considers device 0
+(zero). If you have multiple GPUs on your system see the documentation
+in the scripts for how to target a specific GPU.
 
 Build QA Container
 ------------------
@@ -73,9 +73,9 @@ Run QA Container
 Now run the QA container and mount the QA model repositories into the
 container so the tests will be able to access them::
 
-  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver/<TRTIS_CONTAINER_VERSION> tensorrtserver_qa
+  $ nvidia-docker run -it --rm -v/tmp:/data/inferenceserver tensorrtserver_qa
 
 Within the container the QA tests are in /opt/tensorrtserver/qa. To run a test::
 
   $ cd <test directory>
-  $ ./test.sh <TRTIS_CONTAINER_VERSION>
+  $ ./test.sh
