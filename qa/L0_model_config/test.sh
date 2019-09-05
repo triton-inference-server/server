@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CLIENT_LOG="./client.log"
 CLIENT=model_config_test.py
 
@@ -53,7 +63,7 @@ for modelpath in \
         autofill_noplatform_success/tensorrt/incomplete_input/1 \
         autofill_noplatform_success/tensorrt/incomplete_output/1 ; do
     mkdir -p $modelpath
-    cp /data/inferenceserver/$1/qa_model_repository/plan_float32_float32_float32/1/model.plan \
+    cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float32_float32_float32/1/model.plan \
        $modelpath/.
 done
 

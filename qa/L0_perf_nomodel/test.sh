@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 # Descriptive name for the current results
 UNDERTEST_NAME=${NVIDIA_TENSORRT_SERVER_VERSION}
 
@@ -125,7 +135,7 @@ for idx in "${!LATENCY_NAMES[@]}"; do
               DYNAMIC_BATCH_SIZES=1 \
               INSTANCE_COUNTS=1 \
               REQUIRED_MAX_CONCURRENCY=1 \
-              bash -x ${RUNTEST} $1
+              bash -x ${RUNTEST} ${REPO_VERSION}
     if (( $? != 0 )); then
         RET=1
     fi

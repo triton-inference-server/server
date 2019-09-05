@@ -25,6 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 CLIENT_LOG="./client.log"
 INFER_TEST=infer_zero_test.py
 
@@ -35,8 +45,8 @@ source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
 rm -fr models && mkdir models
-cp -r /data/inferenceserver/$1/qa_identity_model_repository/* models/. && \
-    cp -r /data/inferenceserver/$1/qa_ensemble_model_repository/qa_identity_model_repository/* models/.
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/* models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_identity_model_repository/* models/.
 
 create_nop_modelfile `pwd`/libidentity.so `pwd`/models
 
