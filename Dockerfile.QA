@@ -92,7 +92,13 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
         qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_multiple_ports/models/simple/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
-        qa/L0_multiple_ports/models/simple/1/.
+        qa/L0_multiple_ports/models/simple/1/. && \
+    mkdir -p qa/L0_infer_shm && \
+    cp -r qa/L0_infer/. qa/L0_infer_shm && \
+    mkdir -p qa/L0_batcher_shm && \
+    cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
+    mkdir -p qa/L0_sequence_batcher_shm && \
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm
 
 RUN mkdir -p qa/L0_custom_image_preprocess/models/image_preprocess_nhwc_224x224x3/1 && \
     cp builddir/trtis-custom-backends/install/lib/libimagepreprocess.so \

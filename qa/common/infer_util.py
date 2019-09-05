@@ -25,9 +25,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+import os
 import numpy as np
 from tensorrtserver.api import *
-import tensorrtserver.shared_memory as shm
+if "TEST_SHARED_MEMORY" in os.environ:
+    TEST_SHARED_MEMORY=os.environ["TEST_SHARED_MEMORY"]
+else:
+    TEST_SHARED_MEMORY=0
+if TEST_SHARED_MEMORY:
+    import tensorrtserver.shared_memory as shm
 import test_util as tu
 from sets import Set
 from ctypes import *
@@ -57,21 +63,24 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0, include_shared_memory_test=False):
+                correlation_id=0):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-        configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+        else:
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
     if use_grpc:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-        configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+        else:
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
     if use_streaming:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-        configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+        else:
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
     for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
@@ -268,21 +277,24 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 # zero-sized input/output tensor.
 def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes,
                model_version=None, use_http=True, use_grpc=True,
-               use_streaming=True, include_shared_memory_test=False):
+               use_streaming=True):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-        configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+        else:
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
     if use_grpc:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-        configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+        else:
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
     if use_streaming:
-        if include_shared_memory_test:
+        if TEST_SHARED_MEMORY:
             configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-        configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+        else:
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
     tester.assertEqual(len(input_shapes), len(output_shapes))
     io_cnt = len(input_shapes)
 

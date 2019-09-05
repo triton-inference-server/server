@@ -58,8 +58,7 @@ class BatcherTest(unittest.TestCase):
             raise _check_exception
 
     def check_response(self, trial, bs, thresholds,
-                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16,
-                       include_shared_memory_test=False):
+                       requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16):
         global _check_exception
         try:
             start_ms = int(round(time.time() * 1000))
@@ -71,14 +70,14 @@ class BatcherTest(unittest.TestCase):
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, include_shared_memory_test=include_shared_memory_test)
+                               use_streaming=False)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, include_shared_memory_test=include_shared_memory_test)
+                               use_streaming=False)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -145,10 +144,10 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 2, (3000, None), include_shared_memory_test=True)
-                self.check_response(trial, 6, (3000, None), include_shared_memory_test=True)
+                self.check_response(trial, 2, (3000, None))
+                self.check_response(trial, 6, (3000, None))
                 self.check_deferred_exception()
-                self.check_status(url, protocol, model_name, (2,6), 4, 8)
+                self.check_status(url, protocol, model_name, (2,6), 2, 8)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -165,10 +164,9 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms), \
-                                                            include_shared_memory_test=True)
+                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
                 self.check_deferred_exception()
-                self.check_status(url, protocol, model_name, (1,), 2, 1)
+                self.check_status(url, protocol, model_name, (1,), 1, 1)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -185,10 +183,9 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),\
-                                                            include_shared_memory_test=True)
+                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
                 self.check_deferred_exception()
-                self.check_status(url, protocol, model_name, (3,), 2, 3)
+                self.check_status(url, protocol, model_name, (3,), 1, 3)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -205,9 +202,9 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 7, (3000, None), include_shared_memory_test=True)
+                self.check_response(trial, 7, (3000, None))
                 self.check_deferred_exception()
-                self.check_status(url, protocol, model_name, (7,), 2, 7)
+                self.check_status(url, protocol, model_name, (7,), 1, 7)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 

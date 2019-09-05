@@ -39,7 +39,12 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
-import tensorrtserver.shared_memory as shm
+if "TEST_SHARED_MEMORY" in os.environ:
+    TEST_SHARED_MEMORY=os.environ["TEST_SHARED_MEMORY"]
+else:
+    TEST_SHARED_MEMORY=0
+if TEST_SHARED_MEMORY:
+    import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
@@ -77,8 +82,7 @@ class SequenceBatcherTest(unittest.TestCase):
 
     def check_sequence(self, trial, model_name, input_dtype, correlation_id,
                        sequence_thresholds, values, expected_result,
-                       protocol, batch_size=1, sequence_name="<unknown>",
-                       include_shared_memory_test=False):
+                       protocol, batch_size=1, sequence_name="<unknown>"):
         """Perform sequence of inferences. The 'values' holds a list of
         tuples, one for each inference with format:
 
@@ -100,17 +104,20 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+            else:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
         self.assertEqual(len(configs), 1)
 
@@ -224,8 +231,7 @@ class SequenceBatcherTest(unittest.TestCase):
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
-                             protocol, batch_size=1, sequence_name="<unknown>",
-                             include_shared_memory_test=False):
+                             protocol, batch_size=1, sequence_name="<unknown>"):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
 
@@ -247,17 +253,20 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-            configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+            else:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-            configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            if include_shared_memory_test:
+            if TEST_SHARED_MEMORY:
                 configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-            configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
         self.assertEqual(len(configs), 1)
 
         for config in configs:
@@ -444,10 +453,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(45, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 2 * 9 * (idx + 1), 2 * 9 * (idx + 1))
+                    self.check_status(model_name, (1,), 9 * (idx + 1), 9 * (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -471,10 +480,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                         (("start,end", 42, None, None),),
                                         self.get_expected_result(42, 42, trial, "start,end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 2 * (idx + 1), 2 * (idx + 1))
+                    self.check_status(model_name, (1,), (idx + 1), (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -506,7 +515,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                         self.get_expected_result(10, 9, trial, "end"),
                                         protocol, batch_size=2,
                                         sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -548,7 +557,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(10, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -590,7 +599,7 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 3, None, None)),
                                         self.get_expected_result(6, 3, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
@@ -636,9 +645,9 @@ class SequenceBatcherTest(unittest.TestCase):
                                          (None, 55, None, None)),
                                         self.get_expected_result(6, 3, trial, None),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
-                    self.check_status(model_name, (1,), 6 * (idx + 1), 6 * (idx + 1))
+                    self.check_status(model_name, (1,), 3 * (idx + 1), 3 * (idx + 1))
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
@@ -683,10 +692,10 @@ class SequenceBatcherTest(unittest.TestCase):
                                          ("end", 9, None, None)),
                                         self.get_expected_result(51, 9, trial, "end"),
                                         protocol, sequence_name="{}_{}".format(
-                                            self._testMethodName, protocol), include_shared_memory_test=True)
+                                            self._testMethodName, protocol))
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, (1,), 8 * (idx + 1), 8 * (idx + 1))
+                    self.check_status(model_name, (1,), 4 * (idx + 1), 4 * (idx + 1))
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
