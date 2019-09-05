@@ -619,6 +619,11 @@ PlanBackend::Context::BuildCudaGraph(const int batch_size)
     }
   }
 
+  if (captured) {
+    LOG_VERBOSE(1) << "captured CUDA graph for " << name_ << ", batch size "
+                   << batch_size;
+  }
+
   return captured;
 }
 #endif
