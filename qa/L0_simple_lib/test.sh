@@ -47,32 +47,28 @@ rm -f $CLIENT_LOG
 
 RET=0
 
-# Apply the same procedure to addsub models in other frameworks
-for trial in \
-        graphdef_float32_float32_float32 \
-        savedmodel_float32_float32_float32 \
-        netdef_float32_float32_float32 \
-        onnx_float32_float32_float32 \
-        libtorch_float32_float32_float32 \
-        plan_float32_float32_float32 ; do
+for trial in graphdef savedmodel netdef onnx libtorch plan ; do
+    full=${trial}_float32_float32_float32
     rm -rf $MODELSDIR/simple
     mkdir -p $MODELSDIR/simple/1 && \
-        cp -r $DATADIR/${trial}/1/* $MODELSDIR/simple/1/. && \
-        cp $DATADIR/${trial}/config.pbtxt $MODELSDIR/simple/. && \
+        cp -r $DATADIR/${full}/1/* $MODELSDIR/simple/1/. && \
+        cp $DATADIR/${full}/config.pbtxt $MODELSDIR/simple/. && \
         (cd $MODELSDIR/simple && \
                 sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
     set +e
 
-    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG 2>&1
+    $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.$full.cpu 2>&1
     if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.$full.cpu
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
 
-    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
+    $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.$full.gpu 2>&1
     if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.$full.gpu
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
@@ -80,6 +76,7 @@ for trial in \
     set -e
 done
 
+# custom model needs to be obtained elsewhere
 rm -rf $MODELSDIR/simple/1/*
 cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/simple/1/.
 cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simple/.
@@ -89,24 +86,62 @@ cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/simpl
 
 set +e
 
-$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG 2>&1
+$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.custom.cpu 2>&1
 if [ $? -ne 0 ]; then
+    $CLIENT_LOG.custom.cpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG 2>&1
+$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.custom.gpu 2>&1
 if [ $? -ne 0 ]; then
+    $CLIENT_LOG.custom.gpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
 set -e
 
+# set up "addsub" ensemble
+ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
+rm -rf $MODELSDIR/simple/1/*
+mkdir -p $MODELSDIR/simple/1 && \
+    cp $ENSEMBLEDIR/fan_plan_float32_float32_float32/config.pbtxt $MODELSDIR/simple/. && \
+        (cd $MODELSDIR/simple && \
+                sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
+
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1,-1,-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1,-1,-1/1 && \
+    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1,-1,-1/1/.
+
+cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
+    # make sure version 1 is used (no swap)
+    rm -r $MODELSDIR/plan_float32_float32_float32/2 && \
+    rm -r $MODELSDIR/plan_float32_float32_float32/3
+
+set +e
+
+$SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.ensemble.cpu 2>&1
+if [ $? -ne 0 ]; then
+    $CLIENT_LOG.ensemble.cpu
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.ensemble.gpu 2>&1
+if [ $? -ne 0 ]; then
+    $CLIENT_LOG.ensemble.gpu
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+
 if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
