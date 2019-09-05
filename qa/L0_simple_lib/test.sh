@@ -88,14 +88,14 @@ set +e
 
 $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.custom.cpu 2>&1
 if [ $? -ne 0 ]; then
-    $CLIENT_LOG.custom.cpu
+    cat $CLIENT_LOG.custom.cpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
 $SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.custom.gpu 2>&1
 if [ $? -ne 0 ]; then
-    $CLIENT_LOG.custom.gpu
+    cat $CLIENT_LOG.custom.gpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
@@ -124,16 +124,24 @@ set +e
 
 $SIMPLE_CLIENT -r $MODELSDIR >>$CLIENT_LOG.ensemble.cpu 2>&1
 if [ $? -ne 0 ]; then
-    $CLIENT_LOG.ensemble.cpu
+    cat $CLIENT_LOG.ensemble.cpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-$SIMPLE_CLIENT -r $MODELSDIR -g >>$CLIENT_LOG.ensemble.gpu 2>&1
+$SIMPLE_CLIENT -r $MODELSDIR -g -v >>$CLIENT_LOG.ensemble.gpu 2>&1
 if [ $? -ne 0 ]; then
-    $CLIENT_LOG.ensemble.gpu
+    cat $CLIENT_LOG.ensemble.gpu
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    # For GPU input / output case, all ensemble allocation should be on GPU
+    if grep ^E[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu; then
+        echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu
+        cat $CLIENT_LOG.ensemble.gpu
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e
