@@ -710,8 +710,8 @@ BaseBackend::Context::Run(
               RequestStatusCode::INVALID_ARG,
               "unexpected shape for output '" + name +
                   "', model configuration shape is " +
-                  DimsListToString(shapevec) + ", inference shape is " +
-                  DimsListToString(output_dims));
+                  DimsListToString(output_dims) + ", inference shape is " +
+                  DimsListToString(shapevec));
         }
       }
     }

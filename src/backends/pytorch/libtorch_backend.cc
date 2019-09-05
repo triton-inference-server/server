@@ -464,8 +464,8 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape for output '" + name +
                 "', model configuration shape is " +
-                DimsListToString(content_shape) + ", inference shape is " +
-                DimsListToString(dims));
+                DimsListToString(dims) + ", inference shape is " +
+                DimsListToString(content_shape));
       }
     }
   }
