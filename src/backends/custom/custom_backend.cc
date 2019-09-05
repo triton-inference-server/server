@@ -215,6 +215,12 @@ CustomBackend::CreateExecutionContext(
       &(context->ExecuteFn_), &(context->ExecuteV2Fn_),
       &(context->custom_version_)));
 
+  // Only create stream on V1 as backend is not aware of different memory
+  // types. For other version, the backend should handle this explicitly.
+  if (context->custom_version_ == 1) {
+    RETURN_IF_ERROR(context->CreateCudaStream());
+  }
+
   return Status::Success;
 }
 
@@ -515,6 +521,10 @@ CustomBackend::Context::GetNextInput(
         cudaMemcpyDeviceToHost, stream_);
     if (err == cudaSuccess) {
       *content = buffer_unique_ptr.get();
+      // Use cudaMemcpyAsync to avoid synchronization on default stream,
+      // but stream synchronization must be done per copy to ensure that
+      // the data is ready.
+      cudaStreamSynchronize(stream_);
     }
     return (err == cudaSuccess);
   }
@@ -563,7 +573,9 @@ CustomBackend::Context::GetOutput(
         name, content, content_byte_size, shape, dst_memory_type);
 
     // Done with this output if 'content_byte_size' is 0
-    if ((content_byte_size != 0) && (*content == nullptr)) {
+    if (content_byte_size == 0) {
+      *content = nullptr;
+    } else if (*content == nullptr) {
       // If first attempt is CPU and failed, then allocation failed
       if ((!status.IsOk()) || (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
         return false;

@@ -47,6 +47,15 @@ target_link_libraries(
   identity
   PRIVATE custombackend
 )
+if(${TRTIS_ENABLE_GPU})
+target_include_directories(identity PRIVATE ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+  identity
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
+)
+endif() # TRTIS_ENABLE_GPU
 
 install(
   TARGETS identity

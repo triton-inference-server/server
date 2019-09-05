@@ -605,8 +605,11 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       shape.push_back(dim);
     }
 
+    // Use the memory type of the memory block as preferred memory type
+    TRTSERVER_Memory_Type dst_memory_type;
+    size_t content_size;
+    memory_block->BufferAt(0, &content_size, &dst_memory_type);
 
-    TRTSERVER_Memory_Type dst_memory_type = TRTSERVER_MEMORY_GPU;
     void* buffer;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape,
@@ -616,10 +619,12 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     if (expected_byte_size == 0) {
       continue;
     } else if (buffer == nullptr) {
-      dst_memory_type = TRTSERVER_MEMORY_CPU;
-      RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
-          output_pair.first, &buffer, expected_byte_size, shape,
-          dst_memory_type));
+      if (dst_memory_type != TRTSERVER_MEMORY_CPU) {
+        dst_memory_type = TRTSERVER_MEMORY_CPU;
+        RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
+            output_pair.first, &buffer, expected_byte_size, shape,
+            dst_memory_type));
+      }
       if (buffer == nullptr) {
         return Status(
             RequestStatusCode::INTERNAL,
@@ -630,7 +635,6 @@ EnsembleContext::CheckAndSetEnsembleOutput()
 
     size_t content_offset = 0;
     size_t content_idx = 0;
-    size_t content_size;
     TRTSERVER_Memory_Type src_memory_type;
 
     const char* content =

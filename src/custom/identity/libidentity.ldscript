@@ -27,7 +27,9 @@
   global:
     CustomErrorString;
     CustomExecute;
+    CustomExecuteV2;
     CustomFinalize;
     CustomInitialize;
+    CustomVersion;
   local: *;
 };
