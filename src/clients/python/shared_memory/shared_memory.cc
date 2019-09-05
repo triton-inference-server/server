@@ -66,7 +66,7 @@ SharedMemoryRegionMap(
   return 0;
 }
 
-} // namespace
+}  // namespace
 
 int
 SharedMemoryRegionCreate(

@@ -76,7 +76,8 @@ CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
   if (shm_fd == -1) {
     std::cerr << "error: unable to get shared memory descriptor for "
                  "shared-memory key '" +
-                     shm_key + "'";
+                     shm_key + "'"
+              << std::endl;
     exit(1);
   }
   // extend shared memory object as by default it's initialized with size 0
@@ -84,7 +85,8 @@ CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
   if (res == -1) {
     std::cerr << "error: unable to initialize shared-memory key '" + shm_key +
                      "' to requested size " + std::to_string(batch_byte_size) +
-                     " bytes";
+                     " bytes"
+              << std::endl;
     exit(1);
   }
   return shm_fd;
@@ -99,7 +101,8 @@ MapSharedMemory(int shm_fd, size_t offset, size_t batch_byte_size)
   if (shm_addr == MAP_FAILED) {
     std::cerr << "error: unable to process address space or shared-memory "
                  "descriptor: " +
-                     std::to_string(shm_fd);
+                     std::to_string(shm_fd)
+              << std::endl;
     exit(1);
   }
   return shm_addr;
@@ -111,7 +114,8 @@ UnlinkSharedMemoryRegion(std::string shm_key)
   int shm_fd = shm_unlink(shm_key.c_str());
   if (shm_fd == -1) {
     std::cerr << "error: unable to unlink shared memory for key '" + shm_key +
-                     "'";
+                     "'"
+              << std::endl;
     exit(1);
   }
 }
@@ -121,7 +125,7 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
 {
   int tmp_fd = munmap(shm_addr, byte_size);
   if (tmp_fd == -1) {
-    std::cerr << "Unable to munmap shared memory region";
+    std::cerr << "Unable to munmap shared memory region" << std::endl;
     exit(1);
   }
 }
