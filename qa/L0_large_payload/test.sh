@@ -25,10 +25,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TENSORRT_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 LARGE_PAYLOAD_TEST_PY=large_payload_test.py
-
 CLIENT_LOG_BASE="./client.log"
-
 DATADIR=`pwd`/models
 
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -43,11 +51,16 @@ RET=0
 MODEL_SUFFIX=nobatch_zero_1_float32
 rm -fr models && \
     mkdir models && \
-    cp -r /data/inferenceserver/$1/qa_identity_model_repository/graphdef_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/$1/qa_identity_model_repository/netdef_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/$1/qa_identity_model_repository/onnx_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/$1/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX models/. && \
-    cp -r /data/inferenceserver/$1/qa_identity_model_repository/libtorch_$MODEL_SUFFIX models/. 
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/graphdef_$MODEL_SUFFIX \
+       models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/netdef_$MODEL_SUFFIX \
+       models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_$MODEL_SUFFIX \
+       models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX \
+       models/. && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/libtorch_$MODEL_SUFFIX \
+       models/. 
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
     cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
