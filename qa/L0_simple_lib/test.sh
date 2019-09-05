@@ -136,7 +136,7 @@ if [ $? -ne 0 ]; then
     RET=1
 else
     # For GPU input / output case, all ensemble allocation should be on GPU
-    if grep ^E[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu; then
+    if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu; then
         echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu
         cat $CLIENT_LOG.ensemble.gpu
         echo -e "\n***\n*** Test Failed\n***"
