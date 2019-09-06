@@ -85,6 +85,9 @@ RUN mkdir -p qa/custom_models/custom_int32_int32_int32/1 && \
     mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/L0_simple_ensemble/models/simple/1/. && \
+    mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
+    cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
+        qa/L0_simple_ensemble/models/simple/2/. && \
     mkdir -p qa/L0_multiple_ports/models/simple/1 && \
     cp builddir/trtis-custom-backends/install/lib/libaddsub.so \
         qa/L0_multiple_ports/models/simple/1/.

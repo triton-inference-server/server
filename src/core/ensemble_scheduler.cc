@@ -240,7 +240,8 @@ EnsembleContext::EnsembleContext(
         auto it = step_requested_output_count.find(step_idx);
         if (it == step_requested_output_count.end()) {
           auto output_count = step.output_to_tensor_.size();
-          it = step_requested_output_count.emplace(step_idx, output_count).first;
+          it =
+              step_requested_output_count.emplace(step_idx, output_count).first;
         }
         // If none of the outputs of the step is requested,
         // then the step can be pruned
