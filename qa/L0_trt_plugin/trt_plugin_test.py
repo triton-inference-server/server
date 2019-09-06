@@ -38,7 +38,7 @@ class PluginModelTest(unittest.TestCase):
     def _full_exact(self, batch_size, input_dtype, output_dtype, model_name):
         input_list = list()
         for b in range(batch_size):
-            in0 = np.random.randn(16,1,1).astype(input_dtype)
+            in0 = np.random.randn(16).astype(input_dtype)
             input_list.append(in0)
 
         ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name,

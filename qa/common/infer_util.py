@@ -179,11 +179,11 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     (result_name == OUTPUT1 and output1_raw)):
                     if result_name == OUTPUT0:
                         tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
-                                        "{}, "+OUTPUT0+" expected: {}, got {}".format(
+                                        "{}, expected: {}, got {}".format(
                                             model_name, expected0_list[b], result_val[b]))
                     elif result_name == OUTPUT1:
                         tester.assertTrue(np.array_equal(result_val[b], expected1_list[b]),
-                                        "{}, "+OUTPUT1+" expected: {}, got {}".format(
+                                        "{}, expected: {}, got {}".format(
                                             model_name, expected1_list[b], result_val[b]))
                     else:
                         tester.assertTrue(False, "unexpected raw result {}".format(result_name))
