@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,14 +25,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#ifdef TRTIS_ENABLE_TRACING
+
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-// Start profiling on all GPU devices.
-Status ProfileStartAll();
+class TraceManager {
+ public:
+  static Status Create(
+      const std::string& trace_name, const std::string& hostname,
+      uint32_t port);
+  ~TraceManager();
 
-// Stop profiling on all GPU devices.
-Status ProfileStopAll();
+  static Status Enable(uint32_t rate);
+  static Status Disable();
+
+ private:
+  TraceManager(
+      const std::string& trace_name, const std::string& hostname,
+      uint32_t port);
+
+  // Unfortunately we need manager to be a singleton because the
+  // underlying zipkin library uses singletons for the trace
+  // objects... not sure why they did that...
+  static std::unique_ptr<TraceManager> singleton_;
+
+  bool enable_;
+  uint32_t rate_;
+};
 
 }}  // namespace nvidia::inferenceserver
+
+#endif  // TRTIS_ENABLE_TRACING

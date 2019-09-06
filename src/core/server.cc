@@ -87,7 +87,7 @@ InferenceServer::InferenceServer()
   id_ = "inference:0";
   strict_model_config_ = true;
   strict_readiness_ = true;
-  profiling_enabled_ = false;
+  tracing_enabled_ = false;
   exit_timeout_secs_ = 30;
 
   tf_soft_placement_enabled_ = true;
@@ -413,6 +413,61 @@ InferenceServer::SharedMemoryAddress(
 {
   return shared_memory_manager_->SharedMemoryAddress(
       name, offset, byte_size, shm_mapped_addr);
+}
+
+Status
+InferenceServer::ConfigureTrace(
+    const std::string& trace_name, const std::string& hostname, uint32_t port)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  if (!tracing_enabled_) {
+    return Status(
+        RequestStatusCode::UNSUPPORTED,
+        "tracing is not enabled, use --allow-tracing");
+  }
+
+  return TraceManager::Create(trace_name, hostname, port);
+#else
+  return Status(
+      RequestStatusCode::UNSUPPORTED,
+      "tracing is not supported by this server");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+Status
+InferenceServer::EnableTrace(uint32_t rate)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  if (!tracing_enabled_) {
+    return Status(
+        RequestStatusCode::UNSUPPORTED,
+        "tracing is not enabled, use --allow-tracing");
+  }
+
+  return TraceManager::Enable(rate);
+#else
+  return Status(
+      RequestStatusCode::UNSUPPORTED,
+      "tracing is not supported by this server");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+Status
+InferenceServer::DisableTrace()
+{
+#ifdef TRTIS_ENABLE_TRACING
+  if (!tracing_enabled_) {
+    return Status(
+        RequestStatusCode::UNSUPPORTED,
+        "tracing is not enabled, use --allow-tracing");
+  }
+
+  return TraceManager::Disable();
+#else
+  return Status(
+      RequestStatusCode::UNSUPPORTED,
+      "tracing is not supported by this server");
+#endif  // TRTIS_ENABLE_TRACING
 }
 
 uint64_t

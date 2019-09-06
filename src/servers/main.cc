@@ -82,7 +82,7 @@ int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
 std::vector<std::string> endpoint_names = {
-    "status", "health",       "profile",
+    "status", "health",       "tracecontrol",
     "infer",  "modelcontrol", "sharedmemorycontrol"};
 #endif  // TRTIS_ENABLE_HTTP
 
@@ -133,7 +133,7 @@ enum OptionId {
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-  OPTION_ALLOW_PROFILING,
+  OPTION_ALLOW_TRACING,
 #ifdef TRTIS_ENABLE_HTTP
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
@@ -207,7 +207,7 @@ std::vector<Option> options_{
      "is responsive and all models are available. If false "
      "/api/health/ready endpoint indicates ready if server is responsive "
      "even if some/all models are unavailable."},
-    {OPTION_ALLOW_PROFILING, "allow-profiling", "Allow server profiling."},
+    {OPTION_ALLOW_TRACING, "allow-tracing", "Allow server tracing."},
 #ifdef TRTIS_ENABLE_HTTP
     {OPTION_ALLOW_HTTP, "allow-http",
      "Allow the server to listen for HTTP requests."},
@@ -644,7 +644,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   bool exit_on_error = true;
   bool strict_model_config = true;
   bool strict_readiness = true;
-  bool allow_profiling = false;
+  bool allow_tracing = false;
   bool tf_allow_soft_placement = true;
   float tf_gpu_memory_fraction = 0.0;
   VgpuOption tf_vgpu;
@@ -722,8 +722,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         strict_readiness = ParseBoolOption(optarg);
         break;
 
-      case OPTION_ALLOW_PROFILING:
-        allow_profiling = ParseBoolOption(optarg);
+      case OPTION_ALLOW_TRACING:
+        allow_tracing = ParseBoolOption(optarg);
         break;
 
 #ifdef TRTIS_ENABLE_HTTP
@@ -878,8 +878,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
           server_options, strict_readiness),
       "setting strict readiness");
   FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetProfiling(server_options, allow_profiling),
-      "setting profiling enable");
+      TRTSERVER_ServerOptionsSetTracing(server_options, allow_tracing),
+      "setting tracing enable");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitTimeout(
           server_options, std::max(0, exit_timeout_secs)),
