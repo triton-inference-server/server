@@ -1,1 +1,1 @@
-unexpected shape for input 'INPUT1', model configuration shape is \[16,1\], inference shape is \[16,1,1\]
+binding 'INPUT1' shape expected by framework \[16,1,1\] doesn't match model configuration shape \[16,1\]
