@@ -139,15 +139,74 @@ message StatusResponse
 //@@
 message ProfileRequest
 {
+  //@@  .. cpp:var:: message TraceConfigure
   //@@
-  //@@  .. cpp:var:: string cmd
+  //@@     Setting for configuring tracing. Must be used before tracing
+  //@@     can be enabled. Can be used only once because the trace
+  //@@     configuration can't be changed once it is set.
   //@@
-  //@@     The requested profiling action: 'start' requests that GPU
-  //@@     profiling be enabled on all GPUs controlled by the inference
-  //@@     server; 'stop' requests that GPU profiling be disabled on all GPUs
-  //@@     controlled by the inference server.
+  message TraceConfigure
+  {
+    //@@    .. cpp:var:: string name
+    //@@
+    //@@       Descriptive name for the trace being collected.
+    //@@       Default is "TRTIS".
+    //@@
+    string name = 1;
+
+    //@@    .. cpp:var:: string host
+    //@@
+    //@@       The name of the server where the trace information will be
+    //@@       delivered.
+    //@@
+    string host = 2;
+
+    //@@    .. cpp:var:: uint32 port
+    //@@
+    //@@       The port on the server where the trace information will be
+    //@@       delivered.
+    //@@
+    uint32 port = 3;
+  }
+
+  //@@  .. cpp:var:: message TraceEnable
   //@@
-  string cmd = 1;
+  //@@     Setting for enabling tracing.
+  //@@
+  message TraceEnable
+  {
+    //@@    .. cpp:var:: bool enable
+    //@@
+    //@@       True enables tracing, false disables tracing.
+    //@@
+    bool enable = 1;
+
+    //@@    .. cpp:var:: uint32 sample_rate
+    //@@
+    //@@       When enabling tracing sets the sample rate. Every
+    //@@       'sample_rate' request will be sampled.
+    //@@
+    uint32 sample_rate = 2;
+  }
+
+  //@@  .. cpp:var:: oneof profile_choice
+  //@@
+  //@@     The types of profile requests.
+  //@@
+  oneof profile_choice
+  {
+    //@@    .. cpp:var:: TraceConfigure trace_configure
+    //@@
+    //@@       Configure tracing.
+    //@@
+    TraceConfigure trace_configure = 1;
+
+    //@@    .. cpp:var:: TraceEnable trace_enable
+    //@@
+    //@@       Enable tracing.
+    //@@
+    TraceEnable trace_enable = 2;
+  }
 }
 
 //@@
