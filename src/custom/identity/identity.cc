@@ -263,8 +263,8 @@ Context::Execute(
           }
         } else {
           copy_type = (src_memory_type == CUSTOM_MEMORY_CPU)
-                               ? cudaMemcpyHostToDevice
-                               : cudaMemcpyDeviceToHost;
+                          ? cudaMemcpyHostToDevice
+                          : cudaMemcpyDeviceToHost;
         }
 
         if (copy_type == cudaMemcpyHostToHost) {
