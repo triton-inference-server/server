@@ -40,11 +40,10 @@ import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
 if "TEST_SHARED_MEMORY" in os.environ:
-    TEST_SHARED_MEMORY=os.environ["TEST_SHARED_MEMORY"]
+    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
 else:
     TEST_SHARED_MEMORY=0
-if TEST_SHARED_MEMORY:
-    import tensorrtserver.shared_memory as shm
+import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)

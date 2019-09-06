@@ -29,11 +29,10 @@ import os
 import numpy as np
 from tensorrtserver.api import *
 if "TEST_SHARED_MEMORY" in os.environ:
-    TEST_SHARED_MEMORY=os.environ["TEST_SHARED_MEMORY"]
+    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
 else:
     TEST_SHARED_MEMORY=0
-if TEST_SHARED_MEMORY:
-    import tensorrtserver.shared_memory as shm
+import tensorrtserver.shared_memory as shm
 import test_util as tu
 from sets import Set
 from ctypes import *
@@ -310,9 +309,9 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             shm_op_handles = list()
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             for io_num in range(io_cnt):
-                input0_byte_size = shape_element_count(input_shapes[io_num]) *\
+                input0_byte_size = tu.shape_element_count(input_shapes[io_num]) *\
                                     np.dtype(tensor_dtype).itemsize * batch_size
-                output0_byte_size = shape_element_count(output_shapes[io_num]) *\
+                output0_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
                                     np.dtype(tensor_dtype).itemsize * batch_size
                 shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
                                             "/input"+str(io_num), input0_byte_size))
