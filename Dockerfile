@@ -266,6 +266,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
     (cd builddir && \
             cmake -DCMAKE_BUILD_TYPE=Release \
                   -DTRTIS_ENABLE_METRICS=ON \
+                  -DTRTIS_ENABLE_TRACING=ON \
                   -DTRTIS_ENABLE_GCS=ON \
                   -DTRTIS_ENABLE_S3=ON \
                   -DTRTIS_ENABLE_CUSTOM=ON \

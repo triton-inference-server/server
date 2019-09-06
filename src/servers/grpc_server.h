@@ -72,9 +72,9 @@ class GRPCServer {
   std::unique_ptr<grpc::ServerCompletionQueue> status_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> profile_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> shmcontrol_cq_;
+  std::unique_ptr<grpc::ServerCompletionQueue> tracecontrol_cq_;
 
   grpc::ServerBuilder grpc_builder_;
   std::unique_ptr<grpc::Server> grpc_server_;
@@ -83,9 +83,9 @@ class GRPCServer {
   std::unique_ptr<HandlerBase> status_handler_;
   std::unique_ptr<HandlerBase> infer_handler_;
   std::unique_ptr<HandlerBase> stream_infer_handler_;
-  std::unique_ptr<HandlerBase> profile_handler_;
   std::unique_ptr<HandlerBase> modelcontrol_handler_;
   std::unique_ptr<HandlerBase> shmcontrol_handler_;
+  std::unique_ptr<HandlerBase> tracecontrol_handler_;
 
   GRPCService::AsyncService service_;
   bool running_;
