@@ -419,9 +419,8 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
         return Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape for output '" + name +
-                "', model configuration shape is " +
-                DimsListToString(dims) + ", inference shape is " +
-                DimsListToString(content_shape));
+                "', model configuration shape is " + DimsListToString(dims) +
+                ", inference shape is " + DimsListToString(content_shape));
       }
     }
   }
