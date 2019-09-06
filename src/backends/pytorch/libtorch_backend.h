@@ -69,6 +69,8 @@ class LibTorchBackend : public InferenceBackend {
 
   // For each model instance there is a context.
   struct Context : BackendContext {
+    struct InputMetaData;
+
     Context(
         const std::string& name, const int gpu_device,
         const int max_batch_size);
@@ -82,13 +84,11 @@ class LibTorchBackend : public InferenceBackend {
     Status ValidateOutputs(
         const ::google::protobuf::RepeatedPtrField<ModelOutput>& ios);
 
-    // Set an input tensor data from payloads.
-    Status SetInput(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-        const int& ip_index, const DataType datatype, const DimsList& dims,
+    // Set the meta data of an input from payloads.
+    Status SetInputMetaData(
+        const std::string& name, const DataType datatype, const DimsList& dims,
         const size_t total_batch_size,
-        std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
+        std::vector<Scheduler::Payload>* payloads, InputMetaData* meta_data,
         bool* cuda_copy);
 
     // Run model to execute for one or more requests. This function
@@ -100,14 +100,11 @@ class LibTorchBackend : public InferenceBackend {
     Status Run(
         const LibTorchBackend* base, std::vector<Scheduler::Payload>* payloads);
 
-    // Set an input tensor from one or more payloads.
-    Status SetFixedSizedInputTensor(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-        const int& ip_index, const std::vector<int64_t>& shape,
-        const DataType dtype, const size_t batch1_byte_size,
+    // Helper function to set an input buffer from one or more payloads.
+    Status SetFixedSizedInputBuffer(
+        const std::string& name, const size_t batch1_byte_size,
         const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-        std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-        bool* cuda_copy);
+        InputMetaData* meta_data, bool* cuda_copy);
 
     // Read an output tensor into one or more payloads.
     Status ReadFixedSizedOutputTensor(
@@ -116,11 +113,9 @@ class LibTorchBackend : public InferenceBackend {
         const size_t total_batch_size, const DimsList& dims,
         std::vector<Scheduler::Payload>* payloads, bool* cuda_copy);
 
+    // Set the input tensor given the meta data of the input.
     Status SetInputTensor(
-        std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-        const int& ip_index, const std::vector<int64_t>& shape,
-        const DataType dtype, char* content, const size_t byte_size,
-        const TRTSERVER_Memory_Type memory_type);
+        const InputMetaData& meta_data, torch::jit::IValue* tensor);
 
     Status GetOutputTensor(
         std::vector<torch::Tensor>* outputs_, const int& op_index,
