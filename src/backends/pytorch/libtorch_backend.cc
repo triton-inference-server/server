@@ -399,8 +399,18 @@ LibTorchBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  *cuda_copy |=
+  auto local_cuda_copy =
       SetInputBuffer(name, expected_byte_sizes, payloads, memory_type, buffer);
+
+  // Make sure the copy is finished before creating Torch tensor from the buffer
+  // [TODO] Delay SetInputTensor to after all input buffer copies are initiated,
+  // so that cudaStreamSynchronize() only needs to be called once.
+#ifdef TRTIS_ENABLE_GPU
+  if (local_cuda_copy) {
+    cudaStreamSynchronize(stream_);
+  }
+#endif  // TRTIS_ENABLE_GPU
+  *cuda_copy |= local_cuda_copy;
 
   RETURN_IF_ERROR(SetInputTensor(
       inputs_, name, ip_index, shape, dtype, static_cast<char*>(buffer),
@@ -463,9 +473,8 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
         return Status(
             RequestStatusCode::INVALID_ARG,
             "unexpected shape for output '" + name +
-                "', model configuration shape is " +
-                DimsListToString(dims) + ", inference shape is " +
-                DimsListToString(content_shape));
+                "', model configuration shape is " + DimsListToString(dims) +
+                ", inference shape is " + DimsListToString(content_shape));
       }
     }
   }
