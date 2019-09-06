@@ -40,6 +40,7 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
+#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -104,6 +105,17 @@ class InferenceServer {
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
 
+  // Configure tracing. This does not enable tracing.
+  Status ConfigureTrace(
+      const std::string& trace_name, const std::string& hostname,
+      uint32_t port);
+
+  // Enable tracing and set rate.
+  Status EnableTrace(uint32_t rate);
+
+  // Disable tracing.
+  Status DisableTrace();
+
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }
 
@@ -137,9 +149,9 @@ class InferenceServer {
   bool StrictReadinessEnabled() const { return strict_readiness_; }
   void SetStrictReadinessEnabled(bool e) { strict_readiness_ = e; }
 
-  // Get / set profiling enable.
-  bool ProfilingEnabled() const { return profiling_enabled_; }
-  void SetProfilingEnabled(bool e) { profiling_enabled_ = e; }
+  // Get / set tracing enable.
+  bool TracingEnabled() const { return tracing_enabled_; }
+  void SetTracingEnabled(bool e) { tracing_enabled_ = e; }
 
   // Get / set the server exit timeout, in seconds.
   int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
@@ -199,7 +211,7 @@ class InferenceServer {
   ModelControlMode model_control_mode_;
   bool strict_model_config_;
   bool strict_readiness_;
-  bool profiling_enabled_;
+  bool tracing_enabled_;
   uint32_t exit_timeout_secs_;
 
   // Tensorflow options

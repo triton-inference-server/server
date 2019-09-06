@@ -195,7 +195,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         smb_manager_(smb_manager), endpoint_names_(endpoints),
         allocator_(nullptr),
         api_regex_(
-            R"(/api/(health|profile|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
+            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol|tracecontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
@@ -262,13 +262,14 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   void Handle(evhtp_request_t* req) override;
   void HandleHealth(evhtp_request_t* req, const std::string& health_uri);
-  void HandleProfile(evhtp_request_t* req, const std::string& profile_uri);
   void HandleInfer(evhtp_request_t* req, const std::string& infer_uri);
   void HandleStatus(evhtp_request_t* req, const std::string& status_uri);
   void HandleModelControl(
       evhtp_request_t* req, const std::string& modelcontrol_uri);
   void HandleSharedMemoryControl(
       evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
+  void HandleTraceControl(
+      evhtp_request_t* req, const std::string& tracecontrol_uri);
 
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
@@ -416,13 +417,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleHealth(req, rest);
       return;
     }
-    // profile
-    if (endpoint == "profile" &&
-        (std::find(endpoint_names_.begin(), endpoint_names_.end(), "profile") !=
-         endpoint_names_.end())) {
-      HandleProfile(req, rest);
-      return;
-    }
     // infer
     if (endpoint == "infer" &&
         (std::find(endpoint_names_.begin(), endpoint_names_.end(), "infer") !=
@@ -444,6 +438,14 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
              endpoint_names_.begin(), endpoint_names_.end(),
              "sharedmemorycontrol") != endpoint_names_.end())) {
       HandleSharedMemoryControl(req, rest);
+      return;
+    }
+    // tracecontrol
+    if (endpoint == "tracecontrol" &&
+        (std::find(
+             endpoint_names_.begin(), endpoint_names_.end(), "tracecontrol") !=
+         endpoint_names_.end())) {
+      HandleTraceControl(req, rest);
       return;
     }
   }
@@ -495,44 +497,6 @@ HTTPAPIServer::HandleHealth(evhtp_request_t* req, const std::string& health_uri)
       req, (health && (err == nullptr)) ? EVHTP_RES_OK : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
-}
-
-void
-HTTPAPIServer::HandleProfile(
-    evhtp_request_t* req, const std::string& profile_uri)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  if (!profile_uri.empty() && (profile_uri != "/")) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  std::string cmd;
-  const char* cmd_c_str = evhtp_kv_find(req->uri->query, "cmd");
-  if (cmd_c_str != NULL) {
-    cmd = std::string(cmd_c_str);
-  }
-
-  // For now profile is a nop...
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, nullptr /* err */,
-      RequestStatusUtil::NextUniqueRequestId(), server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
 }
 
 void
@@ -747,6 +711,44 @@ HTTPAPIServer::HandleSharedMemoryControl(
                : EVHTP_RES_BADREQ);
 
   TRTSERVER_ErrorDelete(err);
+}
+
+void
+HTTPAPIServer::HandleTraceControl(
+    evhtp_request_t* req, const std::string& tracecontrol_uri)
+{
+  if (req->method != htp_method_GET) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  if (!tracecontrol_uri.empty() && (tracecontrol_uri != "/")) {
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  std::string cmd;
+  const char* cmd_c_str = evhtp_kv_find(req->uri->query, "cmd");
+  if (cmd_c_str != NULL) {
+    cmd = std::string(cmd_c_str);
+  }
+
+  // For now tracing is a nop...
+
+  RequestStatus request_status;
+  RequestStatusUtil::Create(
+      &request_status, nullptr /* err */,
+      RequestStatusUtil::NextUniqueRequestId(), server_id_);
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(
+          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
+
+  evhtp_send_reply(
+      req, (request_status.code() == RequestStatusCode::SUCCESS)
+               ? EVHTP_RES_OK
+               : EVHTP_RES_BADREQ);
 }
 
 TRTSERVER_Error*

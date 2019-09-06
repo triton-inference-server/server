@@ -230,6 +230,32 @@ TrtServerMetrics::Serialize(const char** base, size_t* byte_size)
 }
 
 //
+// TrtTraceOptions
+//
+// Implementation for TRTSERVER_TraceOptions.
+//
+class TrtTraceOptions {
+ public:
+  TrtTraceOptions();
+
+  const std::string& TraceName() const { return trace_name_; }
+  void SetTraceName(const char* n) { trace_name_ = n; }
+
+  const std::string& Host() const { return host_; }
+  void SetHost(const char* n) { host_ = n; }
+
+  uint32_t Port() const { return port_; }
+  void SetPort(uint32_t p) { port_ = p; }
+
+ private:
+  std::string trace_name_;
+  std::string host_;
+  uint32_t port_;
+};
+
+TrtTraceOptions::TrtTraceOptions() : trace_name_("TRTIS"), port_(0) {}
+
+//
 // TrtServerOptions
 //
 // Implementation for TRTSERVER_ServerOptions.
@@ -256,8 +282,8 @@ class TrtServerOptions {
   bool StrictReadiness() const { return strict_readiness_; }
   void SetStrictReadiness(bool b) { strict_readiness_ = b; }
 
-  bool Profiling() const { return profiling_; }
-  void SetProfiling(bool b) { profiling_ = b; }
+  bool Tracing() const { return tracing_; }
+  void SetTracing(bool b) { tracing_ = b; }
 
   unsigned int ExitTimeout() const { return exit_timeout_; }
   void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
@@ -293,7 +319,7 @@ class TrtServerOptions {
   bool exit_on_error_;
   bool strict_model_config_;
   bool strict_readiness_;
-  bool profiling_;
+  bool tracing_;
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
@@ -306,7 +332,7 @@ class TrtServerOptions {
 TrtServerOptions::TrtServerOptions()
     : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
-      profiling_(false), metrics_(true), gpu_metrics_(true), exit_timeout_(30),
+      tracing_(false), metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
@@ -715,6 +741,49 @@ TRTSERVER_InferenceResponseOutputData(
 }
 
 //
+// TRTSERVER_TraceOptions
+//
+TRTSERVER_Error*
+TRTSERVER_TraceOptionsNew(TRTSERVER_TraceOptions** options)
+{
+  *options = reinterpret_cast<TRTSERVER_TraceOptions*>(new TrtTraceOptions());
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceOptionsDelete(TRTSERVER_TraceOptions* options)
+{
+  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
+  delete loptions;
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceOptionsSetTraceName(
+    TRTSERVER_TraceOptions* options, const char* trace_name)
+{
+  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
+  loptions->SetTraceName(trace_name);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceOptionsSetHost(TRTSERVER_TraceOptions* options, const char* host)
+{
+  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
+  loptions->SetHost(host);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceOptionsSetPort(TRTSERVER_TraceOptions* options, uint32_t port)
+{
+  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
+  loptions->SetPort(port);
+  return nullptr;  // Success
+}
+
+//
 // TRTSERVER_ServerOptions
 //
 TRTSERVER_Error*
@@ -809,11 +878,11 @@ TRTSERVER_ServerOptionsSetStrictReadiness(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerOptionsSetProfiling(
-    TRTSERVER_ServerOptions* options, bool profiling)
+TRTSERVER_ServerOptionsSetTracing(
+    TRTSERVER_ServerOptions* options, bool tracing)
 {
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
-  loptions->SetProfiling(profiling);
+  loptions->SetTracing(tracing);
   return nullptr;  // Success
 }
 
@@ -939,7 +1008,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
-  lserver->SetProfilingEnabled(loptions->Profiling());
+  lserver->SetTracingEnabled(loptions->Tracing());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetTensorFlowSoftPlacementEnabled(
       loptions->TensorFlowSoftPlacement());
@@ -1166,6 +1235,33 @@ TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
   return TRTSERVER_ErrorNew(
       TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
 #endif  // TRTIS_ENABLE_METRICS
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerTraceConfigure(
+    TRTSERVER_Server* server, TRTSERVER_TraceOptions* options)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
+  RETURN_IF_STATUS_ERROR(lserver->ConfigureTrace(
+      loptions->TraceName(), loptions->Host(), loptions->Port()));
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerTraceEnable(TRTSERVER_Server* server, uint32_t rate)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  RETURN_IF_STATUS_ERROR(lserver->EnableTrace(rate));
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerTraceDisable(TRTSERVER_Server* server)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  RETURN_IF_STATUS_ERROR(lserver->DisableTrace());
+  return nullptr;  // success
 }
 
 TRTSERVER_Error*

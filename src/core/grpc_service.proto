@@ -47,17 +47,28 @@ service GRPCService
   //@@
   rpc Status(StatusRequest) returns (StatusResponse) {}
 
-  //@@  .. cpp:var:: rpc Profile(ProfileRequest) returns (ProfileResponse)
-  //@@
-  //@@     Enable and disable low-level GPU profiling.
-  //@@
-  rpc Profile(ProfileRequest) returns (ProfileResponse) {}
-
   //@@  .. cpp:var:: rpc Health(HealthRequest) returns (HealthResponse)
   //@@
   //@@     Check liveness and readiness of the inference server.
   //@@
   rpc Health(HealthRequest) returns (HealthResponse) {}
+
+  //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
+  //@@
+  //@@     Request inference using a specific model. [ To handle large input
+  //@@     tensors likely need to set the maximum message size to that they
+  //@@     can be transmitted in one pass.
+  //@@
+  rpc Infer(InferRequest) returns (InferResponse) {}
+
+  //@@  .. cpp:var:: rpc StreamInfer(stream InferRequest) returns (stream
+  //@@     InferResponse)
+  //@@
+  //@@     Request inferences using a specific model in a streaming manner.
+  //@@     Individual inference requests sent through the same stream will be
+  //@@     processed in order and be returned on completion
+  //@@
+  rpc StreamInfer(stream InferRequest) returns (stream InferResponse) {}
 
   //@@  .. cpp:var:: rpc ModelControl(ModelControlRequest) returns
   //@@     (ModelControlResponse)
@@ -76,22 +87,12 @@ service GRPCService
   {
   }
 
-  //@@  .. cpp:var:: rpc Infer(InferRequest) returns (InferResponse)
+  //@@  .. cpp:var:: rpc TraceControl(TraceControlRequest) returns
+  //@@     (TraceControlResponse)
   //@@
-  //@@     Request inference using a specific model. [ To handle large input
-  //@@     tensors likely need to set the maximum message size to that they
-  //@@     can be transmitted in one pass.
+  //@@     Enable and disable tracing.
   //@@
-  rpc Infer(InferRequest) returns (InferResponse) {}
-
-  //@@  .. cpp:var:: rpc StreamInfer(stream InferRequest) returns (stream
-  //@@     InferResponse)
-  //@@
-  //@@     Request inferences using a specific model in a streaming manner.
-  //@@     Individual inference requests sent through the same stream will be
-  //@@     processed in order and be returned on completion
-  //@@
-  rpc StreamInfer(stream InferRequest) returns (stream InferResponse) {}
+  rpc TraceControl(TraceControlRequest) returns (TraceControlResponse) {}
 }
 
 //@@
@@ -133,11 +134,11 @@ message StatusResponse
 }
 
 //@@
-//@@.. cpp:var:: message ProfileRequest
+//@@.. cpp:var:: message TraceControlRequest
 //@@
-//@@   Request message for Profile gRPC endpoint.
+//@@   Request message for tracecontrol gRPC endpoint.
 //@@
-message ProfileRequest
+message TraceControlRequest
 {
   //@@  .. cpp:var:: message TraceConfigure
   //@@
@@ -184,16 +185,16 @@ message ProfileRequest
     //@@    .. cpp:var:: uint32 sample_rate
     //@@
     //@@       When enabling tracing sets the sample rate. Every
-    //@@       'sample_rate' request will be sampled.
+    //@@       'rate' request will be sampled.
     //@@
-    uint32 sample_rate = 2;
+    uint32 rate = 2;
   }
 
-  //@@  .. cpp:var:: oneof profile_choice
+  //@@  .. cpp:var:: oneof trace_choice
   //@@
-  //@@     The types of profile requests.
+  //@@     The types of trace requests.
   //@@
-  oneof profile_choice
+  oneof trace_choice
   {
     //@@    .. cpp:var:: TraceConfigure trace_configure
     //@@
@@ -210,11 +211,11 @@ message ProfileRequest
 }
 
 //@@
-//@@.. cpp:var:: message ProfileResponse
+//@@.. cpp:var:: message TraceControlResponse
 //@@
-//@@   Response message for Profile gRPC endpoint.
+//@@   Response message for tracecontrol endpoint.
 //@@
-message ProfileResponse
+message TraceControlResponse
 {
   //@@
   //@@  .. cpp:var:: RequestStatus request_status
@@ -442,8 +443,8 @@ message InferRequest
 
   //@@  .. cpp:var:: InferRequestHeader meta_data
   //@@
-  //@@     Meta-data for the request profiling input tensors and requesting
-  //@@     output tensors.
+  //@@     Meta-data for the request: input tensors, output
+  //@@     tensors, etc.
   //@@
   InferRequestHeader meta_data = 3;
 

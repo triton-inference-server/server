@@ -288,8 +288,8 @@ if(${TRTIS_ENABLE_TRACING})
   message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
   target_link_libraries(
     trtserver
-    PRIVATE -L${TRTIS_TRACE_INSTALL_PATH}/lib
-    PRIVATE -lcppkin
+    PUBLIC -L${TRTIS_TRACE_INSTALL_PATH}/lib
+    PUBLIC -lcppkin
   )
 endif() # TRTIS_ENABLE_TRACING
 

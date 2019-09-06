@@ -1325,81 +1325,6 @@ StreamInferHandler::CompleteResponse(Handler::State* state)
 }
 
 //
-// ProfileHandler
-//
-class ProfileHandler : public Handler<
-                           GRPCService::AsyncService,
-                           grpc::ServerAsyncResponseWriter<ProfileResponse>,
-                           ProfileRequest, ProfileResponse> {
- public:
-  ProfileHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
-      size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-ProfileHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestProfile(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-ProfileHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  ProfileResponse& response = state->response_;
-
-  if (state->step_ == START) {
-    // For now profile is a nop...
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), nullptr /* success */,
-        state->unique_id_, server_id_);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
-//
 // ModelControlHandler
 //
 class ModelControlHandler
@@ -1567,6 +1492,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
           if (del_err != nullptr) {
             LOG_ERROR << "failed to delete shared memory block: "
                       << TRTSERVER_ErrorMessage(del_err);
+            TRTSERVER_ErrorDelete(del_err);
           }
         }
         break;
@@ -1581,6 +1507,112 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
             TRTSERVER_ERROR_UNKNOWN,
             "unknown sharedmemorycontrol request type");
         break;
+    }
+
+    RequestStatusUtil::Create(
+        response.mutable_request_status(), err, state->unique_id_, server_id_);
+
+    TRTSERVER_ErrorDelete(err);
+
+    state->step_ = Steps::COMPLETE;
+    state->context_->responder_->Finish(response, grpc::Status::OK, state);
+  } else if (state->step_ == Steps::COMPLETE) {
+    state->step_ = Steps::FINISH;
+  }
+
+  // Only handle one status request at a time (to avoid having status
+  // request cause too much load on server), so register for next
+  // request only after this one finished.
+  if (!shutdown && (state->step_ == Steps::FINISH)) {
+    StartNewRequest();
+  }
+
+  return state->step_ != Steps::FINISH;
+}
+
+//
+// TraceControlHandler
+//
+class TraceControlHandler
+    : public Handler<
+          GRPCService::AsyncService,
+          grpc::ServerAsyncResponseWriter<TraceControlResponse>,
+          TraceControlRequest, TraceControlResponse> {
+ public:
+  TraceControlHandler(
+      const std::string& name,
+      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
+      size_t max_state_bucket_count)
+      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
+  {
+  }
+
+ protected:
+  void StartNewRequest() override;
+  bool Process(State* state, bool rpc_ok) override;
+};
+
+void
+TraceControlHandler::StartNewRequest()
+{
+  auto context = std::make_shared<State::Context>(server_id_);
+  State* state = StateNew(context);
+  service_->RequestTraceControl(
+      state->context_->ctx_.get(), &state->request_,
+      state->context_->responder_.get(), cq_, cq_, state);
+
+  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
+                 << state->unique_id_;
+}
+
+bool
+TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
+{
+  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
+                 << state->unique_id_ << " step " << state->step_;
+
+  // If RPC failed on a new request then the server is shutting down
+  // and so we should do nothing (including not registering for a new
+  // request). If RPC failed on a non-START step then there is nothing
+  // we can do since we one execute one step.
+  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
+  if (shutdown) {
+    state->step_ = Steps::FINISH;
+  }
+
+  const TraceControlRequest& request = state->request_;
+  TraceControlResponse& response = state->response_;
+
+  if (state->step_ == START) {
+    TRTSERVER_Error* err = nullptr;
+
+    if (request.has_trace_configure()) {
+      TRTSERVER_TraceOptions* options = nullptr;
+      err = TRTSERVER_TraceOptionsNew(&options);
+      if (err != nullptr) {
+        TRTSERVER_TraceOptionsSetTraceName(
+            options, request.trace_configure().name().c_str());
+        TRTSERVER_TraceOptionsSetHost(
+            options, request.trace_configure().host().c_str());
+        TRTSERVER_TraceOptionsSetPort(
+            options, request.trace_configure().port());
+        err = TRTSERVER_ServerTraceConfigure(trtserver_.get(), options);
+
+        TRTSERVER_Error* del_err = TRTSERVER_TraceOptionsDelete(options);
+        if (del_err != nullptr) {
+          LOG_ERROR << "failed to delete trace options: "
+                    << TRTSERVER_ErrorMessage(del_err);
+          TRTSERVER_ErrorDelete(del_err);
+        }
+      }
+    } else if (request.has_trace_enable()) {
+      if (request.trace_enable().enable()) {
+        err = TRTSERVER_ServerTraceEnable(
+            trtserver_.get(), request.trace_enable().rate());
+      } else {
+        err = TRTSERVER_ServerTraceDisable(trtserver_.get());
+      }
     }
 
     RequestStatusUtil::Create(
@@ -1665,10 +1697,10 @@ GRPCServer::Start()
   status_cq_ = grpc_builder_.AddCompletionQueue();
   infer_cq_ = grpc_builder_.AddCompletionQueue();
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
-  profile_cq_ = grpc_builder_.AddCompletionQueue();
   modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
   shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
+  tracecontrol_cq_ = grpc_builder_.AddCompletionQueue();
 
   // Handler for health requests. A single thread processes all of
   // these requests.
@@ -1702,14 +1734,6 @@ GRPCServer::Start()
   hstreaminfer->Start(stream_infer_thread_cnt_);
   stream_infer_handler_.reset(hstreaminfer);
 
-  // Handler for profile requests. A single thread processes all of
-  // these requests.
-  ProfileHandler* hprofile = new ProfileHandler(
-      "ProfileHandler", server_, server_id_, &service_, profile_cq_.get(),
-      2 /* max_state_bucket_count */);
-  hprofile->Start(1 /* thread_cnt */);
-  profile_handler_.reset(hprofile);
-
   // Handler for model-control requests. A single thread processes all
   // of these requests.
   ModelControlHandler* hmodelcontrol = new ModelControlHandler(
@@ -1725,6 +1749,14 @@ GRPCServer::Start()
       &service_, shmcontrol_cq_.get(), 2 /* max_state_bucket_count */);
   hshmcontrol->Start(1 /* thread_cnt */);
   shmcontrol_handler_.reset(hshmcontrol);
+
+  // Handler for trace-control requests. A single thread processes all
+  // of these requests.
+  TraceControlHandler* htracecontrol = new TraceControlHandler(
+      "TraceControlHandler", server_, server_id_, &service_,
+      tracecontrol_cq_.get(), 2 /* max_state_bucket_count */);
+  htracecontrol->Start(1 /* thread_cnt */);
+  tracecontrol_handler_.reset(htracecontrol);
 
   running_ = true;
   LOG_INFO << "Started GRPCService at " << server_addr_;
@@ -1746,9 +1778,9 @@ GRPCServer::Stop()
   status_cq_->Shutdown();
   infer_cq_->Shutdown();
   stream_infer_cq_->Shutdown();
-  profile_cq_->Shutdown();
   modelcontrol_cq_->Shutdown();
   shmcontrol_cq_->Shutdown();
+  tracecontrol_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
@@ -1756,9 +1788,9 @@ GRPCServer::Stop()
   dynamic_cast<StatusHandler*>(status_handler_.get())->Stop();
   dynamic_cast<InferHandler*>(infer_handler_.get())->Stop();
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
-  dynamic_cast<ProfileHandler*>(profile_handler_.get())->Stop();
   dynamic_cast<ModelControlHandler*>(modelcontrol_handler_.get())->Stop();
   dynamic_cast<SharedMemoryControlHandler*>(shmcontrol_handler_.get())->Stop();
+  dynamic_cast<TraceControlHandler*>(tracecontrol_handler_.get())->Stop();
 
   running_ = false;
   return nullptr;  // success

@@ -52,6 +52,7 @@ struct TRTSERVER_ResponseAllocator;
 struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
 struct TRTSERVER_SharedMemoryBlock;
+struct TRTSERVER_TraceOptions;
 
 /// Types of memory recognized by TRTSERVER.
 typedef enum trtserver_memorytype_enum {
@@ -399,6 +400,46 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
     size_t* byte_size, TRTSERVER_Memory_Type* memory_type);
 
+/// TRTSERVER_TraceOptions
+///
+/// Options to use when configuring tracing.
+///
+
+/// Create a new trace options object. The caller takes ownership of
+/// the TRTSERVER_TraceOptions object and must call
+/// TRTSERVER_TraceOptionsDelete to release the object.
+/// \param options Returns the new trace options object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsNew(
+    TRTSERVER_TraceOptions** options);
+
+/// Delete a trace options object.
+/// \param options The trace options object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsDelete(
+    TRTSERVER_TraceOptions* options);
+
+/// Set the descriptive name for the trace.
+/// \param options The trace options object.
+/// \param trace_name The descriptive name.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetTraceName(
+    TRTSERVER_TraceOptions* options, const char* trace_name);
+
+/// Set the host name of the server where the trace should be sent.
+/// \param options The trace options object.
+/// \param host The server hostname.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetHost(
+    TRTSERVER_TraceOptions* options, const char* host);
+
+/// Set the port of the server where the trace should be sent.
+/// \param options The trace options object.
+/// \param port The server port.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetPort(
+    TRTSERVER_TraceOptions* options, uint32_t port);
+
 /// TRTSERVER_ServerOptions
 ///
 /// Options to use when creating an inference server.
@@ -489,12 +530,12 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitOnError(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictReadiness(
     TRTSERVER_ServerOptions* options, bool strict);
 
-/// Enable or disable profiling in a server options.
+/// Enable or disable tracing in a server options.
 /// \param options The server options object.
-/// \param strict True to enable profiling, false to disable.
+/// \param strict True to enable tracing, false to disable.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetProfiling(
-    TRTSERVER_ServerOptions* options, bool profiling);
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetTracing(
+    TRTSERVER_ServerOptions* options, bool tracing);
 
 /// Set the exit timeout, in seconds, for the server in a server
 /// options.
@@ -732,6 +773,26 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
     TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
+
+/// Configure tracing on the server.
+/// \param server The inference server object.
+/// \param options The trace options object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceConfigure(
+    TRTSERVER_Server* server, TRTSERVER_TraceOptions* options);
+
+/// Enable tracing on the server and set sample rate.
+/// \param server The inference server object.
+/// \param rate The sampling rate.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceEnable(
+    TRTSERVER_Server* server, uint32_t rate);
+
+/// Disable tracing on the server.
+/// \param server The inference server object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceDisable(
+    TRTSERVER_Server* server);
 
 /// Type for inference completion callback function. The callback
 /// function takes ownership of the TRTSERVER_InferenceResponse object

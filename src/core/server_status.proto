@@ -68,21 +68,6 @@ message StatusRequestStats
 }
 
 //@@
-//@@.. cpp:var:: message ProfileRequestStats
-//@@
-//@@   Statistics collected for Profile requests.
-//@@
-message ProfileRequestStats
-{
-  //@@  .. cpp:var:: StatDuration success
-  //@@
-  //@@     Total time required to handle successful Profile requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
-  //@@
-  StatDuration success = 1;
-}
-
-//@@
 //@@.. cpp:var:: message HealthRequestStats
 //@@
 //@@   Statistics collected for Health requests.
@@ -122,6 +107,21 @@ message SharedMemoryControlRequestStats
   //@@  .. cpp:var:: StatDuration success
   //@@
   //@@     Total time required to handle successful SharedMemoryControl
+  //@@     requests, not including HTTP or gRPC endpoint termination time.
+  //@@
+  StatDuration success = 1;
+}
+
+//@@
+//@@.. cpp:var:: message TraceControlRequestStats
+//@@
+//@@   Statistics collected for TraceControl requests.
+//@@
+message TraceControlRequestStats
+{
+  //@@  .. cpp:var:: StatDuration success
+  //@@
+  //@@     Total time required to handle successful trace-control
   //@@     requests, not including HTTP or gRPC endpoint termination time.
   //@@
   StatDuration success = 1;
@@ -353,12 +353,6 @@ message ServerStatus
   //@@
   StatusRequestStats status_stats = 5;
 
-  //@@  .. cpp:var:: ProfileRequestStats profile_stats
-  //@@
-  //@@     Statistics for Profile requests.
-  //@@
-  ProfileRequestStats profile_stats = 6;
-
   //@@  .. cpp:var:: HealthRequestStats health_stats
   //@@
   //@@     Statistics for Health requests.
@@ -376,4 +370,10 @@ message ServerStatus
   //@@     Statistics for SharedMemoryControl requests.
   //@@
   SharedMemoryControlRequestStats shm_control_stats = 10;
+
+  //@@  .. cpp:var:: TraceControlRequestStats trace_control_stats
+  //@@
+  //@@     Statistics for TraceControl requests.
+  //@@
+  TraceControlRequestStats trace_control_stats = 6;
 }
