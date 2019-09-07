@@ -50,7 +50,7 @@ fi
 RET=0
 
 set +e
-python $SIMPLE_TEST_PY.test_ensemble_add_sub -v >>$CLIENT_LOG 2>&1
+python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -71,7 +71,7 @@ fi
 RET=0
 
 set +e
-python $SIMPLE_TEST_PY.test_ensemble_add_sub_one_output -v >>$CLIENT_LOG 2>&1
+python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub_one_output >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
