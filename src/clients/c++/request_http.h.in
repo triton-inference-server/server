@@ -127,25 +127,6 @@ class ServerStatusHttpContext {
 };
 
 //==============================================================================
-/// ProfileHttpContext is the HTTP instantiation of ProfileContext.
-///
-class ProfileHttpContext {
- public:
-  /// Create context that controls profiling on a server using HTTP
-  /// protocol.
-  /// \param ctx Returns the new ProfileContext object.
-  /// \param server_url The inference server name and port.
-  /// \param headers Map of HTTP headers to use with the profile
-  /// request. The map key/value indicates the header name/value.
-  /// \param verbose If true generate verbose output when contacting
-  /// the inference server.
-  /// \return Error object indicating success or failure.
-  static Error Create(
-      std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-      const std::map<std::string, std::string>& headers, bool verbose = false);
-};
-
-//==============================================================================
 /// ModelControlHttpContext is the HTTP instantiation of ModelControlContext.
 ///
 class ModelControlHttpContext {
@@ -165,9 +146,9 @@ class ModelControlHttpContext {
 };
 
 //==============================================================================
-//// SharedMemoryControlHttpContext is the HTTP instantiation of
-//// SharedMemoryControlContext.
-////
+/// SharedMemoryControlHttpContext is the HTTP instantiation of
+/// SharedMemoryControlContext.
+///
 class SharedMemoryControlHttpContext {
  public:
   /// Create context that controls registration / unregistration of shared
@@ -181,6 +162,26 @@ class SharedMemoryControlHttpContext {
   /// \return Error object indicating success or failure.
   static Error Create(
       std::unique_ptr<SharedMemoryControlContext>* ctx,
+      const std::string& server_url,
+      const std::map<std::string, std::string>& headers, bool verbose = false);
+};
+
+//==============================================================================
+/// TraceControlHttpContext is the HTTP instantiation of
+/// TraceControlContext.
+///
+class TraceControlHttpContext {
+ public:
+  /// Create context that controls tracing using HTTP.
+  /// \param ctx Returns the new TraceControlContext object.
+  /// \param server_url The inference server name and port.
+  /// \param headers Map of HTTP headers to use with the control request.
+  /// The map key/value indicates the header name/value.
+  /// \param verbose If true generate verbose output when contacting the
+  /// inference server.
+  /// \return Error object indicating success or failure.
+  static Error Create(
+      std::unique_ptr<TraceControlContext>* ctx,
       const std::string& server_url,
       const std::map<std::string, std::string>& headers, bool verbose = false);
 };

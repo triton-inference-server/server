@@ -74,7 +74,7 @@ RequestTimers::Record(Kind kind)
 //==============================================================================
 
 bool
-OptionsImpl::Flag(InferRequestHeader::Flag flag) const
+InferOptionsImpl::Flag(InferRequestHeader::Flag flag) const
 {
   if (flag == InferRequestHeader::FLAG_NONE) {
     return false;
@@ -85,7 +85,7 @@ OptionsImpl::Flag(InferRequestHeader::Flag flag) const
 }
 
 void
-OptionsImpl::SetFlag(InferRequestHeader::Flag flag, bool value)
+InferOptionsImpl::SetFlag(InferRequestHeader::Flag flag, bool value)
 {
   if (flag != InferRequestHeader::FLAG_NONE) {
     uint32_t iflag = static_cast<uint32_t>(flag);
@@ -98,7 +98,8 @@ OptionsImpl::SetFlag(InferRequestHeader::Flag flag, bool value)
 }
 
 Error
-OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
+InferOptionsImpl::AddRawResult(
+    const std::shared_ptr<InferContext::Output>& output)
 {
   outputs_.emplace_back(std::make_pair(
       output, OutputOptions(InferContext::Result::ResultFormat::RAW)));
@@ -106,7 +107,7 @@ OptionsImpl::AddRawResult(const std::shared_ptr<InferContext::Output>& output)
 }
 
 Error
-OptionsImpl::AddClassResult(
+InferOptionsImpl::AddClassResult(
     const std::shared_ptr<InferContext::Output>& output, uint64_t k)
 {
   outputs_.emplace_back(std::make_pair(
@@ -115,7 +116,7 @@ OptionsImpl::AddClassResult(
 }
 
 Error
-OptionsImpl::AddSharedMemoryResult(
+InferOptionsImpl::AddSharedMemoryResult(
     const std::shared_ptr<InferContext::Output>& output,
     const std::string& name, size_t offset, size_t byte_size)
 {
@@ -130,7 +131,7 @@ OptionsImpl::AddSharedMemoryResult(
 Error
 InferContext::Options::Create(std::unique_ptr<InferContext::Options>* options)
 {
-  options->reset(new OptionsImpl());
+  options->reset(new InferOptionsImpl());
   return Error::Success;
 }
 
@@ -907,7 +908,8 @@ InferContextImpl::GetOutput(
 Error
 InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 {
-  const OptionsImpl& options = reinterpret_cast<const OptionsImpl&>(boptions);
+  const InferOptionsImpl& options =
+      reinterpret_cast<const InferOptionsImpl&>(boptions);
   shm_outputs_.clear();
 
   // If the model doesn't support batching (i.e. max_batch_size_ == 0)
@@ -939,7 +941,7 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 
   for (const auto& p : options.Outputs()) {
     const std::shared_ptr<Output>& output = p.first;
-    const OptionsImpl::OutputOptions& ooptions = p.second;
+    const InferOptionsImpl::OutputOptions& ooptions = p.second;
 
     reinterpret_cast<OutputImpl*>(output.get())
         ->SetResultFormat(ooptions.result_format);

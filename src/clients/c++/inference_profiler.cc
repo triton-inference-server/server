@@ -32,22 +32,20 @@ namespace perfclient {
 
 nic::Error
 InferenceProfiler::Create(
-    const bool verbose, const bool profile, const double stable_offset,
+    const bool verbose, const double stable_offset,
     const uint64_t measurement_window_ms, const size_t max_measurement_count,
     const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
 {
-  std::unique_ptr<nic::ProfileContext> profile_ctx;
   std::unique_ptr<nic::ServerStatusContext> status_ctx;
-  RETURN_IF_ERROR(factory->CreateProfileContext(&profile_ctx));
   RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
 
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
-      verbose, profile, stable_offset, measurement_window_ms,
-      max_measurement_count, (percentile != -1), percentile,
-      factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
-      std::move(profile_ctx), std::move(status_ctx), std::move(manager)));
+      verbose, stable_offset, measurement_window_ms, max_measurement_count,
+      (percentile != -1), percentile, factory->SchedulerType(),
+      factory->ModelName(), factory->ModelVersion(), std::move(status_ctx),
+      std::move(manager)));
 
   if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
     ni::ServerStatus server_status;
@@ -93,21 +91,19 @@ InferenceProfiler::BuildComposingModelMap(
 }
 
 InferenceProfiler::InferenceProfiler(
-    const bool verbose, const bool profile, const double stable_offset,
+    const bool verbose, const double stable_offset,
     const int32_t measurement_window_ms, const size_t max_measurement_count,
     const bool extra_percentile, const size_t percentile,
     const ContextFactory::ModelSchedulerType scheduler_type,
     const std::string& model_name, const int64_t model_version,
-    std::unique_ptr<nic::ProfileContext> profile_ctx,
     std::unique_ptr<nic::ServerStatusContext> status_ctx,
     std::unique_ptr<LoadManager> manager)
-    : verbose_(verbose), profile_(profile),
-      measurement_window_ms_(measurement_window_ms),
+    : verbose_(verbose), measurement_window_ms_(measurement_window_ms),
       max_measurement_count_(max_measurement_count),
       extra_percentile_(extra_percentile), percentile_(percentile),
       scheduler_type_(scheduler_type), model_name_(model_name),
-      model_version_(model_version), profile_ctx_(std::move(profile_ctx)),
-      status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
+      model_version_(model_version), status_ctx_(std::move(status_ctx)),
+      manager_(std::move(manager))
 {
   load_parameters_.stable_offset = stable_offset;
   load_parameters_.stability_window = 3;
@@ -262,12 +258,6 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
   nic::InferContext::Stat end_stat;
 
   RETURN_IF_ERROR(GetServerSideStatus(&start_status));
-
-  // Start profiling on the server if requested.
-  if (profile_) {
-    RETURN_IF_ERROR(StartProfile());
-  }
-
   RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&start_stat));
 
   // Wait for specified time interval in msec
@@ -275,11 +265,6 @@ InferenceProfiler::Measure(PerfStatus& status_summary)
       std::chrono::milliseconds((uint64_t)(measurement_window_ms_ * 1.2)));
 
   RETURN_IF_ERROR(manager_->GetAccumulatedContextStat(&end_stat));
-
-  // Stop profiling on the server if requested.
-  if (profile_) {
-    RETURN_IF_ERROR(StopProfile());
-  }
 
   // Get server status and then print report on difference between
   // before and after status.

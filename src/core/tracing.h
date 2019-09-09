@@ -38,8 +38,7 @@ class TraceManager {
       uint32_t port);
   ~TraceManager();
 
-  static Status Enable(uint32_t rate);
-  static Status Disable();
+  static Status SetLevel(uint32_t level, uint32_t rate);
 
  private:
   TraceManager(
@@ -51,7 +50,7 @@ class TraceManager {
   // objects... not sure why they did that...
   static std::unique_ptr<TraceManager> singleton_;
 
-  bool enable_;
+  uint32_t level_;
   uint32_t rate_;
 };
 

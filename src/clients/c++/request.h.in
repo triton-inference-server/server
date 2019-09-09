@@ -719,42 +719,6 @@ class InferContext {
 };
 
 //==============================================================================
-/// A ProfileContext object is used to control profiling on the
-/// inference server. Once created a ProfileContext object can be used
-/// repeatedly.
-///
-/// A ProfileContext object can use either HTTP protocol or GRPC protocol
-/// depending on the Create function (ProfileHttpContext::Create or
-/// ProfileGrpcContext::Create). For example:
-///
-/// \code
-///   std::unique_ptr<ProfileContext> ctx;
-///   ProfileGrpcContext::Create(&ctx, "localhost:8000");
-///   ctx->StartProfile();
-///   ...
-///   ctx->StopProfile();
-///   ...
-/// \endcode
-///
-/// \note
-///   ProfileContext::Create methods are thread-safe.  StartProfiling()
-///   and StopProfiling() are not thread-safe. For a given
-///   ProfileContext, calls to these methods must be serialized.
-///
-class ProfileContext {
- public:
-  virtual ~ProfileContext() = 0;
-
-  /// Start profiling on the inference server.
-  /// \return Error object indicating success or failure.
-  virtual Error StartProfile() = 0;
-
-  /// Stop profiling on the inference server.
-  /// \return Error object indicating success or failure.
-  virtual Error StopProfile() = 0;
-};
-
-//==============================================================================
 /// A ModelControlContext object is used to control the model loading /
 /// unloading on the inference server. Once created a ModelControlContext object
 /// can be used repeatedly.
@@ -842,6 +806,81 @@ class SharedMemoryControlContext {
   /// Unregisters all registered shared memory regions on the inference server.
   /// \return Error object indicating success or failure.
   virtual Error UnregisterAllSharedMemory() = 0;
+};
+
+//==============================================================================
+/// A TraceControlContext object is used to control trace generation.
+///
+/// A TraceControlContext object can use either HTTP protocol or GRPC
+/// protocol depending on the Create function
+/// (TraceControlHttpContext::Create or
+/// TraceControlGrpcContext::Create). For example:
+///
+/// \code
+///   std::unique_ptr<TraceControlContext> ctx;
+///   TraceControlGrpcContext::Create(&ctx, "localhost:8000");
+///   std::unique_ptr<TraceControlContext::Options> options;
+///   TraceControlContext::Options::Create(&options);
+///   options->SetTraceName("TRTIS");
+///   options->SetHost("traceserver");
+///   options->SetPort(9411);
+///   ctx->Configure(*options);
+///   ...
+///   ctx->Enable(sample_rate);
+///   ...
+///   ctx->Disable();
+///   ...
+/// \endcode
+///
+class TraceControlContext {
+ public:
+  class Options {
+   public:
+    virtual ~Options() = 0;
+
+    /// Create a new Options object with default values.
+    /// \return Error object indicating success or failure.
+    static Error Create(std::unique_ptr<Options>* options);
+
+    /// Get the descriptive name for the trace.
+    virtual const std::string& TraceName() const = 0;
+
+    /// Set the descriptive name for the trace.
+    /// \param name The descriptive name.
+    virtual void SetTraceName(const std::string& name) = 0;
+
+    /// Get the trace server hostname.
+    virtual const std::string& TraceHost() const = 0;
+
+    /// Set the trace server hostname.
+    /// \param host The hostname.
+    virtual void SetTraceHost(const std::string& host) = 0;
+
+    /// Get the trace server port.
+    virtual uint32_t TracePort() const = 0;
+
+    /// Set the trace server port.
+    /// \param port The port.
+    virtual void SetTracePort(uint32_t port) = 0;
+  };
+
+  virtual ~TraceControlContext() = 0;
+
+  /// Configure tracing. Tracing can only be configured once for a
+  /// given inference server. Configuring the trace does not enable
+  /// trace collection.
+  /// \param options The options to use for configuration.
+  /// \return Error object indicating success or failure.
+  virtual Error Configure(const Options& options) = 0;
+
+  /// Set the tracing level.
+  /// \param level The tracing level. (0) Disable tracing, (1) Minimal
+  /// tracing, trace only overall request, queue and compute, (2) Full
+  /// tracing, minimal tracing plus details.
+  /// \param rate Set the trace rate, only meaningful when enabling
+  /// trace.
+  /// \return Error object indicating success or failure.
+  virtual Error SetLevel(uint32_t level, uint32_t rate) = 0;
 };
 
 //==============================================================================

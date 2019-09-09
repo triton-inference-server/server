@@ -435,34 +435,16 @@ InferenceServer::ConfigureTrace(
 }
 
 Status
-InferenceServer::EnableTrace(uint32_t rate)
+InferenceServer::SetTraceLevel(uint32_t level, uint32_t rate)
 {
 #ifdef TRTIS_ENABLE_TRACING
   if (!tracing_enabled_) {
     return Status(
         RequestStatusCode::UNSUPPORTED,
-        "tracing is not enabled, use --allow-tracing");
+        "tracing is not enabled on the server, use --allow-tracing");
   }
 
-  return TraceManager::Enable(rate);
-#else
-  return Status(
-      RequestStatusCode::UNSUPPORTED,
-      "tracing is not supported by this server");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
-Status
-InferenceServer::DisableTrace()
-{
-#ifdef TRTIS_ENABLE_TRACING
-  if (!tracing_enabled_) {
-    return Status(
-        RequestStatusCode::UNSUPPORTED,
-        "tracing is not enabled, use --allow-tracing");
-  }
-
-  return TraceManager::Disable();
+  return TraceManager::SetLevel(level, rate);
 #else
   return Status(
       RequestStatusCode::UNSUPPORTED,
