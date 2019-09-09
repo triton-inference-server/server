@@ -88,7 +88,7 @@ if __name__ == '__main__':
 
     # Send async inference
     for idx in range(request_cnt):
-        result = ctx.async_run_with_cb(partial(completion_callback, user_data, idx),
+        ctx.async_run_with_cb(partial(completion_callback, user_data, idx),
                                         { 'INPUT0' : (input0_data,),
                                           'INPUT1' : (input1_data,) },
                                         { 'OUTPUT0' : InferContext.ResultFormat.RAW,
