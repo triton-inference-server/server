@@ -1394,13 +1394,6 @@ class InferContext:
             The flags to use for the inference. The bitwise-or of
             InferRequestHeader.Flag values.
 
-        Returns
-        -------
-        int
-            Integer identifier which must be passed to
-            get_async_run_results() to wait on and retrieve the
-            inference results.
-
         Raises
         ------
         InferenceServerException
