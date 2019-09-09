@@ -284,6 +284,15 @@ if(${TRTIS_ENABLE_METRICS})
   )
 endif() # TRTIS_ENABLE_METRICS
 
+if(${TRTIS_ENABLE_TRACING})
+  message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
+  target_link_libraries(
+    trtserver
+    PRIVATE -L${TRTIS_TRACE_INSTALL_PATH}/lib
+    PRIVATE -lcppkin
+  )
+endif() # TRTIS_ENABLE_TRACING
+
 if(${TRTIS_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
@@ -318,7 +327,19 @@ install(
 )
 
 install(
-  FILES
-    ../core/trtserver.h
+  FILES ../core/trtserver.h
   DESTINATION include
 )
+
+if(${TRTIS_ENABLE_TRACING})
+install(
+  DIRECTORY ${TRTIS_TRACE_INSTALL_PATH}/include/
+  DESTINATION include/cppkin
+)
+install(
+  FILES
+    ${TRTIS_TRACE_INSTALL_PATH}/lib/libCore.so
+    ${TRTIS_TRACE_INSTALL_PATH}/lib/libcppkin.so
+  DESTINATION lib
+)
+endif() # TRTIS_ENABLE_TRACING
