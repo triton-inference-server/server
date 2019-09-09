@@ -43,6 +43,13 @@
 
 namespace nvidia { namespace inferenceserver {
 
+struct LibTorchBackend::Context::InputMetaData {
+  std::string name_;
+  std::vector<int64_t> shape_;
+  torch::ScalarType torch_type_;
+  std::unique_ptr<AllocatedSystemMemory> input_buffer_;
+};
+
 LibTorchBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
@@ -372,81 +379,28 @@ LibTorchBackend::Run(
 }
 
 Status
-LibTorchBackend::Context::SetFixedSizedInputTensor(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-    const int& ip_index, const std::vector<int64_t>& shape,
-    const DataType dtype, const size_t batch1_byte_size,
-    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    bool* cuda_copy)
-{
-  // The entire input tensor must be delivered as a single
-  // contiguous chunk so create a buffer large enough to hold the
-  // entire dynamic batched input.
-  auto memory_type = (gpu_device_ == NO_GPU_DEVICE) ? TRTSERVER_MEMORY_CPU
-                                                    : TRTSERVER_MEMORY_GPU;
-  input_buffers->emplace_back();
-  input_buffers->back().reset(
-      new AllocatedSystemMemory(total_byte_size, memory_type));
-  char* buffer = input_buffers->back()->MutableBuffer(&memory_type);
-
-  // Visit the payloads in order and copy the input tensors to 'buffer'.
-  std::vector<size_t> expected_byte_sizes;
-  for (auto& payload : *payloads) {
-    const InferRequestHeader& request_header =
-        payload.request_provider_->RequestHeader();
-    expected_byte_sizes.push_back(
-        request_header.batch_size() * batch1_byte_size);
-  }
-
-  auto local_cuda_copy =
-      SetInputBuffer(name, expected_byte_sizes, payloads, memory_type, buffer);
-
-  // Make sure the copy is finished before creating Torch tensor from the buffer
-  // [TODO] Delay SetInputTensor to after all input buffer copies are initiated,
-  // so that cudaStreamSynchronize() only needs to be called once.
-#ifdef TRTIS_ENABLE_GPU
-  if (local_cuda_copy) {
-    cudaStreamSynchronize(stream_);
-  }
-#endif  // TRTIS_ENABLE_GPU
-  *cuda_copy |= local_cuda_copy;
-
-  RETURN_IF_ERROR(SetInputTensor(
-      inputs_, name, ip_index, shape, dtype, static_cast<char*>(buffer),
-      total_byte_size, memory_type));
-  return Status::Success;
-}
-
-Status
 LibTorchBackend::Context::SetInputTensor(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-    const int& ip_index, const std::vector<int64_t>& shape,
-    const DataType dtype, char* content, const size_t byte_size,
-    const TRTSERVER_Memory_Type memory_type)
+    const InputMetaData& meta_data, torch::jit::IValue* tensor)
 {
-  const auto pr = ConvertDataTypeToTorchType(dtype);
-  if (!pr.first) {
-    return Status(
-        RequestStatusCode::INTERNAL, "Failed to convert DataType '" +
-                                         DataType_Name(dtype) +
-                                         "' to Torch datatype");
-  }
-  torch::TensorOptions options{pr.second};
+  TRTSERVER_Memory_Type memory_type;
+  size_t total_byte_size = meta_data.input_buffer_->TotalByteSize();
+  char* buffer = meta_data.input_buffer_->MutableBuffer(&memory_type);
+
+  torch::TensorOptions options{meta_data.torch_type_};
   auto updated_options = options.device(
       (memory_type == TRTSERVER_MEMORY_CPU) ? torch::kCPU : torch::kCUDA);
   torch::Tensor input_tensor =
-      torch::from_blob(content, shape, updated_options);
+      torch::from_blob(buffer, meta_data.shape_, updated_options);
   input_tensor = input_tensor.to(device_);
 
-  if (input_tensor.nbytes() != byte_size) {
+  if (input_tensor.nbytes() != total_byte_size) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "unexpected size " + std::to_string(byte_size) +
-            " for inference input '" + name + "', expecting " +
+        "unexpected size " + std::to_string(total_byte_size) +
+            " for inference input '" + meta_data.name_ + "', expecting " +
             std::to_string(input_tensor.nbytes()));
   }
-  (*inputs_)[ip_index] = input_tensor;
+  *tensor = input_tensor;
 
   return Status::Success;
 }
@@ -539,38 +493,75 @@ LibTorchBackend::Context::GetOutputTensor(
 }
 
 Status
-LibTorchBackend::Context::SetInput(
-    std::vector<torch::jit::IValue>* inputs_, const std::string& name,
-    const int& ip_index, const DataType datatype, const DimsList& dims,
+LibTorchBackend::Context::SetInputMetaData(
+    const std::string& name, const DataType datatype, const DimsList& dims,
     const size_t total_batch_size, std::vector<Scheduler::Payload>* payloads,
-    std::vector<std::unique_ptr<AllocatedSystemMemory>>* input_buffers,
-    bool* cuda_copy)
+    InputMetaData* meta_data, bool* cuda_copy)
 {
+  meta_data->name_ = name;
   // Get the shape of the input. The provider has already checked that
   // the request shape is valid so don't need to do it here.
-  std::vector<int64_t> shape;
+  meta_data->shape_.clear();
 
   // If model supports batching then prepend the batch dimension
   // onto the input shape.
   if (max_batch_size_ != NO_BATCHING) {
-    shape.push_back(total_batch_size);
+    meta_data->shape_.push_back(total_batch_size);
   }
 
   size_t batch1_element_cnt = 1;
   for (auto dim : dims) {
-    shape.push_back(dim);
+    meta_data->shape_.push_back(dim);
     batch1_element_cnt *= dim;
   }
+
+  const auto pr = ConvertDataTypeToTorchType(datatype);
+  if (!pr.first) {
+    return Status(
+        RequestStatusCode::INTERNAL, "Failed to convert DataType '" +
+                                         DataType_Name(datatype) +
+                                         "' to Torch datatype");
+  }
+  meta_data->torch_type_ = pr.second;
 
   // Checked at initialization time to make sure that STRING is not
   // being used for an input, so can just assume fixed-sized here.
   const size_t batch1_byte_size =
       batch1_element_cnt * GetDataTypeByteSize(datatype);
-  const size_t total_byte_size = total_batch_size * batch1_byte_size;
+  const auto total_byte_size = total_batch_size * batch1_byte_size;
 
-  return SetFixedSizedInputTensor(
-      inputs_, name, ip_index, shape, datatype, batch1_byte_size,
-      total_byte_size, payloads, input_buffers, cuda_copy);
+  return SetFixedSizedInputBuffer(
+      name, batch1_byte_size, total_byte_size, payloads, meta_data, cuda_copy);
+}
+
+Status
+LibTorchBackend::Context::SetFixedSizedInputBuffer(
+    const std::string& name, const size_t batch1_byte_size,
+    const size_t total_byte_size, std::vector<Scheduler::Payload>* payloads,
+    InputMetaData* meta_data, bool* cuda_copy)
+{
+  // The entire input tensor must be delivered as a single
+  // contiguous chunk so create a buffer large enough to hold the
+  // entire dynamic batched input.
+  auto memory_type = (gpu_device_ == NO_GPU_DEVICE) ? TRTSERVER_MEMORY_CPU
+                                                    : TRTSERVER_MEMORY_GPU;
+  meta_data->input_buffer_.reset(
+      new AllocatedSystemMemory(total_byte_size, memory_type));
+  char* buffer = meta_data->input_buffer_->MutableBuffer(&memory_type);
+
+  // Visit the payloads in order and copy the input tensors to 'buffer'.
+  std::vector<size_t> expected_byte_sizes;
+  for (auto& payload : *payloads) {
+    const InferRequestHeader& request_header =
+        payload.request_provider_->RequestHeader();
+    expected_byte_sizes.push_back(
+        request_header.batch_size() * batch1_byte_size);
+  }
+
+  *cuda_copy |=
+      SetInputBuffer(name, expected_byte_sizes, payloads, memory_type, buffer);
+
+  return Status::Success;
 }
 
 Status
@@ -622,18 +613,17 @@ LibTorchBackend::Context::Run(
   const std::shared_ptr<InferRequestProvider::InputOverrideMap>&
       input_override_map = input_request_provider->GetInputOverride();
 
-  // Hold reference to each buffer of input data to that it stays
-  // until the inference has completed.
-  std::vector<std::unique_ptr<AllocatedSystemMemory>> input_buffers;
-
-  size_t overide_inputs = 0;
+  size_t input_count = input_request_provider->RequestHeader().input().size();
   if (input_override_map != nullptr) {
-    overide_inputs = input_override_map->size();
+    input_count += input_override_map->size();
   }
 
+  // Hold reference to each buffer of input data to that it stays
+  // until the inference has completed.
+  std::vector<InputMetaData> input_meta_data(input_count);
+
   // Store input and output tensors
-  std::vector<torch::jit::IValue> inputs_(
-      input_request_provider->RequestHeader().input().size() + overide_inputs);
+  std::vector<torch::jit::IValue> inputs_(input_count);
   std::vector<torch::Tensor> outputs_;
 
   // Inputs from the request...
@@ -644,9 +634,9 @@ LibTorchBackend::Context::Run(
     const ModelInput* input_config;
     RETURN_IF_ERROR(base->GetInput(name, &input_config));
 
-    RETURN_IF_ERROR(SetInput(
-        &inputs_, name, ip_index, input_config->data_type(), input.dims(),
-        total_batch_size, payloads, &input_buffers, &cuda_copy));
+    RETURN_IF_ERROR(SetInputMetaData(
+        name, input_config->data_type(), input.dims(), total_batch_size,
+        payloads, &(input_meta_data[ip_index]), &cuda_copy));
   }
 
   std::string deliminator = "__";
@@ -674,9 +664,9 @@ LibTorchBackend::Context::Run(
                 "' does not follow naming convention i.e. <name>__<index>.");
       }
       input_index_map_[name] = ip_index;
-      RETURN_IF_ERROR(SetInput(
-          &inputs_, name, ip_index, override->datatype_, override->dims_,
-          total_batch_size, payloads, &input_buffers, &cuda_copy));
+      RETURN_IF_ERROR(SetInputMetaData(
+          name, override->datatype_, override->dims_, total_batch_size,
+          payloads, &(input_meta_data[ip_index]), &cuda_copy));
     }
   }
 #ifdef TRTIS_ENABLE_GPU
@@ -684,6 +674,10 @@ LibTorchBackend::Context::Run(
     cudaStreamSynchronize(stream_);
   }
 #endif  // TRTIS_ENABLE_GPU
+
+  for (size_t i = 0; i < inputs_.size(); i++) {
+    SetInputTensor(input_meta_data[i], &(inputs_[i]));
+  }
 
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
