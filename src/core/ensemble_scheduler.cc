@@ -217,7 +217,6 @@ EnsembleContext::EnsembleContext(
   }
 
   // Prune ensemble first if not all outputs are requested
-  // [TODO] build request specific tensor_to_step_
   std::set<std::string> ignored_tensor;
   for (const auto& ensemble_output : info_->ensemble_output_shape_) {
     ignored_tensor.insert(ensemble_output.first);
