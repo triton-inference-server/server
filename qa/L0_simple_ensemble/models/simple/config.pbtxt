@@ -28,6 +28,7 @@ name: "simple"
 platform: "custom"
 max_batch_size: 8
 default_model_filename: "libaddsub.so"
+version_policy: { all {} }
 input [
   {
     name: "INPUT0"

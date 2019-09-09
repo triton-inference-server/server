@@ -34,12 +34,47 @@ import os
 import unittest
 import numpy as np
 import infer_util as iu
+from tensorrtserver.api import *
 
 class EnsembleTest(unittest.TestCase):
+    def _get_infer_count_per_version(self, model_name):
+        ctx = ServerStatusContext("localhost:8000", ProtocolType.HTTP, model_name)
+        ss = ctx.get_server_status()
+        self.assertEqual(len(ss.model_status), 1)
+        self.assertTrue(model_name in ss.model_status,
+                        "expected status for model " + model_name)
+        self.assertTrue(1 in ss.model_status[model_name].version_status,
+                        "expected status for version 1 of model " + model_name)
+        self.assertTrue(2 in ss.model_status[model_name].version_status,
+                        "expected status for version 2 of model " + model_name)
+        infer_count = []
+        infer_count.append(ss.model_status[model_name].version_status[1].model_inference_count)
+        infer_count.append(ss.model_status[model_name].version_status[2].model_inference_count)
+        return infer_count
+
     def test_ensemble_add_sub(self):
         for bs in (1, 8):
             iu.infer_exact(self, "ensemble_add_sub", (16,), bs,
                                 np.int32, np.int32, np.int32)
+        
+        infer_count = self._get_infer_count_per_version("simple")
+        # The two 'simple' versions should have the same infer count
+        if (infer_count[0] != infer_count[1]):
+            self.assertTrue(False, "unexpeced different infer count for different 'simple' versions")
+    
+    def test_ensemble_add_sub_one_output(self):
+        for bs in (1, 8):
+            iu.infer_exact(self, "ensemble_add_sub", (16,), bs,
+                                np.int32, np.int32, np.int32,
+                                outputs=("OUTPUT0",))
+        
+        infer_count = self._get_infer_count_per_version("simple")
+        # Only 'simple' version 2 should have non-zero infer count
+        # as it is in charge of producing OUTPUT0
+        if (infer_count[0] != 0):
+            self.assertTrue(False, "unexpeced non-zero infer count for 'simple' version 1")
+        elif (infer_count[1] == 0):
+            self.assertTrue(False, "unexpeced zero infer count for 'simple' version 2")
 
 if __name__ == '__main__':
     logging.basicConfig( stream=sys.stderr )
