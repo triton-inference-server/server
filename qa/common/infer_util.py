@@ -147,9 +147,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             input1_list.append(in1)
 
         if config[3]:
-            input0_byte_size = input0_list[0].nbytes * batch_size
-            output0_byte_size = expected0_val_list[0].nbytes * batch_size
-            output1_byte_size = expected1_val_list[0].nbytes * batch_size
+            input0_byte_size = input0_list[0].size * input0_list[0].itemsize * batch_size
+            output0_byte_size = expected0_val_list[0].size * expected0_val_list[0].itemsize * batch_size
+            output1_byte_size = expected1_val_list[0].size * expected1_val_list[0].itemsize * batch_size
             # create and register shared memory region for inputs and outputs
             shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
             shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)

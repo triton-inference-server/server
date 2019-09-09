@@ -1169,7 +1169,6 @@ class InferContext:
                     for b in range(batch_size):
                         cval = shm_addr
                         cval_len = start_pos + int(byte_size.value/batch_size)
-                        start_pos += int(byte_size.value/batch_size)
                         if cval_len == 0:
                             val = np.empty(shape, dtype=result_dtype)
                             results[output_name].append(val)
@@ -1177,19 +1176,20 @@ class InferContext:
                             val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
 
                             if result_dtype != np.object:
-                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=offset.value)
+                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
                             else:
                                 strs = list()
                                 offset = 0
                                 while offset < len(val_buf):
-                                    l = struct.unpack_from("<I", val_buf, offset.value)[0]
+                                    l = struct.unpack_from("<I", val_buf, start_pos)[0]
                                     offset += 4
-                                    sb = struct.unpack_from("<{}s".format(l), val_buf, offset.value)[0]
+                                    sb = struct.unpack_from("<{}s".format(l), val_buf, start_pos)[0]
                                     offset += l
                                     strs.append(sb)
                                 val = np.array(strs, dtype=object)
 
                             # Reshape the result to the appropriate shape
+                            start_pos += int(byte_size.value/batch_size)
                             shaped = np.reshape(val, shape)
                             results[output_name].append(shaped)
                 else:

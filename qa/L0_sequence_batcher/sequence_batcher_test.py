@@ -153,7 +153,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     output_info = InferContext.ResultFormat.RAW
 
                     if config[3]:
-                        input_byte_size = input_list[0].nbytes * batch_size
+                        input_byte_size = input_list[0].size * input_list[0].itemsize * batch_size
                         output_byte_size = np.dtype(input_dtype).itemsize
                         # create and register shared memory region for inputs and outputs
                         shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)

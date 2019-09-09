@@ -729,10 +729,6 @@ InferAllocatorPayload(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
 
-      if (alloc_payload->shm_map_ == nullptr) {
-        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
-      }
-
       alloc_payload->shm_map_->emplace(
           io.name(),
           AllocPayload::ShmInfo{base, io.shared_memory().byte_size()});
