@@ -110,11 +110,8 @@ class InferenceServer {
       const std::string& trace_name, const std::string& hostname,
       uint32_t port);
 
-  // Enable tracing and set rate.
-  Status EnableTrace(uint32_t rate);
-
-  // Disable tracing.
-  Status DisableTrace();
+  // Set trace level and rate.
+  Status SetTraceLevel(uint32_t level, uint32_t rate);
 
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }

@@ -781,18 +781,16 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceConfigure(
     TRTSERVER_Server* server, TRTSERVER_TraceOptions* options);
 
-/// Enable tracing on the server and set sample rate.
+/// Set the tracing level to enable or disable tracing on the
+/// server. When enabling set the sample rate.
 /// \param server The inference server object.
+/// \param level The tracing level. (0) Disable tracing, (1) Minimal
+/// tracing, trace only overall request, queue and compute, (2) Full
+/// tracing, minimal tracing plus details.
 /// \param rate The sampling rate.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceEnable(
-    TRTSERVER_Server* server, uint32_t rate);
-
-/// Disable tracing on the server.
-/// \param server The inference server object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceDisable(
-    TRTSERVER_Server* server);
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceSetLevel(
+    TRTSERVER_Server* server, uint32_t level, uint32_t rate);
 
 /// Type for inference completion callback function. The callback
 /// function takes ownership of the TRTSERVER_InferenceResponse object

@@ -99,10 +99,32 @@ class RequestTimers {
 
 //==============================================================================
 
-class OptionsImpl : public InferContext::Options {
+class TraceOptionsImpl : public TraceControlContext::Options {
  public:
-  OptionsImpl() : flags_(0), batch_size_(0) {}
-  ~OptionsImpl() = default;
+  TraceOptionsImpl() : trace_name_("TRTIS"), trace_port_(9411) {}
+  ~TraceOptionsImpl() = default;
+
+  const std::string& TraceName() const override { return trace_name_; }
+  void SetTraceName(const std::string& name) override { trace_name_ = name; }
+
+  const std::string& TraceHost() const override { return trace_host_; }
+  void SetTraceHost(const std::string& host) override { trace_host_ = host; }
+
+  uint32_t TracePort() const override { return trace_port_; }
+  void SetTracePort(uint32_t port) override { trace_port_ = port; }
+
+ private:
+  std::string trace_name_;
+  std::string trace_host_;
+  uint32_t trace_port_;
+};
+
+//==============================================================================
+
+class InferOptionsImpl : public InferContext::Options {
+ public:
+  InferOptionsImpl() : flags_(0), batch_size_(0) {}
+  ~InferOptionsImpl() = default;
 
   bool Flag(InferRequestHeader::Flag flag) const override;
   void SetFlag(InferRequestHeader::Flag flag, bool value) override;

@@ -70,7 +70,7 @@ TraceManager::Create(
 
 TraceManager::TraceManager(
     const std::string& trace_name, const std::string& hostname, uint32_t port)
-    : enable_(false), rate_(1000)
+    : level_(0 /* disabled */), rate_(1000)
 {
   cppkin::CppkinParams cppkin_params;
   cppkin_params.AddParam(cppkin::ConfigTags::HOST_ADDRESS, hostname);
@@ -89,28 +89,15 @@ TraceManager::~TraceManager()
 }
 
 Status
-TraceManager::Enable(uint32_t rate)
+TraceManager::SetLevel(uint32_t level, uint32_t rate)
 {
   if (singleton_ == nullptr) {
     return Status(
         RequestStatusCode::UNAVAILABLE, "tracing is not yet configured");
   }
 
-  singleton_->enable_ = true;
+  singleton_->level_ = level;
   singleton_->rate_ = rate;
-
-  return Status::Success;
-}
-
-Status
-TraceManager::Disable()
-{
-  if (singleton_ == nullptr) {
-    return Status(
-        RequestStatusCode::UNAVAILABLE, "tracing is not yet configured");
-  }
-
-  singleton_->enable_ = false;
 
   return Status::Success;
 }

@@ -329,8 +329,6 @@ Usage(char** argv, const std::string& msg = std::string())
                "unstable after the maximum number of measuremnts."
             << std::endl;
   std::cerr << "For -l, it has no effect unless -d flag is set." << std::endl;
-  std::cerr << "The -n flag enables profiling for the duration of the run"
-            << std::endl;
   std::cerr
       << "If -x is not specified the most recent version (that is, the highest "
       << "numbered version) of the model will be used." << std::endl;
@@ -378,7 +376,6 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
-  bool profile = false;
   bool dynamic_concurrency_mode = false;
   bool streaming = false;
   bool zero_input = false;
@@ -414,7 +411,7 @@ main(int argc, char** argv)
   // Parse commandline...
   int opt;
   while ((opt = getopt_long(
-              argc, argv, "vndazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
+              argc, argv, "vdazc:u:m:x:b:t:p:i:H:l:r:s:f:", long_options,
               NULL)) != -1) {
     switch (opt) {
       case 0:
@@ -463,9 +460,6 @@ main(int argc, char** argv)
       }
       case 'v':
         verbose = true;
-        break;
-      case 'n':
-        profile = true;
         break;
       case 'z':
         zero_input = true;
@@ -586,9 +580,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = perfclient::InferenceProfiler::Create(
-      verbose, profile, stable_offset, measurement_window_ms,
-      max_measurement_count, percentile, factory, std::move(manager),
-      &profiler);
+      verbose, stable_offset, measurement_window_ms, max_measurement_count,
+      percentile, factory, std::move(manager), &profiler);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;

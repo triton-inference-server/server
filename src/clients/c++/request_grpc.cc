@@ -229,72 +229,6 @@ ServerStatusGrpcContext::Create(
 
 //==============================================================================
 
-class ProfileGrpcContextImpl : public ProfileContext {
- public:
-  ProfileGrpcContextImpl(const std::string& url, bool verbose);
-  Error StartProfile() override;
-  Error StopProfile() override;
-
- private:
-  Error SendCommand(const std::string& cmd_str);
-
-  // GRPC end point.
-  std::unique_ptr<GRPCService::Stub> stub_;
-
-  // Enable verbose output
-  const bool verbose_;
-};
-
-ProfileGrpcContextImpl::ProfileGrpcContextImpl(
-    const std::string& url, bool verbose)
-    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
-{
-}
-
-Error
-ProfileGrpcContextImpl::StartProfile()
-{
-  return SendCommand("start");
-}
-
-Error
-ProfileGrpcContextImpl::StopProfile()
-{
-  return SendCommand("stop");
-}
-
-Error
-ProfileGrpcContextImpl::SendCommand(const std::string& cmd_str)
-{
-  ProfileRequest request;
-  ProfileResponse response;
-  grpc::ClientContext context;
-
-  request.set_cmd(cmd_str);
-  grpc::Status status = stub_->Profile(&context, request, &response);
-  if (status.ok()) {
-    return Error(response.request_status());
-  } else {
-    // Something wrong with the GRPC conncection
-    return Error(
-        RequestStatusCode::INTERNAL,
-        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
-            status.error_message());
-  }
-}
-
-Error
-ProfileGrpcContext::Create(
-    std::unique_ptr<ProfileContext>* ctx, const std::string& server_url,
-    bool verbose)
-{
-  ctx->reset(static_cast<ProfileContext*>(
-      new ProfileGrpcContextImpl(server_url, verbose)));
-  return Error::Success;
-}
-
-//==============================================================================
-
 class ModelControlGrpcContextImpl : public ModelControlContext {
  public:
   ModelControlGrpcContextImpl(const std::string& url, bool verbose);
@@ -460,6 +394,83 @@ SharedMemoryControlGrpcContext::Create(
 {
   ctx->reset(static_cast<SharedMemoryControlContext*>(
       new SharedMemoryControlGrpcContextImpl(server_url, verbose)));
+  return Error::Success;
+}
+
+//==============================================================================
+
+class TraceControlGrpcContextImpl : public TraceControlContext {
+ public:
+  TraceControlGrpcContextImpl(const std::string& url, bool verbose);
+  Error Configure(const TraceControlContext::Options& options) override;
+ Error SetLevel(uint32_t level, uint32_t rate) override;
+
+ private:
+  // GRPC end point.
+  std::unique_ptr<GRPCService::Stub> stub_;
+
+  // Enable verbose output
+  const bool verbose_;
+};
+
+TraceControlGrpcContextImpl::TraceControlGrpcContextImpl(
+    const std::string& url, bool verbose)
+    : stub_(GRPCService::NewStub(GetChannel(url))), verbose_(verbose)
+{
+}
+
+Error
+TraceControlGrpcContextImpl::Configure(
+    const TraceControlContext::Options& options)
+{
+  TraceControlRequest request;
+  TraceControlResponse response;
+  grpc::ClientContext context;
+
+  request.mutable_trace_configure()->set_name(options.TraceName());
+  request.mutable_trace_configure()->set_host(options.TraceHost());
+  request.mutable_trace_configure()->set_port(options.TracePort());
+
+  grpc::Status status = stub_->TraceControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+
+ Error TraceControlGrpcContextImpl::SetLevel(uint32_t level, uint32_t rate)
+{
+  TraceControlRequest request;
+  TraceControlResponse response;
+  grpc::ClientContext context;
+
+  request.mutable_trace_enable()->set_level(level);
+  request.mutable_trace_enable()->set_rate(rate);
+
+  grpc::Status status = stub_->TraceControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+
+Error
+TraceControlGrpcContext::Create(
+    std::unique_ptr<TraceControlContext>* ctx, const std::string& server_url,
+    bool verbose)
+{
+  ctx->reset(static_cast<TraceControlContext*>(
+      new TraceControlGrpcContextImpl(server_url, verbose)));
   return Error::Success;
 }
 

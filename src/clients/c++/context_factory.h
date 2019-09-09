@@ -57,10 +57,6 @@ class ContextFactory {
       const bool streaming, const std::string& model_name,
       const int64_t model_version, std::shared_ptr<ContextFactory>* factory);
 
-  /// Create a ProfileContext.
-  /// \param ctx Returns a new ProfileContext object.
-  nic::Error CreateProfileContext(std::unique_ptr<nic::ProfileContext>* ctx);
-
   /// Create a ServerStatusContext.
   /// \param ctx Returns a new ServerStatusContext object.
   nic::Error CreateServerStatusContext(

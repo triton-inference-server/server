@@ -121,7 +121,6 @@ class InferenceProfiler {
  public:
   /// Create a profiler that collects and summarizes inference statistic.
   /// \param verbose Whether to print verbose logging.
-  /// \param profile Whether to send profile requests to server.
   /// \param stable_offset The range that the measurement is considered as
   /// stable. i.e. within (1 +/- stable_offset) * average value of the last
   /// 3 measurements. The criterias are "infer per second" and "average
@@ -138,7 +137,7 @@ class InferenceProfiler {
   /// \param manger Returns a new InferenceProfiler object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool verbose, const bool profile, const double stable_offset,
+      const bool verbose, const double stable_offset,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
       const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager> manager,
@@ -160,12 +159,11 @@ class InferenceProfiler {
 
  private:
   InferenceProfiler(
-      const bool verbose, const bool profile, const double stable_offset,
+      const bool verbose, const double stable_offset,
       const int32_t measurement_window_ms, const size_t max_measurement_count,
       const bool extra_percentile, const size_t percentile,
       const ContextFactory::ModelSchedulerType scheduler_type,
       const std::string& model_name, const int64_t model_version,
-      std::unique_ptr<nic::ProfileContext> profile_ctx,
       std::unique_ptr<nic::ServerStatusContext> status_ctx,
       std::unique_ptr<LoadManager> manager);
 
@@ -183,10 +181,6 @@ class InferenceProfiler {
   /// \param The server status response from TRTIS
   /// \return Error object indicating success or failure
   nic::Error BuildComposingModelMap(const ni::ServerStatus& server_status);
-
-  nic::Error StartProfile() { return profile_ctx_->StartProfile(); }
-
-  nic::Error StopProfile() { return profile_ctx_->StopProfile(); }
 
   /// Helper function to perform measurement.
   /// \param status_summary The summary of this measurement.
@@ -296,7 +290,6 @@ class InferenceProfiler {
       ServerSideStats* server_stats);
 
   bool verbose_;
-  bool profile_;
   uint64_t measurement_window_ms_;
   size_t max_measurement_count_;
   bool extra_percentile_;
@@ -307,7 +300,6 @@ class InferenceProfiler {
   int64_t model_version_;
   ComposingModelMap composing_models_map_;
 
-  std::unique_ptr<nic::ProfileContext> profile_ctx_;
   std::unique_ptr<nic::ServerStatusContext> status_ctx_;
   std::unique_ptr<LoadManager> manager_;
   LoadParams load_parameters_;
