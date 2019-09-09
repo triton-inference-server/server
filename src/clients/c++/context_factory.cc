@@ -60,18 +60,6 @@ ContextFactory::Create(
 }
 
 nic::Error
-ContextFactory::CreateProfileContext(std::unique_ptr<nic::ProfileContext>* ctx)
-{
-  nic::Error err;
-  if (protocol_ == ProtocolType::HTTP) {
-    err = nic::ProfileHttpContext::Create(ctx, url_, http_headers_, false);
-  } else {
-    err = nic::ProfileGrpcContext::Create(ctx, url_, false);
-  }
-  return err;
-}
-
-nic::Error
 ContextFactory::CreateServerStatusContext(
     std::unique_ptr<nic::ServerStatusContext>* ctx)
 {

@@ -1248,19 +1248,11 @@ TRTSERVER_ServerTraceConfigure(
   return nullptr;  // success
 }
 
-TRTSERVER_Error*
-TRTSERVER_ServerTraceEnable(TRTSERVER_Server* server, uint32_t rate)
+ TRTSERVER_Error* TRTSERVER_ServerTraceSetLevel(
+    TRTSERVER_Server* server, uint32_t level, uint32_t rate)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  RETURN_IF_STATUS_ERROR(lserver->EnableTrace(rate));
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerTraceDisable(TRTSERVER_Server* server)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  RETURN_IF_STATUS_ERROR(lserver->DisableTrace());
+  RETURN_IF_STATUS_ERROR(lserver->SetTraceLevel(level, rate));
   return nullptr;  // success
 }
 

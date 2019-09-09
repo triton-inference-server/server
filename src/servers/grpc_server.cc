@@ -1607,12 +1607,8 @@ TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
         }
       }
     } else if (request.has_trace_enable()) {
-      if (request.trace_enable().enable()) {
-        err = TRTSERVER_ServerTraceEnable(
-            trtserver_.get(), request.trace_enable().rate());
-      } else {
-        err = TRTSERVER_ServerTraceDisable(trtserver_.get());
-      }
+        err = TRTSERVER_ServerTraceSetLevel(
+            trtserver_.get(), request.trace_enable().level(), request.trace_enable().rate());
     }
 
     RequestStatusUtil::Create(
@@ -1699,8 +1695,8 @@ GRPCServer::Start()
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
   shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
-  grpc_server_ = grpc_builder_.BuildAndStart();
   tracecontrol_cq_ = grpc_builder_.AddCompletionQueue();
+  grpc_server_ = grpc_builder_.BuildAndStart();
 
   // Handler for health requests. A single thread processes all of
   // these requests.

@@ -176,11 +176,18 @@ message TraceControlRequest
   //@@
   message TraceEnable
   {
-    //@@    .. cpp:var:: bool enable
+    //@@    .. cpp:var:: uint32 level
     //@@
-    //@@       True enables tracing, false disables tracing.
+    //@@       Set the trace level.
     //@@
-    bool enable = 1;
+    //@@         0: Disable tracing.
+    //@@
+    //@@         1: Minimal tracing, trace only overall request, queue
+    //@@            and compute.
+    //@@
+    //@@         2: Full tracing, minimal tracing plus details.
+    //@@
+    uint32 level = 1;
 
     //@@    .. cpp:var:: uint32 sample_rate
     //@@
