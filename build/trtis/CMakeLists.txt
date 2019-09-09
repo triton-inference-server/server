@@ -46,6 +46,10 @@ if(${TRTIS_ENABLE_ASAN})
   set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${_ASAN_FLAGS}")
 endif() # TRTIS_ENABLE_ASAN
 
+if(${TRTIS_ENABLE_TRACING})
+  add_definitions(-DTRTIS_ENABLE_TRACING=1)
+endif() # TRTIS_ENABLE_TRACING
+
 if(${TRTIS_ENABLE_GPU})
   add_definitions(-DTRTIS_ENABLE_GPU=1)
   add_definitions(-DTRTIS_MIN_COMPUTE_CAPABILITY=${TRTIS_MIN_COMPUTE_CAPABILITY})
@@ -117,6 +121,14 @@ if(${TRTIS_ENABLE_GPU})
     message(WARNING "CUDA ${CUDA_VERSION} does not support CUDA graphs.")
   endif()
 endif() # TRTIS_ENABLE_GPU
+
+#
+# Trace
+#
+if(${TRTIS_ENABLE_TRACING})
+message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
+include_directories(${TRTIS_TRACE_INSTALL_PATH}/include)
+endif() # TRTIS_ENABLE_TRACING
 
 #
 # libevent
