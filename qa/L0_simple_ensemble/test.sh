@@ -39,6 +39,7 @@ mkdir -p `pwd`/models/ensemble_add_sub_int32_int32_int32/1
 
 rm -f $CLIENT_LOG $SERVER_LOG
 
+# Run ensemble model with all outputs requested
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -49,7 +50,28 @@ fi
 RET=0
 
 set +e
-python $SIMPLE_TEST_PY -v >>$CLIENT_LOG 2>&1
+python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+
+# Run ensemble model with only one output requested
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+RET=0
+
+set +e
+python $SIMPLE_TEST_PY EnsembleTest.test_ensemble_add_sub_one_output >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

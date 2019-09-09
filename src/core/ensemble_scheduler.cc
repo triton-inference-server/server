@@ -150,6 +150,11 @@ class EnsembleContext {
 
   size_t inflight_step_counter_;
 
+  // pointer that either points to 'pruned_tensor_to_step_' or to
+  // 'info_->tensor_to_step_' if all ensemble outputs are requested
+  std::unordered_map<std::string, std::set<size_t>>* tensor_to_step_;
+
+  std::unordered_map<std::string, std::set<size_t>> pruned_tensor_to_step_;
   std::unordered_map<std::string, TensorData> tensor_data_;
 
   // Handle to all backend that may be used in the ensemble
@@ -211,7 +216,51 @@ EnsembleContext::EnsembleContext(
     }
   }
 
-  for (const auto& pair : info_->tensor_to_step_) {
+  // Prune ensemble first if not all outputs are requested
+  std::set<std::string> ignored_tensor;
+  for (const auto& ensemble_output : info_->ensemble_output_shape_) {
+    ignored_tensor.insert(ensemble_output.first);
+  }
+  for (const auto& output : request_provider_->RequestHeader().output()) {
+    ignored_tensor.erase(output.name());
+  }
+  if (ignored_tensor.empty()) {
+    tensor_to_step_ = &(info_->tensor_to_step_);
+  } else {
+    pruned_tensor_to_step_ = info_->tensor_to_step_;
+    tensor_to_step_ = &pruned_tensor_to_step_;
+    // Backward traversal
+    std::unordered_map<size_t, size_t> step_requested_output_count;
+    while (!ignored_tensor.empty()) {
+      std::set<std::string> new_ignored_tensor;
+      for (const auto& output : ignored_tensor) {
+        auto step_idx = info_->tensor_to_prev_step_[output];
+        auto& step = info_->steps_[step_idx];
+        auto it = step_requested_output_count.find(step_idx);
+        if (it == step_requested_output_count.end()) {
+          auto output_count = step.output_to_tensor_.size();
+          it =
+              step_requested_output_count.emplace(step_idx, output_count).first;
+        }
+        // If none of the outputs of the step is requested,
+        // then the step can be pruned
+        if (--it->second == 0) {
+          for (const auto& input : step.input_to_tensor_) {
+            auto& step_set = pruned_tensor_to_step_[input.second];
+            step_set.erase(step_idx);
+            // If all steps depend on a tensor are pruned,
+            // then the tensor can be ignored.
+            if (step_set.empty()) {
+              new_ignored_tensor.insert(input.second);
+            }
+          }
+        }
+      }
+      ignored_tensor.swap(new_ignored_tensor);
+    }
+  }
+
+  for (const auto& pair : *tensor_to_step_) {
     tensor_data_.emplace(pair.first, TensorData());
   }
 
@@ -434,7 +483,7 @@ EnsembleContext::GetNextSteps(
   std::set<size_t> next_step_idx;
   // Get steps whose tensors used for input are set
   for (const auto tensor_name : updated_tensors) {
-    const auto& step_idx = info_->tensor_to_step_[tensor_name];
+    const auto& step_idx = (*tensor_to_step_)[tensor_name];
     for (const auto& idx : step_idx) {
       bool ready = true;
       for (const auto& input_pair : info_->steps_[idx].input_to_tensor_) {
@@ -816,6 +865,8 @@ EnsembleScheduler::EnsembleScheduler(
       }
       info_->steps_[step_idx].output_to_tensor_.emplace(
           std::make_pair(pair.first, pair.second));
+
+      info_->tensor_to_prev_step_.emplace(pair.second, step_idx);
     }
   }
 }
