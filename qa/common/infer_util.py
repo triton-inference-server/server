@@ -128,14 +128,14 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             expected1_val_list.append(op1)
             if output0_dtype == np.object:
                 expected0_list.append(np.array([unicode(str(x), encoding='utf-8')
-                                                for x in (op0.flatten())], dtype=object).reshape(op1.shape))
+                                                for x in (op0.flatten())], dtype=object).reshape(op0.shape))
             else:
-                expected0_list.append(op0)
+                expected0_list.append(op0.astype(output0_dtype))
             if output1_dtype == np.object:
                 expected1_list.append(np.array([unicode(str(x), encoding='utf-8')
                                                 for x in (op1.flatten())], dtype=object).reshape(op1.shape))
             else:
-                expected1_list.append(op1)
+                expected1_list.append(op1.astype(output1_dtype))
 
             if input_dtype == np.object:
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
@@ -148,8 +148,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
         if config[3]:
             input0_byte_size = input0_list[0].size * input0_list[0].itemsize * batch_size
-            output0_byte_size = expected0_val_list[0].size * expected0_val_list[0].itemsize * batch_size
-            output1_byte_size = expected1_val_list[0].size * expected1_val_list[0].itemsize * batch_size
+            output0_byte_size = expected0_list[0].size * expected0_list[0].itemsize * batch_size
+            output1_byte_size = expected1_list[0].size * expected1_list[0].itemsize * batch_size
+
             # create and register shared memory region for inputs and outputs
             shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
             shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
