@@ -87,7 +87,6 @@ InferenceServer::InferenceServer()
   id_ = "inference:0";
   strict_model_config_ = true;
   strict_readiness_ = true;
-  tracing_enabled_ = false;
   exit_timeout_secs_ = 30;
 
   tf_soft_placement_enabled_ = true;
@@ -420,12 +419,11 @@ InferenceServer::ConfigureTrace(
     const std::string& trace_name, const std::string& hostname, uint32_t port)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  if (!tracing_enabled_) {
-    return Status(
-        RequestStatusCode::UNSUPPORTED,
-        "tracing is not enabled, use --allow-tracing");
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
   }
 
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
   return TraceManager::Create(trace_name, hostname, port);
 #else
   return Status(
@@ -438,12 +436,11 @@ Status
 InferenceServer::SetTraceLevel(uint32_t level, uint32_t rate)
 {
 #ifdef TRTIS_ENABLE_TRACING
-  if (!tracing_enabled_) {
-    return Status(
-        RequestStatusCode::UNSUPPORTED,
-        "tracing is not enabled on the server, use --allow-tracing");
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
   }
 
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
   return TraceManager::SetLevel(level, rate);
 #else
   return Status(

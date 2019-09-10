@@ -1610,8 +1610,9 @@ TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
         }
       }
     } else if (request.has_trace_enable()) {
-        err = TRTSERVER_ServerTraceSetLevel(
-            trtserver_.get(), request.trace_enable().level(), request.trace_enable().rate());
+      err = TRTSERVER_ServerSetTraceLevel(
+          trtserver_.get(), request.trace_enable().level(),
+          request.trace_enable().rate());
     }
 
     RequestStatusUtil::Create(

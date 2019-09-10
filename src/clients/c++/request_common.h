@@ -99,10 +99,10 @@ class RequestTimers {
 
 //==============================================================================
 
-class TraceOptionsImpl : public TraceControlContext::Options {
+class TraceControlOptionsImpl : public TraceControlContext::Options {
  public:
-  TraceOptionsImpl() : trace_name_("TRTIS"), trace_port_(9411) {}
-  ~TraceOptionsImpl() = default;
+  TraceControlOptionsImpl() : trace_name_("TRTIS"), trace_port_(9411) {}
+  ~TraceControlOptionsImpl() = default;
 
   const std::string& TraceName() const override { return trace_name_; }
   void SetTraceName(const std::string& name) override { trace_name_ = name; }
