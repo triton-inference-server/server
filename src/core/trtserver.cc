@@ -35,6 +35,7 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
+#include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
