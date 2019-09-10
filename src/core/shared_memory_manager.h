@@ -32,6 +32,25 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/status.h"
 
+/// A struct that records the shared memory regions registered by the shared
+/// memory manager.
+struct SharedMemoryInfo {
+  SharedMemoryInfo(
+      const std::string& name, const std::string& shm_key, const size_t offset,
+      const size_t byte_size, int shm_fd, void* mapped_addr)
+      : name_(name), shm_key_(shm_key), offset_(offset), byte_size_(byte_size),
+        shm_fd_(shm_fd), mapped_addr_(mapped_addr)
+  {
+  }
+
+  std::string name_;
+  std::string shm_key_;
+  size_t offset_;
+  size_t byte_size_;
+  int shm_fd_;
+  void* mapped_addr_;
+};
+
 namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
@@ -41,26 +60,6 @@ class ServerStatusManager;
 /// An object to manage the registered shared memory regions in the server.
 class SharedMemoryManager {
  public:
-  /// A struct that records the shared memory regions registered by the shared
-  /// memory manager.
-  struct SharedMemoryInfo {
-    SharedMemoryInfo(
-        const std::string& name, const std::string& shm_key,
-        const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr)
-        : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr)
-    {
-    }
-
-    std::string name_;
-    std::string shm_key_;
-    size_t offset_;
-    size_t byte_size_;
-    int shm_fd_;
-    void* mapped_addr_;
-  };
-
   using SharedMemoryStateMap =
       std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
 
