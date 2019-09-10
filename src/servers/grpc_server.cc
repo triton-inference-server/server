@@ -1548,6 +1548,11 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
           err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
         }
         break;
+      case SharedMemoryControlRequest::UNREGISTER_ALL:
+        if (err == nullptr) {
+          err = TRTSERVER_ServerGetSharedMemoryStatus(trtserver_.get());
+        }
+        break;
       default:
         err = TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_UNKNOWN,

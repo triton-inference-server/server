@@ -35,6 +35,7 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
+#include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
@@ -1171,6 +1172,33 @@ TRTSERVER_ServerSharedMemoryAddress(
 
   RETURN_IF_STATUS_ERROR(
       lserver->SharedMemoryAddress(lsmb->Name(), offset, byte_size, base));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerGetSharedMemoryStatus(
+    TRTSERVER_Server* server,
+    std::vector<TRTSERVER_SharedMemoryBlock*>& active_shm_regions)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  std::vector<SharedMemoryInfo*> active_shm_vector;
+  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&active_shm_vector));
+
+  for (auto shm_info_itr = active_shm_vector.begin();
+       shm_info_itr != active_shm_vector.end(); shm_info_itr++) {
+    active_shm_regions.emplace_back(
+        reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
+            new TrtServerSharedMemoryBlock(
+                TRTSERVER_MEMORY_CPU, (*shm_info_itr)->name_.c_str(),
+                (*shm_info_itr)->shm_key_.c_str(), (*shm_info_itr)->offset_,
+                (*shm_info_itr)->byte_size_)));
+  }
 
   return nullptr;  // success
 }

@@ -690,6 +690,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
     }
   } else if (action_type_str == "unregisterall") {
     err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
+  } else if (action_type_str == "status") {
+    err = TRTSERVER_ServerGetSharedMemoryStatus(server_.get());
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,

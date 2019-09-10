@@ -205,6 +205,18 @@ SharedMemoryManager::UnregisterAllSharedMemory()
   return Status::Success;
 }
 
+Status
+SharedMemoryManager::GetSharedMemoryStatus(
+    std::vector<SharedMemoryInfo*>* active_shm_regions)
+{
+  active_shm_regions->clear();
+  for (const auto& shm_info : shared_memory_map_) {
+    active_shm_regions->push_back(shm_info.second.get());
+  }
+
+  return Status::Success;
+}
+
 SharedMemoryManager::SharedMemoryManager(
     const std::shared_ptr<ServerStatusManager>& status_manager)
     : status_manager_(status_manager)
