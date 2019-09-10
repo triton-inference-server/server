@@ -146,10 +146,6 @@ class InferenceServer {
   bool StrictReadinessEnabled() const { return strict_readiness_; }
   void SetStrictReadinessEnabled(bool e) { strict_readiness_ = e; }
 
-  // Get / set tracing enable.
-  bool TracingEnabled() const { return tracing_enabled_; }
-  void SetTracingEnabled(bool e) { tracing_enabled_ = e; }
-
   // Get / set the server exit timeout, in seconds.
   int32_t ExitTimeoutSeconds() const { return exit_timeout_secs_; }
   void SetExitTimeoutSeconds(int32_t s) { exit_timeout_secs_ = std::max(0, s); }
@@ -208,7 +204,6 @@ class InferenceServer {
   ModelControlMode model_control_mode_;
   bool strict_model_config_;
   bool strict_readiness_;
-  bool tracing_enabled_;
   uint32_t exit_timeout_secs_;
 
   // Tensorflow options

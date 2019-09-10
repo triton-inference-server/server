@@ -822,13 +822,13 @@ class SharedMemoryControlContext {
 ///   std::unique_ptr<TraceControlContext::Options> options;
 ///   TraceControlContext::Options::Create(&options);
 ///   options->SetTraceName("TRTIS");
-///   options->SetHost("traceserver");
-///   options->SetPort(9411);
+///   options->SetTraceHost("traceserver");
+///   options->SetTracePort(9411);
 ///   ctx->Configure(*options);
 ///   ...
-///   ctx->Enable(sample_rate);
+///   ctx->SetLevel(1, 1000);
 ///   ...
-///   ctx->Disable();
+///   ctx->SetLevel(0, 0);
 ///   ...
 /// \endcode
 ///

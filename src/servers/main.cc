@@ -98,6 +98,13 @@ bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
 
+#ifdef TRTIS_ENABLE_TRACING
+std::string trace_host_;
+int32_t trace_port_ = 9411;
+int32_t trace_level_ = 0;  // disabled
+int32_t trace_rate_ = 1000;
+#endif  // TRTIS_ENABLE_TRACING
+
 #ifdef TRTIS_ENABLE_GRPC
 // The number of threads to initialize for handling GRPC infer
 // requests.
@@ -113,7 +120,6 @@ int grpc_stream_infer_thread_cnt_ = 4;
 // allocation/deallocation of request/response objects. Higher values
 // trade-off increased memory usage for higher performance.
 int grpc_infer_allocation_pool_size_ = 128;
-
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_HTTP
@@ -133,7 +139,6 @@ enum OptionId {
   OPTION_EXIT_ON_ERROR,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
-  OPTION_ALLOW_TRACING,
 #ifdef TRTIS_ENABLE_HTTP
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
@@ -152,6 +157,12 @@ enum OptionId {
   OPTION_ALLOW_GPU_METRICS,
   OPTION_METRICS_PORT,
 #endif  // TRTIS_ENABLE_METRICS
+#ifdef TRTIS_ENABLE_TRACING
+  OPTION_TRACE_HOST,
+  OPTION_TRACE_PORT,
+  OPTION_TRACE_LEVEL,
+  OPTION_TRACE_RATE,
+#endif  // TRTIS_ENABLE_TRACING
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
   OPTION_ALLOW_MODEL_CONTROL,
@@ -207,7 +218,6 @@ std::vector<Option> options_{
      "is responsive and all models are available. If false "
      "/api/health/ready endpoint indicates ready if server is responsive "
      "even if some/all models are unavailable."},
-    {OPTION_ALLOW_TRACING, "allow-tracing", "Allow server tracing."},
 #ifdef TRTIS_ENABLE_HTTP
     {OPTION_ALLOW_HTTP, "allow-http",
      "Allow the server to listen for HTTP requests."},
@@ -243,6 +253,21 @@ std::vector<Option> options_{
     {OPTION_METRICS_PORT, "metrics-port",
      "The port reporting prometheus metrics."},
 #endif  // TRTIS_ENABLE_METRICS
+#ifdef TRTIS_ENABLE_TRACING
+    {OPTION_TRACE_HOST, "trace-host",
+     "Enable tracing on server startup. Set the hostname of the server where "
+     "trace data should be sent."},
+    {OPTION_TRACE_PORT, "trace-port",
+     "Set the port on the server where trace data should be sent. Default is "
+     "9411. Valid only if --trace-host is also given."},
+    {OPTION_TRACE_LEVEL, "trace-level",
+     "Set the trace level. (0) Disable tracing, (1) Minimal tracing, trace "
+     "only overall request, queue and compute, (2) Full tracing, minimal "
+     "tracing plus details. Valid only if --trace-host is also given."},
+    {OPTION_TRACE_RATE, "trace-rate",
+     "Set the trace sampling rate. Default is 1000. Valid only if --trace-host "
+     "is also given."},
+#endif  // TRTIS_ENABLE_TRACING
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
      "Poll the model repository to detect changes. The poll rate is "
      "controlled by 'repository-poll-secs'."},
@@ -522,6 +547,40 @@ StopEndpoints()
   return ret;
 }
 
+#ifdef TRTIS_ENABLE_TRACING
+TRTSERVER_Error*
+StartTracing(const std::shared_ptr<TRTSERVER_Server>& server)
+{
+  TRTSERVER_Error* err = nullptr;
+
+  // Configure tracing if host is specified.
+  if (!trace_host_.empty()) {
+    TRTSERVER_TraceOptions* options = nullptr;
+    err = TRTSERVER_TraceOptionsNew(&options);
+    if (err != nullptr) {
+      TRTSERVER_TraceOptionsSetHost(options, trace_host_.c_str());
+      TRTSERVER_TraceOptionsSetPort(options, trace_port_);
+      err = TRTSERVER_ServerTraceConfigure(server.get(), options);
+
+      TRTSERVER_Error* del_err = TRTSERVER_TraceOptionsDelete(options);
+      if (del_err != nullptr) {
+        LOG_ERROR << "failed to delete trace options: "
+                  << TRTSERVER_ErrorMessage(del_err);
+        TRTSERVER_ErrorDelete(del_err);
+      }
+    }
+
+    // Set the initial level and rate.
+    if (err == nullptr) {
+      err = TRTSERVER_ServerSetTraceLevel(
+          server.get(), trace_level_, trace_rate_);
+    }
+  }
+
+  return err;
+}
+#endif  // TRTIS_ENABLE_TRACING
+
 std::string
 Usage()
 {
@@ -644,12 +703,10 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   bool exit_on_error = true;
   bool strict_model_config = true;
   bool strict_readiness = true;
-  bool allow_tracing = false;
   bool tf_allow_soft_placement = true;
   float tf_gpu_memory_fraction = 0.0;
   VgpuOption tf_vgpu;
   int32_t exit_timeout_secs = 30;
-
   int32_t repository_poll_secs = repository_poll_secs_;
 
 #ifdef TRTIS_ENABLE_HTTP
@@ -669,6 +726,13 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
 #endif  // TRTIS_ENABLE_METRICS
+
+#ifdef TRTIS_ENABLE_TRACING
+  std::string trace_host = trace_host_;
+  int32_t trace_port = trace_port_;
+  int32_t trace_level = trace_level_;
+  int32_t trace_rate = trace_rate_;
+#endif  // TRTIS_ENABLE_TRACING
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
   bool allow_model_control = allow_model_control_;
@@ -722,10 +786,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         strict_readiness = ParseBoolOption(optarg);
         break;
 
-      case OPTION_ALLOW_TRACING:
-        allow_tracing = ParseBoolOption(optarg);
-        break;
-
 #ifdef TRTIS_ENABLE_HTTP
       case OPTION_ALLOW_HTTP:
         allow_http_ = ParseBoolOption(optarg);
@@ -771,6 +831,21 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         metrics_port = ParseIntOption(optarg);
         break;
 #endif  // TRTIS_ENABLE_METRICS
+
+#ifdef TRTIS_ENABLE_TRACING
+      case OPTION_TRACE_HOST:
+        trace_host = optarg;
+        break;
+      case OPTION_TRACE_PORT:
+        trace_port = ParseIntOption(optarg);
+        break;
+      case OPTION_TRACE_LEVEL:
+        trace_level = ParseIntOption(optarg);
+        break;
+      case OPTION_TRACE_RATE:
+        trace_rate = ParseIntOption(optarg);
+        break;
+#endif  // TRTIS_ENABLE_TRACING
 
       case OPTION_ALLOW_POLL_REPO:
         allow_poll_model_repository = ParseBoolOption(optarg);
@@ -852,6 +927,13 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
 #endif  // TRTIS_ENABLE_METRICS
 
+#ifdef TRTIS_ENABLE_TRACING
+  trace_host_ = trace_host;
+  trace_port_ = trace_port;
+  trace_level_ = trace_level;
+  trace_rate_ = trace_rate;
+#endif  // TRTIS_ENABLE_TRACING
+
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision())
     return false;
@@ -877,9 +959,6 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       TRTSERVER_ServerOptionsSetStrictReadiness(
           server_options, strict_readiness),
       "setting strict readiness");
-  FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetTracing(server_options, allow_tracing),
-      "setting tracing enable");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitTimeout(
           server_options, std::max(0, exit_timeout_secs)),
@@ -945,6 +1024,13 @@ main(int argc, char** argv)
       TRTSERVER_ServerOptionsDelete(server_options), "deleting server options");
 
   std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
+
+#ifdef TRTIS_ENABLE_TRACING
+  // Configure and start tracing if specified on the command line.
+  if (!StartTracing(server)) {
+    exit(1);
+  }
+#endif  // TRTIS_ENABLE_TRACING
 
   // Start the HTTP, GRPC, and metrics endpoints.
   if (!StartEndpoints(server, smb_manager)) {

@@ -403,7 +403,7 @@ class TraceControlGrpcContextImpl : public TraceControlContext {
  public:
   TraceControlGrpcContextImpl(const std::string& url, bool verbose);
   Error Configure(const TraceControlContext::Options& options) override;
- Error SetLevel(uint32_t level, uint32_t rate) override;
+  Error SetLevel(uint32_t level, uint32_t rate) override;
 
  private:
   // GRPC end point.
@@ -443,7 +443,8 @@ TraceControlGrpcContextImpl::Configure(
   }
 }
 
- Error TraceControlGrpcContextImpl::SetLevel(uint32_t level, uint32_t rate)
+Error
+TraceControlGrpcContextImpl::SetLevel(uint32_t level, uint32_t rate)
 {
   TraceControlRequest request;
   TraceControlResponse response;
@@ -456,7 +457,7 @@ TraceControlGrpcContextImpl::Configure(
   if (status.ok()) {
     return Error(response.request_status());
   } else {
-    // Something wrong with the GRPC conncection
+    // Something wrong with the GRPC connection
     return Error(
         RequestStatusCode::INTERNAL,
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
