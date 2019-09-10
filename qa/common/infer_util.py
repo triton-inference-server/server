@@ -62,7 +62,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0):
+                correlation_id=0, shm_region_names=None):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -152,10 +152,27 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             output1_byte_size = expected1_list[0].size * expected1_list[0].itemsize * batch_size
 
             # create and register shared memory region for inputs and outputs
-            shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-            shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
-            shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
-            shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
+            if shm_region_names is None:
+                shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
+                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
+                if "OUTPUT0" in outputs:
+                    shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
+                if "OUTPUT1" in outputs:
+                    shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
+            else:
+                shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
+                                                                '/'+shm_region_names[0], input0_byte_size)
+                shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
+                                                                '/'+shm_region_names[1], input0_byte_size)
+                i = 0
+                if "OUTPUT0" in outputs:
+                    shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
+                                                                    '/'+shm_region_names[2], output0_byte_size)
+                    i+=1
+                if "OUTPUT1" in outputs:
+                    shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
+                                                                    '/'+shm_region_names[2+i], output1_byte_size)
+
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip0_handle, input0_list)
             shm.set_shared_memory_region(shm_ip1_handle, input1_list)
@@ -163,8 +180,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             shared_memory_ctx.register(shm_ip0_handle)
             shared_memory_ctx.register(shm_ip1_handle)
-            shared_memory_ctx.register(shm_op0_handle)
-            shared_memory_ctx.register(shm_op1_handle)
+            if "OUTPUT0" in outputs:
+                shared_memory_ctx.register(shm_op0_handle)
+            if "OUTPUT1" in outputs:
+                shared_memory_ctx.register(shm_op1_handle)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]
@@ -225,12 +244,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     (result_name == OUTPUT1 and output1_raw)):
                     if result_name == OUTPUT0:
                         tester.assertTrue(np.array_equal(result_val[b], expected0_list[b]),
-                                        "{}, "+OUTPUT0+" expected: {}, got {}".format(
-                                            model_name, expected0_list[b], result_val[b]))
+                                        "{}, {} expected: {}, got {}".format(
+                                            model_name, OUTPUT0, expected0_list[b], result_val[b]))
                     elif result_name == OUTPUT1:
                         tester.assertTrue(np.array_equal(result_val[b], expected1_list[b]),
-                                        "{}, "+OUTPUT1+" expected: {}, got {}".format(
-                                            model_name, expected1_list[b], result_val[b]))
+                                        "{}, {} expected: {}, got {}".format(
+                                            model_name, OUTPUT1, expected1_list[b], result_val[b]))
                     else:
                         tester.assertTrue(False, "unexpected raw result {}".format(result_name))
                 else:
@@ -265,10 +284,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             shm.destroy_shared_memory_region(shm_ip0_handle)
             shared_memory_ctx.unregister(shm_ip1_handle)
             shm.destroy_shared_memory_region(shm_ip1_handle)
-            shared_memory_ctx.unregister(shm_op0_handle)
-            shm.destroy_shared_memory_region(shm_op0_handle)
-            shared_memory_ctx.unregister(shm_op1_handle)
-            shm.destroy_shared_memory_region(shm_op1_handle)
+            if "OUTPUT0" in outputs:
+                shared_memory_ctx.unregister(shm_op0_handle)
+                shm.destroy_shared_memory_region(shm_op0_handle)
+            if "OUTPUT1" in outputs:
+                shared_memory_ctx.unregister(shm_op1_handle)
+                shm.destroy_shared_memory_region(shm_op1_handle)
 
     return results
 
