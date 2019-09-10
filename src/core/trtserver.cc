@@ -282,9 +282,6 @@ class TrtServerOptions {
   bool StrictReadiness() const { return strict_readiness_; }
   void SetStrictReadiness(bool b) { strict_readiness_ = b; }
 
-  bool Tracing() const { return tracing_; }
-  void SetTracing(bool b) { tracing_ = b; }
-
   unsigned int ExitTimeout() const { return exit_timeout_; }
   void SetExitTimeout(unsigned int t) { exit_timeout_ = t; }
 
@@ -319,7 +316,6 @@ class TrtServerOptions {
   bool exit_on_error_;
   bool strict_model_config_;
   bool strict_readiness_;
-  bool tracing_;
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
@@ -332,7 +328,7 @@ class TrtServerOptions {
 TrtServerOptions::TrtServerOptions()
     : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
-      tracing_(false), metrics_(true), gpu_metrics_(true), exit_timeout_(30),
+      metrics_(true), gpu_metrics_(true), exit_timeout_(30),
       tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
@@ -878,15 +874,6 @@ TRTSERVER_ServerOptionsSetStrictReadiness(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerOptionsSetTracing(
-    TRTSERVER_ServerOptions* options, bool tracing)
-{
-  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
-  loptions->SetTracing(tracing);
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetExitTimeout(
     TRTSERVER_ServerOptions* options, unsigned int timeout)
 {
@@ -1008,7 +995,6 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
-  lserver->SetTracingEnabled(loptions->Tracing());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetTensorFlowSoftPlacementEnabled(
       loptions->TensorFlowSoftPlacement());
@@ -1248,7 +1234,8 @@ TRTSERVER_ServerTraceConfigure(
   return nullptr;  // success
 }
 
- TRTSERVER_Error* TRTSERVER_ServerTraceSetLevel(
+TRTSERVER_Error*
+TRTSERVER_ServerSetTraceLevel(
     TRTSERVER_Server* server, uint32_t level, uint32_t rate)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);

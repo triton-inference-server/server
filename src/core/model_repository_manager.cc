@@ -891,17 +891,16 @@ ModelRepositoryManager::Create(
   // Some models may failed to be loaded after model manager is created,
   // return proper error and let function caller decide whether to proceed.
   for (const auto& model : (*model_repository_manager)->infos_) {
-    const auto version_states = (*model_repository_manager)->GetVersionStates(model.first);
+    const auto version_states =
+        (*model_repository_manager)->GetVersionStates(model.first);
     // Return general error message, detail of each model's loading state
     // is logged separately.
     if (version_states.empty()) {
-      return Status(
-          RequestStatusCode::INTERNAL, "failed to load all models");
+      return Status(RequestStatusCode::INTERNAL, "failed to load all models");
     }
     for (const auto& state : version_states) {
       if (state.second != ModelReadyState::MODEL_READY) {
-        return Status(
-            RequestStatusCode::INTERNAL, "failed to load all models");
+        return Status(RequestStatusCode::INTERNAL, "failed to load all models");
       }
     }
   }

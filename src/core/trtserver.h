@@ -530,13 +530,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetExitOnError(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictReadiness(
     TRTSERVER_ServerOptions* options, bool strict);
 
-/// Enable or disable tracing in a server options.
-/// \param options The server options object.
-/// \param strict True to enable tracing, false to disable.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetTracing(
-    TRTSERVER_ServerOptions* options, bool tracing);
-
 /// Set the exit timeout, in seconds, for the server in a server
 /// options.
 /// \param options The server options object.
@@ -789,7 +782,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceConfigure(
 /// tracing, minimal tracing plus details.
 /// \param rate The sampling rate.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceSetLevel(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSetTraceLevel(
     TRTSERVER_Server* server, uint32_t level, uint32_t rate);
 
 /// Type for inference completion callback function. The callback
