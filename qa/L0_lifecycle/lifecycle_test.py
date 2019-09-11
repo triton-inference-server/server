@@ -193,7 +193,7 @@ class LifeCycleTest(unittest.TestCase):
                 iu.infer_exact(self, model_name, tensor_shape, 1,
                                np.float32, np.float32, np.float32, swap=True)
             for version in [1, 3]:
-                iu.infer_exact(self, 'plan', (input_size), 1,
+                iu.infer_exact(self, 'plan', (input_size,), 1,
                                np.float32, np.float32, np.float32,
                                swap=(version == 3), model_version=version)
         except InferenceServerException as ex:
