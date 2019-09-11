@@ -47,6 +47,7 @@
 #include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
+#include "src/core/grpc_service.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -415,10 +416,9 @@ InferenceServer::SharedMemoryAddress(
 }
 
 Status
-InferenceServer::GetSharedMemoryStatus(
-    std::vector<SharedMemoryInfo*>* active_shm_regions)
+InferenceServer::GetSharedMemoryStatus(SharedMemoryControlResponse* shm_status)
 {
-  return shared_memory_manager_->GetSharedMemoryStatus(active_shm_regions);
+  return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
 InferenceServer::ConfigureTrace(
     const std::string& trace_name, const std::string& hostname, uint32_t port)
 {

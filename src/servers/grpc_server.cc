@@ -1517,6 +1517,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == START) {
     TRTSERVER_SharedMemoryBlock* smb = nullptr;
+    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
 
     TRTSERVER_Error* err = nullptr;
     switch (request.type()) {
@@ -1548,9 +1549,9 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
           err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
         }
         break;
-      case SharedMemoryControlRequest::UNREGISTER_ALL:
+      case SharedMemoryControlRequest::GET_STATUS:
         if (err == nullptr) {
-          err = TRTSERVER_ServerGetSharedMemoryStatus(trtserver_.get());
+          err = TRTSERVER_ServerGetSharedMemoryStatus(trtserver_.get(), &shm_status_protobuf);
         }
         break;
       default:

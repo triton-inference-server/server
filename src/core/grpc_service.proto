@@ -286,6 +286,12 @@ message SharedMemoryControlRequest
     //@@       To unregister all active shared memory regions.
     //@@
     UNREGISTER_ALL = 2;
+
+    //@@    .. cpp:enumerator:: Type::GET_STATUS = 3
+    //@@
+    //@@       To get the list of all active shared memory regions.
+    //@@
+    GET_STATUS = 3;
   }
 
   //@@

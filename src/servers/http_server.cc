@@ -691,7 +691,42 @@ HTTPAPIServer::HandleSharedMemoryControl(
   } else if (action_type_str == "unregisterall") {
     err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
   } else if (action_type_str == "status") {
-    err = TRTSERVER_ServerGetSharedMemoryStatus(server_.get());
+      TRTSERVER_Protobuf* server_status_protobuf = nullptr;
+      TRTSERVER_Error* err = TRTSERVER_ServerGetSharedMemoryStatus(server_.get(), &server_status_protobuf);
+      if (err == nullptr) {
+        const char* status_buffer;
+        size_t status_byte_size;
+        err = TRTSERVER_ProtobufSerialize(
+            server_status_protobuf, &status_buffer, &status_byte_size);
+        if (err == nullptr) {
+          // Request text or binary format for status?
+          std::string format;
+          const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+          if (format_c_str != NULL) {
+            format = std::string(format_c_str);
+          } else {
+            format = "text";
+          }
+
+          if (format == "binary") {
+            evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+            evhtp_headers_add_header(
+                req->headers_out,
+                evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+          } else {
+            ServerStatus server_status;
+            if (!server_status.ParseFromArray(status_buffer, status_byte_size)) {
+              err = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+            } else {
+              std::string server_status_str = server_status.DebugString();
+              evbuffer_add(
+                  req->buffer_out, server_status_str.c_str(),
+                  server_status_str.size());
+            }
+          }
+        }
+      }
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,

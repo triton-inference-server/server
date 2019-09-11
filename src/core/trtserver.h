@@ -774,8 +774,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
 /// \param active_shm_regions The list of active shared memory regions.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryStatus(
-    TRTSERVER_Server* server,
-    std::vector<TRTSERVER_SharedMemoryBlock*>& active_shm_regions);
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** status);
 
 /// Get the current metrics for the server. The caller takes ownership
 /// of the metrics object and must call TRTSERVER_MetricsDelete to

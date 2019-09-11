@@ -100,8 +100,7 @@ class SharedMemoryManager {
       void** shm_mapped_addr);
 
   /// Get the list of all registered shared memory regions.
-  Status GetSharedMemoryStatus(
-      std::vector<SharedMemoryInfo*>* active_shm_regions);
+  Status GetSharedMemoryStatus(SharedMemoryControlResponse* shm_status);
 
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(
