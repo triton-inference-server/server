@@ -428,7 +428,8 @@ PlanBackend::Context::ValidateOutputs(
 Status
 PlanBackend::Context::InitializeInputBinding(
     const std::string& input_name, const DataType input_datatype,
-    const DimsList& model_config_dims, const bool support_batching)
+    const DimsList& model_config_dims, const bool support_batching,
+    const bool is_control)
 {
   int index = binding_offset_ + engine_->getBindingIndex(input_name.c_str());
   if (index < 0) {
@@ -466,9 +467,20 @@ PlanBackend::Context::InitializeInputBinding(
     is_dynamic_ = true;
   }
 
-  RETURN_IF_ERROR(CompareDimsSupported(
-      name_, input_name, engine_dims, model_config_dims, support_batching,
-      is_dynamic_));
+  if (!is_control) {
+    RETURN_IF_ERROR(CompareDimsSupported(
+        name_, input_name, engine_dims, model_config_dims, support_batching,
+        is_dynamic_));
+  } else {
+      std::vector<int64_t> dims_vec;
+      DimsToDimVec(engine_dims, &dims_vec);
+      if (GetElementCount(dims_vec) != 1) {
+        return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected dimensions " + DimsDebugString(engine_dims) + " for control input '" +
+              input_name + "', expecting a single element for " + name_);
+      }
+  }
 
   int64_t byte_size;
   std::vector<int64_t> maximum_dims;
@@ -547,14 +559,12 @@ PlanBackend::Context::InitializeSequenceControlInputBindings(
           true /* required */, &tensor_name, &tensor_datatype, nullptr, nullptr,
           nullptr, nullptr));
 
-      // Control tensors must have shape [1,1,1].
+      // Control tensors must have shape [1].
       DimsList dims;
-      dims.Add(1);
-      dims.Add(1);
       dims.Add(1);
 
       RETURN_IF_ERROR(InitializeInputBinding(
-          tensor_name, tensor_datatype, dims, support_batching));
+          tensor_name, tensor_datatype, dims, support_batching, true));
     }
   }
 

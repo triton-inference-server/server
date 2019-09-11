@@ -215,6 +215,7 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 #!/bin/bash
 set -e
 export CUDA_VISIBLE_DEVICES=$CUDA_DEVICE
+export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 cd $SRCDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR

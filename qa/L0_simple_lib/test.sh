@@ -111,9 +111,9 @@ mkdir -p $MODELSDIR/simple/1 && \
                 sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
                 sed -i "s/label_filename:.*//" config.pbtxt)
 
-cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1,-1,-1 $MODELSDIR/. && \
-    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1,-1,-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1,-1,-1/1/.
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
+    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
 
 cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
     # make sure version 1 is used (no swap)

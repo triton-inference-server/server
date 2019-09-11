@@ -977,4 +977,4 @@ if __name__ == '__main__':
     # TRT plan that reshapes neither input nor output. Needed for
     # L0_perflab_nomodel.
     create_trt_models(FLAGS.models_dir, np.float32,
-                      ([1,1,1],), ([1,1,1],))
+                      ([1],), ([1],))

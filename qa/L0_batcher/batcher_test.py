@@ -61,15 +61,9 @@ class BatcherTest(unittest.TestCase):
             start_ms = int(round(time.time() * 1000))
 
             if trial == "savedmodel" or trial == "graphdef" or trial == "netdef" \
-                    or trial == "custom" or trial == "libtorch" or trial == "onnx":
+                    or trial == "custom" or trial == "libtorch" or trial == "onnx" \
+                    or trial == "plan":
                 tensor_shape = (input_size,)
-                iu.infer_exact(self, trial, tensor_shape, bs,
-                               np.float32, np.float32, np.float32, swap=False,
-                               model_version=1, outputs=requested_outputs,
-                               use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False)
-            elif trial == "plan":
-                tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
