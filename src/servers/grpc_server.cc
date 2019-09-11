@@ -1593,7 +1593,7 @@ TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_trace_configure()) {
       TRTSERVER_TraceOptions* options = nullptr;
       err = TRTSERVER_TraceOptionsNew(&options);
-      if (err != nullptr) {
+      if (err == nullptr) {
         TRTSERVER_TraceOptionsSetTraceName(
             options, request.trace_configure().name().c_str());
         TRTSERVER_TraceOptionsSetHost(
