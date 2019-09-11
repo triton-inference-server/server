@@ -74,9 +74,14 @@ class InferTest(unittest.TestCase):
 
         if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,1,1), (input_size,1,1), (input_size,1,1)):
-            _infer_exact_helper(self, 'plan', (input_size, 1, 1), 8,
-                            input_dtype, output0_dtype, output1_dtype,
-                            output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            if input_dtype == np.int8:
+                _infer_exact_helper(self, 'plan', (input_size, 1, 1), 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
+            else:
+                _infer_exact_helper(self, 'plan', (input_size,), 8,
+                                input_dtype, output0_dtype, output1_dtype,
+                                output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,), (input_size,)):

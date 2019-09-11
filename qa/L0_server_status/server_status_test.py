@@ -163,7 +163,7 @@ class ServerStatusTest(unittest.TestCase):
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
         for platform in ('graphdef', 'netdef', 'plan'):
-            tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
+            tensor_shape = (input_size,)
             model_name = platform + "_float32_float32_float32"
 
             # Initially there should be no version status...

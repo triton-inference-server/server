@@ -98,7 +98,7 @@ for BACKEND in $BACKENDS; do
         [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_reshape_model_repository && \
         [ $BACKEND != "plan" ] && [ $BACKEND != "libtorch" ] && \
         REPO_DIR=$DATADIR/qa_identity_model_repository
-    SHAPE=${TENSOR_SIZE} && [ $BACKEND == "plan" ] && SHAPE="1,1,${TENSOR_SIZE}"
+    SHAPE=${TENSOR_SIZE}
     KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
