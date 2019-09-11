@@ -10,29 +10,21 @@ input {
   name: "INPUT0"
   data_type: TYPE_FP32
   dims: 16
-  dims: 1
-  dims: 1
 }
 input {
   name: "INPUT1"
   data_type: TYPE_FP32
   dims: 16
-  dims: 1
-  dims: 1
 }
 output {
   name: "OUTPUT0"
   data_type: TYPE_FP32
   dims: 16
-  dims: 1
-  dims: 1
 }
 output {
   name: "OUTPUT1"
   data_type: TYPE_FP32
   dims: 16
-  dims: 1
-  dims: 1
 }
 instance_group {
   name: "no_config"

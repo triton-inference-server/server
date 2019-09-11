@@ -79,7 +79,8 @@ class PlanBackend : public InferenceBackend {
 
     Status InitializeInputBinding(
         const std::string& input_name, const DataType input_datatype,
-        const DimsList& input_dims, const bool support_batching);
+        const DimsList& input_dims, const bool support_batching,
+        const bool is_control = false);
     Status InitializeSequenceControlInputBindings(
         const ModelConfig& config, const bool support_batching);
     Status InitializeConfigInputBindings(

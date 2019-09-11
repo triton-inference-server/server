@@ -61,10 +61,9 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
 
     """
     if (("savedmodel" in trial) or ("graphdef" in trial) or
-        ("netdef" in trial) or ("custom" in trial)):
+        ("netdef" in trial) or ("custom" in trial) or
+        ("plan" in trial)):
         tensor_shape = (1,)
-    elif "plan" in trial:
-        tensor_shape = (1,1,1)
     else:
         assert False, "unknown trial type: " + trial
 
