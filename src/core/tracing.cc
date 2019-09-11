@@ -29,6 +29,7 @@
 #include "src/core/tracing.h"
 
 #include <cppkin.h>
+#include "src/core/logging.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -64,6 +65,9 @@ TraceManager::Create(
         "trace configuration requires a non-zero port");
   }
 
+  LOG_INFO << "Configured trace: " << trace_name << ", " << hostname << ":"
+           << port;
+
   singleton_.reset(new TraceManager(trace_name, hostname, port));
   return Status::Success;
 }
@@ -72,20 +76,22 @@ TraceManager::TraceManager(
     const std::string& trace_name, const std::string& hostname, uint32_t port)
     : level_(0 /* disabled */), rate_(1000)
 {
+  auto transportType = cppkin::TransportType::Http;
+  auto encodingType = cppkin::EncodingType::Json;
+
   cppkin::CppkinParams cppkin_params;
   cppkin_params.AddParam(cppkin::ConfigTags::HOST_ADDRESS, hostname);
   cppkin_params.AddParam(cppkin::ConfigTags::PORT, port);
   cppkin_params.AddParam(cppkin::ConfigTags::SERVICE_NAME, trace_name);
   cppkin_params.AddParam(cppkin::ConfigTags::SAMPLE_COUNT, 1);
-  cppkin_params.AddParam(cppkin::ConfigTags::TRANSPORT_TYPE, "http");
-  cppkin_params.AddParam(cppkin::ConfigTags::ENCODING_TYPE, "json");
+  cppkin_params.AddParam(
+      cppkin::ConfigTags::TRANSPORT_TYPE,
+      cppkin::TransportType(transportType).ToString());
+  cppkin_params.AddParam(
+      cppkin::ConfigTags::ENCODING_TYPE,
+      cppkin::EncodingType(encodingType).ToString());
 
   cppkin::Init(cppkin_params);
-}
-
-TraceManager::~TraceManager()
-{
-  cppkin::Stop();
 }
 
 Status
@@ -98,6 +104,8 @@ TraceManager::SetLevel(uint32_t level, uint32_t rate)
 
   singleton_->level_ = level;
   singleton_->rate_ = rate;
+
+  LOG_VERBOSE(1) << "Setting trace: level " << level << ", rate " << rate;
 
   return Status::Success;
 }

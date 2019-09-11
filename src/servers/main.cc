@@ -547,17 +547,17 @@ StopEndpoints()
   return ret;
 }
 
-#ifdef TRTIS_ENABLE_TRACING
-TRTSERVER_Error*
+bool
 StartTracing(const std::shared_ptr<TRTSERVER_Server>& server)
 {
+#ifdef TRTIS_ENABLE_TRACING
   TRTSERVER_Error* err = nullptr;
 
   // Configure tracing if host is specified.
   if (!trace_host_.empty()) {
     TRTSERVER_TraceOptions* options = nullptr;
     err = TRTSERVER_TraceOptionsNew(&options);
-    if (err != nullptr) {
+    if (err == nullptr) {
       TRTSERVER_TraceOptionsSetHost(options, trace_host_.c_str());
       TRTSERVER_TraceOptionsSetPort(options, trace_port_);
       err = TRTSERVER_ServerTraceConfigure(server.get(), options);
@@ -577,9 +577,15 @@ StartTracing(const std::shared_ptr<TRTSERVER_Server>& server)
     }
   }
 
-  return err;
-}
+  if (err != nullptr) {
+    LOG_ERROR << "Failed to configure tracing: " << TRTSERVER_ErrorMessage(err);
+    TRTSERVER_ErrorDelete(err);
+    return false;
+  }
 #endif  // TRTIS_ENABLE_TRACING
+
+  return true;
+}
 
 std::string
 Usage()
@@ -1025,12 +1031,10 @@ main(int argc, char** argv)
 
   std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
 
-#ifdef TRTIS_ENABLE_TRACING
   // Configure and start tracing if specified on the command line.
   if (!StartTracing(server)) {
     exit(1);
   }
-#endif  // TRTIS_ENABLE_TRACING
 
   // Start the HTTP, GRPC, and metrics endpoints.
   if (!StartEndpoints(server, smb_manager)) {
