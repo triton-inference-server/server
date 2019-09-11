@@ -24,15 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# SERVER must be defined
-if [ -z "$SERVER" ]; then
-    echo "=== $SERVER is empty"
-    exit 1
-fi
-
+TRACE_COLLECTOR_LOG=${TRACE_COLLECTOR_LOG:=./trace_collector.log}
 SERVER_LOG=${SERVER_LOG:=./server.log}
-FILE_TIMEOUT=${FILE_TIMEOUT:=10}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
+MONITOR_FILE_TIMEOUT=${MONITOR_FILE_TIMEOUT:=10}
 
 # Sets WAIT_RET to 0 on success, 1 on failure
 function wait_for_file_str() {
@@ -155,6 +150,12 @@ function wait_for_model_stable() {
 # error (including expired timeout)
 function run_server () {
     SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
     if [ ! -f "$SERVER" ]; then
         echo "=== $SERVER does not exist"
         return
@@ -176,6 +177,12 @@ function run_server () {
 # error (including expired timeout)
 function run_server_tolive () {
     SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
     if [ ! -f "$SERVER" ]; then
         echo "=== $SERVER does not exist"
         return
@@ -196,6 +203,12 @@ function run_server_tolive () {
 # of SERVER, or 0 if error
 function run_server_nowait () {
     SERVER_PID=0
+
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
     if [ ! -f "$SERVER" ]; then
         echo "=== $SERVER does not exist"
         return
@@ -204,6 +217,26 @@ function run_server_nowait () {
     echo "=== Running $SERVER $SERVER_ARGS"
     $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
+}
+
+# Run trace collector. Sets TRACE_COLLECTOR_PID to pid of
+# TRACE_COLLECTOR, or 0 if error
+function run_trace_collector () {
+    TRACE_COLLECTOR_PID=0
+
+    if [ -z "$TRACE_COLLECTOR" ]; then
+        echo "=== TRACE_COLLECTOR must be defined"
+        return
+    fi
+
+    if [ ! -f "$TRACE_COLLECTOR" ]; then
+        echo "=== $TRACE_COLLECTOR does not exist"
+        return
+    fi
+
+    echo "=== Running $TRACE_COLLECTOR $TRACE_COLLECTOR_ARGS"
+    $TRACE_COLLECTOR $TRACE_COLLECTOR_ARGS > $TRACE_COLLECTOR_LOG 2>&1 &
+    TRACE_COLLECTOR_PID=$!
 }
 
 # Run nvidia-smi to monitor GPU utilization.
@@ -221,7 +254,7 @@ function run_gpu_monitor () {
     nvidia-smi dmon -s u $MONITOR_ID_ARG -f $MONITOR_LOG &
     MONITOR_PID=$!
 
-    local exists_secs="$FILE_TIMEOUT"
+    local exists_secs="$MONITOR_FILE_TIMEOUT"
     until test $exists_secs -eq 0 -o -f "$MONITOR_LOG" ; do sleep 1; ((exists_secs--)); done
     if [ "$exists_secs" == "0" ]; then
         echo "=== Timeout. Unable to find '$MONITOR_LOG'"

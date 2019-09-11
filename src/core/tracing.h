@@ -36,7 +36,6 @@ class TraceManager {
   static Status Create(
       const std::string& trace_name, const std::string& hostname,
       uint32_t port);
-  ~TraceManager();
 
   static Status SetLevel(uint32_t level, uint32_t rate);
 
