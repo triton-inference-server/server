@@ -40,7 +40,7 @@ LIBTORCH_OP_VAL_CLIENT=lt_op_val_client.py
 DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store2
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-repository=$DATADIR
+SERVER_ARGS="--model-repository=$DATADIR --exit-on-error=false"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
