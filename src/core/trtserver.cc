@@ -29,11 +29,11 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 #include "src/core/shared_memory_manager.h"
