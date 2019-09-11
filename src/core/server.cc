@@ -47,6 +47,7 @@
 #include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
+#include "src/core/grpc_service.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 

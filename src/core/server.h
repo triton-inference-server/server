@@ -38,6 +38,7 @@
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 
