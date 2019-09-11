@@ -884,12 +884,27 @@ ModelRepositoryManager::Create(
     // only error happens before model load / unload will be return
     // model loading / unloading error will be printed but ignored
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal());
-    // TODO [DLIS-506] On init, should check whether all model versions
-    //                 are in READY state. If not, return loading error and let
-    //                 server decides whether to exit
   }
 
   *model_repository_manager = std::move(local_manager);
+
+  // Some models may failed to be loaded after model manager is created,
+  // return proper error and let function caller decide whether to proceed.
+  for (const auto& model : (*model_repository_manager)->infos_) {
+    const auto version_states = (*model_repository_manager)->GetVersionStates(model.first);
+    // Return general error message, detail of each model's loading state
+    // is logged separately.
+    if (version_states.empty()) {
+      return Status(
+          RequestStatusCode::INTERNAL, "failed to load all models");
+    }
+    for (const auto& state : version_states) {
+      if (state.second != ModelReadyState::MODEL_READY) {
+        return Status(
+            RequestStatusCode::INTERNAL, "failed to load all models");
+      }
+    }
+  }
 
   return Status::Success;
 }

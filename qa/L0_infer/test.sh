@@ -68,7 +68,7 @@ for TARGET in cpu gpu; do
         fi
         # set strict readiness=false on CPU-only device to allow
         # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --strict-readiness=false"
+        SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --strict-readiness=false --exit-on-error=false"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
