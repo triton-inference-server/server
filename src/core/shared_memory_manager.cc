@@ -206,12 +206,16 @@ SharedMemoryManager::UnregisterAllSharedMemory()
 }
 
 Status
-SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryControlResponse* shm_status)
+SharedMemoryManager::GetSharedMemoryStatus(
+    SharedMemoryControlResponse* shm_status)
 {
-  // active_shm_regions->clear();
-  // for (const auto& shm_info : shared_memory_map_) {
-  //   // active_shm_regions->push_back(shm_info.second.get());
-  // }
+  for (const auto& shm_info : shared_memory_map_) {
+    auto rshm_region = shm_status->add_active_shared_memory_region();
+    rshm_region->set_name(shm_info.second->name_);
+    rshm_region->set_shm_key(shm_info.second->shm_key_);
+    rshm_region->set_offset(shm_info.second->offset_);
+    rshm_region->set_byte_size(shm_info.second->byte_size_);
+  }
 
   return Status::Success;
 }

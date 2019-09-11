@@ -34,11 +34,11 @@
 #include <vector>
 
 #include "src/core/api.pb.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.pb.h"
 #include "src/core/provider.h"
 #include "src/core/server_status.h"
 #include "src/core/server_status.pb.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 
@@ -106,7 +106,7 @@ class InferenceServer {
       void** shm_mapped_addr);
 
   // Get list of active shared memory regions.
-  Status GetSharedMemoryStatus(SharedMemoryControlResponse* shm_status);
+  Status SharedMemoryStatus(SharedMemoryControlResponse* shm_status);
 
   // Configure tracing. This does not enable tracing.
   Status ConfigureTrace(

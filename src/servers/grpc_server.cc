@@ -1551,7 +1551,8 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         break;
       case SharedMemoryControlRequest::GET_STATUS:
         if (err == nullptr) {
-          err = TRTSERVER_ServerGetSharedMemoryStatus(trtserver_.get(), &shm_status_protobuf);
+          err = TRTSERVER_ServerSharedMemoryStatus(
+              trtserver_.get(), &shm_status_protobuf);
         }
         break;
       default:

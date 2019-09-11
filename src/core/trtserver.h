@@ -771,9 +771,9 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
 /// If there are none then the list is empty. Returned error indicates if it
 /// was able to successfully get all active shared memory regions or not.
 /// \param server The inference server object.
-/// \param active_shm_regions The list of active shared memory regions.
+/// \param status Returns the shared memory status protobuf.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerGetSharedMemoryStatus(
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status);
 
 /// Get the current metrics for the server. The caller takes ownership

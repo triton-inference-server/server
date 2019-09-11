@@ -39,6 +39,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
@@ -47,7 +48,6 @@
 #include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
-#include "src/core/grpc_service.pb.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -416,8 +416,14 @@ InferenceServer::SharedMemoryAddress(
 }
 
 Status
-InferenceServer::GetSharedMemoryStatus(SharedMemoryControlResponse* shm_status)
+InferenceServer::SharedMemoryStatus(SharedMemoryControlResponse* shm_status)
 {
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
   return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
 InferenceServer::ConfigureTrace(
     const std::string& trace_name, const std::string& hostname, uint32_t port)

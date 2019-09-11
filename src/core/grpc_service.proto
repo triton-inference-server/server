@@ -332,7 +332,7 @@ message SharedMemoryControlResponse
   //@@
   //@@     The list of active shared memory regions.
   //@@
-  repeated InferSharedMemoryRegion active_shared_memory_regions = 2;
+  repeated InferSharedMemoryRegion active_shared_memory_region = 2;
 }
 
 //@@

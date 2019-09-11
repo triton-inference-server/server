@@ -29,11 +29,11 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
 #include "src/core/request_status.pb.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 #include "src/core/shared_memory_manager.h"
@@ -1178,7 +1178,7 @@ TRTSERVER_ServerSharedMemoryAddress(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerGetSharedMemoryStatus(
+TRTSERVER_ServerSharedMemoryStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
@@ -1189,17 +1189,7 @@ TRTSERVER_ServerGetSharedMemoryStatus(
 
   std::vector<SharedMemoryInfo*> active_shm_vector;
   ni::SharedMemoryControlResponse shm_status;
-  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&shm_status));
-
-  // for (auto shm_info_itr = active_shm_vector.begin();
-  //      shm_info_itr != active_shm_vector.end(); shm_info_itr++) {
-  //   active_shm_regions.emplace_back(
-  //       reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
-  //           new TrtServerSharedMemoryBlock(
-  //               TRTSERVER_MEMORY_CPU, (*shm_info_itr)->name_.c_str(),
-  //               (*shm_info_itr)->shm_key_.c_str(), (*shm_info_itr)->offset_,
-  //               (*shm_info_itr)->byte_size_)));
-  // }
+  RETURN_IF_STATUS_ERROR(lserver->SharedMemoryStatus(&shm_status));
 
   TrtServerProtobuf* protobuf = new TrtServerProtobuf(shm_status);
   *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
