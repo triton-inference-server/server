@@ -137,14 +137,14 @@ message InferRequestStats
   //@@  .. cpp:var:: StatDuration success
   //@@
   //@@     Total time required to handle successful Infer requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
+  //@@     including HTTP or GRPC endpoint handling time.
   //@@
   StatDuration success = 1;
 
   //@@  .. cpp:var:: StatDuration failed
   //@@
   //@@     Total time required to handle failed Infer requests, not
-  //@@     including HTTP or gRPC endpoint termination time.
+  //@@     including HTTP or GRPC endpoint handling time.
   //@@
   StatDuration failed = 2;
 
