@@ -34,6 +34,7 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
