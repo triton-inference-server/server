@@ -108,8 +108,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git
 # Use a fixed commit after rel-0.5.0
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
-            git checkout 810ee0068f5d9c91426fe941f961410792337b7a && \
-            git submodule update)
+            git checkout a0ba25f98f210fa506300bb5040695e2b7a636a8 && \
+            git submodule update --init --recursive)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
