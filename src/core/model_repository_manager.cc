@@ -880,28 +880,31 @@ ModelRepositoryManager::Create(
           !strict_model_config, polling_enabled, model_control_enabled,
           std::move(life_cycle)));
 
+  bool all_models_polled = true;
   if (!model_control_enabled) {
     // only error happens before model load / unload will be return
     // model loading / unloading error will be printed but ignored
-    RETURN_IF_ERROR(local_manager->PollAndUpdateInternal());
+    RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
 
+  if (!all_models_polled) {
+    return Status(RequestStatusCode::INTERNAL, "failed to load all models");
+  }
   // Some models may failed to be loaded after model manager is created,
   // return proper error and let function caller decide whether to proceed.
   for (const auto& model : (*model_repository_manager)->infos_) {
-    const auto version_states = (*model_repository_manager)->GetVersionStates(model.first);
+    const auto version_states =
+        (*model_repository_manager)->GetVersionStates(model.first);
     // Return general error message, detail of each model's loading state
     // is logged separately.
     if (version_states.empty()) {
-      return Status(
-          RequestStatusCode::INTERNAL, "failed to load all models");
+      return Status(RequestStatusCode::INTERNAL, "failed to load all models");
     }
     for (const auto& state : version_states) {
       if (state.second != ModelReadyState::MODEL_READY) {
-        return Status(
-            RequestStatusCode::INTERNAL, "failed to load all models");
+        return Status(RequestStatusCode::INTERNAL, "failed to load all models");
       }
     }
   }
@@ -916,11 +919,12 @@ ModelRepositoryManager::PollAndUpdate()
     return Status(RequestStatusCode::UNAVAILABLE, "polling is disabled");
   }
 
-  return PollAndUpdateInternal();
+  bool all_models_polled;
+  return PollAndUpdateInternal(&all_models_polled);
 }
 
 Status
-ModelRepositoryManager::PollAndUpdateInternal()
+ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
 {
   // Serialize all operations that change model state
   std::lock_guard<std::mutex> lock(poll_mu_);
@@ -937,8 +941,9 @@ ModelRepositoryManager::PollAndUpdateInternal()
   std::set<std::string> subdirs;
   RETURN_IF_ERROR(GetDirectorySubdirs(repository_path_, &subdirs));
 
-  RETURN_IF_ERROR(
-      Poll(subdirs, &added, &deleted, &modified, &unmodified, &new_infos));
+  RETURN_IF_ERROR(Poll(
+      subdirs, &added, &deleted, &modified, &unmodified, &new_infos,
+      all_models_polled));
 
   // Anything in 'infos_' that is not in "added", "modified", or
   // "unmodified" is deleted.
@@ -1103,8 +1108,15 @@ ModelRepositoryManager::LoadUnloadModel(
 
       ModelInfoMap new_infos;
       while (!models.empty()) {
-        RETURN_IF_ERROR(
-            Poll(models, &added, &deleted, &modified, &unmodified, &new_infos));
+        bool all_models_polled;
+        RETURN_IF_ERROR(Poll(
+            models, &added, &deleted, &modified, &unmodified, &new_infos,
+            &all_models_polled));
+        if ((!all_models_polled) && (*models.begin() == model_name)) {
+          return Status(
+              RequestStatusCode::INTERNAL,
+              "failed to poll requested model '" + model_name + "'");
+        }
 
         // If at least one model is marked deleted, model directory is not found
         // and the whole load process should return as failure.
@@ -1252,49 +1264,98 @@ Status
 ModelRepositoryManager::Poll(
     const std::set<std::string>& models, std::set<std::string>* added,
     std::set<std::string>* deleted, std::set<std::string>* modified,
-    std::set<std::string>* unmodified, ModelInfoMap* updated_infos)
+    std::set<std::string>* unmodified, ModelInfoMap* updated_infos,
+    bool* all_models_polled)
 {
+  // State of the model in terms of polling. If error happens during polling
+  // an individual model, its state will fallback to different states to be
+  // ignored from the polling. i.e. STATE_ADDED -> STATE_INVALID,
+  // STATE_MODIFIED -> STATE_UNMODIFIED.
+  enum ModelPollState {
+    STATE_ADDED,
+    STATE_MODIFIED,
+    STATE_UNMODIFIED,
+    STATE_INVALID
+  };
+
+  *all_models_polled = true;
   for (const auto& child : models) {
+    auto model_poll_state = STATE_UNMODIFIED;
     const auto full_path = JoinPath({repository_path_, child});
 
     // If the model directory does not exist, the model is marked as deleted
     bool exists = false;
-    RETURN_IF_ERROR(FileExists(full_path, &exists));
-    if (!exists) {
+    Status status = FileExists(full_path, &exists);
+    if (!status.IsOk()) {
+      model_poll_state = STATE_INVALID;
+    } else if (!exists) {
       deleted->insert(child);
       continue;
     }
 
-    // If 'child' is a new model or an existing model that has been
-    // modified since the last time it was polled, then need to
-    // (re)load, normalize and validate the configuration.
-    bool need_load = false;
-    int64_t mtime_ns;
+    std::unique_ptr<ModelInfo> model_info;
     const auto iitr = infos_.find(child);
-    if (iitr == infos_.end()) {
-      added->insert(child);
-      mtime_ns = GetModifiedTime(std::string(full_path));
-      need_load = true;
+    if (model_poll_state == STATE_INVALID) {
+      // If the model path can't be polled, ignore the model from the poll.
+      if (iitr != infos_.end()) {
+        model_poll_state = STATE_UNMODIFIED;
+      }
     } else {
-      mtime_ns = iitr->second->mtime_nsec_;
-      if (IsModified(std::string(full_path), &mtime_ns)) {
-        modified->insert(child);
-        need_load = true;
+      // If 'child' is a new model or an existing model that has been
+      // modified since the last time it was polled, then need to
+      // (re)load, normalize and validate the configuration.
+      int64_t mtime_ns;
+      if (iitr == infos_.end()) {
+        mtime_ns = GetModifiedTime(std::string(full_path));
+        model_poll_state = STATE_ADDED;
       } else {
-        unmodified->insert(child);
-        const auto& ret = updated_infos->emplace(child, nullptr);
-        if (!ret.second) {
-          return Status(
-              RequestStatusCode::ALREADY_EXISTS,
-              "unexpected model info for model '" + child + "'");
+        mtime_ns = iitr->second->mtime_nsec_;
+        if (IsModified(std::string(full_path), &mtime_ns)) {
+          model_poll_state = STATE_MODIFIED;
+        }
+      }
+
+      if (model_poll_state != STATE_UNMODIFIED) {
+        model_info.reset(new ModelInfo());
+        ModelConfig& model_config = model_info->model_config_;
+        model_info->mtime_nsec_ = mtime_ns;
+
+        // If enabled, try to automatically generate missing parts of
+        // the model configuration (autofill) from the model
+        // definition. In all cases normalize and validate the config.
+        status = GetNormalizedModelConfig(
+            full_path, backend_config_map_, autofill_, &model_config);
+        if (status.IsOk()) {
+          status = ValidateModelConfig(model_config, std::string());
+        }
+        if (status.IsOk()) {
+          model_info->platform_ = GetPlatform(model_config.platform());
+
+          // Make sure the name of the model matches the name of the
+          // directory. This is a somewhat arbitrary requirement but seems
+          // like good practice to require it of the user. It also acts as a
+          // check to make sure we don't have two different models with the
+          // same name.
+          if (model_config.name() != child) {
+            status = Status(
+                RequestStatusCode::INVALID_ARG,
+                "unexpected directory name '" + child + "' for model '" +
+                    model_config.name() +
+                    "', directory name must equal model name");
+          }
         }
 
-        std::unique_ptr<ModelInfo>& model_info = ret.first->second;
-        model_info.reset(new ModelInfo(*iitr->second));
+        if (!status.IsOk()) {
+          if (model_poll_state == STATE_MODIFIED) {
+            model_poll_state = STATE_UNMODIFIED;
+          } else {
+            model_poll_state = STATE_INVALID;
+          }
+        }
       }
     }
 
-    if (need_load) {
+    if (model_poll_state != STATE_INVALID) {
       const auto& ret = updated_infos->emplace(child, nullptr);
       if (!ret.second) {
         return Status(
@@ -1302,32 +1363,22 @@ ModelRepositoryManager::Poll(
             "unexpected model info for model '" + child + "'");
       }
 
-      std::unique_ptr<ModelInfo>& model_info = ret.first->second;
-      model_info.reset(new ModelInfo());
-      ModelConfig& model_config = model_info->model_config_;
-      model_info->mtime_nsec_ = mtime_ns;
-
-      // If enabled, try to automatically generate missing parts of
-      // the model configuration (autofill) from the model
-      // definition. In all cases normalize and validate the config.
-      RETURN_IF_ERROR(GetNormalizedModelConfig(
-          full_path, backend_config_map_, autofill_, &model_config));
-      RETURN_IF_ERROR(ValidateModelConfig(model_config, std::string()));
-
-      model_info->platform_ = GetPlatform(model_config.platform());
-
-      // Make sure the name of the model matches the name of the
-      // directory. This is a somewhat arbitrary requirement but seems
-      // like good practice to require it of the user. It also acts as a
-      // check to make sure we don't have two different models with the
-      // same name.
-      if (model_config.name() != child) {
-        return Status(
-            RequestStatusCode::INVALID_ARG,
-            "unexpected directory name '" + child + "' for model '" +
-                model_config.name() +
-                "', directory name must equal model name");
+      if (model_poll_state == STATE_UNMODIFIED) {
+        ret.first->second.reset(new ModelInfo(*iitr->second));
+        unmodified->insert(child);
+      } else {
+        ret.first->second = std::move(model_info);
+        if (model_poll_state == STATE_ADDED) {
+          added->insert(child);
+        } else {
+          modified->insert(child);
+        }
       }
+    }
+
+    if (!status.IsOk()) {
+      LOG_ERROR << status.Message();
+      *all_models_polled = false;
     }
   }
 
