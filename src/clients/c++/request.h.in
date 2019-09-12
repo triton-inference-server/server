@@ -50,6 +50,7 @@
 #include "src/core/api.pb.h"
 #include "src/core/request_status.pb.h"
 #include "src/core/server_status.pb.h"
+#include "src/core/grpc_service.pb.h"
 #endif
 
 namespace nvidia { namespace inferenceserver {
@@ -786,6 +787,9 @@ class ModelControlContext {
 ///   ...
 ///   ctx->UnregisterAllSharedMemory();
 ///   ...
+///   SharedMemoryControlResponse status;
+///   ctx->SharedMemoryStatus(&status);
+///   ...
 /// \endcode
 ///
 class SharedMemoryControlContext {
@@ -816,6 +820,12 @@ class SharedMemoryControlContext {
   /// Unregisters all registered shared memory regions on the inference server.
   /// \return Error object indicating success or failure.
   virtual Error UnregisterAllSharedMemory() = 0;
+
+  /// Get the list of all active/registered shared memory regions on the
+  /// inference server.
+  /// \param status The active shared memory regions.
+  /// \return Error object indicating success or failure.
+  virtual Error SharedMemoryStatus(SharedMemoryControlResponse* status) = 0;
 };
 
 //==============================================================================

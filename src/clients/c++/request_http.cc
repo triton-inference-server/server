@@ -599,12 +599,14 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
+  Error SharedMemoryStatus(SharedMemoryControlResponse* status) override;
 
  private:
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
+      const std::string& shm_key, const size_t offset, const size_t byte_size,
+      SharedMemoryControlResponse* shm_status);
 
   // URL for control endpoint on inference server.
   const std::string url_;
@@ -632,28 +634,39 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest("register", name, shm_key, offset, byte_size);
+  return SendRequest("register", name, shm_key, offset, byte_size, nullptr);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest("unregister", name, "", 0, 0);
+  return SendRequest("unregister", name, "", 0, 0, nullptr);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("unregisterall", "", "", 0, 0);
+  return SendRequest("unregisterall", "", "", 0, 0, nullptr);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::SharedMemoryStatus(
+    SharedMemoryControlResponse* shm_status)
+{
+  return SendRequest("status", "", "", 0, 0, shm_status);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    SharedMemoryControlResponse* shm_status)
 {
   request_status_.Clear();
+  if (shm_status != nullptr) {
+    shm_status->Clear();
+  }
 
   if (!curl_global.Status().IsOk()) {
     return curl_global.Status();
@@ -719,6 +732,15 @@ SharedMemoryControlHttpContextImpl::SendRequest(
     request_status_.set_code(RequestStatusCode::INTERNAL);
     request_status_.set_msg(
         "sharedmemorycontrol request did not return status");
+  }
+
+  // // Parse the response as a ModelConfigList...
+  // if (!shm_status->ParseFromString(response_)) {
+  //   return Error(RequestStatusCode::INTERNAL, "failed to parse server status");
+  // }
+
+  if (verbose_) {
+    std::cout << shm_status->DebugString() << std::endl;
   }
 
   return Error(request_status_);

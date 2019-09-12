@@ -309,6 +309,7 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
+  Error SharedMemoryStatus(SharedMemoryControlResponse* shm_status) override;
 
  private:
   // GRPC end point.
