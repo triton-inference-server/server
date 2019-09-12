@@ -267,7 +267,6 @@ class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const BackendConfigMap& backend_map,
-      const std::string& repository_path,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
 
   ~BackendLifeCycle() = default;
@@ -276,8 +275,9 @@ class ModelRepositoryManager::BackendLifeCycle {
   // If 'force_unload', all versions that are being served will
   // be unloaded before loading the specified versions.
   Status AsyncLoad(
-      const std::string& model_name, const std::set<int64_t>& versions,
-      const ModelConfig& model_config, bool force_unload = true,
+      const std::string& repository_path, const std::string& model_name,
+      const std::set<int64_t>& versions, const ModelConfig& model_config,
+      bool force_unload = true,
       std::function<void(int64_t, ModelReadyState, size_t)> OnComplete =
           nullptr);
 
@@ -298,13 +298,15 @@ class ModelRepositoryManager::BackendLifeCycle {
  private:
   struct BackendInfo {
     BackendInfo(
-        const ModelReadyState state, const ActionType next_action,
-        const ModelConfig& model_config)
-        : platform_(GetPlatform(model_config.platform())), state_(state),
+        const std::string& repository_path, const ModelReadyState state,
+        const ActionType next_action, const ModelConfig& model_config)
+        : repository_path_(repository_path),
+          platform_(GetPlatform(model_config.platform())), state_(state),
           next_action_(next_action), model_config_(model_config)
     {
     }
 
+    const std::string repository_path_;
     Platform platform_;
 
     std::recursive_mutex mtx_;
@@ -320,7 +322,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(const std::string& repository_path);
+  BackendLifeCycle() = default;
 
   // Function called after backend state / next action is updated.
   // Caller must obtain the mutex of 'backend_info' before calling this function
@@ -347,7 +349,6 @@ class ModelRepositoryManager::BackendLifeCycle {
   BackendMap map_;
   std::mutex map_mtx_;
 
-  const std::string& repository_path_;
 #ifdef TRTIS_ENABLE_CAFFE2
   std::unique_ptr<NetDefBackendFactory> netdef_factory_;
 #endif  // TRTIS_ENABLE_CAFFE2
@@ -370,20 +371,12 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
 };
 
-ModelRepositoryManager::BackendLifeCycle::BackendLifeCycle(
-    const std::string& repository_path)
-    : repository_path_(repository_path)
-{
-}
-
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const BackendConfigMap& backend_map,
-    const std::string& repository_path,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
-  std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(repository_path));
+  std::unique_ptr<BackendLifeCycle> local_life_cycle(new BackendLifeCycle());
 
 #ifdef TRTIS_ENABLE_TENSORFLOW
   {
@@ -553,8 +546,9 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 
 Status
 ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
-    const std::string& model_name, const std::set<int64_t>& versions,
-    const ModelConfig& model_config, bool force_unload,
+    const std::string& repository_path, const std::string& model_name,
+    const std::set<int64_t>& versions, const ModelConfig& model_config,
+    bool force_unload,
     std::function<void(int64_t, ModelReadyState, size_t)> OnComplete)
 {
   LOG_VERBOSE(1) << "AsyncLoad() '" << model_name << "'";
@@ -569,7 +563,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         std::make_pair(version, std::unique_ptr<BackendInfo>()));
     if (res.second) {
       res.first->second.reset(new BackendInfo(
-          ModelReadyState::MODEL_UNKNOWN, ActionType::NO_ACTION, model_config));
+          repository_path, ModelReadyState::MODEL_UNKNOWN,
+          ActionType::NO_ACTION, model_config));
     }
   }
 
@@ -718,8 +713,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 {
   LOG_VERBOSE(1) << "CreateInferenceBackend() '" << model_name << "' version "
                  << version;
-  const auto version_path =
-      JoinPath({repository_path_, model_name, std::to_string(version)});
+  const auto version_path = JoinPath(
+      {backend_info->repository_path_, model_name, std::to_string(version)});
   // make copy of the current model config in case model config in backend info
   // is updated (another poll) during the creation of backend handle
   ModelConfig model_config;
@@ -870,8 +865,8 @@ ModelRepositoryManager::Create(
       &backend_config_map);
 
   std::unique_ptr<BackendLifeCycle> life_cycle;
-  RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, backend_config_map, repository_path, &life_cycle));
+  RETURN_IF_ERROR(
+      BackendLifeCycle::Create(server, backend_config_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
@@ -973,7 +968,8 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
     ModelConfig model_config;
     std::set<int64_t> versions;
     // Utilize "force_unload" of AsyncLoad()
-    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+    backend_life_cycle_->AsyncLoad(
+        repository_path_, name, versions, model_config);
   }
 
   // model loading / unloading error will be printed but ignored
@@ -1028,7 +1024,7 @@ ModelRepositoryManager::LoadModelByDependency()
       std::set<int64_t> versions;
       // Utilize "force_unload" of AsyncLoad()
       backend_life_cycle_->AsyncLoad(
-          invalid_model->model_name_, versions, model_config);
+          repository_path_, invalid_model->model_name_, versions, model_config);
       LOG_ERROR << invalid_model->status_.AsString();
       invalid_model->loaded_versions_ = std::set<int64_t>();
       loaded_models.emplace(invalid_model);
@@ -1044,8 +1040,8 @@ ModelRepositoryManager::LoadModelByDependency()
           valid_model->model_name_, valid_model->model_config_, &versions);
       if (status.IsOk()) {
         status = backend_life_cycle_->AsyncLoad(
-            valid_model->model_name_, versions, valid_model->model_config_,
-            true,
+            repository_path_, valid_model->model_name_, versions,
+            valid_model->model_config_, true,
             [model_state](
                 int64_t version, ModelReadyState state,
                 size_t total_version_cnt) {
@@ -1163,7 +1159,8 @@ ModelRepositoryManager::LoadUnloadModel(
     ModelConfig model_config;
     std::set<int64_t> versions;
     // Utilize "force_unload" of AsyncLoad()
-    backend_life_cycle_->AsyncLoad(name, versions, model_config);
+    backend_life_cycle_->AsyncLoad(
+        repository_path_, name, versions, model_config);
   }
 
   // model loading / unloading error will be printed but ignored
@@ -1221,8 +1218,8 @@ ModelRepositoryManager::UnloadAllModels()
   ModelConfig model_config;
   std::set<int64_t> versions;
   for (const auto& name_info : infos_) {
-    Status unload_status =
-        backend_life_cycle_->AsyncLoad(name_info.first, versions, model_config);
+    Status unload_status = backend_life_cycle_->AsyncLoad(
+        repository_path_, name_info.first, versions, model_config);
     if (!unload_status.IsOk()) {
       status = Status(
           RequestStatusCode::INTERNAL,
