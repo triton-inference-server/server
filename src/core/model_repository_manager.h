@@ -154,7 +154,7 @@ class ModelRepositoryManager {
       std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// The internal function that are called in Create() and PollAndUpdate().
-  Status PollAndUpdateInternal();
+  Status PollAndUpdateInternal(bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,
@@ -168,11 +168,16 @@ class ModelRepositoryManager {
   /// \param unmodified The names of the models remaining in the
   /// repository that have not changed.
   /// \param updated_infos The model infos retrieved from the poll.
+  /// \param all_models_polled Return true if all models are polled and
+  /// their model configuration are validated successfully. Instead of aborting
+  /// the polling, the models that fail will be ignored and their model infos
+  /// will stay in the previous state.
   /// \return The error status.
   Status Poll(
       const std::set<std::string>& models, std::set<std::string>* added,
       std::set<std::string>* deleted, std::set<std::string>* modified,
-      std::set<std::string>* unmodified, ModelInfoMap* updated_infos);
+      std::set<std::string>* unmodified, ModelInfoMap* updated_infos,
+      bool* all_models_polled);
 
   /// Update the configurations of newly added / modified model and their
   /// information shown in server status
