@@ -165,7 +165,9 @@ class SequenceBatcherTest(unittest.TestCase):
                         shm.set_shared_memory_region(shm_ip_handle, input_list)
 
                         shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+                        shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.unregister(shm_op_handle)
                         shared_memory_ctx.register(shm_op_handle)
 
                         input_info = shm_ip_handle
@@ -317,7 +319,9 @@ class SequenceBatcherTest(unittest.TestCase):
                         shm.set_shared_memory_region(shm_ip_handle, input_list)
 
                         shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+                        shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.unregister(shm_op_handle)
                         shared_memory_ctx.register(shm_op_handle)
 
                         input_info = shm_ip_handle
@@ -612,6 +616,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
+                    print(model_name + "-> " + ex.message())
                     self.assertEqual("inference:0", ex.server_id())
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
