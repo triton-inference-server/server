@@ -711,6 +711,9 @@ InferAllocatorPayload(
     AllocPayload* alloc_payload)
 {
   alloc_payload->response_ = &response;
+  if (alloc_payload->shm_map_ != nullptr) {
+    alloc_payload->shm_map_->clear();
+  }
 
   // If any of the outputs use shared memory, then we must calculate
   // the memory address for that output and store it in the allocator
