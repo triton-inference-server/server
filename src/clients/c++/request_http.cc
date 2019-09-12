@@ -689,8 +689,10 @@ SharedMemoryControlHttpContextImpl::SendRequest(
 
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-  // use POST method
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  if (action_str != "status") {
+    // use POST method
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  }
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -734,12 +736,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
         "sharedmemorycontrol request did not return status");
   }
 
-  // // Parse the response as a ModelConfigList...
-  // if (!shm_status->ParseFromString(response_)) {
-  //   return Error(RequestStatusCode::INTERNAL, "failed to parse server status");
-  // }
-
-  if (verbose_) {
+  if (verbose_ && action_str == "status") {
     std::cout << shm_status->DebugString() << std::endl;
   }
 
