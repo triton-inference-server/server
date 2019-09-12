@@ -229,10 +229,9 @@ SequenceBatchScheduler::Enqueue(
     const std::shared_ptr<InferResponseProvider>& response_provider,
     std::function<void(const Status&)> OnComplete)
 {
-  // Queue timer starts at the beginning of the queueing and scheduling process
-  std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer(
-      new ModelInferStats::ScopedTimer());
-  stats->StartQueueTimer(queue_timer.get());
+  // Queue timer starts at the beginning of the queueing and
+  // scheduling process
+  stats->StartQueueTimer();
 
   const auto& request_header = request_provider->RequestHeader();
 
@@ -328,7 +327,7 @@ SequenceBatchScheduler::Enqueue(
         << request_provider->ModelName();
 
     bl_itr->second->emplace_back(
-        queue_timer, stats, request_provider, response_provider, OnComplete);
+        stats, request_provider, response_provider, OnComplete);
     // If the sequence is ending then forget correlation ID
     // connection to this backlog queue. If another sequence starts
     // with the same correlation ID it will be collected in another
@@ -355,7 +354,7 @@ SequenceBatchScheduler::Enqueue(
     auto backlog = std::make_shared<std::deque<Scheduler::Payload>>();
     backlog_queues_.push_back(backlog);
     backlog->emplace_back(
-        queue_timer, stats, request_provider, response_provider, OnComplete);
+        stats, request_provider, response_provider, OnComplete);
     if (!seq_end) {
       sequence_to_backlog_map_[correlation_id] = std::move(backlog);
     }
@@ -382,8 +381,8 @@ SequenceBatchScheduler::Enqueue(
                  << batcher_idx << ", slot " << slot;
 
   batchers_[batcher_idx]->Enqueue(
-      slot, correlation_id, queue_timer, stats, request_provider,
-      response_provider, OnComplete);
+      slot, correlation_id, stats, request_provider, response_provider,
+      OnComplete);
 }
 
 bool
@@ -530,10 +529,8 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
         sequence_to_batchslot_map_.erase(idle_correlation_id);
 
-        std::unique_ptr<ModelInferStats::ScopedTimer> idle_queue_timer;
         batchers_[batcher_idx]->Enqueue(
-            slot, idle_correlation_id, idle_queue_timer, nullptr, nullptr,
-            nullptr, nullptr);
+            slot, idle_correlation_id, nullptr, nullptr, nullptr, nullptr);
         cid_itr = correlation_id_timestamps_.erase(cid_itr);
       } else {
         // If the idle correlation ID is in the backlog, then just
@@ -610,7 +607,6 @@ SequenceBatchScheduler::SequenceBatch::~SequenceBatch()
 void
 SequenceBatchScheduler::SequenceBatch::Enqueue(
     const uint32_t slot, const CorrelationID correlation_id,
-    std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
     const std::shared_ptr<ModelInferStats>& stats,
     const std::shared_ptr<InferRequestProvider>& request_provider,
     const std::shared_ptr<InferResponseProvider>& response_provider,
@@ -633,7 +629,7 @@ SequenceBatchScheduler::SequenceBatch::Enqueue(
     }
 
     queues_[slot].emplace_back(
-        queue_timer, stats, request_provider, response_provider, OnComplete);
+        stats, request_provider, response_provider, OnComplete);
 
     slot_correlation_ids_[slot] = correlation_id;
     max_active_slot_ = std::max(max_active_slot_, static_cast<int32_t>(slot));
@@ -759,10 +755,8 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               null_request_provider->SetInputOverride(
                   notready_input_overrides_);
 
-              std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer;
               payloads->emplace_back(
-                  queue_timer, nullptr, null_request_provider, nullptr,
-                  nullptr);
+                  nullptr, null_request_provider, nullptr, nullptr);
             } else {
               Scheduler::Payload& slot_payload = queue.front();
               const auto& request_provider = slot_payload.request_provider_;
@@ -779,8 +773,8 @@ SequenceBatchScheduler::SequenceBatch::SchedulerThread(
               }
 
               payloads->emplace_back(
-                  slot_payload.queue_timer_, slot_payload.stats_,
-                  request_provider, slot_payload.response_provider_,
+                  slot_payload.stats_, request_provider,
+                  slot_payload.response_provider_,
                   slot_payload.complete_function_);
 
               queue.pop_front();

@@ -44,8 +44,7 @@ class Scheduler {
     Payload() = default;
     Payload(const Payload& payload) = delete;
     Payload(Payload&& payload)
-        : queue_timer_(std::move(payload.queue_timer_)),
-          stats_(std::move(payload.stats_)),
+        : stats_(std::move(payload.stats_)),
           request_provider_(std::move(payload.request_provider_)),
           response_provider_(std::move(payload.response_provider_)),
           complete_function_(std::move(payload.complete_function_)),
@@ -53,19 +52,16 @@ class Scheduler {
     {
     }
     Payload(
-        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,
         const std::function<void(const Status&)> complete_function)
-        : queue_timer_(std::move(queue_timer)), stats_(stats),
-          request_provider_(request_provider),
+        : stats_(stats), request_provider_(request_provider),
           response_provider_(response_provider),
           complete_function_(complete_function), status_(Status::Success)
     {
     }
 
-    std::unique_ptr<ModelInferStats::ScopedTimer> queue_timer_;
     std::shared_ptr<ModelInferStats> stats_;
     std::shared_ptr<InferRequestProvider> request_provider_;
     std::shared_ptr<InferResponseProvider> response_provider_;
