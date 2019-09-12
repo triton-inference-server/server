@@ -755,8 +755,7 @@ EnsembleContext::ScheduleSteps(
   for (const auto& step : steps) {
     auto infer_stats = std::make_shared<ModelInferStats>(
         context->is_->StatusManager(), step->backend_->Name());
-    auto timer = std::make_shared<ModelInferStats::ScopedTimer>();
-    infer_stats->StartRequestTimer(timer.get());
+    infer_stats->StartRequestTimer();
     infer_stats->SetRequestedVersion(step->backend_->Version());
     infer_stats->SetMetricReporter(step->backend_->MetricReporter());
     infer_stats->SetBatchSize(
@@ -766,20 +765,23 @@ EnsembleContext::ScheduleSteps(
     context->is_->Infer(
         step->backend_, step->request_provider_, step->response_provider_,
         infer_stats,
-        [context, step, infer_stats, timer](const Status& status) mutable {
+        [context, step, infer_stats](const Status& status) mutable {
           infer_stats->SetFailed(!status.IsOk());
           if (!status.IsOk()) {
             LOG_VERBOSE(1) << "Ensemble infer failed: " << status.Message();
           }
 
-          timer.reset();
-          // Accumulate the queue and compute durations from this composing
-          // model
+          infer_stats->StopRequestTimer();
+
+          // Accumulate the queue and compute durations from this
+          // composing model
           context->stats_->IncrementQueueDuration(
               infer_stats->GetQueueDuration());
           context->stats_->IncrementComputeDuration(
               infer_stats->GetComputeDuration());
+
           infer_stats.reset();
+
           step->infer_status_ = status;
           Proceed(context, step);
         });

@@ -340,10 +340,7 @@ ModelInferStats::ScopedTimer::ScopedTimer()
 
 ModelInferStats::ScopedTimer::~ScopedTimer()
 {
-  if (duration_ptr_ != nullptr) {
-    Stop();
-    *duration_ptr_ = cummulative_duration_ns_;
-  }
+  Stop();
 }
 
 struct timespec
@@ -367,6 +364,10 @@ ModelInferStats::ScopedTimer::Stop()
 
     start_.tv_sec = 0;
     start_.tv_nsec = 0;
+
+    if (duration_ptr_ != nullptr) {
+      *duration_ptr_ = cummulative_duration_ns_;
+    }
   }
 }
 
@@ -432,24 +433,42 @@ ModelInferStats::IncrementComputeDuration(const uint64_t increment_value)
 }
 
 struct timespec
-ModelInferStats::StartRequestTimer(ScopedTimer* timer) const
+ModelInferStats::StartRequestTimer()
 {
-  timer->duration_ptr_ = &request_duration_ns_;
-  return timer->Start();
+  request_timer_.duration_ptr_ = &request_duration_ns_;
+  return request_timer_.Start();
+}
+
+void
+ModelInferStats::StopRequestTimer()
+{
+  request_timer_.Stop();
 }
 
 struct timespec
-ModelInferStats::StartQueueTimer(ScopedTimer* timer) const
+ModelInferStats::StartQueueTimer()
 {
-  timer->duration_ptr_ = &queue_duration_ns_;
-  return timer->Start();
+  queue_timer_.duration_ptr_ = &queue_duration_ns_;
+  return queue_timer_.Start();
+}
+
+void
+ModelInferStats::StopQueueTimer()
+{
+  queue_timer_.Stop();
 }
 
 struct timespec
-ModelInferStats::StartComputeTimer(ScopedTimer* timer) const
+ModelInferStats::StartComputeTimer()
 {
-  timer->duration_ptr_ = &compute_duration_ns_;
-  return timer->Start();
+  compute_timer_.duration_ptr_ = &compute_duration_ns_;
+  return compute_timer_.Start();
+}
+
+void
+ModelInferStats::StopComputeTimer()
+{
+  compute_timer_.Stop();
 }
 
 }}  // namespace nvidia::inferenceserver

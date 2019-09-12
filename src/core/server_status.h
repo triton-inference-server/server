@@ -156,20 +156,30 @@ class ModelInferStats {
   // Returns the current compute_duration in nanoseconds
   uint64_t GetComputeDuration() const { return compute_duration_ns_; }
 
-  // Get a ScopedTimer that measures entire inference request-response
-  // duration. The lifetime of 'timer' must not exceed the
-  // lifetime of 'this' object.
-  struct timespec StartRequestTimer(ScopedTimer* timer) const;
+  // Get the timer measuring the queue time.
+  const ScopedTimer& QueueTimer() const { return queue_timer_; }
 
-  // Get a ScopedTimer that measures wait time spent in backend Run(),
-  // including queuing, scheduling. The lifetime of 'timer' must not
-  // exceed the lifetime of 'this' object.
-  struct timespec StartQueueTimer(ScopedTimer* timer) const;
+  // Start the timer that measures entire inference request-response
+  // duration. Return the start timestamp.
+  struct timespec StartRequestTimer();
 
-  // Get a ScopedTimer that measures model compute duration including
-  // H2D, compute and D2H. The lifetime of 'timer' must not exceed the
-  // lifetime of 'this' object.
-  struct timespec StartComputeTimer(ScopedTimer* timer) const;
+  // Stop the timer that measures entire inference request-response
+  // duration.
+  void StopRequestTimer();
+
+  // Start the timer that measures queue time. Return the start
+  // timestamp.
+  struct timespec StartQueueTimer();
+
+  // Stop the timer that measures queue time.
+  void StopQueueTimer();
+
+  // Start the timer that measures compute time. Return the start
+  // timestamp.
+  struct timespec StartComputeTimer();
+
+  // Stop the timer that measures compute time.
+  void StopComputeTimer();
 
  private:
   std::shared_ptr<ServerStatusManager> status_manager_;
@@ -181,6 +191,10 @@ class ModelInferStats {
   bool failed_;
 
   uint32_t execution_count_;
+  ScopedTimer request_timer_;
+  ScopedTimer queue_timer_;
+  ScopedTimer compute_timer_;
+
   mutable uint64_t request_duration_ns_;
   mutable uint64_t queue_duration_ns_;
   mutable uint64_t compute_duration_ns_;

@@ -115,7 +115,6 @@ class SequenceBatchScheduler : public Scheduler {
     // slot.
     void Enqueue(
         const uint32_t slot, const CorrelationID correlation_id,
-        std::unique_ptr<ModelInferStats::ScopedTimer>& queue_timer,
         const std::shared_ptr<ModelInferStats>& stats,
         const std::shared_ptr<InferRequestProvider>& request_provider,
         const std::shared_ptr<InferResponseProvider>& response_provider,

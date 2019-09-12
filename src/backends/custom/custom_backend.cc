@@ -291,23 +291,24 @@ CustomBackend::RunBackend(
     return;
   }
 
-  std::vector<ModelInferStats::ScopedTimer> compute_timers;
+  // Stop queue timer and start compute timer when the payload is
+  // scheduled to run
   for (auto& payload : *payloads) {
-    // Stop queue timer when the payload is scheduled to run
-    if (payload.queue_timer_ != nullptr) {
-      payload.queue_timer_.reset();
-    }
-
     if (payload.stats_ != nullptr) {
-      compute_timers.emplace_back();
-      payload.stats_->StartComputeTimer(&compute_timers.back());
+      payload.stats_->StopQueueTimer();
+      payload.stats_->StartComputeTimer();
       payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
 
   Status status = contexts_[runner_idx]->Run(this, payloads);
-  // reset compute timers before calling OnComplete function
-  compute_timers.clear();
+
+  // Stop compute timers.
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->StopComputeTimer();
+    }
+  }
 
   OnCompleteQueuedPayloads(status);
 }
