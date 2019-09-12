@@ -715,7 +715,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
         SharedMemoryControlResponse shm_status;
         if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
           err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
         } else {
           std::string shm_status_str = shm_status.DebugString();
           evbuffer_add(

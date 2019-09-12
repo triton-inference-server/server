@@ -1524,7 +1524,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
       case SharedMemoryControlRequest::REGISTER:
         err = smb_manager_->Create(
             &smb, request.shared_memory_region().name(),
-            request.shared_memory_region().shm_key(),
+            request.shared_memory_region().shared_memory_key(),
             request.shared_memory_region().offset(),
             request.shared_memory_region().byte_size());
         if (err == nullptr) {
@@ -1550,9 +1550,19 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         }
         break;
       case SharedMemoryControlRequest::GET_STATUS:
+        err = TRTSERVER_ServerSharedMemoryStatus(
+            trtserver_.get(), &shm_status_protobuf);
         if (err == nullptr) {
-          err = TRTSERVER_ServerSharedMemoryStatus(
-              trtserver_.get(), &shm_status_protobuf);
+          const char* status_buffer;
+          size_t status_byte_size;
+          err = TRTSERVER_ProtobufSerialize(
+              shm_status_protobuf, &status_buffer, &status_byte_size);
+          if (err == nullptr) {
+            if (!response.ParseFromArray(status_buffer, status_byte_size)) {
+              err = TRTSERVER_ErrorNew(
+                  TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
+            }
+          }
         }
         break;
       default:
