@@ -71,7 +71,7 @@ namespace {
 
 void
 BuildBackendConfigMap(
-    const std::string& version, const std::string& model_repository_path,
+    const std::string& version,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
     const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_vgpu_memory_limit_mb,
@@ -165,7 +165,6 @@ BuildBackendConfigMap(
   {
     auto custom_config = std::make_shared<CustomBackendFactory::Config>();
     custom_config->inference_server_version = version;
-    custom_config->model_repository_path = model_repository_path;
     (*backend_configs)[kCustomPlatform] = custom_config;
   }
 #endif  // TRTIS_ENABLE_CUSTOM
@@ -760,7 +759,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 #endif  // TRTIS_ENABLE_PYTORCH
 #ifdef TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_CUSTOM:
-      status = custom_factory_->CreateBackend(version_path, model_config, &is);
+      status = custom_factory_->CreateBackend(backend_info->repository_path_, model_name, version, model_config, &is);
       break;
 #endif  // TRTIS_ENABLE_CUSTOM
     case Platform::PLATFORM_ENSEMBLE:
@@ -860,7 +859,7 @@ ModelRepositoryManager::Create(
   BackendConfigMap backend_config_map;
 
   BuildBackendConfigMap(
-      server_version, repository_path, strict_model_config,
+      server_version, strict_model_config,
       tf_gpu_memory_fraction, tf_allow_soft_placement, tf_memory_limit_mb,
       &backend_config_map);
 
