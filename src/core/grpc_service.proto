@@ -236,12 +236,12 @@ message InferSharedMemoryRegion
   //@@
   string name = 1;
 
-  //@@  .. cpp:var:: string shm_key
+  //@@  .. cpp:var:: string shared_memory_key
   //@@
   //@@     The name of the shared memory region that holds the input data
   //@@     (or where the output data should be written).
   //@@
-  string shm_key = 2;
+  string shared_memory_key = 2;
 
   //@@  .. cpp:var:: uint64 offset
   //@@
@@ -332,7 +332,7 @@ message SharedMemoryControlResponse
   //@@
   //@@     The list of active shared memory regions.
   //@@
-  repeated InferSharedMemoryRegion active_shared_memory_region = 2;
+  repeated InferSharedMemoryRegion shared_memory_region = 2;
 }
 
 //@@

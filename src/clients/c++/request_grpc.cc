@@ -362,7 +362,7 @@ SharedMemoryControlGrpcContextImpl::SendRequest(
   if (action == SharedMemoryControlRequest::REGISTER) {
     auto rshm_region = request.mutable_shared_memory_region();
     rshm_region->set_name(name);
-    rshm_region->set_shm_key(shm_key);
+    rshm_region->set_shared_memory_key(shm_key);
     rshm_region->set_offset(offset);
     rshm_region->set_byte_size(byte_size);
     request.set_type(action);

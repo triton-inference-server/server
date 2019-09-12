@@ -34,6 +34,7 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
+#include "src/core/grpc_service.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
@@ -627,9 +628,16 @@ void
 HTTPAPIServer::HandleSharedMemoryControl(
     evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
 {
-  if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+  if (sharedmemorycontrol_uri == "/status") {
+    if (req->method != htp_method_GET) {
+      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+      return;
+    }
+  } else {
+    if (req->method != htp_method_POST) {
+      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+      return;
+    }
   }
 
   re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
@@ -679,7 +687,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }
-  } else if ((action_type_str == "unregister") && (remaining=="all")) {
+  } else if ((action_type_str == "unregister") && (remaining == "all")) {
     err = smb_manager_->Clear();
     if (err == nullptr) {
       err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
@@ -704,10 +712,15 @@ HTTPAPIServer::HandleSharedMemoryControl(
       err = TRTSERVER_ProtobufSerialize(
           shm_status_protobuf, &status_buffer, &status_byte_size);
       if (err == nullptr) {
-        evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
-        evhtp_headers_add_header(
-            req->headers_out,
-            evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+        SharedMemoryControlResponse shm_status;
+        if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
+          err = TRTSERVER_ErrorNew(
+              TRTSERVER_ERROR_UNKNOWN, "failed to parse server status");
+        } else {
+          std::string shm_status_str = shm_status.DebugString();
+          evbuffer_add(
+              req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
+        }
       }
     }
   } else {
