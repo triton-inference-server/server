@@ -131,6 +131,39 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_parse_error_no_model_config
+rm -fr models
+mkdir models
+for i in graphdef savedmodel netdef plan ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
+rm models/graphdef_float32_float32_float32/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server_tolive
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# give plenty of time for model to load (and fail to load)
+wait_for_model_stable $SERVER_TIMEOUT
+
+set +e
+python $LC_TEST LifeCycleTest.test_parse_error_no_model_config >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_init_error_modelfail
 rm -fr models
 mkdir models
@@ -138,6 +171,9 @@ cp -r ../custom_models/custom_sequence_int32 models/.
 cp -r ../custom_models/custom_int32_int32_int32 models/.
 sed -i "s/OUTPUT/_OUTPUT/" models/custom_sequence_int32/config.pbtxt
 sed -i "s/OUTPUT/_OUTPUT/" models/custom_int32_int32_int32/config.pbtxt
+for i in graphdef savedmodel netdef ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+done
 
 SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
