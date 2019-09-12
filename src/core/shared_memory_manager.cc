@@ -183,7 +183,7 @@ Status
 SharedMemoryManager::UnregisterAllSharedMemory()
 {
   // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock(register_mu_);
+  // don't lock mutex here since used in unregister function
 
   std::string error_message =
       "Failed to unregister the following shared memory regions: ";

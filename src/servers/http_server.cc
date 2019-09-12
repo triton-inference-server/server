@@ -206,7 +206,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister|unregisterall|status)(.*))")
+            R"(/(register|unregister|status)(.*))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -645,8 +645,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
     return;
   } else {
     if (remaining.empty()) {
-      if ((action_type_str != "unregisterall") &&
-          (action_type_str != "status")) {
+      if (action_type_str != "status") {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
@@ -658,10 +657,12 @@ HTTPAPIServer::HandleSharedMemoryControl(
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
-      if (action_type_str == "unregister" &&
-          (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
+      if (action_type_str == "unregister") {
+        if ((remaining != "all") &&
+            (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
+          evhtp_send_reply(req, EVHTP_RES_BADREQ);
+          return;
+        }
       }
     }
   }
@@ -678,6 +679,11 @@ HTTPAPIServer::HandleSharedMemoryControl(
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }
+  } else if ((action_type_str == "unregister") && (remaining=="all")) {
+    err = smb_manager_->Clear();
+    if (err == nullptr) {
+      err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
+    }
   } else if (action_type_str == "unregister") {
     err = smb_manager_->Remove(&smb, name.c_str());
     if ((err == nullptr) && (smb != nullptr)) {
@@ -688,8 +694,6 @@ HTTPAPIServer::HandleSharedMemoryControl(
                   << TRTSERVER_ErrorMessage(del_err);
       }
     }
-  } else if (action_type_str == "unregisterall") {
-    err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
   } else if (action_type_str == "status") {
     TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
     TRTSERVER_Error* err =

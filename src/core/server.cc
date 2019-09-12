@@ -425,6 +425,9 @@ InferenceServer::SharedMemoryStatus(SharedMemoryControlResponse* shm_status)
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
+}
+
+Status
 InferenceServer::ConfigureTrace(
     const std::string& trace_name, const std::string& hostname, uint32_t port)
 {

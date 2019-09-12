@@ -110,14 +110,18 @@ SharedMemoryBlockManager::Clear()
 {
   std::string failed_blocks;
 
-  for (auto pr : blocks_) {
-    TRTSERVER_Error* err = TRTSERVER_SharedMemoryBlockDelete(pr.second);
+  auto it = blocks_.begin();
+  while (it != blocks_.cend()) {
+    TRTSERVER_Error* err = TRTSERVER_SharedMemoryBlockDelete(it->second);
     if (err != nullptr) {
       if (failed_blocks.empty()) {
-        failed_blocks = pr.first;
+        failed_blocks = it->first;
       } else {
-        failed_blocks += ", " + pr.first;
+        failed_blocks += ", " + it->first;
       }
+      ++it;
+    } else {
+      blocks_.erase(it++);
     }
   }
 
