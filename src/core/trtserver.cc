@@ -1261,7 +1261,8 @@ TRTSERVER_ServerInferAsync(
 
   auto infer_stats = std::make_shared<ni::ModelInferStats>(
       lserver->StatusManager(), lprovider->ModelName());
-  infer_stats->StartRequestTimer();
+  infer_stats->CaptureTimestamp(
+      ni::ModelInferStats::TimestampKind::kRequestStart);
   infer_stats->SetRequestedVersion(lprovider->ModelVersion());
   infer_stats->SetMetricReporter(lprovider->Backend()->MetricReporter());
   infer_stats->SetBatchSize(request_header->batch_size());
@@ -1292,7 +1293,8 @@ TRTSERVER_ServerInferAsync(
           LOG_VERBOSE(1) << "Infer failed: " << status.Message();
         }
 
-        infer_stats->StopRequestTimer();
+        infer_stats->CaptureTimestamp(
+            ni::ModelInferStats::TimestampKind::kRequestEnd);
 
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);

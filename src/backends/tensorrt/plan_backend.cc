@@ -561,8 +561,8 @@ PlanBackend::Run(
   // scheduled to run
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
-      payload.stats_->StopQueueTimer();
-      payload.stats_->StartComputeTimer();
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeStart);
       payload.stats_->SetGPUDevice(contexts_[runner_idx]->gpu_device_);
     }
   }
@@ -572,7 +572,8 @@ PlanBackend::Run(
   // Stop compute timers.
   for (auto& payload : *payloads) {
     if (payload.stats_ != nullptr) {
-      payload.stats_->StopComputeTimer();
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeEnd);
     }
   }
 
