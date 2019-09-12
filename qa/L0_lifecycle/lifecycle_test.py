@@ -87,6 +87,55 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_parse_error_no_model_config(self):
+        # --strict-readiness=true so server is live but not ready
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # Server was started but with a model that fails to be polled
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                model_name = tu.get_model_name('graphdef', np.float32, np.float32, np.float32)
+
+                hctx = ServerHealthContext(pair[0], pair[1], True)
+                # Server is ready which is different from other modelfail tests
+                # as the models failed to be polled will be ignored
+                self.assertTrue(hctx.is_ready())
+                self.assertTrue(hctx.is_live())
+
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+
+                self.assertTrue(False,
+                                 "expected model '" + model_name + "' to be ignored due to polling failure")
+
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith(
+                        "no status available for unknown model 'graphdef_float32_float32_float32'"))
+
+        # And other models should be loaded successfully
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                for base_name in ["savedmodel", 'netdef']:
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                        
+                    iu.infer_exact(self, base_name, tensor_shape, 1,
+                                   np.float32, np.float32, np.float32,
+                                   model_version=1)
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_parse_error_modelfail(self):
         # --strict-readiness=true so server is live but not ready
         input_size = 16
@@ -127,6 +176,27 @@ class LifeCycleTest(unittest.TestCase):
                 ex.message().startswith(
                     "Inference request for unknown model 'graphdef_float32_float32_float32'"))
 
+        # And other models should be loaded successfully
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                for base_name in ["savedmodel", 'netdef']:
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                        
+                    iu.infer_exact(self, base_name, tensor_shape, 1,
+                                   np.float32, np.float32, np.float32,
+                                   model_version=1)
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
     def test_init_error_modelfail(self):
         # --strict-readiness=true so server is live but not ready
 
@@ -153,6 +223,29 @@ class LifeCycleTest(unittest.TestCase):
                 hctx = ServerHealthContext(pair[0], pair[1], True)
                 self.assertFalse(hctx.is_ready())
                 self.assertTrue(hctx.is_live())
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # And other models should be loaded successfully
+        input_size = 16
+        tensor_shape = (input_size,)
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                for base_name in ["graphdef", "savedmodel", 'netdef']:
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                        
+                    iu.infer_exact(self, base_name, tensor_shape, 1,
+                                   np.float32, np.float32, np.float32,
+                                   model_version=1)
 
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
