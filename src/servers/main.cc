@@ -28,7 +28,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <algorithm>
-#include <chrono>
+#include <cctype>
 #include <condition_variable>
 #include <csignal>
 #include <iostream>
@@ -82,8 +82,7 @@ int32_t http_port_ = 8000;
 int32_t http_health_port_ = -1;
 std::vector<int32_t> http_ports_;
 std::vector<std::string> endpoint_names = {
-    "status", "health",       "tracecontrol",
-    "infer",  "modelcontrol", "sharedmemorycontrol"};
+    "status", "health", "infer", "modelcontrol", "sharedmemorycontrol"};
 #endif  // TRTIS_ENABLE_HTTP
 
 #ifdef TRTIS_ENABLE_GRPC
@@ -99,9 +98,8 @@ int32_t metrics_port_ = 8002;
 #endif  // TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_TRACING
-std::string trace_host_;
-int32_t trace_port_ = 9411;
-int32_t trace_level_ = 0;  // disabled
+std::string trace_filepath_;
+TRTSERVER_Trace_Level trace_level_ = TRTSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -158,8 +156,7 @@ enum OptionId {
   OPTION_METRICS_PORT,
 #endif  // TRTIS_ENABLE_METRICS
 #ifdef TRTIS_ENABLE_TRACING
-  OPTION_TRACE_HOST,
-  OPTION_TRACE_PORT,
+  OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
 #endif  // TRTIS_ENABLE_TRACING
@@ -254,19 +251,13 @@ std::vector<Option> options_{
      "The port reporting prometheus metrics."},
 #endif  // TRTIS_ENABLE_METRICS
 #ifdef TRTIS_ENABLE_TRACING
-    {OPTION_TRACE_HOST, "trace-host",
-     "Enable tracing on server startup. Set the hostname of the server where "
-     "trace data should be sent."},
-    {OPTION_TRACE_PORT, "trace-port",
-     "Set the port on the server where trace data should be sent. Default is "
-     "9411. Valid only if --trace-host is also given."},
+    {OPTION_TRACE_FILEPATH, "trace-file",
+     "Set the file where trace output will be saved."},
     {OPTION_TRACE_LEVEL, "trace-level",
-     "Set the trace level. (0) Disable tracing, (1) Minimal tracing, trace "
-     "only overall request, queue and compute, (2) Full tracing, minimal "
-     "tracing plus details. Valid only if --trace-host is also given."},
+     "Set the trace level. OFF to disable tracing, MIN for minimal tracing, "
+     "MAX for maximal tracing. Default is OFF."},
     {OPTION_TRACE_RATE, "trace-rate",
-     "Set the trace sampling rate. Default is 1000. Valid only if --trace-host "
-     "is also given."},
+     "Set the trace sampling rate. Default is 1000."},
 #endif  // TRTIS_ENABLE_TRACING
     {OPTION_ALLOW_POLL_REPO, "allow-poll-model-repository",
      "Poll the model repository to detect changes. The poll rate is "
@@ -361,11 +352,12 @@ TRTSERVER_Error*
 StartGrpcService(
     std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
         smb_manager)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
-      server, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
+      server, trace_manager, smb_manager, grpc_port_, grpc_infer_thread_cnt_,
       grpc_stream_infer_thread_cnt_, grpc_infer_allocation_pool_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -384,12 +376,13 @@ TRTSERVER_Error*
 StartHttpService(
     std::vector<std::unique_ptr<nvidia::inferenceserver::HTTPServer>>* services,
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
         smb_manager,
     std::map<int32_t, std::vector<std::string>>& port_map)
 {
   TRTSERVER_Error* err = nvidia::inferenceserver::HTTPServer::CreateAPIServer(
-      server, smb_manager, port_map, http_thread_cnt_, services);
+      server, trace_manager, smb_manager, port_map, http_thread_cnt_, services);
   if (err == nullptr) {
     for (auto& http_eps : *services) {
       if (http_eps != nullptr) {
@@ -433,6 +426,7 @@ StartMetricsService(
 bool
 StartEndpoints(
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryBlockManager>&
         smb_manager)
 {
@@ -446,7 +440,7 @@ StartEndpoints(
   // Enable GRPC endpoints if requested...
   if (allow_grpc_ && (grpc_port_ != -1)) {
     TRTSERVER_Error* err =
-        StartGrpcService(&grpc_service_, server, smb_manager);
+        StartGrpcService(&grpc_service_, server, trace_manager, smb_manager);
     if (err != nullptr) {
       LOG_ERROR << "Failed to start GRPC service: "
                 << TRTSERVER_ErrorMessage(err);
@@ -468,8 +462,8 @@ StartEndpoints(
       }
     }
 
-    TRTSERVER_Error* err =
-        StartHttpService(&http_services_, server, smb_manager, port_map);
+    TRTSERVER_Error* err = StartHttpService(
+        &http_services_, server, trace_manager, smb_manager, port_map);
     if (err != nullptr) {
       LOG_ERROR << "Failed to start HTTP service: "
                 << TRTSERVER_ErrorMessage(err);
@@ -548,40 +542,43 @@ StopEndpoints()
 }
 
 bool
-StartTracing(const std::shared_ptr<TRTSERVER_Server>& server)
+StartTracing(
+    const std::shared_ptr<TRTSERVER_Server>& server,
+    std::shared_ptr<nvidia::inferenceserver::TraceManager>* trace_manager)
 {
+  trace_manager->reset();
+
 #ifdef TRTIS_ENABLE_TRACING
   TRTSERVER_Error* err = nullptr;
 
   // Configure tracing if host is specified.
-  if (!trace_host_.empty()) {
-    TRTSERVER_TraceOptions* options = nullptr;
-    err = TRTSERVER_TraceOptionsNew(&options);
+  if (trace_level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
+    err = nvidia::inferenceserver::TraceManager::Create(
+        trace_manager, trace_filepath_);
     if (err == nullptr) {
-      TRTSERVER_TraceOptionsSetHost(options, trace_host_.c_str());
-      TRTSERVER_TraceOptionsSetPort(options, trace_port_);
-      err = TRTSERVER_ServerTraceConfigure(server.get(), options);
-
-      TRTSERVER_Error* del_err = TRTSERVER_TraceOptionsDelete(options);
-      if (del_err != nullptr) {
-        LOG_ERROR << "failed to delete trace options: "
-                  << TRTSERVER_ErrorMessage(del_err);
-        TRTSERVER_ErrorDelete(del_err);
+      err = (*trace_manager)->SetRate(trace_rate_);
+      if (err == nullptr) {
+        err = (*trace_manager)->SetLevel(trace_level_);
       }
-    }
-
-    // Set the initial level and rate.
-    if (err == nullptr) {
-      err = TRTSERVER_ServerSetTraceLevel(
-          server.get(), trace_level_, trace_rate_);
     }
   }
 
   if (err != nullptr) {
     LOG_ERROR << "Failed to configure tracing: " << TRTSERVER_ErrorMessage(err);
     TRTSERVER_ErrorDelete(err);
+    trace_manager->reset();
     return false;
   }
+#endif  // TRTIS_ENABLE_TRACING
+
+  return true;
+}
+
+bool
+StopTracing(
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager)
+{
+#ifdef TRTIS_ENABLE_TRACING
 #endif  // TRTIS_ENABLE_TRACING
 
   return true;
@@ -599,12 +596,16 @@ Usage()
 }
 
 bool
-ParseBoolOption(const std::string arg)
+ParseBoolOption(std::string arg)
 {
-  if ((arg == "true") || (arg == "True") || (arg == "1")) {
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if ((arg == "true") || (arg == "1")) {
     return true;
   }
-  if ((arg == "false") || (arg == "False") || (arg == "0")) {
+  if ((arg == "false") || (arg == "0")) {
     return false;
   }
 
@@ -626,17 +627,45 @@ ParseFloatOption(const std::string arg)
 }
 
 int
-ParseIntBoolOption(const std::string arg)
+ParseIntBoolOption(std::string arg)
 {
-  if ((arg == "true") || (arg == "True")) {
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if (arg == "true") {
     return 1;
   }
-  if ((arg == "false") || (arg == "False")) {
+  if (arg == "false") {
     return 0;
   }
 
   return ParseIntOption(arg);
 }
+
+#ifdef TRTIS_ENABLE_TRACING
+TRTSERVER_Trace_Level
+ParseTraceLevelOption(std::string arg)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if ((arg == "false") || (arg == "off")) {
+    return TRTSERVER_TRACE_LEVEL_DISABLED;
+  }
+  if ((arg == "true") || (arg == "on") || (arg == "min")) {
+    return TRTSERVER_TRACE_LEVEL_MIN;
+  }
+  if (arg == "max") {
+    return TRTSERVER_TRACE_LEVEL_MAX;
+  }
+
+  LOG_ERROR << "invalid value for trace level option: " << arg;
+  LOG_ERROR << Usage();
+  exit(1);
+}
+#endif  // TRTIS_ENABLE_TRACING
 
 struct VgpuOption {
   int gpu_device_;
@@ -734,9 +763,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_TRACING
-  std::string trace_host = trace_host_;
-  int32_t trace_port = trace_port_;
-  int32_t trace_level = trace_level_;
+  std::string trace_filepath = trace_filepath_;
+  TRTSERVER_Trace_Level trace_level = trace_level_;
   int32_t trace_rate = trace_rate_;
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -839,14 +867,11 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_TRACING
-      case OPTION_TRACE_HOST:
-        trace_host = optarg;
-        break;
-      case OPTION_TRACE_PORT:
-        trace_port = ParseIntOption(optarg);
+      case OPTION_TRACE_FILEPATH:
+        trace_filepath = optarg;
         break;
       case OPTION_TRACE_LEVEL:
-        trace_level = ParseIntOption(optarg);
+        trace_level = ParseTraceLevelOption(optarg);
         break;
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
@@ -916,8 +941,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #ifdef TRTIS_ENABLE_HTTP
   http_port_ = http_port;
   http_health_port_ = http_health_port;
-  http_ports_ = {http_port_, http_health_port_, http_port_,
-                 http_port_, http_port_,        http_port_};
+  http_ports_ = {http_port_, http_health_port_, http_port_, http_port_,
+                 http_port_};
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRTIS_ENABLE_HTTP
 
@@ -934,8 +959,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 #endif  // TRTIS_ENABLE_METRICS
 
 #ifdef TRTIS_ENABLE_TRACING
-  trace_host_ = trace_host;
-  trace_port_ = trace_port;
+  trace_filepath_ = trace_filepath;
   trace_level_ = trace_level;
   trace_rate_ = trace_rate;
 #endif  // TRTIS_ENABLE_TRACING
@@ -1018,6 +1042,9 @@ main(int argc, char** argv)
     exit(1);
   }
 
+  // Trace manager.
+  std::shared_ptr<nvidia::inferenceserver::TraceManager> trace_manager;
+
   // Manager for shared memory blocks.
   auto smb_manager =
       std::make_shared<nvidia::inferenceserver::SharedMemoryBlockManager>();
@@ -1032,12 +1059,12 @@ main(int argc, char** argv)
   std::shared_ptr<TRTSERVER_Server> server(server_ptr, TRTSERVER_ServerDelete);
 
   // Configure and start tracing if specified on the command line.
-  if (!StartTracing(server)) {
+  if (!StartTracing(server, &trace_manager)) {
     exit(1);
   }
 
   // Start the HTTP, GRPC, and metrics endpoints.
-  if (!StartEndpoints(server, smb_manager)) {
+  if (!StartEndpoints(server, trace_manager, smb_manager)) {
     exit(1);
   }
 
@@ -1065,7 +1092,8 @@ main(int argc, char** argv)
 
   LOG_IF_ERR(TRTSERVER_ServerStop(server.get()), "failed to stop server");
 
-  // Stop the HTTP, GRPC, and metrics endpoints.
+  // Stop tracing and the HTTP, GRPC, and metrics endpoints.
+  StopTracing(trace_manager);
   StopEndpoints();
 
 #ifdef TRTIS_ENABLE_ASAN

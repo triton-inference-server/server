@@ -38,6 +38,10 @@
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
 
+#ifdef TRTIS_ENABLE_TRACING
+#include "src/servers/tracer.h"
+#endif  // TRTIS_ENABLE_TRACING
+
 namespace nvidia { namespace inferenceserver {
 
 // Generic HTTP server using evhtp
@@ -188,14 +192,16 @@ class HTTPAPIServer : public HTTPServerImpl {
  public:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
+          trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const std::vector<std::string>& endpoints, const int32_t port,
       const int thread_cnt)
       : HTTPServerImpl(port, thread_cnt), server_(server),
-        smb_manager_(smb_manager), endpoint_names_(endpoints),
-        allocator_(nullptr),
+        trace_manager_(trace_manager), smb_manager_(smb_manager),
+        endpoint_names_(endpoints), allocator_(nullptr),
         api_regex_(
-            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol|tracecontrol)(.*))"),
+            R"(/api/(health|infer|status|modelcontrol|sharedmemorycontrol)(.*))"),
         health_regex_(R"(/(live|ready))"),
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
@@ -236,9 +242,13 @@ class HTTPAPIServer : public HTTPServerImpl {
     ~InferRequest() = default;
 
     static void InferComplete(
-        TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
-        void* userp);
+        TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+        TRTSERVER_InferenceResponse* response, void* userp);
     evhtp_res FinalizeResponse(TRTSERVER_InferenceResponse* response);
+
+#ifdef TRTIS_ENABLE_TRACING
+    std::unique_ptr<Tracer> tracer_;
+#endif  // TRTIS_ENABLE_TRACING
 
     std::unique_ptr<EVBufferPair> response_pair_;
 
@@ -268,8 +278,6 @@ class HTTPAPIServer : public HTTPServerImpl {
       evhtp_request_t* req, const std::string& modelcontrol_uri);
   void HandleSharedMemoryControl(
       evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
-  void HandleTraceControl(
-      evhtp_request_t* req, const std::string& tracecontrol_uri);
 
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
@@ -284,6 +292,7 @@ class HTTPAPIServer : public HTTPServerImpl {
   std::shared_ptr<TRTSERVER_Server> server_;
   const char* server_id_;
 
+  std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   std::vector<std::string> endpoint_names_;
 
@@ -438,14 +447,6 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
              endpoint_names_.begin(), endpoint_names_.end(),
              "sharedmemorycontrol") != endpoint_names_.end())) {
       HandleSharedMemoryControl(req, rest);
-      return;
-    }
-    // tracecontrol
-    if (endpoint == "tracecontrol" &&
-        (std::find(
-             endpoint_names_.begin(), endpoint_names_.end(), "tracecontrol") !=
-         endpoint_names_.end())) {
-      HandleTraceControl(req, rest);
       return;
     }
   }
@@ -713,44 +714,6 @@ HTTPAPIServer::HandleSharedMemoryControl(
   TRTSERVER_ErrorDelete(err);
 }
 
-void
-HTTPAPIServer::HandleTraceControl(
-    evhtp_request_t* req, const std::string& tracecontrol_uri)
-{
-  if (req->method != htp_method_GET) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
-  }
-
-  if (!tracecontrol_uri.empty() && (tracecontrol_uri != "/")) {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  std::string cmd;
-  const char* cmd_c_str = evhtp_kv_find(req->uri->query, "cmd");
-  if (cmd_c_str != NULL) {
-    cmd = std::string(cmd_c_str);
-  }
-
-  // For now tracing is a nop...
-
-  RequestStatus request_status;
-  RequestStatusUtil::Create(
-      &request_status, nullptr /* err */,
-      RequestStatusUtil::NextUniqueRequestId(), server_id_);
-
-  evhtp_headers_add_header(
-      req->headers_out,
-      evhtp_header_new(
-          kStatusHTTPHeader, request_status.ShortDebugString().c_str(), 1, 1));
-
-  evhtp_send_reply(
-      req, (request_status.code() == RequestStatusCode::SUCCESS)
-               ? EVHTP_RES_OK
-               : EVHTP_RES_BADREQ);
-}
-
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
@@ -936,8 +899,21 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       response_pair->first = req->buffer_out;
       infer_request->response_pair_.reset(response_pair);
 
+      // Get the trace object to use for this request. If nullptr then
+      // no tracing will be performed.
+      TRTSERVER_Trace* trace = nullptr;
+#ifdef TRTIS_ENABLE_TRACING
+      if (trace_manager_ != nullptr) {
+        infer_request->tracer_.reset(
+            trace_manager_->SampleTrace(model_name, model_version));
+        if (infer_request->tracer_ != nullptr) {
+          trace = infer_request->tracer_->ServerTrace();
+        }
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
       err = TRTSERVER_ServerInferAsync(
-          server_.get(), request_provider, allocator_,
+          server_.get(), trace, request_provider, allocator_,
           reinterpret_cast<void*>(response_pair), InferRequest::InferComplete,
           reinterpret_cast<void*>(infer_request));
       if (err != nullptr) {
@@ -1010,8 +986,8 @@ HTTPAPIServer::InferRequest::InferRequest(
 
 void
 HTTPAPIServer::InferRequest::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
-    void* userp)
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_InferenceResponse* response, void* userp)
 {
   HTTPAPIServer::InferRequest* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
@@ -1021,8 +997,11 @@ HTTPAPIServer::InferRequest::InferComplete(
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request->req_);
   }
 
+  // Don't need to explicitly delete 'trace'. It will be deleted by
+  // the Tracer object in 'infer_request'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
+  delete infer_request;
 }
 
 evhtp_res
@@ -1108,6 +1087,7 @@ HTTPAPIServer::InferRequest::FinalizeResponse(
 TRTSERVER_Error*
 HTTPServer::CreateAPIServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const std::map<int32_t, std::vector<std::string>>& port_map, int thread_cnt,
     std::vector<std::unique_ptr<HTTPServer>>* http_servers)
@@ -1123,7 +1103,8 @@ HTTPServer::CreateAPIServer(
     std::string addr = "0.0.0.0:" + std::to_string(ep_map.first);
     LOG_INFO << "Starting HTTPService at " << addr;
     http_servers->emplace_back(new HTTPAPIServer(
-        server, smb_manager, ep_map.second, ep_map.first, thread_cnt));
+        server, trace_manager, smb_manager, ep_map.second, ep_map.first,
+        thread_cnt));
   }
 
   return nullptr;

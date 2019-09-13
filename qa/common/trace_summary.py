@@ -27,58 +27,36 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import cgi
 import json
-import signal
 import sys
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 FLAGS = None
 
-class TraceRequestHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        # Don't expect GET, so send a failure.
-        self.send_response(400)
-        self.end_headers()
+def summarize(traces):
+    for trace in traces:
+        timestamps = []
+        for ts in trace["timestamps"]:
+            timestamps.append((ts["name"], ts["ns"]))
+        timestamps.sort(key=lambda tup: tup[1])
 
-    def do_POST(self):
-        ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
-        if ctype != 'application/json':
-            self.send_response(400)
-            self.end_headers()
-            return
-
-        length = int(self.headers.getheader('content-length'))
-        trace_data = json.loads(self.rfile.read(length))
-        if FLAGS.verbose:
-            print json.dumps(trace_data, sort_keys=True, indent=2)
-
-        self.send_response(200)
-        self.end_headers()
-
-    def log_message(self, format, *args):
-        if FLAGS.verbose:
-            print("%s - - [%s] %s" % (self.address_string(), self.log_date_time_string(),
-                                      format%args))
-
-def sig_handler(_signo, _stack_frame):
-    sys.exit(0)
+        print("{} ({}):".format(trace["model_name"], trace["model_version"]));
+        now = None
+        for ts in timestamps:
+            if now is not None:
+                print("\t\t{}us".format((ts[1] - now) / 1000))
+            print("\t{}".format(ts[0]))
+            now = ts[1]
 
 if __name__ == '__main__':
-    signal.signal(signal.SIGTERM, sig_handler)
-    signal.signal(signal.SIGHUP, sig_handler)
-
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
                         help='Enable verbose output')
-    parser.add_argument('--port', type=int, required=False, default=9411,
-                        help='Trace port')
+    parser.add_argument('file', type=argparse.FileType('r'), nargs='+')
     FLAGS = parser.parse_args()
 
-    server = HTTPServer(("", FLAGS.port), TraceRequestHandler)
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
+    for f in FLAGS.file:
+        trace_data = json.loads(f.read())
+        if FLAGS.verbose:
+            print json.dumps(trace_data, sort_keys=True, indent=2)
 
-    server.server_close()
+        summarize(trace_data)

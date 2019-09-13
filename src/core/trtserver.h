@@ -52,7 +52,7 @@ struct TRTSERVER_ResponseAllocator;
 struct TRTSERVER_Server;
 struct TRTSERVER_ServerOptions;
 struct TRTSERVER_SharedMemoryBlock;
-struct TRTSERVER_TraceOptions;
+struct TRTSERVER_Trace;
 
 /// Types of memory recognized by TRTSERVER.
 typedef enum trtserver_memorytype_enum {
@@ -290,6 +290,54 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_MetricsFormatted(
     TRTSERVER_Metrics* metrics, TRTSERVER_Metric_Format format,
     const char** base, size_t* byte_size);
 
+/// TRTSERVER_Trace
+///
+/// Object that represents tracing for a request.
+///
+
+/// Trace levels
+typedef enum trtserver_tracelevel_enum {
+  TRTSERVER_TRACE_LEVEL_DISABLED,
+  TRTSERVER_TRACE_LEVEL_MIN,
+  TRTSERVER_TRACE_LEVEL_MAX
+} TRTSERVER_Trace_Level;
+
+// Trace activities
+typedef enum trtserver_traceactivity_enum {
+  TRTSERVER_TRACE_REQUEST_START,
+  TRTSERVER_TRACE_QUEUE_START,
+  TRTSERVER_TRACE_COMPUTE_START,
+  TRTSERVER_TRACE_COMPUTE_END,
+  TRTSERVER_TRACE_REQUEST_END
+} TRTSERVER_Trace_Activity;
+
+/// Type for trace activity callback function. This callback function
+/// is used to report activity occurring during a traced request. The
+/// 'userp' data is the same as what is supplied in the call to
+/// TRTSERVER_TraceNew.
+typedef void (*TRTSERVER_TraceActivityFn_t)(
+    TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
+    uint64_t timestamp_ns, void* userp);
+
+/// Create a new trace object. The caller takes ownership of the
+/// TRTSERVER_Trace object and must call TRTSERVER_TraceDelete to
+/// release the object.
+/// \param trace Returns the new trace object.
+/// \param level The tracing level.
+/// \param activity_fn The callback function where activity for the
+/// trace is reported.
+/// \param activity_userp User-provided pointer that is delivered to
+/// the activity function.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceNew(
+    TRTSERVER_Trace** trace, TRTSERVER_Trace_Level level,
+    TRTSERVER_TraceActivityFn_t activity_fn, void* activity_userp);
+
+/// Delete a trace object.
+/// \param trace The trace object.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceDelete(TRTSERVER_Trace* trace);
+
 /// TRTSERVER_InferenceRequestProvider
 ///
 /// Object representing the request provider for an inference
@@ -399,46 +447,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
     size_t* byte_size, TRTSERVER_Memory_Type* memory_type);
-
-/// TRTSERVER_TraceOptions
-///
-/// Options to use when configuring tracing.
-///
-
-/// Create a new trace options object. The caller takes ownership of
-/// the TRTSERVER_TraceOptions object and must call
-/// TRTSERVER_TraceOptionsDelete to release the object.
-/// \param options Returns the new trace options object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsNew(
-    TRTSERVER_TraceOptions** options);
-
-/// Delete a trace options object.
-/// \param options The trace options object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsDelete(
-    TRTSERVER_TraceOptions* options);
-
-/// Set the descriptive name for the trace.
-/// \param options The trace options object.
-/// \param trace_name The descriptive name.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetTraceName(
-    TRTSERVER_TraceOptions* options, const char* trace_name);
-
-/// Set the host name of the server where the trace should be sent.
-/// \param options The trace options object.
-/// \param host The server hostname.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetHost(
-    TRTSERVER_TraceOptions* options, const char* host);
-
-/// Set the port of the server where the trace should be sent.
-/// \param options The trace options object.
-/// \param port The server port.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_TraceOptionsSetPort(
-    TRTSERVER_TraceOptions* options, uint32_t port);
 
 /// TRTSERVER_ServerOptions
 ///
@@ -767,32 +775,18 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerMetrics(
     TRTSERVER_Server* server, TRTSERVER_Metrics** metrics);
 
-/// Configure tracing on the server.
-/// \param server The inference server object.
-/// \param options The trace options object.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerTraceConfigure(
-    TRTSERVER_Server* server, TRTSERVER_TraceOptions* options);
-
-/// Set the tracing level to enable or disable tracing on the
-/// server. When enabling set the sample rate.
-/// \param server The inference server object.
-/// \param level The tracing level. (0) Disable tracing, (1) Minimal
-/// tracing, trace only overall request, queue and compute, (2) Full
-/// tracing, minimal tracing plus details.
-/// \param rate The sampling rate.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSetTraceLevel(
-    TRTSERVER_Server* server, uint32_t level, uint32_t rate);
-
-/// Type for inference completion callback function. The callback
-/// function takes ownership of the TRTSERVER_InferenceResponse object
-/// and must call TRTSERVER_InferenceResponseDelete to release the
-/// object. The 'userp' data is the same as what is supplied in the
-/// call to TRTSERVER_ServerInferAsync.
+/// Type for inference completion callback function. If non-nullptr,
+/// the 'trace' object is the trace associated with the request that
+/// is completing. The callback function takes ownership of the
+/// TRTSERVER_Trace object and must call TRTSERVER_TraceDelete to
+/// release the object. The callback function takes ownership of the
+/// TRTSERVER_InferenceResponse object and must call
+/// TRTSERVER_InferenceResponseDelete to release the object. The
+/// 'userp' data is the same as what is supplied in the call to
+/// TRTSERVER_ServerInferAsync.
 typedef void (*TRTSERVER_InferenceCompleteFn_t)(
-    TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
-    void* userp);
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_InferenceResponse* response, void* userp);
 
 /// Perform inference using the meta-data and inputs supplied by the
 /// request provider. The caller retains ownership of
@@ -800,6 +794,8 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 /// TRTSERVER_InferenceRequestProviderDelete once this function
 /// returns.
 /// \param server The inference server object.
+/// \param trace The trace object for this request, or nullptr if no
+/// tracing.
 /// \param request_provider The request provider for the request.
 /// \param response_allocator The TRTSERVER_ResponseAllocator to use
 /// to allocate buffers to hold inference results.
@@ -811,7 +807,7 @@ typedef void (*TRTSERVER_InferenceCompleteFn_t)(
 /// the completion function.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerInferAsync(
-    TRTSERVER_Server* server,
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
     TRTSERVER_InferenceRequestProvider* request_provider,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,

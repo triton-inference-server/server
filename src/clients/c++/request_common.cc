@@ -73,16 +73,6 @@ RequestTimers::Record(Kind kind)
 
 //==============================================================================
 
-Error
-TraceControlContext::Options::Create(
-    std::unique_ptr<TraceControlContext::Options>* options)
-{
-  options->reset(new TraceControlOptionsImpl());
-  return Error::Success;
-}
-
-//==============================================================================
-
 bool
 InferOptionsImpl::Flag(InferRequestHeader::Flag flag) const
 {

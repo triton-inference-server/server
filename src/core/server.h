@@ -40,7 +40,6 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
-#include "src/core/tracing.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -104,14 +103,6 @@ class InferenceServer {
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
-
-  // Configure tracing. This does not enable tracing.
-  Status ConfigureTrace(
-      const std::string& trace_name, const std::string& hostname,
-      uint32_t port);
-
-  // Set trace level and rate.
-  Status SetTraceLevel(uint32_t level, uint32_t rate);
 
   // Return the ready state for the server.
   ServerReadyState ReadyState() const { return ready_state_; }

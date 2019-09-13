@@ -36,6 +36,7 @@
 #include "src/core/server.h"
 #include "src/core/server_status.h"
 #include "src/core/status.h"
+#include "src/core/tracing.h"
 
 namespace ni = nvidia::inferenceserver;
 
@@ -228,32 +229,6 @@ TrtServerMetrics::Serialize(const char** base, size_t* byte_size)
       TRTSERVER_ERROR_UNSUPPORTED, "metrics not supported");
 #endif  // TRTIS_ENABLE_METRICS
 }
-
-//
-// TrtTraceOptions
-//
-// Implementation for TRTSERVER_TraceOptions.
-//
-class TrtTraceOptions {
- public:
-  TrtTraceOptions();
-
-  const std::string& TraceName() const { return trace_name_; }
-  void SetTraceName(const char* n) { trace_name_ = n; }
-
-  const std::string& Host() const { return host_; }
-  void SetHost(const char* n) { host_ = n; }
-
-  uint32_t Port() const { return port_; }
-  void SetPort(uint32_t p) { port_ = p; }
-
- private:
-  std::string trace_name_;
-  std::string host_;
-  uint32_t port_;
-};
-
-TrtTraceOptions::TrtTraceOptions() : trace_name_("TRTIS"), port_(0) {}
 
 //
 // TrtServerOptions
@@ -616,6 +591,40 @@ TRTSERVER_MetricsFormatted(
 }
 
 //
+// TRTSERVER_Trace
+//
+TRTSERVER_Error*
+TRTSERVER_TraceNew(
+    TRTSERVER_Trace** trace, TRTSERVER_Trace_Level level,
+    TRTSERVER_TraceActivityFn_t activity_fn, void* activity_userp)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  std::unique_ptr<ni::Trace> ltrace;
+  RETURN_IF_STATUS_ERROR(
+      ni::Trace::Create(level, activity_fn, activity_userp, &ltrace));
+  *trace = reinterpret_cast<TRTSERVER_Trace*>(ltrace.release());
+  return nullptr;  // Success
+#else
+  *trace = nullptr;
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+TRTSERVER_Error*
+TRTSERVER_TraceDelete(TRTSERVER_Trace* trace)
+{
+#ifdef TRTIS_ENABLE_TRACING
+  ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+  delete ltrace;
+  return nullptr;  // Success
+#else
+  return TRTSERVER_ErrorNew(
+      TRTSERVER_ERROR_UNSUPPORTED, "tracing not supported");
+#endif  // TRTIS_ENABLE_TRACING
+}
+
+//
 // TRTSERVER_InferenceRequestProvider
 //
 TRTSERVER_Error*
@@ -734,49 +743,6 @@ TRTSERVER_InferenceResponseOutputData(
 {
   TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
   return lresponse->OutputData(name, base, byte_size, memory_type);
-}
-
-//
-// TRTSERVER_TraceOptions
-//
-TRTSERVER_Error*
-TRTSERVER_TraceOptionsNew(TRTSERVER_TraceOptions** options)
-{
-  *options = reinterpret_cast<TRTSERVER_TraceOptions*>(new TrtTraceOptions());
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_TraceOptionsDelete(TRTSERVER_TraceOptions* options)
-{
-  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
-  delete loptions;
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_TraceOptionsSetTraceName(
-    TRTSERVER_TraceOptions* options, const char* trace_name)
-{
-  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
-  loptions->SetTraceName(trace_name);
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_TraceOptionsSetHost(TRTSERVER_TraceOptions* options, const char* host)
-{
-  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
-  loptions->SetHost(host);
-  return nullptr;  // Success
-}
-
-TRTSERVER_Error*
-TRTSERVER_TraceOptionsSetPort(TRTSERVER_TraceOptions* options, uint32_t port)
-{
-  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
-  loptions->SetPort(port);
-  return nullptr;  // Success
 }
 
 //
@@ -1224,28 +1190,8 @@ TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerTraceConfigure(
-    TRTSERVER_Server* server, TRTSERVER_TraceOptions* options)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  TrtTraceOptions* loptions = reinterpret_cast<TrtTraceOptions*>(options);
-  RETURN_IF_STATUS_ERROR(lserver->ConfigureTrace(
-      loptions->TraceName(), loptions->Host(), loptions->Port()));
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
-TRTSERVER_ServerSetTraceLevel(
-    TRTSERVER_Server* server, uint32_t level, uint32_t rate)
-{
-  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
-  RETURN_IF_STATUS_ERROR(lserver->SetTraceLevel(level, rate));
-  return nullptr;  // success
-}
-
-TRTSERVER_Error*
 TRTSERVER_ServerInferAsync(
-    TRTSERVER_Server* server,
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
     TRTSERVER_InferenceRequestProvider* request_provider,
     TRTSERVER_ResponseAllocator* response_allocator,
     void* response_allocator_userp, TRTSERVER_InferenceCompleteFn_t complete_fn,
@@ -1286,7 +1232,7 @@ TRTSERVER_ServerInferAsync(
   lserver->Infer(
       lprovider->Backend(), infer_request_provider, infer_response_provider,
       infer_stats,
-      [infer_stats, infer_response_provider, server, complete_fn,
+      [infer_stats, trace, infer_response_provider, server, complete_fn,
        complete_userp](const ni::Status& status) mutable {
         infer_stats->SetFailed(!status.IsOk());
         if (!status.IsOk()) {
@@ -1296,10 +1242,18 @@ TRTSERVER_ServerInferAsync(
         infer_stats->CaptureTimestamp(
             ni::ModelInferStats::TimestampKind::kRequestEnd);
 
+#ifdef TRTIS_ENABLE_TRACING
+        if (trace != nullptr) {
+          ni::Trace* ltrace = reinterpret_cast<ni::Trace*>(trace);
+          ltrace->Report(infer_stats);
+        }
+#endif  // TRTIS_ENABLE_TRACING
+
         TrtServerResponse* response =
             new TrtServerResponse(status, infer_response_provider);
         complete_fn(
-            server, reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
+            server, trace,
+            reinterpret_cast<TRTSERVER_InferenceResponse*>(response),
             complete_userp);
       });
 
