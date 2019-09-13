@@ -61,6 +61,8 @@ constexpr char kCaffe2NetDefInitFilenamePrefix[] = "init_";
 #ifdef TRTIS_ENABLE_ONNXRUNTIME
 constexpr char kOnnxRuntimeOnnxPlatform[] = "onnxruntime_onnx";
 constexpr char kOnnxRuntimeOnnxFilename[] = "model.onnx";
+constexpr char kOnnxRuntimeTensorRTExecutionProvider[] = "tensorrt";
+constexpr char kOnnxRuntimeOpenVINOExecutionProvider[] = "openvino";
 #endif  // TRTIS_ENABLE_ONNXRUNTIME
 
 #ifdef TRTIS_ENABLE_PYTORCH
