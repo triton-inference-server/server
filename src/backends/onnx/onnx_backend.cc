@@ -38,7 +38,7 @@
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
-#include <core/providers/cuda/cuda_provider_factory.h>
+#include <cuda_provider_factory.h>
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
 
@@ -59,9 +59,7 @@ OnnxBackend::Context::~Context()
   if (session_ != nullptr) {
     OnnxLoader::UnloadSession(session_);
   }
-  if (allocator_ != nullptr) {
-    OrtReleaseAllocator(allocator_);
-  }
+  // 'allocator_' is default allocator which is managed by ONNX Runtime
 }
 
 Status
@@ -87,7 +85,7 @@ OnnxBackend::CreateExecutionContexts(
       session_options, &OrtReleaseSessionOptions);
   RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
   // disable graph optimization
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, 0));
+  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
 
   Status status = CreateExecutionContextsHelper(session_options, models);
 
@@ -218,7 +216,7 @@ OnnxBackend::CreateExecutionContext(
   // Create Onnx session
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
-  RETURN_IF_ORT_ERROR(OrtCreateDefaultAllocator(&context->allocator_));
+  RETURN_IF_ORT_ERROR(OrtGetAllocatorWithDefaultOptions(&context->allocator_));
 
   // If this is a sequence model then make sure that the required
   // inputs are present in the model and have the correct shape and
@@ -589,7 +587,7 @@ OnnxBackend::Context::SetInputTensor(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   if (data_type != TYPE_STRING) {
-    const OrtAllocatorInfo* allocator_info;
+    const OrtMemoryInfo* allocator_info;
     RETURN_IF_ORT_ERROR(OrtAllocatorGetInfo(allocator_, &allocator_info));
     RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
         allocator_info, (void*)input_buffers->back().get(), total_byte_size,
