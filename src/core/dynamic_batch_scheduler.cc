@@ -136,7 +136,7 @@ DynamicBatchScheduler::Enqueue(
 {
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  stats->StartQueueTimer();
+  stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 
   bool wake_runner = false;
   {
@@ -403,8 +403,8 @@ DynamicBatchScheduler::GetDynamicBatch()
   // a thread to check again at the maximum allowed delay.
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
-  const struct timespec& queued =
-      queue_.front().stats_->QueueTimer().StartTimeStamp();
+  const struct timespec& queued = queue_.front().stats_->Timestamp(
+      ModelInferStats::TimestampKind::kQueueStart);
   uint64_t delay_ns = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) -
                       (queued.tv_sec * NANOS_PER_SECOND + queued.tv_nsec);
 

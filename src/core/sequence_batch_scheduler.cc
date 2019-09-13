@@ -231,7 +231,7 @@ SequenceBatchScheduler::Enqueue(
 {
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
-  stats->StartQueueTimer();
+  stats->CaptureTimestamp(ModelInferStats::TimestampKind::kQueueStart);
 
   const auto& request_header = request_provider->RequestHeader();
 
