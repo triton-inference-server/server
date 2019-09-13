@@ -38,6 +38,7 @@
 #include "src/core/server_status.h"
 
 #ifdef TRTIS_ENABLE_GPU
+#include <tensorrt_provider_factory.h>
 #include <cuda_provider_factory.h>
 #include <cuda_runtime_api.h>
 #endif  // TRTIS_ENABLE_GPU
@@ -206,6 +207,8 @@ OnnxBackend::CreateExecutionContext(
 
   if (gpu_device != Context::NO_GPU_DEVICE) {
 #ifdef TRTIS_ENABLE_GPU
+    // [TODO] append execution providers based on model config
+    RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_Tensorrt(session_options, gpu_device));
     RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
         session_options, gpu_device));
 #else
