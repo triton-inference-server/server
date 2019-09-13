@@ -99,18 +99,17 @@ FROM ${BASE_IMAGE} AS trtserver_onnx
 # needs to be built from source
 
 # Onnx Runtime release version
-ARG ONNX_RUNTIME_VERSION=0.4.0
+ARG ONNX_RUNTIME_VERSION=0.5.0
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
 RUN apt-get update && apt-get install -y --no-install-recommends git
 
-# Check out stable commit on master until new release
-# to support cloud-based filesystems
+# Use a fixed commit after rel-0.5.0
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
-            git checkout 2f698bd54b713bb87dbd0bbb913e94bcf7fd480c && \
-            git submodule update)
+            git checkout a0ba25f98f210fa506300bb5040695e2b7a636a8 && \
+            git submodule update --init --recursive)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
@@ -236,8 +235,14 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/li
      /opt/tensorrtserver/lib/
 
 # Onnx Runtime headers and library
-ARG ONNX_RUNTIME_VERSION=0.4.0
-COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime \
+# Put include files to same directory as ONNX Runtime changed the include path
+# https://github.com/microsoft/onnxruntime/pull/1461
+ARG ONNX_RUNTIME_VERSION=0.5.0
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/session/onnxruntime_c_api.h \
+     /opt/tensorrtserver/include/onnxruntime/
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cpu/cpu_provider_factory.h \
+     /opt/tensorrtserver/include/onnxruntime/
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/cuda/cuda_provider_factory.h \
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tensorrtserver/lib/
