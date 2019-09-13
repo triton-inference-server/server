@@ -127,6 +127,7 @@ class SequenceBatcherTest(unittest.TestCase):
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
@@ -163,8 +164,6 @@ class SequenceBatcherTest(unittest.TestCase):
                         shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
                         # copy data into shared memory region for input values
                         shm.set_shared_memory_region(shm_ip_handle, input_list)
-
-                        shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
                         shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
                         shared_memory_ctx.unregister(shm_op_handle)
@@ -277,11 +276,17 @@ class SequenceBatcherTest(unittest.TestCase):
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
                 result_ids = list()
 
+                if config[3]:
+                    shm_ip_handle = []
+                    shm_op_handle = []
+
+                i = 0
                 for flag_str, value, pre_delay_ms in values:
                     flags = InferRequestHeader.FLAG_NONE
                     if flag_str is not None:
@@ -308,24 +313,26 @@ class SequenceBatcherTest(unittest.TestCase):
                         output_byte_size = np.dtype(input_dtype).itemsize
                         # create and register shared memory region for inputs and outputs
                         if shm_region_names is None:
-                            shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
-                            shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+                            shm_ip_handle.append(shm.create_shared_memory_region(
+                                "input_data"+str(i), "/input"+str(i), input_byte_size))
+                            shm_op_handle.append(shm.create_shared_memory_region(
+                                "output_data"+str(i), "/output"+str(i), output_byte_size))
                         else:
-                            shm_ip_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
-                                                                            '/'+shm_region_names[0], input_byte_size)
-                            shm_op_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                            '/'+shm_region_names[1], output_byte_size)
+                            shm_ip_handle.append(shm.create_shared_memory_region(
+                                shm_region_names[0]+str(i)+'_data', '/'+shm_region_names[0]+str(i),
+                                input_byte_size))
+                            shm_op_handle.append(shm.create_shared_memory_region(
+                                shm_region_names[1]+str(i)+'_data', '/'+shm_region_names[1]+str(i),
+                                output_byte_size))
                         # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list)
+                        shared_memory_ctx.unregister(shm_ip_handle[-1])
+                        shared_memory_ctx.register(shm_ip_handle[-1])
+                        shared_memory_ctx.unregister(shm_op_handle[-1])
+                        shared_memory_ctx.register(shm_op_handle[-1])
 
-                        shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
-                        shared_memory_ctx.unregister(shm_ip_handle)
-                        shared_memory_ctx.register(shm_ip_handle)
-                        shared_memory_ctx.unregister(shm_op_handle)
-                        shared_memory_ctx.register(shm_op_handle)
-
-                        input_info = shm_ip_handle
-                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+                        input_info = shm_ip_handle[-1]
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle[-1])
 
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
@@ -340,6 +347,7 @@ class SequenceBatcherTest(unittest.TestCase):
                             { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
                             batch_size=batch_size, flags=flags))
                         OUTPUT = "OUTPUT__0"
+                    i+=1
 
                 # Wait for the results in the order sent
                 result = None
@@ -353,10 +361,11 @@ class SequenceBatcherTest(unittest.TestCase):
                 seq_end_ms = int(round(time.time() * 1000))
 
                 if config[3]:
-                    shared_memory_ctx.unregister(shm_ip_handle)
-                    shm.destroy_shared_memory_region(shm_ip_handle)
-                    shared_memory_ctx.unregister(shm_op_handle)
-                    shm.destroy_shared_memory_region(shm_op_handle)
+                    for i in range(len(shm_ip_handle)):
+                        shared_memory_ctx.unregister(shm_ip_handle[i])
+                        shm.destroy_shared_memory_region(shm_ip_handle[i])
+                        shared_memory_ctx.unregister(shm_op_handle[i])
+                        shm.destroy_shared_memory_region(shm_op_handle[i])
 
                 if input_dtype == np.object:
                     self.assertEqual(int(result), expected_result)
