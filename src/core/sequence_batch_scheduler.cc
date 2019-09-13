@@ -295,7 +295,7 @@ SequenceBatchScheduler::Enqueue(
   {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t now_us = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) / 1000;
+    uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
     correlation_id_timestamps_[correlation_id] = now_us;
   }
 
@@ -490,7 +490,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t now_us = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) / 1000;
+    uint64_t now_us = TIMESPEC_TO_NANOS(now) / 1000;
 
     for (auto cid_itr = correlation_id_timestamps_.cbegin();
          cid_itr != correlation_id_timestamps_.cend();) {

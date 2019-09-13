@@ -314,12 +314,8 @@ InferenceProfiler::MeasurementTimestamp(const TimestampVector& timestamps)
   uint64_t first_request_start_ns = 0;
   uint64_t last_request_end_ns = 0;
   for (auto& timestamp : timestamps) {
-    uint64_t request_start_time =
-        std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<0>(timestamp).tv_nsec;
-    uint64_t request_end_time =
-        std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<1>(timestamp).tv_nsec;
+    uint64_t request_start_time = TIMESPEC_TO_NANOS(std::get<0>(timestamp));
+    uint64_t request_end_time = TIMESPEC_TO_NANOS(std::get<1>(timestamp));
     if ((first_request_start_ns > request_start_time) ||
         (first_request_start_ns == 0)) {
       first_request_start_ns = request_start_time;
@@ -352,12 +348,8 @@ InferenceProfiler::ValidLatencyMeasurement(
   std::vector<uint64_t> valid_latencies;
   valid_sequence_count = 0;
   for (auto& timestamp : timestamps) {
-    uint64_t request_start_ns =
-        std::get<0>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<0>(timestamp).tv_nsec;
-    uint64_t request_end_ns =
-        std::get<1>(timestamp).tv_sec * ni::NANOS_PER_SECOND +
-        std::get<1>(timestamp).tv_nsec;
+    uint64_t request_start_ns = TIMESPEC_TO_NANOS(std::get<0>(timestamp));
+    uint64_t request_end_ns = TIMESPEC_TO_NANOS(std::get<1>(timestamp));
 
     if (request_start_ns <= request_end_ns) {
       // Only counting requests that end within the time interval

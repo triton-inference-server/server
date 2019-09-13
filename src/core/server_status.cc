@@ -323,8 +323,8 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
     struct timespec end;
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    uint64_t start_ns = start_.tv_sec * NANOS_PER_SECOND + start_.tv_nsec;
-    uint64_t end_ns = end.tv_sec * NANOS_PER_SECOND + end.tv_nsec;
+    uint64_t start_ns = TIMESPEC_TO_NANOS(start_);
+    uint64_t end_ns = TIMESPEC_TO_NANOS(end);
     uint64_t duration = (start_ns > end_ns) ? 0 : end_ns - start_ns;
 
     status_manager_->UpdateServerStat(duration, kind_);
@@ -410,8 +410,8 @@ ModelInferStats::Duration(
 {
   const struct timespec& start = Timestamp(start_kind);
   const struct timespec& end = Timestamp(end_kind);
-  uint64_t start_ns = start.tv_sec * NANOS_PER_SECOND + start.tv_nsec;
-  uint64_t end_ns = end.tv_sec * NANOS_PER_SECOND + end.tv_nsec;
+  uint64_t start_ns = TIMESPEC_TO_NANOS(start);
+  uint64_t end_ns = TIMESPEC_TO_NANOS(end);
 
   // If the start or end timestamp is 0 then can't calculate the
   // duration, so return 0.
