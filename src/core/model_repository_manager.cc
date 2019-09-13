@@ -1372,6 +1372,7 @@ ModelRepositoryManager::Poll(
       model_info.reset(new ModelInfo());
       ModelConfig& model_config = model_info->model_config_;
       model_info->mtime_nsec_ = mtime_ns;
+      model_info->model_repository_path_ = repository;
 
       // If enabled, try to automatically generate missing parts of
       // the model configuration (autofill) from the model
