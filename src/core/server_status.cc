@@ -331,46 +331,6 @@ ServerStatTimerScoped::~ServerStatTimerScoped()
   }
 }
 
-ModelInferStats::ScopedTimer::ScopedTimer()
-    : cummulative_duration_ns_(0), duration_ptr_(nullptr)
-{
-  start_.tv_sec = 0;
-  start_.tv_nsec = 0;
-}
-
-ModelInferStats::ScopedTimer::~ScopedTimer()
-{
-  Stop();
-}
-
-struct timespec
-ModelInferStats::ScopedTimer::Start()
-{
-  clock_gettime(CLOCK_MONOTONIC, &start_);
-  return start_;
-}
-
-void
-ModelInferStats::ScopedTimer::Stop()
-{
-  // Ignore the stop if the timer hasn't been started
-  if (start_.tv_sec != 0) {
-    struct timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &end);
-
-    uint64_t start_ns = start_.tv_sec * NANOS_PER_SECOND + start_.tv_nsec;
-    uint64_t end_ns = end.tv_sec * NANOS_PER_SECOND + end.tv_nsec;
-    cummulative_duration_ns_ += (start_ns > end_ns) ? 0 : end_ns - start_ns;
-
-    start_.tv_sec = 0;
-    start_.tv_nsec = 0;
-
-    if (duration_ptr_ != nullptr) {
-      *duration_ptr_ = cummulative_duration_ns_;
-    }
-  }
-}
-
 ModelInferStats::~ModelInferStats()
 {
   // If the inference request failed before a backend could be
@@ -380,18 +340,28 @@ ModelInferStats::~ModelInferStats()
                                     ? metric_reporter_->ModelVersion()
                                     : requested_model_version_;
 
+  uint64_t request_duration_ns =
+      Duration(TimestampKind::kRequestStart, TimestampKind::kRequestEnd);
+
   if (failed_) {
     status_manager_->UpdateFailedInferStats(
-        model_name_, model_version, batch_size_, request_duration_ns_);
+        model_name_, model_version, batch_size_, request_duration_ns);
 #ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
       metric_reporter_->MetricInferenceFailure(gpu_device_).Increment();
     }
 #endif  // TRTIS_ENABLE_METRICS
   } else {
+    uint64_t queue_duration_ns =
+        extra_queue_duration_ +
+        Duration(TimestampKind::kQueueStart, TimestampKind::kComputeStart);
+    uint64_t compute_duration_ns =
+        extra_compute_duration_ +
+        Duration(TimestampKind::kComputeStart, TimestampKind::kComputeEnd);
+
     status_manager_->UpdateSuccessInferStats(
         model_name_, model_version, batch_size_, execution_count_,
-        request_duration_ns_, queue_duration_ns_, compute_duration_ns_);
+        request_duration_ns, queue_duration_ns, compute_duration_ns);
 
 #ifdef TRTIS_ENABLE_METRICS
     if (metric_reporter_ != nullptr) {
@@ -404,71 +374,52 @@ ModelInferStats::~ModelInferStats()
       }
 
       metric_reporter_->MetricInferenceRequestDuration(gpu_device_)
-          .Increment(request_duration_ns_ / 1000);
+          .Increment(request_duration_ns / 1000);
       metric_reporter_->MetricInferenceComputeDuration(gpu_device_)
-          .Increment(compute_duration_ns_ / 1000);
+          .Increment(compute_duration_ns / 1000);
       metric_reporter_->MetricInferenceQueueDuration(gpu_device_)
-          .Increment(queue_duration_ns_ / 1000);
+          .Increment(queue_duration_ns / 1000);
 
       metric_reporter_->MetricInferenceLoadRatio(gpu_device_)
           .Observe(
-              (double)request_duration_ns_ /
-              std::max(1.0, (double)compute_duration_ns_));
+              (double)request_duration_ns /
+              std::max(1.0, (double)compute_duration_ns));
     }
 #endif  // TRTIS_ENABLE_METRICS
   }
 }
 
-
 void
-ModelInferStats::IncrementQueueDuration(const uint64_t increment_value)
+ModelInferStats::IncrementQueueDuration(const ModelInferStats& other)
 {
-  queue_duration_ns_ += increment_value;
-}
-
-void
-ModelInferStats::IncrementComputeDuration(const uint64_t increment_value)
-{
-  compute_duration_ns_ += increment_value;
-}
-
-struct timespec
-ModelInferStats::StartRequestTimer()
-{
-  request_timer_.duration_ptr_ = &request_duration_ns_;
-  return request_timer_.Start();
+  extra_queue_duration_ +=
+      other.Duration(TimestampKind::kQueueStart, TimestampKind::kComputeStart);
 }
 
 void
-ModelInferStats::StopRequestTimer()
+ModelInferStats::IncrementComputeDuration(const ModelInferStats& other)
 {
-  request_timer_.Stop();
+  extra_compute_duration_ +=
+      other.Duration(TimestampKind::kComputeStart, TimestampKind::kComputeEnd);
 }
 
-struct timespec
-ModelInferStats::StartQueueTimer()
+uint64_t
+ModelInferStats::Duration(
+    ModelInferStats::TimestampKind start_kind,
+    ModelInferStats::TimestampKind end_kind) const
 {
-  queue_timer_.duration_ptr_ = &queue_duration_ns_;
-  return queue_timer_.Start();
-}
+  const struct timespec& start = Timestamp(start_kind);
+  const struct timespec& end = Timestamp(end_kind);
+  uint64_t start_ns = start.tv_sec * NANOS_PER_SECOND + start.tv_nsec;
+  uint64_t end_ns = end.tv_sec * NANOS_PER_SECOND + end.tv_nsec;
 
-void
-ModelInferStats::StopQueueTimer()
-{
-  queue_timer_.Stop();
-}
+  // If the start or end timestamp is 0 then can't calculate the
+  // duration, so return 0.
+  if ((start_ns == 0) || (end_ns == 0)) {
+    return 0;
+  }
 
-struct timespec
-ModelInferStats::StartComputeTimer()
-{
-  compute_timer_.duration_ptr_ = &compute_duration_ns_;
-  return compute_timer_.Start();
-}
-
-void
-ModelInferStats::StopComputeTimer()
-{
-  compute_timer_.Stop();
+  return (start_ns > end_ns) ? 0 : end_ns - start_ns;
 }
 
 }}  // namespace nvidia::inferenceserver

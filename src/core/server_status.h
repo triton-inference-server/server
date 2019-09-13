@@ -84,24 +84,13 @@ class ServerStatTimerScoped {
 // Stats collector for an inference request.
 class ModelInferStats {
  public:
-  // A timer that starts on construction and stops on destruction. Can
-  // also be stopped and started manually and multiple times. The
-  // measured time is the accumulation of start-stop durations.
-  class ScopedTimer {
-   public:
-    ScopedTimer();
-    ~ScopedTimer();
-
-    struct timespec Start();
-    void Stop();
-
-    const struct timespec& StartTimeStamp() const { return start_; };
-
-   private:
-    friend class ModelInferStats;
-    struct timespec start_;
-    uint64_t cummulative_duration_ns_;
-    uint64_t* duration_ptr_;
+  enum class TimestampKind {
+    kRequestStart,  // Start request processing
+    kQueueStart,    // Request enters the queue
+    kComputeStart,  // Request leaves queue and starts compute
+    kComputeEnd,    // Request completes compute
+    kRequestEnd,    // Done with request processing
+    COUNT__
   };
 
  public:
@@ -112,9 +101,11 @@ class ModelInferStats {
       const std::string& model_name)
       : status_manager_(status_manager), model_name_(model_name),
         requested_model_version_(-1), batch_size_(0), gpu_device_(-1),
-        failed_(false), execution_count_(0), request_duration_ns_(0),
-        queue_duration_ns_(0), compute_duration_ns_(0)
+        failed_(false), execution_count_(0),
+        timestamps_((size_t)TimestampKind::COUNT__), extra_queue_duration_(0),
+        extra_compute_duration_(0)
   {
+    memset(&timestamps_[0], 0, sizeof(struct timespec) * timestamps_.size());
   }
 
   // Report collected statistics.
@@ -139,49 +130,38 @@ class ModelInferStats {
   // Set CUDA GPU device index where inference was performed.
   void SetGPUDevice(int idx) { gpu_device_ = idx; }
 
-  // Increments the queue_duration by specified value
-  void IncrementQueueDuration(const uint64_t increment_value);
-  // Increments the compute duration by specified value
-  void IncrementComputeDuration(const uint64_t increment_value);
-
   // Set the number of model executions that were performed for this
   // inference request. Can be zero if this request was dynamically
   // batched with another request (in dynamic batch case only one of
   // the batched requests will count the execution).
   void SetModelExecutionCount(uint32_t count) { execution_count_ = count; }
 
-  // Returns the current queue_duration in nanoseconds
-  uint64_t GetQueueDuration() const { return queue_duration_ns_; }
+  // Get the timestamp for a kind.
+  const struct timespec& Timestamp(TimestampKind kind) const
+  {
+    return timestamps_[(size_t)kind];
+  }
 
-  // Returns the current compute_duration in nanoseconds
-  uint64_t GetComputeDuration() const { return compute_duration_ns_; }
+  // Set a timestamp to the current time. Return the timestamp.
+  const struct timespec& CaptureTimestamp(TimestampKind kind)
+  {
+    struct timespec& ts = timestamps_[(size_t)kind];
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
+  }
 
-  // Get the timer measuring the queue time.
-  const ScopedTimer& QueueTimer() const { return queue_timer_; }
+  // Include queue time from another stat into this stat's queue time.
+  void IncrementQueueDuration(const ModelInferStats& other);
 
-  // Start the timer that measures entire inference request-response
-  // duration. Return the start timestamp.
-  struct timespec StartRequestTimer();
-
-  // Stop the timer that measures entire inference request-response
-  // duration.
-  void StopRequestTimer();
-
-  // Start the timer that measures queue time. Return the start
-  // timestamp.
-  struct timespec StartQueueTimer();
-
-  // Stop the timer that measures queue time.
-  void StopQueueTimer();
-
-  // Start the timer that measures compute time. Return the start
-  // timestamp.
-  struct timespec StartComputeTimer();
-
-  // Stop the timer that measures compute time.
-  void StopComputeTimer();
+  // Include compute time from another stat into this stat's compute
+  // time.
+  void IncrementComputeDuration(const ModelInferStats& other);
 
  private:
+  uint64_t Duration(
+      ModelInferStats::TimestampKind start_kind,
+      ModelInferStats::TimestampKind end_kind) const;
+
   std::shared_ptr<ServerStatusManager> status_manager_;
   std::shared_ptr<MetricModelReporter> metric_reporter_;
   const std::string model_name_;
@@ -191,13 +171,10 @@ class ModelInferStats {
   bool failed_;
 
   uint32_t execution_count_;
-  ScopedTimer request_timer_;
-  ScopedTimer queue_timer_;
-  ScopedTimer compute_timer_;
+  std::vector<struct timespec> timestamps_;
 
-  mutable uint64_t request_duration_ns_;
-  mutable uint64_t queue_duration_ns_;
-  mutable uint64_t compute_duration_ns_;
+  uint64_t extra_queue_duration_;
+  uint64_t extra_compute_duration_;
 };
 
 // Manage access and updates to server status information.
