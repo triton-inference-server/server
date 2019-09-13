@@ -370,9 +370,12 @@ main(int argc, char** argv)
   }
 
   // Get shared memory regions all active/registered within TRTIS
-  ni::SharedMemoryControlResponse status;
-  err = shared_memory_ctx->SharedMemoryStatus(&status);
-
+  ni::SharedMemoryStatus status;
+  err = shared_memory_ctx->GetSharedMemoryStatus(&status);
+  if (!err.IsOk()) {
+    std::cerr << "error: " << err << std::endl;
+  }
+  std::cout << "shm status: " << std::endl << status.DebugString() << '\n';
   // Unregister shared memory (One by one or all at a time) from TRTIS
   // err = shared_memory_ctx->UnregisterAllSharedMemory();
   err = shared_memory_ctx->UnregisterSharedMemory("input_data");

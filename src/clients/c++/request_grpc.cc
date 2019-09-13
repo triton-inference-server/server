@@ -309,7 +309,7 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
-  Error SharedMemoryStatus(SharedMemoryControlResponse* shm_status) override;
+  Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
 
  private:
   // GRPC end point.
@@ -400,6 +400,48 @@ SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus(
+    SharedMemoryStatus* shm_status)
+{
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+  if (shm_status != nullptr) {
+    shm_status->Clear();
+  }
+
+  request.mutable_get_status();
+
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    grpc_status = Error(response.request_status());
+    if (action == GET_STATUS) {
+      std::string response_str;
+      response.clear_request_status();
+      response.SerializeToString(&response_str);
+      if (!shm_status->ParseFromString(response_str)) {
+        return Error(
+            RequestStatusCode::INTERNAL,
+            "failed to parse shared memory status");
+      }
+    }
+  } else {
+    // Something wrong with the GRPC conncection
+    grpc_status = Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+
+  // Log shared memory status if request is SUCCESS and verbose is true.
+  if ((grpc_status.IsOk()) && verbose_) {
+    std::cerr << shm_status->DebugString() << std::endl;
+  }
+  return grpc_status;
 }
 
 Error
