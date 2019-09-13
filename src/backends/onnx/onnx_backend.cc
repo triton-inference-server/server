@@ -586,7 +586,7 @@ OnnxBackend::Context::SetInputTensor(
       name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
 
   if (data_type != TYPE_STRING) {
-    const OrtAllocatorInfo* allocator_info;
+    const OrtMemoryInfo* allocator_info;
     RETURN_IF_ORT_ERROR(OrtAllocatorGetInfo(allocator_, &allocator_info));
     RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
         allocator_info, (void*)input_buffers->back().get(), total_byte_size,
