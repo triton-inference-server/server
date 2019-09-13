@@ -90,8 +90,9 @@ class ModelRepositoryManager {
   static Status Create(
       InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::string& repository_path, const bool strict_model_config,
-      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
+      const std::set<std::string>& repository_path,
+      const bool strict_model_config, const float tf_gpu_memory_fraction,
+      const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
       const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
@@ -148,7 +149,7 @@ class ModelRepositoryManager {
 
   ModelRepositoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::string& repository_path,
+      const std::set<std::string>& repository_path,
       const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<BackendLifeCycle> life_cycle);
@@ -239,6 +240,7 @@ class ModelRepositoryManager {
   /// \return True if the node is ready. False otherwise.
   bool CheckNode(DependencyNode* node);
 
+  // [TODO] update docs
   /// Get the list of versions to be loaded for a named model based on version
   /// policy. Version directories that are not numerically named,
   /// or that have zero prefix will be ignored.
@@ -247,10 +249,10 @@ class ModelRepositoryManager {
   /// \param versions Returns the versions to be loaded
   /// \return The error status.
   Status VersionsToLoad(
-      const std::string& name, const ModelConfig& model_config,
-      std::set<int64_t>* versions);
+      const std::string model_repository_path, const std::string& name,
+      const ModelConfig& model_config, std::set<int64_t>* versions);
 
-  const std::string repository_path_;
+  const std::set<std::string> repository_paths_;
   const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;

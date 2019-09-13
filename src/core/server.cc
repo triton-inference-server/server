@@ -127,9 +127,10 @@ InferenceServer::Init()
   // is disabled, all models are eagerly loaded when the manager is created.
   bool polling_enabled = (model_control_mode_ == MODE_POLL);
   bool model_control_enabled = (model_control_mode_ == MODE_EXPLICIT);
+  std::set<std::string> model_repositories{model_repository_path_};
   status = ModelRepositoryManager::Create(
-      this, version_, status_manager_, model_repository_path_,
-      strict_model_config_, tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
+      this, version_, status_manager_, model_repositories, strict_model_config_,
+      tf_gpu_memory_fraction_, tf_soft_placement_enabled_,
       tf_vgpu_memory_limits_, polling_enabled, model_control_enabled,
       &model_repository_manager_);
   if (!status.IsOk()) {
