@@ -36,7 +36,6 @@
 #include "src/core/request_status.pb.h"
 #include "src/core/server.h"
 #include "src/core/server_status.h"
-#include "src/core/shared_memory_manager.h"
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
@@ -1188,8 +1187,8 @@ TRTSERVER_ServerSharedMemoryStatus(
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   std::vector<SharedMemoryInfo*> active_shm_vector;
-  ni::SharedMemoryControlResponse shm_status;
-  RETURN_IF_STATUS_ERROR(lserver->SharedMemoryStatus(&shm_status));
+  ni::SharedMemoryStatus shm_status;
+  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&shm_status));
 
   TrtServerProtobuf* protobuf = new TrtServerProtobuf(shm_status);
   *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);

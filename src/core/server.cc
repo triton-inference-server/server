@@ -39,7 +39,6 @@
 #include "src/core/api.pb.h"
 #include "src/core/backend.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"
@@ -416,7 +415,7 @@ InferenceServer::SharedMemoryAddress(
 }
 
 Status
-InferenceServer::SharedMemoryStatus(SharedMemoryControlResponse* shm_status)
+InferenceServer::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");

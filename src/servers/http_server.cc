@@ -34,7 +34,6 @@
 #include <thread>
 #include "src/core/api.pb.h"
 #include "src/core/constants.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
@@ -712,7 +711,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
       err = TRTSERVER_ProtobufSerialize(
           shm_status_protobuf, &status_buffer, &status_byte_size);
       if (err == nullptr) {
-        SharedMemoryControlResponse shm_status;
+        SharedMemoryStatus shm_status;
         if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
           err = TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");

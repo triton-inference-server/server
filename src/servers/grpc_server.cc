@@ -1520,56 +1520,51 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
 
     TRTSERVER_Error* err = nullptr;
-    switch (request.type()) {
-      case SharedMemoryControlRequest::REGISTER:
-        err = smb_manager_->Create(
-            &smb, request.shared_memory_region().name(),
-            request.shared_memory_region().shared_memory_key(),
-            request.shared_memory_region().offset(),
-            request.shared_memory_region().byte_size());
-        if (err == nullptr) {
-          err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
+    if (request.has_register_()) {
+      err = smb_manager_->Create(
+          &smb, request.shared_memory_region().name(),
+          request.shared_memory_region().shared_memory_key(),
+          request.shared_memory_region().offset(),
+          request.shared_memory_region().byte_size());
+      if (err == nullptr) {
+        err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
+      }
+    } else if (request.has_unregister()) {
+      err = smb_manager_->Remove(&smb, request.shared_memory_region().name());
+      if ((err == nullptr) && (smb != nullptr)) {
+        err = TRTSERVER_ServerUnregisterSharedMemory(trtserver_.get(), smb);
+        TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
+        if (del_err != nullptr) {
+          LOG_ERROR << "failed to delete shared memory block: "
+                    << TRTSERVER_ErrorMessage(del_err);
+          TRTSERVER_ErrorDelete(del_err);
         }
-        break;
-      case SharedMemoryControlRequest::UNREGISTER:
-        err = smb_manager_->Remove(&smb, request.shared_memory_region().name());
-        if ((err == nullptr) && (smb != nullptr)) {
-          err = TRTSERVER_ServerUnregisterSharedMemory(trtserver_.get(), smb);
-          TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);
-          if (del_err != nullptr) {
-            LOG_ERROR << "failed to delete shared memory block: "
-                      << TRTSERVER_ErrorMessage(del_err);
-            TRTSERVER_ErrorDelete(del_err);
+      }
+    } else if (request.has_unregister_all()) {
+      err = smb_manager_->Clear();
+      if (err == nullptr) {
+        err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
+      }
+    } else if (request.has_get_status()) {
+      err = TRTSERVER_ServerSharedMemoryStatus(
+          trtserver_.get(), &shm_status_protobuf);
+      if (err == nullptr) {
+        const char* status_buffer;
+        size_t status_byte_size;
+        err = TRTSERVER_ProtobufSerialize(
+            shm_status_protobuf, &status_buffer, &status_byte_size);
+        if (err == nullptr) {
+          if (!response.ParseFromArray(status_buffer, status_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN,
+                "failed to parse shared memory status");
           }
         }
-        break;
-      case SharedMemoryControlRequest::UNREGISTER_ALL:
-        err = smb_manager_->Clear();
-        if (err == nullptr) {
-          err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
-        }
-        break;
-      case SharedMemoryControlRequest::GET_STATUS:
-        err = TRTSERVER_ServerSharedMemoryStatus(
-            trtserver_.get(), &shm_status_protobuf);
-        if (err == nullptr) {
-          const char* status_buffer;
-          size_t status_byte_size;
-          err = TRTSERVER_ProtobufSerialize(
-              shm_status_protobuf, &status_buffer, &status_byte_size);
-          if (err == nullptr) {
-            if (!response.ParseFromArray(status_buffer, status_byte_size)) {
-              err = TRTSERVER_ErrorNew(
-                  TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
-            }
-          }
-        }
-        break;
-      default:
-        err = TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_UNKNOWN,
-            "unknown sharedmemorycontrol request type");
-        break;
+      }
+      TRTSERVER_ProtobufDelete(shm_status_protobuf);
+    } else {
+      err = TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_UNKNOWN, "unknown sharedmemorycontrol request type");
     }
 
     RequestStatusUtil::Create(

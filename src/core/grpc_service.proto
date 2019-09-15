@@ -257,6 +257,11 @@ message InferSharedMemoryRegion
   uint64 byte_size = 4;
 }
 
+message controlType
+{
+  uint32 type = 1;
+}
+
 //@@
 //@@.. cpp:var:: message SharedMemoryControlRequest
 //@@
@@ -264,44 +269,36 @@ message InferSharedMemoryRegion
 //@@
 message SharedMemoryControlRequest
 {
-  //@@  .. cpp:enum:: Type
+  //@@  .. cpp:var:: oneof type
   //@@
   //@@     Types of control operations for shared memory
   //@@
-  enum Type {
-    //@@    .. cpp:enumerator:: Type::REGISTER = 0
+  oneof type
+  {
+    //@@    .. cpp:var:: uint32 REGISTER
     //@@
     //@@       To register the specified shared memory region.
     //@@
-    REGISTER = 0;
+    controlType register = 1;
 
-    //@@    .. cpp:enumerator:: Type::UNREGISTER = 1
+    //@@    .. cpp:var:: uint32 UNREGISTER
     //@@
     //@@       To unregister the specified shared memory region.
     //@@
-    UNREGISTER = 1;
+    controlType unregister = 2;
 
-    //@@    .. cpp:enumerator:: Type::UNREGISTER_ALL = 2
+    //@@    .. cpp:var:: uint32 UNREGISTER_ALL
     //@@
     //@@       To unregister all active shared memory regions.
     //@@
-    UNREGISTER_ALL = 2;
+    controlType unregister_all = 3;
 
-    //@@    .. cpp:enumerator:: Type::GET_STATUS = 3
+    //@@    .. cpp:var:: uint32 GET_STATUS
     //@@
     //@@       To get the list of all active shared memory regions.
     //@@
-    GET_STATUS = 3;
+    controlType get_status = 4;
   }
-
-  //@@
-  //@@  .. cpp:var:: Type type
-  //@@
-  //@@     The control type that states whether to register/unregister the
-  //@@     specified shared memory region. Unregister all active shared memory
-  //@@     regions or get the list of active shared memory regions
-  //@@
-  Type type = 1;
 
   //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
   //@@
@@ -310,7 +307,7 @@ message SharedMemoryControlRequest
   //@@     Only 'name' is needed to UNREGISTER the shared memory region.
   //@@     No fields are needed to UNREGISTER_ALL.
   //@@
-  InferSharedMemoryRegion shared_memory_region = 2;
+  InferSharedMemoryRegion shared_memory_region = 5;
 }
 
 //@@
@@ -328,9 +325,9 @@ message SharedMemoryControlResponse
   RequestStatus request_status = 1;
 
   //@@
-  //@@  .. cpp:var:: RequestStatus request_status
+  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
   //@@
-  //@@     The list of active shared memory regions.
+  //@@     The list of active/registered shared memory regions.
   //@@
   repeated InferSharedMemoryRegion shared_memory_region = 2;
 }

@@ -206,8 +206,7 @@ SharedMemoryManager::UnregisterAllSharedMemory()
 }
 
 Status
-SharedMemoryManager::GetSharedMemoryStatus(
-    SharedMemoryControlResponse* shm_status)
+SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
 {
   for (const auto& shm_info : shared_memory_map_) {
     auto rshm_region = shm_status->add_shared_memory_region();
