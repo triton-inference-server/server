@@ -723,12 +723,14 @@ HTTPAPIServer::HandleSharedMemoryControl(
           evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
           evhtp_headers_add_header(
               req->headers_out,
-              evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+              evhtp_header_new(
+                  "Content-Type", "application/octet-stream", 1, 1));
         } else {
           SharedMemoryStatus shm_status;
           if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
             err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
+                TRTSERVER_ERROR_UNKNOWN,
+                "failed to parse shared memory status");
           } else {
             std::string shm_status_str = shm_status.DebugString();
             evbuffer_add(
@@ -737,6 +739,11 @@ HTTPAPIServer::HandleSharedMemoryControl(
         }
       }
     }
+    if (err != nullptr) {
+      LOG_ERROR << "failed to fetch shared memory status: "
+                << TRTSERVER_ErrorMessage(err);
+    }
+    TRTSERVER_ProtobufDelete(shm_status_protobuf);
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,

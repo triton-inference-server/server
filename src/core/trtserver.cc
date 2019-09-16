@@ -29,7 +29,6 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
@@ -1186,7 +1185,6 @@ TRTSERVER_ServerSharedMemoryStatus(
       lserver->StatusManager(),
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
-  std::vector<SharedMemoryInfo*> active_shm_vector;
   ni::SharedMemoryStatus shm_status;
   RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&shm_status));
 

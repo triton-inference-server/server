@@ -1517,7 +1517,6 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == START) {
     TRTSERVER_SharedMemoryBlock* smb = nullptr;
-    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
 
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
@@ -1546,6 +1545,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
       }
     } else if (request.has_get_status()) {
+      TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
       err = TRTSERVER_ServerSharedMemoryStatus(
           trtserver_.get(), &shm_status_protobuf);
       if (err == nullptr) {
@@ -1560,6 +1560,10 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
                 "failed to parse shared memory status");
           }
         }
+      }
+      if (err != nullptr) {
+        LOG_ERROR << "failed to fetch shared memory status: "
+                  << TRTSERVER_ErrorMessage(err);
       }
       TRTSERVER_ProtobufDelete(shm_status_protobuf);
     } else {

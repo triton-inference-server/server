@@ -268,7 +268,8 @@ message SharedMemoryControlRequest
   //@@
   //@@     The information needed to register the shared memory region.
   //@@
-  message RegisterInfo {
+  message RegisterInfo
+  {
     //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
     //@@
     //@@     The shared memory region to register.
@@ -280,7 +281,8 @@ message SharedMemoryControlRequest
   //@@
   //@@     The information needed to unregister the shared memory region.
   //@@
-  message UnregisterInfo {
+  message UnregisterInfo
+  {
     //@@
     //@@  .. cpp:var:: string name
     //@@
