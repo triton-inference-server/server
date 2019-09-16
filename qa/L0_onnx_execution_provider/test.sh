@@ -51,36 +51,36 @@ rm -fr models && mkdir -p models && \
     (cd models/onnx_float32_float32_float32_def && \
             sed -i 's/^name: "onnx_float32_float32_float32"/name: "onnx_float32_float32_float32_def"/' \
                 config.pbtxt) && \
-    # GPU execution providers
+    # GPU execution accelerators
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_trt && \
     (cd models/onnx_float32_float32_float32_trt && \
             sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_trt"/' \
                 config.pbtxt && \
-            echo "optimization { execution_providers { gpu_execution_provider : [\"tensorrt\"] } }" >> config.pbtxt) && \
-    # CPU execution providers
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"tensorrt\"] } }" >> config.pbtxt) && \
+    # CPU execution accelerators
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_openvino && \
     (cd models/onnx_float32_float32_float32_openvino && \
             sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_openvino"/' \
                 config.pbtxt && \
-            echo "optimization { execution_providers { cpu_execution_provider : [\"openvino\"] } }" >> config.pbtxt) && \
-    # CPU execution providers on CPU context
+            echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"openvino\"] } }" >> config.pbtxt) && \
+    # CPU execution accelerators on CPU context
     cp -r models/onnx_float32_float32_float32_openvino models/onnx_float32_float32_float32_cpu_openvino && \
     (cd models/onnx_float32_float32_float32_cpu_openvino && \
             sed -i 's/^name: "onnx_float32_float32_float32_openvino"/name: "onnx_float32_float32_float32_cpu_openvino"/' \
                 config.pbtxt && \
             echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt) && \
-    # Unknown GPU execution provider
+    # Unknown GPU execution accelerator
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_unknown_gpu && \
     (cd models/onnx_float32_float32_float32_unknown_gpu && \
             sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_unknown_gpu"/' \
                 config.pbtxt && \
-            echo "optimization { execution_providers { gpu_execution_provider : [\"unknown_gpu\"] } }" >> config.pbtxt) && \
-    # Unknown CPU execution providers
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"unknown_gpu\"] } }" >> config.pbtxt) && \
+    # Unknown CPU execution accelerators
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_unknown_cpu && \
     (cd models/onnx_float32_float32_float32_unknown_cpu && \
             sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_unknown_cpu"/' \
                 config.pbtxt && \
-            echo "optimization { execution_providers { cpu_execution_provider : [\"unknown_cpu\"] } }" >> config.pbtxt)
+            echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"unknown_cpu\"] } }" >> config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -93,47 +93,47 @@ RET=0
 
 set +e
 
-grep "TensorRT Execution Provider is set for onnx_float32_float32_float32_trt" $SERVER_LOG
+grep "TensorRT Execution Accelerator is set for onnx_float32_float32_float32_trt" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected TensorRT Execution Provider is set\n***"
+    echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
     RET=1
 fi
-grep "CUDA Execution Provider is set for onnx_float32_float32_float32_trt" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_trt" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected CUDA Execution Provider is set\n***"
+    echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set\n***"
     RET=1
 fi
 
-grep "OpenVINO Execution Provider is not supported for onnx_float32_float32_float32_openvino" $SERVER_LOG
+grep "OpenVINO Execution Accelerator is not supported for onnx_float32_float32_float32_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected OpenVINO is not supported\n***"
     RET=1
 fi
-grep "CUDA Execution Provider is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected CUDA Execution Provider is set\n***"
+    echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set\n***"
     RET=1
 fi
 
-grep "OpenVINO Execution Provider is not supported for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
+grep "OpenVINO Execution Accelerator is not supported for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected OpenVINO Execution Provider is not supported\n***"
+    echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is not supported\n***"
     RET=1
 fi
-grep "CUDA Execution Provider is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
 if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** Failed. Expected CUDA Execution Provider is not set\n***"
+    echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is not set\n***"
     RET=1
 fi
 
-grep "Ignore unknown Execution Provider 'unknown_gpu' for onnx_float32_float32_float32_unknown_gpu" $SERVER_LOG
+grep "Ignore unknown Execution Accelerator 'unknown_gpu' for onnx_float32_float32_float32_unknown_gpu" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Provider is ignored\n***"
+    echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator is ignored\n***"
     RET=1
 fi
-grep "Ignore unknown Execution Provider 'unknown_cpu' for onnx_float32_float32_float32_unknown_cpu" $SERVER_LOG
+grep "Ignore unknown Execution Accelerator 'unknown_cpu' for onnx_float32_float32_float32_unknown_cpu" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Provider is ignored\n***"
+    echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator is ignored\n***"
     RET=1
 fi
 

@@ -205,38 +205,38 @@ OnnxBackend::CreateExecutionContext(
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
 
-  // Set execution providers
+  // Set execution execution_accelerators (execution providers in ONNX Runtime)
   if (gpu_device != Context::NO_GPU_DEVICE) {
 #ifdef TRTIS_ENABLE_GPU
-    if (Config().optimization().has_execution_providers()) {
+    if (Config().optimization().has_execution_accelerators()) {
       // Don't need to ensure uniqueness of the providers,
       // ONNX Runtime will check it.
-      for (const auto& execution_provider : Config().optimization().execution_providers().gpu_execution_provider()) {
-        if (execution_provider == kOnnxRuntimeTensorRTExecutionProvider) {
+      for (const auto& execution_accelerator : Config().optimization().execution_accelerators().gpu_execution_accelerator()) {
+        if (execution_accelerator == kTensorRTExecutionAccelerator) {
           RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_Tensorrt(session_options, gpu_device));
-          LOG_VERBOSE(1) << "TensorRT Execution Provider is set for "
+          LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                          << instance_name << " on device " << gpu_device;
         } else {
-          LOG_ERROR << "Ignore unknown Execution Provider '" << execution_provider << "' for " << instance_name;
+          LOG_ERROR << "Ignore unknown Execution Accelerator '" << execution_accelerator << "' for " << instance_name;
         }
       }
     }
     RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
         session_options, gpu_device));
-    LOG_VERBOSE(1) << "CUDA Execution Provider is set for "
+    LOG_VERBOSE(1) << "CUDA Execution Accelerator is set for "
                    << instance_name << " on device " << gpu_device;
 #else
     return Status(RequestStatusCode::INTERNAL, "GPU instances not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
-  if (Config().optimization().has_execution_providers()) {
-    for (const auto& execution_provider : Config().optimization().execution_providers().cpu_execution_provider()) {
-      if (execution_provider == kOnnxRuntimeOpenVINOExecutionProvider) {
-        LOG_ERROR << "OpenVINO Execution Provider is not supported for "
+  if (Config().optimization().has_execution_accelerators()) {
+    for (const auto& execution_accelerator : Config().optimization().execution_accelerators().cpu_execution_accelerator()) {
+      if (execution_accelerator == kOpenVINOExecutionAccelerator) {
+        LOG_ERROR << "OpenVINO Execution Accelerator is not supported for "
                   << instance_name;
       } else {
-        LOG_ERROR << "Ignore unknown Execution Provider '" << execution_provider << "' for " << instance_name;
+        LOG_ERROR << "Ignore unknown Execution Accelerator '" << execution_accelerator << "' for " << instance_name;
       }
     }
   }
