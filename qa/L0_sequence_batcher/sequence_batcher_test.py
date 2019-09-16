@@ -39,6 +39,11 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
+if "TEST_SHARED_MEMORY" in os.environ:
+    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
+else:
+    TEST_SHARED_MEMORY=0
+import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
@@ -51,7 +56,10 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
 # Add ensemble to the _trials
-ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
+if TEST_SHARED_MEMORY:
+    ENSEMBLE_PREFIXES = []
+else:
+    ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 res = []
 for trial in _trials:
     res.append(trial)
@@ -98,11 +106,20 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False))
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
+            else:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False))
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True))
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
         self.assertEqual(len(configs), 1)
 
@@ -110,6 +127,7 @@ class SequenceBatcherTest(unittest.TestCase):
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
@@ -135,15 +153,34 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    input_info = input_list
+                    output_info = InferContext.ResultFormat.RAW
+
+                    if config[3]:
+                        input_byte_size = input_list[0].size * input_list[0].itemsize * batch_size
+                        output_byte_size = np.dtype(input_dtype).itemsize
+                        # create and register shared memory region for inputs and outputs
+                        shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+                        # copy data into shared memory region for input values
+                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+                        shared_memory_ctx.unregister(shm_ip_handle)
+                        shared_memory_ctx.register(shm_ip_handle)
+                        shared_memory_ctx.unregister(shm_op_handle)
+                        shared_memory_ctx.register(shm_op_handle)
+
+                        input_info = shm_ip_handle
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+
                     start_ms = int(round(time.time() * 1000))
                     if "libtorch" not in trial:
                         results = ctx.run(
-                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
                             batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT"
                     else:
                         results = ctx.run(
-                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
                             batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"
 
@@ -168,6 +205,12 @@ class SequenceBatcherTest(unittest.TestCase):
                     if delay_ms is not None:
                         time.sleep(delay_ms[1] / 1000.0)
 
+                    if config[3]:
+                        shared_memory_ctx.unregister(shm_ip_handle)
+                        shm.destroy_shared_memory_region(shm_ip_handle)
+                        shared_memory_ctx.unregister(shm_op_handle)
+                        shm.destroy_shared_memory_region(shm_op_handle)
+
                 seq_end_ms = int(round(time.time() * 1000))
 
                 if input_dtype == np.object:
@@ -191,7 +234,7 @@ class SequenceBatcherTest(unittest.TestCase):
 
     def check_sequence_async(self, trial, model_name, input_dtype, correlation_id,
                              sequence_thresholds, values, expected_result,
-                             protocol, batch_size=1, sequence_name="<unknown>"):
+                             protocol, batch_size=1, sequence_name="<unknown>", shm_region_names=None):
         """Perform sequence of inferences using async run. The 'values' holds
         a list of tuples, one for each inference with format:
 
@@ -213,23 +256,37 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", ProtocolType.HTTP, False))
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
+            else:
+                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", ProtocolType.GRPC, False))
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", ProtocolType.GRPC, True))
-
+            if TEST_SHARED_MEMORY:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
+            else:
+                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
         self.assertEqual(len(configs), 1)
 
         for config in configs:
             ctx = InferContext(config[0], config[1], model_name,
                                correlation_id=correlation_id, streaming=config[2],
                                verbose=True)
+            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
                 result_ids = list()
 
+                if config[3]:
+                    shm_ip_handle = []
+                    shm_op_handle = []
+
+                i = 0
                 for flag_str, value, pre_delay_ms in values:
                     flags = InferRequestHeader.FLAG_NONE
                     if flag_str is not None:
@@ -248,19 +305,49 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    input_info = input_list
+                    output_info = InferContext.ResultFormat.RAW
+
+                    if config[3]:
+                        input_byte_size = input_list[0].nbytes * batch_size
+                        output_byte_size = np.dtype(input_dtype).itemsize
+                        # create and register shared memory region for inputs and outputs
+                        if shm_region_names is None:
+                            shm_ip_handle.append(shm.create_shared_memory_region(
+                                "input_data"+str(i), "/input"+str(i), input_byte_size))
+                            shm_op_handle.append(shm.create_shared_memory_region(
+                                "output_data"+str(i), "/output"+str(i), output_byte_size))
+                        else:
+                            shm_ip_handle.append(shm.create_shared_memory_region(
+                                shm_region_names[0]+str(i)+'_data', '/'+shm_region_names[0]+str(i),
+                                input_byte_size))
+                            shm_op_handle.append(shm.create_shared_memory_region(
+                                shm_region_names[1]+str(i)+'_data', '/'+shm_region_names[1]+str(i),
+                                output_byte_size))
+                        # copy data into shared memory region for input values
+                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list)
+                        shared_memory_ctx.unregister(shm_ip_handle[-1])
+                        shared_memory_ctx.register(shm_ip_handle[-1])
+                        shared_memory_ctx.unregister(shm_op_handle[-1])
+                        shared_memory_ctx.register(shm_op_handle[-1])
+
+                        input_info = shm_ip_handle[-1]
+                        output_info = (InferContext.ResultFormat.RAW, shm_op_handle[-1])
+
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
 
                     if "libtorch" not in trial:
                         result_ids.append(ctx.async_run(
-                            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
+                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
                             batch_size=batch_size, flags=flags))
                         OUTPUT = "OUTPUT"
                     else:
                         result_ids.append(ctx.async_run(
-                            { "INPUT__0" : input_list }, { "OUTPUT__0" : InferContext.ResultFormat.RAW},
+                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
                             batch_size=batch_size, flags=flags))
                         OUTPUT = "OUTPUT__0"
+                    i+=1
 
                 # Wait for the results in the order sent
                 result = None
@@ -272,6 +359,13 @@ class SequenceBatcherTest(unittest.TestCase):
                     print("{}: {}".format(sequence_name, result))
 
                 seq_end_ms = int(round(time.time() * 1000))
+
+                if config[3]:
+                    for i in range(len(shm_ip_handle)):
+                        shared_memory_ctx.unregister(shm_ip_handle[i])
+                        shm.destroy_shared_memory_region(shm_ip_handle[i])
+                        shared_memory_ctx.unregister(shm_op_handle[i])
+                        shm.destroy_shared_memory_region(shm_op_handle[i])
 
                 if input_dtype == np.object:
                     self.assertEqual(int(result), expected_result)
@@ -335,7 +429,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # Get the datatype to use based on what models are available (see test.sh)
         if ("plan" in trial) or ("savedmodel" in trial):
             return np.float32
-        if "graphdef" in trial:
+        if ("graphdef" in trial) and (not TEST_SHARED_MEMORY):
             return np.dtype(object)
         return np.int32
 
@@ -531,6 +625,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.check_deferred_exception()
                     self.assertTrue(False, "expected error")
                 except InferenceServerException as ex:
+                    print(model_name + "-> " + ex.message())
                     self.assertEqual("inference:0", ex.server_id())
                     for prefix in ENSEMBLE_PREFIXES:
                         if model_name.startswith(prefix):
@@ -658,7 +753,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 4, None)),
                           self.get_expected_result(10, 4, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 988,
@@ -670,7 +766,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(27, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
 
                 for t in threads:
                     t.start()
@@ -711,7 +808,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(4, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -723,7 +821,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 14, None)),
                           self.get_expected_result(50, 14, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -733,7 +832,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -745,7 +845,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1114, None)),
                           self.get_expected_result(4450, 1114, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
 
                 threads[1].start()
                 threads[3].start()
@@ -795,7 +896,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -806,7 +908,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -817,7 +920,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -828,7 +932,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
 
                 for t in threads:
                     t.start()
@@ -871,7 +976,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -882,7 +988,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -893,7 +1000,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -904,7 +1012,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -915,7 +1024,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 11113, None)),
                           self.get_expected_result(33336, 11113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
 
                 for t in threads:
                     t.start()
@@ -965,7 +1075,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -975,7 +1086,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(24, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -985,7 +1097,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -996,7 +1109,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1005,7 +1119,8 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
@@ -1014,7 +1129,8 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start,end", 22222, None),),
                           self.get_expected_result(22222, 22222, trial, "start,end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip5', 'op5']}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1070,7 +1186,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1080,7 +1197,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(24, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1090,7 +1208,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(224, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1101,7 +1220,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1110,7 +1230,8 @@ class SequenceBatcherTest(unittest.TestCase):
                           (("start,end", 11111, None),),
                           self.get_expected_result(11111, 11111, trial, "start,end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1006,
@@ -1121,7 +1242,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 22224, 2000),),
                           self.get_expected_result(66669, 22224, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip5', 'op5']}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1169,7 +1291,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 3, None)),
                           self.get_expected_result(6, 3, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1180,7 +1303,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(36, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1191,7 +1315,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(336, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1202,7 +1327,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(3336, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1212,7 +1338,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1268,7 +1395,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 3, None)),
                           self.get_expected_result(4, 3, trial, None),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1280,7 +1408,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, None)),
                           self.get_expected_result(48, 13, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1292,7 +1421,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, None)),
                           self.get_expected_result(448, 113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1304,7 +1434,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, None)),
                           self.get_expected_result(4448, 1113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1001,
@@ -1314,7 +1445,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
 
                 threads[0].start()
                 threads[1].start()
@@ -1368,7 +1500,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            (None, 3, _max_sequence_idle_ms + 1000)),
                           self.get_expected_result(4, 3, trial, None),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip0', 'op0']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1002,
@@ -1380,7 +1513,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 13, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(48, 13, trial, None),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip1', 'op1']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1003,
@@ -1392,7 +1526,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(448, 113, trial, None),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip2', 'op2']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1004,
@@ -1404,7 +1539,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 1113, _max_sequence_idle_ms / 2)),
                           self.get_expected_result(4448, 1113, trial, None),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip3', 'op3']}))
                 threads.append(threading.Thread(
                     target=self.check_sequence_async,
                     args=(trial, model_name, dtype, 1005,
@@ -1414,7 +1550,8 @@ class SequenceBatcherTest(unittest.TestCase):
                            ("end", 11113, None)),
                           self.get_expected_result(22224, 11113, trial, "end"),
                           protocol),
-                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol)}))
+                    kwargs={'sequence_name' : "{}_{}".format(self._testMethodName, protocol),
+                    'shm_region_names': ['ip4', 'op4']}))
 
                 threads[0].start()
                 threads[1].start()

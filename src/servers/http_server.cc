@@ -926,8 +926,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       request_header_serialized.c_str(), request_header_serialized.size());
   if (err == nullptr) {
     EVBufferPair* response_pair(new EVBufferPair());
-    // std::map<std::string, std::pair<const void*, size_t>>* output_shm_map =
-    //     new std::map<std::string, std::pair<const void*, size_t>>;
     err = EVBufferToInput(
         model_name, request_header, req->buffer_in, request_provider,
         response_pair->second);
@@ -937,7 +935,6 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 
       response_pair->first = req->buffer_out;
       infer_request->response_pair_.reset(response_pair);
-      // response_pair->op_shm_map_ = output_shm_map;
 
       err = TRTSERVER_ServerInferAsync(
           server_.get(), request_provider, allocator_,
