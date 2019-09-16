@@ -711,14 +711,29 @@ HTTPAPIServer::HandleSharedMemoryControl(
       err = TRTSERVER_ProtobufSerialize(
           shm_status_protobuf, &status_buffer, &status_byte_size);
       if (err == nullptr) {
-        SharedMemoryStatus shm_status;
-        if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
-          err = TRTSERVER_ErrorNew(
-              TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
+        std::string format;
+        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+        if (format_c_str != NULL) {
+          format = std::string(format_c_str);
         } else {
-          std::string shm_status_str = shm_status.DebugString();
-          evbuffer_add(
-              req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
+          format = "text";
+        }
+
+        if (format == "binary") {
+          evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+          evhtp_headers_add_header(
+              req->headers_out,
+              evhtp_header_new("Content-Type", "application/octet-stream", 1, 1));
+        } else {
+          SharedMemoryStatus shm_status;
+          if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN, "failed to parse shared memory status");
+          } else {
+            std::string shm_status_str = shm_status.DebugString();
+            evbuffer_add(
+                req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
+          }
         }
       }
     }
