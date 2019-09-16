@@ -91,6 +91,10 @@ nic::Error* SharedMemoryControlContextRegister(
     SharedMemoryControlContextCtx* ctx, void* shm_handle);
 nic::Error* SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, void* shm_handle);
+nic::Error* SharedMemoryControlContextUnregisterAll(
+    SharedMemoryControlContextCtx* ctx);
+nic::Error* SharedMemoryControlContextGetStatus(
+    SharedMemoryControlContextCtx* ctx, char** status, uint32_t* status_len);
 nic::Error* SharedMemoryControlContextGetSharedMemoryHandle(
     void* shm_handle, void** shm_addr, const char** shm_key, int* shm_fd,
     size_t* offset, size_t* byte_size);

@@ -136,11 +136,9 @@ if __name__ == '__main__':
             sys.exit(1);
 
     del results
-    shared_memory_ctx.unregister(shm_ip0_handle)
+    print(shared_memory_ctx.get_shared_memory_status())
+    shared_memory_ctx.unregister_all()
     shm.destroy_shared_memory_region(shm_ip0_handle)
-    shared_memory_ctx.unregister(shm_ip1_handle)
     shm.destroy_shared_memory_region(shm_ip1_handle)
-    shared_memory_ctx.unregister(shm_op0_handle)
     shm.destroy_shared_memory_region(shm_op0_handle)
-    shared_memory_ctx.unregister(shm_op1_handle)
     shm.destroy_shared_memory_region(shm_op1_handle)
