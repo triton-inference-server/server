@@ -118,7 +118,7 @@ LocalFileSystem::FileModificationTime(
     return Status(RequestStatusCode::INTERNAL, "failed to stat file " + path);
   }
 
-  *mtime_ns = st.st_mtim.tv_sec * NANOS_PER_SECOND + st.st_mtim.tv_nsec;
+  *mtime_ns = TIMESPEC_TO_NANOS(st.st_mtim);
   return Status::Success;
 }
 
