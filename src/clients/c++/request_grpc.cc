@@ -415,6 +415,7 @@ SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus(
 
   request.mutable_get_status();
 
+  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {

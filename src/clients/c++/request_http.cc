@@ -703,6 +703,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }
+  full_url += "?format=binary";
 
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
