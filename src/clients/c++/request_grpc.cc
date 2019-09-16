@@ -340,7 +340,6 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   rshm_region->set_offset(offset);
   rshm_region->set_byte_size(byte_size);
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
@@ -365,7 +364,6 @@ SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
   auto unregister_info = request.mutable_unregister();
   unregister_info->set_name(name);
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
@@ -388,7 +386,6 @@ SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
 
   request.mutable_unregister_all();
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {

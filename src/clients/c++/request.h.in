@@ -787,7 +787,7 @@ class ModelControlContext {
 ///   ctx->UnregisterAllSharedMemory();
 ///   ...
 ///   SharedMemoryStatus status;
-///   ctx->SharedMemoryStatus(&status);
+///   ctx->GetSharedMemoryStatus(&status);
 ///   ...
 /// \endcode
 ///
@@ -822,7 +822,7 @@ class SharedMemoryControlContext {
 
   /// Get the list of all active/registered shared memory regions on the
   /// inference server.
-  /// \param status The active shared memory regions.
+  /// \param status Returns the active shared memory regions.
   /// \return Error object indicating success or failure.
   virtual Error GetSharedMemoryStatus(SharedMemoryStatus* status) = 0;
 };

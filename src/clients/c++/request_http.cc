@@ -761,8 +761,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (action_str == "status") {
     if (!shm_status->ParseFromString(response_)) {
       return Error(
-          RequestStatusCode::INTERNAL,
-          "failed to parse shared memory status");
+          RequestStatusCode::INTERNAL, "failed to parse shared memory status");
     }
 
     if (verbose_) {
