@@ -29,7 +29,6 @@
 #include <string>
 #include <vector>
 #include "src/core/backend.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/provider_utils.h"
