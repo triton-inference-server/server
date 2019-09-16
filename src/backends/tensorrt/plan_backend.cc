@@ -461,6 +461,15 @@ PlanBackend::Context::InitializeInputBinding(
             " for " + name_);
   }
 
+  MemoryFormat fmt = ConvertTrtFmtToFmt(engine_->getBindingFormat(index));
+  if (fmt != MemoryFormat::LINEAR) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "unexpected tensor format " + MemoryFormat_Name(fmt) + " for input '" +
+            input_name +
+            "'. Only LINEAR memory format is supported at present.");
+  }
+
   nvinfer1::Dims engine_dims = engine_->getBindingDimensions(index);
   // Detect whether dynamic or not
   if (ContainsWildcard(engine_dims)) {
@@ -472,14 +481,15 @@ PlanBackend::Context::InitializeInputBinding(
         name_, input_name, engine_dims, model_config_dims, support_batching,
         is_dynamic_));
   } else {
-      std::vector<int64_t> dims_vec;
-      DimsToDimVec(engine_dims, &dims_vec);
-      if (GetElementCount(dims_vec) != 1) {
-        return Status(
+    std::vector<int64_t> dims_vec;
+    DimsToDimVec(engine_dims, &dims_vec);
+    if (GetElementCount(dims_vec) != 1) {
+      return Status(
           RequestStatusCode::INVALID_ARG,
-          "unexpected dimensions " + DimsDebugString(engine_dims) + " for control input '" +
-              input_name + "', expecting a single element for " + name_);
-      }
+          "unexpected dimensions " + DimsDebugString(engine_dims) +
+              " for control input '" + input_name +
+              "', expecting a single element for " + name_);
+    }
   }
 
   int64_t byte_size;
@@ -620,6 +630,15 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           "unexpected datatype " + DataType_Name(dt) +
               " for inference output '" + io.name() + "', expecting " +
               DataType_Name(io.data_type()) + " for " + name_);
+    }
+
+    MemoryFormat fmt = ConvertTrtFmtToFmt(engine_->getBindingFormat(index));
+    if (fmt != MemoryFormat::LINEAR) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "unexpected tensor format " + MemoryFormat_Name(fmt) +
+              " for output '" + io.name() +
+              "'. Only LINEAR memory format is supported at present.");
     }
 
     const DimsList& model_config_dims =
