@@ -45,6 +45,50 @@ ConvertTrtTypeToDataType(nvinfer1::DataType trt_type)
   return TYPE_INVALID;
 }
 
+MemoryFormat
+ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt)
+{
+  switch (trt_fmt) {
+    case nvinfer1::TensorFormat::kLINEAR:
+      return MemoryFormat::LINEAR;
+    case nvinfer1::TensorFormat::kCHW2:
+      return MemoryFormat::CHW2;
+    case nvinfer1::TensorFormat::kCHW4:
+      return MemoryFormat::CHW4;
+    case nvinfer1::TensorFormat::kHWC8:
+      return MemoryFormat::HCW8;
+    case nvinfer1::TensorFormat::kCHW16:
+      return MemoryFormat::CHW16;
+    case nvinfer1::TensorFormat::kCHW32:
+      return MemoryFormat::CHW32;
+  }
+
+  return MemoryFormat::INVALID;
+}
+
+const std::string
+MemoryFormat_Name(MemoryFormat fmt)
+{
+  switch (fmt) {
+    case MemoryFormat::LINEAR:
+      return "LINEAR";
+    case MemoryFormat::CHW2:
+      return "CHW2";
+    case MemoryFormat::CHW4:
+      return "CHW4";
+    case MemoryFormat::HCW8:
+      return "HCW8";
+    case MemoryFormat::CHW16:
+      return "CHW16";
+    case MemoryFormat::CHW32:
+      return "CHW32";
+    case MemoryFormat::INVALID:
+      return "INVALID";
+  }
+
+  return "INVALID";
+}
+
 std::pair<bool, nvinfer1::DataType>
 ConvertDataTypeToTrtType(const DataType& dtype)
 {

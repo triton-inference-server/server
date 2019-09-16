@@ -32,6 +32,28 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// The memory layouts for i/o tensors
+enum class MemoryFormat {
+  // Row major linear format.
+  LINEAR,
+  // Two wide channel vectorized row major format.
+  CHW2,
+  // Four wide channel vectorized row major format.
+  CHW4,
+  // Eight channel format where C is padded to a multiple of 8.
+  HCW8,
+  // Sixteen wide channel vectorized row major format.
+  CHW16,
+  // Thirty-two wide channel vectorized row major format.
+  CHW32,
+  // Invalid Memory format
+  INVALID
+};
+
+MemoryFormat ConvertTrtFmtToFmt(nvinfer1::TensorFormat trt_fmt);
+
+const std::string MemoryFormat_Name(MemoryFormat fmt);
+
 DataType ConvertTrtTypeToDataType(nvinfer1::DataType trt_type);
 
 std::pair<bool, nvinfer1::DataType> ConvertDataTypeToTrtType(
