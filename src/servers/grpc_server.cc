@@ -1522,15 +1522,15 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
       err = smb_manager_->Create(
-          &smb, request.shared_memory_region().name(),
-          request.shared_memory_region().shared_memory_key(),
-          request.shared_memory_region().offset(),
-          request.shared_memory_region().byte_size());
+          &smb, request.register_().shared_memory_region().name(),
+          request.register_().shared_memory_region().shared_memory_key(),
+          request.register_().shared_memory_region().offset(),
+          request.register_().shared_memory_region().byte_size());
       if (err == nullptr) {
         err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
       }
     } else if (request.has_unregister()) {
-      err = smb_manager_->Remove(&smb, request.shared_memory_region().name());
+      err = smb_manager_->Remove(&smb, request.unregister().name());
       if ((err == nullptr) && (smb != nullptr)) {
         err = TRTSERVER_ServerUnregisterSharedMemory(trtserver_.get(), smb);
         TRTSERVER_Error* del_err = TRTSERVER_SharedMemoryBlockDelete(smb);

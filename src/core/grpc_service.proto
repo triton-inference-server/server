@@ -257,11 +257,6 @@ message InferSharedMemoryRegion
   uint64 byte_size = 4;
 }
 
-message controlType
-{
-  uint32 type = 1;
-}
-
 //@@
 //@@.. cpp:var:: message SharedMemoryControlRequest
 //@@
@@ -269,45 +264,67 @@ message controlType
 //@@
 message SharedMemoryControlRequest
 {
-  //@@  .. cpp:var:: oneof type
+  //@@  .. cpp:var:: message RegisterInfo
+  //@@
+  //@@     The information needed to register the shared memory region.
+  //@@
+  message RegisterInfo {
+    //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
+    //@@
+    //@@     The shared memory region to register.
+    //@@
+    InferSharedMemoryRegion shared_memory_region = 5;
+  }
+
+  //@@  .. cpp:var:: message UnregisterInfo
+  //@@
+  //@@     The information needed to unregister the shared memory region.
+  //@@
+  message UnregisterInfo {
+    //@@
+    //@@  .. cpp:var:: string name
+    //@@
+    //@@     The name for this shared memory region to unregister.
+    //@@
+    string name = 1;
+  }
+
+  //@@  .. cpp:var:: message NoInfo
+  //@@
+  //@@     Information needed to UnregisterAll and GetStatus of shared memory.
+  //@@
+  message NoInfo {}
+
+  //@@  .. cpp:var:: oneof shared_memory_control
   //@@
   //@@     Types of control operations for shared memory
   //@@
-  oneof type
+  oneof shared_memory_control
   {
-    //@@    .. cpp:var:: uint32 REGISTER
+    //@@    .. cpp:var:: RegisterInfo register
     //@@
     //@@       To register the specified shared memory region.
     //@@
-    controlType register = 1;
+    RegisterInfo register = 1;
 
-    //@@    .. cpp:var:: uint32 UNREGISTER
+    //@@    .. cpp:var:: UnregisterInfo unregister
     //@@
     //@@       To unregister the specified shared memory region.
     //@@
-    controlType unregister = 2;
+    UnregisterInfo unregister = 2;
 
-    //@@    .. cpp:var:: uint32 UNREGISTER_ALL
+    //@@    .. cpp:var:: NoInfo unregister_all
     //@@
     //@@       To unregister all active shared memory regions.
     //@@
-    controlType unregister_all = 3;
+    NoInfo unregister_all = 3;
 
-    //@@    .. cpp:var:: uint32 GET_STATUS
+    //@@    .. cpp:var:: NoInfo get_status
     //@@
     //@@       To get the list of all active shared memory regions.
     //@@
-    controlType get_status = 4;
+    NoInfo get_status = 4;
   }
-
-  //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
-  //@@
-  //@@     The shared memory region to register or unregister.
-  //@@     All fields are needed to REGISTER the shared memory region.
-  //@@     Only 'name' is needed to UNREGISTER the shared memory region.
-  //@@     No fields are needed to UNREGISTER_ALL.
-  //@@
-  InferSharedMemoryRegion shared_memory_region = 5;
 }
 
 //@@
