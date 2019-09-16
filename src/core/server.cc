@@ -77,7 +77,7 @@ InferenceServer::InferenceServer()
 {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  start_time_ns_ = ts.tv_sec * NANOS_PER_SECOND + ts.tv_nsec;
+  start_time_ns_ = TIMESPEC_TO_NANOS(ts);
 
   const char* vstr = getenv("TENSORRT_SERVER_VERSION");
   if (vstr != nullptr) {
@@ -455,7 +455,7 @@ InferenceServer::UptimeNs() const
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
 
-  uint64_t now_ns = now.tv_sec * NANOS_PER_SECOND + now.tv_nsec;
+  uint64_t now_ns = TIMESPEC_TO_NANOS(now);
   return now_ns - start_time_ns_;
 }
 

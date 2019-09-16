@@ -405,8 +405,7 @@ DynamicBatchScheduler::GetDynamicBatch()
   clock_gettime(CLOCK_MONOTONIC, &now);
   const struct timespec& queued = queue_.front().stats_->Timestamp(
       ModelInferStats::TimestampKind::kQueueStart);
-  uint64_t delay_ns = (now.tv_sec * NANOS_PER_SECOND + now.tv_nsec) -
-                      (queued.tv_sec * NANOS_PER_SECOND + queued.tv_nsec);
+  uint64_t delay_ns = TIMESPEC_TO_NANOS(now) - TIMESPEC_TO_NANOS(queued);
 
   if (delay_ns >= pending_batch_delay_ns_) {
     return 0;

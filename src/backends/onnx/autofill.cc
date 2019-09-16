@@ -315,7 +315,8 @@ AutoFillOnnx::Create(
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
       session_options, &OrtReleaseSessionOptions);
   RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
-  RETURN_IF_ORT_ERROR(OrtSetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
+  RETURN_IF_ORT_ERROR(
+      OrtSetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
 
   OrtSession* session;
 
