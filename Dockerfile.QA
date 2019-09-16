@@ -63,6 +63,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple_string qa/L0_simple_string_example/models/. && \
     mkdir qa/L0_simple_shared_memory_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_shared_memory_example/models/. && \
+    mkdir qa/L0_shared_memory/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
     cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/.
@@ -128,7 +130,13 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_model_config/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
-        qa/L0_simple_lib/.
+        qa/L0_simple_lib/. && \
+    mkdir -p qa/L0_infer_shm && \
+    cp -r qa/L0_infer/. qa/L0_infer_shm && \
+    mkdir -p qa/L0_batcher_shm && \
+    cp -r qa/L0_batcher/. qa/L0_batcher_shm && \
+    mkdir -p qa/L0_sequence_batcher_shm && \
+    cp -r qa/L0_sequence_batcher/. qa/L0_sequence_batcher_shm
 
 # Generating the docs requires the docs source and the source code so
 # copy that into L0_docs so that it is available when that test runs.

@@ -60,6 +60,7 @@ for m in \
         $DATADIR/qa_sequence_model_repository/plan_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_sequence_object \
+        $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/savedmodel_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/onnx_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_sequence_float32 \
@@ -89,11 +90,13 @@ for m in \
         $DATADIR/qa_sequence_model_repository/plan_nobatch_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/netdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_object \
+        $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32 \
         $DATADIR/qa_sequence_model_repository/savedmodel_nobatch_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/onnx_nobatch_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_plan_nobatch_sequence_float32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_netdef_nobatch_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_object \
+        $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_savedmodel_nobatch_sequence_float32 \
         $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32 ; do
     cp -r $m models0/. && \
@@ -102,28 +105,36 @@ for m in \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-# Setup variable-size model repository.
-#   modelsv - one instance with batch-size 4
-rm -fr modelsv && mkdir modelsv
-for m in \
-        $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
-        $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object \
-        $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 \
-        $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
-        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
-        $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32 ; do
-    cp -r $m modelsv/. && \
-        (cd modelsv/$(basename $m) && \
-            sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-done
+# Setup variable-size model repository for non shared memory case.
+if [ "$TEST_SHARED_MEMORY" == "0" ]; then
+  #   modelsv - one instance with batch-size 4
+  rm -fr modelsv && mkdir modelsv
+  for m in \
+          $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
+          $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object \
+          $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 \
+          $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32 \
+          $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
+          $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
+          $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
+          $DATADIR/qa_variable_sequence_model_repository/libtorch_sequence_int32 ; do
+      cp -r $m modelsv/. && \
+          (cd modelsv/$(basename $m) && \
+              sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+              sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+              sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+  done
+fi
 
 # Same test work on all models since they all have same total number
 # of batch slots.
-for model_trial in v 0 1 2 4 ; do
+if [ "$TEST_SHARED_MEMORY" == "0" ]; then
+  trial_types="v 0 1 2 4"
+else
+  trial_types="0 1 2 4"
+fi
+
+for model_trial in $trial_types ; do
     export NO_BATCHING=1 &&
         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
     export MODEL_INSTANCES=1 &&

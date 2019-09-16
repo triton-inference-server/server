@@ -90,7 +90,13 @@ done
 # reset (which is used to make sure the correctly batch size was used
 # for execution). Test everything with fixed-tensor-size models and
 # variable-tensor-size models.
-for model_type in FIXED VARIABLE; do
+if [ "$TEST_SHARED_MEMORY" == "0" ]; then
+  types="FIXED VARIABLE"
+else
+  types="FIXED"
+fi
+
+for model_type in $types; do
     export BATCHER_TYPE=$model_type
     MODEL_PATH=models && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
     for i in \
@@ -162,65 +168,68 @@ for model_type in FIXED VARIABLE; do
     done
 done
 
-# Tests that run only on the variable-size tensor models
-export BATCHER_TYPE=VARIABLE
-for i in \
-        test_multi_batch_not_preferred_different_shape \
-        test_multi_batch_preferred_different_shape \
-        test_multi_batch_different_shape ; do
-    SERVER_ARGS="--model-repository=`pwd`/var_models"
-    SERVER_LOG="./$i.VARIABLE.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
 
-    echo "Test: $i" >>$CLIENT_LOG
+# Tests that run only on the variable-size tensor models (not for shared memory)
+if [ "$TEST_SHARED_MEMORY" == "0" ]; then
+  export BATCHER_TYPE=VARIABLE
+  for i in \
+          test_multi_batch_not_preferred_different_shape \
+          test_multi_batch_preferred_different_shape \
+          test_multi_batch_different_shape ; do
+      SERVER_ARGS="--model-repository=`pwd`/var_models"
+      SERVER_LOG="./$i.VARIABLE.serverlog"
+      run_server
+      if [ "$SERVER_PID" == "0" ]; then
+          echo -e "\n***\n*** Failed to start $SERVER\n***"
+          cat $SERVER_LOG
+          exit 1
+      fi
 
-    set +e
-    python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+      echo "Test: $i" >>$CLIENT_LOG
 
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+      set +e
+      python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+          echo -e "\n***\n*** Test Failed\n***"
+          RET=1
+      fi
+      set -e
 
-# Tests that run only on the variable-size tensor models and that
-# require TRTSERVER_DELAY_SCHEDULER so that the scheduler is delayed
-# and requests can collect in the queue.
-export BATCHER_TYPE=VARIABLE
-for i in \
-        test_multi_batch_delayed_preferred_different_shape ; do
-    export TRTSERVER_DELAY_SCHEDULER=4
-    SERVER_ARGS="--model-repository=`pwd`/var_models"
-    SERVER_LOG="./$i.VARIABLE.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+      kill $SERVER_PID
+      wait $SERVER_PID
+  done
 
-    echo "Test: $i" >>$CLIENT_LOG
+  # Tests that run only on the variable-size tensor models and that
+  # require TRTSERVER_DELAY_SCHEDULER so that the scheduler is delayed
+  # and requests can collect in the queue.
+  export BATCHER_TYPE=VARIABLE
+  for i in \
+          test_multi_batch_delayed_preferred_different_shape ; do
+      export TRTSERVER_DELAY_SCHEDULER=4
+      SERVER_ARGS="--model-repository=`pwd`/var_models"
+      SERVER_LOG="./$i.VARIABLE.serverlog"
+      run_server
+      if [ "$SERVER_PID" == "0" ]; then
+          echo -e "\n***\n*** Failed to start $SERVER\n***"
+          cat $SERVER_LOG
+          exit 1
+      fi
 
-    set +e
-    python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+      echo "Test: $i" >>$CLIENT_LOG
 
-    unset TRTSERVER_DELAY_SCHEDULER
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+      set +e
+      python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+          echo -e "\n***\n*** Test Failed\n***"
+          RET=1
+      fi
+      set -e
+
+      unset TRTSERVER_DELAY_SCHEDULER
+      kill $SERVER_PID
+      wait $SERVER_PID
+  done
+fi
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see

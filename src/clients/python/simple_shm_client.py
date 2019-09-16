@@ -87,7 +87,7 @@ if __name__ == '__main__':
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input1_data = np.ones(shape=16, dtype=np.int32)
 
-    input_byte_size = input0_data.nbytes
+    input_byte_size = input0_data.size * input0_data.itemsize
     output_byte_size = input_byte_size
 
     # Create Output0 and Output1 in Shared Memory and store shared memory handle
