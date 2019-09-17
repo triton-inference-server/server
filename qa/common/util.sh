@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-TRACE_COLLECTOR_LOG=${TRACE_COLLECTOR_LOG:=./trace_collector.log}
 SERVER_LOG=${SERVER_LOG:=./server.log}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 MONITOR_FILE_TIMEOUT=${MONITOR_FILE_TIMEOUT:=10}
@@ -217,26 +216,6 @@ function run_server_nowait () {
     echo "=== Running $SERVER $SERVER_ARGS"
     $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
-}
-
-# Run trace collector. Sets TRACE_COLLECTOR_PID to pid of
-# TRACE_COLLECTOR, or 0 if error
-function run_trace_collector () {
-    TRACE_COLLECTOR_PID=0
-
-    if [ -z "$TRACE_COLLECTOR" ]; then
-        echo "=== TRACE_COLLECTOR must be defined"
-        return
-    fi
-
-    if [ ! -f "$TRACE_COLLECTOR" ]; then
-        echo "=== $TRACE_COLLECTOR does not exist"
-        return
-    fi
-
-    echo "=== Running $TRACE_COLLECTOR $TRACE_COLLECTOR_ARGS"
-    $TRACE_COLLECTOR $TRACE_COLLECTOR_ARGS > $TRACE_COLLECTOR_LOG 2>&1 &
-    TRACE_COLLECTOR_PID=$!
 }
 
 # Run nvidia-smi to monitor GPU utilization.

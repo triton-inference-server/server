@@ -86,13 +86,6 @@ service GRPCService
       returns (SharedMemoryControlResponse)
   {
   }
-
-  //@@  .. cpp:var:: rpc TraceControl(TraceControlRequest) returns
-  //@@     (TraceControlResponse)
-  //@@
-  //@@     Enable and disable tracing.
-  //@@
-  rpc TraceControl(TraceControlRequest) returns (TraceControlResponse) {}
 }
 
 //@@
@@ -131,105 +124,6 @@ message StatusResponse
   //@@     The server and model status.
   //@@
   ServerStatus server_status = 2;
-}
-
-//@@
-//@@.. cpp:var:: message TraceControlRequest
-//@@
-//@@   Request message for tracecontrol gRPC endpoint.
-//@@
-message TraceControlRequest
-{
-  //@@  .. cpp:var:: message TraceConfigure
-  //@@
-  //@@     Setting for configuring tracing. Must be used before tracing
-  //@@     can be enabled. Can be used only once because the trace
-  //@@     configuration can't be changed once it is set.
-  //@@
-  message TraceConfigure
-  {
-    //@@    .. cpp:var:: string name
-    //@@
-    //@@       Descriptive name for the trace being collected.
-    //@@       Default is "TRTIS".
-    //@@
-    string name = 1;
-
-    //@@    .. cpp:var:: string host
-    //@@
-    //@@       The name of the server where the trace information will be
-    //@@       delivered.
-    //@@
-    string host = 2;
-
-    //@@    .. cpp:var:: uint32 port
-    //@@
-    //@@       The port on the server where the trace information will be
-    //@@       delivered.
-    //@@
-    uint32 port = 3;
-  }
-
-  //@@  .. cpp:var:: message TraceEnable
-  //@@
-  //@@     Setting for enabling tracing.
-  //@@
-  message TraceEnable
-  {
-    //@@    .. cpp:var:: uint32 level
-    //@@
-    //@@       Set the trace level.
-    //@@
-    //@@         0: Disable tracing.
-    //@@
-    //@@         1: Minimal tracing, trace only overall request, queue
-    //@@            and compute.
-    //@@
-    //@@         2: Full tracing, minimal tracing plus details.
-    //@@
-    uint32 level = 1;
-
-    //@@    .. cpp:var:: uint32 sample_rate
-    //@@
-    //@@       When enabling tracing sets the sample rate. Every
-    //@@       'rate' request will be sampled.
-    //@@
-    uint32 rate = 2;
-  }
-
-  //@@  .. cpp:var:: oneof trace_choice
-  //@@
-  //@@     The types of trace requests.
-  //@@
-  oneof trace_choice
-  {
-    //@@    .. cpp:var:: TraceConfigure trace_configure
-    //@@
-    //@@       Configure tracing.
-    //@@
-    TraceConfigure trace_configure = 1;
-
-    //@@    .. cpp:var:: TraceEnable trace_enable
-    //@@
-    //@@       Enable tracing.
-    //@@
-    TraceEnable trace_enable = 2;
-  }
-}
-
-//@@
-//@@.. cpp:var:: message TraceControlResponse
-//@@
-//@@   Response message for tracecontrol endpoint.
-//@@
-message TraceControlResponse
-{
-  //@@
-  //@@  .. cpp:var:: RequestStatus request_status
-  //@@
-  //@@     The status of the request, indicating success or failure.
-  //@@
-  RequestStatus request_status = 1;
 }
 
 //@@

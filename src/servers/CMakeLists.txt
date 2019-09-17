@@ -108,16 +108,51 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
 endif() # TRTIS_ENABLE_HTTP || TRTIS_ENABLE_METRICS
 
 #
+# tracing
+#
+set(TRACING_OBJECTS "")
+set(TRACING_LIBRARIES "")
+
+if(${TRTIS_ENABLE_TRACING})
+  message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
+
+  set(
+    TRACING_SRCS
+    tracer.cc
+  )
+
+  set(
+    TRACING_HDRS
+    tracer.h
+  )
+
+  add_library(
+    tracing-library EXCLUDE_FROM_ALL OBJECT
+    ${TRACING_SRCS} ${TRACING_HDRS}
+  )
+
+  set(
+    TRACING_OBJECTS
+    $<TARGET_OBJECTS:tracing-library>
+  )
+endif() # TRTIS_ENABLE_TRACING
+
+#
 # trtserver
 #
 set(
   TRTSERVER_SRCS
-  main.cc common.cc shared_memory_block_manager.cc ../core/logging.cc
+  main.cc
+  common.cc
+  shared_memory_block_manager.cc
+  ../core/logging.cc
 )
 
 set(
   TRTSERVER_HDRS
-  common.h shared_memory_block_manager.h ../core/logging.h
+  common.h
+  shared_memory_block_manager.h
+  ../core/logging.h
 )
 
 add_executable(
@@ -126,12 +161,14 @@ add_executable(
   ${TRTSERVER_HDRS}
   ${HTTP_ENDPOINT_OBJECTS}
   ${GRPC_ENDPOINT_OBJECTS}
+  ${TRACING_OBJECTS}
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
 target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
   ${GRPC_ENDPOINT_LIBRARIES}
+  ${TRACING_LIBRARIES}
   PRIVATE trtserver
 )
 install(
@@ -157,11 +194,13 @@ add_executable(
   ${SIMPLE_SRCS}
   ${SIMPLE_HDRS}
   $<TARGET_OBJECTS:proto-library>
+  ${TRACING_OBJECTS}
 )
 target_link_libraries(
   simple
   PRIVATE trtserver
   PRIVATE protobuf::libprotobuf
+  ${TRACING_LIBRARIES}
 )
 if(${TRTIS_ENABLE_GPU})
 target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -284,15 +323,6 @@ if(${TRTIS_ENABLE_METRICS})
   )
 endif() # TRTIS_ENABLE_METRICS
 
-if(${TRTIS_ENABLE_TRACING})
-  message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
-  target_link_libraries(
-    trtserver
-    PUBLIC -L${TRTIS_TRACE_INSTALL_PATH}/lib
-    PUBLIC -lcppkin
-  )
-endif() # TRTIS_ENABLE_TRACING
-
 if(${TRTIS_ENABLE_GCS})
   find_package(storage_client REQUIRED)
   message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
@@ -330,16 +360,3 @@ install(
   FILES ../core/trtserver.h
   DESTINATION include
 )
-
-if(${TRTIS_ENABLE_TRACING})
-install(
-  DIRECTORY ${TRTIS_TRACE_INSTALL_PATH}/include/
-  DESTINATION include/cppkin
-)
-install(
-  FILES
-    ${TRTIS_TRACE_INSTALL_PATH}/lib/libCore.so
-    ${TRTIS_TRACE_INSTALL_PATH}/lib/libcppkin.so
-  DESTINATION lib
-)
-endif() # TRTIS_ENABLE_TRACING

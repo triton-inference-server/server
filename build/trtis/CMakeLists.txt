@@ -123,15 +123,6 @@ if(${TRTIS_ENABLE_GPU})
 endif() # TRTIS_ENABLE_GPU
 
 #
-# Trace
-#
-if(${TRTIS_ENABLE_TRACING})
-message(STATUS "Using tracing ${TRTIS_TRACE_INSTALL_PATH}")
-include_directories(${TRTIS_TRACE_INSTALL_PATH}/include)
-include_directories(${TRTIS_TRACE_EXTRA_INCLUDE_PATH})
-endif() # TRTIS_ENABLE_TRACING
-
-#
 # libevent
 #
 find_package(Libevent CONFIG REQUIRED)

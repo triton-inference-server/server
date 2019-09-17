@@ -26,26 +26,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SIMPLE_CLIENT=../clients/simple_client
-SIMPLE_CLIENT_PY=../clients/simple_client.py
-
-TRACE_COLLECTOR=`pwd`/../common/trace_collector.py
-TRACE_COLLECTOR_ARGS="-v"
-TRACE_COLLECTOR_LOG="./trace_collector.log"
+TRACE_SUMMARY=../common/trace_summary.py
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--trace-host=localhost --model-repository=`pwd`/models"
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f *.log
+RET=0
 
-run_trace_collector
-if [ "$TRACE_COLLECTOR_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $TRACE_COLLECTOR\n***"
-    cat $TRACE_COLLECTOR_LOG
-    exit 1
-fi
-
+# trace-rate == 1, make sure every request is traced
+SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_1.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -53,22 +44,77 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-RET=0
-
 set +e
 
-$SIMPLE_CLIENT -v >>client_c++.log 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+for p in {1..10}; do
+    $SIMPLE_CLIENT >> client_1.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_1.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
 
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-kill $TRACE_COLLECTOR_PID
-wait $TRACE_COLLECTOR_PID
+set +e
+
+$TRACE_SUMMARY trace_1.log > summary_1.log
+
+if [ `grep -c simple summary_1.log` != "20" ]; then
+    cat summary_1.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+# trace-rate == 6
+SERVER_ARGS="--trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_6.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_CLIENT >> client_6.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_6.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY trace_6.log > summary_6.log
+
+if [ `grep -c simple summary_6.log` != "3" ]; then
+    cat summary_6.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
