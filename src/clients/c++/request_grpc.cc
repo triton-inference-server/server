@@ -310,10 +310,18 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
 
+  enum ControlType {
+    REGISTER = 1,
+    UNREGISTER = 2,
+    UNREGISTER_ALL = 3,
+    GET_STATUS = 4
+  };
+
  private:
   Error SendRequest(
-      const std::string& name, const SharedMemoryControlRequest::Type action,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
+      const std::string& name, const ControlType action,
+      const std::string& shm_key, const size_t offset, const size_t byte_size,
+      SharedMemoryStatus* shm_status);
 
   // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
@@ -333,58 +341,79 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest(
-      name, SharedMemoryControlRequest::REGISTER, shm_key, offset, byte_size);
+  return SendRequest(name, REGISTER, shm_key, offset, byte_size, nullptr);
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest(name, SharedMemoryControlRequest::UNREGISTER, "", 0, 0);
+  return SendRequest(name, UNREGISTER, "", 0, 0, nullptr);
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("", SharedMemoryControlRequest::UNREGISTER_ALL, "", 0, 0);
+  return SendRequest("", UNREGISTER_ALL, "", 0, 0, nullptr);
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::SendRequest(
-    const std::string& name, const SharedMemoryControlRequest::Type action,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& name, const ControlType action,
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    SharedMemoryStatus* shm_status)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
+  if (shm_status != nullptr) {
+    shm_status->Clear();
+  }
 
-  if (action == SharedMemoryControlRequest::REGISTER) {
-    auto rshm_region = request.mutable_shared_memory_region();
+  if (action == REGISTER) {
+    auto register_info = request.mutable_register_();
+    auto rshm_region = register_info->mutable_shared_memory_region();
     rshm_region->set_name(name);
     rshm_region->set_shared_memory_key(shm_key);
     rshm_region->set_offset(offset);
     rshm_region->set_byte_size(byte_size);
-    request.set_type(action);
-  } else if (action == SharedMemoryControlRequest::UNREGISTER) {
-    auto rshm_region = request.mutable_shared_memory_region();
-    rshm_region->set_name(name);
-    request.set_type(action);
-  } else if (action == SharedMemoryControlRequest::UNREGISTER_ALL) {
-    request.set_type(action);
+  } else if (action == UNREGISTER) {
+    auto unregister_info = request.mutable_unregister();
+    unregister_info->set_name(name);
+  } else if (action == UNREGISTER_ALL) {
+    request.mutable_unregister_all();
+  } else if (action == GET_STATUS) {
+    request.mutable_get_status();
   }
 
+  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
-    return Error(response.request_status());
+    grpc_status = Error(response.request_status());
+    if (action == GET_STATUS) {
+      std::string response_str;
+      response.clear_request_status();
+      response.SerializeToString(&response_str);
+      if (!shm_status->ParseFromString(response_str)) {
+        return Error(
+            RequestStatusCode::INTERNAL,
+            "failed to parse shared memory status");
+      }
+    }
   } else {
     // Something wrong with the GRPC conncection
-    return Error(
+    grpc_status = Error(
         RequestStatusCode::INTERNAL,
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
+
+  // Log shared memory status if request is SUCCESS and verbose is true.
+  if ((grpc_status.IsOk()) && verbose_ && (action == GET_STATUS)) {
+    std::cerr << shm_status->DebugString() << std::endl;
+  }
+  return grpc_status;
 }
 
 Error
