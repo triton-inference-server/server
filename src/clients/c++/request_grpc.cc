@@ -33,7 +33,6 @@
 #include <iostream>
 #include "src/clients/c++/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
@@ -406,9 +405,7 @@ SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus(
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
-  if (shm_status != nullptr) {
-    shm_status->Clear();
-  }
+  shm_status->Clear();
 
   request.mutable_get_status();
 

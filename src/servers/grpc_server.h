@@ -27,6 +27,7 @@
 
 #include <grpc++/grpc++.h>
 #include "src/core/grpc_service.grpc.pb.h"
+#include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/shared_memory_block_manager.h"
 #include "src/servers/tracer.h"
