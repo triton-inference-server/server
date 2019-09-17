@@ -1,0 +1,49 @@
+# HELP nv_inference_request_success Number of successful inference requests, all batch sizes
+# TYPE nv_inference_request_success counter
+nv_inference_request_success{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 127085.000000
+# HELP nv_inference_request_failure Number of failed inference requests, all batch sizes
+# TYPE nv_inference_request_failure counter
+# HELP nv_inference_count Number of inferences performed
+# TYPE nv_inference_count counter
+nv_inference_count{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 127085.000000
+# HELP nv_inference_exec_count Number of model executions performed
+# TYPE nv_inference_exec_count counter
+nv_inference_exec_count{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 127085.000000
+# HELP nv_inference_request_duration_us Cummulative inference request duration in microseconds
+# TYPE nv_inference_request_duration_us counter
+nv_inference_request_duration_us{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 26940496.000000
+# HELP nv_inference_compute_duration_us Cummulative inference compute duration in microseconds
+# TYPE nv_inference_compute_duration_us counter
+nv_inference_compute_duration_us{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 23282817.000000
+# HELP nv_inference_queue_duration_us Cummulative inference queuing duration in microseconds
+# TYPE nv_inference_queue_duration_us counter
+nv_inference_queue_duration_us{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 2501297.000000
+# TYPE nv_inference_load_ratio histogram
+nv_inference_load_ratio_count{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 127085
+nv_inference_load_ratio_sum{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1"} 147984.321591
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="1.050000"} 241
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="1.100000"} 41957
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="1.250000"} 107400
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="1.500000"} 125154
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="2.000000"} 126888
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="10.000000"} 127065
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="50.000000"} 127085
+nv_inference_load_ratio_bucket{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99",model="savedmodel_zero_1_float32",version="1",le="+Inf"} 127085
+# HELP nv_gpu_utilization GPU utilization rate [0.0 - 1.0)
+# TYPE nv_gpu_utilization gauge
+nv_gpu_utilization{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 0.010000
+# HELP nv_gpu_memory_total_bytes GPU total memory, in bytes
+# TYPE nv_gpu_memory_total_bytes gauge
+nv_gpu_memory_total_bytes{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 25365381120.000000
+# HELP nv_gpu_memory_used_bytes GPU used memory, in bytes
+# TYPE nv_gpu_memory_used_bytes gauge
+nv_gpu_memory_used_bytes{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 686620672.000000
+# HELP nv_gpu_power_usage GPU power usage in watts
+# TYPE nv_gpu_power_usage gauge
+nv_gpu_power_usage{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 70.425000
+# HELP nv_gpu_power_limit GPU power management limit in watts
+# TYPE nv_gpu_power_limit gauge
+nv_gpu_power_limit{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 280.000000
+# HELP nv_energy_consumption GPU energy consumption in joules since the trtserver started
+# TYPE nv_energy_consumption counter
+nv_energy_consumption{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 2512.212000

@@ -1,0 +1,52 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Pass [1] throughput: 4031 infer/sec. p95 latency: 290 usec
+  Pass [2] throughput: 3671 infer/sec. p95 latency: 334 usec
+  Pass [3] throughput: 3770 infer/sec. p95 latency: 311 usec
+  Pass [4] throughput: 4313 infer/sec. p95 latency: 266 usec
+  Pass [5] throughput: 4737 infer/sec. p95 latency: 259 usec
+  Pass [6] throughput: 5078 infer/sec. p95 latency: 249 usec
+  Pass [7] throughput: 4488 infer/sec. p95 latency: 282 usec
+  Pass [8] throughput: 3684 infer/sec. p95 latency: 309 usec
+  Pass [9] throughput: 3793 infer/sec. p95 latency: 295 usec
+  Pass [10] throughput: 3924 infer/sec. p95 latency: 289 usec
+  Client: 
+    Request count: 19620
+    Throughput: 3924 infer/sec
+    p50 latency: 250 usec
+    p90 latency: 276 usec
+    p95 latency: 289 usec
+    p99 latency: 346 usec
+    Avg gRPC time: 231 usec (marshal 4 usec + response wait 219 usec + unmarshal 8 usec)
+  Server: 
+    Request count: 23376
+    Avg request latency: 65 usec (overhead 9 usec + queue 12 usec + compute 44 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 6848 infer/sec. p95 latency: 383 usec
+  Pass [2] throughput: 7073 infer/sec. p95 latency: 363 usec
+  Pass [3] throughput: 7011 infer/sec. p95 latency: 366 usec
+  Client: 
+    Request count: 35056
+    Throughput: 7011 infer/sec
+    p50 latency: 266 usec
+    p90 latency: 344 usec
+    p95 latency: 366 usec
+    p99 latency: 412 usec
+    Avg gRPC time: 256 usec (marshal 4 usec + response wait 245 usec + unmarshal 7 usec)
+  Server: 
+    Request count: 42252
+    Avg request latency: 62 usec (overhead 7 usec + queue 17 usec + compute 38 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, 3924 infer/sec, latency 289 usec
+Concurrency: 2, 7011 infer/sec, latency 366 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4277  100  4277    0     0   835k      0 --:--:-- --:--:-- --:--:--  835k
