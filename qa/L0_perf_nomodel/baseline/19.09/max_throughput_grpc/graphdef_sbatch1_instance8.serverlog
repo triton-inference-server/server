@@ -1,0 +1,101 @@
+I0917 23:16:29.365298 2359 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:16:29.371011 2359 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:16:29.371293 2359 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:16:29.405250 2359 server_status.cc:83] New status tracking for model 'graphdef_zero_1_float32'
+I0917 23:16:29.405323 2359 model_repository_manager.cc:668] loading: graphdef_zero_1_float32:1
+I0917 23:16:29.407537 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:29.531938: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3599270000 Hz
+2019-09-17 23:16:29.532595: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f12086a7c30 executing computations on platform Host. Devices:
+2019-09-17 23:16:29.532617: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2019-09-17 23:16:29.532721: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+2019-09-17 23:16:29.534230: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:29.534249: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:29.536900: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:31.978760: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:31.978801: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:31.978809: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:31.982562: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:31.984088: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f10d1f38390 executing computations on platform CUDA. Devices:
+2019-09-17 23:16:31.984107: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+I0917 23:16:31.985680 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:31.987025: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:31.987041: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:31.989442: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:31.989463: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:31.989470: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:31.989476: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:31.991919: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:31.992574 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:31.993915: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:31.993931: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:31.996330: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:31.996346: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:31.996354: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:31.996359: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:31.998808: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:31.999450 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:32.000916: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:32.000931: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:32.003311: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:32.003328: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:32.003336: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:32.003342: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:32.005782: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:32.006432 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:32.007754: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:32.007769: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:32.010207: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:32.010225: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:32.010232: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:32.010238: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:32.012682: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:32.013370 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:32.014717: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:32.014733: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:32.017130: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:32.017148: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:32.017155: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:32.017166: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:32.019610: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:32.020471 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:32.021805: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:32.021821: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:32.024213: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:32.024230: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:32.024237: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:32.024243: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:32.026672: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:32.027316 2359 base_backend.cc:165] Creating instance graphdef_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using model.graphdef
+2019-09-17 23:16:32.028639: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:32.028654: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:32.031053: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:32.031071: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:32.031078: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:32.031084: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:32.033523: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+I0917 23:16:32.034897 2359 model_repository_manager.cc:810] successfully loaded 'graphdef_zero_1_float32' version 1
+I0917 23:16:32.035020 2359 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:16:32.038200 2359 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:16:32.038245 2359 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:16:32.080624 2359 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:16:50.282865 2359 main.cc:282] Interrupt signal (15) received.
+I0917 23:16:50.282891 2359 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:16:50.282900 2359 model_repository_manager.cc:694] unloading: graphdef_zero_1_float32:1
+I0917 23:16:50.284490 2359 model_repository_manager.cc:796] successfully unloaded 'graphdef_zero_1_float32' version 1
+I0917 23:16:50.284509 2359 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

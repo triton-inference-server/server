@@ -1,0 +1,141 @@
+I0917 23:16:51.798351 2568 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:16:51.804141 2568 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:16:51.804446 2568 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:16:51.831666 2568 server_status.cc:83] New status tracking for model 'savedmodel_zero_1_float32'
+I0917 23:16:51.831729 2568 model_repository_manager.cc:668] loading: savedmodel_zero_1_float32:1
+I0917 23:16:51.834051 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:51.916977: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:51.917113: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:51.932693: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3599270000 Hz
+2019-09-17 23:16:51.933843: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f19586a7e80 executing computations on platform Host. Devices:
+2019-09-17 23:16:51.933892: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2019-09-17 23:16:51.934065: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+2019-09-17 23:16:51.937334: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:51.937367: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:51.941847: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.296323: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.296394: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.296403: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.300381: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.301896: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7f1828e4a170 executing computations on platform CUDA. Devices:
+2019-09-17 23:16:54.301918: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+2019-09-17 23:16:54.302963: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.303009: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.303028: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 2386063 microseconds.
+I0917 23:16:54.303506 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.303537: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.303608: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.305012: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.305026: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.307469: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.307488: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.307496: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.307502: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.309973: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.310196: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.310221: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.310233: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6698 microseconds.
+I0917 23:16:54.310684 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.310703: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.310756: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.312130: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.312144: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.314563: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.314580: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.314587: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.314593: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.317008: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.317232: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.317257: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.317268: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6567 microseconds.
+I0917 23:16:54.317722 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.317884: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.317938: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.319273: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.319287: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.321774: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.321792: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.321800: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.321806: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.324233: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.324428: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.324451: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.324462: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6581 microseconds.
+I0917 23:16:54.324894 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.324913: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.324969: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.326358: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.326372: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.328742: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.328758: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.328765: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.328771: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.331252: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.331454: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.331477: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.331488: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6577 microseconds.
+I0917 23:16:54.331921 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.331939: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.331985: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.333350: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.333364: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.335754: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.335771: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.335778: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.335784: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.338270: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.338641: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.338666: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.338677: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6739 microseconds.
+I0917 23:16:54.339110 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.339128: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.339178: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.340554: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.340567: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.343043: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.343061: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.343068: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.343074: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.345553: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.345777: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.345801: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.345812: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6685 microseconds.
+I0917 23:16:54.346264 2568 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-17 23:16:54.346282: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-17 23:16:54.346330: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-17 23:16:54.347659: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-17 23:16:54.347672: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-17 23:16:54.350105: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-17 23:16:54.350124: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-17 23:16:54.350132: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-17 23:16:54.350138: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-17 23:16:54.352567: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-17 23:16:54.352914: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-17 23:16:54.352938: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-17 23:16:54.352950: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 6669 microseconds.
+I0917 23:16:54.353515 2568 model_repository_manager.cc:810] successfully loaded 'savedmodel_zero_1_float32' version 1
+I0917 23:16:54.353586 2568 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:16:54.356204 2568 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:16:54.356219 2568 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:16:54.398083 2568 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:17:12.743383 2568 main.cc:282] Interrupt signal (15) received.
+I0917 23:17:12.743425 2568 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:17:12.743436 2568 model_repository_manager.cc:694] unloading: savedmodel_zero_1_float32:1
+I0917 23:17:12.745097 2568 model_repository_manager.cc:796] successfully unloaded 'savedmodel_zero_1_float32' version 1
+I0917 23:17:12.745112 2568 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

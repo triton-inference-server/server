@@ -1,0 +1,26 @@
+I0917 23:17:59.112182 3069 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:17:59.117922 3069 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:17:59.118167 3069 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:17:59.146941 3069 server_status.cc:83] New status tracking for model 'netdef_zero_1_float32'
+I0917 23:17:59.147014 3069 model_repository_manager.cc:668] loading: netdef_zero_1_float32:1
+I0917 23:17:59.149440 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+[E init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+I0917 23:18:01.713347 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.713889 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.714379 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.714865 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.715350 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.715835 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.716319 3069 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0917 23:18:01.717066 3069 model_repository_manager.cc:810] successfully loaded 'netdef_zero_1_float32' version 1
+I0917 23:18:01.717147 3069 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:18:01.719940 3069 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:18:01.719958 3069 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:18:01.761810 3069 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:18:20.050893 3069 main.cc:282] Interrupt signal (15) received.
+I0917 23:18:20.050924 3069 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:18:20.050935 3069 model_repository_manager.cc:694] unloading: netdef_zero_1_float32:1
+I0917 23:18:20.052137 3069 model_repository_manager.cc:796] successfully unloaded 'netdef_zero_1_float32' version 1
+I0917 23:18:20.052153 3069 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

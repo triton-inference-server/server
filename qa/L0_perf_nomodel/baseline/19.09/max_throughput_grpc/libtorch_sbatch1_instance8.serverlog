@@ -1,0 +1,23 @@
+I0917 23:17:38.799346 2933 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:17:38.805003 2933 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:17:38.805326 2933 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:17:38.836402 2933 server_status.cc:83] New status tracking for model 'libtorch_zero_1_float32'
+I0917 23:17:38.836477 2933 model_repository_manager.cc:668] loading: libtorch_zero_1_float32:1
+I0917 23:17:38.838864 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.939435 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.940158 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.940872 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.941585 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.942287 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.942994 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.943699 2933 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using model.pt
+I0917 23:17:38.944595 2933 model_repository_manager.cc:810] successfully loaded 'libtorch_zero_1_float32' version 1
+I0917 23:17:38.944668 2933 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:17:38.947231 2933 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:17:38.947280 2933 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:17:38.989565 2933 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:17:57.682627 2933 main.cc:282] Interrupt signal (15) received.
+I0917 23:17:57.682657 2933 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:17:57.682667 2933 model_repository_manager.cc:694] unloading: libtorch_zero_1_float32:1
+I0917 23:17:57.683169 2933 model_repository_manager.cc:796] successfully unloaded 'libtorch_zero_1_float32' version 1
+I0917 23:17:57.683185 2933 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests
