@@ -1,0 +1,19 @@
+I0918 17:22:52.510453 3511 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:22:52.516246 3511 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:22:52.516551 3511 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:22:52.544401 3511 server_status.cc:83] New status tracking for model 'onnx_zero_1_float32'
+I0918 17:22:52.544469 3511 model_repository_manager.cc:668] loading: onnx_zero_1_float32:1
+I0918 17:22:52.546880 3511 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.onnx
+I0918 17:22:56.502098 3511 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.onnx
+I0918 17:22:56.503422 3511 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.onnx
+I0918 17:22:56.504582 3511 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.onnx
+I0918 17:22:56.505644 3511 model_repository_manager.cc:810] successfully loaded 'onnx_zero_1_float32' version 1
+I0918 17:22:56.505713 3511 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:22:56.508307 3511 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:22:56.508323 3511 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:22:56.549975 3511 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:23:21.538350 3511 main.cc:282] Interrupt signal (15) received.
+I0918 17:23:21.538385 3511 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:23:21.538398 3511 model_repository_manager.cc:694] unloading: onnx_zero_1_float32:1
+I0918 17:23:21.541566 3511 model_repository_manager.cc:796] successfully unloaded 'onnx_zero_1_float32' version 1
+I0918 17:23:21.541586 3511 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

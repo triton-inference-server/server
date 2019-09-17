@@ -1,0 +1,23 @@
+I0917 23:21:15.405890 3911 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:21:15.411675 3911 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:21:15.411984 3911 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:21:15.439808 3911 server_status.cc:83] New status tracking for model 'onnx_zero_1_float32'
+I0917 23:21:15.439872 3911 model_repository_manager.cc:668] loading: onnx_zero_1_float32:1
+I0917 23:21:15.442290 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.392348 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.393833 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.395114 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.396396 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.397678 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.398954 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.400219 3911 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 23:21:19.401965 3911 model_repository_manager.cc:810] successfully loaded 'onnx_zero_1_float32' version 1
+I0917 23:21:19.402082 3911 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:21:19.404685 3911 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:21:19.404739 3911 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:21:19.447131 3911 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:21:38.506320 3911 main.cc:282] Interrupt signal (15) received.
+I0917 23:21:38.506353 3911 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:21:38.506367 3911 model_repository_manager.cc:694] unloading: onnx_zero_1_float32:1
+I0917 23:21:38.511957 3911 model_repository_manager.cc:796] successfully unloaded 'onnx_zero_1_float32' version 1
+I0917 23:21:38.511976 3911 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

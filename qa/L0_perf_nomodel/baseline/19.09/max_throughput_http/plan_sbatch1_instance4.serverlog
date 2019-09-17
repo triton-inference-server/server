@@ -1,0 +1,23 @@
+I0918 17:20:10.627398 2997 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:20:10.633155 2997 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:20:10.633411 2997 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:20:10.664752 2997 server_status.cc:83] New status tracking for model 'plan_zero_1_float32'
+I0918 17:20:10.664827 2997 model_repository_manager.cc:668] loading: plan_zero_1_float32:1
+I0918 17:20:10.667245 2997 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.plan
+I0918 17:20:14.667666 2997 plan_backend.cc:388] Created instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) with stream priority 0
+I0918 17:20:14.668119 2997 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.plan
+I0918 17:20:14.672435 2997 plan_backend.cc:388] Created instance plan_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) with stream priority 0
+I0918 17:20:14.672895 2997 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.plan
+I0918 17:20:14.677150 2997 plan_backend.cc:388] Created instance plan_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) with stream priority 0
+I0918 17:20:14.677620 2997 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.plan
+I0918 17:20:14.681918 2997 plan_backend.cc:388] Created instance plan_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) with stream priority 0
+I0918 17:20:14.682397 2997 model_repository_manager.cc:810] successfully loaded 'plan_zero_1_float32' version 1
+I0918 17:20:14.682446 2997 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:20:14.685257 2997 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:20:14.685294 2997 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:20:14.727601 2997 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:20:57.654625 2997 main.cc:282] Interrupt signal (15) received.
+I0918 17:20:57.654648 2997 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:20:57.654658 2997 model_repository_manager.cc:694] unloading: plan_zero_1_float32:1
+I0918 17:20:57.656763 2997 model_repository_manager.cc:796] successfully unloaded 'plan_zero_1_float32' version 1
+I0918 17:20:57.656778 2997 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

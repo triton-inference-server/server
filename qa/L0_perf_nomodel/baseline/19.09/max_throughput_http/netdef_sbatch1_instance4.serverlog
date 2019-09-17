@@ -1,0 +1,22 @@
+I0918 17:23:43.341227 3707 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:23:43.347005 3707 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:23:43.347368 3707 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:23:43.375910 3707 server_status.cc:83] New status tracking for model 'netdef_zero_1_float32'
+I0918 17:23:43.375974 3707 model_repository_manager.cc:668] loading: netdef_zero_1_float32:1
+I0918 17:23:43.378217 3707 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+[E init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+I0918 17:23:45.925286 3707 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0918 17:23:45.925831 3707 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0918 17:23:45.926335 3707 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+I0918 17:23:45.926934 3707 model_repository_manager.cc:810] successfully loaded 'netdef_zero_1_float32' version 1
+I0918 17:23:45.927017 3707 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:23:45.929966 3707 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:23:45.929983 3707 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:23:45.971722 3707 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:24:10.327861 3707 main.cc:282] Interrupt signal (15) received.
+I0918 17:24:10.327888 3707 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:24:10.327899 3707 model_repository_manager.cc:694] unloading: netdef_zero_1_float32:1
+I0918 17:24:10.328978 3707 model_repository_manager.cc:796] successfully unloaded 'netdef_zero_1_float32' version 1
+I0918 17:24:10.328995 3707 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,19 @@
+I0918 17:16:40.831008 1942 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:16:40.836653 1942 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:16:40.836896 1942 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:16:40.868712 1942 server_status.cc:83] New status tracking for model 'netdef_zero_1_float32'
+I0918 17:16:40.868786 1942 model_repository_manager.cc:668] loading: netdef_zero_1_float32:1
+I0918 17:16:40.871241 1942 netdef_backend.cc:208] Creating instance netdef_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using init_model.netdef and model.netdef
+[E init_intrinsics_check.cc:43] CPU feature avx is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature avx2 is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+[E init_intrinsics_check.cc:43] CPU feature fma is present on your machine, but the Caffe2 binary is not compiled with it. It means you may not get the full speed of your CPU.
+I0918 17:16:43.431329 1942 model_repository_manager.cc:810] successfully loaded 'netdef_zero_1_float32' version 1
+I0918 17:16:43.431380 1942 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:16:43.433551 1942 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:16:43.433594 1942 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:16:43.476020 1942 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:17:19.857406 1942 main.cc:282] Interrupt signal (15) received.
+I0918 17:17:19.857465 1942 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:17:19.857486 1942 model_repository_manager.cc:694] unloading: netdef_zero_1_float32:1
+I0918 17:17:19.864324 1942 model_repository_manager.cc:796] successfully unloaded 'netdef_zero_1_float32' version 1
+I0918 17:17:19.864364 1942 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,16 @@
+I0918 17:10:05.859087 684 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:10:05.864723 684 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:10:05.864974 684 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:10:05.896394 684 server_status.cc:83] New status tracking for model 'custom_zero_1_float32'
+I0918 17:10:05.896469 684 model_repository_manager.cc:668] loading: custom_zero_1_float32:1
+I0918 17:10:05.897812 684 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_0_cpu on CPU using libcustom.so
+I0918 17:10:05.992250 684 model_repository_manager.cc:810] successfully loaded 'custom_zero_1_float32' version 1
+I0918 17:10:05.992335 684 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:10:05.994306 684 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:10:05.994351 684 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:10:06.036825 684 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:10:24.782528 684 main.cc:282] Interrupt signal (15) received.
+I0918 17:10:24.782579 684 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:10:24.782600 684 model_repository_manager.cc:694] unloading: custom_zero_1_float32:1
+I0918 17:10:24.833734 684 model_repository_manager.cc:796] successfully unloaded 'custom_zero_1_float32' version 1
+I0918 17:10:24.833765 684 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests
