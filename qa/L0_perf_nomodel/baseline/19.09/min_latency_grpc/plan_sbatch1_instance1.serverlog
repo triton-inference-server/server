@@ -1,0 +1,17 @@
+I0918 17:06:45.904709 94 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:06:45.910391 94 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:06:45.910654 94 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:06:45.945834 94 server_status.cc:83] New status tracking for model 'plan_zero_1_float32'
+I0918 17:06:45.945910 94 model_repository_manager.cc:668] loading: plan_zero_1_float32:1
+I0918 17:06:45.948403 94 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.plan
+I0918 17:06:49.858828 94 plan_backend.cc:388] Created instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) with stream priority 0
+I0918 17:06:49.859087 94 model_repository_manager.cc:810] successfully loaded 'plan_zero_1_float32' version 1
+I0918 17:06:49.859189 94 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:06:49.861882 94 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:06:49.861927 94 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:06:49.904323 94 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:07:08.862914 94 main.cc:282] Interrupt signal (15) received.
+I0918 17:07:08.862963 94 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:07:08.862982 94 model_repository_manager.cc:694] unloading: plan_zero_1_float32:1
+I0918 17:07:08.865003 94 model_repository_manager.cc:796] successfully unloaded 'plan_zero_1_float32' version 1
+I0918 17:07:08.865035 94 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

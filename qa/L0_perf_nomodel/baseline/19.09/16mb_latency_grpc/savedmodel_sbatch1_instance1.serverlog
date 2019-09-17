@@ -1,0 +1,36 @@
+I0918 17:13:43.370020 1343 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:13:43.375776 1343 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:13:43.376098 1343 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:13:43.407397 1343 server_status.cc:83] New status tracking for model 'savedmodel_zero_1_float32'
+I0918 17:13:43.407472 1343 model_repository_manager.cc:668] loading: savedmodel_zero_1_float32:1
+I0918 17:13:43.409808 1343 base_backend.cc:165] Creating instance savedmodel_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.savedmodel
+2019-09-18 17:13:43.498535: I tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel
+2019-09-18 17:13:43.498671: I tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2019-09-18 17:13:43.515641: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3599270000 Hz
+2019-09-18 17:13:43.516337: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7faa4c6a7e10 executing computations on platform Host. Devices:
+2019-09-18 17:13:43.516362: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): <undefined>, <undefined>
+2019-09-18 17:13:43.516467: I tensorflow/stream_executor/platform/default/dso_loader.cc:42] Successfully opened dynamic library libcuda.so.1
+2019-09-18 17:13:43.517930: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1640] Found device 0 with properties: 
+name: TITAN RTX major: 7 minor: 5 memoryClockRate(GHz): 1.77
+pciBusID: 0000:01:00.0
+2019-09-18 17:13:43.517948: I tensorflow/stream_executor/platform/default/dlopen_checker_stub.cc:25] GPU libraries are statically linked, skip dlopen check.
+2019-09-18 17:13:43.520618: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1763] Adding visible gpu devices: 0
+2019-09-18 17:13:45.992690: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1181] Device interconnect StreamExecutor with strength 1 edge matrix:
+2019-09-18 17:13:45.992740: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1187]      0 
+2019-09-18 17:13:45.992747: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1200] 0:   N 
+2019-09-18 17:13:45.996504: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1326] Created TensorFlow device (/job:localhost/replica:0/task:0/device:GPU:0 with 22309 MB memory) -> physical GPU (device: 0, name: TITAN RTX, pci bus id: 0000:01:00.0, compute capability: 7.5)
+2019-09-18 17:13:45.998041: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x7fa9044e0180 executing computations on platform CUDA. Devices:
+2019-09-18 17:13:45.998060: I tensorflow/compiler/xla/service/service.cc:175]   StreamExecutor device (0): TITAN RTX, Compute Capability 7.5
+2019-09-18 17:13:45.999136: I tensorflow/cc/saved_model/loader.cc:204] Restoring SavedModel bundle.
+2019-09-18 17:13:45.999183: I tensorflow/cc/saved_model/loader.cc:214] The specified SavedModel has no variables; no checkpoints were restored. File does not exist: /opt/tensorrtserver/qa/L0_perf_nomodel/models/savedmodel_zero_1_float32/1/model.savedmodel/variables/variables.index
+2019-09-18 17:13:45.999202: I tensorflow/cc/saved_model/loader.cc:332] SavedModel load for tags { serve }; Status: success. Took 2500681 microseconds.
+I0918 17:13:45.999306 1343 model_repository_manager.cc:810] successfully loaded 'savedmodel_zero_1_float32' version 1
+I0918 17:13:45.999387 1343 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:13:46.002539 1343 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:13:46.002562 1343 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:13:46.044406 1343 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:14:04.325862 1343 main.cc:282] Interrupt signal (15) received.
+I0918 17:14:04.325907 1343 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:14:04.325926 1343 model_repository_manager.cc:694] unloading: savedmodel_zero_1_float32:1
+I0918 17:14:04.326569 1343 model_repository_manager.cc:796] successfully unloaded 'savedmodel_zero_1_float32' version 1
+I0918 17:14:04.326604 1343 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

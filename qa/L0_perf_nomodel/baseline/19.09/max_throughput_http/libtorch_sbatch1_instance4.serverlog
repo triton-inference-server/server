@@ -1,0 +1,19 @@
+I0918 17:23:23.051594 3618 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0918 17:23:23.057258 3618 metrics.cc:169]   GPU 0: TITAN RTX
+I0918 17:23:23.057501 3618 server.cc:110] Initializing TensorRT Inference Server
+I0918 17:23:23.085337 3618 server_status.cc:83] New status tracking for model 'libtorch_zero_1_float32'
+I0918 17:23:23.085404 3618 model_repository_manager.cc:668] loading: libtorch_zero_1_float32:1
+I0918 17:23:23.087737 3618 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.pt
+I0918 17:23:23.186343 3618 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.pt
+I0918 17:23:23.187017 3618 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.pt
+I0918 17:23:23.187682 3618 libtorch_backend.cc:226] Creating instance libtorch_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.pt
+I0918 17:23:23.188263 3618 model_repository_manager.cc:810] successfully loaded 'libtorch_zero_1_float32' version 1
+I0918 17:23:23.188296 3618 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0918 17:23:23.190026 3618 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0918 17:23:23.190076 3618 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0918 17:23:23.232351 3618 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0918 17:23:41.975172 3618 main.cc:282] Interrupt signal (15) received.
+I0918 17:23:41.975197 3618 server.cc:165] Waiting for in-flight inferences to complete.
+I0918 17:23:41.975206 3618 model_repository_manager.cc:694] unloading: libtorch_zero_1_float32:1
+I0918 17:23:41.975475 3618 model_repository_manager.cc:796] successfully unloaded 'libtorch_zero_1_float32' version 1
+I0918 17:23:41.975489 3618 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

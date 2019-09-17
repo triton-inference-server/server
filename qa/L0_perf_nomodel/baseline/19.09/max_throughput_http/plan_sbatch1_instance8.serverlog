@@ -1,0 +1,31 @@
+I0917 23:18:21.619035 3225 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:18:21.624814 3225 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:18:21.625060 3225 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:18:21.660784 3225 server_status.cc:83] New status tracking for model 'plan_zero_1_float32'
+I0917 23:18:21.660859 3225 model_repository_manager.cc:668] loading: plan_zero_1_float32:1
+I0917 23:18:21.663189 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.579105 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.579570 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.583726 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_1_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.584163 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.588140 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_2_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.588576 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.592758 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_3_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.593213 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.597303 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_4_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.597750 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.601834 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_5_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.602262 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.606747 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_6_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.607175 3225 plan_backend.cc:228] Creating instance plan_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) using model.plan
+I0917 23:18:25.611128 3225 plan_backend.cc:388] Created instance plan_zero_1_float32_0_7_gpu0 on GPU 0 (7.5) with stream priority 0
+I0917 23:18:25.611893 3225 model_repository_manager.cc:810] successfully loaded 'plan_zero_1_float32' version 1
+I0917 23:18:25.611946 3225 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:18:25.614866 3225 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:18:25.614882 3225 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:18:25.656279 3225 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:19:26.893411 3225 main.cc:282] Interrupt signal (15) received.
+I0917 23:19:26.893436 3225 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:19:26.893445 3225 model_repository_manager.cc:694] unloading: plan_zero_1_float32:1
+I0917 23:19:26.896970 3225 model_repository_manager.cc:796] successfully unloaded 'plan_zero_1_float32' version 1
+I0917 23:19:26.896985 3225 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,23 @@
+I0917 23:16:09.069851 2223 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 23:16:09.075479 2223 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 23:16:09.075784 2223 server.cc:110] Initializing TensorRT Inference Server
+I0917 23:16:09.106597 2223 server_status.cc:83] New status tracking for model 'custom_zero_1_float32'
+I0917 23:16:09.106670 2223 model_repository_manager.cc:668] loading: custom_zero_1_float32:1
+I0917 23:16:09.107684 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_0_cpu on CPU using libcustom.so
+I0917 23:16:09.108415 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_1_cpu on CPU using libcustom.so
+I0917 23:16:09.108450 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_2_cpu on CPU using libcustom.so
+I0917 23:16:09.108468 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_3_cpu on CPU using libcustom.so
+I0917 23:16:09.108485 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_4_cpu on CPU using libcustom.so
+I0917 23:16:09.108503 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_5_cpu on CPU using libcustom.so
+I0917 23:16:09.108519 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_6_cpu on CPU using libcustom.so
+I0917 23:16:09.108537 2223 custom_backend.cc:194] Creating instance custom_zero_1_float32_0_7_cpu on CPU using libcustom.so
+I0917 23:16:09.194419 2223 model_repository_manager.cc:810] successfully loaded 'custom_zero_1_float32' version 1
+I0917 23:16:09.194476 2223 main.cc:417] Starting endpoints, 'inference:0' listening on
+I0917 23:16:09.196303 2223 grpc_server.cc:1730] Started GRPCService at 0.0.0.0:8001
+I0917 23:16:09.196339 2223 http_server.cc:1125] Starting HTTPService at 0.0.0.0:8000
+I0917 23:16:09.238624 2223 http_server.cc:1139] Starting Metrics Service at 0.0.0.0:8002
+I0917 23:16:27.966207 2223 main.cc:282] Interrupt signal (15) received.
+I0917 23:16:27.966249 2223 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 23:16:27.966264 2223 model_repository_manager.cc:694] unloading: custom_zero_1_float32:1
+I0917 23:16:28.023895 2223 model_repository_manager.cc:796] successfully unloaded 'custom_zero_1_float32' version 1
+I0917 23:16:28.023927 2223 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

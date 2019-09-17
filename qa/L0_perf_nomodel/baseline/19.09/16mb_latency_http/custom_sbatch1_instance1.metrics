@@ -1,0 +1,49 @@
+# HELP nv_inference_request_success Number of successful inference requests, all batch sizes
+# TYPE nv_inference_request_success counter
+nv_inference_request_success{model="custom_zero_1_float32",version="1"} 180.000000
+# HELP nv_inference_request_failure Number of failed inference requests, all batch sizes
+# TYPE nv_inference_request_failure counter
+# HELP nv_inference_count Number of inferences performed
+# TYPE nv_inference_count counter
+nv_inference_count{model="custom_zero_1_float32",version="1"} 180.000000
+# HELP nv_inference_exec_count Number of model executions performed
+# TYPE nv_inference_exec_count counter
+nv_inference_exec_count{model="custom_zero_1_float32",version="1"} 180.000000
+# HELP nv_inference_request_duration_us Cummulative inference request duration in microseconds
+# TYPE nv_inference_request_duration_us counter
+nv_inference_request_duration_us{model="custom_zero_1_float32",version="1"} 2360050.000000
+# HELP nv_inference_compute_duration_us Cummulative inference compute duration in microseconds
+# TYPE nv_inference_compute_duration_us counter
+nv_inference_compute_duration_us{model="custom_zero_1_float32",version="1"} 2347833.000000
+# HELP nv_inference_queue_duration_us Cummulative inference queuing duration in microseconds
+# TYPE nv_inference_queue_duration_us counter
+nv_inference_queue_duration_us{model="custom_zero_1_float32",version="1"} 9157.000000
+# TYPE nv_inference_load_ratio histogram
+nv_inference_load_ratio_count{model="custom_zero_1_float32",version="1"} 180
+nv_inference_load_ratio_sum{model="custom_zero_1_float32",version="1"} 180.950033
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="1.050000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="1.100000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="1.250000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="1.500000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="2.000000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="10.000000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="50.000000"} 180
+nv_inference_load_ratio_bucket{model="custom_zero_1_float32",version="1",le="+Inf"} 180
+# HELP nv_gpu_utilization GPU utilization rate [0.0 - 1.0)
+# TYPE nv_gpu_utilization gauge
+nv_gpu_utilization{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 0.000000
+# HELP nv_gpu_memory_total_bytes GPU total memory, in bytes
+# TYPE nv_gpu_memory_total_bytes gauge
+nv_gpu_memory_total_bytes{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 25365381120.000000
+# HELP nv_gpu_memory_used_bytes GPU used memory, in bytes
+# TYPE nv_gpu_memory_used_bytes gauge
+nv_gpu_memory_used_bytes{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 181207040.000000
+# HELP nv_gpu_power_usage GPU power usage in watts
+# TYPE nv_gpu_power_usage gauge
+nv_gpu_power_usage{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 17.696000
+# HELP nv_gpu_power_limit GPU power management limit in watts
+# TYPE nv_gpu_power_limit gauge
+nv_gpu_power_limit{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 280.000000
+# HELP nv_energy_consumption GPU energy consumption in joules since the trtserver started
+# TYPE nv_energy_consumption counter
+nv_energy_consumption{gpu_uuid="GPU-afa8a63c-8c10-755e-256b-d987b765ba99"} 1081.855000
