@@ -986,7 +986,7 @@ class LifeCycleTest(unittest.TestCase):
                 self.assertEqual("inference:0", ex.server_id())
                 self.assertGreater(ex.request_id(), 0)
                 self.assertTrue(
-                    ex.message().startswith("failed to stat directory for model"))
+                    ex.message().startswith("failed to load 'unknown_model', no version is available"))
 
         # Load ensemble model first, the dependent model will be polled and loaded
         for model_name in models:

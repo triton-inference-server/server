@@ -1115,31 +1115,20 @@ ModelRepositoryManager::LoadUnloadModel(
         RETURN_IF_ERROR(Poll(
             models, &added, &deleted, &modified, &unmodified, &new_infos,
             &all_models_polled));
-        if ((!all_models_polled) && (*models.begin() == model_name)) {
-          return Status(
-              RequestStatusCode::INTERNAL,
-              "failed to poll requested model '" + model_name + "'");
-        }
-
-        // [TODO] the behavior should be consistent, Should not treat other
-        // depending model as requested to load...
-        // If at least one model is marked deleted, model directory is not found
-        // and the whole load process should return as failure.
-        if (!deleted.empty()) {
-          return Status(
-              RequestStatusCode::NOT_FOUND,
-              "failed to stat directory for model '" + model_name + "'");
-        }
 
         // More models should be polled is the polled models are ensembles
         std::set<std::string> next_models;
         for (const auto& model : models) {
-          const auto& config = new_infos.find(model)->second->model_config_;
-          if (config.has_ensemble_scheduling()) {
-            for (const auto& step : config.ensemble_scheduling().step()) {
-              bool need_poll = checked_modes.emplace(step.model_name()).second;
-              if (need_poll) {
-                next_models.emplace(step.model_name());
+          auto it = new_infos.find(model);
+          // Some models may be marked as deleted and not in 'new_infos'
+          if (it != new_infos.end()) {
+          const auto& config = it->second->model_config_;
+            if (config.has_ensemble_scheduling()) {
+              for (const auto& step : config.ensemble_scheduling().step()) {
+                bool need_poll = checked_modes.emplace(step.model_name()).second;
+                if (need_poll) {
+                  next_models.emplace(step.model_name());
+                }
               }
             }
           }
@@ -1164,6 +1153,9 @@ ModelRepositoryManager::LoadUnloadModel(
   // Update dependency graph and load
   Update(added, deleted, modified);
 
+  // The models are in 'deleted' either when they are asked to be unloaded or
+  // they are not found / are duplicated across all model repositories.
+  // In all cases, should unload them explicitly.
   for (const auto& name : deleted) {
     ModelConfig model_config;
     std::set<int64_t> versions;
@@ -1178,6 +1170,12 @@ ModelRepositoryManager::LoadUnloadModel(
   // Check if model is loaded / unloaded properly
   const auto version_states = GetVersionStates(model_name);
   if (type == ActionType::LOAD) {
+    if (version_states.empty()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to load '" + model_name +
+              "', no version is available");
+    }
     const auto& info = infos_.find(model_name)->second;
     const auto& config = info->model_config_;
     const auto& repository = info->model_repository_path_;
