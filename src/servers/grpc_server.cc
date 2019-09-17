@@ -41,6 +41,11 @@
 #include "src/core/constants.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
+#include "src/servers/tracer.h"
+
+#ifdef TRTIS_ENABLE_TRACING
+#include "src/servers/tracer.h"
+#endif  // TRTIS_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -269,6 +274,10 @@ class HandlerState {
 
   uint64_t unique_id_;
   Steps step_;
+
+#ifdef TRTIS_ENABLE_TRACING
+  std::unique_ptr<Tracer> tracer_;
+#endif  // TRTIS_ENABLE_TRACING
 
   RequestType request_;
   ResponseType response_;
@@ -810,12 +819,13 @@ class InferHandler : public Handler<
   InferHandler(
       const std::string& name,
       const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TraceManager>& trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count)
       : Handler(
             name, trtserver, server_id, service, cq, max_state_bucket_count),
-        smb_manager_(smb_manager)
+        trace_manager_(trace_manager), smb_manager_(smb_manager)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -831,9 +841,10 @@ class InferHandler : public Handler<
 
  private:
   static void InferComplete(
-      TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
-      void* userp);
+      TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+      TRTSERVER_InferenceResponse* response, void* userp);
 
+  std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   TRTSERVER_ResponseAllocator* allocator_;
 };
@@ -904,9 +915,22 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
               trtserver_, smb_manager_, request.meta_data(), response,
               &state->alloc_payload_);
           if (err == nullptr) {
+            // Get the trace object to use for this request. If
+            // nullptr then no tracing will be performed.
+            TRTSERVER_Trace* trace = nullptr;
+#ifdef TRTIS_ENABLE_TRACING
+            if (trace_manager_ != nullptr) {
+              state->tracer_.reset(trace_manager_->SampleTrace(
+                  request.model_name(), request.model_version()));
+              if (state->tracer_ != nullptr) {
+                trace = state->tracer_->ServerTrace();
+              }
+            }
+#endif  // TRTIS_ENABLE_TRACING
+
             state->step_ = ISSUED;
             err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), request_provider, allocator_,
+                trtserver_.get(), trace, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 InferComplete, reinterpret_cast<void*>(state));
 
@@ -930,7 +954,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
       TRTSERVER_ErrorDelete(err);
 
       // Clear the meta-data and raw output as they may be partially
-      // or un-initialized.
+      // initialized or uninitialized.
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
@@ -949,8 +973,8 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 InferHandler::InferComplete(
-    TRTSERVER_Server* server, TRTSERVER_InferenceResponse* trtserver_response,
-    void* userp)
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -994,7 +1018,7 @@ InferHandler::InferComplete(
   }
 
   // If the response is an error then clear the meta-data and raw
-  // output as they may be partially or un-initialized.
+  // output as they may be partially initialized or uninitialized.
   if (response_status != nullptr) {
     response.mutable_meta_data()->Clear();
     response.mutable_raw_output()->Clear();
@@ -1004,6 +1028,8 @@ InferHandler::InferComplete(
       response.mutable_request_status(), response_status, state->unique_id_,
       state->context_->server_id_);
 
+  // Don't need to explicitly delete 'trace'. It will be deleted by
+  // the Tracer object in 'state'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
@@ -1027,12 +1053,13 @@ class StreamInferHandler
   StreamInferHandler(
       const std::string& name,
       const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
+      const std::shared_ptr<TraceManager>& trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count)
       : Handler(
             name, trtserver, server_id, service, cq, max_state_bucket_count),
-        smb_manager_(smb_manager)
+        trace_manager_(trace_manager), smb_manager_(smb_manager)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -1048,10 +1075,11 @@ class StreamInferHandler
 
  private:
   static void StreamInferComplete(
-      TRTSERVER_Server* server, TRTSERVER_InferenceResponse* response,
-      void* userp);
+      TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+      TRTSERVER_InferenceResponse* response, void* userp);
   static void CompleteResponse(Handler::State* state);
 
+  std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   TRTSERVER_ResponseAllocator* allocator_;
 };
@@ -1156,9 +1184,22 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
               trtserver_, smb_manager_, request.meta_data(), response,
               &state->alloc_payload_);
           if (err == nullptr) {
+            // Get the trace object to use for this request. If
+            // nullptr then no tracing will be performed.
+            TRTSERVER_Trace* trace = nullptr;
+#ifdef TRTIS_ENABLE_TRACING
+            if (trace_manager_ != nullptr) {
+              state->tracer_.reset(trace_manager_->SampleTrace(
+                  request.model_name(), request.model_version()));
+              if (state->tracer_ != nullptr) {
+                trace = state->tracer_->ServerTrace();
+              }
+            }
+#endif  // TRTIS_ENABLE_TRACING
+
             state->step_ = ISSUED;
             err = TRTSERVER_ServerInferAsync(
-                trtserver_.get(), request_provider, allocator_,
+                trtserver_.get(), trace, request_provider, allocator_,
                 &state->alloc_payload_ /* response_allocator_userp */,
                 StreamInferComplete, reinterpret_cast<void*>(state));
 
@@ -1184,7 +1225,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       TRTSERVER_ErrorDelete(err);
 
       // Clear the meta-data and raw output as they may be partially
-      // or un-initialized.
+      // initialized or uninitialized.
       response.mutable_meta_data()->Clear();
       response.mutable_raw_output()->Clear();
 
@@ -1246,8 +1287,8 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
 void
 StreamInferHandler::StreamInferComplete(
-    TRTSERVER_Server* server, TRTSERVER_InferenceResponse* trtserver_response,
-    void* userp)
+    TRTSERVER_Server* server, TRTSERVER_Trace* trace,
+    TRTSERVER_InferenceResponse* trtserver_response, void* userp)
 {
   State* state = reinterpret_cast<State*>(userp);
 
@@ -1292,7 +1333,7 @@ StreamInferHandler::StreamInferComplete(
   }
 
   // If the response is an error then clear the meta-data and raw
-  // output as they may be partially or un-initialized.
+  // output as they may be partially initialized or uninitialized.
   if (response_status != nullptr) {
     response.mutable_meta_data()->Clear();
     response.mutable_raw_output()->Clear();
@@ -1302,6 +1343,8 @@ StreamInferHandler::StreamInferComplete(
       response.mutable_request_status(), response_status, state->unique_id_,
       state->context_->server_id_);
 
+  // Don't need to explicitly delete 'trace'. It will be deleted by
+  // the Tracer object in 'state'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(trtserver_response),
       "deleting GRPC response");
@@ -1533,109 +1576,6 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
   return state->step_ != Steps::FINISH;
 }
 
-//
-// TraceControlHandler
-//
-class TraceControlHandler
-    : public Handler<
-          GRPCService::AsyncService,
-          grpc::ServerAsyncResponseWriter<TraceControlResponse>,
-          TraceControlRequest, TraceControlResponse> {
- public:
-  TraceControlHandler(
-      const std::string& name,
-      const std::shared_ptr<TRTSERVER_Server>& trtserver, const char* server_id,
-      GRPCService::AsyncService* service, grpc::ServerCompletionQueue* cq,
-      size_t max_state_bucket_count)
-      : Handler(name, trtserver, server_id, service, cq, max_state_bucket_count)
-  {
-  }
-
- protected:
-  void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok) override;
-};
-
-void
-TraceControlHandler::StartNewRequest()
-{
-  auto context = std::make_shared<State::Context>(server_id_);
-  State* state = StateNew(context);
-  service_->RequestTraceControl(
-      state->context_->ctx_.get(), &state->request_,
-      state->context_->responder_.get(), cq_, cq_, state);
-
-  LOG_VERBOSE(1) << "New request handler for " << Name() << ", "
-                 << state->unique_id_;
-}
-
-bool
-TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
-{
-  LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
-                 << state->unique_id_ << " step " << state->step_;
-
-  // If RPC failed on a new request then the server is shutting down
-  // and so we should do nothing (including not registering for a new
-  // request). If RPC failed on a non-START step then there is nothing
-  // we can do since we one execute one step.
-  const bool shutdown = (!rpc_ok && (state->step_ == Steps::START));
-  if (shutdown) {
-    state->step_ = Steps::FINISH;
-  }
-
-  const TraceControlRequest& request = state->request_;
-  TraceControlResponse& response = state->response_;
-
-  if (state->step_ == START) {
-    TRTSERVER_Error* err = nullptr;
-
-    if (request.has_trace_configure()) {
-      TRTSERVER_TraceOptions* options = nullptr;
-      err = TRTSERVER_TraceOptionsNew(&options);
-      if (err == nullptr) {
-        TRTSERVER_TraceOptionsSetTraceName(
-            options, request.trace_configure().name().c_str());
-        TRTSERVER_TraceOptionsSetHost(
-            options, request.trace_configure().host().c_str());
-        TRTSERVER_TraceOptionsSetPort(
-            options, request.trace_configure().port());
-        err = TRTSERVER_ServerTraceConfigure(trtserver_.get(), options);
-
-        TRTSERVER_Error* del_err = TRTSERVER_TraceOptionsDelete(options);
-        if (del_err != nullptr) {
-          LOG_ERROR << "failed to delete trace options: "
-                    << TRTSERVER_ErrorMessage(del_err);
-          TRTSERVER_ErrorDelete(del_err);
-        }
-      }
-    } else if (request.has_trace_enable()) {
-      err = TRTSERVER_ServerSetTraceLevel(
-          trtserver_.get(), request.trace_enable().level(),
-          request.trace_enable().rate());
-    }
-
-    RequestStatusUtil::Create(
-        response.mutable_request_status(), err, state->unique_id_, server_id_);
-
-    TRTSERVER_ErrorDelete(err);
-
-    state->step_ = Steps::COMPLETE;
-    state->context_->responder_->Finish(response, grpc::Status::OK, state);
-  } else if (state->step_ == Steps::COMPLETE) {
-    state->step_ = Steps::FINISH;
-  }
-
-  // Only handle one status request at a time (to avoid having status
-  // request cause too much load on server), so register for next
-  // request only after this one finished.
-  if (!shutdown && (state->step_ == Steps::FINISH)) {
-    StartNewRequest();
-  }
-
-  return state->step_ != Steps::FINISH;
-}
-
 }  // namespace
 
 //
@@ -1643,12 +1583,14 @@ TraceControlHandler::Process(Handler::State* state, bool rpc_ok)
 //
 GRPCServer::GRPCServer(
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const char* server_id, const std::string& server_addr,
     const int infer_thread_cnt, const int stream_infer_thread_cnt,
     const int infer_allocation_pool_size)
-    : server_(server), smb_manager_(smb_manager), server_id_(server_id),
-      server_addr_(server_addr), infer_thread_cnt_(infer_thread_cnt),
+    : server_(server), trace_manager_(trace_manager), smb_manager_(smb_manager),
+      server_id_(server_id), server_addr_(server_addr),
+      infer_thread_cnt_(infer_thread_cnt),
       stream_infer_thread_cnt_(stream_infer_thread_cnt),
       infer_allocation_pool_size_(infer_allocation_pool_size), running_(false)
 {
@@ -1662,6 +1604,7 @@ GRPCServer::~GRPCServer()
 TRTSERVER_Error*
 GRPCServer::Create(
     const std::shared_ptr<TRTSERVER_Server>& server,
+    const std::shared_ptr<nvidia::inferenceserver::TraceManager>& trace_manager,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager, int32_t port,
     int infer_thread_cnt, int stream_infer_thread_cnt,
     int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server)
@@ -1675,7 +1618,7 @@ GRPCServer::Create(
 
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
-      server, smb_manager, server_id, addr, infer_thread_cnt,
+      server, trace_manager, smb_manager, server_id, addr, infer_thread_cnt,
       stream_infer_thread_cnt, infer_allocation_pool_size));
 
   return nullptr;  // success
@@ -1699,7 +1642,6 @@ GRPCServer::Start()
   stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   modelcontrol_cq_ = grpc_builder_.AddCompletionQueue();
   shmcontrol_cq_ = grpc_builder_.AddCompletionQueue();
-  tracecontrol_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
 
   // Handler for health requests. A single thread processes all of
@@ -1720,16 +1662,16 @@ GRPCServer::Start()
 
   // Handler for inference requests.
   InferHandler* hinfer = new InferHandler(
-      "InferHandler", server_, server_id_, smb_manager_, &service_,
-      infer_cq_.get(),
+      "InferHandler", server_, server_id_, trace_manager_, smb_manager_,
+      &service_, infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
   hinfer->Start(infer_thread_cnt_);
   infer_handler_.reset(hinfer);
 
   // Handler for streaming inference requests.
   StreamInferHandler* hstreaminfer = new StreamInferHandler(
-      "StreamInferHandler", server_, server_id_, smb_manager_, &service_,
-      stream_infer_cq_.get(),
+      "StreamInferHandler", server_, server_id_, trace_manager_, smb_manager_,
+      &service_, stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */);
   hstreaminfer->Start(stream_infer_thread_cnt_);
   stream_infer_handler_.reset(hstreaminfer);
@@ -1749,14 +1691,6 @@ GRPCServer::Start()
       &service_, shmcontrol_cq_.get(), 2 /* max_state_bucket_count */);
   hshmcontrol->Start(1 /* thread_cnt */);
   shmcontrol_handler_.reset(hshmcontrol);
-
-  // Handler for trace-control requests. A single thread processes all
-  // of these requests.
-  TraceControlHandler* htracecontrol = new TraceControlHandler(
-      "TraceControlHandler", server_, server_id_, &service_,
-      tracecontrol_cq_.get(), 2 /* max_state_bucket_count */);
-  htracecontrol->Start(1 /* thread_cnt */);
-  tracecontrol_handler_.reset(htracecontrol);
 
   running_ = true;
   LOG_INFO << "Started GRPCService at " << server_addr_;
@@ -1780,7 +1714,6 @@ GRPCServer::Stop()
   stream_infer_cq_->Shutdown();
   modelcontrol_cq_->Shutdown();
   shmcontrol_cq_->Shutdown();
-  tracecontrol_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
@@ -1790,7 +1723,6 @@ GRPCServer::Stop()
   dynamic_cast<StreamInferHandler*>(stream_infer_handler_.get())->Stop();
   dynamic_cast<ModelControlHandler*>(modelcontrol_handler_.get())->Stop();
   dynamic_cast<SharedMemoryControlHandler*>(shmcontrol_handler_.get())->Stop();
-  dynamic_cast<TraceControlHandler*>(tracecontrol_handler_.get())->Stop();
 
   running_ = false;
   return nullptr;  // success

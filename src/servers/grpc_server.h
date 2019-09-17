@@ -29,6 +29,7 @@
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/shared_memory_block_manager.h"
+#include "src/servers/tracer.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -36,6 +37,8 @@ class GRPCServer {
  public:
   static TRTSERVER_Error* Create(
       const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
+          trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       int32_t port, int infer_thread_cnt, int stream_infer_thread_cnt,
       int infer_allocation_pool_size, std::unique_ptr<GRPCServer>* grpc_server);
@@ -54,12 +57,15 @@ class GRPCServer {
  private:
   GRPCServer(
       const std::shared_ptr<TRTSERVER_Server>& server,
+      const std::shared_ptr<nvidia::inferenceserver::TraceManager>&
+          trace_manager,
       const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
       const char* server_id, const std::string& server_addr,
       const int infer_thread_cnt, const int stream_infer_thread_cnt,
       const int infer_allocation_pool_size);
 
   std::shared_ptr<TRTSERVER_Server> server_;
+  std::shared_ptr<TraceManager> trace_manager_;
   std::shared_ptr<SharedMemoryBlockManager> smb_manager_;
   const char* server_id_;
   const std::string server_addr_;
@@ -74,7 +80,6 @@ class GRPCServer {
   std::unique_ptr<grpc::ServerCompletionQueue> stream_infer_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> modelcontrol_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> shmcontrol_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> tracecontrol_cq_;
 
   grpc::ServerBuilder grpc_builder_;
   std::unique_ptr<grpc::Server> grpc_server_;
@@ -85,7 +90,6 @@ class GRPCServer {
   std::unique_ptr<HandlerBase> stream_infer_handler_;
   std::unique_ptr<HandlerBase> modelcontrol_handler_;
   std::unique_ptr<HandlerBase> shmcontrol_handler_;
-  std::unique_ptr<HandlerBase> tracecontrol_handler_;
 
   GRPCService::AsyncService service_;
   bool running_;

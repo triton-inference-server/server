@@ -766,18 +766,6 @@ SharedMemoryControlHttpContext::Create(
 
 //==============================================================================
 
-Error
-TraceControlHttpContext::Create(
-    std::unique_ptr<TraceControlContext>* ctx, const std::string& server_url,
-    const std::map<std::string, std::string>& headers, bool verbose)
-{
-  return Error(
-      RequestStatusCode::INTERNAL,
-      "TraceControlHttpContext::Create not yet implemented");
-}
-
-//==============================================================================
-
 class HttpRequestImpl : public RequestImpl {
  public:
   HttpRequestImpl(

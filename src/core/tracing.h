@@ -27,30 +27,40 @@
 
 #ifdef TRTIS_ENABLE_TRACING
 
+#include <vector>
+#include "src/core/server_status.h"
 #include "src/core/status.h"
+#include "src/core/trtserver.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class TraceManager {
+//
+// A trace.
+//
+class Trace {
  public:
   static Status Create(
-      const std::string& trace_name, const std::string& hostname,
-      uint32_t port);
+      TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
+      void* activity_userp, std::unique_ptr<Trace>* trace)
+  {
+    trace->reset(new Trace(level, activity_fn, activity_userp));
+    return Status::Success;
+  }
 
-  static Status SetLevel(uint32_t level, uint32_t rate);
+  void Report(const std::shared_ptr<ModelInferStats>& infer_stats);
 
  private:
-  TraceManager(
-      const std::string& trace_name, const std::string& hostname,
-      uint32_t port);
+  Trace(
+      TRTSERVER_Trace_Level level, TRTSERVER_TraceActivityFn_t activity_fn,
+      void* activity_userp)
+      : level_(level), activity_fn_(activity_fn),
+        activity_userp_(activity_userp)
+  {
+  }
 
-  // Unfortunately we need manager to be a singleton because the
-  // underlying zipkin library uses singletons for the trace
-  // objects... not sure why they did that...
-  static std::unique_ptr<TraceManager> singleton_;
-
-  uint32_t level_;
-  uint32_t rate_;
+  const TRTSERVER_Trace_Level level_;
+  TRTSERVER_TraceActivityFn_t activity_fn_;
+  void* activity_userp_;
 };
 
 }}  // namespace nvidia::inferenceserver
