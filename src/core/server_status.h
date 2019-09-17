@@ -82,11 +82,13 @@ class ServerStatTimerScoped {
 class ModelInferStats {
  public:
   enum class TimestampKind {
-    kRequestStart,  // Start request processing
-    kQueueStart,    // Request enters the queue
-    kComputeStart,  // Request leaves queue and starts compute
-    kComputeEnd,    // Request completes compute
-    kRequestEnd,    // Done with request processing
+    kRequestStart,        // Start request processing
+    kQueueStart,          // Request enters the queue
+    kComputeStart,        // Request leaves queue and starts compute
+    kComputeInputEnd,     // Requests finishes preparing inputs
+    kComputeOutputStart,  // Request starts processing outputs
+    kComputeEnd,          // Request completes compute
+    kRequestEnd,          // Done with request processing
     COUNT__
   };
 

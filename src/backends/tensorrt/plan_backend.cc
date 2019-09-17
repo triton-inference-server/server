@@ -697,6 +697,13 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
         static_cast<char*>(buffers_[bindex]));
   }
 
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeInputEnd);
+    }
+  }
+
   // Async execute the inference using a CUDA graph if available for
   // the batch-size, otherwise execution normally.
   auto itr = cuda_graph_execs_.find(total_batch_size);
@@ -715,6 +722,13 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
       return Status(
           RequestStatusCode::INTERNAL,
           "unable to enqueue for inference " + name_);
+    }
+  }
+
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeOutputStart);
     }
   }
 

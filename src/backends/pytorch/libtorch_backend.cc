@@ -681,8 +681,22 @@ LibTorchBackend::Context::Run(
     SetInputTensor(input_meta_data[i], &(inputs_[i]));
   }
 
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeInputEnd);
+    }
+  }
+
   // Run...
   RETURN_IF_ERROR(Execute(&inputs_, &outputs_));
+
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeOutputStart);
+    }
+  }
 
   // verify output indices are valid with number of outputs after execution
   for (const auto& output : base->Config().output()) {

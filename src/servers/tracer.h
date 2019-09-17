@@ -81,7 +81,7 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
 class Tracer {
  public:
   Tracer(
-      const std::shared_ptr<TraceManager>& manager,
+      const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level,
       const std::string& model_name, int64_t model_version);
   ~Tracer();
 
@@ -92,8 +92,16 @@ class Tracer {
   void SetServerTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
   TRTSERVER_Trace* ServerTrace() const { return trace_; }
 
+  // Capture a named timestamp using a nanosecond precision time. If
+  // the time is not given (or is given as zero) then the current time
+  // will be used.
+  void CaptureTimestamp(
+      TRTSERVER_Trace_Level level, const std::string& name,
+      uint64_t timestamp_ns = 0);
+
  private:
   std::shared_ptr<TraceManager> manager_;
+  const TRTSERVER_Trace_Level level_;
 
   std::stringstream tout_;
   uint32_t timestamp_cnt_;
