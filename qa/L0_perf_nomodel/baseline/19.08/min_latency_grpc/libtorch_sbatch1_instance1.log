@@ -1,0 +1,53 @@
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 300 msec
+  Concurrency limit: 2 concurrent requests
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Pass [1] throughput: 1527 infer/sec. p95 latency: 616 usec
+  Pass [2] throughput: 2107 infer/sec. p95 latency: 755 usec
+  Pass [3] throughput: 1818 infer/sec. p95 latency: 793 usec
+  Pass [4] throughput: 2059 infer/sec. p95 latency: 710 usec
+  Pass [5] throughput: 2672 infer/sec. p95 latency: 510 usec
+  Pass [6] throughput: 1764 infer/sec. p95 latency: 811 usec
+  Pass [7] throughput: 3067 infer/sec. p95 latency: 334 usec
+  Pass [8] throughput: 2056 infer/sec. p95 latency: 767 usec
+  Pass [9] throughput: 1671 infer/sec. p95 latency: 820 usec
+  Pass [10] throughput: 3025 infer/sec. p95 latency: 346 usec
+Failed to obtain stable measurement within 10 measurement windows for concurrency 1. Please try to increase the time window.
+  Client: 
+    Request count: 15126
+    Throughput: 3025 infer/sec
+    p50 latency: 321 usec
+    p90 latency: 336 usec
+    p95 latency: 346 usec
+    p99 latency: 399 usec
+    Avg gRPC time: 310 usec (marshal 2 usec + response wait 304 usec + unmarshal 4 usec)
+  Server: 
+    Request count: 18162
+    Avg request latency: 177 usec (overhead 7 usec + queue 11 usec + compute 159 usec)
+
+Request concurrency: 2
+  Pass [1] throughput: 5049 infer/sec. p95 latency: 462 usec
+  Pass [2] throughput: 5182 infer/sec. p95 latency: 448 usec
+  Pass [3] throughput: 5192 infer/sec. p95 latency: 438 usec
+  Client: 
+    Request count: 25961
+    Throughput: 5192 infer/sec
+    p50 latency: 366 usec
+    p90 latency: 417 usec
+    p95 latency: 438 usec
+    p99 latency: 507 usec
+    Avg gRPC time: 355 usec (marshal 3 usec + response wait 346 usec + unmarshal 6 usec)
+  Server: 
+    Request count: 31176
+    Avg request latency: 204 usec (overhead 6 usec + queue 46 usec + compute 152 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, 3025 infer/sec, latency 346 usec
+Concurrency: 2, 5192 infer/sec, latency 438 usec
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  4347  100  4347    0     0   849k      0 --:--:-- --:--:-- --:--:--  849k

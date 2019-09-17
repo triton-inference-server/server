@@ -1,0 +1,16 @@
+I0917 22:45:59.459721 2936 metrics.cc:160] found 1 GPUs supporting NVML metrics
+I0917 22:45:59.465313 2936 metrics.cc:169]   GPU 0: TITAN RTX
+I0917 22:45:59.465558 2936 server.cc:111] Initializing TensorRT Inference Server
+I0917 22:45:59.494547 2936 server_status.cc:83] New status tracking for model 'onnx_zero_1_float32'
+I0917 22:45:59.494621 2936 model_repository_manager.cc:668] loading: onnx_zero_1_float32:1
+I0917 22:45:59.496966 2936 onnx_backend.cc:188] Creating instance onnx_zero_1_float32_0_0_gpu0 on GPU 0 (7.5) using model.onnx
+I0917 22:46:03.122529 2936 model_repository_manager.cc:811] successfully loaded 'onnx_zero_1_float32' version 1
+I0917 22:46:03.122595 2936 main.cc:390] Starting endpoints, 'inference:0' listening on
+I0917 22:46:03.122830 2936 grpc_server.cc:443] Starting a GRPCService at 0.0.0.0:8001
+I0917 22:46:03.133816 2936 http_server.cc:833] Starting HTTPService at 0.0.0.0:8000
+I0917 22:46:03.175292 2936 http_server.cc:847] Starting Metrics Service at 0.0.0.0:8002
+I0917 22:46:51.514942 2936 main.cc:262] Interrupt signal (15) received.
+I0917 22:46:51.514979 2936 server.cc:165] Waiting for in-flight inferences to complete.
+I0917 22:46:51.514990 2936 model_repository_manager.cc:694] unloading: onnx_zero_1_float32:1
+I0917 22:46:51.516260 2936 model_repository_manager.cc:797] successfully unloaded 'onnx_zero_1_float32' version 1
+I0917 22:46:51.516278 2936 server.cc:180] Timeout 30: Found 0 live models and 0 in-flight requests

@@ -1,0 +1,3 @@
+Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
+1,1771,5,239,18,281,9,544,636,665,720
+2,3625,5,215,97,215,8,537,608,633,687
