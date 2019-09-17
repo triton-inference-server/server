@@ -396,6 +396,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/LICENSE LICENSE.openvino
 COPY --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
 COPY --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
