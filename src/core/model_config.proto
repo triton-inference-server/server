@@ -432,6 +432,45 @@ message ModelOptimizationPolicy
     bool graphs = 1;
   }
 
+  //@@
+  //@@  .. cpp:var:: message ExecutionAccelerators
+  //@@
+  //@@     Specify the preferred execution accelerators to be used to execute
+  //@@     the model. Currently only recognized by ONNX Runtime backend.
+  //@@
+  //@@     For ONNX Runtime backend, multiple execution accelerators may be set
+  //@@     for both GPU and CPU, in such case, the priority will be in the
+  //@@     following order:
+  //@@         <gpu_execution_accelerator> (if instance is on GPU)
+  //@@         CUDA Exectuion Provider     (if instance is on GPU)
+  //@@         <cpu_execution_accelerator>
+  //@@         Default CPU Execution Provider
+  //@@
+  message ExecutionAccelerators
+  {
+    //@@    .. cpp:var:: string gpu_execution_accelerator (repeated)
+    //@@
+    //@@       The preferred execution provider to be used if the model instance
+    //@@       is deployed on GPU. The order priority implies priority, i.e. the
+    //@@       provider at the front has highest priority.
+    //@@
+    //@@       For ONNX Runtime backend, possible value is "tensorrt".
+    //@@
+    repeated string gpu_execution_accelerator = 1;
+
+    //@@    .. cpp:var:: string cpu_execution_accelerator (repeated)
+    //@@
+    //@@       The preferred execution provider to be used if the model instance
+    //@@       is deployed on CPU, or if the model instance is deployed on GPU
+    //@@       but both 'gpu_execution_accelerator' and CUDA Execution Provider
+    //@@       don't support the operators. The order priority implies priority,
+    //@@       i.e. the provider at the front has highest priority.
+    //@@
+    //@@       For ONNX Runtime backend, currently there is no possible value.
+    //@@
+    repeated string cpu_execution_accelerator = 2;
+  }
+
   //@@  .. cpp:var:: Graph graph
   //@@
   //@@     The graph optimization setting for the model. Optional.
@@ -449,6 +488,12 @@ message ModelOptimizationPolicy
   //@@     CUDA-specific optimization settings. Optional.
   //@@
   Cuda cuda = 3;
+
+  //@@  .. cpp:var:: ExecutionAccelerators execution_accelerators
+  //@@
+  //@@     The accelerators used for the model. Optional.
+  //@@
+  ExecutionAccelerators execution_accelerators = 4;
 }
 
 //@@

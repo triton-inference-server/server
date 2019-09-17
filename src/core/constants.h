@@ -73,6 +73,9 @@ constexpr char kCustomPlatform[] = "custom";
 constexpr char kCustomFilename[] = "libcustom.so";
 #endif  // TRTIS_ENABLE_CUSTOM
 
+constexpr char kTensorRTExecutionAccelerator[] = "tensorrt";
+constexpr char kOpenVINOExecutionAccelerator[] = "openvino";
+
 constexpr char kEnsemblePlatform[] = "ensemble";
 constexpr char kModelConfigPbTxt[] = "config.pbtxt";
 
