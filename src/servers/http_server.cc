@@ -739,10 +739,6 @@ HTTPAPIServer::HandleSharedMemoryControl(
         }
       }
     }
-    if (err != nullptr) {
-      LOG_ERROR << "failed to fetch shared memory status: "
-                << TRTSERVER_ErrorMessage(err);
-    }
     TRTSERVER_ProtobufDelete(shm_status_protobuf);
   } else {
     err = TRTSERVER_ErrorNew(

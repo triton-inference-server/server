@@ -151,6 +151,7 @@ SharedMemoryManager::RegisterSharedMemory(
 Status
 SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
 {
+  // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
     RETURN_IF_ERROR(
@@ -206,6 +207,7 @@ SharedMemoryManager::UnregisterAllSharedMemory()
       error_message += unreg_fail + " ,";
     }
     LOG_ERROR << error_message;
+    return Status(RequestStatusCode::INTERNAL, error_message);
   }
 
   return Status::Success;

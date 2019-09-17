@@ -264,11 +264,11 @@ message InferSharedMemoryRegion
 //@@
 message SharedMemoryControlRequest
 {
-  //@@  .. cpp:var:: message RegisterInfo
+  //@@  .. cpp:var:: message Register
   //@@
-  //@@     The information needed to register the shared memory region.
+  //@@     Register a shared memory region.
   //@@
-  message RegisterInfo
+  message Register
   {
     //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
     //@@
@@ -277,11 +277,11 @@ message SharedMemoryControlRequest
     InferSharedMemoryRegion shared_memory_region = 5;
   }
 
-  //@@  .. cpp:var:: message UnregisterInfo
+  //@@  .. cpp:var:: message Unregister
   //@@
-  //@@     The information needed to unregister the shared memory region.
+  //@@     Unregister a specified shared memory region.
   //@@
-  message UnregisterInfo
+  message Unregister
   {
     //@@
     //@@  .. cpp:var:: string name
@@ -291,11 +291,17 @@ message SharedMemoryControlRequest
     string name = 1;
   }
 
-  //@@  .. cpp:var:: message NoInfo
+  //@@  .. cpp:var:: message UnregisterAll
   //@@
-  //@@     Information needed to UnregisterAll and GetStatus of shared memory.
+  //@@     Unregister all shared memory regions.
   //@@
-  message NoInfo {}
+  message UnregisterAll {}
+
+  //@@  .. cpp:var:: message GetStatus
+  //@@
+  //@@     Get the status of all active shared memory regions.
+  //@@
+  message GetStatus {}
 
   //@@  .. cpp:var:: oneof shared_memory_control
   //@@
@@ -303,29 +309,29 @@ message SharedMemoryControlRequest
   //@@
   oneof shared_memory_control
   {
-    //@@    .. cpp:var:: RegisterInfo register
+    //@@    .. cpp:var:: Register register
     //@@
     //@@       To register the specified shared memory region.
     //@@
-    RegisterInfo register = 1;
+    Register register = 1;
 
-    //@@    .. cpp:var:: UnregisterInfo unregister
+    //@@    .. cpp:var:: Unregister unregister
     //@@
     //@@       To unregister the specified shared memory region.
     //@@
-    UnregisterInfo unregister = 2;
+    Unregister unregister = 2;
 
-    //@@    .. cpp:var:: NoInfo unregister_all
+    //@@    .. cpp:var:: UnregisterAll unregister_all
     //@@
     //@@       To unregister all active shared memory regions.
     //@@
-    NoInfo unregister_all = 3;
+    UnregisterAll unregister_all = 3;
 
-    //@@    .. cpp:var:: NoInfo get_status
+    //@@    .. cpp:var:: GetStatus get_status
     //@@
-    //@@       To get the list of all active shared memory regions.
+    //@@       Get the status of all active shared memory regions.
     //@@
-    NoInfo get_status = 4;
+    GetStatus get_status = 4;
   }
 }
 
@@ -344,7 +350,7 @@ message SharedMemoryControlResponse
   RequestStatus request_status = 1;
 
   //@@
-  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
+  //@@  .. cpp:var:: InferSharedMemoryRegion shared_memory_region
   //@@
   //@@     The list of active/registered shared memory regions.
   //@@
