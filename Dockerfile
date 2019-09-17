@@ -257,6 +257,21 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/li
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tensorrtserver/lib/
 
+# OpenVINO
+ENV INTEL_CVSDK_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
+ENV INTEL_OPENVINO_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
+
+ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:$LD_LIBRARY_PATH
+
+ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
+ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
+
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools \
+     $INTEL_CVSDK_DIR/deployment_tools
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
+     $INTEL_CVSDK_DIR/tools
+
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
@@ -389,6 +404,26 @@ COPY --from=trtserver_build /opt/tensorrtserver/lib lib
 COPY --from=trtserver_build /opt/tensorrtserver/include include
 
 RUN chmod ugo-w+rx /opt/tensorrtserver/lib/*.so
+
+# Install ONNX-Runtime-OpenVINO dependencies to use it in base container
+ENV INTEL_CVSDK_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
+ENV INTEL_OPENVINO_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
+
+ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:$LD_LIBRARY_PATH
+
+ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
+ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
+
+# ONNX Runtime uses Python3 syntax
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip
+RUN pip3 install --upgrade wheel setuptools && \
+    (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
+        pip3 install -r requirements_onnx.txt)
+# Python scripts that need to be in 'pwd' on running the application
+# https://github.com/microsoft/onnxruntime/issues/1861
+COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
+     /opt/tensorrtserver
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
