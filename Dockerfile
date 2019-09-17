@@ -424,7 +424,7 @@ RUN pip3 install --upgrade wheel setuptools && \
 # Python scripts that need to be in 'pwd' on running the application
 # https://github.com/microsoft/onnxruntime/issues/1861
 COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
-     /opt/tensorrtserver
+     /opt/tensorrtserver/
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
