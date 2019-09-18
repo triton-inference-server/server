@@ -447,6 +447,7 @@ class InferContextImpl : public InferContext {
 
   Error SetRunOptions(const Options& options) override;
   Error GetStat(Stat* stat) const override;
+  int64_t ByteSize(const DimsList& dims, DataType dtype) const override;
 
   virtual Error GetReadyAsyncRequest(
       std::shared_ptr<Request>* async_request, bool* is_ready,
