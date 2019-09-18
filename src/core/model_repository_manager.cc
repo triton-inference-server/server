@@ -883,6 +883,10 @@ ModelRepositoryManager::Create(
     // only error happens before model load / unload will be return
     // model loading / unloading error will be printed but ignored
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
+  } else {
+    // [TODO] load models specified by '--load-model'
+    std::set<std::string> models;
+    RETURN_IF_ERROR(local_manager->LoadUnloadModels(models, ActionType::LOAD, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
@@ -1096,76 +1100,8 @@ ModelRepositoryManager::LoadUnloadModel(
   // Serialize all operations that change model state
   std::lock_guard<std::mutex> lock(poll_mu_);
 
-  // Update ModelInfo related to file system accordingly
-  std::set<std::string> added, deleted, modified, unmodified;
-  {
-    if (type == ActionType::UNLOAD) {
-      std::lock_guard<std::mutex> lk(infos_mu_);
-      size_t erased_cnt = infos_.erase(model_name);
-      if (erased_cnt != 0) {
-        deleted.insert(model_name);
-      }
-    } else {
-      std::set<std::string> checked_modes{model_name};
-      std::set<std::string> models{model_name};
-
-      ModelInfoMap new_infos;
-      while (!models.empty()) {
-        bool all_models_polled;
-        RETURN_IF_ERROR(Poll(
-            models, &added, &deleted, &modified, &unmodified, &new_infos,
-            &all_models_polled));
-
-        // More models should be polled is the polled models are ensembles
-        std::set<std::string> next_models;
-        for (const auto& model : models) {
-          auto it = new_infos.find(model);
-          // Some models may be marked as deleted and not in 'new_infos'
-          if (it != new_infos.end()) {
-          const auto& config = it->second->model_config_;
-            if (config.has_ensemble_scheduling()) {
-              for (const auto& step : config.ensemble_scheduling().step()) {
-                bool need_poll = checked_modes.emplace(step.model_name()).second;
-                if (need_poll) {
-                  next_models.emplace(step.model_name());
-                }
-              }
-            }
-          }
-        }
-        models.swap(next_models);
-      }
-
-      // Only update the infos when all validation is completed
-      std::lock_guard<std::mutex> lk(infos_mu_);
-      for (const auto& model_name : added) {
-        auto nitr = new_infos.find(model_name);
-        infos_.emplace(model_name, std::move(nitr->second));
-      }
-      for (const auto& model_name : modified) {
-        auto nitr = new_infos.find(model_name);
-        auto itr = infos_.find(model_name);
-        itr->second = std::move(nitr->second);
-      }
-    }
-  }
-
-  // Update dependency graph and load
-  Update(added, deleted, modified);
-
-  // The models are in 'deleted' either when they are asked to be unloaded or
-  // they are not found / are duplicated across all model repositories.
-  // In all cases, should unload them explicitly.
-  for (const auto& name : deleted) {
-    ModelConfig model_config;
-    std::set<int64_t> versions;
-    std::string empty_path;
-    // Utilize "force_unload" of AsyncLoad()
-    backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
-  }
-
-  // model loading / unloading error will be printed but ignored
-  LoadModelByDependency();
+  bool polled = true;
+  RETURN_IF_ERROR(LoadUnloadModels({model_name}, type, &polled));
 
   // Check if model is loaded / unloaded properly
   const auto version_states = GetVersionStates(model_name);
@@ -1215,6 +1151,88 @@ ModelRepositoryManager::LoadUnloadModel(
               "', versions that are still available: " + ready_version_str);
     }
   }
+
+  return Status::Success;
+}
+
+Status
+ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_names, ActionType type, bool* all_models_polled)
+{
+  *all_models_polled = true;
+  // Update ModelInfo related to file system accordingly
+  std::set<std::string> added, deleted, modified, unmodified;
+  {
+    if (type == ActionType::UNLOAD) {
+      std::lock_guard<std::mutex> lk(infos_mu_);
+      for (const auto& model_name : model_names) {
+        size_t erased_cnt = infos_.erase(model_name);
+        if (erased_cnt != 0) {
+          deleted.insert(model_name);
+        }
+      }
+    } else {
+      std::set<std::string> checked_modes = model_names;
+      std::set<std::string> models = model_names;
+
+      ModelInfoMap new_infos;
+      while (!models.empty()) {
+        bool polled = true;
+        RETURN_IF_ERROR(Poll(
+            models, &added, &deleted, &modified, &unmodified, &new_infos,
+            &polled));
+        *all_models_polled &= polled;
+
+        // More models should be polled is the polled models are ensembles
+        std::set<std::string> next_models;
+        for (const auto& model : models) {
+          auto it = new_infos.find(model);
+          // Some models may be marked as deleted and not in 'new_infos'
+          if (it != new_infos.end()) {
+          const auto& config = it->second->model_config_;
+            if (config.has_ensemble_scheduling()) {
+              for (const auto& step : config.ensemble_scheduling().step()) {
+                bool need_poll = checked_modes.emplace(step.model_name()).second;
+                if (need_poll) {
+                  next_models.emplace(step.model_name());
+                }
+              }
+            }
+          }
+        }
+        models.swap(next_models);
+      }
+
+      // Only update the infos when all validation is completed
+      std::lock_guard<std::mutex> lk(infos_mu_);
+      for (const auto& model_name : added) {
+        auto nitr = new_infos.find(model_name);
+        infos_.emplace(model_name, std::move(nitr->second));
+      }
+      for (const auto& model_name : modified) {
+        auto nitr = new_infos.find(model_name);
+        auto itr = infos_.find(model_name);
+        itr->second = std::move(nitr->second);
+      }
+    }
+  }
+
+  // Update dependency graph and load
+  Update(added, deleted, modified);
+
+
+  // The models are in 'deleted' either when they are asked to be unloaded or
+  // they are not found / are duplicated across all model repositories.
+  // In all cases, should unload them explicitly.
+  for (const auto& name : deleted) {
+    ModelConfig model_config;
+    std::set<int64_t> versions;
+    std::string empty_path;
+    // Utilize "force_unload" of AsyncLoad()
+    backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
+  }
+
+  // model loading / unloading error will be printed but ignored
+  LoadModelByDependency();
 
   return Status::Success;
 }
