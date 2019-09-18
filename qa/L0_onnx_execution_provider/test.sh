@@ -44,44 +44,42 @@ source ../common/util.sh
 
 rm -f ./*.log
 rm -fr models && mkdir -p models && \
-    cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 \
-       models/onnx_float32_float32_float32_def && \
-    rm -fr models/onnx_float32_float32_float32_def/2 && \
-    rm -fr models/onnx_float32_float32_float32_def/3 && \
-    (cd models/onnx_float32_float32_float32_def && \
-            sed -i 's/^name: "onnx_float32_float32_float32"/name: "onnx_float32_float32_float32_def"/' \
+    cp -r $DATADIR/onnx_model_store/resnet50 \
+       models/resnet50_def && \
+    (cd models/resnet50_def && \
+            sed -i 's/^name: "resnet50"/name: "resnet50_def"/' \
                 config.pbtxt) && \
     # GPU execution accelerators
     # For TensorRT, only deploy it on gpu 0 as deploying on other devices
     # will cause segfault
-    cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_trt && \
-    (cd models/onnx_float32_float32_float32_trt && \
-            sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_trt"/' \
+    cp -r models/resnet50_def models/resnet50_trt && \
+    (cd models/resnet50_trt && \
+            sed -i 's/^name: "resnet50_def"/name: "resnet50_trt"/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"tensorrt\"] } }" >> config.pbtxt && \
             echo "instance_group [ { gpus: [0] } ]" >> config.pbtxt) && \
     # CPU execution accelerators
-    cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_openvino && \
-    (cd models/onnx_float32_float32_float32_openvino && \
-            sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_openvino"/' \
+    cp -r models/resnet50_def models/resnet50_openvino && \
+    (cd models/resnet50_openvino && \
+            sed -i 's/^name: "resnet50_def"/name: "resnet50_openvino"/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"openvino\"] } }" >> config.pbtxt) && \
     # CPU execution accelerators on CPU context
-    cp -r models/onnx_float32_float32_float32_openvino models/onnx_float32_float32_float32_cpu_openvino && \
-    (cd models/onnx_float32_float32_float32_cpu_openvino && \
-            sed -i 's/^name: "onnx_float32_float32_float32_openvino"/name: "onnx_float32_float32_float32_cpu_openvino"/' \
+    cp -r models/resnet50_openvino models/resnet50_cpu_openvino && \
+    (cd models/resnet50_cpu_openvino && \
+            sed -i 's/^name: "resnet50_openvino"/name: "resnet50_cpu_openvino"/' \
                 config.pbtxt && \
             echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt) && \
     # Unknown GPU execution accelerator
-    cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_unknown_gpu && \
-    (cd models/onnx_float32_float32_float32_unknown_gpu && \
-            sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_unknown_gpu"/' \
+    cp -r models/resnet50_def models/resnet50_unknown_gpu && \
+    (cd models/resnet50_unknown_gpu && \
+            sed -i 's/^name: "resnet50_def"/name: "resnet50_unknown_gpu"/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"unknown_gpu\"] } }" >> config.pbtxt) && \
     # Unknown CPU execution accelerators
-    cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_unknown_cpu && \
-    (cd models/onnx_float32_float32_float32_unknown_cpu && \
-            sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_unknown_cpu"/' \
+    cp -r models/resnet50_def models/resnet50_unknown_cpu && \
+    (cd models/resnet50_unknown_cpu && \
+            sed -i 's/^name: "resnet50_def"/name: "resnet50_unknown_cpu"/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"unknown_cpu\"] } }" >> config.pbtxt)
 
@@ -96,46 +94,51 @@ RET=0
 
 set +e
 
-grep "TensorRT Execution Accelerator is set for onnx_float32_float32_float32_trt" $SERVER_LOG
+grep "TensorRT Execution Accelerator is set for resnet50_trt" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
     RET=1
 fi
-grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_trt" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for resnet50_trt" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set\n***"
     RET=1
 fi
 
 
-grep "OpenVINO Execution Accelerator is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
+grep "OpenVINO Execution Accelerator is set for resnet50_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is set\n***"
     RET=1
 fi
-grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for resnet50_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set\n***"
     RET=1
 fi
 
-grep "OpenVINO Execution Accelerator is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
+grep "OpenVINO Execution Accelerator is set for resnet50_cpu_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is set\n***"
     RET=1
 fi
-grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
+grep "CUDA Execution Accelerator is set for resnet50_cpu_openvino" $SERVER_LOG
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is not set\n***"
     RET=1
 fi
 
-grep "Ignore unknown Execution Accelerator 'unknown_gpu' for onnx_float32_float32_float32_unknown_gpu" $SERVER_LOG
+grep "\[OpenVINO-EP\] Rejecting" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected OpenVINO is set on models that support it\n***"
+    RET=1
+fi
+grep "Ignore unknown Execution Accelerator 'unknown_gpu' for resnet50_unknown_gpu" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator is ignored\n***"
     RET=1
 fi
-grep "Ignore unknown Execution Accelerator 'unknown_cpu' for onnx_float32_float32_float32_unknown_cpu" $SERVER_LOG
+grep "Ignore unknown Execution Accelerator 'unknown_cpu' for resnet50_unknown_cpu" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator is ignored\n***"
     RET=1
