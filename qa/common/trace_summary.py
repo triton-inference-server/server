@@ -56,16 +56,27 @@ def summarize(traces):
             model_span_map[key] = dict()
 
         model_count_map[key] += 1
+        if "http infer start" in timestamps:
+            add_span(model_span_map[key], timestamps,
+                     "http infer", "http infer start", "http infer end")
+            add_span(model_span_map[key], timestamps,
+                     "http receive", "http infer start", "request handler start")
+            add_span(model_span_map[key], timestamps,
+                     "http send", "compute end", "http infer end")
+        elif "grpc infer start" in timestamps:
+            add_span(model_span_map[key], timestamps,
+                     "grpc infer", "grpc infer start", "grpc infer end")
+            add_span(model_span_map[key], timestamps,
+                     "grpc receive", "grpc infer start", "request handler start")
+            add_span(model_span_map[key], timestamps,
+                     "grpc send", "compute end", "grpc infer end")
+
         add_span(model_span_map[key], timestamps,
                  "request handler", "request handler start", "request handler end")
-        add_span(model_span_map[key], timestamps,
-                 "api receive", "api request start", "request handler start")
         add_span(model_span_map[key], timestamps,
                  "queue", "queue start", "compute start")
         add_span(model_span_map[key], timestamps,
                  "compute", "compute start", "compute end")
-        add_span(model_span_map[key], timestamps,
-                 "api send", "compute end", "api request end")
         if ("compute input end" in timestamps) and ("compute output start" in timestamps):
             add_span(model_span_map[key], timestamps,
                      "compute input", "compute start", "compute input end")
@@ -91,15 +102,42 @@ def summarize(traces):
     for key, cnt in model_count_map.items():
         model_name, model_value = key
         print("Summary for {} ({}): trace count = {}".format(model_name, model_value, cnt))
-        print("Server API receive (avg): {}us".format(model_span_map[key]["api receive"] / cnt / 1000))
-        print("Server request (avg): {}us".format(model_span_map[key]["request handler"] / cnt / 1000))
-        print("Server queue (avg): {}us".format(model_span_map[key]["queue"] / cnt / 1000))
-        print("Server compute (avg): {}us".format(model_span_map[key]["compute"] / cnt / 1000))
+
+        if "http infer" in model_span_map[key]:
+            print("HTTP infer request (avg): {}us".format(
+                model_span_map[key]["http infer"] / (cnt * 1000)))
+            print("\tHTTP receive (avg): {}us".format(
+                model_span_map[key]["http receive"] / (cnt * 1000)))
+        elif "grpc infer" in model_span_map[key]:
+            print("GRPC infer request (avg): {}us".format(
+                model_span_map[key]["grpc infer"] / (cnt * 1000)))
+            print("\tGRPC receive (avg): {}us".format(
+                model_span_map[key]["grpc receive"] / (cnt * 1000)))
+
+        print("\tHandler (avg): {}us".format(
+            model_span_map[key]["request handler"] / (cnt * 1000)))
+        print("\t\tOverhead (avg): {}us".format(
+            (model_span_map[key]["request handler"] -
+             model_span_map[key]["queue"] -
+             model_span_map[key]["compute"]) / (cnt * 1000)))
+        print("\t\tQueue (avg): {}us".format(
+            model_span_map[key]["queue"] / (cnt * 1000)))
+        print("\t\tCompute (avg): {}us".format(
+            model_span_map[key]["compute"] / (cnt * 1000)))
         if ("compute input" in model_span_map[key]) and "compute output" in model_span_map[key]:
-            print("\tinput (avg): {}us".format(model_span_map[key]["compute input"] / cnt / 1000))
-            print("\tinfer (avg): {}us".format(model_span_map[key]["compute infer"] / cnt / 1000))
-            print("\toutput (avg): {}us".format(model_span_map[key]["compute output"] / cnt / 1000))
-        print("Server API send (avg): {}us".format(model_span_map[key]["api send"] / cnt / 1000))
+            print("\t\t\tInput (avg): {}us".format(
+                model_span_map[key]["compute input"] / (cnt * 1000)))
+            print("\t\t\tInfer (avg): {}us".format(
+                model_span_map[key]["compute infer"] / (cnt * 1000)))
+            print("\t\t\tOutput (avg): {}us".format(
+                model_span_map[key]["compute output"] / (cnt * 1000)))
+
+        if "http infer" in model_span_map[key]:
+            print("\tHTTP send (avg): {}us".format(
+                model_span_map[key]["http send"] / (cnt * 1000)))
+        elif "grpc infer" in model_span_map[key]:
+            print("\tGRPC send (avg): {}us".format(
+                model_span_map[key]["grpc send"] / (cnt * 1000)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

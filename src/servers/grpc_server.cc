@@ -895,7 +895,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
           request.model_name(), request.model_version()));
       if (state->tracer_ != nullptr) {
         state->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc infer start");
       }
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -978,7 +978,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
     // the end of the request.
     if (state->tracer_ != nullptr) {
       state->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc infer end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1174,7 +1174,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
           state->request_.model_name(), state->request_.model_version()));
       if (state->tracer_ != nullptr) {
         state->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc infer start");
       }
     }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1311,7 +1311,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // the end of the request.
     if (state->tracer_ != nullptr) {
       state->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc infer end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 

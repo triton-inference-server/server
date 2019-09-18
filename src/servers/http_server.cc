@@ -920,7 +920,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   if (trace_manager_ != nullptr) {
     tracer.reset(trace_manager_->SampleTrace(model_name, model_version));
     if (tracer != nullptr) {
-      tracer->CaptureTimestamp(TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+      tracer->CaptureTimestamp(TRTSERVER_TRACE_LEVEL_MIN, "http infer start");
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1060,7 +1060,7 @@ HTTPAPIServer::InferRequest::InferComplete(
   // Capture a timestamp for the end of the request.
   if (infer_request->tracer_ != nullptr) {
     infer_request->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+        TRTSERVER_TRACE_LEVEL_MIN, "http infer end");
   }
 #endif  // TRTIS_ENABLE_TRACING
 
