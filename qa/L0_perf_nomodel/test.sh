@@ -84,8 +84,8 @@ TEST_ANALYSIS_ARGS=(
     --latency
     --latency
     --latency
-    "--throughput --concurrency 4"
-    "--throughput --concurrency 4")
+    "--throughput --concurrency 8"
+    "--throughput --concurrency 8")
 TEST_DIRS=(
     min_latency_grpc
     min_latency_http
@@ -108,6 +108,13 @@ TEST_TENSOR_SIZES=(
     1
     1)
 TEST_INSTANCE_COUNTS=(
+    1
+    1
+    1
+    1
+    4
+    4)
+TEST_CONCURRENCY=(
     1
     1
     1
@@ -153,6 +160,7 @@ if (( $skip_data != 1 )); then
         TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
         TEST_BACKEND=${TEST_BACKENDS[$idx]}
         TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
+        TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
         RESULTNAME=${TEST_NAME} \
                   RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
@@ -165,6 +173,7 @@ if (( $skip_data != 1 )); then
                   STATIC_BATCH_SIZES=1 \
                   DYNAMIC_BATCH_SIZES=1 \
                   INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
+                  CONCURRENCY=${TEST_CONCURRENCY} \
                   bash -x ${RUNTEST} ${REPO_VERSION}
         if (( $? != 0 )); then
             RET=1
@@ -196,6 +205,8 @@ for BASELINE_NAME in $(ls ${BASELINE_DIR}); do
         TEST_DIR=${TEST_DIRS[$idx]}
         TEST_ANALYSIS_ARG=${TEST_ANALYSIS_ARGS[$idx]}
 
+        echo -e "====================\n" >> ${ANALYZE_LOG} 2>&1
+
         $ANALYZE --name="${TEST_NAME}" \
                  ${TEST_ANALYSIS_ARG} \
                  --slowdown-threshold=${PERF_CLIENT_SLOWDOWN_THRESHOLD} \
@@ -207,9 +218,9 @@ for BASELINE_NAME in $(ls ${BASELINE_DIR}); do
         if (( $? != 0 )); then
             echo -e "** ${TEST_NAME} Analysis Failed"
             RET=1
-        else
-            cat ${ANALYZE_LOG}
         fi
+
+        echo -e "\n" >> ${ANALYZE_LOG} 2>&1
     done
 done
 

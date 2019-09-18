@@ -42,11 +42,12 @@ def read_results(concurrency, path):
     heading to value at the given concurrency level.
     """
     csvs = dict()
-    for f in os.listdir(path):
-        fullpath = os.path.join(path, f)
-        if os.path.isfile(fullpath) and (f.endswith(".csv")):
-            platform = f.split('_')[0]
-            csvs[platform] = fullpath
+    if os.path.exists(path):
+        for f in os.listdir(path):
+            fullpath = os.path.join(path, f)
+            if os.path.isfile(fullpath) and (f.endswith(".csv")):
+                platform = f.split('_')[0]
+                csvs[platform] = fullpath
 
     results = dict()
     for platform, fullpath in csvs.items():
@@ -65,12 +66,10 @@ def read_results(concurrency, path):
 
                 linenum += 1
 
-            if (header_row is None) or (concurrency_row is None):
-                print("warning: unable to parse CSV file {}".format(fullpath))
-
-            results[platform] = dict()
-            for header, result in zip(header_row, concurrency_row):
-                results[platform][header] = result
+            if (header_row is not None) and (concurrency_row is not None):
+                results[platform] = dict()
+                for header, result in zip(header_row, concurrency_row):
+                    results[platform][header] = result
 
     return results
 
