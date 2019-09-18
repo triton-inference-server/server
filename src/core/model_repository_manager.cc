@@ -1113,7 +1113,15 @@ ModelRepositoryManager::LoadUnloadModel(
           "failed to load '" + model_name +
               "', no version is available");
     }
-    const auto& info = infos_.find(model_name)->second;
+    auto it = infos_.find(model_name);
+    if (it == infos_.end()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "failed to load '" + model_name +
+              "', failed to poll from model repository");
+    }
+
+    const auto& info = it->second;
     const auto& config = info->model_config_;
     const auto& repository = info->model_repository_path_;
     std::set<int64_t> expected_versions;
@@ -1164,12 +1172,8 @@ ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_name
   std::set<std::string> added, deleted, modified, unmodified;
   {
     if (type == ActionType::UNLOAD) {
-      std::lock_guard<std::mutex> lk(infos_mu_);
       for (const auto& model_name : model_names) {
-        size_t erased_cnt = infos_.erase(model_name);
-        if (erased_cnt != 0) {
-          deleted.insert(model_name);
-        }
+        deleted.insert(model_name);
       }
     } else {
       std::set<std::string> checked_modes = model_names;
@@ -1216,21 +1220,20 @@ ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_name
       }
     }
   }
-
-  // Update dependency graph and load
-  Update(added, deleted, modified);
-
-
   // The models are in 'deleted' either when they are asked to be unloaded or
   // they are not found / are duplicated across all model repositories.
-  // In all cases, should unload them explicitly.
+  // In all cases, should unload them and remove from 'infos_' explicitly.
   for (const auto& name : deleted) {
+    infos_.erase(name);
     ModelConfig model_config;
     std::set<int64_t> versions;
     std::string empty_path;
     // Utilize "force_unload" of AsyncLoad()
     backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
   }
+  
+  // Update dependency graph and load
+  Update(added, deleted, modified);
 
   // model loading / unloading error will be printed but ignored
   LoadModelByDependency();
@@ -1325,15 +1328,18 @@ ModelRepositoryManager::Poll(
     for (const auto& model : models) {
       bool exists = false;
       for (const auto repository_path : repository_paths_) {
+        bool exists_in_this_repo = false;
         const auto full_path = JoinPath({repository_path, model});
-        Status status = FileExists(full_path, &exists);
+        Status status = FileExists(full_path, &exists_in_this_repo);
         if (!status.IsOk()) {
           LOG_ERROR << "failed to poll model repository '" << repository_path
                     << "' for model '" << model << "': " << status.Message();
           *all_models_polled = false;
-        } else if (exists) {
+        } else if (exists_in_this_repo) {
           auto res = model_to_repository.emplace(model, repository_path);
-          if (!res.second) {
+          if (res.second) {
+            exists = true;
+          } else {
             exists = false;
             model_to_repository.erase(res.first);
             LOG_ERROR << "failed to poll model '" << model

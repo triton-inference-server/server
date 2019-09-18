@@ -40,6 +40,26 @@ from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
 
 class LifeCycleTest(unittest.TestCase):
+    def _infer_unaffected_models(self, model_base_names, tensor_shape):
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                for base_name in model_base_names:
+                    model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
+                    ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                    ss = ctx.get_server_status()
+
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model_name in ss.model_status,
+                                    "expected status for model " + model_name)
+                    for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                        self.assertEqual(v.ready_state, server_status.MODEL_READY)
+                        
+                    iu.infer_exact(self, base_name, tensor_shape, 1,
+                                   np.float32, np.float32, np.float32,
+                                   model_version=1)
+
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_parse_error_noexit(self):
         # Server was started with invalid args and
@@ -952,27 +972,6 @@ class LifeCycleTest(unittest.TestCase):
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_multiple_model_repository_polling(self):
-        def _infer_unaffected_models(tester, model_base_names, tensor_shape):
-            try:
-                for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
-                    for base_name in model_base_names:
-                        model_name = tu.get_model_name(base_name, np.float32, np.float32, np.float32)
-                        ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
-                        ss = ctx.get_server_status()
-
-                        tester.assertEqual(len(ss.model_status), 1)
-                        tester.assertTrue(model_name in ss.model_status,
-                                          "expected status for model " + model_name)
-                        for (k, v) in iteritems(ss.model_status[model_name].version_status):
-                            tester.assertEqual(v.ready_state, server_status.MODEL_READY)
-                            
-                        iu.infer_exact(tester, base_name, tensor_shape, 1,
-                                       np.float32, np.float32, np.float32,
-                                       model_version=1)
-
-            except InferenceServerException as ex:
-                tester.assertTrue(False, "unexpected error {}".format(ex))
-
         input_size = 16
         model_shape = (input_size,)
         model_base = 'savedmodel'
@@ -1006,7 +1005,7 @@ class LifeCycleTest(unittest.TestCase):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
         # And other models should be loaded successfully
-        _infer_unaffected_models(self, ["graphdef", 'netdef'], model_shape)
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
         # Add the savedmodel to the second model repository, should cause
         # it to be unloaded due to duplication
@@ -1028,7 +1027,7 @@ class LifeCycleTest(unittest.TestCase):
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-        _infer_unaffected_models(self, ["graphdef", 'netdef'], model_shape)
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
         # Remove the savedmodel from the first model repository, the model from
         # the second model repository should be loaded properly
@@ -1060,7 +1059,133 @@ class LifeCycleTest(unittest.TestCase):
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
         
-        _infer_unaffected_models(self, ["graphdef", 'netdef'], model_shape)
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+
+    def test_multiple_model_repository_control(self):
+        # similar to test_multiple_model_repository_control, but the model
+        # polling is controlled by the API
+        input_size = 16
+        model_shape = (input_size,)
+        model_base = 'savedmodel'
+        model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+        model_bases = ['savedmodel', "graphdef", 'netdef']
+
+        # Make sure the models are not in the status at first and load them
+        for base in model_bases:
+            name = tu.get_model_name(base, np.float32, np.float32, np.float32)
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                try:
+                    ctx = ServerStatusContext(pair[0], pair[1], name, True)
+                    ss = ctx.get_server_status()
+                    self.assertTrue(False, "expected unknown model failure")
+                except InferenceServerException as ex:
+                    self.assertEqual("inference:0", ex.server_id())
+                    self.assertGreater(ex.request_id(), 0)
+                    self.assertTrue(
+                        ex.message().startswith("no status available for unknown model"))
+            try:
+                ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
+                ctx.load(name)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Add the savedmodel to the second model repository, which doesn't
+        # affect the model state, savedmodel from the first model is still
+        # available
+        shutil.copytree(model_name, "models_0/" + model_name)
+        # Make sure savedmodel is in the status
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                    # Only version 1 is loaded
+                    self.assertTrue(k in (1,))
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Run inference on the savedmodel
+        try:
+            iu.infer_exact(self, model_base, model_shape, 1,
+                           np.float32, np.float32, np.float32,
+                           model_version=1)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # And other models should be loaded successfully
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+
+        # reload the model which cause the model fails to load
+        try:
+            ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
+            ctx.load(model_name)
+            self.assertTrue(False, "expected error for loading duplicated model")
+        except InferenceServerException as ex:
+            self.assertEqual("inference:0", ex.server_id())
+            self.assertTrue(
+                ex.message().startswith("failed to load '{}'".format(model_name)))
+
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                    self.assertTrue(k in (1,))
+                    self.assertEqual(v.ready_state, server_status.MODEL_UNAVAILABLE)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
+
+        # Remove the savedmodel from the first model repository and load agian, 
+        # the model from the second model repository should be loaded properly
+        shutil.rmtree("models/" + model_name)
+        try:
+            ctx = ModelControlContext("localhost:8000", ProtocolType.HTTP, True)
+            ctx.load(model_name)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        try:
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                for (k, v) in iteritems(ss.model_status[model_name].version_status):
+                    # Both version 1 and 3 are loaded
+                    self.assertTrue(k in (1,3))
+                    self.assertEqual(v.ready_state, server_status.MODEL_READY)
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Both version 1 and 3 should work...
+        for version in (1, 3):
+            try:
+                iu.infer_exact(self, model_base, model_shape, 1,
+                            np.float32, np.float32, np.float32, swap=(version != 1),
+                            model_version=version)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+        
+        self._infer_unaffected_models(["graphdef", 'netdef'], model_shape)
 
     def test_model_control(self):
         input_size = 16
