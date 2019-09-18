@@ -238,12 +238,14 @@ OnnxBackend::CreateExecutionContext(
 #endif  // TRTIS_ENABLE_GPU
   }
 
+  bool need_lock = false;
   if (Config().optimization().has_execution_accelerators()) {
     for (const auto& execution_accelerator : Config()
                                                  .optimization()
                                                  .execution_accelerators()
                                                  .cpu_execution_accelerator()) {
       if (execution_accelerator == kOpenVINOExecutionAccelerator) {
+        need_lock = true;
         RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
             session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
@@ -255,7 +257,14 @@ OnnxBackend::CreateExecutionContext(
     }
   }
 
-  // Create Onnx session
+  // ONNX session creation with OpenVINO is not thread-safe,
+  // so multiple creations are serialized with a global lock.
+  static std::mutex global_context_mu;
+  std::unique_lock<std::mutex> glock(global_context_mu, std::defer_lock);
+  if (need_lock) {
+    glock.lock();
+  }
+
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
   RETURN_IF_ORT_ERROR(OrtGetAllocatorWithDefaultOptions(&context->allocator_));
