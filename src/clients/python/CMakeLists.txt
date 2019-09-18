@@ -35,6 +35,7 @@ target_link_libraries(
   PUBLIC request
 )
 
+if(NOT WIN32)
 #
 # libcshm.so
 #
@@ -43,6 +44,7 @@ target_link_libraries(
   cshm
   rt
 )
+endif()
 
 #
 # Wheel file
@@ -50,7 +52,9 @@ target_link_libraries(
 set(wheel_stamp_file "stamp.whl")
 configure_file(../../../VERSION VERSION COPYONLY)
 configure_file(__init__.py __init__.py COPYONLY)
+if(NOT WIN32)
 configure_file(shared_memory/__init__.py shared_memory/__init__.py COPYONLY)
+endif()
 configure_file(setup.py setup.py COPYONLY)
 
 add_custom_command(
