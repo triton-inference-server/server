@@ -52,11 +52,14 @@ rm -fr models && mkdir -p models && \
             sed -i 's/^name: "onnx_float32_float32_float32"/name: "onnx_float32_float32_float32_def"/' \
                 config.pbtxt) && \
     # GPU execution accelerators
+    # For TensorRT, only deploy it on gpu 0 as deploying on other devices
+    # will cause segfault
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_trt && \
     (cd models/onnx_float32_float32_float32_trt && \
             sed -i 's/^name: "onnx_float32_float32_float32_def"/name: "onnx_float32_float32_float32_trt"/' \
                 config.pbtxt && \
-            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"tensorrt\"] } }" >> config.pbtxt) && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"tensorrt\"] } }" >> config.pbtxt && \
+            echo "instance_group [ { gpus: [0] } ]" >> config.pbtxt) && \
     # CPU execution accelerators
     cp -r models/onnx_float32_float32_float32_def models/onnx_float32_float32_float32_openvino && \
     (cd models/onnx_float32_float32_float32_openvino && \
@@ -104,9 +107,10 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep "OpenVINO Execution Accelerator is not supported for onnx_float32_float32_float32_openvino" $SERVER_LOG
+
+grep "OpenVINO Execution Accelerator is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected OpenVINO is not supported\n***"
+    echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is set\n***"
     RET=1
 fi
 grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_openvino" $SERVER_LOG
@@ -115,9 +119,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-grep "OpenVINO Execution Accelerator is not supported for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
+grep "OpenVINO Execution Accelerator is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is not supported\n***"
+    echo -e "\n***\n*** Failed. Expected OpenVINO Execution Accelerator is set\n***"
     RET=1
 fi
 grep "CUDA Execution Accelerator is set for onnx_float32_float32_float32_cpu_openvino" $SERVER_LOG
