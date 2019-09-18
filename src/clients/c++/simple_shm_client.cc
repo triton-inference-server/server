@@ -272,8 +272,11 @@ main(int argc, char** argv)
   FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
   FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
 
-  size_t input_byte_size = 16 * sizeof(int32_t);
-  size_t output_byte_size = 16 * sizeof(int32_t);
+  // Get the size of the inputs and outputs from the Shape and DataType
+  int input_byte_size =
+      infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
+  int output_byte_size =
+      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
 
   // Create Output0 and Output1 in Shared Memory
   std::string shm_key = "/output_simple";

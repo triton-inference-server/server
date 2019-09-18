@@ -653,6 +653,16 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error SetRunOptions(const Options& options) = 0;
 
+  /// Get the byte size of an input or output given the shape and the datatype.
+  /// \param shape The shape of the input/output.
+  /// \param dtype The datatype of the input/output.
+  /// \return The size in bytes of this input/output. This is the size for
+  /// one instance of the input/output, not the entire size of a batched
+  /// input/output. When the byte-size is not known, for example for
+  /// non-fixed-sized types like TYPE_STRING or for inputs/outputs with
+  /// variable-size dimensions, this will return -1.
+  virtual int64_t ByteSize(const DimsList& shape, DataType dtype) const = 0;
+
   /// Get the current statistics of the InferContext.
   /// \param stat Returns the Stat object holding the statistics.
   /// \return Error object indicating success or failure.

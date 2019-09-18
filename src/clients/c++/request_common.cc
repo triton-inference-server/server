@@ -905,6 +905,12 @@ InferContextImpl::GetOutput(
       "unknown output '" + name + "' for '" + model_name_ + "'");
 }
 
+int64_t
+InferContextImpl::ByteSize(const DimsList& dims, DataType dtype) const
+{
+  return GetByteSize(dtype, dims);
+}
+
 Error
 InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 {
