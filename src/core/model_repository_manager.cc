@@ -305,7 +305,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     {
     }
 
-    const std::string repository_path_;
+    std::string repository_path_;
     Platform platform_;
 
     std::recursive_mutex mtx_;
@@ -573,6 +573,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
   for (auto& version_backend : it->second) {
     std::lock_guard<std::recursive_mutex> lock(version_backend.second->mtx_);
     if (versions.find(version_backend.first) != versions.end()) {
+      version_backend.second->repository_path_ = repository_path;
       version_backend.second->model_config_ = model_config;
       version_backend.second->next_action_ = ActionType::LOAD;
     } else if (force_unload) {
