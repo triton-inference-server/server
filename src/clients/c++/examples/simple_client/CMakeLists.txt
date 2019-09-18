@@ -26,12 +26,34 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
+# Source with include paths adjusted to reflect that all headers are
+# in the same directory. These source versions are used in the client
+# container install.
+set(TRTIS_CLIENT_HEADER_FLAT 1)
+configure_file(simple_client.cc.in flat_src/simple_client.cc @ONLY)
 
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
-add_subdirectory(examples)
-endif()
+# Source with full include paths needed for build.
+set(TRTIS_CLIENT_HEADER_FLAT 0)
+configure_file(simple_client.cc.in simple_client.cc @ONLY)
+
+
+#
+# simple_client
+#
+add_executable(
+  simple_client
+  ${CMAKE_CURRENT_BINARY_DIR}/simple_client.cc
+)
+target_link_libraries(
+  simple_client
+  PRIVATE request_static
+)
+install(
+  TARGETS simple_client
+  RUNTIME DESTINATION bin
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_src/simple_client.cc
+  DESTINATION src
+)

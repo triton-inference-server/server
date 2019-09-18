@@ -26,12 +26,24 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
+# Install cmake files that builds the samples within the client install.
+install(
+  FILES
+    ${CMAKE_BINARY_DIR}/../CMakeLists.txt
+  DESTINATION src/cmake
+)
+install(
+  FILES
+    CMakeLists.example
+  DESTINATION src/cmake/trtis-clients
+  RENAME CMakeLists.txt
+)
 
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
-add_subdirectory(examples)
-endif()
+add_subdirectory(ensemble_image_client)
+add_subdirectory(image_client)
+add_subdirectory(perf_client)
+add_subdirectory(simple_client)
+add_subdirectory(simple_callback_client)
+add_subdirectory(simple_sequence_client)
+add_subdirectory(simple_shm_client)
+add_subdirectory(simple_string_client)

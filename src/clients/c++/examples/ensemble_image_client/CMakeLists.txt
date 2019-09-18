@@ -26,12 +26,15 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
-
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
-add_subdirectory(examples)
-endif()
+#
+# ensemble_image_client
+#
+add_executable(ensemble_image_client ensemble_image_client.cc)
+target_link_libraries(
+  ensemble_image_client
+  PRIVATE request_static
+)
+install(
+  TARGETS ensemble_image_client
+  RUNTIME DESTINATION bin
+)

@@ -26,12 +26,18 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
-
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
-add_subdirectory(examples)
-endif()
+#
+# image_client
+#
+find_package(OpenCV REQUIRED)
+add_executable(image_client image_client.cc)
+target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(
+  image_client
+  PRIVATE request_static
+  PRIVATE ${OpenCV_LIBS}
+)
+install(
+  TARGETS image_client
+  RUNTIME DESTINATION bin
+)
