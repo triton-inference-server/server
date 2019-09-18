@@ -242,8 +242,8 @@ class TrtServerOptions {
   const std::string& ServerId() const { return server_id_; }
   void SetServerId(const char* id) { server_id_ = id; }
 
-  const std::string& ModelRepositoryPath() const { return repo_path_; }
-  void SetModelRepositoryPath(const char* p) { repo_path_ = p; }
+  const std::set<std::string>& ModelRepositoryPaths() const { return repo_paths_; }
+  void SetModelRepositoryPath(const char* p) { repo_paths_.insert(p); }
 
   ni::ModelControlMode ModelControlMode() const { return model_control_mode_; }
   void SetModelControlMode(ni::ModelControlMode m) { model_control_mode_ = m; }
@@ -286,7 +286,7 @@ class TrtServerOptions {
 
  private:
   std::string server_id_;
-  std::string repo_path_;
+  std::set<std::string> repo_paths_;
   ni::ModelControlMode model_control_mode_;
   bool exit_on_error_;
   bool strict_model_config_;
@@ -957,7 +957,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
 #endif  // TRTIS_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
-  lserver->SetModelRepositoryPath(loptions->ModelRepositoryPath());
+  lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
