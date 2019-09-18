@@ -906,61 +906,9 @@ InferContextImpl::GetOutput(
 }
 
 int64_t
-InferContextImpl::ByteSize(const DimsList& dims, const DataType& dtype) const
+InferContextImpl::ByteSize(const DimsList& dims, DataType dtype) const
 {
-  int dtype_size = -1;
-  switch (dtype) {
-    case TYPE_BOOL:
-      dtype_size = 1;
-      break;
-    case TYPE_UINT8:
-      dtype_size = 1;
-      break;
-    case TYPE_INT8:
-      dtype_size = 1;
-      break;
-    case TYPE_INT16:
-      dtype_size = 2;
-      break;
-    case TYPE_INT32:
-      dtype_size = 4;
-      break;
-    case TYPE_INT64:
-      dtype_size = 8;
-      break;
-    case TYPE_FP16:
-      dtype_size = 2;
-      break;
-    case TYPE_FP32:
-      dtype_size = 4;
-      break;
-    case TYPE_FP64:
-      dtype_size = 8;
-      break;
-    case TYPE_UINT16:
-      dtype_size = 2;
-      break;
-    case TYPE_UINT32:
-      dtype_size = 4;
-      break;
-    case TYPE_UINT64:
-      dtype_size = 8;
-      break;
-    case TYPE_STRING:
-    default:
-      return -1;
-  }
-
-  int byte_size = 1;
-  for (const auto dim : dims) {
-    if (dim == -1) {
-      return -1;
-    }
-    byte_size *= dim;
-  }
-
-  byte_size *= dtype_size;
-  return byte_size;
+  return GetByteSize(dtype, dims);
 }
 
 Error
