@@ -42,7 +42,10 @@
 #include <cuda_runtime_api.h>
 #include <tensorrt_provider_factory.h>
 #endif  // TRTIS_ENABLE_GPU
+
+#ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
 #include <openvino_provider_factory.h>
+#endif  // TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
 
 namespace nvidia { namespace inferenceserver {
 
@@ -245,11 +248,15 @@ OnnxBackend::CreateExecutionContext(
                                                  .execution_accelerators()
                                                  .cpu_execution_accelerator()) {
       if (execution_accelerator == kOpenVINOExecutionAccelerator) {
+#ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
         RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
             session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
-                        << instance_name << " on device CPU";
+                        << instance_name << " on device CPU"; 
+#else
+        LOG_ERROR << "OpenVINO Execution Accelerator is not enabled";
+#endif  // TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
       } else {
         LOG_ERROR << "Ignore unknown Execution Accelerator '"
                   << execution_accelerator << "' for " << instance_name;
