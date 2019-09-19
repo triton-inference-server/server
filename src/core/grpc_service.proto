@@ -344,7 +344,7 @@ message SharedMemoryControlResponse
   }
 
   //@@
-  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
+  //@@  .. cpp:var:: RequestStatus request_status
   //@@
   //@@     The status of the request, indicating success or failure.
   //@@
