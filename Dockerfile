@@ -292,6 +292,8 @@ WORKDIR /workspace
 RUN rm -fr *
 COPY . .
 
+RUN find / -name libtbb.so.2
+
 # Build the server.
 #
 # - Need to find CUDA stubs if they are available since some backends
