@@ -35,56 +35,49 @@ namespace nvidia { namespace inferenceserver {
 void
 Trace::Report(const std::shared_ptr<ModelInferStats>& infer_stats)
 {
-  activity_fn_(
-      reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_START,
-      TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-          ModelInferStats::TimestampKind::kRequestStart)),
-      activity_userp_);
-  activity_fn_(
-      reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
-      TIMESPEC_TO_NANOS(
-          infer_stats->Timestamp(ModelInferStats::TimestampKind::kQueueStart)),
-      activity_userp_);
-  activity_fn_(
-      reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_START,
-      TIMESPEC_TO_NANOS(infer_stats->Timestamp(
-          ModelInferStats::TimestampKind::kComputeStart)),
-      activity_userp_);
-  activity_fn_(
-      reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
-      TIMESPEC_TO_NANOS(
-          infer_stats->Timestamp(ModelInferStats::TimestampKind::kComputeEnd)),
-      activity_userp_);
-  activity_fn_(
-      reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
-      TIMESPEC_TO_NANOS(
-          infer_stats->Timestamp(ModelInferStats::TimestampKind::kRequestEnd)),
-      activity_userp_);
-}
+  if (level_ != TRTSERVER_TRACE_LEVEL_DISABLED) {
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_START,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kRequestStart)),
+        activity_userp_);
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_QUEUE_START,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kQueueStart)),
+        activity_userp_);
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_START,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kComputeStart)),
+        activity_userp_);
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_COMPUTE_END,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kComputeEnd)),
+        activity_userp_);
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this), TRTSERVER_TRACE_REQUEST_END,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kRequestEnd)),
+        activity_userp_);
+  }
 
-#if 0
-void
-Log(const struct timespec& ts, const std::string& str)
-{
-  LOG_INFO << str << ts.tv_sec * NANOS_PER_SECOND + ts.tv_nsec;
+  if (level_ == TRTSERVER_TRACE_LEVEL_MAX) {
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this),
+        TRTSERVER_TRACE_COMPUTE_INPUT_END,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kComputeInputEnd)),
+        activity_userp_);
+    activity_fn_(
+        reinterpret_cast<TRTSERVER_Trace*>(this),
+        TRTSERVER_TRACE_COMPUTE_OUTPUT_START,
+        TIMESPEC_TO_NANOS(infer_stats->Timestamp(
+            ModelInferStats::TimestampKind::kComputeOutputStart)),
+        activity_userp_);
+  }
 }
-#endif
-#if 0
-void
-Trace::Submit(const std::vector<struct timespec>& timestamps)
-{
-  Log(timestamps[(size_t)ModelInferStats::TimestampKind::kRequestStart],
-      "RequestStart");
-  Log(timestamps[(size_t)ModelInferStats::TimestampKind::kQueueStart],
-      "QueueStart");
-  Log(timestamps[(size_t)ModelInferStats::TimestampKind::kComputeStart],
-      "ComputeStart");
-  Log(timestamps[(size_t)ModelInferStats::TimestampKind::kComputeEnd],
-      "ComputeEnd");
-  Log(timestamps[(size_t)ModelInferStats::TimestampKind::kRequestEnd],
-      "RequestEnd");
-}
-#endif
 
 }}  // namespace nvidia::inferenceserver
 

@@ -633,7 +633,7 @@ BaseBackend::Context::Run(
   }
 
   // Collect the names of outputs requested by any request
-  // payload. Skip payloads that have an error.
+  // payload.
   std::set<std::string> required_outputs;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
@@ -665,12 +665,26 @@ BaseBackend::Context::Run(
   std::unique_ptr<TRTISTF_TensorList, decltype(&TRTISTF_TensorListDelete)>
       output_tensors(nullptr, TRTISTF_TensorListDelete);
 
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeInputEnd);
+    }
+  }
+
   {
     TRTISTF_TensorList* rtl;
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelRun(
         trtistf_model_.get(), *(input_tensors.release()),
         required_outputs.size(), output_names_cstr, &rtl));
     output_tensors.reset(rtl);
+  }
+
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeOutputStart);
+    }
   }
 
   // Make sure each output is of the expected size and copy it into

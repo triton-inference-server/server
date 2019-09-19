@@ -107,7 +107,8 @@ TraceManager::SampleTrace(const std::string& model_name, int64_t model_version)
     return nullptr;
   }
 
-  Tracer* tracer = new Tracer(shared_from_this(), model_name, model_version);
+  Tracer* tracer =
+      new Tracer(shared_from_this(), level_, model_name, model_version);
 
   TRTSERVER_Trace* trace = nullptr;
   TRTSERVER_Error* err = TRTSERVER_TraceNew(
@@ -146,9 +147,9 @@ TraceManager::WriteTrace(const std::stringstream& ss)
 }
 
 Tracer::Tracer(
-    const std::shared_ptr<TraceManager>& manager, const std::string& model_name,
-    int64_t model_version)
-    : manager_(manager), timestamp_cnt_(0)
+    const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level,
+    const std::string& model_name, int64_t model_version)
+    : manager_(manager), level_(level), timestamp_cnt_(0)
 {
   tout_ << "{ \"model_name\": \"" << model_name
         << "\", \"model_version\": " << model_version << ", \"timestamps\": [";
@@ -163,6 +164,26 @@ Tracer::~Tracer()
 }
 
 void
+Tracer::CaptureTimestamp(
+    TRTSERVER_Trace_Level level, const std::string& name, uint64_t timestamp_ns)
+{
+  if (level <= level_) {
+    if (timestamp_ns == 0) {
+      struct timespec ts;
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      timestamp_ns = TIMESPEC_TO_NANOS(ts);
+    }
+
+    if (timestamp_cnt_ != 0) {
+      tout_ << ",";
+    }
+
+    tout_ << "{\"name\":\"" << name << "\", \"ns\":" << timestamp_ns << "}";
+    timestamp_cnt_++;
+  }
+}
+
+void
 Tracer::TraceActivity(
     TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
     uint64_t timestamp_ns, void* userp)
@@ -172,7 +193,7 @@ Tracer::TraceActivity(
   const char* activity_name = "<unknown>";
   switch (activity) {
     case TRTSERVER_TRACE_REQUEST_START:
-      activity_name = "request start";
+      activity_name = "request handler start";
       break;
     case TRTSERVER_TRACE_QUEUE_START:
       activity_name = "queue start";
@@ -180,21 +201,21 @@ Tracer::TraceActivity(
     case TRTSERVER_TRACE_COMPUTE_START:
       activity_name = "compute start";
       break;
+    case TRTSERVER_TRACE_COMPUTE_INPUT_END:
+      activity_name = "compute input end";
+      break;
+    case TRTSERVER_TRACE_COMPUTE_OUTPUT_START:
+      activity_name = "compute output start";
+      break;
     case TRTSERVER_TRACE_COMPUTE_END:
       activity_name = "compute end";
       break;
     case TRTSERVER_TRACE_REQUEST_END:
-      activity_name = "request end";
+      activity_name = "request handler end";
       break;
   }
 
-  if (tracer->timestamp_cnt_ != 0) {
-    tracer->tout_ << ",";
-  }
-
-  tracer->tout_ << "{\"name\":\"" << activity_name
-                << "\", \"ns\":" << timestamp_ns << "}";
-  tracer->timestamp_cnt_++;
+  tracer->CaptureTimestamp(tracer->level_, activity_name, timestamp_ns);
 }
 
 }}  // namespace nvidia::inferenceserver

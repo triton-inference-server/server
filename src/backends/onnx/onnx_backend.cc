@@ -552,11 +552,25 @@ OnnxBackend::Context::Run(
     output_tensors_.emplace_back(nullptr);
   }
 
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeInputEnd);
+    }
+  }
+
   // Run...
   RETURN_IF_ORT_ERROR(OrtRun(
       session_, NULL /* run options */, input_names.data(),
       (const OrtValue* const*)input_tensors_.data(), input_tensors_.size(),
       output_names.data(), output_names.size(), output_tensors_.data()));
+
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeOutputStart);
+    }
+  }
 
   // Make sure each output is of the expected size and copy it into
   // the payload responses.

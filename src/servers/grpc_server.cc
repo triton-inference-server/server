@@ -887,6 +887,19 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
   InferResponse& response = state->response_;
 
   if (state->step_ == Steps::START) {
+#ifdef TRTIS_ENABLE_TRACING
+    // Earliest entrypoint for a GRPC request. Capture a timestamp for
+    // the start of the request.
+    if (trace_manager_ != nullptr) {
+      state->tracer_.reset(trace_manager_->SampleTrace(
+          request.model_name(), request.model_version()));
+      if (state->tracer_ != nullptr) {
+        state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+      }
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     // Start a new request to replace this one...
     if (!shutdown) {
       StartNewRequest();
@@ -919,12 +932,8 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
             // nullptr then no tracing will be performed.
             TRTSERVER_Trace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (trace_manager_ != nullptr) {
-              state->tracer_.reset(trace_manager_->SampleTrace(
-                  request.model_name(), request.model_version()));
-              if (state->tracer_ != nullptr) {
-                trace = state->tracer_->ServerTrace();
-              }
+            if (state->tracer_ != nullptr) {
+              trace = state->tracer_->ServerTrace();
             }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -964,6 +973,15 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
       state->context_->responder_->Finish(response, grpc::Status::OK, state);
     }
   } else if (state->step_ == Steps::COMPLETE) {
+#ifdef TRTIS_ENABLE_TRACING
+    // Final entrypoint for a GRPC request. Capture a timestamp for
+    // the end of the request.
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     state->step_ = Steps::FINISH;
     finished = true;
   }
@@ -1147,6 +1165,20 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
       return !finished;
     }
 
+#ifdef TRTIS_ENABLE_TRACING
+    // Earliest entrypoint for a streaming GRPC request where the
+    // request is valid. Capture a timestamp for the start of the
+    // request.
+    if (trace_manager_ != nullptr) {
+      state->tracer_.reset(trace_manager_->SampleTrace(
+          state->request_.model_name(), state->request_.model_version()));
+      if (state->tracer_ != nullptr) {
+        state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+      }
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     // Request has been successfully read so put it in the context
     // queue so that it's response is sent in the same order as the
     // request was received.
@@ -1188,12 +1220,8 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
             // nullptr then no tracing will be performed.
             TRTSERVER_Trace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-            if (trace_manager_ != nullptr) {
-              state->tracer_.reset(trace_manager_->SampleTrace(
-                  request.model_name(), request.model_version()));
-              if (state->tracer_ != nullptr) {
-                trace = state->tracer_->ServerTrace();
-              }
+            if (state->tracer_ != nullptr) {
+              trace = state->tracer_->ServerTrace();
             }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1278,6 +1306,15 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
 
   } else if (state->step_ == Steps::COMPLETE) {
+#ifdef TRTIS_ENABLE_TRACING
+    // Final entrypoint for a GRPC request. Capture a timestamp for
+    // the end of the request.
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     state->step_ = Steps::FINISH;
     finished = true;
   }
