@@ -116,8 +116,9 @@ class ConcurrencyManager : public LoadManager {
 
  private:
   ConcurrencyManager(
+      const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const bool zero_input,
+      const size_t sequence_length,
       const std::shared_ptr<ContextFactory>& factory);
 
   /// Function for worker that sends async inference requests.
@@ -132,11 +133,9 @@ class ConcurrencyManager : public LoadManager {
   /// Helper function to prepare the InferContext for sending inference request.
   /// \param ctx Returns a new InferContext.
   /// \param options Returns the options used by 'ctx'.
-  /// \param input_buffer Returns the generated input_buffer for all requests.
   nic::Error PrepareInfer(
       std::unique_ptr<nic::InferContext>* ctx,
-      std::unique_ptr<nic::InferContext::Options>* options,
-      std::vector<uint8_t>& input_buffer);
+      std::unique_ptr<nic::InferContext::Options>* options);
 
   /// Generate random sequence length based on 'offset_ratio' and
   /// 'sequence_length_'. (1 +/- 'offset_ratio') * 'sequence_length_'
@@ -147,7 +146,6 @@ class ConcurrencyManager : public LoadManager {
   size_t batch_size_;
   size_t max_threads_;
   size_t sequence_length_;
-  bool zero_input_;
 
   bool on_sequence_model_;
 
@@ -158,6 +156,9 @@ class ConcurrencyManager : public LoadManager {
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
+
+  // Placeholder for generated input data, which will be used for all inputs
+  std::vector<uint8_t> input_buf_;
 
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;
