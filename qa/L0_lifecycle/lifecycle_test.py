@@ -1364,5 +1364,184 @@ class LifeCycleTest(unittest.TestCase):
                 except InferenceServerException as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_multiple_model_repository_control_startup_models(self):
+        input_size = 16
+        model_shape = (input_size,)
+        # Model that is used to test control API
+        model_base = 'graphdef'
+        ensemble_prefix = "simple_"
+        model_name = tu.get_model_name(model_base, np.float32, np.float32, np.float32)
+        ensemble_name = ensemble_prefix + model_name
+
+        loaded_models = ['savedmodel', ensemble_prefix + 'savedmodel']
+        unloaded_models = [ensemble_prefix + model_base, 'netdef']
+
+        # Make sure the models are not in the status
+        for base in unloaded_models:
+            name = tu.get_model_name(base, np.float32, np.float32, np.float32)
+            for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+                try:
+                    ctx = ServerStatusContext(pair[0], pair[1], name, True)
+                    ss = ctx.get_server_status()
+                    self.assertTrue(False, "expected unknown model failure")
+                except InferenceServerException as ex:
+                    self.assertEqual("inference:0", ex.server_id())
+                    self.assertGreater(ex.request_id(), 0)
+                    self.assertTrue(
+                        ex.message().startswith("no status available for unknown model"))
+        
+        # And loaded models work properly
+        self._infer_unaffected_models(loaded_models + [model_base], model_shape)
+
+        # Load non-existing model
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.load("unknown_model")
+                self.assertTrue(False, "expected unknown model failure")
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertGreater(ex.request_id(), 0)
+                self.assertTrue(
+                    ex.message().startswith("failed to load 'unknown_model', no version is available"))
+
+        # Load ensemble model first, the dependent model will be polled and loaded
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.load(ensemble_name)
+
+                for model in [model_name, ensemble_name]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model in ss.model_status,
+                                    "expected status for model " + model)
+                    self.assertTrue(1 in ss.model_status[model].version_status,
+                                    "expected status for version 1 of model " + model)
+                    self.assertTrue(3 in ss.model_status[model].version_status,
+                                    "expected status for version 3 of model " + model)
+                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
+                                    server_status.MODEL_READY)
+                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
+                                    server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Delete model configuration, which cause only version 3 to be available
+        # if the models are re-loaded
+        os.remove("models/" + model_name + "/config.pbtxt")
+
+        # Run inference on the model, both versions 1 and 3
+        for version in (1, 3):
+            try:
+                iu.infer_exact(self, model_base, model_shape, 1,
+                                np.float32, np.float32, np.float32, swap=(version == 3),
+                                model_version=version)
+                # ensemble always swap because it uses latest version (v3)
+                # of the composing model
+                iu.infer_exact(self, ensemble_prefix + model_base, model_shape, 1,
+                                np.float32, np.float32, np.float32, swap=True,
+                                model_version=version)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Reload models, only version 3 should be available
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.load(model_name)
+
+                ctx = ServerStatusContext(pair[0], pair[1], model_name, True)
+                ss = ctx.get_server_status()
+                self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                self.assertEqual("inference:0", ss.id)
+                self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                self.assertEqual(len(ss.model_status), 1)
+                self.assertTrue(model_name in ss.model_status,
+                                "expected status for model " + model_name)
+                self.assertTrue(1 in ss.model_status[model_name].version_status,
+                                "expected status for version 1 of model " + model_name)
+                self.assertTrue(3 in ss.model_status[model_name].version_status,
+                                "expected status for version 3 of model " + model_name)
+                self.assertEqual(ss.model_status[model_name].version_status[1].ready_state,
+                                server_status.MODEL_UNAVAILABLE)
+                self.assertEqual(ss.model_status[model_name].version_status[3].ready_state,
+                                server_status.MODEL_READY)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        self._infer_unaffected_models(loaded_models, model_shape)
+
+        # Unload non-existing model, nothing should happen
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.unload("unknown_model")
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Unload the depending model, as side effect, the ensemble model will be
+        # forced to be unloaded
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.unload(model_name)
+
+                for model in [model_name, ensemble_name]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model in ss.model_status,
+                                    "expected status for model " + model)
+                    self.assertTrue(1 in ss.model_status[model].version_status,
+                                    "expected status for version 1 of model " + model)
+                    self.assertTrue(3 in ss.model_status[model].version_status,
+                                    "expected status for version 3 of model " + model)
+                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
+                                    server_status.MODEL_UNAVAILABLE)
+                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
+                                    server_status.MODEL_UNAVAILABLE)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Unload ensemble model, and load the depending model, ensemble should
+        # not be re-evaluated as it is unloaded explicitly
+        for pair in [("localhost:8000", ProtocolType.HTTP), ("localhost:8001", ProtocolType.GRPC)]:
+            try:
+                ctx = ModelControlContext(pair[0], pair[1], True)
+                ctx.unload(ensemble_name)
+                ctx.load(model_name)
+
+                for model in [model_name, ensemble_name]:
+                    ctx = ServerStatusContext(pair[0], pair[1], model, True)
+                    ss = ctx.get_server_status()
+                    self.assertEqual(os.environ["TENSORRT_SERVER_VERSION"], ss.version)
+                    self.assertEqual("inference:0", ss.id)
+                    self.assertEqual(server_status.SERVER_READY, ss.ready_state)
+                    self.assertEqual(len(ss.model_status), 1)
+                    self.assertTrue(model in ss.model_status,
+                                    "expected status for model " + model)
+                    self.assertTrue(1 in ss.model_status[model].version_status,
+                                    "expected status for version 1 of model " + model)
+                    self.assertTrue(3 in ss.model_status[model].version_status,
+                                    "expected status for version 3 of model " + model)
+                    self.assertEqual(ss.model_status[model].version_status[1].ready_state,
+                                    server_status.MODEL_UNAVAILABLE)
+                    model_status = server_status.MODEL_UNAVAILABLE if ensemble_prefix in model \
+                                        else server_status.MODEL_READY
+                    self.assertEqual(ss.model_status[model].version_status[3].ready_state,
+                                    model_status)
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+        
+        self._infer_unaffected_models(loaded_models, model_shape)
+
 if __name__ == '__main__':
     unittest.main()
