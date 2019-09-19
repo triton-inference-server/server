@@ -1453,6 +1453,10 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
+  const long buffer_byte_size = 16 * 1024 * 1024;
+  curl_easy_setopt(curl, CURLOPT_UPLOAD_BUFFERSIZE, buffer_byte_size);
+  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
+
   // request data provided by RequestProvider()
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
   curl_easy_setopt(curl, CURLOPT_READDATA, http_request.get());
@@ -1500,10 +1504,9 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
     }
   }
 
-  // Set the expected POST size. If you want to POST large amounts of
-  // data, consider CURLOPT_POSTFIELDSIZE_LARGE
+  const curl_off_t post_byte_size = http_request->total_input_byte_size_;
   curl_easy_setopt(
-      curl, CURLOPT_POSTFIELDSIZE, http_request->total_input_byte_size_);
+      curl, CURLOPT_POSTFIELDSIZE_LARGE, post_byte_size);
 
   // Headers to specify input and output tensors
   infer_request_str_.clear();
