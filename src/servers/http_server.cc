@@ -913,6 +913,18 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
     model_version = std::atoll(model_version_str.c_str());
   }
 
+#ifdef TRTIS_ENABLE_TRACING
+  // Earliest entrypoint for an HTTP infer request. Capture a
+  // timestamp for the start of the request.
+  std::unique_ptr<Tracer> tracer;
+  if (trace_manager_ != nullptr) {
+    tracer.reset(trace_manager_->SampleTrace(model_name, model_version));
+    if (tracer != nullptr) {
+      tracer->CaptureTimestamp(TRTSERVER_TRACE_LEVEL_MIN, "api request start");
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   std::string infer_request_header(
       evhtp_kv_find(req->headers_in, kInferRequestHTTPHeader));
 
@@ -953,12 +965,9 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
       // no tracing will be performed.
       TRTSERVER_Trace* trace = nullptr;
 #ifdef TRTIS_ENABLE_TRACING
-      if (trace_manager_ != nullptr) {
-        infer_request->tracer_.reset(
-            trace_manager_->SampleTrace(model_name, model_version));
-        if (infer_request->tracer_ != nullptr) {
-          trace = infer_request->tracer_->ServerTrace();
-        }
+      if (tracer != nullptr) {
+        infer_request->tracer_ = std::move(tracer);
+        trace = infer_request->tracer_->ServerTrace();
       }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1046,6 +1055,14 @@ HTTPAPIServer::InferRequest::InferComplete(
   } else {
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request->req_);
   }
+
+#ifdef TRTIS_ENABLE_TRACING
+  // Capture a timestamp for the end of the request.
+  if (infer_request->tracer_ != nullptr) {
+    infer_request->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "api request end");
+  }
+#endif  // TRTIS_ENABLE_TRACING
 
   // Don't need to explicitly delete 'trace'. It will be deleted by
   // the Tracer object in 'infer_request'.

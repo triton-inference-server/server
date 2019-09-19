@@ -34,7 +34,45 @@ source ../common/util.sh
 rm -f *.log
 RET=0
 
-# trace-rate == 1, make sure every request is traced
+# trace-level=OFF make sure no tracing
+SERVER_ARGS="--trace-file=trace_off.log --trace-level=OFF --trace-rate=1 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_off.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_CLIENT >> client_off.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_off.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+if [ -f ./trace_off.log ]; then
+    echo -e "\n***\n*** Test Failed, unexpected generation of trace_off.log\n***"
+    RET=1
+fi
+
+set -e
+
+# trace-rate == 1, trace-level=MIN make sure every request is traced
 SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_1.log"
 run_server
@@ -65,9 +103,15 @@ wait $SERVER_PID
 
 set +e
 
-$TRACE_SUMMARY trace_1.log > summary_1.log
+$TRACE_SUMMARY -t trace_1.log > summary_1.log
 
-if [ `grep -c simple summary_1.log` != "20" ]; then
+if [ `grep -c "compute input end" summary_1.log` != "0" ]; then
+    cat summary_1.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_1.log` != "20" ]; then
     cat summary_1.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -75,7 +119,7 @@ fi
 
 set -e
 
-# trace-rate == 6
+# trace-rate == 6, trace-level=MIN
 SERVER_ARGS="--trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_6.log"
 run_server
@@ -106,10 +150,63 @@ wait $SERVER_PID
 
 set +e
 
-$TRACE_SUMMARY trace_6.log > summary_6.log
+$TRACE_SUMMARY -t trace_6.log > summary_6.log
 
-if [ `grep -c simple summary_6.log` != "3" ]; then
+if [ `grep -c "compute input end" summary_6.log` != "0" ]; then
     cat summary_6.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_6.log` != "3" ]; then
+    cat summary_6.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+# trace-rate == 7, trace-level=MAX
+SERVER_ARGS="--trace-file=trace_7.log --trace-level=MAX --trace-rate=7 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_7.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_CLIENT >> client_7.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_7.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t trace_7.log > summary_7.log
+
+if [ `grep -c "compute input end" summary_7.log` != "2" ]; then
+    cat summary_7.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_7.log` != "2" ]; then
+    cat summary_7.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

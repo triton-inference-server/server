@@ -461,6 +461,13 @@ CustomBackend::Context::Run(
     custom_payload.error_code = 0;
   }
 
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeInputEnd);
+    }
+  }
+
   // Execute the custom backend which will use CustomGetOutput to get
   // the output buffers into which it will write the results for the
   // requested outputs.
@@ -476,6 +483,13 @@ CustomBackend::Context::Run(
           library_context_handle_, custom_payloads.size(), &custom_payloads[0],
           CustomGetNextInput, CustomGetOutput);
       break;
+  }
+
+  for (auto& payload : *payloads) {
+    if (payload.stats_ != nullptr) {
+      payload.stats_->CaptureTimestamp(
+          ModelInferStats::TimestampKind::kComputeOutputStart);
+    }
   }
 
   // After execution, input buffer can be clean up if any
