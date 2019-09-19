@@ -257,21 +257,6 @@ COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/li
 COPY --from=trtserver_caffe2 /opt/conda/lib/python3.6/site-packages/torch/lib/libcaffe2_nvrtc.so \
      /opt/tensorrtserver/lib/
 
-# OpenVINO
-ENV INTEL_CVSDK_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
-ENV INTEL_OPENVINO_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
-
-ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:$LD_LIBRARY_PATH
-
-ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
-ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
-ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
-
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools \
-     $INTEL_CVSDK_DIR/deployment_tools
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
-     $INTEL_CVSDK_DIR/tools
-
 # Onnx Runtime headers and library
 # Put include files to same directory as ONNX Runtime changed the include path
 # https://github.com/microsoft/onnxruntime/pull/1461
@@ -290,6 +275,15 @@ COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUN
      /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
+
+# Minimum OpenVINO libraries required by ONNX Runtime to link and to run
+# with OpenVINO Execution Provider
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+     /opt/tensorrtserver/lib/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+     /opt/tensorrtserver/lib/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+     /opt/tensorrtserver/lib/
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
@@ -407,24 +401,20 @@ COPY --from=trtserver_build /opt/tensorrtserver/include include
 RUN chmod ugo-w+rx /opt/tensorrtserver/lib/*.so
 
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
-ENV INTEL_CVSDK_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
-ENV INTEL_OPENVINO_DIR /opt/tensorrtserver/lib/openvino_2019.1.144
-
-ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:$LD_LIBRARY_PATH
-
-ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
-ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
-ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
+COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
+     /opt/openvino_scripts/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model_optimizer \
+     /opt/openvino_scripts/openvino_2019.1.144/deployment_tools/model_optimizer/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
+     /opt/openvino_scripts/openvino_2019.1.144/tools
+ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.1.144
+ENV PYTHONPATH $INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 
 # ONNX Runtime uses Python3 syntax
 RUN apt-get update && apt-get install -y --no-install-recommends python3-pip
 RUN pip3 install --upgrade wheel setuptools && \
     (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
         pip3 install -r requirements_onnx.txt)
-# Python scripts that need to be in 'pwd' on running the application
-# https://github.com/microsoft/onnxruntime/issues/1861
-COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
-     /opt/tensorrtserver/
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
