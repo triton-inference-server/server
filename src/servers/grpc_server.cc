@@ -1521,10 +1521,9 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
       err = smb_manager_->Create(
-          &smb, request.register_().shared_memory_region().name(),
-          request.register_().shared_memory_region().shared_memory_key(),
-          request.register_().shared_memory_region().offset(),
-          request.register_().shared_memory_region().byte_size());
+          &smb, request.register_().name(),
+          request.register_().shared_memory_key(), request.register_().offset(),
+          request.register_().byte_size());
       if (err == nullptr) {
         err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
       }
@@ -1544,7 +1543,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
       if (err == nullptr) {
         err = TRTSERVER_ServerUnregisterAllSharedMemory(trtserver_.get());
       }
-    } else if (request.has_get_status()) {
+    } else if (request.has_status()) {
       TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
       err = TRTSERVER_ServerSharedMemoryStatus(
           trtserver_.get(), &shm_status_protobuf);
@@ -1553,8 +1552,10 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         size_t status_byte_size;
         err = TRTSERVER_ProtobufSerialize(
             shm_status_protobuf, &status_buffer, &status_byte_size);
+        auto shm_status_response = response.mutable_shared_memory_status();
         if (err == nullptr) {
-          if (!response.ParseFromArray(status_buffer, status_byte_size)) {
+          if (!shm_status_response->ParseFromArray(
+                  status_buffer, status_byte_size)) {
             err = TRTSERVER_ErrorNew(
                 TRTSERVER_ERROR_UNKNOWN,
                 "failed to parse shared memory status");

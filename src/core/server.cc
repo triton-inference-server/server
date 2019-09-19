@@ -426,41 +426,6 @@ InferenceServer::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
   return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
 }
 
-Status
-InferenceServer::ConfigureTrace(
-    const std::string& trace_name, const std::string& hostname, uint32_t port)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-  return TraceManager::Create(trace_name, hostname, port);
-#else
-  return Status(
-      RequestStatusCode::UNSUPPORTED,
-      "tracing is not supported by this server");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
-Status
-InferenceServer::SetTraceLevel(uint32_t level, uint32_t rate)
-{
-#ifdef TRTIS_ENABLE_TRACING
-  if (ready_state_ != ServerReadyState::SERVER_READY) {
-    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
-  }
-
-  ScopedAtomicIncrement inflight(inflight_request_counter_);
-  return TraceManager::SetLevel(level, rate);
-#else
-  return Status(
-      RequestStatusCode::UNSUPPORTED,
-      "tracing is not supported by this server");
-#endif  // TRTIS_ENABLE_TRACING
-}
-
 uint64_t
 InferenceServer::UptimeNs() const
 {

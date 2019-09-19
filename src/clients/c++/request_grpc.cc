@@ -333,8 +333,7 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
 
-  auto register_info = request.mutable_register_();
-  auto rshm_region = register_info->mutable_shared_memory_region();
+  auto rshm_region = request.mutable_register_();
   rshm_region->set_name(name);
   rshm_region->set_shared_memory_key(shm_key);
   rshm_region->set_offset(offset);
