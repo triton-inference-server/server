@@ -839,6 +839,7 @@ ModelRepositoryManager::Create(
     InferenceServer* server, const std::string& server_version,
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::set<std::string>& repository_paths,
+    const std::set<std::string>& startup_models,
     const bool strict_model_config, const float tf_gpu_memory_fraction,
     const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
@@ -885,9 +886,7 @@ ModelRepositoryManager::Create(
     // model loading / unloading error will be printed but ignored
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   } else {
-    // [TODO] load models specified by '--load-model'
-    std::set<std::string> models;
-    RETURN_IF_ERROR(local_manager->LoadUnloadModels(models, ActionType::LOAD, &all_models_polled));
+    RETURN_IF_ERROR(local_manager->LoadUnloadModels(startup_models, ActionType::LOAD, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);

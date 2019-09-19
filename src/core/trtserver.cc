@@ -248,6 +248,9 @@ class TrtServerOptions {
   ni::ModelControlMode ModelControlMode() const { return model_control_mode_; }
   void SetModelControlMode(ni::ModelControlMode m) { model_control_mode_ = m; }
 
+  const std::set<std::string>& StartupModels() const { return models_; }
+  void SetStartupModel(const char* m) { models_.insert(m); }
+
   bool ExitOnError() const { return exit_on_error_; }
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
@@ -288,6 +291,7 @@ class TrtServerOptions {
   std::string server_id_;
   std::set<std::string> repo_paths_;
   ni::ModelControlMode model_control_mode_;
+  std::set<std::string> models_;
   bool exit_on_error_;
   bool strict_model_config_;
   bool strict_readiness_;
@@ -813,6 +817,15 @@ TRTSERVER_ServerOptionsSetModelControlMode(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetStartupModel(
+    TRTSERVER_ServerOptions* options, const char* model_name)
+{
+  TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
+  loptions->SetStartupModel(model_name);
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerOptionsSetExitOnError(
     TRTSERVER_ServerOptions* options, bool exit)
 {
@@ -959,6 +972,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetId(loptions->ServerId());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
+  lserver->SetStartupModels(loptions->StartupModels());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());

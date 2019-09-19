@@ -163,6 +163,7 @@ enum OptionId {
   OPTION_ALLOW_POLL_REPO,
   OPTION_POLL_REPO_SECS,
   OPTION_ALLOW_MODEL_CONTROL,
+  OPTION_STARTUP_MODEL,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
@@ -275,7 +276,12 @@ std::vector<Option> options_{
     {OPTION_ALLOW_MODEL_CONTROL, "allow-model-control",
      "Allow to load or to unload models explicitly using model control API. "
      "If true the models in the model repository will not be loaded at "
-     "startup. Cannot be specified if --allow-poll-model-repository is true."},
+     "startup, unless the model is specified by --load-model. Cannot be "
+     "specified if --allow-poll-model-repository is true."},
+    {OPTION_STARTUP_MODEL, "load-model",
+     "Name of the model to be loaded on server startup. It may be specified "
+     "multiple times to add multiple models. Note that this option will only "
+     "take affect if --allow-model-control is true."},
     {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
      "finish. After the timeout expires the server exits even if inferences "
@@ -776,6 +782,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
 
   bool allow_poll_model_repository = repository_poll_secs > 0;
   bool allow_model_control = allow_model_control_;
+  std::set<std::string> startup_models_;
 
   bool log_info = true;
   bool log_warn = true;
@@ -893,6 +900,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_ALLOW_MODEL_CONTROL:
         allow_model_control = ParseBoolOption(optarg);
         break;
+      case OPTION_STARTUP_MODEL:
+        startup_models_.insert(optarg);
+        break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
         break;
@@ -986,6 +996,12 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetModelControlMode(server_options, control_mode),
       "setting model control mode");
+  for (const auto& model : startup_models_) {
+    FAIL_IF_ERR(
+        TRTSERVER_ServerOptionsSetStartupModel(
+            server_options, model.c_str()),
+        "setting startup model");
+  }
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
       "setting exit on error");

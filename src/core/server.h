@@ -129,6 +129,10 @@ class InferenceServer {
   ModelControlMode GetModelControlMode() const { return model_control_mode_; }
   void SetModelControlMode(ModelControlMode m) { model_control_mode_ = m; }
 
+  // Get / set the startup models
+  const std::set<std::string>& StartupModels() const { return startup_models_; }
+  void SetStartupModels(const std::set<std::string>& m) { startup_models_ = m; }
+
   // Get / set strict model configuration enable.
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
   void SetStrictModelConfigEnabled(bool e) { strict_model_config_ = e; }
@@ -192,6 +196,7 @@ class InferenceServer {
   uint64_t start_time_ns_;
 
   std::set<std::string> model_repository_paths_;
+  std::set<std::string> startup_models_;
   ModelControlMode model_control_mode_;
   bool strict_model_config_;
   bool strict_readiness_;

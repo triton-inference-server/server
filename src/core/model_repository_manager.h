@@ -91,6 +91,7 @@ class ModelRepositoryManager {
       InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
       const std::set<std::string>& repository_path,
+      const std::set<std::string>& startup_models,
       const bool strict_model_config, const float tf_gpu_memory_fraction,
       const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
