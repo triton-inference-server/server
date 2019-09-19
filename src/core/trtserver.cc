@@ -1176,6 +1176,25 @@ TRTSERVER_ServerSharedMemoryAddress(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerSharedMemoryStatus(
+    TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  ni::SharedMemoryStatus shm_status;
+  RETURN_IF_STATUS_ERROR(lserver->GetSharedMemoryStatus(&shm_status));
+
+  TrtServerProtobuf* protobuf = new TrtServerProtobuf(shm_status);
+  *status = reinterpret_cast<TRTSERVER_Protobuf*>(protobuf);
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerMetrics(TRTSERVER_Server* server, TRTSERVER_Metrics** metrics)
 {
 #ifdef TRTIS_ENABLE_METRICS

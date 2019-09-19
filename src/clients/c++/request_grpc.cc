@@ -311,10 +311,6 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   Error UnregisterAllSharedMemory() override;
 
  private:
-  Error SendRequest(
-      const std::string& name, const SharedMemoryControlRequest::Type action,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
-
   // GRPC end point.
   std::unique_ptr<GRPCService::Stub> stub_;
 
@@ -333,47 +329,65 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest(
-      name, SharedMemoryControlRequest::REGISTER, shm_key, offset, byte_size);
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+
+  auto rshm_region = request.mutable_register_();
+  rshm_region->set_name(name);
+  rshm_region->set_shared_memory_key(shm_key);
+  rshm_region->set_offset(offset);
+  rshm_region->set_byte_size(byte_size);
+
+  Error grpc_status;
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest(name, SharedMemoryControlRequest::UNREGISTER, "", 0, 0);
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+
+  auto unregister_info = request.mutable_unregister();
+  unregister_info->set_name(name);
+
+  Error grpc_status;
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
 }
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("", SharedMemoryControlRequest::UNREGISTER_ALL, "", 0, 0);
-}
-
-Error
-SharedMemoryControlGrpcContextImpl::SendRequest(
-    const std::string& name, const SharedMemoryControlRequest::Type action,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
-{
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
   grpc::ClientContext context;
 
-  if (action == SharedMemoryControlRequest::REGISTER) {
-    auto rshm_region = request.mutable_shared_memory_region();
-    rshm_region->set_name(name);
-    rshm_region->set_shm_key(shm_key);
-    rshm_region->set_offset(offset);
-    rshm_region->set_byte_size(byte_size);
-    request.set_type(action);
-  } else if (action == SharedMemoryControlRequest::UNREGISTER) {
-    auto rshm_region = request.mutable_shared_memory_region();
-    rshm_region->set_name(name);
-    request.set_type(action);
-  } else if (action == SharedMemoryControlRequest::UNREGISTER_ALL) {
-    request.set_type(action);
-  }
+  request.mutable_unregister_all();
 
+  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {

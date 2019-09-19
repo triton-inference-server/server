@@ -84,7 +84,7 @@ class SharedMemoryManager {
       const size_t byte_size);
 
   /// Unregister a specified shared memory region if registered else do nothing
-  /// if not registered and return success.
+  /// and return success.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
   /// \return error status.
@@ -100,6 +100,9 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
 
+  /// Get the list of all registered shared memory regions.
+  Status GetSharedMemoryStatus(SharedMemoryStatus* shm_status);
+
   /// Creates a SharedMemoryManager object that uses the given status_manager
   static Status Create(
       const std::shared_ptr<ServerStatusManager>& status_manager,
@@ -108,6 +111,7 @@ class SharedMemoryManager {
  private:
   SharedMemoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager);
+  Status UnregisterSharedMemoryHelper(const std::string& name);
 
   std::mutex register_mu_;
 

@@ -149,11 +149,9 @@ SharedMemoryManager::RegisterSharedMemory(
 }
 
 Status
-SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
+SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
 {
-  // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock(register_mu_);
-
+  // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
     RETURN_IF_ERROR(
@@ -180,6 +178,15 @@ SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
 }
 
 Status
+SharedMemoryManager::UnregisterSharedMemory(const std::string& name)
+{
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  return UnregisterSharedMemoryHelper(name);
+}
+
+Status
 SharedMemoryManager::UnregisterAllSharedMemory()
 {
   // Serialize all operations that write/read current shared memory regions
@@ -189,7 +196,7 @@ SharedMemoryManager::UnregisterAllSharedMemory()
       "Failed to unregister the following shared memory regions: ";
   std::vector<std::string> unregister_fails;
   for (const auto& shm_info : shared_memory_map_) {
-    Status unregister_status = UnregisterSharedMemory(shm_info.first);
+    Status unregister_status = UnregisterSharedMemoryHelper(shm_info.first);
     if (!unregister_status.IsOk()) {
       unregister_fails.push_back(shm_info.first);
     }
@@ -200,6 +207,24 @@ SharedMemoryManager::UnregisterAllSharedMemory()
       error_message += unreg_fail + " ,";
     }
     LOG_ERROR << error_message;
+    return Status(RequestStatusCode::INTERNAL, error_message);
+  }
+
+  return Status::Success;
+}
+
+Status
+SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
+{
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(register_mu_);
+
+  for (const auto& shm_info : shared_memory_map_) {
+    auto rshm_region = shm_status->add_shared_memory_region();
+    rshm_region->set_name(shm_info.second->name_);
+    rshm_region->set_shared_memory_key(shm_info.second->shm_key_);
+    rshm_region->set_offset(shm_info.second->offset_);
+    rshm_region->set_byte_size(shm_info.second->byte_size_);
   }
 
   return Status::Success;
