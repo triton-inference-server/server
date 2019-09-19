@@ -63,6 +63,14 @@ int GetProfileIndex(const std::string profile_name);
 
 bool CompareDims(const nvinfer1::Dims& model_dims, const DimsList& dims);
 
+Status ValidateDimension(
+    const nvinfer1::Dims& this_dims, const nvinfer1::Dims& min_dims,
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension);
+
+Status ValidateDimension(
+    const DimsList& this_dims, const nvinfer1::Dims& min_dims,
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension);
+
 Status CompareDimsSupported(
     const std::string& model_name, const std::string& tensor_name,
     const nvinfer1::Dims& model_dims, const DimsList& dims,
