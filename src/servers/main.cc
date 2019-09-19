@@ -998,8 +998,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       "setting model control mode");
   for (const auto& model : startup_models_) {
     FAIL_IF_ERR(
-        TRTSERVER_ServerOptionsSetStartupModel(
-            server_options, model.c_str()),
+        TRTSERVER_ServerOptionsSetStartupModel(server_options, model.c_str()),
         "setting startup model");
   }
   FAIL_IF_ERR(

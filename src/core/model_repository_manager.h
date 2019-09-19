@@ -159,7 +159,9 @@ class ModelRepositoryManager {
   Status PollAndUpdateInternal(bool* all_models_polled);
 
   /// The internal function that load or unload a set of models.
-  Status LoadUnloadModels(const std::set<std::string>& models, ActionType type, bool* all_models_polled);
+  Status LoadUnloadModels(
+      const std::set<std::string>& models, ActionType type,
+      bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,

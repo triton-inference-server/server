@@ -517,7 +517,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelControlMode(
     TRTSERVER_ServerOptions* options, TRTSERVER_Model_Control_Mode mode);
 
 /// Set the model to be loaded at startup in a server options. The model will be
-/// polled from the model repositories. This function can be called multiple 
+/// polled from the model repositories. This function can be called multiple
 /// times with different model name to set multiple startup models.
 /// Note that it only takes affect on TRTSERVER_MODEL_CONTROL_EXPLICIT mode.
 /// \param options The server options object.

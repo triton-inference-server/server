@@ -242,7 +242,10 @@ class TrtServerOptions {
   const std::string& ServerId() const { return server_id_; }
   void SetServerId(const char* id) { server_id_ = id; }
 
-  const std::set<std::string>& ModelRepositoryPaths() const { return repo_paths_; }
+  const std::set<std::string>& ModelRepositoryPaths() const
+  {
+    return repo_paths_;
+  }
   void SetModelRepositoryPath(const char* p) { repo_paths_.insert(p); }
 
   ni::ModelControlMode ModelControlMode() const { return model_control_mode_; }

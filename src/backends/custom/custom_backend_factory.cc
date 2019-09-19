@@ -52,12 +52,12 @@ CustomBackendFactory::Create(
 
 Status
 CustomBackendFactory::CreateBackend(
-    const std::string& model_repository_path, const std::string& model_name, 
+    const std::string& model_repository_path, const std::string& model_name,
     const int64_t version, const ModelConfig& model_config,
     std::unique_ptr<InferenceBackend>* backend)
 {
-  const auto path = JoinPath(
-      {model_repository_path, model_name, std::to_string(version)});
+  const auto path =
+      JoinPath({model_repository_path, model_name, std::to_string(version)});
 
   // Read all the files in 'path'.
   std::set<std::string> custom_files;

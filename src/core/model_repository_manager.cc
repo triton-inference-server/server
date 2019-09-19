@@ -839,9 +839,8 @@ ModelRepositoryManager::Create(
     InferenceServer* server, const std::string& server_version,
     const std::shared_ptr<ServerStatusManager>& status_manager,
     const std::set<std::string>& repository_paths,
-    const std::set<std::string>& startup_models,
-    const bool strict_model_config, const float tf_gpu_memory_fraction,
-    const bool tf_allow_soft_placement,
+    const std::set<std::string>& startup_models, const bool strict_model_config,
+    const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
     const bool polling_enabled, const bool model_control_enabled,
     std::unique_ptr<ModelRepositoryManager>* model_repository_manager)
@@ -886,7 +885,8 @@ ModelRepositoryManager::Create(
     // model loading / unloading error will be printed but ignored
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   } else {
-    RETURN_IF_ERROR(local_manager->LoadUnloadModels(startup_models, ActionType::LOAD, &all_models_polled));
+    RETURN_IF_ERROR(local_manager->LoadUnloadModels(
+        startup_models, ActionType::LOAD, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
@@ -1109,8 +1109,7 @@ ModelRepositoryManager::LoadUnloadModel(
     if (version_states.empty()) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "failed to load '" + model_name +
-              "', no version is available");
+          "failed to load '" + model_name + "', no version is available");
     }
     auto it = infos_.find(model_name);
     if (it == infos_.end()) {
@@ -1164,7 +1163,9 @@ ModelRepositoryManager::LoadUnloadModel(
 }
 
 Status
-ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_names, ActionType type, bool* all_models_polled)
+ModelRepositoryManager::LoadUnloadModels(
+    const std::set<std::string>& model_names, ActionType type,
+    bool* all_models_polled)
 {
   *all_models_polled = true;
   // Update ModelInfo related to file system accordingly
@@ -1192,10 +1193,11 @@ ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_name
           auto it = new_infos.find(model);
           // Some models may be marked as deleted and not in 'new_infos'
           if (it != new_infos.end()) {
-          const auto& config = it->second->model_config_;
+            const auto& config = it->second->model_config_;
             if (config.has_ensemble_scheduling()) {
               for (const auto& step : config.ensemble_scheduling().step()) {
-                bool need_poll = checked_modes.emplace(step.model_name()).second;
+                bool need_poll =
+                    checked_modes.emplace(step.model_name()).second;
                 if (need_poll) {
                   next_models.emplace(step.model_name());
                 }
@@ -1230,7 +1232,7 @@ ModelRepositoryManager::LoadUnloadModels(const std::set<std::string>& model_name
     // Utilize "force_unload" of AsyncLoad()
     backend_life_cycle_->AsyncLoad(empty_path, name, versions, model_config);
   }
-  
+
   // Update dependency graph and load
   Update(added, deleted, modified);
 
