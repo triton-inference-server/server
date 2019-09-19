@@ -414,6 +414,18 @@ InferenceServer::SharedMemoryAddress(
       name, offset, byte_size, shm_mapped_addr);
 }
 
+Status
+InferenceServer::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->GetSharedMemoryStatus(shm_status);
+}
+
 uint64_t
 InferenceServer::UptimeNs() const
 {

@@ -71,8 +71,8 @@ class SharedMemoryBlockManager {
   TRTSERVER_Error* Find(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name);
 
-  /// Remove from and manager and return a named shared memory
-  /// block. Ownership of 'smb' is transferred to the caller which is
+  /// Remove from manager and return a named shared memory block
+  /// Ownership of 'smb' is transferred to the caller which is
   /// responsible for deleting the object. Return 'smb' == nullptr if
   /// the named block doesn't exist.
   /// \param smb Returns the shared memory block.

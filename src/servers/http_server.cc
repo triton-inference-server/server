@@ -206,7 +206,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister|unregisterall|status)(.*))")
+            R"(/(register|unregister|status)(.*))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -627,9 +627,16 @@ void
 HTTPAPIServer::HandleSharedMemoryControl(
     evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
 {
-  if (req->method != htp_method_POST) {
-    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
-    return;
+  if (sharedmemorycontrol_uri == "/status") {
+    if (req->method != htp_method_GET) {
+      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+      return;
+    }
+  } else {
+    if (req->method != htp_method_POST) {
+      evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+      return;
+    }
   }
 
   re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
@@ -645,8 +652,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
     return;
   } else {
     if (remaining.empty()) {
-      if ((action_type_str != "unregisterall") &&
-          (action_type_str != "status")) {
+      if (action_type_str != "status") {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
@@ -658,10 +664,12 @@ HTTPAPIServer::HandleSharedMemoryControl(
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
-      if (action_type_str == "unregister" &&
-          (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
-        evhtp_send_reply(req, EVHTP_RES_BADREQ);
-        return;
+      if (action_type_str == "unregister") {
+        if ((remaining != "all") &&
+            (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
+          evhtp_send_reply(req, EVHTP_RES_BADREQ);
+          return;
+        }
       }
     }
   }
@@ -678,6 +686,11 @@ HTTPAPIServer::HandleSharedMemoryControl(
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }
+  } else if ((action_type_str == "unregister") && (remaining == "all")) {
+    err = smb_manager_->Clear();
+    if (err == nullptr) {
+      err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
+    }
   } else if (action_type_str == "unregister") {
     err = smb_manager_->Remove(&smb, name.c_str());
     if ((err == nullptr) && (smb != nullptr)) {
@@ -688,8 +701,45 @@ HTTPAPIServer::HandleSharedMemoryControl(
                   << TRTSERVER_ErrorMessage(del_err);
       }
     }
-  } else if (action_type_str == "unregisterall") {
-    err = TRTSERVER_ServerUnregisterAllSharedMemory(server_.get());
+  } else if (action_type_str == "status") {
+    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
+    TRTSERVER_Error* err =
+        TRTSERVER_ServerSharedMemoryStatus(server_.get(), &shm_status_protobuf);
+    if (err == nullptr) {
+      const char* status_buffer;
+      size_t status_byte_size;
+      err = TRTSERVER_ProtobufSerialize(
+          shm_status_protobuf, &status_buffer, &status_byte_size);
+      if (err == nullptr) {
+        std::string format;
+        const char* format_c_str = evhtp_kv_find(req->uri->query, "format");
+        if (format_c_str != NULL) {
+          format = std::string(format_c_str);
+        } else {
+          format = "text";
+        }
+
+        if (format == "binary") {
+          evbuffer_add(req->buffer_out, status_buffer, status_byte_size);
+          evhtp_headers_add_header(
+              req->headers_out,
+              evhtp_header_new(
+                  "Content-Type", "application/octet-stream", 1, 1));
+        } else {
+          SharedMemoryStatus shm_status;
+          if (!shm_status.ParseFromArray(status_buffer, status_byte_size)) {
+            err = TRTSERVER_ErrorNew(
+                TRTSERVER_ERROR_UNKNOWN,
+                "failed to parse shared memory status");
+          } else {
+            std::string shm_status_str = shm_status.DebugString();
+            evbuffer_add(
+                req->buffer_out, shm_status_str.c_str(), shm_status_str.size());
+          }
+        }
+      }
+    }
+    TRTSERVER_ProtobufDelete(shm_status_protobuf);
   } else {
     err = TRTSERVER_ErrorNew(
         TRTSERVER_ERROR_UNKNOWN,
