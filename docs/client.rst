@@ -141,7 +141,7 @@ Windows 10
 ..........
 
 For Windows, the dependencies can be installed using pip
-and `vcpkg<https://github.com/Microsoft/vcpkg>`_ which is a C++ library
+and `vcpkg <https://github.com/Microsoft/vcpkg>`_ which is a C++ library
 management tool on Windows. The following shows how to install the dependencies
 using them, and you can also install the dependencies in other ways that you
 prefer::
