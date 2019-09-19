@@ -284,6 +284,7 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/infer
      /opt/tensorrtserver/lib/
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
      /opt/tensorrtserver/lib/
+RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
