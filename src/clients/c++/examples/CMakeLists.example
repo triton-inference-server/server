@@ -42,7 +42,8 @@ message(STATUS "Using gRPC ${gRPC_VERSION}")
 include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Curl
-find_package(CURL REQUIRED)
+find_package(CURL CONFIG REQUIRED)
+message(STATUS "Using curl ${CURL_VERSION}")
 
 #
 # Example applications
@@ -61,7 +62,7 @@ target_link_libraries(
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
   PUBLIC protobuf::libprotobuf
-  PUBLIC ${CURL_LIBRARY}
+  PUBLIC CURL::libcurl
 )
 install(
   TARGETS simple_client_static
