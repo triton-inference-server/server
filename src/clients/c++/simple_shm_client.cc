@@ -377,6 +377,7 @@ main(int argc, char** argv)
     exit(1);
   }
   std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
+
   // Unregister shared memory (One by one or all at a time) from TRTIS
   // err = shared_memory_ctx->UnregisterAllSharedMemory();
   err = shared_memory_ctx->UnregisterSharedMemory("input_data");
