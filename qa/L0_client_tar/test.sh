@@ -34,7 +34,7 @@ mkdir trtis_client
 
 # Build
 cd trtis_client/src/cmake
-cmake .
+cmake -DCMAKE_BUILD_TYPE=Release .
 make -j16 trtis-clients
 
 # There is no server running but can still check to make sure that the
