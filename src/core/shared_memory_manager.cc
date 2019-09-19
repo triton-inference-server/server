@@ -230,21 +230,6 @@ SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
   return Status::Success;
 }
 
-Status
-SharedMemoryManager::GetSharedMemoryStatus(
-    SharedMemoryControlResponse* shm_status)
-{
-  for (const auto& shm_info : shared_memory_map_) {
-    auto rshm_region = shm_status->add_active_shared_memory_region();
-    rshm_region->set_name(shm_info.second->name_);
-    rshm_region->set_shm_key(shm_info.second->shm_key_);
-    rshm_region->set_offset(shm_info.second->offset_);
-    rshm_region->set_byte_size(shm_info.second->byte_size_);
-  }
-
-  return Status::Success;
-}
-
 SharedMemoryManager::SharedMemoryManager(
     const std::shared_ptr<ServerStatusManager>& status_manager)
     : status_manager_(status_manager)

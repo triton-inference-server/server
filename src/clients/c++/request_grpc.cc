@@ -407,20 +407,19 @@ SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus(
   grpc::ClientContext context;
   shm_status->Clear();
 
-  request.mutable_get_status();
+  request.mutable_status();
 
   Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
     grpc_status = Error(response.request_status());
+    auto shm_status_response = response.mutable_shared_memory_status();
     std::string response_str;
-    response.clear_request_status();
-    response.SerializeToString(&response_str);
+    shm_status_response->SerializeToString(&response_str);
     if (!shm_status->ParseFromString(response_str)) {
       return Error(
-          RequestStatusCode::INTERNAL,
-          "failed to parse shared memory status");
+          RequestStatusCode::INTERNAL, "failed to parse shared memory status");
     }
   } else {
     // Something wrong with the GRPC conncection

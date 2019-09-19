@@ -406,18 +406,3 @@ message SharedMemoryStatus
   //@@
   repeated SharedMemoryRegion shared_memory_region = 2;
 }
-
-//@@
-//@@.. cpp:var:: message SharedMemoryStatus
-//@@
-//@@   Shared memory status for the inference server.
-//@@
-message SharedMemoryStatus
-{
-  //@@
-  //@@  .. cpp:var:: SharedMemoryRegion shared_memory_region
-  //@@
-  //@@     The list of active/registered shared memory regions.
-  //@@
-  repeated SharedMemoryRegion shared_memory_region = 2;
-}

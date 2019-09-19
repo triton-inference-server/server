@@ -321,7 +321,12 @@ message SharedMemoryControlRequest
   }
 }
 
-message SharedMemoryStatusResponse
+//@@
+//@@.. cpp:var:: message SharedMemoryControlResponse
+//@@
+//@@   Response message for SharedMemoryControl gRPC endpoint.
+//@@
+message SharedMemoryControlResponse
 {
   //@@
   //@@.. cpp:var:: message Status

@@ -1554,7 +1554,6 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == START) {
     TRTSERVER_SharedMemoryBlock* smb = nullptr;
-    TRTSERVER_Protobuf* shm_status_protobuf = nullptr;
 
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
