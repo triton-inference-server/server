@@ -30,7 +30,8 @@ cmake_minimum_required (VERSION 3.5)
 #
 # librequest.so and librequest_static.a
 #
-find_package(CURL REQUIRED)
+find_package(CURL CONFIG REQUIRED)
+message(STATUS "Using curl ${CURL_VERSION}")
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
 
@@ -63,6 +64,9 @@ add_library(
   request-library EXCLUDE_FROM_ALL OBJECT
   ${REQUEST_SRCS} ${REQUEST_HDRS}
 )
+target_include_directories(
+  request-library PRIVATE
+  $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>)
 add_dependencies(
   request-library
   model-config-library grpc-library proto-library
@@ -81,7 +85,7 @@ target_link_libraries(
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
   PUBLIC protobuf::libprotobuf
-  PUBLIC ${CURL_LIBRARY}
+  PUBLIC CURL::libcurl
 )
 if(NOT WIN32)
   target_link_libraries(
@@ -98,7 +102,6 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
-target_include_directories(request PRIVATE ${CURL_INCLUDE_DIRS})
 set_target_properties(
   request
   PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
@@ -112,7 +115,7 @@ target_link_libraries(
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
   PUBLIC protobuf::libprotobuf
-  PUBLIC ${CURL_LIBRARY}
+  PUBLIC CURL::libcurl
 )
 if(NOT WIN32)
   target_link_libraries(
