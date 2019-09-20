@@ -1559,8 +1559,8 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_register_()) {
       err = smb_manager_->Create(
           &smb, request.register_().name(),
-          request.register_().shared_memory_key(), request.register_().offset(),
-          request.register_().byte_size());
+          request.register_().system_shared_memory().shared_memory_key(),
+          request.register_().offset(), request.register_().byte_size());
       if (err == nullptr) {
         err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
       }
