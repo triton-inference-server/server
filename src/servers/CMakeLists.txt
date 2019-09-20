@@ -313,6 +313,14 @@ if(${TRTIS_ENABLE_ONNXRUNTIME})
     PUBLIC -lonnxruntime
   )
 endif() # TRTIS_ENABLE_ONNXRUNTIME
+if(${TRTIS_ENABLE_ONNXRUNTIME_OPENVINO})
+  target_link_libraries(
+    trtserver
+    PUBLIC ${TRTIS_EXTRA_LDFLAGS}
+    PUBLIC -ltbb
+    PUBLIC -linference_engine
+  )
+endif() # TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
 
 if(${TRTIS_ENABLE_METRICS})
   find_package(prometheus-cpp CONFIG REQUIRED)
