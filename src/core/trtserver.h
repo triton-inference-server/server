@@ -485,7 +485,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetServerId(
     TRTSERVER_ServerOptions* options, const char* server_id);
 
 /// Set the model repository path in a server options. The path must be
-/// the full absolute path to the model repository.
+/// the full absolute path to the model repository. This function can be called
+/// multiple times with different paths to set multiple model repositories.
+/// Note that if a model is not unique across all model repositories
+/// at any time, the model will not be available.
 /// \param options The server options object.
 /// \param model_repository_path The full path to the model repository.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -514,6 +517,17 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelControlMode(
     TRTSERVER_ServerOptions* options, TRTSERVER_Model_Control_Mode mode);
+
+/// Set the model to be loaded at startup in a server options. The model must be
+/// present in one, and only one, of the specified model repositories.
+/// This function can be called multiple times with different model name
+/// to set multiple startup models.
+/// Note that it only takes affect on TRTSERVER_MODEL_CONTROL_EXPLICIT mode.
+/// \param options The server options object.
+/// \param mode_name The name of the model to load on startup.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStartupModel(
+    TRTSERVER_ServerOptions* options, const char* model_name);
 
 /// Enable or disable strict model configuration handling in a server
 /// options.

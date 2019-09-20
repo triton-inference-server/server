@@ -73,7 +73,9 @@ class ModelRepositoryManager {
   /// \param server_version The version of the inference server.
   /// \param status_manager The status manager that the model repository manager
   /// will update model configuration and state to.
-  /// \param repositpory_path The file-system path of the repository.
+  /// \param repositpory_paths A set of file-system paths of the repositories.
+  /// \param startup_models A set of models to be loaded at startup
+  /// if model control is enabled.
   /// \param strict_model_config If false attempt to autofill missing required
   /// information in each model configuration.
   /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
@@ -90,8 +92,10 @@ class ModelRepositoryManager {
   static Status Create(
       InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::string& repository_path, const bool strict_model_config,
-      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
+      const std::set<std::string>& repository_paths,
+      const std::set<std::string>& startup_models,
+      const bool strict_model_config, const float tf_gpu_memory_fraction,
+      const bool tf_allow_soft_placement,
       const std::map<int, std::pair<int, uint64_t>> tf_memory_limit_mb,
       const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<ModelRepositoryManager>* model_repository_manager);
@@ -148,13 +152,18 @@ class ModelRepositoryManager {
 
   ModelRepositoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::string& repository_path,
+      const std::set<std::string>& repository_paths,
       const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<BackendLifeCycle> life_cycle);
 
   /// The internal function that are called in Create() and PollAndUpdate().
   Status PollAndUpdateInternal(bool* all_models_polled);
+
+  /// The internal function that load or unload a set of models.
+  Status LoadUnloadModels(
+      const std::set<std::string>& models, ActionType type,
+      bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,
@@ -242,22 +251,23 @@ class ModelRepositoryManager {
   /// Get the list of versions to be loaded for a named model based on version
   /// policy. Version directories that are not numerically named,
   /// or that have zero prefix will be ignored.
+  /// \param model_repository_path The file-system path of the repository that
+  /// the model is at.
   /// \param name The model name.
   /// \param model_config The model configuration.
   /// \param versions Returns the versions to be loaded
   /// \return The error status.
   Status VersionsToLoad(
-      const std::string& name, const ModelConfig& model_config,
-      std::set<int64_t>* versions);
+      const std::string model_repository_path, const std::string& name,
+      const ModelConfig& model_config, std::set<int64_t>* versions);
 
-  const std::string repository_path_;
+  const std::set<std::string> repository_paths_;
   const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;
   const bool model_control_enabled_;
 
   std::mutex poll_mu_;
-  std::mutex infos_mu_;
   ModelInfoMap infos_;
 
   std::unordered_map<std::string, std::unique_ptr<DependencyNode>>
