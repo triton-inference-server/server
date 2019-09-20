@@ -38,7 +38,7 @@ fi
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --exit-on-error=false"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -50,8 +50,9 @@ rm -fr models && mkdir -p models && \
             sed -i 's/^name: "resnet50"/name: "resnet50_def"/' \
                 config.pbtxt) && \
     # GPU execution accelerators
-    # For TensorRT, only deploy it on gpu 0 as deploying on other devices
-    # will cause segfault
+    # [DLIS-729] For TensorRT, only deploy it on gpu 0 as deploying on
+    # other devices will cause segfault
+    # https://github.com/microsoft/onnxruntime/issues/1881
     cp -r models/resnet50_def models/resnet50_trt && \
     (cd models/resnet50_trt && \
             sed -i 's/^name: "resnet50_def"/name: "resnet50_trt"/' \
@@ -83,7 +84,7 @@ rm -fr models && mkdir -p models && \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"unknown_cpu\"] } }" >> config.pbtxt)
 
-run_server
+run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -133,14 +134,14 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Failed. Expected OpenVINO is set on models that support it\n***"
     RET=1
 fi
-grep "Ignore unknown Execution Accelerator 'unknown_gpu' for resnet50_unknown_gpu" $SERVER_LOG
+grep "failed to load 'resnet50_unknown_gpu' version 1: Invalid argument: unknown Execution Accelerator 'unknown_gpu' is requested" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator is ignored\n***"
+    echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator returns error\n***"
     RET=1
 fi
-grep "Ignore unknown Execution Accelerator 'unknown_cpu' for resnet50_unknown_cpu" $SERVER_LOG
+grep "failed to load 'resnet50_unknown_cpu' version 1: Invalid argument: unknown Execution Accelerator 'unknown_cpu' is requested" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator is ignored\n***"
+    echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator returns error\n***"
     RET=1
 fi
 
