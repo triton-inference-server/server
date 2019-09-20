@@ -92,7 +92,7 @@ class ModelRepositoryManager {
   static Status Create(
       InferenceServer* server, const std::string& server_version,
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::set<std::string>& repository_path,
+      const std::set<std::string>& repository_paths,
       const std::set<std::string>& startup_models,
       const bool strict_model_config, const float tf_gpu_memory_fraction,
       const bool tf_allow_soft_placement,
@@ -152,7 +152,7 @@ class ModelRepositoryManager {
 
   ModelRepositoryManager(
       const std::shared_ptr<ServerStatusManager>& status_manager,
-      const std::set<std::string>& repository_path,
+      const std::set<std::string>& repository_paths,
       const BackendConfigMap& backend_config_map, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
       std::unique_ptr<BackendLifeCycle> life_cycle);

@@ -516,12 +516,13 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelRepositoryPath(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetModelControlMode(
     TRTSERVER_ServerOptions* options, TRTSERVER_Model_Control_Mode mode);
 
-/// Set the model to be loaded at startup in a server options. The model will be
-/// polled from the model repositories. This function can be called multiple
-/// times with different model name to set multiple startup models.
+/// Set the model to be loaded at startup in a server options. The model must be
+/// present in one, and only one, of the specified model repositories.
+/// This function can be called multiple times with different model name
+/// to set multiple startup models.
 /// Note that it only takes affect on TRTSERVER_MODEL_CONTROL_EXPLICIT mode.
 /// \param options The server options object.
-/// \param model_repository_path The full path to the model repository.
+/// \param mode_name The name of the model to load on startup.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStartupModel(
     TRTSERVER_ServerOptions* options, const char* model_name);
