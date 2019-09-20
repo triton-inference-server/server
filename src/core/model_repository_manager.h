@@ -73,7 +73,9 @@ class ModelRepositoryManager {
   /// \param server_version The version of the inference server.
   /// \param status_manager The status manager that the model repository manager
   /// will update model configuration and state to.
-  /// \param repositpory_path The file-system path of the repository.
+  /// \param repositpory_paths A set of file-system paths of the repositories.
+  /// \param startup_models A set of models to be loaded at startup
+  /// if model control is enabled.
   /// \param strict_model_config If false attempt to autofill missing required
   /// information in each model configuration.
   /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
@@ -246,10 +248,11 @@ class ModelRepositoryManager {
   /// \return True if the node is ready. False otherwise.
   bool CheckNode(DependencyNode* node);
 
-  // [TODO] update docs
   /// Get the list of versions to be loaded for a named model based on version
   /// policy. Version directories that are not numerically named,
   /// or that have zero prefix will be ignored.
+  /// \param model_repository_path The file-system path of the repository that
+  /// the model is at.
   /// \param name The model name.
   /// \param model_config The model configuration.
   /// \param versions Returns the versions to be loaded
@@ -265,7 +268,6 @@ class ModelRepositoryManager {
   const bool model_control_enabled_;
 
   std::mutex poll_mu_;
-  std::mutex infos_mu_;
   ModelInfoMap infos_;
 
   std::unordered_map<std::string, std::unique_ptr<DependencyNode>>

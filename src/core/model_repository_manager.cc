@@ -960,12 +960,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
     return Status::Success;
   }
 
-  // Swap the new infos in place under a short-lived lock and only if
-  // there were no errors encountered during polling.
-  {
-    std::lock_guard<std::mutex> lock(infos_mu_);
-    infos_.swap(new_infos);
-  }
+  infos_.swap(new_infos);
 
   Update(added, deleted, modified);
 
@@ -1209,7 +1204,6 @@ ModelRepositoryManager::LoadUnloadModels(
       }
 
       // Only update the infos when all validation is completed
-      std::lock_guard<std::mutex> lk(infos_mu_);
       for (const auto& model_name : added) {
         auto nitr = new_infos.find(model_name);
         infos_.emplace(model_name, std::move(nitr->second));
@@ -1299,7 +1293,9 @@ ModelRepositoryManager::Poll(
 {
   *all_models_polled = true;
   std::map<std::string, std::string> model_to_repository;
-  // Poll all models in all model repositories if no model is specified
+
+  // If no model is specified, poll all models in all model repositories.
+  // Otherwise, only poll the specified models
   if (models.empty()) {
     std::set<std::string> duplicated_models;
     for (const auto repository_path : repository_paths_) {
@@ -1615,8 +1611,6 @@ Status
 ModelRepositoryManager::GetModelConfig(
     const std::string& name, ModelConfig* model_config)
 {
-  std::lock_guard<std::mutex> lock(infos_mu_);
-
   const auto itr = infos_.find(name);
   if (itr == infos_.end()) {
     return Status(
