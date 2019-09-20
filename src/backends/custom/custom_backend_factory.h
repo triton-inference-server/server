@@ -38,9 +38,6 @@ class CustomBackendFactory {
   struct Config : public BackendConfig {
     // The inference server version.
     std::string inference_server_version;
-
-    // The absolute path to the model repository root.
-    std::string model_repository_path;
   };
 
   static Status Create(
@@ -48,7 +45,8 @@ class CustomBackendFactory {
       std::unique_ptr<CustomBackendFactory>* factory);
 
   Status CreateBackend(
-      const std::string& path, const ModelConfig& model_config,
+      const std::string& model_repository_path, const std::string& model_name,
+      const int64_t version, const ModelConfig& model_config,
       std::unique_ptr<InferenceBackend>* backend);
 
   ~CustomBackendFactory() = default;

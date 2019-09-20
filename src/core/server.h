@@ -118,19 +118,23 @@ class InferenceServer {
   void SetId(const std::string& id) { id_ = id; }
 
   // Get / set the model repository path
-  const std::string& ModelRepositoryPath() const
+  const std::set<std::string>& ModelRepositoryPaths() const
   {
-    return model_repository_path_;
+    return model_repository_paths_;
   }
 
-  void SetModelRepositoryPath(const std::string& p)
+  void SetModelRepositoryPaths(const std::set<std::string>& p)
   {
-    model_repository_path_ = p;
+    model_repository_paths_ = p;
   }
 
   // Get / set model control mode.
   ModelControlMode GetModelControlMode() const { return model_control_mode_; }
   void SetModelControlMode(ModelControlMode m) { model_control_mode_ = m; }
+
+  // Get / set the startup models
+  const std::set<std::string>& StartupModels() const { return startup_models_; }
+  void SetStartupModels(const std::set<std::string>& m) { startup_models_ = m; }
 
   // Get / set strict model configuration enable.
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
@@ -194,7 +198,8 @@ class InferenceServer {
   std::string id_;
   uint64_t start_time_ns_;
 
-  std::string model_repository_path_;
+  std::set<std::string> model_repository_paths_;
+  std::set<std::string> startup_models_;
   ModelControlMode model_control_mode_;
   bool strict_model_config_;
   bool strict_readiness_;
