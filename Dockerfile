@@ -123,6 +123,26 @@ RUN sed -i "s/libicu55/libicu60/" ${SCRIPT_DIR}/install_ubuntu.sh && \
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
 
+# Install OpenVINO
+# https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
+ARG OPENVINO_VERSION=2019_R1.1
+RUN /tmp/scripts/install_openvino.sh -o ${OPENVINO_VERSION}
+ENV INTEL_CVSDK_DIR /data/dldt/openvino_2019.1.144
+ENV INTEL_OPENVINO_DIR /data/dldt/openvino_2019.1.144
+
+ENV LD_LIBRARY_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/temp/omp/lib:$INTEL_CVSDK_DIR/deployment_tools/inference_engine/external/tbb/lib:/usr/local/openblas/lib:$LD_LIBRARY_PATH
+
+ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
+ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
+ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
+
+RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-opencl_1.0.2-1787_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-opencl_19.15.12831_amd64.deb && \
+    wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-ocloc_19.15.12831_amd64.deb && \
+    sudo dpkg -i *.deb && rm -rf *.deb
+
 # Allow configure to pick up GDK and CuDNN where it expects it.
 # (Note: $CUDNN_VERSION is defined by NVidia's base image)
 RUN _CUDNN_VERSION=$(echo $CUDNN_VERSION | cut -d. -f1-2) && \
@@ -158,6 +178,7 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
             --cudnn_home /usr/local/cudnn-$(echo $CUDNN_VERSION | cut -d. -f1-2)/cuda \
             --use_tensorrt \
             --tensorrt_home /usr/src/tensorrt \
+            --use_openvino CPU_FP32 \
             --update \
             --build
 
@@ -248,10 +269,22 @@ COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/provi
      /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/tensorrt/tensorrt_provider_factory.h \
      /opt/tensorrtserver/include/onnxruntime/
+COPY --from=trtserver_onnx /workspace/onnxruntime/include/onnxruntime/core/providers/openvino/openvino_provider_factory.h \
+     /opt/tensorrtserver/include/onnxruntime/
 COPY --from=trtserver_onnx /workspace/build/Release/libonnxruntime.so.${ONNX_RUNTIME_VERSION} \
      /opt/tensorrtserver/lib/
 RUN cd /opt/tensorrtserver/lib && \
     ln -sf libonnxruntime.so.${ONNX_RUNTIME_VERSION} libonnxruntime.so
+
+# Minimum OpenVINO libraries required by ONNX Runtime to link and to run
+# with OpenVINO Execution Provider
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libinference_engine.so \
+     /opt/tensorrtserver/lib/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/lib/intel64/libMKLDNNPlugin.so \
+     /opt/tensorrtserver/lib/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/inference_engine/external/tbb/lib/libtbb.so.2 \
+     /opt/tensorrtserver/lib/
+RUN cd /opt/tensorrtserver/lib && ln -sf libtbb.so.2 libtbb.so
 
 # Copy entire repo into container even though some is not needed for
 # build itself... because we want to be able to copyright check on
@@ -283,6 +316,7 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
                   -DTRTIS_ENABLE_TENSORRT=ON \
                   -DTRTIS_ENABLE_CAFFE2=ON \
                   -DTRTIS_ENABLE_ONNXRUNTIME=ON \
+                  -DTRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON \
                   -DTRTIS_ENABLE_PYTORCH=ON \
                   -DTRTIS_ONNXRUNTIME_INCLUDE_PATHS="/opt/tensorrtserver/include/onnxruntime" \
                   -DTRTIS_PYTORCH_INCLUDE_PATHS="/opt/tensorrtserver/include/torch" \
@@ -358,6 +392,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
 COPY LICENSE .
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/LICENSE LICENSE.openvino
 COPY --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
 COPY --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
 COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
@@ -366,6 +401,23 @@ COPY --from=trtserver_build /opt/tensorrtserver/lib lib
 COPY --from=trtserver_build /opt/tensorrtserver/include include
 
 RUN chmod ugo-w+rx /opt/tensorrtserver/lib/*.so
+
+# Install ONNX-Runtime-OpenVINO dependencies to use it in base container
+COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
+     /opt/openvino_scripts/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model_optimizer \
+     /opt/openvino_scripts/openvino_2019.1.144/deployment_tools/model_optimizer/
+COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
+     /opt/openvino_scripts/openvino_2019.1.144/tools
+ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.1.144
+ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
+
+# ONNX Runtime requires Python3 to convert ONNX models to OpenVINO models
+# in its OpenVINO execution accelerator
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip
+RUN pip3 install --upgrade wheel setuptools && \
+    (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
+        pip3 install -r requirements_onnx.txt)
 
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \

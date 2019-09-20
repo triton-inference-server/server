@@ -466,7 +466,7 @@ message ModelOptimizationPolicy
     //@@       don't support the operators. The order priority implies priority,
     //@@       i.e. the provider at the front has highest priority.
     //@@
-    //@@       For ONNX Runtime backend, currently there is no possible value.
+    //@@       For ONNX Runtime backend, possible value is "openvino".
     //@@
     repeated string cpu_execution_accelerator = 2;
   }
