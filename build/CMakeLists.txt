@@ -197,6 +197,7 @@ ExternalProject_Add(libevhtp
   URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
   URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
   PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
+  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
   CMAKE_CACHE_ARGS
     -DEVHTP_DISABLE_SSL:BOOL=ON
