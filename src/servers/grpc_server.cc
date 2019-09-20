@@ -1557,10 +1557,16 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
 
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
-      err = smb_manager_->Create(
-          &smb, request.register_().name(),
-          request.register_().system_shared_memory().shared_memory_key(),
-          request.register_().offset(), request.register_().byte_size());
+      if (request.register_().has_system_shared_memory()) {
+        err = smb_manager_->Create(
+            &smb, request.register_().name(),
+            request.register_().system_shared_memory().shared_memory_key(),
+            request.register_().offset(), request.register_().byte_size());
+      } else {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            "only system shared memory is supported currently");
+      }
       if (err == nullptr) {
         err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
       }
@@ -1594,7 +1600,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
           if (!shm_status_response->ParseFromArray(
                   status_buffer, status_byte_size)) {
             err = TRTSERVER_ErrorNew(
-                TRTSERVER_ERROR_UNKNOWN,
+                TRTSERVER_ERROR_INTERNAL,
                 "failed to parse shared memory status");
           }
         }
