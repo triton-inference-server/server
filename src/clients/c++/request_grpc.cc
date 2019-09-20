@@ -33,7 +33,6 @@
 #include <iostream>
 #include "src/clients/c++/request_common.h"
 #include "src/core/grpc_service.grpc.pb.h"
-#include "src/core/grpc_service.pb.h"
 #include "src/core/model_config.pb.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
@@ -309,6 +308,7 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
+  Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
 
  private:
   // GRPC end point.
@@ -339,7 +339,6 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   rshm_region->set_offset(offset);
   rshm_region->set_byte_size(byte_size);
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
@@ -364,7 +363,6 @@ SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
   auto unregister_info = request.mutable_unregister();
   unregister_info->set_name(name);
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
@@ -387,7 +385,6 @@ SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
 
   request.mutable_unregister_all();
 
-  Error grpc_status;
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
   if (status.ok()) {
@@ -399,6 +396,44 @@ SharedMemoryControlGrpcContextImpl::UnregisterAllSharedMemory()
         "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
             status.error_message());
   }
+}
+
+Error
+SharedMemoryControlGrpcContextImpl::GetSharedMemoryStatus(
+    SharedMemoryStatus* shm_status)
+{
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+  shm_status->Clear();
+
+  request.mutable_status();
+
+  Error grpc_status;
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    grpc_status = Error(response.request_status());
+    auto shm_status_response = response.mutable_shared_memory_status();
+    std::string response_str;
+    shm_status_response->SerializeToString(&response_str);
+    if (!shm_status->ParseFromString(response_str)) {
+      return Error(
+          RequestStatusCode::INTERNAL, "failed to parse shared memory status");
+    }
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+
+  // Log shared memory status if request is SUCCESS and verbose is true.
+  if ((grpc_status.IsOk()) && verbose_) {
+    std::cerr << shm_status->DebugString() << std::endl;
+  }
+  return grpc_status;
 }
 
 Error
