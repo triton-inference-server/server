@@ -293,8 +293,6 @@ WORKDIR /workspace
 RUN rm -fr *
 COPY . .
 
-RUN find / -name libtbb.so.2
-
 # Build the server.
 #
 # - Need to find CUDA stubs if they are available since some backends
@@ -412,9 +410,10 @@ COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model
 COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
      /opt/openvino_scripts/openvino_2019.1.144/tools
 ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.1.144
-ENV PYTHONPATH $INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
+ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 
-# ONNX Runtime uses Python3 syntax
+# ONNX Runtime requires Python3 to convert ONNX models to OpenVINO models
+# in its OpenVINO execution accelerator
 RUN apt-get update && apt-get install -y --no-install-recommends python3-pip
 RUN pip3 install --upgrade wheel setuptools && \
     (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
