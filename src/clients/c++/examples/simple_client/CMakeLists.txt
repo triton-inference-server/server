@@ -57,3 +57,4 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/flat_src/simple_client.cc
   DESTINATION src
 )
+

@@ -27,11 +27,5 @@
 cmake_minimum_required (VERSION 3.5)
 
 add_subdirectory(library)
-
-if(WIN32)
-  message("Currently, CMake will only build client library and skip example "
-          "clients in Windows. Because the examples use functionalities that "
-		      "are UNIX specific.")
-else()
 add_subdirectory(examples)
-endif()
+

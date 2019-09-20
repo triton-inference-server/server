@@ -38,3 +38,4 @@ install(
   TARGETS simple_string_client
   RUNTIME DESTINATION bin
 )
+

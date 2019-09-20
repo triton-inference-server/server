@@ -26,6 +26,11 @@
 
 cmake_minimum_required (VERSION 3.5)
 
+if(WIN32)
+  message("Currently, CMake will only build client library and skip example "
+          "clients in Windows. Because the examples use functionalities that "
+		      "are UNIX specific.")
+else()
 # Install cmake files that builds the samples within the client install.
 install(
   FILES
@@ -47,3 +52,6 @@ add_subdirectory(simple_callback_client)
 add_subdirectory(simple_sequence_client)
 add_subdirectory(simple_shm_client)
 add_subdirectory(simple_string_client)
+
+endif()
+

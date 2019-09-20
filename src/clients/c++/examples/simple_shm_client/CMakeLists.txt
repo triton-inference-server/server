@@ -39,3 +39,4 @@ install(
   TARGETS simple_shm_client
   RUNTIME DESTINATION bin
 )
+

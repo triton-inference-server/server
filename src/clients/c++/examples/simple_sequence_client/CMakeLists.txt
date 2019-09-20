@@ -38,3 +38,4 @@ install(
   TARGETS simple_sequence_client
   RUNTIME DESTINATION bin
 )
+
