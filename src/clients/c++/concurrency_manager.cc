@@ -372,13 +372,15 @@ ConcurrencyManager::AsyncInfer(
         num_reqs =
             ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
       }
-      for (size_t& i = ctxs[idx]->inflight_request_cnt_; i < num_reqs; i++) {
+
+      auto& inflight_request_cnt = ctxs[idx]->inflight_request_cnt_;
+      for (; inflight_request_cnt < num_reqs; inflight_request_cnt++) {
         uint32_t flags = 0;
         if (on_sequence_model_) {
-          if (i == 0) {
+          if (inflight_request_cnt == 0) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
           }
-          if (i == num_reqs - 1) {
+          if (inflight_request_cnt == (num_reqs - 1)) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
           }
           options->SetFlag(
