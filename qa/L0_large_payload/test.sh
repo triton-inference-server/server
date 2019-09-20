@@ -49,18 +49,11 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 MODEL_SUFFIX=nobatch_zero_1_float32
-rm -fr models && \
-    mkdir models && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/graphdef_$MODEL_SUFFIX \
-       models/. && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/netdef_$MODEL_SUFFIX \
-       models/. && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_$MODEL_SUFFIX \
-       models/. && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/savedmodel_$MODEL_SUFFIX \
-       models/. && \
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/libtorch_$MODEL_SUFFIX \
-       models/. 
+rm -fr models && mkdir models
+for TARGET in graphdef savedmodel netdef onnx libtorch plan; do
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$MODEL_SUFFIX \
+       models/.
+done
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
     cp `pwd`/libidentity.so models/custom_zero_1_float32/1/. && \
@@ -74,8 +67,7 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
 #
 # Skipping TensorRT Plan model for now as it only supports fixed size
 # tensor and it fails to generate layer with large dimension size
-# [TODO] Revisit this once TensorRT supports variable size tensor
-for TARGET in graphdef savedmodel netdef onnx libtorch custom; do
+for TARGET in graphdef savedmodel netdef onnx libtorch custom plan; do
     SERVER_LOG=$SERVER_LOG_BASE.$TARGET
     CLIENT_LOG=$CLIENT_LOG_BASE.$TARGET
 
