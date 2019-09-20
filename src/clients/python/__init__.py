@@ -35,6 +35,7 @@ import pkg_resources
 import struct
 import tensorrtserver.api.model_config_pb2
 from tensorrtserver.api.server_status_pb2 import ServerStatus
+from tensorrtserver.api.server_status_pb2 import SharedMemoryStatus
 from tensorrtserver.api.api_pb2 import *
 
 class _utf8(object):
@@ -120,6 +121,12 @@ _crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
 _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
 _crequest_shm_control_ctx_unregister.restype = c_void_p
 _crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
+_crequest_shm_control_ctx_unregister_all = _crequest.SharedMemoryControlContextUnregisterAll
+_crequest_shm_control_ctx_unregister_all.restype = c_void_p
+_crequest_shm_control_ctx_unregister_all.argtypes = [c_void_p]
+_crequest_shm_control_ctx_get_status = _crequest.SharedMemoryControlContextGetStatus
+_crequest_shm_control_ctx_get_status.restype = c_void_p
+_crequest_shm_control_ctx_get_status.argtypes =  [c_void_p, POINTER(c_char_p), POINTER(c_uint32)]
 
 _crequest_infer_ctx_new = _crequest.InferContextNew
 _crequest_infer_ctx_new.restype = c_void_p
@@ -770,6 +777,52 @@ class SharedMemoryControlContext:
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_shm_control_ctx_unregister(self._ctx, shm_handle)))
         return
+
+    def unregister_all(self):
+        """Request the inference server to unregister all shared memory regions.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to unregister any shared memory regions.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_unregister_all(self._ctx)))
+        return
+
+    def get_shared_memory_status(self):
+        """Contact the inference server and get status.
+
+        Returns
+        -------
+        SharedMemoryStatus
+            The SharedMemoryStatus protobuf containing the status.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to get status.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        cstatus = c_char_p()
+        cstatus_len = c_uint32()
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_get_status(
+                self._ctx, byref(cstatus), byref(cstatus_len))))
+        status_buf = cast(cstatus, POINTER(c_byte * cstatus_len.value))[0]
+
+        status = SharedMemoryStatus()
+        status.ParseFromString(status_buf)
+        return status
 
     def get_last_request_id(self):
         """Get the request ID of the most recent register() or unregister()

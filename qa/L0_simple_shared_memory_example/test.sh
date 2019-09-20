@@ -67,8 +67,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "localhost:8000" client_c++.log` != "9" ]; then
-    echo -e "\n***\n*** Failed. Expected 9 Host: localhost:8000 headers for C++ client\n***"
+if [ `grep -c "localhost:8000" client_c++.log` != "10" ]; then
+    echo -e "\n***\n*** Failed. Expected 10 Host: localhost:8000 headers for C++ client\n***"
     RET=1
 fi
 

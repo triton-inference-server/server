@@ -120,12 +120,30 @@ if len(error_msg) > 1:
 # Shared memory region larger than needed - Throws error
 basic_inference(shm_ip0_handle, shm_ip2_handle, shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 1:
-    if error_msg[-1] != "The input 'INPUT1' has shared memory of size 128 bytes while the expected size is 1 * 64 = 64 bytes":
+    if error_msg[-1] != "The input 'INPUT1' has shared memory of size 128 bytes"\
+                            " while the expected size is 1 * 64 = 64 bytes":
         raise Exception(error_msg[-1])
 
 # One of the inputs - INPUT1 does not use shared memory
 basic_inference(shm_ip0_handle, [input1_data], shm_op0_handle, shm_op1_handle, error_msg)
 if len(error_msg) > 2:
     raise Exception(error_msg[-1])
+
+# get status before and after shared memory
+status_before = shared_memory_ctx.get_shared_memory_status()
+assert len(status_before.shared_memory_region) == 5
+shared_memory_ctx.unregister_all()
+status_after = shared_memory_ctx.get_shared_memory_status()
+assert len(status_after.shared_memory_region) == 0
+
+# cleanup (error with shm_op0_handle destroy since open on server)
+shm.destroy_shared_memory_region(shm_ip0_handle)
+shm.destroy_shared_memory_region(shm_ip1_handle)
+shm.destroy_shared_memory_region(shm_ip2_handle)
+shm.destroy_shared_memory_region(shm_op1_handle)
+try:
+    shm.destroy_shared_memory_region(shm_op0_handle)
+except:
+    pass
 
 print(error_msg)

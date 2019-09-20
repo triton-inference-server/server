@@ -329,6 +329,7 @@ ModelControlContextUnload(ModelControlContextCtx* ctx, const char* model_name)
 //==============================================================================
 struct SharedMemoryControlContextCtx {
   std::unique_ptr<nic::SharedMemoryControlContext> ctx;
+  std::string status_buf;
 };
 
 nic::Error*
@@ -396,6 +397,38 @@ SharedMemoryControlContextUnregister(
   nic::Error err = ctx->ctx->UnregisterSharedMemory(handle->trtis_shm_name_);
   if (err.IsOk()) {
     return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+SharedMemoryControlContextUnregisterAll(SharedMemoryControlContextCtx* ctx)
+{
+  nic::Error err = ctx->ctx->UnregisterAllSharedMemory();
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+
+nic::Error*
+SharedMemoryControlContextGetStatus(
+    SharedMemoryControlContextCtx* ctx, char** status, uint32_t* status_len)
+{
+  ctx->status_buf.clear();
+
+  ni::SharedMemoryStatus shm_status;
+  nic::Error err = ctx->ctx->GetSharedMemoryStatus(&shm_status);
+  if (err.IsOk()) {
+    if (shm_status.SerializeToString(&ctx->status_buf)) {
+      *status = &ctx->status_buf[0];
+      *status_len = ctx->status_buf.size();
+    } else {
+      err = nic::Error(
+          ni::RequestStatusCode::INTERNAL, "failed to parse server status");
+    }
   }
 
   return new nic::Error(err);

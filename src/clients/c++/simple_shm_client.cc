@@ -369,22 +369,33 @@ main(int argc, char** argv)
     }
   }
 
-  // Unregister and cleanup shared memory
+  // Get shared memory regions all active/registered within TRTIS
+  ni::SharedMemoryStatus status;
+  err = shared_memory_ctx->GetSharedMemoryStatus(&status);
+  if (!err.IsOk()) {
+    std::cerr << "error: " << err << std::endl;
+    exit(1);
+  }
+  std::cout << "Shared Memory Status:\n" << status.DebugString() << "\n";
+
+  // Unregister shared memory (One by one or all at a time) from TRTIS
+  // err = shared_memory_ctx->UnregisterAllSharedMemory();
   err = shared_memory_ctx->UnregisterSharedMemory("input_data");
   if (!err.IsOk()) {
     std::cerr << "error: unable to unregister shared memory input region: "
               << err << std::endl;
     exit(1);
   }
-  UnmapSharedMemory(input0_shm, input_byte_size * 2);
-  UnlinkSharedMemoryRegion("/input_simple");
-
   err = shared_memory_ctx->UnregisterSharedMemory("output_data");
   if (!err.IsOk()) {
     std::cerr << "error: unable to unregister shared memory output region: "
               << err << std::endl;
     exit(1);
   }
+
+  // Cleanup shared memory
+  UnmapSharedMemory(input0_shm, input_byte_size * 2);
+  UnlinkSharedMemoryRegion("/input_simple");
   UnmapSharedMemory(output0_shm, output_byte_size * 2);
   UnlinkSharedMemoryRegion("/output_simple");
   return 0;

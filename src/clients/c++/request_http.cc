@@ -599,12 +599,14 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const size_t byte_size) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
+  Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
 
  private:
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size);
+  static size_t ResponseHandler(void*, size_t, size_t, void*);
 
   // URL for control endpoint on inference server.
   const std::string url_;
@@ -617,7 +619,22 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
 
   // Enable verbose output
   const bool verbose_;
+
+  // Serialized SharedMemoryStatus response from server.
+  std::string response_;
 };
+
+size_t
+SharedMemoryControlHttpContextImpl::ResponseHandler(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  SharedMemoryControlHttpContextImpl* ctx =
+      reinterpret_cast<SharedMemoryControlHttpContextImpl*>(userp);
+  uint8_t* buf = reinterpret_cast<uint8_t*>(contents);
+  size_t result_bytes = size * nmemb;
+  std::copy(buf, buf + result_bytes, std::back_inserter(ctx->response_));
+  return result_bytes;
+}
 
 SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
     const std::string& url, const std::map<std::string, std::string>& headers,
@@ -649,10 +666,32 @@ SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 }
 
 Error
+SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
+    SharedMemoryStatus* shm_status)
+{
+  shm_status->Clear();
+
+  Error err = SendRequest("status", "", "", 0, 0);
+  if (err.IsOk()) {
+    if (!shm_status->ParseFromString(response_)) {
+      return Error(
+          RequestStatusCode::INTERNAL, "failed to parse shared memory status");
+    }
+
+    if (verbose_) {
+      std::cout << shm_status->DebugString() << std::endl;
+    }
+  }
+
+  return err;
+}
+
+Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
     const std::string& shm_key, const size_t offset, const size_t byte_size)
 {
+  response_.clear();
   request_status_.Clear();
 
   if (!curl_global.Status().IsOk()) {
@@ -673,11 +712,14 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }
+  full_url += "?format=binary";
 
   curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-  // use POST method
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  if (action_str != "status") {
+    // use POST method
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  }
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
@@ -685,6 +727,10 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   // response headers handled by ResponseHeaderHandler()
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
   curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Response data handled by ResponseHandler()
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
 
   // Add custom headers...
   struct curl_slist* header_list = nullptr;
