@@ -36,6 +36,7 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png',
              'preprocessed', 'jmx', 'gz',
              'caffemodel')
 SKIP_PATHS = ('builddir',
+              'build/libevhtp',
               'deploy/single_server/.helmignore',
               'docs/examples/model_repository',
               'docs/examples/ensemble_model_repository',
