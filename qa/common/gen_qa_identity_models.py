@@ -585,6 +585,7 @@ def create_plan_dynamic_rf_modelfile(
         out_node = network.add_identity(in_node)
 
         out_node.get_output(0).set_name("OUTPUT{}".format(io_num))
+        out_node.get_output(0).set_type(trt_dtype)
         network.mark_output(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
