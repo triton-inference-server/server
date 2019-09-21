@@ -226,6 +226,67 @@ MaximumDims(
   return Status::Success;
 }
 
+Status
+ValidateDimension(
+    const nvinfer1::Dims& this_dims, const nvinfer1::Dims& min_dims,
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension)
+{
+  const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
+  if ((this_dims.nbDims + nonbatch_start_idx) != max_dims.nbDims) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "The number of dimensions expected by engine: " +
+            std::to_string(max_dims.nbDims - nonbatch_start_idx) +
+            ", Got: " + std::to_string(this_dims.nbDims));
+  }
+
+  for (int i = 0; i < this_dims.nbDims; i++) {
+    if (this_dims.d[i] < min_dims.d[i + nonbatch_start_idx] ||
+        this_dims.d[i] > max_dims.d[i + nonbatch_start_idx]) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "The shape of dimension " + std::to_string(i) +
+              " is expected to be in range from " +
+              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " to " +
+              std::to_string(max_dims.d[i + nonbatch_start_idx]) +
+              ", Got: " + std::to_string(this_dims.d[i]));
+    }
+  }
+  return Status::Success;
+}
+
+Status
+ValidateDimension(
+    const DimsList& this_dims, const nvinfer1::Dims& min_dims,
+    const nvinfer1::Dims& max_dims, const bool skip_first_dimension)
+{
+  const int nonbatch_start_idx = (skip_first_dimension ? 1 : 0);
+  if (int(this_dims.size() + nonbatch_start_idx) != max_dims.nbDims) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "The number of dimensions expected by engine: " +
+            std::to_string(max_dims.nbDims - nonbatch_start_idx) +
+            ", Got: " + std::to_string(this_dims.size()));
+  }
+
+  for (int i = 0; i < int(this_dims.size()); i++) {
+    if (this_dims[i] == -1) {
+      continue;
+    }
+    if (this_dims[i] < min_dims.d[i + nonbatch_start_idx] ||
+        this_dims[i] > max_dims.d[i + nonbatch_start_idx]) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "The shape of dimension " + std::to_string(i) +
+              " is expected to be in range from " +
+              std::to_string(min_dims.d[i + nonbatch_start_idx]) + " to " +
+              std::to_string(max_dims.d[i + nonbatch_start_idx]) +
+              ", Got: " + std::to_string(this_dims[i]));
+    }
+  }
+  return Status::Success;
+}
+
 
 void
 DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)

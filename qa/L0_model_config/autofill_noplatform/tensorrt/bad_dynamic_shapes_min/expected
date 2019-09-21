@@ -1,0 +1,1 @@
+model config specifies invalid shape for input 'INPUT0' for bad_dynamic_shapes_min_0_gpu0. Error details: The shape of dimension 0 is expected to be in range from 4 to 32, Got: 3

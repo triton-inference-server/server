@@ -47,7 +47,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 TRIALS="tensorflow_savedmodel tensorflow_graphdef tensorrt_plan caffe2_netdef onnxruntime_onnx pytorch_libtorch custom"
 
-# Copy TensorRT plans into the test model repositories.
+# Copy fixed TensorRT plans into the test model repositories.
 for modelpath in \
         autofill_noplatform/tensorrt/bad_input_dims/1 \
         autofill_noplatform/tensorrt/bad_input_type/1 \
@@ -64,6 +64,15 @@ for modelpath in \
         autofill_noplatform_success/tensorrt/incomplete_output/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float32_float32_float32/1/model.plan \
+       $modelpath/.
+done
+
+# Copy variable-sized TensorRT plans into the test model repositories.
+for modelpath in \
+        autofill_noplatform/tensorrt/bad_dynamic_shapes_max/1 \
+        autofill_noplatform/tensorrt/bad_dynamic_shapes_min/1; do
+    mkdir -p $modelpath
+    cp /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32/1/model.plan \
        $modelpath/.
 done
 

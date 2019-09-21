@@ -1,0 +1,24 @@
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 33 ]
+  },
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 33 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 33 ]
+  },
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 33 ]
+  }
+]
