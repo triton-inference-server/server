@@ -45,7 +45,8 @@ PlanBackend::Context::Context(
     const int profile_index)
     : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
       engine_(nullptr), context_(nullptr), is_dynamic_(false),
-      profile_index_(profile_index), max_dynamic_batch_size_(INT_MAX),
+      profile_index_(profile_index), min_dims_(nullptr),
+      max_dims_(nullptr), max_dynamic_batch_size_(INT_MAX),
       byte_sizes_(nullptr), buffers_(nullptr)
 {
   stream_ = nullptr;
@@ -58,6 +59,16 @@ PlanBackend::Context::~Context()
   if (byte_sizes_ != nullptr) {
     delete[] byte_sizes_;
     byte_sizes_ = nullptr;
+  }
+
+  if (min_dims_ != nullptr) {
+    delete[] min_dims_;
+    min_dims_ = nullptr;
+  }
+
+  if (max_dims_ != nullptr) {
+    delete[] max_dims_;
+    max_dims_ = nullptr;
   }
 
   if (buffers_ != nullptr) {
@@ -305,6 +316,8 @@ PlanBackend::CreateExecutionContext(
   // what is in the configuration. Allocate memory for the maximum
   // possible batch size: min(engine maximum, config maximum)
   context->byte_sizes_ = new uint64_t[context->num_expected_bindings_];
+  context->min_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
+  context->max_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
   context->buffers_ =
       new void*[context->num_expected_bindings_]();  // init to nullptr
 
@@ -499,6 +512,17 @@ PlanBackend::Context::InitializeInputBinding(
   } else {
     nvinfer1::Dims max_profile_dims = engine_->getProfileDimensions(
         index, profile_index_, nvinfer1::OptProfileSelector::kMAX);
+    min_dims_[index - binding_offset_] = engine_->getProfileDimensions(
+        index, profile_index_, nvinfer1::OptProfileSelector::kMIN);
+    Status status = ValidateDimension(
+        model_config_dims, min_dims_[index - binding_offset_], max_profile_dims,
+        support_batching);
+    if (!status.IsOk()) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "model config specifies invalid shape for input '" + input_name +
+              "' for " + name_ + ". Error details: " + status.Message());
+    }
     RETURN_IF_ERROR(MaximumDims(
         max_profile_dims, model_config_dims, &maximum_dims, support_batching));
     if (support_batching) {
@@ -509,6 +533,8 @@ PlanBackend::Context::InitializeInputBinding(
       max_dynamic_batch_size_ = 1;
     }
     byte_size = GetByteSize(max_batch_size_, dt, maximum_dims);
+    // Update the maximum dimension with respect to the allocated buffer
+    DimVecToDims(maximum_dims, &max_dims_[index - binding_offset_]);
   }
   if (byte_size == -1) {
     return Status(
@@ -542,10 +568,9 @@ PlanBackend::Context::InitializeInputBinding(
     if (!context_->setBindingDimensions(index, input_dim)) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "failed to set binding dimension to " + DimsDebugString(input_dim) +
-              " for input '" + input_name + "' for " + name_ +
-              ". Expected shape :" +
-              DimsDebugString(engine_->getBindingDimensions(index)));
+          "trt failed to set binding dimension to " +
+              DimsDebugString(input_dim) + " for input '" + input_name +
+              "' for " + name_);
     }
   }
 
@@ -880,12 +905,20 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
             "failed to create dims object for " + DimsListToString(shape) +
                 " for input '" + name + "' for " + name_ + ".");
       }
+      Status status = ValidateDimension(
+          this_dim, min_dims_[bindex], max_dims_[bindex], false);
+      if (!status.IsOk()) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "request specifies invalid shape for input '" + name + "' for " +
+                name_ + ". Error details: " + status.Message());
+      }
       if (!context_->setBindingDimensions(binding_offset_ + bindex, this_dim)) {
         return Status(
             RequestStatusCode::INTERNAL,
-            "failed to set binding dimension to " + DimsDebugString(this_dim) +
-                " for input '" + name + "' for " + name_ +
-                ". The dimension is beyond the limits of optimization profile");
+            "trt failed to set binding dimension to " +
+                DimsDebugString(this_dim) + " for input '" + name + "' for " +
+                name_);
       }
     }
   }
