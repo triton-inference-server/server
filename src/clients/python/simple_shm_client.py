@@ -57,7 +57,7 @@ if __name__ == '__main__':
     # each and returns 2 output tensors of 16 integers each. One
     # output tensor is the element-wise sum of the inputs and one
     # output is the element-wise difference.
-    model_name = "simple"
+    model_name = "libtorch_float32_float32_float32"
     model_version = -1
     batch_size = 1
 

@@ -219,7 +219,7 @@ InputImpl::SetSharedMemory(
   }
 
   // verify byte size of shared memory equals that of expected batch byte size
-  if (byte_size != (batch_size_ * byte_size_)) {
+  if (byte_size > (batch_size_ * byte_size_)) {
     return Error(
         RequestStatusCode::INVALID_ARG,
         "The input '" + Name() + "' has shared memory of size " +
