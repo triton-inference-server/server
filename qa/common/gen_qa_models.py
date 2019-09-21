@@ -573,7 +573,7 @@ output [
 
 def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
-        input_dtype, output0_dtype, output1_dtype, swap):
+        input_dtype, output0_dtype, output1_dtype, swap, min_dim, max_dim):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
@@ -627,10 +627,9 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
         max_shape = max_shape + [max(1, max_batch)]
     for i in input_shape:
         if i == -1:
-            # Generating a very generous optimization profile
-            min_shape = min_shape + [1]
-            opt_shape = opt_shape + [8]
-            max_shape = max_shape + [32]
+            min_shape = min_shape + [min_dim]
+            opt_shape = opt_shape + [int((max_dim + min_dim) / 2)]
+            max_shape = max_shape + [max_dim]
         else:
             min_shape = min_shape + [i]
             opt_shape = opt_shape + [i]
@@ -656,8 +655,12 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network,config)
 
 
+    # Use a different model name for different kinds of models
     model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
                                    input_dtype, output0_dtype, output1_dtype)
+    if min_dim != 1 or max_dim !=32:
+        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -673,7 +676,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
 
 def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
-        input_dtype, output0_dtype, output1_dtype, swap):
+        input_dtype, output0_dtype, output1_dtype, swap, min_dim, max_dim):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
     trt_output1_dtype = np_to_trt_dtype(output1_dtype)
@@ -710,10 +713,9 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
         max_shape = max_shape + [max(1, max_batch)]
     for i in input_shape:
         if i == -1:
-            # Generating a very generous optimization profile
-            min_shape = min_shape + [1]
-            opt_shape = opt_shape + [8]
-            max_shape = max_shape + [32]
+            min_shape = min_shape + [min_dim]
+            opt_shape = opt_shape + [int((max_dim + min_dim) / 2)]
+            max_shape = max_shape + [max_dim]
         else:
             min_shape = min_shape + [i]
             opt_shape = opt_shape + [i]
@@ -728,8 +730,12 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     engine = builder.build_engine(network,config)
 
 
+    # Use a different model name for different kinds of models
     model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
                                    input_dtype, output0_dtype, output1_dtype)
+    if min_dim != 1 or max_dim !=32:
+        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+       
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -865,7 +871,7 @@ def create_plan_fixed_modelfile( models_dir, max_batch, model_version,
 def create_plan_modelfile(
         models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
-        input_dtype, output0_dtype, output1_dtype, swap=False):
+        input_dtype, output0_dtype, output1_dtype, swap=False, min_dim=1, max_dim=32):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
@@ -878,7 +884,8 @@ def create_plan_modelfile(
             create_plan_dynamic_rf_modelfile(
                 models_dir, max_batch, model_version,
                 input_shape, output0_shape, output1_shape,
-                input_dtype, output0_dtype, output1_dtype, swap)
+                input_dtype, output0_dtype, output1_dtype, swap,
+                min_dim, max_dim)
         else:
             create_plan_fixed_rf_modelfile(
                 models_dir, max_batch, model_version,
@@ -892,7 +899,8 @@ def create_plan_modelfile(
             create_plan_dynamic_modelfile(
                 models_dir, max_batch, model_version,
                 input_shape, output0_shape, output1_shape,
-                input_dtype, output0_dtype, output1_dtype, swap)
+                input_dtype, output0_dtype, output1_dtype, swap,
+                min_dim, max_dim)
         else:
             create_plan_fixed_modelfile(
                 models_dir, max_batch, model_version,
@@ -903,7 +911,7 @@ def create_plan_modelconfig(
         models_dir, max_batch, model_version,
         input_shape, output0_shape, output1_shape,
         input_dtype, output0_dtype, output1_dtype,
-        output0_label_cnt, version_policy):
+        output0_label_cnt, version_policy, min_dim=1, max_dim=32):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      input_shape, output0_shape, output1_shape):
@@ -920,9 +928,12 @@ def create_plan_modelconfig(
         else:
             version_policy_str = "{ all { }}"
 
-    # Use a different model name for the non-batching variant
+    # Use a different model name for different kinds of models
     model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
                                    input_dtype, output0_dtype, output1_dtype)
+    if min_dim != 1 or max_dim !=32:
+        model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
+
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -1302,6 +1313,19 @@ def create_models(
             models_dir, 0, model_version,
             input_shape + suffix, output0_shape + suffix, output1_shape + suffix,
             input_dtype, output0_dtype, output1_dtype)
+        
+        if -1 in input_shape:
+            # models for testing optimization profiles
+            create_plan_modelconfig(
+                models_dir, 8, model_version,
+                input_shape + suffix, output0_shape + suffix, output1_shape  + suffix,
+                input_dtype, output0_dtype, output1_dtype,
+                output0_label_cnt, version_policy, min_dim=4, max_dim=32)
+            create_plan_modelfile(
+                models_dir, 8, model_version,
+                input_shape + suffix, output0_shape + suffix, output1_shape + suffix,
+                input_dtype, output0_dtype, output1_dtype, min_dim=4, max_dim=32)
+
 
     if FLAGS.onnx:
         # max-batch 8
@@ -1499,7 +1523,7 @@ if __name__ == '__main__':
                                             (16,), (16,), (16,), vt, vt, vt, swap=True)
                 create_plan_modelfile(FLAGS.models_dir, 0, 3,
                                             (16,), (16,), (16,), vt, vt, vt, swap=True)
-            
+                
             vt = np.int8
             #handle INT8 separately as it doesn't allow 1d tensors
             create_plan_modelfile(FLAGS.models_dir, 8, 2,
@@ -1549,7 +1573,7 @@ if __name__ == '__main__':
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
-        create_models(FLAGS.models_dir, np.float32, np.float32, np.float32, (-1,), (16,), (16,), 16)
+        create_models(FLAGS.models_dir, np.float32, np.float32, np.float32, (-1,), (-1,), (-1,), 16)
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int32, (-1,-1), (2,8), (2,8), 16)
         create_models(FLAGS.models_dir, np.float32, np.int64, np.int64, (8,-1), (8,4), (8,4), 32)
         create_models(FLAGS.models_dir, np.float32, np.int32, np.int64, (-1,8,-1), (2,8,2), (2,8,2), 32)

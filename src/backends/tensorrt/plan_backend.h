@@ -113,6 +113,11 @@ class PlanBackend : public InferenceBackend {
     // Offset used for addressing bindings from the configured optmization
     // profile
     int binding_offset_;
+    // Min Dimensions per bindings
+    nvinfer1::Dims* min_dims_;
+    // Max Dimensions per bindings
+    nvinfer1::Dims* max_dims_;
+
     // Stores the minimum of the maximum possible value of the first dimension
     int max_dynamic_batch_size_;
 
