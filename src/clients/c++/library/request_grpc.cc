@@ -697,23 +697,25 @@ InferGrpcContextImpl::Run(ResultMap* results)
       std::static_pointer_cast<GrpcRequestImpl>(sync_request_);
 
   sync_request->Timer().Reset();
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+
   // Use send timer to measure time for marshalling infer request
-  sync_request->Timer().Record(RequestTimers::Kind::SEND_START);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
   Error err = PreRunProcessing(sync_request_);
   if (!err.IsOk()) {
     return err;
   }
-  sync_request->Timer().Record(RequestTimers::Kind::SEND_END);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
 
-  sync_request->Timer().Record(RequestTimers::Kind::REQUEST_START);
   sync_request->grpc_response_->Clear();
   sync_request->grpc_status_ =
       stub_->Infer(&context, request_, sync_request->grpc_response_.get());
-  sync_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
 
-  sync_request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
   Error request_status = sync_request->GetResults(*this, results);
-  sync_request->Timer().Record(RequestTimers::Kind::RECEIVE_END);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
 
   err = UpdateStat(sync_request->Timer());
   if (!err.IsOk()) {
@@ -763,16 +765,17 @@ InferGrpcContextImpl::AsyncRun(
     }
   }
 
-  current_context->Timer().Reset();
-  current_context->Timer().Record(RequestTimers::Kind::SEND_START);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+
   Error err = PreRunProcessing(*async_request);
   if (!err.IsOk()) {
     ongoing_async_requests_.erase(current_context->Id());
     return err;
   }
-  current_context->Timer().Record(RequestTimers::Kind::SEND_END);
 
-  current_context->Timer().Record(RequestTimers::Kind::REQUEST_START);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
+
   std::unique_ptr<grpc::ClientAsyncResponseReader<InferResponse>> rpc(
       stub_->PrepareAsyncInfer(
           &current_context->grpc_context_, request_,
@@ -801,9 +804,9 @@ InferGrpcContextImpl::GetAsyncRunResults(
   std::shared_ptr<GrpcRequestImpl> grpc_request =
       std::static_pointer_cast<GrpcRequestImpl>(async_request);
 
-  grpc_request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
+  grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
   Error request_status = grpc_request->GetResults(*this, results);
-  grpc_request->Timer().Record(RequestTimers::Kind::RECEIVE_END);
+  grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
   err = UpdateStat(grpc_request->Timer());
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -931,7 +934,8 @@ InferGrpcContextImpl::AsyncTransfer()
 
         std::shared_ptr<GrpcRequestImpl> grpc_request =
             std::static_pointer_cast<GrpcRequestImpl>(itr->second);
-        grpc_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
+        grpc_request->Timer().CaptureTimestamp(
+            RequestTimers::Kind::REQUEST_END);
         grpc_request->SetIsReady(true);
         if (grpc_request->HasCallback()) {
           request_with_callback = itr->second;
@@ -1052,16 +1056,16 @@ InferGrpcStreamContextImpl::AsyncRun(
     }
   }
 
-  current_context->Timer().Reset();
-  current_context->Timer().Record(RequestTimers::Kind::SEND_START);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+
   Error err = PreRunProcessing(*async_request);
   if (!err.IsOk()) {
     ongoing_async_requests_.erase(current_context->Id());
     return err;
   }
-  current_context->Timer().Record(RequestTimers::Kind::SEND_END);
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
 
-  current_context->Timer().Record(RequestTimers::Kind::REQUEST_START);
   bool ok = stream_->Write(request_);
 
   if (ok) {
@@ -1098,7 +1102,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
       std::shared_ptr<GrpcRequestImpl> grpc_request =
           std::static_pointer_cast<GrpcRequestImpl>(itr->second);
       grpc_request->grpc_response_->Swap(&response);
-      grpc_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
+      grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
       grpc_request->SetIsReady(true);
       if (grpc_request->HasCallback()) {
         request_with_callback = itr->second;

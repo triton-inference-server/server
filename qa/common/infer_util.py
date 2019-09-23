@@ -230,7 +230,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         if not skip_request_id_check:
             global _seen_request_ids
             request_id = ctx.get_last_request_id()
-            tester.assertFalse(request_id in _seen_request_ids)
+            tester.assertFalse(request_id in _seen_request_ids,
+                               "request_id: {}".format(request_id))
             _seen_request_ids.add(request_id)
 
         tester.assertEqual(ctx.get_last_request_model_name(), model_name)
