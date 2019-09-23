@@ -57,14 +57,15 @@ ConcurrencyManager::Create(
     std::unique_ptr<LoadManager>* manager)
 {
   std::unique_ptr<ConcurrencyManager> local_manager(new ConcurrencyManager(
-      batch_size, max_threads, sequence_length, zero_input, factory));
+      input_shapes, batch_size, max_threads, sequence_length, factory));
 
   std::unique_ptr<nic::InferContext> ctx;
   RETURN_IF_ERROR(local_manager->factory_->CreateInferContext(&ctx));
 
-  // Validate user provided shape
-  if (!input_shapes.empty()) {
-    for (const auto& input : ctx->Inputs()) {
+  size_t max_input_byte_size = 0;
+  for (const auto& input : ctx->Inputs()) {
+    // Validate user provided shape
+    if (!input_shapes.empty()) {
       auto it = input_shapes.find(input->Name());
       if (it != input_shapes.end()) {
         const auto& dims = it->second;
@@ -78,12 +79,36 @@ ConcurrencyManager::Create(
         }
       }
     }
-    local_manager->input_shapes_ = input_shapes;
-  }
 
-  // Read provided data
-  if (!data_directory.empty()) {
-    for (const auto& input : ctx->Inputs()) {
+    // For variable shape, set the shape if specified
+    if (input->Shape().empty()) {
+      auto it = input_shapes.find(input->Name());
+      if (it != input_shapes.end()) {
+        input->SetShape(it->second);
+      }
+    }
+    const int64_t bs = input->ByteSize();
+    if (bs < 0) {
+      std::string error_detail;
+      if (input->Shape().empty()) {
+        error_detail =
+            "has variable-size shape and the shape to be used is not specified";
+      } else {
+        error_detail = "has STRING data type";
+      }
+      return nic::Error(
+          ni::RequestStatusCode::INVALID_ARG,
+          "input '" + input->Name() + "' " + error_detail +
+              ", unable to create input values for "
+              "model '" +
+              ctx->ModelName() + "'");
+    }
+
+    max_input_byte_size =
+        std::max(max_input_byte_size, (size_t)input->ByteSize());
+
+    // Read provided data
+    if (!data_directory.empty()) {
       const auto file_path = data_directory + "/" + input->Name();
       auto it =
           local_manager->input_data_.emplace(input->Name(), std::vector<char>())
@@ -92,17 +117,30 @@ ConcurrencyManager::Create(
     }
   }
 
+  // Create a zero or randomly (as indicated by zero_input_)
+  // initialized buffer that is large enough to provide the largest
+  // needed input. We (re)use this buffer for all input values.
+  if (zero_input) {
+    local_manager->input_buf_.resize(max_input_byte_size, 0);
+  } else {
+    local_manager->input_buf_.resize(max_input_byte_size);
+    for (auto& byte : local_manager->input_buf_) {
+      byte = rand();
+    }
+  }
+
   *manager = std::move(local_manager);
   return nic::Error::Success;
 }
 
 ConcurrencyManager::ConcurrencyManager(
+    const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const bool zero_input,
+    const size_t sequence_length,
     const std::shared_ptr<ContextFactory>& factory)
     : batch_size_(batch_size), max_threads_(max_threads),
-      sequence_length_(sequence_length), zero_input_(zero_input),
-      factory_(factory)
+      sequence_length_(sequence_length), factory_(factory),
+      input_shapes_(input_shapes)
 {
   request_timestamps_.reset(new TimestampVector());
   on_sequence_model_ = (factory_->SchedulerType() == ContextFactory::SEQUENCE);
@@ -180,8 +218,7 @@ ConcurrencyManager::SwapTimestamps(TimestampVector& new_timestamps)
 nic::Error
 ConcurrencyManager::PrepareInfer(
     std::unique_ptr<nic::InferContext>* ctx,
-    std::unique_ptr<nic::InferContext::Options>* options,
-    std::vector<uint8_t>& input_buffer)
+    std::unique_ptr<nic::InferContext::Options>* options)
 {
   RETURN_IF_ERROR(factory_->CreateInferContext(ctx));
 
@@ -220,45 +257,14 @@ ConcurrencyManager::PrepareInfer(
 
   RETURN_IF_ERROR((*ctx)->SetRunOptions(*(*options)));
 
-  // Create a zero or randomly (as indicated by zero_input_)
-  // initialized buffer that is large enough to provide the largest
-  // needed input. We (re)use this buffer for all input values.
-  size_t max_input_byte_size = 0;
+  // Set the provided shape for variable shape tensor
   for (const auto& input : (*ctx)->Inputs()) {
-    // For variable shape, first set the shape if specified
     if (input->Shape().empty()) {
       auto it = input_shapes_.find(input->Name());
       if (it != input_shapes_.end()) {
         input->SetShape(it->second);
       }
     }
-    const int64_t bs = input->ByteSize();
-    if (bs < 0) {
-      std::string error_detail;
-      if (input->Shape().empty()) {
-        error_detail =
-            "has variable-size shape and the shape to be used is not specified";
-      } else {
-        error_detail = "has STRING data type";
-      }
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "input '" + input->Name() + "' " + error_detail +
-              ", unable to create input values for "
-              "model '" +
-              (*ctx)->ModelName() + "'");
-    }
-
-    max_input_byte_size =
-        std::max(max_input_byte_size, (size_t)input->ByteSize());
-  }
-
-  if (input_buffer.size() == 0) {
-    std::vector<uint8_t> input_buf(max_input_byte_size);
-    for (size_t i = 0; i < input_buf.size(); ++i) {
-      input_buf[i] = (zero_input_) ? 0 : rand();
-    }
-    input_buffer.swap(input_buf);
   }
 
   // Initialize inputs
@@ -266,7 +272,7 @@ ConcurrencyManager::PrepareInfer(
     RETURN_IF_ERROR(input->Reset());
 
     size_t batch1_size = (size_t)input->ByteSize();
-    const uint8_t* data = &input_buffer[0];
+    const uint8_t* data = &input_buf_[0];
     // if available, use provided data instead
     auto it = input_data_.find(input->Name());
     if (it != input_data_.end()) {
@@ -323,7 +329,6 @@ ConcurrencyManager::AsyncInfer(
   std::vector<std::unique_ptr<InferContextMetaData>> ctxs;
 
   // Variable that can be used across InferContexts
-  std::vector<uint8_t> input_buf;
   std::unique_ptr<nic::InferContext::Options> options(nullptr);
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
 
@@ -350,7 +355,7 @@ ConcurrencyManager::AsyncInfer(
     while (active_ctx_cnt > ctxs.size()) {
       ctxs.emplace_back(new InferContextMetaData());
       stats->emplace_back();
-      *err = PrepareInfer(&(ctxs.back()->ctx_), &options, input_buf);
+      *err = PrepareInfer(&(ctxs.back()->ctx_), &options);
       if (!err->IsOk()) {
         return;
       }
@@ -367,13 +372,15 @@ ConcurrencyManager::AsyncInfer(
         num_reqs =
             ctxs[idx]->inflight_request_cnt_ == 0 ? GetRandomLength(0.2) : 0;
       }
-      for (size_t& i = ctxs[idx]->inflight_request_cnt_; i < num_reqs; i++) {
+
+      auto& inflight_request_cnt = ctxs[idx]->inflight_request_cnt_;
+      for (; inflight_request_cnt < num_reqs; inflight_request_cnt++) {
         uint32_t flags = 0;
         if (on_sequence_model_) {
-          if (i == 0) {
+          if (inflight_request_cnt == 0) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_START;
           }
-          if (i == num_reqs - 1) {
+          if (inflight_request_cnt == (num_reqs - 1)) {
             flags |= ni::InferRequestHeader::FLAG_SEQUENCE_END;
           }
           options->SetFlag(
