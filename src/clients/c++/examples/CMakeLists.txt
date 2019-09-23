@@ -26,6 +26,16 @@
 
 cmake_minimum_required (VERSION 3.5)
 
+# Source with include paths adjusted to reflect that all headers are
+# in the same directory. These source versions are used in the client
+# container install.
+set(TRTIS_CLIENT_HEADER_FLAT 1)
+configure_file(simple_client.cc.in flat_src/simple_client.cc @ONLY)
+
+# Source with full include paths needed for build.
+set(TRTIS_CLIENT_HEADER_FLAT 0)
+configure_file(simple_client.cc.in simple_client.cc @ONLY)
+
 if(WIN32)
   message("Currently, CMake will only build client library and skip example "
           "clients in Windows. Because the examples use functionalities that "
@@ -44,14 +54,95 @@ install(
   RENAME CMakeLists.txt
 )
 
-add_subdirectory(ensemble_image_client)
-add_subdirectory(image_client)
-add_subdirectory(perf_client)
-add_subdirectory(simple_client)
-add_subdirectory(simple_callback_client)
-add_subdirectory(simple_sequence_client)
-add_subdirectory(simple_shm_client)
-add_subdirectory(simple_string_client)
+#
+# ensemble_image_client
+#
+add_executable(ensemble_image_client ensemble_image_client.cc)
+target_link_libraries(
+  ensemble_image_client
+  PRIVATE request_static
+)
+install(
+  TARGETS ensemble_image_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# image_client
+#
+find_package(OpenCV REQUIRED)
+add_executable(image_client image_client.cc)
+target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(
+  image_client
+  PRIVATE request_static
+  PRIVATE ${OpenCV_LIBS}
+)
+install(
+  TARGETS image_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# simple_callback_client
+#
+add_executable(simple_callback_client simple_callback_client.cc)
+target_link_libraries(
+  simple_callback_client
+  PRIVATE request_static
+)
+install(
+  TARGETS simple_callback_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# simple_client
+#
+add_executable(
+  simple_client
+  ${CMAKE_CURRENT_BINARY_DIR}/simple_client.cc
+)
+target_link_libraries(
+  simple_client
+  PRIVATE request_static
+)
+install(
+  TARGETS simple_client
+  RUNTIME DESTINATION bin
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/flat_src/simple_client.cc
+  DESTINATION src
+)
+
+#
+# simple_shm_client
+#
+add_executable(simple_shm_client simple_shm_client.cc)
+target_link_libraries(
+  simple_shm_client
+  PRIVATE request_static
+  rt
+)
+install(
+  TARGETS simple_shm_client
+  RUNTIME DESTINATION bin
+)
+
+#
+# simple_string_client
+#
+add_executable(simple_string_client simple_string_client.cc)
+target_link_libraries(
+  simple_string_client
+  PRIVATE request_static
+)
+install(
+  TARGETS simple_string_client
+  RUNTIME DESTINATION bin
+)
 
 endif()
 

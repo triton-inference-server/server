@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "src/clients/c++/examples/perf_client/perf_utils.h"
+#include "src/clients/c++/perf_client/perf_utils.h"
 
 namespace perfclient {
 

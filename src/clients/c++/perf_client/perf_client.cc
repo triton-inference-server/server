@@ -26,11 +26,11 @@
 
 #include <getopt.h>
 
-#include "src/clients/c++/examples/perf_client/concurrency_manager.h"
-#include "src/clients/c++/examples/perf_client/context_factory.h"
-#include "src/clients/c++/examples/perf_client/inference_profiler.h"
-#include "src/clients/c++/examples/perf_client/load_manager.h"
-#include "src/clients/c++/examples/perf_client/perf_utils.h"
+#include "src/clients/c++/perf_client/concurrency_manager.h"
+#include "src/clients/c++/perf_client/context_factory.h"
+#include "src/clients/c++/perf_client/inference_profiler.h"
+#include "src/clients/c++/perf_client/load_manager.h"
+#include "src/clients/c++/perf_client/perf_utils.h"
 
 
 namespace perfclient {

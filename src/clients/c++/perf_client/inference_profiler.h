@@ -26,8 +26,8 @@
 #pragma once
 
 #include <thread>
-#include "src/clients/c++/examples/perf_client/context_factory.h"
-#include "src/clients/c++/examples/perf_client/load_manager.h"
+#include "src/clients/c++/perf_client/context_factory.h"
+#include "src/clients/c++/perf_client/load_manager.h"
 
 
 namespace perfclient {
