@@ -122,7 +122,7 @@ Features
   the server is running.
 
 * `Model repositories
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#>`_
   may reside on a locally accessible file system (e.g. NFS), in Google
   Cloud Storage or in Amazon S3.
 
@@ -136,7 +136,7 @@ Features
   indicating GPU utilization, server throughput, and server latency.
 
 * `C library inferface
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/library_api.html>`_
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/library_api.html>`_
   allows the full functionality of the inference server to be included
   directly in an application.
   
