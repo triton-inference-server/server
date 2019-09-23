@@ -36,20 +36,6 @@ ARG PYVER=3
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYVER=$PYVER
 
-# install platform specific packages
-RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-                libcurl3-dev; \
-    elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
-        apt-get install -y --no-install-recommends \
-                libcurl4-openssl-dev; \
-    else \
-        echo "Ubuntu version must be either 16.04 or 18.04" && \
-        exit 1; \
-    fi
-
 RUN PYSFX=`[ "$PYVER" != "2" ] && echo "$PYVER" || echo ""` && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
