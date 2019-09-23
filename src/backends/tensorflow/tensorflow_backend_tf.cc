@@ -36,7 +36,7 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
-#include "tensorflow/core/protobuf/rewriter_config.proto"
+#include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
 
