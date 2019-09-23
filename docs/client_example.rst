@@ -159,8 +159,8 @@ Image Classification Example Application
 ----------------------------------------
 
 The image classification example that uses the C++ client API is
-available at `src/clients/c++/image\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/image_client.cc>`_. The
+available at `src/clients/c++/examples/image\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/image_client.cc>`_. The
 Python version of the image classification client is available at
 `src/clients/python/image\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/image_client.py>`_.
@@ -276,8 +276,8 @@ custom backend and a Caffe2 ResNet50 model. This ensemble allows you
 to send the raw image binaries in the request and receive
 classification results without preprocessing the images on the
 client. The ensemble image classification example that uses the C++
-client API is available at `src/clients/c++/ensemble\_image\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/ensemble_image_client.cc>`_.
+client API is available at `src/clients/c++/examples/ensemble\_image\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/ensemble_image_client.cc>`_.
 The Python version of the image classification client is available at
 `src/clients/python/ensemble\_image\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/ensemble_image_client.py>`_.
