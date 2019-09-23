@@ -29,8 +29,8 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include "src/clients/c++/library/request_grpc.h"
-#include "src/clients/c++/library/request_http.h"
+#include "src/clients/c++/request_grpc.h"
+#include "src/clients/c++/request_http.h"
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -163,7 +163,7 @@ main(int argc, char** argv)
   // each and returns 2 output tensors of 16 integers each. One output
   // tensor is the element-wise sum of the inputs and one output is
   // the element-wise difference.
-  std::string model_name = "simple";
+  std::string model_name = "libtorch_float32_float32_float32";
 
   // Create a health context and get the ready and live state of the
   // server.
@@ -262,28 +262,35 @@ main(int argc, char** argv)
 
   std::shared_ptr<nic::InferContext::Input> input0, input1;
   std::shared_ptr<nic::InferContext::Output> output0, output1;
-  FAIL_IF_ERR(infer_ctx->GetInput("INPUT0", &input0), "unable to get INPUT0");
-  FAIL_IF_ERR(infer_ctx->GetInput("INPUT1", &input1), "unable to get INPUT1");
   FAIL_IF_ERR(
-      infer_ctx->GetOutput("OUTPUT0", &output0), "unable to get OUTPUT0");
+      infer_ctx->GetInput("INPUT__0", &input0), "unable to get INPUT__0");
   FAIL_IF_ERR(
-      infer_ctx->GetOutput("OUTPUT1", &output1), "unable to get OUTPUT1");
+      infer_ctx->GetInput("INPUT__1", &input1), "unable to get INPUT__1");
+  FAIL_IF_ERR(
+      infer_ctx->GetOutput("OUTPUT__0", &output0), "unable to get OUTPUT__0");
+  FAIL_IF_ERR(
+      infer_ctx->GetOutput("OUTPUT__1", &output1), "unable to get OUTPUT__1");
 
-  FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT0");
-  FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT1");
+  FAIL_IF_ERR(input0->Reset(), "unable to reset INPUT__0");
+  FAIL_IF_ERR(input1->Reset(), "unable to reset INPUT__1");
+
+  std::vector<int64_t> test_dims;
+  test_dims.push_back(8);
+  input0->SetShape(test_dims);
+  input1->SetShape(test_dims);
 
   // Get the size of the inputs and outputs from the Shape and DataType
-  int input_byte_size =
-      infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
-  int output_byte_size =
-      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
+  int input_byte_size = 64;
+  // infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
+  int output_byte_size = 64;
+  // infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
 
   // Create Output0 and Output1 in Shared Memory
   std::string shm_key = "/output_simple";
   int shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
-  int* output0_shm =
-      (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
-  int* output1_shm = (int*)(output0_shm + 16);
+  float* output0_shm =
+      (float*)(MapSharedMemory(shm_fd_op, 0, output_byte_size));
+  float* output1_shm = (float*)(output0_shm + 8);
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
@@ -302,9 +309,10 @@ main(int argc, char** argv)
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
   options->AddSharedMemoryResult(
-      output1, "output_data", output_byte_size, output_byte_size);
+      output0, "output_data", 0, output_byte_size / 2);
+  options->AddSharedMemoryResult(
+      output1, "output_data", output_byte_size / 2, output_byte_size / 2);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
@@ -313,9 +321,9 @@ main(int argc, char** argv)
   // integers and Input1 to all ones.
   shm_key = "/input_simple";
   int shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
-  int* input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
-  int* input1_shm = (int*)(input0_shm + 16);
-  for (size_t i = 0; i < 16; ++i) {
+  float* input0_shm = (float*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size));
+  float* input1_shm = (float*)(input0_shm + 8);
+  for (size_t i = 0; i < 8; ++i) {
     *(input0_shm + i) = i;
     *(input1_shm + i) = 1;
   }
@@ -329,12 +337,13 @@ main(int argc, char** argv)
   }
 
   // Set the shared memory region for Inputs
-  err = input0->SetSharedMemory("input_data", 0, input_byte_size);
+  err = input0->SetSharedMemory("input_data", 0, input_byte_size / 2);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
   }
-  err = input1->SetSharedMemory("input_data", input_byte_size, input_byte_size);
+  err = input1->SetSharedMemory(
+      "input_data", input_byte_size / 2, input_byte_size / 2);
   if (!err.IsOk()) {
     std::cerr << "failed setting shared memory input: " << err << std::endl;
     exit(1);
@@ -351,7 +360,7 @@ main(int argc, char** argv)
               << std::endl;
   }
 
-  for (size_t i = 0; i < 16; ++i) {
+  for (size_t i = 0; i < 8; ++i) {
     std::cout << input0_shm[i] << " + " << input1_shm[i] << " = "
               << output0_shm[i] << std::endl;
     std::cout << input0_shm[i] << " - " << input1_shm[i] << " = "
