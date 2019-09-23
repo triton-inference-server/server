@@ -36,6 +36,7 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
+#include "tensorflow/core/protobuf/rewriter_config.proto"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
 
@@ -212,6 +213,25 @@ NewSessionOptions(
   session_options->config.mutable_graph_options()
       ->mutable_optimizer_options()
       ->set_global_jit_level(xla);
+  
+  // TF-TRT optimization.
+  // [TODO] For now, always set it as sanity check that the convertor
+  // is included in the build, later should update this to be configurable.
+  // Config is specified based on:
+  // https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/tensorrt/test/test_tftrt.py#L238
+  auto opt_config = session_options->config.mutable_graph_options()
+      ->mutable_rewrite_options();
+  opt_config->set_meta_optimizer_iterations(tensorflow::RewriterConfig::ONE);
+  opt_config->add_optimizers("constfold");
+  opt_config->add_optimizers("layout");
+  auto trt_optimizer = opt_config->add_custom_optimizers();
+  trt_optimizer->set_name("TensorRTOptimizer");
+  auto trt_parameter_map = trt_optimizer->mutable_parameter_map();
+  (*trt_parameter_map)["minimum_segment_size"].set_i(3);
+  (*trt_parameter_map)["precision_mode"].set_s("FP32");
+  // [TODO] get from model config
+  (*trt_parameter_map)["max_batch_size"].set_i(16);
+  (*trt_parameter_map)["max_workspace_size_bytes"].set_i(1 << 25);
 }
 
 //
