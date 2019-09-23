@@ -59,7 +59,7 @@ What's New In 1.6.0
   now uses significantly less memory while delivering higher performance.
 
 * The ensemble scheduler is now more flexible in allowing batching and 
-  non-batching models to be composed together in and ensemble.
+  non-batching models to be composed together in an ensemble.
 
 * The ensemble scheduler will now keep tensors in GPU memory between models 
   when possible. Doing so significantly increases performance of some ensembles
@@ -122,9 +122,9 @@ Features
   the server is running.
 
 * `Model repositories
-  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/model_repository.html#>`_
-  may reside on a locally accessible file system (e.g. NFS) or in
-  Google Cloud Storage.
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/model_repository.html#>`_
+  may reside on a locally accessible file system (e.g. NFS), in Google
+  Cloud Storage or in Amazon S3.
 
 * Readiness and liveness `health endpoints
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/http_grpc_api.html#health>`_
@@ -135,6 +135,11 @@ Features
   <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/metrics.html>`_
   indicating GPU utilization, server throughput, and server latency.
 
+* `C library inferface
+  <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/library_api.html>`_
+  allows the full functionality of the inference server to be included
+  directly in an application.
+  
 .. overview-end-marker-do-not-remove
 
 The current release of the TensorRT Inference Server is 1.6.0 and
