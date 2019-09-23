@@ -668,7 +668,7 @@ InferResponseAlloc(
         // If the output is in shared memory then just need to check
         // that the requested size matches what is expected by the
         // request.
-        if (byte_size != pr->second.byte_size_) {
+        if (byte_size > pr->second.byte_size_) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INTERNAL,
               std::string(
