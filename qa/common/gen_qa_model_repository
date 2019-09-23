@@ -221,6 +221,8 @@ python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
 chown -R $(id -u):$(id -g) $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
+chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
@@ -242,6 +244,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
