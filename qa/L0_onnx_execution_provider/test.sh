@@ -57,14 +57,14 @@ rm -fr models && mkdir -p models && \
     (cd models/resnet50_trt && \
             sed -i 's/^name: "resnet50_def"/name: "resnet50_trt"/' \
                 config.pbtxt && \
-            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"tensorrt\"] } }" >> config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\"} ] } }" >> config.pbtxt && \
             echo "instance_group [ { gpus: [0] } ]" >> config.pbtxt) && \
     # CPU execution accelerators
     cp -r models/resnet50_def models/resnet50_openvino && \
     (cd models/resnet50_openvino && \
             sed -i 's/^name: "resnet50_def"/name: "resnet50_openvino"/' \
                 config.pbtxt && \
-            echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"openvino\"] } }" >> config.pbtxt) && \
+            echo "optimization { execution_accelerators { cpu_execution_accelerator : [ { name : \"openvino\"} ] } }" >> config.pbtxt) && \
     # CPU execution accelerators on CPU context
     cp -r models/resnet50_openvino models/resnet50_cpu_openvino && \
     (cd models/resnet50_cpu_openvino && \
@@ -76,13 +76,13 @@ rm -fr models && mkdir -p models && \
     (cd models/resnet50_unknown_gpu && \
             sed -i 's/^name: "resnet50_def"/name: "resnet50_unknown_gpu"/' \
                 config.pbtxt && \
-            echo "optimization { execution_accelerators { gpu_execution_accelerator : [\"unknown_gpu\"] } }" >> config.pbtxt) && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"unknown_gpu\"} ] } }" >> config.pbtxt) && \
     # Unknown CPU execution accelerators
     cp -r models/resnet50_def models/resnet50_unknown_cpu && \
     (cd models/resnet50_unknown_cpu && \
             sed -i 's/^name: "resnet50_def"/name: "resnet50_unknown_cpu"/' \
                 config.pbtxt && \
-            echo "optimization { execution_accelerators { cpu_execution_accelerator : [\"unknown_cpu\"] } }" >> config.pbtxt)
+            echo "optimization { execution_accelerators { cpu_execution_accelerator : [ { name : \"unknown_cpu\"} ] } }" >> config.pbtxt)
 
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
