@@ -34,8 +34,8 @@
 #include <iostream>
 #include <iterator>
 #include <string>
-#include "src/clients/c++/request_grpc.h"
-#include "src/clients/c++/request_http.h"
+#include "src/clients/c++/library/request_grpc.h"
+#include "src/clients/c++/library/request_http.h"
 #include "src/core/model_config.pb.h"
 
 #include <opencv2/core/version.hpp>

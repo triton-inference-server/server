@@ -254,8 +254,8 @@ API. The commented interface is available at
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/__init__.py>`_
 and in the API Reference.
 
-A simple C++ example application at `src/clients/c++/simple\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_client.cc>`_
+A simple C++ example application at `src/clients/c++/examples/simple\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_client.cc>`_
 and a Python version at `src/clients/python/simple\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
 demonstrate basic client API usage.
@@ -286,8 +286,8 @@ Shared Memory
 ^^^^^^^^^^^^^
 
 A simple C++ example application using shared memory at
-`src/clients/c++/simple\_shm\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_shm_client.cc>`_
+`src/clients/c++/examples/simple\_shm\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_shm_client.cc>`_
 and a Python version at `src/clients/python/simple\_shm\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_shm_client.py>`_
 demonstrate the usage of shared memory with the client API.
@@ -326,8 +326,8 @@ input tensor must be initialized with SetFromString() instead of
 SetRaw().
 
 String tensors are demonstrated in the C++ example application at
-`src/clients/c++/simple\_string\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_string_client.cc>`_
+`src/clients/c++/examples/simple\_string\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_string_client.cc>`_
 and a Python version at `src/clients/python/simple\_string\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_string_client.py>`_.
 
@@ -352,8 +352,8 @@ async_run() methods in the Python API.
 
 The use of correlation ID and start and end flags are demonstrated in
 the C++ example application at
-`src/clients/c++/simple\_sequence\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/simple_sequence_client.cc>`_
+`src/clients/c++/examples/simple\_sequence\_client.cc
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_sequence_client.cc>`_
 and a Python version at
 `src/clients/python/simple\_sequence\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_sequence_client.py>`_.

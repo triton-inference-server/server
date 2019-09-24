@@ -83,3 +83,4 @@ install(
   TARGETS simple_client_shared
   RUNTIME DESTINATION bin
 )
+

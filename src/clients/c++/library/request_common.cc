@@ -26,7 +26,7 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/request_common.h"
+#include "src/clients/c++/library/request_common.h"
 
 namespace nvidia { namespace inferenceserver { namespace client {
 

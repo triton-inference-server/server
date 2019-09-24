@@ -27,7 +27,7 @@
 
 #include <string>
 
-#include "src/clients/c++/perf_utils.h"
+#include "src/clients/c++/perf_client/perf_utils.h"
 
 namespace perfclient {
 
