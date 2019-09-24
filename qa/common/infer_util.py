@@ -55,6 +55,24 @@ def _range_repr_dtype(dtype):
         return np.int32
     return dtype
 
+def _prepend_string_size(input_values):
+    input_list = []
+    for input_value in input_values:
+        flattened = bytes()
+        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to STRING type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        input_value = np.asarray(flattened)
+        input_list.append(input_value)
+    return input_list
+
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
@@ -147,6 +165,20 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             input1_list.append(in1)
 
         if config[3]:
+            # print("Before", input0_list[0].size * input0_list[0].itemsize * batch_size)
+
+            # prepend size of string to string input string data
+            if input_dtype == np.object:
+                input0_list = _prepend_string_size(input0_list)
+                input1_list = _prepend_string_size(input1_list)
+                # print("After", input0_list[0].size * input0_list[0].itemsize * batch_size)
+
+            if output0_dtype == np.object:
+                expected0_list = _prepend_string_size(expected0_list)
+
+            if output1_dtype == np.object:
+                expected1_list = _prepend_string_size(expected1_list)
+
             input0_byte_size = input0_list[0].size * input0_list[0].itemsize * batch_size
             output0_byte_size = expected0_list[0].size * expected0_list[0].itemsize * batch_size
             output1_byte_size = expected1_list[0].size * expected1_list[0].itemsize * batch_size

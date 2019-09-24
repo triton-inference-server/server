@@ -588,6 +588,7 @@ BaseBackend::Context::SetStringInputTensor(
       }
 
       const uint32_t len = *(reinterpret_cast<const uint32_t*>(content));
+      LOG_VERBOSE(1) << "string len-> " << len ;
       content += sizeof(uint32_t);
       content_byte_size -= sizeof(uint32_t);
 

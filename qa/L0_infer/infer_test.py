@@ -128,53 +128,54 @@ class InferTest(unittest.TestCase):
                             input_dtype, output0_dtype, output1_dtype,
                             output0_raw=output0_raw, output1_raw=output1_raw, swap=swap)
 
-    def test_raw_bbb(self):
-        self._full_exact(np.int8, np.int8, np.int8,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_sss(self):
-        self._full_exact(np.int16, np.int16, np.int16,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_iii(self):
-        self._full_exact(np.int32, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_lll(self):
-        self._full_exact(np.int64, np.int64, np.int64,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_hhh(self):
-        self._full_exact(np.float16, np.float16, np.float16,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_fff(self):
-        self._full_exact(np.float32, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=True)
-    def test_raw_hff(self):
-        self._full_exact(np.float16, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_bii(self):
-        self._full_exact(np.int8, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ibb(self):
-        self._full_exact(np.int32, np.int8, np.int8,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ibs(self):
-        self._full_exact(np.int32, np.int8, np.int16,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_iff(self):
-        self._full_exact(np.int32, np.float32, np.float32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_fii(self):
-        self._full_exact(np.float32, np.int32, np.int32,
-                         output0_raw=True, output1_raw=True, swap=False)
-    def test_raw_ihs(self):
-        self._full_exact(np.int32, np.float16, np.int16,
+    # def test_raw_bbb(self):
+    #     self._full_exact(np.int8, np.int8, np.int8,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_sss(self):
+    #     self._full_exact(np.int16, np.int16, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_iii(self):
+    #     self._full_exact(np.int32, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_lll(self):
+    #     self._full_exact(np.int64, np.int64, np.int64,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_hhh(self):
+    #     self._full_exact(np.float16, np.float16, np.float16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_fff(self):
+    #     self._full_exact(np.float32, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=True)
+    # def test_raw_hff(self):
+    #     self._full_exact(np.float16, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_bii(self):
+    #     self._full_exact(np.int8, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ibb(self):
+    #     self._full_exact(np.int32, np.int8, np.int8,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ibs(self):
+    #     self._full_exact(np.int32, np.int8, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_iff(self):
+    #     self._full_exact(np.int32, np.float32, np.float32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_fii(self):
+    #     self._full_exact(np.float32, np.int32, np.int32,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+    # def test_raw_ihs(self):
+    #     self._full_exact(np.int32, np.float16, np.int16,
+    #                      output0_raw=True, output1_raw=True, swap=False)
+
+    def test_raw_ooo(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
                          output0_raw=True, output1_raw=True, swap=False)
 
     if not TEST_SHARED_MEMORY:
         def test_raw_oii(self):
             self._full_exact(np_dtype_string, np.int32, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ooo(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
+                         output0_raw=True, output1_raw=True, swap=False)
         def test_raw_oio(self):
             self._full_exact(np_dtype_string, np.int32, np_dtype_string,
                              output0_raw=True, output1_raw=True, swap=False)
@@ -191,6 +192,7 @@ class InferTest(unittest.TestCase):
             self._full_exact(np.int32, np_dtype_string, np.int32,
                              output0_raw=True, output1_raw=True, swap=False)
 
+    if not TEST_SHARED_MEMORY:
         def test_class_bbb(self):
             self._full_exact(np.int8, np.int8, np.int8,
                              output0_raw=False, output1_raw=False, swap=True)
@@ -353,39 +355,39 @@ class InferTest(unittest.TestCase):
                                np.float32, np.float32, np.float32,
                                model_version=3, swap=True)
 
-    def test_ensemble_mix_platform(self):
-        # Skip on CPU only machine as TensorRT model is used in this ensemble
-        if CPU_ONLY:
-            return
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_platform", (16,), bs,
-                np.float32, np.float32, np.float32)
-
-    def test_ensemble_mix_type(self):
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_type", (16,), bs,
-                np.int32, np.float32, np.float32)
-
-    def test_ensemble_mix_ensemble(self):
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_ensemble", (16,), bs,
-                np.int32, np.float32, np.float32)
-
-    def test_ensemble_mix_batch_nobatch(self):
-        base_names = ["batch_to_nobatch", "nobatch_to_batch"]
-        for name in base_names:
-            for bs in (1, 8):
-                iu.infer_exact(self, name, (16,), bs,
-                    np.float32, np.float32, np.float32)
-            iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
-                np.float32, np.float32, np.float32)
-
-        # batch -> nobatch -> batch
-        for bs in (1, 8):
-            iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
-                np.float32, np.float32, np.float32)
-
     if not TEST_SHARED_MEMORY:
+        def test_ensemble_mix_platform(self):
+            # Skip on CPU only machine as TensorRT model is used in this ensemble
+            if CPU_ONLY:
+                return
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_platform", (16,), bs,
+                    np.float32, np.float32, np.float32)
+
+        def test_ensemble_mix_type(self):
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_type", (16,), bs,
+                    np.int32, np.float32, np.float32)
+
+        def test_ensemble_mix_ensemble(self):
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_ensemble", (16,), bs,
+                    np.int32, np.float32, np.float32)
+
+        def test_ensemble_mix_batch_nobatch(self):
+            base_names = ["batch_to_nobatch", "nobatch_to_batch"]
+            for name in base_names:
+                for bs in (1, 8):
+                    iu.infer_exact(self, name, (16,), bs,
+                        np.float32, np.float32, np.float32)
+                iu.infer_exact(self, name + "_nobatch", (8, 16,), 1,
+                    np.float32, np.float32, np.float32)
+
+            # batch -> nobatch -> batch
+            for bs in (1, 8):
+                iu.infer_exact(self, "mix_nobatch_batch", (16,), bs,
+                    np.float32, np.float32, np.float32)
+
         def test_ensemble_label_lookup(self):
             # Ensemble needs to look up label from the actual model
             for bs in (1, 8):
