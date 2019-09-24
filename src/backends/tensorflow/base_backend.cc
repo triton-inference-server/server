@@ -88,6 +88,7 @@ BaseBackend::CreateExecutionContexts(
             group.name() + "_" + std::to_string(c) + "_model_device";
         RETURN_IF_ERROR(CreateExecutionContext(
             instance_name, Context::MODEL_DEVICE, backend_config, paths));
+        total_context_cnt++;
       } else {
         for (int gpu_device : group.gpus()) {
           const std::string instance_name = group.name() + "_" +
