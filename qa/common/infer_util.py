@@ -69,8 +69,7 @@ def _prepend_string_size(input_values):
                 s = str(obj).encode('utf-8')
             flattened += struct.pack("<I", len(s))
             flattened += s
-        input_value = np.asarray(flattened)
-        input_list.append(input_value)
+        input_list.append(np.asarray(flattened))
     return input_list
 
 # Perform inference using an "addsum" type verification backend.
@@ -165,13 +164,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             input1_list.append(in1)
 
         if config[3]:
-            # print("Before", input0_list[0].size * input0_list[0].itemsize * batch_size)
-
             # prepend size of string to string input string data
             if input_dtype == np.object:
                 input0_list = _prepend_string_size(input0_list)
                 input1_list = _prepend_string_size(input1_list)
-                # print("After", input0_list[0].size * input0_list[0].itemsize * batch_size)
 
             if output0_dtype == np.object:
                 expected0_list = _prepend_string_size(expected0_list)
@@ -179,9 +175,9 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             if output1_dtype == np.object:
                 expected1_list = _prepend_string_size(expected1_list)
 
-            input0_byte_size = input0_list[0].size * input0_list[0].itemsize * batch_size
-            output0_byte_size = expected0_list[0].size * expected0_list[0].itemsize * batch_size
-            output1_byte_size = expected1_list[0].size * expected1_list[0].itemsize * batch_size
+            input0_byte_size = sum([i0.nbytes for i0 in input0_list])
+            output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
+            output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
             # create and register shared memory region for inputs and outputs
             if shm_region_names is None:
@@ -210,11 +206,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             shm.set_shared_memory_region(shm_ip1_handle, input1_list)
 
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+            shared_memory_ctx.unregister(shm_ip0_handle)
+            shared_memory_ctx.unregister(shm_ip1_handle)
             shared_memory_ctx.register(shm_ip0_handle)
             shared_memory_ctx.register(shm_ip1_handle)
             if "OUTPUT0" in outputs:
+                shared_memory_ctx.unregister(shm_op0_handle)
                 shared_memory_ctx.register(shm_op0_handle)
             if "OUTPUT1" in outputs:
+                shared_memory_ctx.unregister(shm_op1_handle)
                 shared_memory_ctx.register(shm_op1_handle)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]

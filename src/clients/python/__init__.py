@@ -1234,7 +1234,7 @@ class InferContext:
                         c_void_p(_crequest_get_shared_memory_handle_info(output_format[1], \
                                 byref(shm_addr), byref(shm_key), byref(shm_fd), \
                                 byref(offset), byref(byte_size))))
-                    if (sum(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
+                    if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
                         element_byte_size = sum(shape) * np.dtype(result_dtype).itemsize
                     else:
                         element_byte_size = int(byte_size.value/batch_size)
@@ -1252,12 +1252,12 @@ class InferContext:
                                 val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
                             else:
                                 strs = list()
-                                offset = 0
+                                str_offset = 0
                                 while offset < len(val_buf):
-                                    l = struct.unpack_from("<I", val_buf, start_pos)[0]
-                                    offset += 4
-                                    sb = struct.unpack_from("<{}s".format(l), val_buf, start_pos)[0]
-                                    offset += l
+                                    l = struct.unpack_from("<I", val_buf, str_offset)[0]
+                                    str_offset += 4
+                                    sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
+                                    str_offset += l
                                     strs.append(sb)
                                 val = np.array(strs, dtype=object)
 
