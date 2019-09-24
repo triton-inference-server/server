@@ -191,11 +191,48 @@ BaseBackend::CreateExecutionContext(
   RETURN_IF_ERROR(context->ValidateInputs(Config().input()));
   RETURN_IF_ERROR(context->ValidateOutputs(Config().output()));
 
+  TRTISTF_TFTRTConfig* tftrt_config_ptr = nullptr;
+  TRTISTF_TFTRTConfig tftrt_config;
+  if (Config().optimization().has_execution_accelerators()) {
+    // Set default values
+    tftrt_config.minimum_segment_size_ = 3;
+    tftrt_config.max_workspace_size_bytes_ = 1 << 30;
+    tftrt_config.max_batch_size_ = std::max(Config().max_batch_size(), 1);
+    tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
+    tftrt_config.is_dynamic_op_ = false;
+    for (const auto& io : Config().input()) {
+      const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
+      for (const auto& dim : dims) {
+        tftrt_config.is_dynamic_op_ |= (dim == -1);
+      }
+    }
+    for (const auto& io : Config().output()) {
+      const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
+      for (const auto& dim : dims) {
+        tftrt_config.is_dynamic_op_ |= (dim == -1);
+      }
+    }
+
+    // [TODO] Use non-default value.
+    // if (!Config().optimization().execution_accelerators().cpu_execution_accelerator().empty()) {
+    //   return Status(
+    //         RequestStatusCode::INVALID_ARG,
+    //         "CPU Execution Accelerator is not supported in TensorFlow backend");
+    // }
+    // // [TODO] only GPU device?
+    // if (gpu_device == Context::NO_GPU_DEVICE)
+    // const auto& gpu_execution_accelerators = Config().optimization().execution_accelerators().gpu_execution_accelerator();
+    // if (!gpu_execution_accelerators.empty()) {
+    //   if (gpu_device == Context::NO_GPU_DEVICE)
+    // }
+    tftrt_config_ptr = &tftrt_config;
+  }
+
   RETURN_IF_ERROR(CreateTRTISTFModel(
       graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
-      &context->output_name_map_));
+      &context->output_name_map_, tftrt_config_ptr));
 
   return Status::Success;
 }
