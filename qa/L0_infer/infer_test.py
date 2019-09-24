@@ -168,29 +168,28 @@ class InferTest(unittest.TestCase):
         self._full_exact(np.int32, np.float16, np.int16,
                          output0_raw=True, output1_raw=True, swap=False)
 
-    # WIP shared memory support for string I/O
-    if not TEST_SHARED_MEMORY:
-        def test_raw_ooo(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_oii(self):
-            self._full_exact(np_dtype_string, np.int32, np.int32,
+
+    def test_raw_ooo(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
                          output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_oio(self):
-            self._full_exact(np_dtype_string, np.int32, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ooi(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ioo(self):
-            self._full_exact(np.int32, np_dtype_string, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_iio(self):
-            self._full_exact(np.int32, np.int32, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ioi(self):
-            self._full_exact(np.int32, np_dtype_string, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oii(self):
+        self._full_exact(np_dtype_string, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oio(self):
+        self._full_exact(np_dtype_string, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ooi(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ioo(self):
+        self._full_exact(np.int32, np_dtype_string, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_iio(self):
+        self._full_exact(np.int32, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ioi(self):
+        self._full_exact(np.int32, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
 
     # shared memory does not support class output
     if not TEST_SHARED_MEMORY:

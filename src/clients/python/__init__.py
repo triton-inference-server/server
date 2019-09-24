@@ -1239,30 +1239,40 @@ class InferContext:
                     else:
                         element_byte_size = int(byte_size.value/batch_size)
                     start_pos = offset.value
-                    for b in range(batch_size):
+                    if result_dtype != np.object:
                         cval = shm_addr
-                        cval_len = start_pos + element_byte_size
-                        if cval_len == 0:
-                            val = np.empty(shape, dtype=result_dtype)
-                            results[output_name].append(val)
-                        else:
-                            val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
-
-                            if result_dtype != np.object:
-                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
+                        for b in range(batch_size):
+                            cval_len = start_pos + element_byte_size
+                            if cval_len == 0:
+                                val = np.empty(shape, dtype=result_dtype)
+                                results[output_name].append(val)
                             else:
-                                strs = list()
-                                str_offset = 0
-                                while offset < len(val_buf):
-                                    l = struct.unpack_from("<I", val_buf, str_offset)[0]
-                                    str_offset += 4
-                                    sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
-                                    str_offset += l
-                                    strs.append(sb)
-                                val = np.array(strs, dtype=object)
+                                val_buf = cast(cval, POINTER(c_byte * cval_len))[0]
+                                val = np.frombuffer(val_buf, dtype=result_dtype, offset=start_pos)
 
                             # Reshape the result to the appropriate shape
                             start_pos += element_byte_size
+                            shaped = np.reshape(val, shape)
+                            results[output_name].append(shaped)
+                    else:
+                        cval = shm_addr
+                        str_offset = start_pos
+                        val_buf = cast(cval, POINTER(c_byte * byte_size.value))[0]
+                        b = 0
+                        while b < batch_size:
+                            ii = 0
+                            strs = list()
+                            while (ii % np.prod(shape) != 0) or (ii == 0):
+                                l = struct.unpack_from("<I", val_buf, str_offset)[0]
+                                str_offset += 4
+                                sb = struct.unpack_from("<{}s".format(l), val_buf, str_offset)[0]
+                                str_offset += l
+                                strs.append(sb)
+                                ii+=1
+                            b+=1
+
+                            # Reshape the result to the appropriate shape
+                            val = np.array(strs, dtype=object)
                             shaped = np.reshape(val, shape)
                             results[output_name].append(shaped)
                 else:

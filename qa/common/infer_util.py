@@ -169,20 +169,26 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 input0_list = _prepend_string_size(input0_list)
                 input1_list = _prepend_string_size(input1_list)
 
+            input0_byte_size = sum([i0.nbytes for i0 in input0_list])
+            input1_byte_size = sum([i1.nbytes for i1 in input1_list])
+
             if output0_dtype == np.object:
-                expected0_list = _prepend_string_size(expected0_list)
+                expected0_list_tmp = _prepend_string_size(expected0_list)
+                output0_byte_size = sum([e0.nbytes for e0 in expected0_list_tmp])
+            else:
+                output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
 
             if output1_dtype == np.object:
-                expected1_list = _prepend_string_size(expected1_list)
+                expected1_list_tmp = _prepend_string_size(expected1_list)
+                output1_byte_size = sum([e1.nbytes for e1 in expected1_list_tmp])
+            else:
+                output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
-            input0_byte_size = sum([i0.nbytes for i0 in input0_list])
-            output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
-            output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
             # create and register shared memory region for inputs and outputs
             if shm_region_names is None:
                 shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
+                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
                 if "OUTPUT0" in outputs:
                     shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
                 if "OUTPUT1" in outputs:
@@ -191,7 +197,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
                                                                 '/'+shm_region_names[0], input0_byte_size)
                 shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                '/'+shm_region_names[1], input0_byte_size)
+                                                                '/'+shm_region_names[1], input1_byte_size)
                 i = 0
                 if "OUTPUT0" in outputs:
                     shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
