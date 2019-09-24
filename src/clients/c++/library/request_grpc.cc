@@ -335,7 +335,8 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
 
   auto rshm_region = request.mutable_register_();
   rshm_region->set_name(name);
-  rshm_region->set_shared_memory_key(shm_key);
+  auto shm_id = rshm_region->mutable_system_shared_memory();
+  shm_id->set_shared_memory_key(shm_key);
   rshm_region->set_offset(offset);
   rshm_region->set_byte_size(byte_size);
 
