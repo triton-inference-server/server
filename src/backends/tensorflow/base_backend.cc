@@ -214,17 +214,79 @@ BaseBackend::CreateExecutionContext(
     }
 
     // [TODO] Use non-default value.
-    // if (!Config().optimization().execution_accelerators().cpu_execution_accelerator().empty()) {
-    //   return Status(
-    //         RequestStatusCode::INVALID_ARG,
-    //         "CPU Execution Accelerator is not supported in TensorFlow backend");
-    // }
-    // // [TODO] only GPU device?
-    // if (gpu_device == Context::NO_GPU_DEVICE)
-    // const auto& gpu_execution_accelerators = Config().optimization().execution_accelerators().gpu_execution_accelerator();
-    // if (!gpu_execution_accelerators.empty()) {
-    //   if (gpu_device == Context::NO_GPU_DEVICE)
-    // }
+    if (!Config()
+             .optimization()
+             .execution_accelerators()
+             .cpu_execution_accelerator()
+             .empty()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "CPU Execution Accelerator is not supported in TensorFlow backend");
+    }
+
+    if (gpu_device == Context::NO_GPU_DEVICE) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "GPU Execution Accelerator can only be set on non-CPU backend "
+          "context");
+    }
+    for (const auto& execution_accelerator : Config()
+                                                 .optimization()
+                                                 .execution_accelerators()
+                                                 .gpu_execution_accelerator()) {
+      if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
+        // Validate and set parameters
+        for (const auto& parameter : execution_accelerator.parameters()) {
+          if (parameter.first == "precision_mode") {
+            if (parameter.second == "FP32") {
+              tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
+            } else if (parameter.second == "FP16") {
+              tftrt_config.precision_mode_ = TRTISTF_MODE_FP16;
+            } else if (parameter.second == "INT8") {
+              tftrt_config.precision_mode_ = TRTISTF_MODE_INT8;
+            } else {
+              return Status(
+                  RequestStatusCode::INVALID_ARG, "unknown precision mode '" +
+                                                      parameter.second +
+                                                      "' is requested");
+            }
+          } else if (parameter.first == "minimum_segment_size") {
+            try {
+              tftrt_config.minimum_segment_size_ = std::stoul(parameter.second);
+            }
+            catch (const std::invalid_argument& ia) {
+              return Status(
+                  RequestStatusCode::INVALID_ARG,
+                  "failed to convert minimum_segment_size '" +
+                      parameter.second + "' to integral number");
+            }
+          } else if (parameter.first == "max_workspace_size_bytes") {
+            try {
+              tftrt_config.max_workspace_size_bytes_ =
+                  std::stoul(parameter.second);
+            }
+            catch (const std::invalid_argument& ia) {
+              return Status(
+                  RequestStatusCode::INVALID_ARG,
+                  "failed to convert max_workspace_size_bytes '" +
+                      parameter.second + "' to integral number");
+            }
+          } else {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "unknown parameter '" + parameter.first +
+                    "' is provided for TensorRT Execution Accelerator");
+          }
+        }
+        LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
+                       << instance_name;
+      } else {
+        return Status(
+            RequestStatusCode::INVALID_ARG, "unknown Execution Accelerator '" +
+                                                execution_accelerator.name() +
+                                                "' is requested");
+      }
+    }
     tftrt_config_ptr = &tftrt_config;
   }
 
