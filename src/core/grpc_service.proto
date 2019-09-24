@@ -242,25 +242,83 @@ message SharedMemoryControlRequest
     //@@
     string name = 1;
 
-    //@@  .. cpp:var:: string shared_memory_key
     //@@
-    //@@     The name of the shared memory region that holds the input data
-    //@@     (or where the output data should be written).
+    //@@  .. cpp:var:: message SystemSharedMemoryIdentifier
     //@@
-    string shared_memory_key = 2;
+    //@@     The identifier for this system shared memory region.
+    //@@
+    message SystemSharedMemoryIdentifier
+    {
+      //@@  .. cpp:var:: string shared_memory_key
+      //@@
+      //@@     The name of the shared memory region that holds the input data
+      //@@     (or where the output data should be written).
+      //@@
+      string shared_memory_key = 2;
+    }
+
+    //@@
+    //@@  .. cpp:var:: message CUDASharedMemoryIdentifier
+    //@@
+    //@@     The identifier for this system shared memory region.
+    //@@
+    message CUDASharedMemoryIdentifier
+    {
+      //@@  .. cpp:var:: string shared_memory_key
+      //@@
+      //@@     The name of the system shared memory region that holds the
+      //@@     cudaIPC handle.
+      //@@
+      string shared_memory_key = 1;
+
+      //@@  .. cpp:var:: uint64 offset
+      //@@
+      //@@     The offset of the cudaIPC handle from the start of the shared
+      //@@     memory region.
+      //@@     start = offset, end = offset + size;
+      //@@
+      uint64 offset = 2;
+
+      //@@  .. cpp:var:: uint64 byte_size
+      //@@
+      //@@     Size of the cudaIPC handle in the shared memory block, in bytes.
+      //@@
+      uint64 byte_size = 3;
+    }
+
+    //@@  .. cpp:var:: oneof shared_memory_types
+    //@@
+    //@@     Types of shared memory identifiers
+    //@@
+    oneof shared_memory_types
+    {
+      //@@
+      //@@  .. cpp:var:: SystemSharedMemoryIdentifier system_shared_memory
+      //@@
+      //@@     The identifier for this system shared memory region.
+      //@@
+      SystemSharedMemoryIdentifier system_shared_memory = 2;
+
+      //@@
+      //@@  .. cpp:var:: CUDASharedMemoryIdentifier cuda_shared_memory
+      //@@
+      //@@     The identifier for this CUDA shared memory region.
+      //@@
+      CUDASharedMemoryIdentifier cuda_shared_memory = 3;
+    }
 
     //@@  .. cpp:var:: uint64 offset
     //@@
     //@@     The offset from the start of the shared memory region.
     //@@     start = offset, end = offset + size;
     //@@
-    uint64 offset = 3;
+    uint64 offset = 4;
 
     //@@  .. cpp:var:: uint64 byte_size
     //@@
     //@@     Size of the memory block, in bytes.
     //@@
-    uint64 byte_size = 4;
+    uint64 byte_size = 5;
   }
 
   //@@  .. cpp:var:: message Unregister
