@@ -221,7 +221,7 @@ OnnxBackend::CreateExecutionContext(
                .optimization()
                .execution_accelerators()
                .gpu_execution_accelerator()) {
-        if (execution_accelerator == kTensorRTExecutionAccelerator) {
+        if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
           if (gpu_device == 0) {
             RETURN_IF_ORT_ERROR(
                 OrtSessionOptionsAppendExecutionProvider_Tensorrt(
@@ -240,7 +240,7 @@ OnnxBackend::CreateExecutionContext(
         } else {
           return Status(
               RequestStatusCode::INVALID_ARG,
-              "unknown Execution Accelerator '" + execution_accelerator +
+              "unknown Execution Accelerator '" + execution_accelerator.name() +
                   "' is requested");
         }
       }
@@ -260,7 +260,7 @@ OnnxBackend::CreateExecutionContext(
                                                  .optimization()
                                                  .execution_accelerators()
                                                  .cpu_execution_accelerator()) {
-      if (execution_accelerator == kOpenVINOExecutionAccelerator) {
+      if (execution_accelerator.name() == kOpenVINOExecutionAccelerator) {
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
         RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
@@ -275,7 +275,7 @@ OnnxBackend::CreateExecutionContext(
       } else {
         return Status(
             RequestStatusCode::INVALID_ARG, "unknown Execution Accelerator '" +
-                                                execution_accelerator +
+                                                execution_accelerator.name() +
                                                 "' is requested");
       }
     }

@@ -448,17 +448,52 @@ message ModelOptimizationPolicy
   //@@
   message ExecutionAccelerators
   {
-    //@@    .. cpp:var:: string gpu_execution_accelerator (repeated)
+    //@@
+    //@@  .. cpp:var:: message Accelerator
+    //@@
+    //@@     Specify the accelerator to be used to execute the model.
+    //@@     Accelerator with the same name may accept different parameters
+    //@@     depending on the backends.
+    //@@
+    message Accelerator
+    {
+      //@@    .. cpp:var:: string name
+      //@@
+      //@@       The name of the execution accelerator.
+      //@@
+      string name = 1;
+
+      //@@    .. cpp:var:: map<string, string> parameters
+      //@@
+      //@@       Additional paremeters used to configure the accelerator.
+      //@@
+      map<string, string> parameters = 2;
+    }
+
+    //@@    .. cpp:var:: Accelerator gpu_execution_accelerator (repeated)
     //@@
     //@@       The preferred execution provider to be used if the model instance
     //@@       is deployed on GPU. The order priority implies priority, i.e. the
     //@@       provider at the front has highest priority.
     //@@
-    //@@       For ONNX Runtime backend, possible value is "tensorrt".
+    //@@       For ONNX Runtime backend, possible value is "tensorrt" as name,
+    //@@       and no parameters are required.
     //@@
-    repeated string gpu_execution_accelerator = 1;
+    //@@       For TensorFlow backend, possible value is "tensorrt" as name,
+    //@@       with the following parameters:
+    //@@         "precision_mode" The precission used for optimization.
+    //@@         The value can be one of "FP32", "FP16" and "INT8".
+    //@@         Default value is "FP32".
+    //@@
+    //@@         "minimum_segment_size" The smallest model subgraph that will
+    //@@         be considered for optimization by TensorRT. Default value is 3.
+    //@@
+    //@@         "max_workspace_size_bytes" The maximum GPU memory the model
+    //@@         can use temporarily during execution. Default value is 1GB.
+    //@@
+    repeated Accelerator gpu_execution_accelerator = 1;
 
-    //@@    .. cpp:var:: string cpu_execution_accelerator (repeated)
+    //@@    .. cpp:var:: Accelerator cpu_execution_accelerator (repeated)
     //@@
     //@@       The preferred execution provider to be used if the model instance
     //@@       is deployed on CPU, or if the model instance is deployed on GPU
@@ -466,9 +501,10 @@ message ModelOptimizationPolicy
     //@@       don't support the operators. The order priority implies priority,
     //@@       i.e. the provider at the front has highest priority.
     //@@
-    //@@       For ONNX Runtime backend, possible value is "openvino".
+    //@@       For ONNX Runtime backend, possible value is "openvino" as name,
+    //@@       and no parameters are required.
     //@@
-    repeated string cpu_execution_accelerator = 2;
+    repeated Accelerator cpu_execution_accelerator = 2;
   }
 
   //@@  .. cpp:var:: Graph graph
