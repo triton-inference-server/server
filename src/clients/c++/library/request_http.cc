@@ -26,11 +26,11 @@
 
 #define DLL_EXPORTING
 
-#include "src/clients/c++/request_http.h"
+#include "src/clients/c++/library/request_http.h"
 
 #include <curl/curl.h>
 #include <google/protobuf/text_format.h>
-#include "src/clients/c++/request_common.h"
+#include "src/clients/c++/library/request_common.h"
 
 // MSVC equivalent of POSIX call
 #ifdef _MSC_VER

@@ -23,42 +23,56 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "src/clients/c++/perf_utils.h"
+#include "src/clients/c++/perf_client/perf_utils.h"
 
 namespace perfclient {
 
-class LoadManager {
- public:
-  /// Virtual destructor for well defined cleanup
-  virtual ~LoadManager(){};
+ProtocolType
+ParseProtocol(const std::string& str)
+{
+  std::string protocol(str);
+  std::transform(protocol.begin(), protocol.end(), protocol.begin(), ::tolower);
+  if (protocol == "http") {
+    return ProtocolType::HTTP;
+  } else if (protocol == "grpc") {
+    return ProtocolType::GRPC;
+  }
+  return ProtocolType::UNKNOWN;
+}
 
-  /// Adjust the number of concurrent requests to be the same as
-  /// 'concurrent_request_count' (by creating threads or by pausing threads)
-  /// \parm concurent_request_count The number of concurrent requests.
-  /// \return Error object indicating success or failure.
-  virtual nic::Error ChangeConcurrencyLevel(
-      const size_t concurrent_request_count) = 0;
+nic::Error
+ReadFile(const std::string& path, std::vector<char>* contents)
+{
+  std::ifstream in(path, std::ios::in | std::ios::binary);
+  if (!in) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to open file '" + path + "'");
+  }
 
-  /// Check if the load manager is working as expected.
-  /// \return Error object indicating success or failure.
-  virtual nic::Error CheckHealth() = 0;
+  in.seekg(0, std::ios::end);
 
-  /// Swap the content of the timestamp vector recorded by the load
-  /// manager with a new timestamp vector
-  /// \param new_timestamps The timestamp vector to be swapped.
-  /// \return Error object indicating success or failure.
-  virtual nic::Error SwapTimestamps(TimestampVector& new_timestamps) = 0;
+  int file_size = in.tellg();
+  if (file_size > 0) {
+    contents->resize(file_size);
+    in.seekg(0, std::ios::beg);
+    in.read(&(*contents)[0], contents->size());
+  }
 
-  /// Get the sum of all contexts' stat
-  /// \param contexts_stat Returned the accumulated stat from all contexts
-  /// in load manager
-  virtual nic::Error GetAccumulatedContextStat(
-      nic::InferContext::Stat* contexts_stat) = 0;
+  in.close();
 
-  /// \return the batch size used for the inference requests
-  virtual size_t BatchSize() const = 0;
-};
+  // If size is invalid, report after ifstream is closed
+  if (file_size < 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to get size for file '" + path + "'");
+  } else if (file_size == 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG, "file '" + path + "' is empty");
+  }
+
+  return nic::Error::Success;
+}
 
 }  // namespace perfclient

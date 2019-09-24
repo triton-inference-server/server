@@ -33,7 +33,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/clients/c++/request.h"
+#include "src/clients/c++/library/request.h"
 #include "src/core/constants.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config.pb.h"

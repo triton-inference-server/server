@@ -26,7 +26,31 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-add_subdirectory(library)
-add_subdirectory(examples)
-add_subdirectory(perf_client)
+set(
+  PERF_CLIENT_SRCS
+  perf_client.cc
+  context_factory.cc
+  concurrency_manager.cc
+  inference_profiler.cc
+  perf_utils.cc
+)
+
+set(
+  PERF_CLIENT_HDRS
+  context_factory.h
+  inference_profiler.h
+  perf_utils.h
+  load_manager.h
+)
+
+add_executable(perf_client
+  ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
+target_link_libraries(
+  perf_client
+  PRIVATE request_static
+)
+install(
+  TARGETS perf_client
+  RUNTIME DESTINATION bin
+)
 

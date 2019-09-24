@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/clients/c++/context_factory.h"
+#include "src/clients/c++/perf_client/context_factory.h"
 
 namespace perfclient {
 nic::Error

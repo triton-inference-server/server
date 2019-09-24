@@ -30,8 +30,8 @@
 #include <iomanip>
 #include <iostream>
 
-#include "src/clients/c++/request_grpc.h"
-#include "src/clients/c++/request_http.h"
+#include "src/clients/c++/library/request_grpc.h"
+#include "src/clients/c++/library/request_http.h"
 #include "src/core/constants.h"
 
 namespace ni = nvidia::inferenceserver;
