@@ -1,0 +1,46 @@
+name: "multi_prof_no_batch"
+platform: "tensorrt_plan"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+input {
+  name: "INPUT0"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+input {
+  name: "INPUT1"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+output {
+  name: "OUTPUT0"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+output {
+  name: "OUTPUT1"
+  data_type: TYPE_FP32
+  dims: -1
+  dims: -1
+}
+instance_group {
+  name: "multi_prof_no_batch_0"
+  count: 1
+  gpus: 0
+  kind: KIND_GPU
+  profile: "4"
+}
+instance_group {
+  name: "multi_prof_no_batch_1"
+  count: 1
+  gpus: 0
+  kind: KIND_GPU
+  profile: "5"
+}
+default_model_filename: "model.plan"

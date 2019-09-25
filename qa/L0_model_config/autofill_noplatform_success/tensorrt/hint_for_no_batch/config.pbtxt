@@ -1,0 +1,21 @@
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1, 16 ]
+  },
+  {
+    name: "INPUT1"
+    dims: [ -1, 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    dims: [ -1, 16 ]
+  },
+  {
+    name: "OUTPUT1"
+    dims: [ -1, 16 ]
+  }
+]
