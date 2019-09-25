@@ -54,7 +54,7 @@ for MODEL in \
     rm -fr models/${MODEL}_def/2 && \
     rm -fr models/${MODEL}_def/3 && \
     (cd models/${MODEL}_def && \
-            sed 's/_float32_float32_float32/&_def/' config.pbtxt) && \
+            sed -i 's/_float32_float32_float32/&_def/' config.pbtxt) && \
     # GPU execution accelerators with default setting
     cp -r models/${MODEL}_def models/${MODEL}_trt && \
     (cd models/${MODEL}_trt && \
@@ -103,13 +103,13 @@ for MODEL in \
     # Unknown GPU execution accelerator
     cp -r models/${MODEL}_def models/${MODEL}_unknown_gpu && \
     (cd models/${MODEL}_unknown_gpu && \
-            sed -i 's/^name: "_float32_def"/name: "_float32_unknown_gpu"/' \
+            sed -i 's/_float32_def/_float32_unknown_gpu/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"unknown_gpu\" } ] } }" >> config.pbtxt) && \
     # Unknown CPU execution accelerators
     cp -r models/${MODEL}_def models/${MODEL}_unknown_cpu && \
     (cd models/${MODEL}_unknown_cpu && \
-            sed -i 's/^name: "_float32_def"/name: "_float32_unknown_cpu"/' \
+            sed -i 's/_float32_def/_float32_unknown_cpu/' \
                 config.pbtxt && \
             echo "optimization { execution_accelerators { cpu_execution_accelerator : [ { name : \"unknown_cpu\" } ] } }" >> config.pbtxt)
 
@@ -169,7 +169,7 @@ for MODEL in \
         echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator returns error\n***"
         RET=1
     fi
-    grep "failed to load '${MODEL}_unknown_cpu' version 1: Invalid argument: unknown Execution Accelerator 'unknown_cpu' is requested" $SERVER_LOG
+    grep "failed to load '${MODEL}_unknown_cpu' version 1: Invalid argument: CPU Execution Accelerator is not supported in TensorFlow backend" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator returns error\n***"
         RET=1
