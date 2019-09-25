@@ -56,18 +56,18 @@ def summarize(traces):
             model_span_map[key] = dict()
 
         model_count_map[key] += 1
-        if "http infer start" in timestamps:
+        if ("http recv start" in timestamps) and ("http send end" in timestamps):
             add_span(model_span_map[key], timestamps,
-                     "http infer", "http infer start", "http infer end")
+                     "http infer", "http recv start", "http send end")
             add_span(model_span_map[key], timestamps,
-                     "http receive", "http infer start", "request handler start")
+                     "http recv", "http recv start", "http recv end")
             add_span(model_span_map[key], timestamps,
-                     "http send", "compute end", "http infer end")
+                     "http send", "http send start", "http send end")
         elif "grpc infer start" in timestamps:
             add_span(model_span_map[key], timestamps,
                      "grpc infer", "grpc infer start", "grpc infer end")
             add_span(model_span_map[key], timestamps,
-                     "grpc receive", "grpc infer start", "request handler start")
+                     "grpc recv", "grpc infer start", "request handler start")
             add_span(model_span_map[key], timestamps,
                      "grpc send", "compute end", "grpc infer end")
 
@@ -106,13 +106,22 @@ def summarize(traces):
         if "http infer" in model_span_map[key]:
             print("HTTP infer request (avg): {}us".format(
                 model_span_map[key]["http infer"] / (cnt * 1000)))
-            print("\tHTTP receive (avg): {}us".format(
-                model_span_map[key]["http receive"] / (cnt * 1000)))
+            print("\tReceive (avg): {}us".format(
+                model_span_map[key]["http recv"] / (cnt * 1000)))
+            print("\tSend (avg): {}us".format(
+                model_span_map[key]["http send"] / (cnt * 1000)))
+            print("\tOverhead (avg): {}us".format(
+                (model_span_map[key]["http infer"] -
+                 model_span_map[key]["request handler"] -
+                 model_span_map[key]["http recv"] -
+                 model_span_map[key]["http send"]) / (cnt * 1000)))
         elif "grpc infer" in model_span_map[key]:
             print("GRPC infer request (avg): {}us".format(
                 model_span_map[key]["grpc infer"] / (cnt * 1000)))
             print("\tGRPC receive (avg): {}us".format(
-                model_span_map[key]["grpc receive"] / (cnt * 1000)))
+                model_span_map[key]["grpc recv"] / (cnt * 1000)))
+            print("\tGRPC send (avg): {}us".format(
+                model_span_map[key]["grpc send"] / (cnt * 1000)))
 
         print("\tHandler (avg): {}us".format(
             model_span_map[key]["request handler"] / (cnt * 1000)))
@@ -132,12 +141,6 @@ def summarize(traces):
             print("\t\t\tOutput (avg): {}us".format(
                 model_span_map[key]["compute output"] / (cnt * 1000)))
 
-        if "http infer" in model_span_map[key]:
-            print("\tHTTP send (avg): {}us".format(
-                model_span_map[key]["http send"] / (cnt * 1000)))
-        elif "grpc infer" in model_span_map[key]:
-            print("\tGRPC send (avg): {}us".format(
-                model_span_map[key]["grpc send"] / (cnt * 1000)))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

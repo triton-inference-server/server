@@ -868,7 +868,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
   LOG_VERBOSE(1) << "Process for " << Name() << ", rpc_ok=" << rpc_ok << ", "
                  << state->unique_id_ << " step " << state->step_;
 
-  // We need an explicit finish indicator. Can use 'state->step_'
+  // We need an explicit finish indicator. Can't use 'state->step_'
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;
@@ -1123,7 +1123,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
                  << ", context " << state->context_->unique_id_ << ", "
                  << state->unique_id_ << " step " << state->step_;
 
-  // We need an explicit finish indicator. Can use 'state->step_'
+  // We need an explicit finish indicator. Can't use 'state->step_'
   // because we launch an async thread that could update 'state's
   // step_ to be FINISH before this thread exits this function.
   bool finished = false;

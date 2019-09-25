@@ -1,0 +1,87 @@
+diff --git a/evhtp.c b/evhtp.c
+index 8d34676..5993ddc 100644
+--- a/evhtp.c
++++ b/evhtp.c
+@@ -1335,6 +1335,10 @@ htp__request_parse_start_(htparser * p)
+         return -1;
+     }
+ 
++#ifdef EVHTP_TRTIS_ENABLE_TRACING
++    clock_gettime(CLOCK_MONOTONIC, &(c->request->recv_start_ts));
++#endif  // EVHTP_TRTIS_ENABLE_TRACING
++
+     return 0;
+ }
+ 
+@@ -1839,6 +1843,28 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
+         return -1;
+     }
+ 
++    // NVIDIA: Don't use a scratch evbuffer, just copy the data
++    // directly into the request's buffer_in. This allows the body to
++    // be contiguous in buffer_in. We don't use the htp__hook_body_
++    // callback so there is no need to stage the body data through
++    // 'buf'.
++#ifdef EVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS
++    if (len > 0) {
++        // The first time we get some body content, reserve enough
++        // space in buffer_in to hold the entire body.
++        if (evbuffer_get_length(c->request->buffer_in) == 0) {
++            const char* content_length =
++                evhtp_kv_find(c->request->headers_in, "Content-Length");
++            log_debug("reserving buffer_in for content_length: %s", content_length);
++
++            struct evbuffer_iovec output_iovec;
++            evbuffer_reserve_space(
++                c->request->buffer_in, atol(content_length), &output_iovec, 1);
++        }
++
++        evbuffer_add(c->request->buffer_in, data, len);
++    }
++#else
+     if ((buf = c->scratch_buf) == NULL) {
+         return -1;
+     }
+@@ -1854,6 +1880,7 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
+     }
+ 
+     evbuffer_drain(buf, -1);
++#endif /* EVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS */
+ 
+     c->body_bytes_read += len;
+ 
+@@ -2010,6 +2037,12 @@ htp__request_parse_fini_(htparser * p)
+         return -1;
+     }
+ 
++#ifdef EVHTP_TRTIS_ENABLE_TRACING
++    if (c->request) {
++      clock_gettime(CLOCK_MONOTONIC, &(c->request->recv_end_ts));
++    }
++#endif  // EVHTP_TRTIS_ENABLE_TRACING
++
+     return 0;
+ } /* htp__request_parse_fini_ */
+ 
+@@ -3788,6 +3821,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
+     struct evbuffer    * reply_buf;
+     struct bufferevent * bev;
+ 
++#ifdef EVHTP_TRTIS_ENABLE_TRACING
++    clock_gettime(CLOCK_MONOTONIC, &(request->send_start_ts));
++#endif  // EVHTP_TRTIS_ENABLE_TRACING
++
+     c = request->conn;
+ 
+     log_debug("set finished flag");
+@@ -3805,6 +3842,10 @@ evhtp_send_reply(evhtp_request_t * request, evhtp_res code)
+     bufferevent_write_buffer(bev, reply_buf);
+ 
+     evbuffer_drain(reply_buf, -1);
++
++#ifdef EVHTP_TRTIS_ENABLE_TRACING
++    clock_gettime(CLOCK_MONOTONIC, &(request->send_end_ts));
++#endif  // EVHTP_TRTIS_ENABLE_TRACING
+ }
+ 
+ int

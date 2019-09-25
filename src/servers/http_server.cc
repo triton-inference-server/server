@@ -241,6 +241,8 @@ class HTTPAPIServer : public HTTPServerImpl {
         uint64_t unique_id);
     ~InferRequest() = default;
 
+    evhtp_request_t* EvHtpRequest() const { return req_; }
+
     static void InferComplete(
         TRTSERVER_Server* server, TRTSERVER_Trace* trace,
         TRTSERVER_InferenceResponse* response, void* userp);
@@ -914,13 +916,18 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   }
 
 #ifdef TRTIS_ENABLE_TRACING
-  // Earliest entrypoint for an HTTP infer request. Capture a
-  // timestamp for the start of the request.
+  // Timestamps from evhtp are capture in 'req'. We record here since
+  // this is the first place where we have a tracer.
   std::unique_ptr<Tracer> tracer;
   if (trace_manager_ != nullptr) {
     tracer.reset(trace_manager_->SampleTrace(model_name, model_version));
     if (tracer != nullptr) {
-      tracer->CaptureTimestamp(TRTSERVER_TRACE_LEVEL_MIN, "http infer start");
+      tracer->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
+          TIMESPEC_TO_NANOS(req->recv_start_ts));
+      tracer->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "http recv end",
+          TIMESPEC_TO_NANOS(req->recv_end_ts));
     }
   }
 #endif  // TRTIS_ENABLE_TRACING
@@ -1011,6 +1018,7 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
         req, (request_status.code() == RequestStatusCode::SUCCESS)
                  ? EVHTP_RES_OK
                  : EVHTP_RES_BADREQ);
+    evhtp_request_resume(req);
   }
 
   TRTSERVER_ErrorDelete(err);
@@ -1019,17 +1027,49 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
 void
 HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  evhtp_request_t* request = (evhtp_request_t*)arg;
+  HTTPAPIServer::InferRequest* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+
+  evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_OK);
   evhtp_request_resume(request);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (infer_request->tracer_ != nullptr) {
+    infer_request->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TIMESPEC_TO_NANOS(request->send_start_ts));
+    infer_request->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TIMESPEC_TO_NANOS(request->send_end_ts));
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
+  delete infer_request;
 }
 
 void
 HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 {
-  evhtp_request_t* request = (evhtp_request_t*)arg;
+  HTTPAPIServer::InferRequest* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequest*>(arg);
+
+  evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
   evhtp_request_resume(request);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (infer_request->tracer_ != nullptr) {
+    infer_request->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send start",
+        TIMESPEC_TO_NANOS(request->send_start_ts));
+    infer_request->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "http send end",
+        TIMESPEC_TO_NANOS(request->send_end_ts));
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
+  delete infer_request;
 }
 
 HTTPAPIServer::InferRequest::InferRequest(
@@ -1051,24 +1091,15 @@ HTTPAPIServer::InferRequest::InferComplete(
   HTTPAPIServer::InferRequest* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequest*>(userp);
   if (infer_request->FinalizeResponse(response) == EVHTP_RES_OK) {
-    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request->req_);
+    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
-    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request->req_);
+    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
   }
-
-#ifdef TRTIS_ENABLE_TRACING
-  // Capture a timestamp for the end of the request.
-  if (infer_request->tracer_ != nullptr) {
-    infer_request->tracer_->CaptureTimestamp(
-        TRTSERVER_TRACE_LEVEL_MIN, "http infer end");
-  }
-#endif  // TRTIS_ENABLE_TRACING
 
   // Don't need to explicitly delete 'trace'. It will be deleted by
   // the Tracer object in 'infer_request'.
   LOG_IF_ERR(
       TRTSERVER_InferenceResponseDelete(response), "deleting HTTP response");
-  delete infer_request;
 }
 
 evhtp_res

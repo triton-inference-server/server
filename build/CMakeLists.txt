@@ -197,10 +197,14 @@ ExternalProject_Add(libevhtp
   URL "https://github.com/criticalstack/libevhtp/archive/1.2.18.zip"
   URL_HASH SHA256=3194dc6eb4e8d6aa1e7dd3dc60bfbe066f38f9a0b5881463f0e149badd82a7bb
   PATCH_COMMAND sed -i "s/LibEvent/Libevent/g" ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/CMakeLists.txt
-  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
+  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.c.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/evhtp.c
+  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/evhtp.h.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/evhtp.h
+  COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/config.h.in.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/config.h.in
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
   CMAKE_CACHE_ARGS
     -DEVHTP_DISABLE_SSL:BOOL=ON
+    -DEVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS:BOOL=ON
+    -DEVHTP_TRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DLibevent_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/libevent/install/lib/cmake/libevent
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
