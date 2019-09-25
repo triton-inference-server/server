@@ -46,6 +46,24 @@ else:
 import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
+def _prepend_string_size(input_values):
+    input_list = []
+    for input_value in input_values:
+        flattened = bytes()
+        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to STRING type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        input_list.append(np.asarray(flattened))
+    return input_list
+
+
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
@@ -56,10 +74,7 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
 # Add ensemble to the _trials
-if TEST_SHARED_MEMORY:
-    ENSEMBLE_PREFIXES = []
-else:
-    ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
+ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 res = []
 for trial in _trials:
     res.append(trial)
@@ -153,11 +168,14 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    if input_dtype == np.object:
+                        input_list = _prepend_string_size(input_list)
+                        print("gg", input_list, input_list[0].nbytes)
                     input_info = input_list
                     output_info = InferContext.ResultFormat.RAW
 
                     if config[3]:
-                        input_byte_size = input_list[0].size * input_list[0].itemsize * batch_size
+                        input_byte_size = sum([i0.nbytes for i0 in input_list])
                         output_byte_size = np.dtype(input_dtype).itemsize
                         # create and register shared memory region for inputs and outputs
                         shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
@@ -169,7 +187,7 @@ class SequenceBatcherTest(unittest.TestCase):
                         shared_memory_ctx.unregister(shm_op_handle)
                         shared_memory_ctx.register(shm_op_handle)
 
-                        input_info = shm_ip_handle
+                        input_info = (shm_ip_handle, tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
 
                     start_ms = int(round(time.time() * 1000))
@@ -305,11 +323,14 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
+                    if input_dtype == np.object:
+                        input_list = _prepend_string_size(input_list)
+
                     input_info = input_list
                     output_info = InferContext.ResultFormat.RAW
 
                     if config[3]:
-                        input_byte_size = input_list[0].nbytes * batch_size
+                        input_byte_size = sum([i0.nbytes for i0 in input_list])
                         output_byte_size = np.dtype(input_dtype).itemsize
                         # create and register shared memory region for inputs and outputs
                         if shm_region_names is None:
@@ -429,7 +450,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # Get the datatype to use based on what models are available (see test.sh)
         if ("plan" in trial) or ("savedmodel" in trial):
             return np.float32
-        if ("graphdef" in trial) and (not TEST_SHARED_MEMORY):
+        if ("graphdef" in trial):
             return np.dtype(object)
         return np.int32
 
