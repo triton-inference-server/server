@@ -1,0 +1,17 @@
+instance_group [
+  {
+      profile: "0"
+  }
+]
+
+instance_group [
+  {
+      profile: "1"
+  }
+]
+
+instance_group [
+  {
+      profile: "2"
+  }
+]

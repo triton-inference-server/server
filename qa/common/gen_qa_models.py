@@ -707,10 +707,6 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     min_shape = []
     opt_shape = []
     max_shape = []
-    if max_batch != 0:
-        min_shape = min_shape + [1]
-        opt_shape = opt_shape + [max(1, max_batch)]
-        max_shape = max_shape + [max(1, max_batch)]
     for i in input_shape:
         if i == -1:
             min_shape = min_shape + [min_dim]
@@ -721,11 +717,31 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
             opt_shape = opt_shape + [i]
             max_shape = max_shape + [i]
 
-    profile = builder.create_optimization_profile()
-    profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
-    profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
     config = builder.create_builder_config()
-    config.add_optimization_profile(profile)
+    # create multiple profiles with same shape for testing 
+    # with decreasing batch sizes
+    profile = []
+    for i in range(4):
+        profile.append(builder.create_optimization_profile())
+        if max_batch == 0:
+            profile[i].set_shape("INPUT0", min_shape, opt_shape, max_shape)
+            profile[i].set_shape("INPUT1", min_shape, opt_shape, max_shape)
+        else:
+            bs = [ max_batch - i if max_batch > i else 1]
+            profile[i].set_shape("INPUT0", [1] + min_shape, bs + opt_shape, bs + max_shape)
+            profile[i].set_shape("INPUT1", [1] + min_shape, bs + opt_shape, bs + max_shape)
+        config.add_optimization_profile(profile[i])
+    # some profiles with non-one min shape for first dim to test autofiller
+    for i in range(2):
+        profile.append(builder.create_optimization_profile())
+        if max_batch == 0:
+            profile[i + 4].set_shape("INPUT0", min_shape, opt_shape, max_shape)
+            profile[i + 4].set_shape("INPUT1", min_shape, opt_shape, max_shape)
+        else:
+            profile[i + 4].set_shape("INPUT0", [2 + i] + min_shape, [4] + opt_shape, [8] + max_shape)
+            profile[i + 4].set_shape("INPUT1", [2 + i] + min_shape, [4] + opt_shape, [8] + max_shape)
+        config.add_optimization_profile(profile[i + 4])
+
     builder.set_max_workspace_size(1 << 20)
     engine = builder.build_engine(network,config)
 
