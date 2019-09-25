@@ -1,8 +1,8 @@
 diff --git a/evhtp.c b/evhtp.c
-index 8d34676..790b529 100644
+index 8d34676..4ccc080 100644
 --- a/evhtp.c
 +++ b/evhtp.c
-@@ -1839,6 +1839,29 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
+@@ -1839,6 +1839,28 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
          return -1;
      }
  
@@ -14,9 +14,8 @@ index 8d34676..790b529 100644
 +#if 1
 +    if (len > 0) {
 +        // The first time we get some body content, reserve enough
-+        // space in buffer_in to hold then entire body.
-+        const int n = evbuffer_peek(c->request->buffer_in, -1, NULL, NULL, 0);
-+        if (n == 0) {
++        // space in buffer_in to hold the entire body.
++        if (evbuffer_get_length(c->request->buffer_in) == 0) {
 +            const char* content_length =
 +                evhtp_kv_find(c->request->headers_in, "Content-Length");
 +            log_debug("reserving buffer_in for content_length: %s", content_length);
@@ -32,7 +31,7 @@ index 8d34676..790b529 100644
      if ((buf = c->scratch_buf) == NULL) {
          return -1;
      }
-@@ -1854,6 +1877,7 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
+@@ -1854,6 +1876,7 @@ htp__request_parse_body_(htparser * p, const char * data, size_t len)
      }
  
      evbuffer_drain(buf, -1);
