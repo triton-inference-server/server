@@ -258,7 +258,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            verbose=True)
         if config[3]:
             results = ctx.run(
-                    { INPUT0 : shm_ip0_handle, INPUT1 : shm_ip1_handle },
+                    { INPUT0 : (shm_ip0_handle, tensor_shape),
+                    INPUT1 : (shm_ip1_handle, tensor_shape) },
                     output_req, batch_size)
         else:
             results = ctx.run(

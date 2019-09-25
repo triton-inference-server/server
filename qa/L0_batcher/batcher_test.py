@@ -336,19 +336,19 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (12000, None)),
                                                 kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
+                                                args=(trial, 3, (12000, None)),
                                                 kwargs={'shm_region_names': ['ip10', 'ip1', 'op10', 'op11']}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (12000, None)),
                                                 kwargs={'input_size': 8,
                                                 'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, (3000, None)),
+                                                args=(trial, 5, (12000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip31', 'ip31', 'op30', 'op31']}))
+                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31']}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -582,7 +582,7 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                          kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 4,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
@@ -621,15 +621,19 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None))))
+                                                args=(trial, 1, (3000, None)),
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None))))
+                                                args=(trial, 3, (3000, None)),
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'input_size': 8}))
+                                                kwargs={'input_size': 8,
+                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 5, (3000, None)),
-                                                kwargs={'input_size': 8}))
+                                                kwargs={'input_size': 8,
+                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31']}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
