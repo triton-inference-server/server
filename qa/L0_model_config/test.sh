@@ -69,8 +69,20 @@ done
 
 # Copy variable-sized TensorRT plans into the test model repositories.
 for modelpath in \
+        autofill_noplatform_success/tensorrt/no_name_platform_variable/1 \
+        autofill_noplatform_success/tensorrt/empty_config_variable/1     \
+        autofill_noplatform_success/tensorrt/no_config_variable/1 \
+        autofill_noplatform_success/tensorrt/hint_for_no_batch/1 \
+        autofill_noplatform_success/tensorrt/multi_prof_max_bs/1 \
+        autofill_noplatform_success/tensorrt/multi_prof_no_batch/1 ; do
+    mkdir -p $modelpath
+    cp /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32/1/model.plan \
+       $modelpath/.
+done
+
+for modelpath in \
         autofill_noplatform/tensorrt/bad_dynamic_shapes_max/1 \
-        autofill_noplatform/tensorrt/bad_dynamic_shapes_min/1; do
+        autofill_noplatform/tensorrt/bad_dynamic_shapes_min/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32-4-32/1/model.plan \
        $modelpath/.
@@ -247,7 +259,7 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     # assume that the directory is a single model. Otherwise assume
     # that the directory is an entire model repository.
     rm -fr models && mkdir models
-    if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ]; then
+    if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ]  || [ "$TARGET" = "no_config_variable" ]; then
         cp -r ${TARGET_DIR} models/.
     else
         cp -r ${TARGET_DIR}/* models/.
