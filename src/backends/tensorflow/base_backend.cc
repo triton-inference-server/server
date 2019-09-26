@@ -213,7 +213,6 @@ BaseBackend::CreateExecutionContext(
       }
     }
 
-    // [TODO] Use non-default value.
     if (!Config()
              .optimization()
              .execution_accelerators()
