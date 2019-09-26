@@ -293,7 +293,7 @@ AutoFillSavedModel::Create(
       graphdef_backend_config->allow_gpu_memory_growth,
       graphdef_backend_config->per_process_gpu_memory_fraction,
       graphdef_backend_config->allow_soft_placement,
-      graphdef_backend_config->memory_limit_mb));
+      graphdef_backend_config->memory_limit_mb, nullptr /* tftrt_config */));
 
   autofill->reset(
       new AutoFillSavedModelImpl(model_name, savedmodel_dir, trtistf_model));
