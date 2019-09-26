@@ -1,0 +1,18 @@
+diff --git a/include/evhtp/evhtp.h b/include/evhtp/evhtp.h
+index 9bcee44..e6cf17f 100644
+--- a/include/evhtp/evhtp.h
++++ b/include/evhtp/evhtp.h
+@@ -416,6 +416,13 @@ struct evhtp_request {
+     #define EVHTP_REQ_FLAG_ERROR     (1 << 4)
+     uint16_t flags;
+ 
++#ifdef EVHTP_TRTIS_ENABLE_TRACING
++    struct timespec recv_start_ts;
++    struct timespec recv_end_ts;
++    struct timespec send_start_ts;
++    struct timespec send_end_ts;
++#endif  /* EVHTP_TRTIS_ENABLE_TRACING */
++
+     evhtp_callback_cb cb;               /**< the function to call when fully processed */
+     void            * cbarg;            /**< argument which is passed to the cb function */
+ 
