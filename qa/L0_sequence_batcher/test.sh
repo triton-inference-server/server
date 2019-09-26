@@ -127,13 +127,8 @@ done
 
 # Same test work on all models since they all have same total number
 # of batch slots.
-# if [ "$TEST_SHARED_MEMORY" == "0" ]; then
-trial_types="v 0 1 2 4"
-# else
-#   trial_types="0 1 2 4"
-# fi
 
-for model_trial in $trial_types ; do
+for model_trial in v 0 1 2 4; do
     export NO_BATCHING=1 &&
         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0
     export MODEL_INSTANCES=1 &&
@@ -160,7 +155,7 @@ for model_trial in $trial_types ; do
             test_no_sequence_start2 \
             test_no_sequence_end \
             test_no_correlation_id ; do
-        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR --log-verbose=1"
+        SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
         SERVER_LOG="./$i.$MODEL_DIR.serverlog"
         run_server
         if [ "$SERVER_PID" == "0" ]; then

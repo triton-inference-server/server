@@ -1235,7 +1235,7 @@ class InferContext:
                                 byref(shm_addr), byref(shm_key), byref(shm_fd), \
                                 byref(offset), byref(byte_size))))
                     if (np.prod(shape) * np.dtype(result_dtype).itemsize) < int(byte_size.value/batch_size):
-                        element_byte_size = sum(shape) * np.dtype(result_dtype).itemsize
+                        element_byte_size = np.prod(shape) * np.dtype(result_dtype).itemsize
                     else:
                         element_byte_size = int(byte_size.value/batch_size)
                     start_pos = offset.value
