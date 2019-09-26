@@ -1,0 +1,14 @@
+diff --git a/include/evhtp/config.h.in b/include/evhtp/config.h.in
+index e5e434f..0daf25c 100644
+--- a/include/evhtp/config.h.in
++++ b/include/evhtp/config.h.in
+@@ -44,6 +44,9 @@ extern "C" {
+ #cmakedefine EVHTP_DEBUG
+ #cmakedefine EVHTP_DISABLE_MEMFUNCTIONS
+ 
++#cmakedefine EVHTP_TRTIS_ENABLE_TRACING
++#cmakedefine EVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS
++
+ #ifndef EVHTP_DISABLE_REGEX
+ #include <onigposix.h>
+ #endif
