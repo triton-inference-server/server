@@ -924,9 +924,6 @@ class InferHttpContextImpl : public InferContextImpl {
 
   // Serialized InferRequestHeader
   std::string infer_request_str_;
-
-  // Keep an easy handle alive to reuse the connection
-  CURL* curl_;
 };
 
 //==============================================================================
@@ -997,9 +994,9 @@ HttpRequestImpl::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
     }
   }
 
-  // Sent all input bytes
+  // Set end timestamp if all inputs have been sent.
   if (input_pos_idx_ >= inputs_.size()) {
-    Timer().Record(RequestTimers::Kind::SEND_END);
+    Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
 
   return Error::Success;
@@ -1207,35 +1204,41 @@ InferHttpContextImpl::Run(ResultMap* results)
   std::shared_ptr<HttpRequestImpl> sync_request =
       std::static_pointer_cast<HttpRequestImpl>(sync_request_);
 
+  sync_request->Timer().Reset();
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+
   if (!curl_global.Status().IsOk()) {
     return curl_global.Status();
   }
 
   Error err = PreRunProcessing(sync_request_);
-
   if (!err.IsOk()) {
     return err;
   }
 
-  // Take run time
-  sync_request->Timer().Reset();
-  sync_request->Timer().Record(RequestTimers::Kind::REQUEST_START);
-  sync_request->Timer().Record(RequestTimers::Kind::SEND_START);
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
   if (sync_request->total_input_byte_size_ == 0) {
     // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
     // content length is 0. In that case, we can't measure SEND_END properly
     // (send ends after sending request header).
-    sync_request->Timer().Record(RequestTimers::Kind::SEND_END);
+    sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
-  sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
-  sync_request->Timer().Record(RequestTimers::Kind::RECEIVE_END);
-  sync_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
 
-  err = UpdateStat(sync_request->Timer());
-  if (!err.IsOk()) {
+  // During this call both SEND_END (except in above case) and
+  // RECV_START will be set.
+  sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+
+  err = sync_request->GetResults(results);
+
+  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+
+  if (!UpdateStat(sync_request->Timer()).IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }
-  return sync_request->GetResults(results);
+
+  return err;
 }
 
 Error
@@ -1280,6 +1283,8 @@ InferHttpContextImpl::AsyncRun(
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
+
   Error err = PreRunProcessing(*async_request);
 
   {
@@ -1298,11 +1303,13 @@ InferHttpContextImpl::AsyncRun(
     }
 
     curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
-    current_context->Timer().Reset();
-    current_context->Timer().Record(RequestTimers::Kind::REQUEST_START);
-    current_context->Timer().Record(RequestTimers::Kind::SEND_START);
+
+    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
     if (current_context->total_input_byte_size_ == 0) {
-      current_context->Timer().Record(RequestTimers::Kind::SEND_END);
+      // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
+      // content length is 0. In that case, we can't measure SEND_END properly
+      // (send ends after sending request header).
+      current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
     }
   }
 
@@ -1415,9 +1422,8 @@ InferHttpContextImpl::ResponseHandler(
   HttpRequestImpl* request = reinterpret_cast<HttpRequestImpl*>(userp);
   size_t result_bytes = 0;
 
-  static auto unset_timepoint = RequestTimers::TimePoint();
-  if (request->Timer().receive_start_ == unset_timepoint) {
-    request->Timer().Record(RequestTimers::Kind::RECEIVE_START);
+  if (request->Timer().Timestamp(RequestTimers::Kind::RECV_START) == 0) {
+    request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
   }
 
   Error err = request->SetNextRawResult(
@@ -1505,8 +1511,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   }
 
   const curl_off_t post_byte_size = http_request->total_input_byte_size_;
-  curl_easy_setopt(
-      curl, CURLOPT_POSTFIELDSIZE_LARGE, post_byte_size);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, post_byte_size);
 
   // Headers to specify input and output tensors
   infer_request_str_.clear();
@@ -1536,6 +1541,7 @@ InferHttpContextImpl::AsyncTransfer()
   do {
     std::vector<std::shared_ptr<Request>> request_with_callback;
     bool has_completed = false;
+
     // sleep if no work is available
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] {
@@ -1544,14 +1550,15 @@ InferHttpContextImpl::AsyncTransfer()
       }
       // wake up if at least one request is not ready
       for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (std::static_pointer_cast<HttpRequestImpl>(
-                ongoing_async_request.second)
-                ->IsReady() == false) {
+        if (!std::static_pointer_cast<HttpRequestImpl>(
+                 ongoing_async_request.second)
+                 ->IsReady()) {
           return true;
         }
       }
       return false;
     });
+
     curl_multi_perform(multi_handle_, &place_holder);
     while ((msg = curl_multi_info_read(multi_handle_, &place_holder))) {
       // update request status
@@ -1567,6 +1574,7 @@ InferHttpContextImpl::AsyncTransfer()
         curl_easy_cleanup(msg->easy_handle);
         continue;
       }
+
       std::shared_ptr<HttpRequestImpl> http_request =
           std::static_pointer_cast<HttpRequestImpl>(itr->second);
 
@@ -1574,9 +1582,11 @@ InferHttpContextImpl::AsyncTransfer()
         // Something wrong happened.
         fprintf(stderr, "Unexpected error: received CURLMsg=%d\n", msg->msg);
       } else {
-        http_request->Timer().Record(RequestTimers::Kind::RECEIVE_END);
-        http_request->Timer().Record(RequestTimers::Kind::REQUEST_END);
+        http_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+        http_request->Timer().CaptureTimestamp(
+            RequestTimers::Kind::REQUEST_END);
       }
+
       http_request->http_status_ = msg->data.result;
       http_request->SetIsReady(true);
 
@@ -1585,11 +1595,15 @@ InferHttpContextImpl::AsyncTransfer()
         request_with_callback.emplace_back(itr->second);
       }
     }
+
     lock.unlock();
-    // if it has completed tasks, send signal in case the main thread is waiting
+
+    // Were task(s) completed? If so send signal in case the main
+    // thread is waiting
     if (has_completed) {
       cv_.notify_all();
     }
+
     for (auto& request : request_with_callback) {
       HttpRequestImpl* request_ptr =
           static_cast<HttpRequestImpl*>(request.get());
