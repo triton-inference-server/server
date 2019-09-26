@@ -46,24 +46,6 @@ else:
 import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 
-def _prepend_string_size(input_values):
-    input_list = []
-    for input_value in input_values:
-        flattened = bytes()
-        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
-            # If directly passing bytes to STRING type,
-            # don't convert it to str as Python will encode the
-            # bytes which may distort the meaning
-            if obj.dtype.type == np.bytes_:
-                s = bytes(obj)
-            else:
-                s = str(obj).encode('utf-8')
-            flattened += struct.pack("<I", len(s))
-            flattened += s
-        input_list.append(np.asarray(flattened))
-    return input_list
-
-
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
 
@@ -168,20 +150,19 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
-                    if input_dtype == np.object:
-                        input_list = _prepend_string_size(input_list)
-                        print("gg", input_list, input_list[0].nbytes)
-                    input_info = input_list
-                    output_info = InferContext.ResultFormat.RAW
-
                     if config[3]:
-                        input_byte_size = sum([i0.nbytes for i0 in input_list])
-                        output_byte_size = np.dtype(input_dtype).itemsize
+                        if input_dtype == np.object:
+                            input_list_tmp = iu._prepend_string_size(input_list)
+                        else:
+                            input_list_tmp = input_list
+
+                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                        output_byte_size = np.dtype(input_dtype).itemsize + 2
                         # create and register shared memory region for inputs and outputs
                         shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
                         shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
                         # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                         shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
                         shared_memory_ctx.unregister(shm_op_handle)
@@ -189,6 +170,9 @@ class SequenceBatcherTest(unittest.TestCase):
 
                         input_info = (shm_ip_handle, tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+                    else:
+                        input_info = input_list
+                        output_info = InferContext.ResultFormat.RAW
 
                     start_ms = int(round(time.time() * 1000))
                     if "libtorch" not in trial:
@@ -323,15 +307,14 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
-                    if input_dtype == np.object:
-                        input_list = _prepend_string_size(input_list)
-
-                    input_info = input_list
-                    output_info = InferContext.ResultFormat.RAW
-
                     if config[3]:
-                        input_byte_size = sum([i0.nbytes for i0 in input_list])
-                        output_byte_size = np.dtype(input_dtype).itemsize
+                        if input_dtype == np.object:
+                            input_list_tmp = iu._prepend_string_size(input_list)
+                        else:
+                            input_list_tmp = input_list
+
+                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                        output_byte_size = np.dtype(input_dtype).itemsize + 2
                         # create and register shared memory region for inputs and outputs
                         if shm_region_names is None:
                             shm_ip_handle.append(shm.create_shared_memory_region(
@@ -346,14 +329,17 @@ class SequenceBatcherTest(unittest.TestCase):
                                 shm_region_names[1]+str(i)+'_data', '/'+shm_region_names[1]+str(i),
                                 output_byte_size))
                         # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list)
+                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list_tmp)
                         shared_memory_ctx.unregister(shm_ip_handle[-1])
                         shared_memory_ctx.register(shm_ip_handle[-1])
                         shared_memory_ctx.unregister(shm_op_handle[-1])
                         shared_memory_ctx.register(shm_op_handle[-1])
 
-                        input_info = shm_ip_handle[-1]
+                        input_info = (shm_ip_handle[-1], tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle[-1])
+                    else:
+                        input_info = input_list
+                        output_info = InferContext.ResultFormat.RAW
 
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)

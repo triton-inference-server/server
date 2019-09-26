@@ -91,7 +91,7 @@ done
 # for execution). Test everything with fixed-tensor-size models and
 # variable-tensor-size models.
 
-for model_type in "FIXED VARIABLE"; do
+for model_type in FIXED VARIABLE; do
     export BATCHER_TYPE=$model_type
     MODEL_PATH=models && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
     for i in \
