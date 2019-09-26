@@ -72,6 +72,13 @@ def _prepend_string_size(input_values):
         input_list.append(np.asarray(flattened))
     return input_list
 
+def _match_registered(registered_shm_regions, shm_name, byte_size):
+    if shm_name in registered_shm_regions:
+        if byte_size < registered_shm_regions[shm_name][0]:
+            return True
+    else:
+        return False
+
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
@@ -79,7 +86,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 model_version=None, swap=False,
                 outputs=("OUTPUT0", "OUTPUT1"), use_http=True, use_grpc=True,
                 skip_request_id_check=False, use_streaming=True,
-                correlation_id=0, shm_region_names=None):
+                correlation_id=0, shm_region_names=None, precreated_shm_regions=None):
     tester.assertTrue(use_http or use_grpc or use_streaming)
     configs = []
     if use_http:
@@ -98,6 +105,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
         else:
             configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
 
+    registered_shm_regions = {}
     for config in configs:
         model_name = tu.get_model_name(pf, input_dtype, output0_dtype, output1_dtype)
 
@@ -118,6 +126,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                     np.iinfo(routput1_dtype).max) / 2
 
         num_classes = 3
+        shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
 
         input0_list = list()
         input1_list = list()
@@ -186,34 +195,75 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
 
             # create and register shared memory region for inputs and outputs
-            if shm_region_names is None:
-                shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
-                if "OUTPUT0" in outputs:
-                    shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
-                if "OUTPUT1" in outputs:
-                    shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
+            if precreated_shm_regions is None:
+                if shm_region_names is None:
+                    if not _match_registered(registered_shm_regions, '/input0', input0_byte_size):
+                        shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
+                        registered_shm_regions['/input0'] = (input0_byte_size, shm_ip0_handle)
+                    else:
+                        shm_ip0_handle = registered_shm_regions['/input0'][1]
+
+                    if not _match_registered(registered_shm_regions, '/input1', input1_byte_size):
+                        shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
+                        registered_shm_regions['/input1'] = (input1_byte_size, shm_ip1_handle)
+                    else:
+                        shm_ip1_handle = registered_shm_regions['/input1'][1]
+
+                    if "OUTPUT0" in outputs:
+                        if not _match_registered(registered_shm_regions, '/output0', output0_byte_size):
+                            shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
+                            registered_shm_regions['/output0'] = (output0_byte_size, shm_op0_handle)
+                        else:
+                            shm_op0_handle = registered_shm_regions['/output0'][1]
+
+                    if "OUTPUT1" in outputs:
+                        if not _match_registered(registered_shm_regions, '/output1', output1_byte_size):
+                            shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
+                            registered_shm_regions['/output1'] = (output1_byte_size, shm_op1_handle)
+                        else:
+                            shm_op1_handle = registered_shm_regions['/output1'][1]
+
+                else:
+                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[0], input0_byte_size):
+                        shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
+                                                                        '/'+shm_region_names[0], input0_byte_size)
+                        registered_shm_regions['/'+shm_region_names[0]] = (input0_byte_size, shm_ip0_handle)
+                    else:
+                        shm_ip0_handle = registered_shm_regions['/'+shm_region_names[0]][1]
+
+                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
+                        shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
+                                                                        '/'+shm_region_names[1], input1_byte_size)
+                        registered_shm_regions['/'+shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
+                    else:
+                        shm_ip1_handle = registered_shm_regions['/'+shm_region_names[1]][1]
+
+                    i = 0
+                    if "OUTPUT0" in outputs:
+                        if not _match_registered(registered_shm_regions, '/'+shm_region_names[2], output0_byte_size):
+                            shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
+                                                                            '/'+shm_region_names[2], output0_byte_size)
+                            registered_shm_regions['/'+shm_region_names[2]] = (output0_byte_size, shm_op0_handle)
+                        else:
+                            shm_op0_handle = registered_shm_regions['/'+shm_region_names[2]][1]
+                        i+=1
+
+                    if "OUTPUT1" in outputs:
+                        if not _match_registered(registered_shm_regions, '/'+shm_region_names[2+i], output1_byte_size):
+                            shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
+                                                                            '/'+shm_region_names[2+i], output1_byte_size)
+                            registered_shm_regions['/'+shm_region_names[2+i]] = (output1_byte_size, shm_op1_handle)
+                        else:
+                            shm_op1_handle = registered_shm_regions['/'+shm_region_names[2+i]][1]
             else:
-                shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
-                                                                '/'+shm_region_names[0], input0_byte_size)
-                shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                '/'+shm_region_names[1], input1_byte_size)
-                i = 0
-                if "OUTPUT0" in outputs:
-                    shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
-                                                                    '/'+shm_region_names[2], output0_byte_size)
-                    i+=1
-                if "OUTPUT1" in outputs:
-                    shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
-                                                                    '/'+shm_region_names[2+i], output1_byte_size)
+                shm_ip0_handle = precreated_shm_regions[0]
+                shm_ip1_handle = precreated_shm_regions[1]
+                shm_op0_handle = precreated_shm_regions[2]
+                shm_op1_handle = precreated_shm_regions[3]
 
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip0_handle, input0_list)
             shm.set_shared_memory_region(shm_ip1_handle, input1_list)
-
-            shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
-            shared_memory_ctx.unregister(shm_ip0_handle)
-            shared_memory_ctx.unregister(shm_ip1_handle)
             shared_memory_ctx.register(shm_ip0_handle)
             shared_memory_ctx.register(shm_ip1_handle)
             if "OUTPUT0" in outputs:
@@ -257,10 +307,12 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            correlation_id=correlation_id, streaming=config[2],
                            verbose=True)
         if config[3]:
+            print("zz, running")
             results = ctx.run(
                     { INPUT0 : (shm_ip0_handle, tensor_shape),
                     INPUT1 : (shm_ip1_handle, tensor_shape) },
                     output_req, batch_size)
+            print("zz, run ended")
         else:
             results = ctx.run(
                     { INPUT0 : input0_list, INPUT1 : input1_list },
@@ -320,16 +372,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
 
         if config[3]:
+            print("zz, unregister")
             shared_memory_ctx.unregister(shm_ip0_handle)
-            shm.destroy_shared_memory_region(shm_ip0_handle)
             shared_memory_ctx.unregister(shm_ip1_handle)
-            shm.destroy_shared_memory_region(shm_ip1_handle)
             if "OUTPUT0" in outputs:
                 shared_memory_ctx.unregister(shm_op0_handle)
-                shm.destroy_shared_memory_region(shm_op0_handle)
             if "OUTPUT1" in outputs:
                 shared_memory_ctx.unregister(shm_op1_handle)
-                shm.destroy_shared_memory_region(shm_op1_handle)
 
     return results
 

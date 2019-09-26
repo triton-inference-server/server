@@ -38,7 +38,9 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tensorrtserver.api import *
+import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
+from ctypes import *
 
 if os.environ['BATCHER_TYPE'] == "VARIABLE":
     _trials = ("savedmodel", "graphdef", "netdef", "custom", "libtorch", "onnx")
@@ -47,6 +49,15 @@ else:
 
 _max_queue_delay_ms = 10000
 _check_exception = None
+
+def _create_advance(shm_regions = None):
+    precreated_shm_regions = []
+    if shm_regions is None:
+        shm_regions = ['input0','input1','output0','output1']
+    for shm_region in shm_regions:
+        shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
+        precreated_shm_regions.append(shm_tmp_handle)
+    return precreated_shm_regions
 
 class BatcherTest(unittest.TestCase):
     def setUp(self):
@@ -59,7 +70,7 @@ class BatcherTest(unittest.TestCase):
 
     def check_response(self, trial, bs, thresholds,
                        requested_outputs=("OUTPUT0", "OUTPUT1"), input_size=16,
-                       shm_region_names=None):
+                       shm_region_names=None, precreated_shm_regions=None):
         global _check_exception
         try:
             start_ms = int(round(time.time() * 1000))
@@ -71,14 +82,16 @@ class BatcherTest(unittest.TestCase):
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, shm_region_names=shm_region_names)
+                               use_streaming=False, shm_region_names=shm_region_names,
+                               precreated_shm_regions=precreated_shm_regions)
             elif trial == "plan":
                 tensor_shape = (input_size,1,1)
                 iu.infer_exact(self, trial, tensor_shape, bs,
                                np.float32, np.float32, np.float32, swap=False,
                                model_version=1, outputs=requested_outputs,
                                use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, shm_region_names=shm_region_names)
+                               use_streaming=False, shm_region_names=shm_region_names,
+                               precreated_shm_regions=precreated_shm_regions)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -95,6 +108,7 @@ class BatcherTest(unittest.TestCase):
                                 "expected greater than " + str(gt_ms) +
                                 "ms response time, got " + str(end_ms - start_ms) + " ms")
         except Exception as ex:
+            print("zz", str(ex))
             _check_exception = ex
 
     def check_setup(self, url, protocol, model_name):
@@ -136,6 +150,7 @@ class BatcherTest(unittest.TestCase):
         # Send two requests with static batch sizes == preferred
         # size. This should cause the responses to be returned
         # immediately
+        precreated_shm_regions = _create_advance()
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -145,8 +160,10 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 2, (3000, None))
-                self.check_response(trial, 6, (3000, None))
+                # self.check_response(trial, 2, (3000, None))
+                # self.check_response(trial, 6, (3000, None))
+                self.check_response(trial, 2, (3000, None), precreated_shm_regions=precreated_shm_regions)
+                self.check_response(trial, 6, (3000, None), precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (2,6), 2, 8)
             except InferenceServerException as ex:
