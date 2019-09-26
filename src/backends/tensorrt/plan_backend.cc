@@ -45,9 +45,9 @@ PlanBackend::Context::Context(
     const int profile_index)
     : BackendContext(name, gpu_device, max_batch_size), runtime_(nullptr),
       engine_(nullptr), context_(nullptr), is_dynamic_(false),
-      profile_index_(profile_index), min_dims_(nullptr),
-      max_dims_(nullptr), max_dynamic_batch_size_(INT_MAX),
-      byte_sizes_(nullptr), buffers_(nullptr)
+      profile_index_(profile_index), min_dims_(nullptr), max_dims_(nullptr),
+      max_dynamic_batch_size_(INT_MAX), total_bindings_(0),
+      num_expected_bindings_(0), byte_sizes_(nullptr), buffers_(nullptr)
 {
   stream_ = nullptr;
 }
@@ -72,7 +72,7 @@ PlanBackend::Context::~Context()
   }
 
   if (buffers_ != nullptr) {
-    for (int i = 0; i < num_expected_bindings_; ++i) {
+    for (int i = 0; i < total_bindings_; ++i) {
       if (buffers_[i] != nullptr) {
         cudaError_t err = cudaFree(buffers_[i]);
         if (err != cudaSuccess) {
@@ -195,10 +195,11 @@ void
 PlanBackend::Context::InitProfile()
 {
   const int total_profiles = engine_->getNbOptimizationProfiles();
+  total_bindings_ = engine_->getNbBindings();
   if (total_profiles == 0) {
-    num_expected_bindings_ = engine_->getNbBindings();
+    num_expected_bindings_ = total_bindings_;
   } else {
-    num_expected_bindings_ = engine_->getNbBindings() / total_profiles;
+    num_expected_bindings_ = total_bindings_ / total_profiles;
   }
   binding_offset_ = profile_index_ * num_expected_bindings_;
 }
@@ -318,8 +319,7 @@ PlanBackend::CreateExecutionContext(
   context->byte_sizes_ = new uint64_t[context->num_expected_bindings_];
   context->min_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
   context->max_dims_ = new nvinfer1::Dims[context->num_expected_bindings_];
-  context->buffers_ =
-      new void*[context->num_expected_bindings_]();  // init to nullptr
+  context->buffers_ = new void*[context->total_bindings_]();  // init to nullptr
 
   const bool support_batching = (mbs != Context::NO_BATCHING);
 
@@ -358,7 +358,7 @@ PlanBackend::CreateExecutionContext(
 
   // Make sure every index is initialized.
   for (int i = 0; i < context->num_expected_bindings_; ++i) {
-    if (context->buffers_[i] == nullptr) {
+    if (context->buffers_[context->binding_offset_ + i] == nullptr) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "expected configuration for " +
@@ -451,7 +451,7 @@ PlanBackend::Context::InitializeInputBinding(
         "input '" + input_name + "' not found for " + name_);
   }
 
-  if (buffers_[index - binding_offset_] != nullptr) {
+  if (buffers_[index] != nullptr) {
     return Status(
         RequestStatusCode::INVALID_ARG, "input '" + input_name +
                                             "' has already appeared as an " +
@@ -555,7 +555,7 @@ PlanBackend::Context::InitializeInputBinding(
   }
 
   byte_sizes_[index - binding_offset_] = byte_size;
-  buffers_[index - binding_offset_] = buffer;
+  buffers_[index] = buffer;
 
   if (is_dynamic_) {
     nvinfer1::Dims input_dim;
@@ -634,7 +634,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
           "output '" + io.name() + "' not found for " + name_);
     }
 
-    if (buffers_[index - binding_offset_] != nullptr) {
+    if (buffers_[index] != nullptr) {
       return Status(
           RequestStatusCode::INVALID_ARG, "output '" + io.name() +
                                               "' has already appeared as an " +
@@ -703,7 +703,7 @@ PlanBackend::Context::InitializeConfigOutputBindings(
     }
 
     byte_sizes_[index - binding_offset_] = byte_size;
-    buffers_[index - binding_offset_] = buffer;
+    buffers_[index] = buffer;
   }
 
   return Status::Success;
@@ -892,7 +892,7 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
 
     SetInputBuffer(
         name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU,
-        static_cast<char*>(buffers_[bindex]));
+        static_cast<char*>(buffers_[binding_offset_ + bindex]));
 
     // Set the binding dimension so that output dimensions can be obtained
     if (is_dynamic_) {
@@ -1001,7 +1001,8 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
 
     cuda_copy |= SetFixedSizeOutputBuffer(
-        name, batch1_byte_size, static_cast<char*>(buffers_[bindex]), shape,
+        name, batch1_byte_size,
+        static_cast<char*>(buffers_[binding_offset_ + bindex]), shape,
         TRTSERVER_MEMORY_GPU /* src_memory_type */, payloads);
   }
 
@@ -1029,9 +1030,10 @@ operator<<(std::ostream& out, const PlanBackend& pb)
         << std::endl
         << "  bindings:" << std::endl;
 
-    for (int i = 0; i < context->engine_->getNbBindings(); ++i) {
+    for (int i = 0; i < context->num_expected_bindings_; ++i) {
       out << "    " << i << ": byte_size=" << context->byte_sizes_[i]
-          << ", buffer=" << context->buffers_[i] << " ]" << std::endl;
+          << ", buffer=" << context->buffers_[context->binding_offset_ + i]
+          << " ]" << std::endl;
     }
   }
 

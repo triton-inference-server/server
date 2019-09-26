@@ -738,9 +738,19 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
             profile[i + 4].set_shape("INPUT0", min_shape, opt_shape, max_shape)
             profile[i + 4].set_shape("INPUT1", min_shape, opt_shape, max_shape)
         else:
-            profile[i + 4].set_shape("INPUT0", [2 + i] + min_shape, [4] + opt_shape, [8] + max_shape)
-            profile[i + 4].set_shape("INPUT1", [2 + i] + min_shape, [4] + opt_shape, [8] + max_shape)
+            profile[i + 4].set_shape("INPUT0", [2 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
+            profile[i + 4].set_shape("INPUT1", [2 + i] + min_shape, [max_batch] + opt_shape, [max_batch] + max_shape)
         config.add_optimization_profile(profile[i + 4])
+    # Will repeat another profile with same min and max shapes as the first profile to test non-zero profile
+    # for infer_variable test.
+    profile.append(builder.create_optimization_profile()) 
+    if max_batch == 0:
+        profile[6].set_shape("INPUT0", min_shape, opt_shape, max_shape)
+        profile[6].set_shape("INPUT1", min_shape, opt_shape, max_shape)
+    else:
+        profile[6].set_shape("INPUT0", [1] + min_shape, [1] + opt_shape, [max_batch] + max_shape)
+        profile[6].set_shape("INPUT1", [1] + min_shape, [1] + opt_shape, [max_batch] + max_shape)
+    config.add_optimization_profile(profile[6])
 
     builder.set_max_workspace_size(1 << 20)
     engine = builder.build_engine(network,config)
@@ -951,7 +961,54 @@ def create_plan_modelconfig(
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
     config_dir = models_dir + "/" + model_name
-    config = '''
+    if -1 in input_shape:
+        # Selects the sixth profile for FP32 datatype
+        # Note the min and max shapes of first and sixth 
+        # profile are identical.
+        profile_index = 6 if input_dtype == np.float32 else 0
+        config = '''
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+version_policy: {}
+input [
+  {{
+    name: "INPUT0"
+    data_type: {}
+    dims: [ {} ]
+  }},
+  {{
+    name: "INPUT1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT0"
+    data_type: {}
+    dims: [ {} ]
+    label_filename: "output0_labels.txt"
+   }},
+  {{
+    name: "OUTPUT1"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+instance_group [
+  {{
+      profile:"{}"
+  }}
+]
+'''.format(model_name, max_batch, version_policy_str,
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
+           np_to_model_dtype(output0_dtype), tu.shape_to_dims_str(output0_shape),
+           np_to_model_dtype(output1_dtype), tu.shape_to_dims_str(output1_shape),
+           profile_index)
+    else:
+        config = '''
 name: "{}"
 platform: "tensorrt_plan"
 max_batch_size: {}
