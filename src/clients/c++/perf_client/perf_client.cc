@@ -194,20 +194,17 @@ Report(
   std::string client_library_detail = "    ";
   if (protocol == ProtocolType::GRPC) {
     client_library_detail +=
-        "Avg gRPC time: " +
-        std::to_string(
-            avg_send_time_us + avg_receive_time_us + avg_request_time_us) +
-        " usec (";
+        "Avg gRPC time: " + std::to_string(avg_request_time_us) + " usec (";
     if (!verbose) {
       client_library_detail +=
           "(un)marshal request/response " +
           std::to_string(avg_send_time_us + avg_receive_time_us) +
-          " usec + response wait " + std::to_string(avg_request_time_us) +
+          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
           " usec)";
     } else {
       client_library_detail +=
           "marshal " + std::to_string(avg_send_time_us) +
-          " usec + response wait " + std::to_string(avg_request_time_us) +
+          " usec + response wait " + std::to_string(avg_response_wait_time_us) +
           " usec + unmarshal " + std::to_string(avg_receive_time_us) + " usec)";
     }
   } else {

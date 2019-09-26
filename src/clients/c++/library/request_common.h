@@ -28,6 +28,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <deque>
+#include <limits>
 #include <list>
 #include <mutex>
 #include <string>
@@ -40,61 +41,87 @@
 
 namespace nvidia { namespace inferenceserver { namespace client {
 
-// Timer to record the timestamp for different stages of request
-// handling.
+// Records timestamps for different stages of request handling.
 class RequestTimers {
  public:
-  using ClockType = std::chrono::steady_clock;
-  using TimePoint = ClockType::time_point;
+  /// Timestamp kinds.
+  enum class Kind {
+    /// The start of request handling.
+    REQUEST_START,
+
+    /// The end of request handling.
+    REQUEST_END,
+
+    /// The start of sending request bytes to the server (i.e. first
+    /// byte).
+    SEND_START,
+
+    /// The end of sending request bytes to the server (i.e. last
+    /// byte).
+    SEND_END,
+
+    /// The start of receiving response bytes from the server
+    /// (i.e. first byte).
+    RECV_START,
+
+    /// The end of receiving response bytes from the server (i.e. last
+    /// byte).
+    RECV_END,
+
+    COUNT__
+  };
+
+  /// Construct a timer with zero-ed timestamps.
+  RequestTimers() : timestamps_((size_t)Kind::COUNT__) { Reset(); }
+
+  /// Reset all timestamp values to zero. Must be called before
+  /// re-using the timer.
+  void Reset()
+  {
+    memset(&timestamps_[0], 0, sizeof(uint64_t) * timestamps_.size());
+  }
+
+  /// Get the timestamp, in nanoseconds, for a kind.
+  /// \param kind The timestamp kind.
+  /// \return The timestamp in nanoseconds.
+  uint64_t Timestamp(Kind kind) const { return timestamps_[(size_t)kind]; }
+
+  /// Set a timestamp to the current time, in nanoseconds.
+  /// \param kind The timestamp kind.
+  /// \return The timestamp in nanoseconds.
+  uint64_t CaptureTimestamp(Kind kind)
+  {
+    uint64_t& ts = timestamps_[(size_t)kind];
+    ts = std::chrono::duration_cast<std::chrono::nanoseconds>(
+             std::chrono::high_resolution_clock::now().time_since_epoch())
+             .count();
+    return ts;
+  }
 
   /// Return the duration between start time point and end timepoint
   /// in nanosecond.
   /// \param start The start time point.
   /// \param end The end time point.
-  /// \return Duration in nanosecond.
-  static uint64_t Duration(const TimePoint& start, const TimePoint& end)
+  /// \return Duration in nanosecond, or
+  /// std::numeric_limits<uint64_t>::max to indicate that duration
+  /// could not be calculated.
+  uint64_t Duration(Kind start, Kind end) const
   {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
-        .count();
+    const uint64_t stime = timestamps_[(size_t)start];
+    const uint64_t etime = timestamps_[(size_t)end];
+
+    // If the start or end timestamp is 0 then can't calculate the
+    // duration, so return max to indicate error.
+    if ((stime == 0) || (etime == 0)) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+
+    return (stime > etime) ? std::numeric_limits<uint64_t>::max()
+                           : etime - stime;
   }
 
-  /// The kind of the timer.
-  enum Kind {
-    /// The start of request handling.
-    REQUEST_START,
-    /// The end of request handling.
-    REQUEST_END,
-    /// The start of sending request bytes to the server (i.e. first byte).
-    SEND_START,
-    /// The end of sending request bytes to the server (i.e. last byte).
-    SEND_END,
-    /// The start of receiving response bytes from the server
-    /// (i.e. first byte).
-    RECEIVE_START,
-    /// The end of receiving response bytes from the server
-    /// (i.e. last byte).
-    RECEIVE_END
-  };
-
-  /// Construct a timer with zero-ed timestamps.
-  RequestTimers() { Reset(); }
-
-  /// Reset all timestamp values to zero. Must be called before
-  /// re-using the timer.
-  /// \return Error object indicating success or failure.
-  Error Reset();
-
-  /// Record the current timestamp for a request stage.
-  /// \param kind The Kind of the timestamp.
-  /// \return Error object indicating success or failure.
-  Error Record(Kind kind);
-
-  TimePoint request_start_;
-  TimePoint request_end_;
-  TimePoint send_start_;
-  TimePoint send_end_;
-  TimePoint receive_start_;
-  TimePoint receive_end_;
+ private:
+  std::vector<uint64_t> timestamps_;
 };
 
 //==============================================================================
@@ -401,7 +428,7 @@ class RequestImpl : public InferContext::Request {
   // Indicating if the request has been completed.
   bool ready_;
 
-  // The timer for infer request.
+  // The timers for infer request.
   RequestTimers timer_;
 };
 

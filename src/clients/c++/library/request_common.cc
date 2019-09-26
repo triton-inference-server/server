@@ -32,47 +32,6 @@ namespace nvidia { namespace inferenceserver { namespace client {
 
 //==============================================================================
 
-Error
-RequestTimers::Reset()
-{
-  request_start_ = TimePoint();
-  request_end_ = TimePoint();
-  send_start_ = TimePoint();
-  send_end_ = TimePoint();
-  receive_start_ = TimePoint();
-  receive_end_ = TimePoint();
-  return Error::Success;
-}
-
-Error
-RequestTimers::Record(Kind kind)
-{
-  switch (kind) {
-    case Kind::REQUEST_START:
-      request_start_ = ClockType::now();
-      break;
-    case Kind::REQUEST_END:
-      request_end_ = ClockType::now();
-      break;
-    case Kind::SEND_START:
-      send_start_ = ClockType::now();
-      break;
-    case Kind::SEND_END:
-      send_end_ = ClockType::now();
-      break;
-    case Kind::RECEIVE_START:
-      receive_start_ = ClockType::now();
-      break;
-    case Kind::RECEIVE_END:
-      receive_end_ = ClockType::now();
-      break;
-  }
-
-  return Error::Success;
-}
-
-//==============================================================================
-
 bool
 InferOptionsImpl::Flag(InferRequestHeader::Flag flag) const
 {
@@ -972,61 +931,63 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
 Error
 InferContextImpl::GetStat(Stat* stat) const
 {
-  stat->completed_request_count = context_stat_.completed_request_count;
-  stat->cumulative_total_request_time_ns =
-      context_stat_.cumulative_total_request_time_ns;
-  stat->cumulative_send_time_ns = context_stat_.cumulative_send_time_ns;
-  stat->cumulative_receive_time_ns = context_stat_.cumulative_receive_time_ns;
+  *stat = context_stat_;
   return Error::Success;
 }
 
 Error
 InferContextImpl::UpdateStat(const RequestTimers& timer)
 {
-  if ((timer.request_start_ > timer.request_end_) ||
-      (timer.send_start_ > timer.send_end_) ||
-      (timer.receive_start_ > timer.receive_end_)) {
-    auto zero_time_point = RequestTimers::TimePoint();
-    auto request_start_ns =
-        RequestTimers::Duration(timer.request_start_, zero_time_point);
-    auto request_end_ns =
-        RequestTimers::Duration(timer.request_end_, zero_time_point);
-    auto send_start_ns =
-        RequestTimers::Duration(timer.send_start_, zero_time_point);
-    auto send_end_ns =
-        RequestTimers::Duration(timer.send_end_, zero_time_point);
-    auto receive_start_ns =
-        RequestTimers::Duration(timer.receive_start_, zero_time_point);
-    auto receive_end_ns =
-        RequestTimers::Duration(timer.receive_end_, zero_time_point);
+  const uint64_t request_time_ns = timer.Duration(
+      RequestTimers::Kind::REQUEST_START, RequestTimers::Kind::REQUEST_END);
+  const uint64_t send_time_ns = timer.Duration(
+      RequestTimers::Kind::SEND_START, RequestTimers::Kind::SEND_END);
+  const uint64_t recv_time_ns = timer.Duration(
+      RequestTimers::Kind::RECV_START, RequestTimers::Kind::RECV_END);
+
+  if ((request_time_ns == std::numeric_limits<uint64_t>::max()) ||
+      (send_time_ns == std::numeric_limits<uint64_t>::max()) ||
+      (recv_time_ns == std::numeric_limits<uint64_t>::max())) {
     return Error(
-        RequestStatusCode::INVALID_ARG,
+        RequestStatusCode::INTERNAL,
         "Timer not set correctly." +
-            ((request_start_ns > request_end_ns)
-                 ? (" Request time from " + std::to_string(request_start_ns) +
-                    " to " + std::to_string(request_end_ns) + ".")
+            ((timer.Timestamp(RequestTimers::Kind::REQUEST_START) >
+              timer.Timestamp(RequestTimers::Kind::REQUEST_END))
+                 ? (" Request time from " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::REQUEST_START)) +
+                    " to " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::REQUEST_END)) +
+                    ".")
                  : "") +
-            ((send_start_ns > send_end_ns)
-                 ? (" Send time from " + std::to_string(send_start_ns) +
-                    " to " + std::to_string(send_end_ns) + ".")
+            ((timer.Timestamp(RequestTimers::Kind::SEND_START) >
+              timer.Timestamp(RequestTimers::Kind::SEND_END))
+                 ? (" Send time from " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::SEND_START)) +
+                    " to " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::SEND_END)) +
+                    ".")
                  : "") +
-            ((receive_start_ns > receive_end_ns)
-                 ? (" Receive time from " + std::to_string(receive_start_ns) +
-                    " to " + std::to_string(receive_end_ns) + ".")
+            ((timer.Timestamp(RequestTimers::Kind::RECV_START) >
+              timer.Timestamp(RequestTimers::Kind::RECV_END))
+                 ? (" Receive time from " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::RECV_START)) +
+                    " to " +
+                    std::to_string(
+                        timer.Timestamp(RequestTimers::Kind::RECV_END)) +
+                    ".")
                  : ""));
   }
-
-  uint64_t request_time_ns =
-      RequestTimers::Duration(timer.request_start_, timer.request_end_);
-  uint64_t send_time_ns =
-      RequestTimers::Duration(timer.send_start_, timer.send_end_);
-  uint64_t receive_time_ns =
-      RequestTimers::Duration(timer.receive_start_, timer.receive_end_);
 
   context_stat_.completed_request_count++;
   context_stat_.cumulative_total_request_time_ns += request_time_ns;
   context_stat_.cumulative_send_time_ns += send_time_ns;
-  context_stat_.cumulative_receive_time_ns += receive_time_ns;
+  context_stat_.cumulative_receive_time_ns += recv_time_ns;
+
   return Error::Success;
 }
 
