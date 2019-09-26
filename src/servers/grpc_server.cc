@@ -854,6 +854,17 @@ InferHandler::StartNewRequest()
 {
   auto context = std::make_shared<State::Context>(server_id_);
   State* state = StateNew(context);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_manager_ != nullptr) {
+    state->tracer_.reset(trace_manager_->SampleTrace());
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   service_->RequestInfer(
       state->context_->ctx_.get(), &state->request_,
       state->context_->responder_.get(), cq_, cq_, state);
@@ -888,15 +899,10 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
   if (state->step_ == Steps::START) {
 #ifdef TRTIS_ENABLE_TRACING
-    // Earliest entrypoint for a GRPC request. Capture a timestamp for
-    // the start of the request.
-    if (trace_manager_ != nullptr) {
-      state->tracer_.reset(trace_manager_->SampleTrace(
-          request.model_name(), request.model_version()));
-      if (state->tracer_ != nullptr) {
-        state->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc infer start");
-      }
+    if (state->tracer_ != nullptr) {
+      state->tracer_->SetModel(request.model_name(), request.model_version());
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -969,16 +975,21 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
 
       response.mutable_meta_data()->set_id(request.meta_data().id());
 
+#ifdef TRTIS_ENABLE_TRACING
+      if (state->tracer_ != nullptr) {
+        state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
       state->step_ = COMPLETE;
       state->context_->responder_->Finish(response, grpc::Status::OK, state);
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRTIS_ENABLE_TRACING
-    // Final entrypoint for a GRPC request. Capture a timestamp for
-    // the end of the request.
     if (state->tracer_ != nullptr) {
       state->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc infer end");
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
     }
 #endif  // TRTIS_ENABLE_TRACING
 
@@ -1055,6 +1066,13 @@ InferHandler::InferComplete(
 
   response.mutable_meta_data()->set_id(request.meta_data().id());
 
+#ifdef TRTIS_ENABLE_TRACING
+  if (state->tracer_ != nullptr) {
+    state->tracer_->CaptureTimestamp(
+        TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   state->step_ = COMPLETE;
   state->context_->responder_->Finish(response, grpc::Status::OK, state);
 }
@@ -1108,6 +1126,17 @@ StreamInferHandler::StartNewRequest()
   const uint64_t unique_id = RequestStatusUtil::NextUniqueRequestId();
   auto context = std::make_shared<State::Context>(server_id_, unique_id);
   State* state = StateNew(context);
+
+#ifdef TRTIS_ENABLE_TRACING
+  if (trace_manager_ != nullptr) {
+    state->tracer_.reset(trace_manager_->SampleTrace());
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+    }
+  }
+#endif  // TRTIS_ENABLE_TRACING
+
   service_->RequestStreamInfer(
       state->context_->ctx_.get(), state->context_->responder_.get(), cq_, cq_,
       state);
@@ -1146,6 +1175,15 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     state->context_->responder_->Read(&state->request_, state);
 
   } else if (state->step_ == Steps::READ) {
+#ifdef TRTIS_ENABLE_TRACING
+    if (state->tracer_ != nullptr) {
+      state->tracer_->SetModel(
+          state->request_.model_name(), state->request_.model_version());
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read end");
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     // If done reading and no in-flight requests then can finish the
     // entire stream. Otherwise just finish this state.
     if (!rpc_ok) {
@@ -1164,20 +1202,6 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
 
       return !finished;
     }
-
-#ifdef TRTIS_ENABLE_TRACING
-    // Earliest entrypoint for a streaming GRPC request where the
-    // request is valid. Capture a timestamp for the start of the
-    // request.
-    if (trace_manager_ != nullptr) {
-      state->tracer_.reset(trace_manager_->SampleTrace(
-          state->request_.model_name(), state->request_.model_version()));
-      if (state->tracer_ != nullptr) {
-        state->tracer_->CaptureTimestamp(
-            TRTSERVER_TRACE_LEVEL_MIN, "grpc infer start");
-      }
-    }
-#endif  // TRTIS_ENABLE_TRACING
 
     // Request has been successfully read so put it in the context
     // queue so that it's response is sent in the same order as the
@@ -1267,10 +1291,30 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // 'state' and use it to attempt another read from the connection
     // (i.e the next request in the stream).
     State* next_read_state = StateNew(context, Steps::READ);
+
+#ifdef TRTIS_ENABLE_TRACING
+    // Capture a timestamp for the time when we start waiting for this
+    // next request to read.
+    if (trace_manager_ != nullptr) {
+      next_read_state->tracer_.reset(trace_manager_->SampleTrace());
+      if (next_read_state->tracer_ != nullptr) {
+        next_read_state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc wait/read start");
+      }
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     next_read_state->context_->responder_->Read(
         &next_read_state->request_, next_read_state);
 
   } else if (state->step_ == Steps::WRITTEN) {
+#ifdef TRTIS_ENABLE_TRACING
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc send end");
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     // Log an error and cancel the stream if write failed or 'state'
     // is not the expected next response. We don't necessarily cancel
     // right away. Need to wait for any pending reads, inferences and
@@ -1286,6 +1330,13 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // Write the next response if it is ready...
     auto next_state = state->context_->ReadyResponse();
     if (next_state != nullptr) {
+#ifdef TRTIS_ENABLE_TRACING
+      if (next_state->tracer_ != nullptr) {
+        next_state->tracer_->CaptureTimestamp(
+            TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+      }
+#endif  // TRTIS_ENABLE_TRACING
+
       next_state->step_ = Steps::WRITTEN;
       next_state->context_->responder_->Write(
           next_state->response_, next_state);
@@ -1306,15 +1357,6 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     }
 
   } else if (state->step_ == Steps::COMPLETE) {
-#ifdef TRTIS_ENABLE_TRACING
-    // Final entrypoint for a GRPC request. Capture a timestamp for
-    // the end of the request.
-    if (state->tracer_ != nullptr) {
-      state->tracer_->CaptureTimestamp(
-          TRTSERVER_TRACE_LEVEL_MIN, "grpc infer end");
-    }
-#endif  // TRTIS_ENABLE_TRACING
-
     state->step_ = Steps::FINISH;
     finished = true;
   }
@@ -1402,6 +1444,13 @@ StreamInferHandler::CompleteResponse(Handler::State* state)
   // front state is eventually written it will trigger a write of the
   // next state in the queue.
   if (state == state->context_->ReadyResponse()) {
+#ifdef TRTIS_ENABLE_TRACING
+    if (state->tracer_ != nullptr) {
+      state->tracer_->CaptureTimestamp(
+          TRTSERVER_TRACE_LEVEL_MIN, "grpc send start");
+    }
+#endif  // TRTIS_ENABLE_TRACING
+
     state->step_ = Steps::WRITTEN;
     state->context_->responder_->Write(state->response_, state);
   }
