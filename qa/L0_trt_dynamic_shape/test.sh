@@ -68,8 +68,7 @@ if [ $? -eq 0 ]; then
     RET=1
 fi
 
-EXPECTED_MESSAGE="request specifies invalid shape for input 'INPUT0' for plan_float32_float32_float32-4-32_0_gpu0. \
-Error details: The shape of dimension 1 is expected to be in range from 4 to 32, Got:"
+EXPECTED_MESSAGE="The shape of dimension 1 is expected to be in range from 4 to 32, Got:"
 if [ $(cat ${CLIENT_LOG}_max | grep "${EXPECTED_MESSAGE} 33" | wc -l) -eq 0 ]; then
     cat ${CLIENT_LOG}_max
     echo -e "\n***\n*** Test Failed\n***"
