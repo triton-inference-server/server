@@ -67,14 +67,16 @@ SavedModelBackend::CreateTRTISTFModel(
     const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
     const int device_id, const bool has_graph_level, const int graph_level,
     const std::string& model_path, TRTISTFModelHandle* trtistf_model,
-    IONameMap* input_name_map, IONameMap* output_name_map)
+    IONameMap* input_name_map, IONameMap* output_name_map,
+    const TRTISTF_TFTRTConfig* tftrt_config)
 {
   TRTISTF_Model* model = nullptr;
   RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelCreateFromSavedModel(
       &model, model_path.c_str(), model_path.c_str(), device_id,
       has_graph_level, graph_level, backend_config->allow_gpu_memory_growth,
       backend_config->per_process_gpu_memory_fraction,
-      backend_config->allow_soft_placement, backend_config->memory_limit_mb));
+      backend_config->allow_soft_placement, backend_config->memory_limit_mb,
+      tftrt_config));
 
   trtistf_model->reset(model);
 

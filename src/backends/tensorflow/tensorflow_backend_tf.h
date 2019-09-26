@@ -86,6 +86,21 @@ typedef enum {
   TRTISTF_TYPE_STRING
 } TRTISTF_DataType;
 
+typedef enum {
+  TRTISTF_MODE_FP32,
+  TRTISTF_MODE_FP16,
+  TRTISTF_MODE_INT8,
+} TRTISTF_TFTRTPrecisionMode;
+
+// Config for TF-TRT optimization if specified
+typedef struct {
+  bool is_dynamic_op_;
+  size_t max_batch_size_;
+  size_t max_workspace_size_bytes_;
+  TRTISTF_TFTRTPrecisionMode precision_mode_;
+  size_t minimum_segment_size_;
+} TRTISTF_TFTRTConfig;
+
 // A shape
 typedef struct {
   // Number of dimensions in the shape
@@ -197,7 +212,8 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromGraphDef(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::map<int, std::vector<float>>& memory_limit_mb);
+    const std::map<int, std::vector<float>>& memory_limit_mb,
+    const TRTISTF_TFTRTConfig* tftrt_config);
 
 // Create a SavedModel model.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
@@ -206,7 +222,8 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::map<int, std::vector<float>>& memory_limit_mb);
+    const std::map<int, std::vector<float>>& memory_limit_mb,
+    const TRTISTF_TFTRTConfig* tftrt_config);
 
 // Delete a model.
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);

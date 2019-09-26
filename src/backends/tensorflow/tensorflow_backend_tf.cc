@@ -36,6 +36,7 @@
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/protobuf/meta_graph.pb.h"
+#include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
 
@@ -160,6 +161,19 @@ ConvertShape(const tensorflow::TensorShape& tfshape)
   return shape;
 }
 
+std::string
+PrecisionModeToString(const TRTISTF_TFTRTPrecisionMode m)
+{
+  switch (m) {
+    case TRTISTF_MODE_INT8:
+      return "INT8";
+    case TRTISTF_MODE_FP16:
+      return "FP16";
+    default:
+      return "FP32";
+  }
+}
+
 void
 NewSessionOptions(
     const bool has_graph_level, const int graph_level,
@@ -167,6 +181,7 @@ NewSessionOptions(
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
     const std::map<int, std::vector<float>>& memory_limit_mb,
+    const TRTISTF_TFTRTConfig* tftrt_config,
     tensorflow::SessionOptions* session_options)
 {
   session_options->config.mutable_gpu_options()->set_allow_growth(
@@ -212,6 +227,29 @@ NewSessionOptions(
   session_options->config.mutable_graph_options()
       ->mutable_optimizer_options()
       ->set_global_jit_level(xla);
+
+  // TF-TRT optimization. Parameters that are not specified in 'tftrt_config'
+  // are specified based on:
+  // https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/contrib/tensorrt/test/test_tftrt.py#L238
+  if (tftrt_config != nullptr) {
+    auto opt_config = session_options->config.mutable_graph_options()
+                          ->mutable_rewrite_options();
+    opt_config->set_meta_optimizer_iterations(tensorflow::RewriterConfig::ONE);
+    opt_config->add_optimizers("constfold");
+    opt_config->add_optimizers("layout");
+    auto trt_optimizer = opt_config->add_custom_optimizers();
+    trt_optimizer->set_name("TensorRTOptimizer");
+
+    auto trt_parameter_map = trt_optimizer->mutable_parameter_map();
+    (*trt_parameter_map)["is_dynamic_op"].set_b(tftrt_config->is_dynamic_op_);
+    (*trt_parameter_map)["minimum_segment_size"].set_i(
+        tftrt_config->minimum_segment_size_);
+    (*trt_parameter_map)["precision_mode"].set_s(
+        PrecisionModeToString(tftrt_config->precision_mode_));
+    (*trt_parameter_map)["max_batch_size"].set_i(tftrt_config->max_batch_size_);
+    (*trt_parameter_map)["max_workspace_size_bytes"].set_i(
+        tftrt_config->max_workspace_size_bytes_);
+  }
 }
 
 //
@@ -614,13 +652,14 @@ TRTISTF_ModelCreateFromGraphDef(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::map<int, std::vector<float>>& memory_limit_mb)
+    const std::map<int, std::vector<float>>& memory_limit_mb,
+    const TRTISTF_TFTRTConfig* tftrt_config)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
       per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
-      &session_options);
+      tftrt_config, &session_options);
 
   tensorflow::Session* session;
   RETURN_IF_TF_ERROR(tensorflow::NewSession(session_options, &session));
@@ -684,13 +723,14 @@ TRTISTF_ModelCreateFromSavedModel(
     const int graph_level, const bool allow_gpu_memory_growth,
     const float per_process_gpu_memory_fraction,
     const bool allow_soft_placement,
-    const std::map<int, std::vector<float>>& memory_limit_mb)
+    const std::map<int, std::vector<float>>& memory_limit_mb,
+    const TRTISTF_TFTRTConfig* tftrt_config)
 {
   tensorflow::SessionOptions session_options;
   NewSessionOptions(
       has_graph_level, graph_level, allow_gpu_memory_growth,
       per_process_gpu_memory_fraction, allow_soft_placement, memory_limit_mb,
-      &session_options);
+      tftrt_config, &session_options);
 
 
   if (device_id != TRTISTF_MODEL_DEVICE) {

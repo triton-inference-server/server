@@ -64,7 +64,8 @@ class BaseBackend : public InferenceBackend {
       const std::shared_ptr<GraphDefBackendFactory::Config>& backend_config,
       const int gpu_device, const bool has_graph_level, const int graph_level,
       const std::string& model_path, TRTISTFModelHandle* trtistf_model,
-      IONameMap* input_name_map, IONameMap* output_name_map) = 0;
+      IONameMap* input_name_map, IONameMap* output_name_map,
+      const TRTISTF_TFTRTConfig* tftrt_config) = 0;
 
   // For each model instance there is a context.
   struct Context : BackendContext {
