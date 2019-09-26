@@ -121,6 +121,8 @@ class PlanBackend : public InferenceBackend {
     // Stores the minimum of the maximum possible value of the first dimension
     int max_dynamic_batch_size_;
 
+    // The total number of bindings
+    int total_bindings_;
     // The number of expected bindings to the model. In case of dynamic shapes,
     // it is the number of expected bindings to the configured optimization
     // profile.
