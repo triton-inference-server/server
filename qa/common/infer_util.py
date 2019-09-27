@@ -195,27 +195,26 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
 
 
             # create and register shared memory region for inputs and outputs
-            if precreated_shm_regions is None:
-                if shm_region_names is None:
-                    if not _match_registered(registered_shm_regions, '/input0', input0_byte_size):
-                        shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-                        registered_shm_regions['/input0'] = (input0_byte_size, shm_ip0_handle)
-                    else:
-                        shm_ip0_handle = registered_shm_regions['/input0'][1]
+            if shm_region_names is None:
+                if not _match_registered(registered_shm_regions, '/input0', input0_byte_size):
+                    shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
+                    registered_shm_regions['/input0'] = (input0_byte_size, shm_ip0_handle)
+                else:
+                    shm_ip0_handle = registered_shm_regions['/input0'][1]
 
-                    if not _match_registered(registered_shm_regions, '/input1', input1_byte_size):
-                        shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
-                        registered_shm_regions['/input1'] = (input1_byte_size, shm_ip1_handle)
-                    else:
-                        shm_ip1_handle = registered_shm_regions['/input1'][1]
+                if not _match_registered(registered_shm_regions, '/input1', input1_byte_size):
+                    shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
+                    registered_shm_regions['/input1'] = (input1_byte_size, shm_ip1_handle)
+                else:
+                    shm_ip1_handle = registered_shm_regions['/input1'][1]
 
+                if precreated_shm_regions is None:
                     if "OUTPUT0" in outputs:
                         if not _match_registered(registered_shm_regions, '/output0', output0_byte_size):
                             shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
                             registered_shm_regions['/output0'] = (output0_byte_size, shm_op0_handle)
                         else:
                             shm_op0_handle = registered_shm_regions['/output0'][1]
-
                     if "OUTPUT1" in outputs:
                         if not _match_registered(registered_shm_regions, '/output1', output1_byte_size):
                             shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
@@ -223,21 +222,22 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             shm_op1_handle = registered_shm_regions['/output1'][1]
 
+            else:
+                if not _match_registered(registered_shm_regions, '/'+shm_region_names[0], input0_byte_size):
+                    shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
+                                                                    '/'+shm_region_names[0], input0_byte_size)
+                    registered_shm_regions['/'+shm_region_names[0]] = (input0_byte_size, shm_ip0_handle)
                 else:
-                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[0], input0_byte_size):
-                        shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
-                                                                        '/'+shm_region_names[0], input0_byte_size)
-                        registered_shm_regions['/'+shm_region_names[0]] = (input0_byte_size, shm_ip0_handle)
-                    else:
-                        shm_ip0_handle = registered_shm_regions['/'+shm_region_names[0]][1]
+                    shm_ip0_handle = registered_shm_regions['/'+shm_region_names[0]][1]
 
-                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
-                        shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                        '/'+shm_region_names[1], input1_byte_size)
-                        registered_shm_regions['/'+shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
-                    else:
-                        shm_ip1_handle = registered_shm_regions['/'+shm_region_names[1]][1]
+                if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
+                    shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
+                                                                    '/'+shm_region_names[1], input1_byte_size)
+                    registered_shm_regions['/'+shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
+                else:
+                    shm_ip1_handle = registered_shm_regions['/'+shm_region_names[1]][1]
 
+                if precreated_shm_regions is None:
                     i = 0
                     if "OUTPUT0" in outputs:
                         if not _match_registered(registered_shm_regions, '/'+shm_region_names[2], output0_byte_size):
@@ -247,7 +247,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                         else:
                             shm_op0_handle = registered_shm_regions['/'+shm_region_names[2]][1]
                         i+=1
-
                     if "OUTPUT1" in outputs:
                         if not _match_registered(registered_shm_regions, '/'+shm_region_names[2+i], output1_byte_size):
                             shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
@@ -255,11 +254,19 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             registered_shm_regions['/'+shm_region_names[2+i]] = (output1_byte_size, shm_op1_handle)
                         else:
                             shm_op1_handle = registered_shm_regions['/'+shm_region_names[2+i]][1]
+
+            if precreated_shm_regions is not None:
+                i = 0
+                if "OUTPUT0" in outputs:
+                    shm_op0_handle = precreated_shm_regions[0]
+                    i+=1
+                if "OUTPUT1" in outputs:
+                    shm_op1_handle = precreated_shm_regions[0+i]
             else:
-                shm_ip0_handle = precreated_shm_regions[0]
-                shm_ip1_handle = precreated_shm_regions[1]
-                shm_op0_handle = precreated_shm_regions[2]
-                shm_op1_handle = precreated_shm_regions[3]
+                if "OUTPUT0" in outputs:
+                    shared_memory_ctx.register(shm_op0_handle)
+                if "OUTPUT1" in outputs:
+                    shared_memory_ctx.register(shm_op1_handle)
 
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip0_handle, input0_list)
@@ -307,12 +314,10 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            correlation_id=correlation_id, streaming=config[2],
                            verbose=True)
         if config[3]:
-            print("zz, running")
             results = ctx.run(
                     { INPUT0 : (shm_ip0_handle, tensor_shape),
                     INPUT1 : (shm_ip1_handle, tensor_shape) },
                     output_req, batch_size)
-            print("zz, run ended")
         else:
             results = ctx.run(
                     { INPUT0 : input0_list, INPUT1 : input1_list },
@@ -372,13 +377,13 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             tester.assertTrue(False, "unexpected class result {}".format(result_name))
 
         if config[3]:
-            print("zz, unregister")
             shared_memory_ctx.unregister(shm_ip0_handle)
             shared_memory_ctx.unregister(shm_ip1_handle)
-            if "OUTPUT0" in outputs:
-                shared_memory_ctx.unregister(shm_op0_handle)
-            if "OUTPUT1" in outputs:
-                shared_memory_ctx.unregister(shm_op1_handle)
+            if precreated_shm_regions is None:
+                if "OUTPUT0" in outputs:
+                    shared_memory_ctx.unregister(shm_op0_handle)
+                if "OUTPUT1" in outputs:
+                    shared_memory_ctx.unregister(shm_op1_handle)
 
     return results
 

@@ -47,17 +47,33 @@ if os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = ("savedmodel", "graphdef", "plan", "netdef", "custom", "libtorch", "onnx")
 
+if "TEST_SHARED_MEMORY" in os.environ:
+    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
+else:
+    TEST_SHARED_MEMORY=0
+
 _max_queue_delay_ms = 10000
 _check_exception = None
 
 def _create_advance(shm_regions = None):
-    precreated_shm_regions = []
-    if shm_regions is None:
-        shm_regions = ['input0','input1','output0','output1']
-    for shm_region in shm_regions:
-        shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
-        precreated_shm_regions.append(shm_tmp_handle)
-    return precreated_shm_regions
+    if TEST_SHARED_MEMORY:
+        precreated_shm_regions = []
+        shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
+        if shm_regions is None:
+            shm_regions = ['output0','output1']
+        for shm_region in shm_regions:
+            shm_tmp_handle = shm.create_shared_memory_region(shm_region +'_data', '/'+ shm_region, 512)
+            precreated_shm_regions.append(shm_tmp_handle)
+            shared_memory_ctx.register(shm_tmp_handle)
+        return precreated_shm_regions
+    return shm_regions
+
+def _cleanup_after(shm_handles):
+    if TEST_SHARED_MEMORY:
+        shared_memory_ctx = SharedMemoryControlContext("localhost:8000", ProtocolType.HTTP, verbose=True)
+        for shm_tmp_handle in shm_handles:
+            shared_memory_ctx.unregister(shm_tmp_handle)
+
 
 class BatcherTest(unittest.TestCase):
     def setUp(self):
@@ -168,11 +184,13 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (2,6), 2, 8)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_static_batch_lt_any_preferred(self):
         # Send a request with a static batch size < any preferred
         # size. This should cause the response to be delayed by the
         # max batch queue delay
+        precreated_shm_regions = _create_advance()
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -182,16 +200,19 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
+                self.check_response(trial, 1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (1,), 1, 1)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_static_batch_not_preferred(self):
         # Send a request with a static batch size in between preferred
         # sizes. This should cause the response to be delayed by the
         # max batch queue delay
+        precreated_shm_regions = _create_advance()
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -201,16 +222,19 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms))
+                self.check_response(trial, 3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
+                                    precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (3,), 1, 3)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_static_batch_gt_max_preferred(self):
         # Send a request with a static batch size > maximum preferred
         # size. This should cause the request to be issued immediately
         # (even though the maximum batching queue delay is very high).
+        precreated_shm_regions = _create_advance()
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -220,11 +244,12 @@ class BatcherTest(unittest.TestCase):
                 self.check_setup(url, protocol, model_name)
                 self.assertFalse("TRTSERVER_DELAY_SCHEDULER" in os.environ)
 
-                self.check_response(trial, 7, (3000, None))
+                self.check_response(trial, 7, (3000, None), precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
                 self.check_status(url, protocol, model_name, (7,), 1, 7)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_different_shape(self):
         # Send two requests with sum of static batch sizes ==
@@ -233,6 +258,7 @@ class BatcherTest(unittest.TestCase):
         # not be batched. The first response will come back
         # immediately and the second delayed by the max batch queue
         # delay
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -246,12 +272,14 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'input_size': 16,
-                                                'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:]}))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -261,6 +289,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 2, 2)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_not_preferred(self):
         # Send two requests with total static batch size in between
@@ -268,6 +297,7 @@ class BatcherTest(unittest.TestCase):
         # delayed by the max batch queue delay, and the second by max
         # delay (minus the difference in time that they arrived in the
         # queue)
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -281,11 +311,13 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms - 2000)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:]}))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -295,6 +327,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,3), 1, 4)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_not_preferred_different_shape(self):
         # Send two requests with total static batch size in between
@@ -302,6 +335,7 @@ class BatcherTest(unittest.TestCase):
         # and a non-preferred batch size. This should cause the first
         # two requests to be immediately responded to and the third
         # response to be delayed by the max batch queue delay.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11', 'op20', 'op21'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -314,15 +348,18 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
+                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21'],
+                                                'precreated_shm_regions': precreated_shm_regions[4:]}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -333,6 +370,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,3), 2, 5)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_preferred_different_shape(self):
         # Send two requests with total static batch size in between
@@ -342,6 +380,7 @@ class BatcherTest(unittest.TestCase):
         # request with the same shape as the third that causes a
         # preferred size so that third and forth response are sent
         # immediately.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11', 'op20', 'op21', 'op30', 'op31'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -353,19 +392,23 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (12000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                args=(trial, 1, (3000, None)),
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (12000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip1', 'op10', 'op11']}))
+                                                args=(trial, 3, (3000, None)),
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (12000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
+                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21'],
+                                                'precreated_shm_regions': precreated_shm_regions[4:6]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 5, (12000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31']}))
+                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31'],
+                                                'precreated_shm_regions': precreated_shm_regions[6:]}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -377,6 +420,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,3,5), 2, 10)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_gt_max_preferred(self):
         # Send two requests with first not having preferred size and
@@ -384,6 +428,7 @@ class BatcherTest(unittest.TestCase):
         # second request so that it arrives after the first is already
         # be processed by the dynamic batcher. This should cause both
         # responses to be returned immediately.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -396,10 +441,12 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 7, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -409,6 +456,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (3, 7), 2, 10)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_sum_gt_max_preferred(self):
         # Send two requests with first not having preferred size and
@@ -419,6 +467,7 @@ class BatcherTest(unittest.TestCase):
         # response to be returned immediately but the second response,
         # since it alone is not greater than max preferred size, will
         # be delayed.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -431,11 +480,13 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 4,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -445,11 +496,13 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (3,4), 2, 7)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_same_output0(self):
         # Send two requests where both ask for OUTPUT0. They should be
         # batched and get the correct response even though they don't
         # request both outputs.
+        precreated_shm_regions = _create_advance(['op00','op10'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -464,11 +517,13 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': ['ip00', 'ip01', 'op00']}))
+                                                'shm_region_names': ['ip00', 'ip01', 'op00'],
+                                                'precreated_shm_regions': precreated_shm_regions[:1]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': ['ip10', 'ip11', 'op10']}))
+                                                'shm_region_names': ['ip10', 'ip11', 'op10'],
+                                                'precreated_shm_regions': precreated_shm_regions[1:]}))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -477,11 +532,13 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 1, 2)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_same_output1(self):
         # Send two requests where both ask for OUTPUT1. They should be
         # batched and get the correct response even though they don't
         # request both outputs.
+        precreated_shm_regions = _create_advance(['op00','op10'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -496,11 +553,13 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': ['ip00', 'ip01', 'op01']}))
+                                                'shm_region_names': ['ip00', 'ip01', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:1]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': ['ip10', 'ip11', 'op11']}))
+                                                'shm_region_names': ['ip10', 'ip11', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[1:]}))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -509,12 +568,14 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 1, 2)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_different_outputs(self):
         # Send two requests where one request asks for one output and
         # the other request asks for the other output. They should be
         # batched and get the correct response even though they don't
         # request both outputs.
+        precreated_shm_regions = _create_advance(['op00','op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -529,11 +590,13 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",),
-                                                'shm_region_names': ['ip00', 'ip01', 'op00']}))
+                                                'shm_region_names': ['ip00', 'ip01', 'op00'],
+                                                'precreated_shm_regions': precreated_shm_regions[:1]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",),
-                                                'shm_region_names': ['ip10', 'ip11', 'op11']}))
+                                                'shm_region_names': ['ip10', 'ip11', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[1:]}))
                 threads[0].start()
                 threads[1].start()
                 for t in threads:
@@ -542,6 +605,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 1, 2)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_different_output_order(self):
         # Send two requests that ask for both outputs, but in a
@@ -584,6 +648,7 @@ class BatcherTest(unittest.TestCase):
         # servicing. This should cause first response to be returned
         # immediately but the second response, since it alone is not
         # greater than max preferred size, will be delayed.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -599,11 +664,13 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 4,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads[0].start()
                 time.sleep(1)
                 threads[1].start()
@@ -613,6 +680,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (3,4), 2, 7)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_delayed_preferred_different_shape(self):
         # Send two requests with total static batch size in between
@@ -624,6 +692,7 @@ class BatcherTest(unittest.TestCase):
         # immediately responded to. Send a forth request with the same
         # shape as the third that causes a preferred size so that
         # third and forth response are sent immediately.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11', 'op20', 'op21', 'op30', 'op31'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -639,18 +708,22 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 3, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
+                                                'shm_region_names': ['ip20', 'ip21', 'op20', 'op21'],
+                                                'precreated_shm_regions': precreated_shm_regions[4:6]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 5, (3000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31']}))
+                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31'],
+                                                'precreated_shm_regions': precreated_shm_regions[6:]}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -662,6 +735,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,3,5), 2, 10)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_use_biggest_preferred(self):
         # Send multiple requests that sum to multiple preferred sizes
@@ -669,6 +743,7 @@ class BatcherTest(unittest.TestCase):
         # batch. Use TRTSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11', 'op20', 'op21', 'op30', 'op31', 'op40', 'op41', 'op50', 'op51'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -684,22 +759,28 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
+                                                kwargs={'shm_region_names': ['ip20', 'ip21', 'op20', 'op21'],
+                                                'precreated_shm_regions': precreated_shm_regions[4:6]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip30', 'ip31', 'op30', 'op31']}))
+                                                kwargs={'shm_region_names': ['ip30', 'ip31', 'op30', 'op31'],
+                                                'precreated_shm_regions': precreated_shm_regions[6:8]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip40', 'ip41', 'op40', 'op41']}))
+                                                kwargs={'shm_region_names': ['ip40', 'ip41', 'op40', 'op41'],
+                                                'precreated_shm_regions': precreated_shm_regions[8:10]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip50', 'ip51', 'op50', 'op51']}))
+                                                kwargs={'shm_region_names': ['ip50', 'ip51', 'op50', 'op51'],
+                                                'precreated_shm_regions': precreated_shm_regions[10:]}))
                 for t in threads:
                     t.start()
                 for t in threads:
@@ -708,6 +789,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 1, 6)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
     def test_multi_batch_use_best_preferred(self):
         # Send multiple requests where the initial ones sum to a
@@ -717,6 +799,7 @@ class BatcherTest(unittest.TestCase):
         # timeout. Use TRTSERVER_DELAY_SCHEDULER in the environment so
         # that requests can be queued up before scheduler starts
         # servicing.
+        precreated_shm_regions = _create_advance(['op00', 'op01', 'op10', 'op11', 'op20', 'op21'])
         for trial in _trials:
             try:
                 url = "localhost:8000"
@@ -732,14 +815,17 @@ class BatcherTest(unittest.TestCase):
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01']}))
+                                                kwargs={'shm_region_names': ['ip00', 'ip01', 'op00', 'op01'],
+                                                'precreated_shm_regions': precreated_shm_regions[:2]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1, (3000, None)),
-                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11']}))
+                                                kwargs={'shm_region_names': ['ip10', 'ip11', 'op10', 'op11'],
+                                                'precreated_shm_regions': precreated_shm_regions[2:4]}))
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 1,
                                                       (_max_queue_delay_ms * 1.5, _max_queue_delay_ms)),
-                                                kwargs={'shm_region_names': ['ip20', 'ip21', 'op20', 'op21']}))
+                                                kwargs={'shm_region_names': ['ip20', 'ip21', 'op20', 'op21'],
+                                                'precreated_shm_regions': precreated_shm_regions[4:]}))
                 threads[0].start()
                 threads[1].start()
                 time.sleep(1)
@@ -750,6 +836,7 @@ class BatcherTest(unittest.TestCase):
                 self.check_status(url, protocol, model_name, (1,), 2, 3)
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+        _cleanup_after(precreated_shm_regions)
 
 
 if __name__ == '__main__':
