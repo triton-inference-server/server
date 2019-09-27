@@ -665,9 +665,9 @@ InferResponseAlloc(
     if (shm_map != nullptr) {
       const auto& pr = shm_map->find(tensor_name);
       if (pr != shm_map->end()) {
-        // If the output is in shared memory then just need to check
-        // that the requested size matches what is expected by the
-        // request.
+        // If the output is in shared memory then check that the output byte
+        // size is equal to or less than the size of the requested registered
+        // shared memory region.
         if (byte_size > pr->second.byte_size_) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INTERNAL,

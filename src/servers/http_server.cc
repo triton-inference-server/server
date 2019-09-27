@@ -335,7 +335,9 @@ HTTPAPIServer::ResponseAlloc(
 
     auto pr = output_shm_map.find(tensor_name);
     if (pr != output_shm_map.end()) {
-      // check for byte size mismatch
+      // If byte size of output is greater than requested registered shared
+      // memory region then throw an error. Allow regions that are larger or
+      // equal to the byte size of output.
       if (byte_size > pr->second.second) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
@@ -813,7 +815,7 @@ HTTPAPIServer::EVBufferToInput(
       // correct and set input from the shared memory.
       if (io.has_shared_memory()) {
         LOG_VERBOSE(1) << io.name() << " has shared memory";
-        if (byte_size > io.shared_memory().byte_size()) {
+        if (byte_size != io.shared_memory().byte_size()) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INVALID_ARG,
               std::string(

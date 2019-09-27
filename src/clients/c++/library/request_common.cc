@@ -218,16 +218,15 @@ InputImpl::SetSharedMemory(
         "The input '" + Name() + "' can only be set once with SetSharedMemory");
   }
 
-  // verify byte size of shared memory equals that of expected batch byte size
-  if (byte_size_ != -1) {
-    if (byte_size > (batch_size_ * byte_size_)) {
-      return Error(
-          RequestStatusCode::INVALID_ARG,
-          "The input '" + Name() + "' has shared memory of size " +
-              std::to_string(byte_size) + " bytes while the expected size is " +
-              std::to_string(batch_size_) + " * " + std::to_string(byte_size_) +
-              " = " + std::to_string(batch_size_ * byte_size_) + " bytes");
-    }
+  // Verify byte size of shared memory equals that of expected batch byte size
+  // Skip check for string and variable size tensors
+  if ((byte_size_ != -1) && (byte_size > (batch_size_ * byte_size_))) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "The input '" + Name() + "' has shared memory of size " +
+            std::to_string(byte_size) + " bytes while the expected size is " +
+            std::to_string(batch_size_) + " * " + std::to_string(byte_size_) +
+            " = " + std::to_string(batch_size_ * byte_size_) + " bytes");
   }
 
   io_type_ = SHARED_MEMORY;

@@ -105,8 +105,6 @@ for m in \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-# # Setup variable-size model repository for non shared memory case.
-# if [ "$TEST_SHARED_MEMORY" == "0" ]; then
 #   modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 for m in \
@@ -127,7 +125,6 @@ done
 
 # Same test work on all models since they all have same total number
 # of batch slots.
-
 for model_trial in v 0 1 2 4; do
     export NO_BATCHING=1 &&
         [[ "$model_trial" != "0" ]] && export NO_BATCHING=0

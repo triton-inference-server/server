@@ -982,16 +982,12 @@ class InferContext:
         # An input's data may be specified as a list of numpy arrays,
         # or as a shared memory handle.
         for inp_name, inp in inputs.items():
-            if not isinstance(inp, (list, tuple)) and type(inp) != c_void_p:
+            if (not isinstance(inp, (list, tuple))) and (type(inp) != c_void_p):
                 _raise_error("input '" + inp_name +
                              "' values must be specified as a list of numpy arrays" \
                              " or as a single c_void_p representing the shared memory handle")
             if type(inp) != c_void_p:
-                flag = False
-                if len(inp) == 2:
-                    if (type(inp[0]) == c_void_p) and isinstance(inp[1], (list, tuple)):
-                        flag = True
-                if flag:
+                if (len(inp) == 2) and (type(inp[0]) == c_void_p) and (isinstance(inp[1], (list, tuple))):
                     continue
                 for ip in inp:
                     if not isinstance(ip, (np.ndarray, tuple)):
@@ -1069,7 +1065,7 @@ class InferContext:
                                 # followed by the actual string characters.
                                 # All strings are concatenated together in "C"
                                 # order.
-                                if input_value.dtype == np.object or input_value.dtype.type == np.bytes_:
+                                if (input_value.dtype == np.object) or (input_value.dtype.type == np.bytes_):
                                     flattened = bytes()
                                     for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
                                         # If directly passing bytes to STRING type,
@@ -1091,7 +1087,9 @@ class InferContext:
                                         _crequest_infer_ctx_input_set_raw(
                                             input, input_value.ctypes.data_as(c_void_p),
                                             c_uint64(input_value.size * input_value.itemsize))))
-                    elif isinstance(input_values[1], (list, tuple)) and type(input_values[0]) == c_void_p:
+                    # For variable size tensors, need the shape as well as the
+                    # shared memory handle
+                    elif isinstance(input_values[1], (list, tuple)) and (type(input_values[0]) == c_void_p):
                         shape_value = np.asarray(input_values[1], dtype=np.int64)
                         _raise_if_error(
                             c_void_p(
