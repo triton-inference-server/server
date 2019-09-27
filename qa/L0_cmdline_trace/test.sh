@@ -120,7 +120,7 @@ fi
 set -e
 
 # trace-rate == 6, trace-level=MIN
-SERVER_ARGS="--trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=`pwd`/models"
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_6.log --trace-level=MIN --trace-rate=6 --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_6.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -166,9 +166,9 @@ fi
 
 set -e
 
-# trace-rate == 7, trace-level=MAX
-SERVER_ARGS="--trace-file=trace_7.log --trace-level=MAX --trace-rate=7 --model-repository=`pwd`/models"
-SERVER_LOG="./inference_server_7.log"
+# trace-rate == 9, trace-level=MAX
+SERVER_ARGS="--grpc-infer-thread-count=1 --grpc-stream-infer-thread-count=1 --http-thread-count=1 --trace-file=trace_9.log --trace-level=MAX --trace-rate=9 --model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_9.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -179,12 +179,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_CLIENT >> client_7.log 2>&1
+    $SIMPLE_CLIENT >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_7.log 2>&1
+    $SIMPLE_CLIENT -i grpc -u localhost:8001 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -197,16 +197,16 @@ wait $SERVER_PID
 
 set +e
 
-$TRACE_SUMMARY -t trace_7.log > summary_7.log
+$TRACE_SUMMARY -t trace_9.log > summary_9.log
 
-if [ `grep -c "compute input end" summary_7.log` != "2" ]; then
-    cat summary_7.log
+if [ `grep -c "compute input end" summary_9.log` != "2" ]; then
+    cat summary_9.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_7.log` != "2" ]; then
-    cat summary_7.log
+if [ `grep -c ^simple summary_9.log` != "2" ]; then
+    cat summary_9.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

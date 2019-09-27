@@ -920,8 +920,9 @@ HTTPAPIServer::HandleInfer(evhtp_request_t* req, const std::string& infer_uri)
   // this is the first place where we have a tracer.
   std::unique_ptr<Tracer> tracer;
   if (trace_manager_ != nullptr) {
-    tracer.reset(trace_manager_->SampleTrace(model_name, model_version));
+    tracer.reset(trace_manager_->SampleTrace());
     if (tracer != nullptr) {
+      tracer->SetModel(model_name, model_version);
       tracer->CaptureTimestamp(
           TRTSERVER_TRACE_LEVEL_MIN, "http recv start",
           TIMESPEC_TO_NANOS(req->recv_start_ts));
