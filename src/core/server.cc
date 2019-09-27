@@ -126,7 +126,8 @@ InferenceServer::Init()
 
   // [TODO] set option value
   auto options = PinnedMemoryManager::Options();
-  options.max_total_byte_size = 1;
+  // 16 MB
+  options.max_total_byte_size = 1 << 24;
   status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
