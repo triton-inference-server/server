@@ -35,30 +35,21 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch netdef"}
-STATIC_BATCH_SIZES=${STATIC_BATCH_SIZES:=1}
-DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
-INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
-CONCURRENCY=${CONCURRENCY:=1}
-
-PERF_CLIENT=../clients/perf_client
-PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
-PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
-PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
-PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD:=5}
-TENSOR_SIZE=${TENSOR_SIZE:=1}
+CLIENT=../clients/simple_perf_client
+BACKENDS=${BACKENDS:="custom graphdef savedmodel onnx libtorch netdef"}
+WARMUP_ITERS=20
+MEASURE_ITERS=100
+BATCH_SIZE=1
+TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-RESULTDIR=${RESULTDIR:=.}
 
 SERVER=/opt/tensorrtserver/bin/trtserver
-SERVER_ARGS=--model-repository=`pwd`/models
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
 
-mkdir -p ${RESULTDIR}
 rm -f *.log *.serverlog *.csv *.metrics
 RET=0
 
@@ -67,51 +58,22 @@ rm -fr ./custom_models && mkdir ./custom_models && \
     mkdir -p ./custom_models/custom_zero_1_float32/1 && \
     cp ./libidentity.so ./custom_models/custom_zero_1_float32/1/libcustom.so
 
-PERF_CLIENT_PROTOCOL_ARGS="-i grpc -u localhost:8001" &&
-    [ $PERF_CLIENT_PROTOCOL != "grpc" ] && PERF_CLIENT_PROTOCOL_ARGS=""
-PERF_CLIENT_PERCENTILE_ARGS="" &&
-    (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
-    PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
-
 #
 # Use "identity" model for all model types.
 #
 for BACKEND in $BACKENDS; do
- for STATIC_BATCH in $STATIC_BATCH_SIZES; do
-  for DYNAMIC_BATCH in $DYNAMIC_BATCH_SIZES; do
-   for INSTANCE_CNT in $INSTANCE_COUNTS; do
-    if (( ($DYNAMIC_BATCH > 1) && ($STATIC_BATCH >= $DYNAMIC_BATCH) )); then
-        continue
-    fi
-
-    MAX_LATENCY=300
-    MAX_BATCH=${STATIC_BATCH} && (( $DYNAMIC_BATCH > $STATIC_BATCH )) && MAX_BATCH=${DYNAMIC_BATCH}
-
-    if (( $DYNAMIC_BATCH > 1 )); then
-        NAME=${BACKEND}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
-    else
-        NAME=${BACKEND}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
-    fi
-
     MODEL_NAME=${BACKEND}_zero_1_float32
     REPO_DIR=./custom_models && \
-        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_reshape_model_repository && \
-        [ $BACKEND != "plan" ] && [ $BACKEND != "libtorch" ] && \
-        REPO_DIR=$DATADIR/qa_identity_model_repository
-    SHAPE=${TENSOR_SIZE} && [ $BACKEND == "plan" ] && SHAPE="1,1,${TENSOR_SIZE}"
+        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
     KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
         (cd models/$MODEL_NAME && \
-                sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
-                sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt && \
-                echo "instance_group [ { kind: ${KIND}, count: ${INSTANCE_CNT} }]" >> config.pbtxt)
-    if (( $DYNAMIC_BATCH > 1 )); then
-        (cd models/$MODEL_NAME && \
-                echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
-    fi
+                sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+                echo "instance_group [ { kind: ${KIND} }]" >> config.pbtxt)
 
+    SERVER_ARGS=--model-repository=`pwd`/models
     SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -121,33 +83,33 @@ for BACKEND in $BACKENDS; do
     fi
 
     set +e
-    $PERF_CLIENT -v \
-                 -p${PERF_CLIENT_STABILIZE_WINDOW} \
-                 -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                 ${PERF_CLIENT_PERCENTILE_ARGS} \
-                 ${PERF_CLIENT_PROTOCOL_ARGS} -m ${MODEL_NAME} \
-                 -b${STATIC_BATCH} -t${CONCURRENCY} \
-                 -f ${RESULTDIR}/${NAME}.csv >> ${RESULTDIR}/${NAME}.log 2>&1
+    $CLIENT -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+            -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
-    curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
+
+    $CLIENT -i grpc -u localhost:8001 -m${MODEL_NAME} -b${BATCH_SIZE} \
+            -s${TENSOR_SIZE} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
+
     set -e
 
     kill $SERVER_PID
     wait $SERVER_PID
-   done
-  done
- done
+done
+
+for BACKEND in $BACKENDS; do
+    echo -e "${BACKEND}\n"
+    cat ${BACKEND}.log
 done
 
 if (( $RET == 0 )); then
-    echo -e "\n***\n*** Test ${RESULTNAME} Passed\n***"
+    echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test ${RESULTNAME} FAILED\n***"
+    echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET
