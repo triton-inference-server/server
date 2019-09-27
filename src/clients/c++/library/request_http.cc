@@ -933,8 +933,8 @@ HttpRequestImpl::HttpRequestImpl(
     const std::vector<std::shared_ptr<InferContext::Input>> inputs,
     InferContext::OnCompleteFn callback)
     : RequestImpl(id, std::move(callback)), easy_handle_(curl_easy_init()),
-      header_list_(nullptr), inputs_(inputs), input_pos_idx_(0),
-      result_pos_idx_(0)
+      header_list_(nullptr), inputs_(inputs), total_input_byte_size_(0),
+      input_pos_idx_(0), result_pos_idx_(0)
 {
   if (easy_handle_ != nullptr) {
     SetRunIndex(reinterpret_cast<uintptr_t>(easy_handle_));
@@ -943,7 +943,12 @@ HttpRequestImpl::HttpRequestImpl(
 
 HttpRequestImpl::~HttpRequestImpl()
 {
-  if (easy_handle_ != nullptr) {
+  if (header_list_ != nullptr) {
+    curl_slist_free_all(header_list_);
+    header_list_ = nullptr;
+  }
+
+if (easy_handle_ != nullptr) {
     curl_easy_cleanup(easy_handle_);
   }
 }
@@ -951,23 +956,12 @@ HttpRequestImpl::~HttpRequestImpl()
 Error
 HttpRequestImpl::InitializeRequest()
 {
-  ordered_results_.clear();
-  infer_response_buffer_.clear();
-
-  request_status_.Clear();
-  response_header_.Clear();
-
   for (auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
   }
 
-  total_input_byte_size_ = 0;
-  input_pos_idx_ = 0;
-  result_pos_idx_ = 0;
-
   return Error::Success;
 }
-
 
 Error
 HttpRequestImpl::GetNextInput(uint8_t* buf, size_t size, size_t* input_bytes)
@@ -1074,7 +1068,6 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
   InferResponseHeader infer_response;
 
   if (http_status_ != CURLE_OK) {
-    curl_slist_free_all(header_list_);
     ordered_results_.clear();
     return Error(
         RequestStatusCode::INTERNAL,
@@ -1084,8 +1077,6 @@ HttpRequestImpl::GetResults(InferContext::ResultMap* results)
   // Must use long with curl_easy_getinfo
   long http_code;
   curl_easy_getinfo(easy_handle_, CURLINFO_RESPONSE_CODE, &http_code);
-
-  curl_slist_free_all(header_list_);
 
   // Should have a request status, if not then create an error status.
   if (request_status_.code() == RequestStatusCode::INVALID) {
@@ -1188,11 +1179,6 @@ InferHttpContextImpl::InitHttp(const std::string& server_url)
       &sctx, server_url, headers_, model_name_, verbose_);
   if (err.IsOk()) {
     err = Init(std::move(sctx));
-    if (err.IsOk()) {
-      // Create request context for synchronous request.
-      sync_request_.reset(
-          static_cast<InferContext::Request*>(new HttpRequestImpl(0, inputs_)));
-    }
   }
 
   return err;
@@ -1202,7 +1188,7 @@ Error
 InferHttpContextImpl::Run(ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
-      std::static_pointer_cast<HttpRequestImpl>(sync_request_);
+      std::make_shared<HttpRequestImpl>(0, inputs_);
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
@@ -1211,7 +1197,8 @@ InferHttpContextImpl::Run(ResultMap* results)
     return curl_global.Status();
   }
 
-  Error err = PreRunProcessing(sync_request_);
+  std::shared_ptr<Request> lr = std::static_pointer_cast<Request>(sync_request);
+  Error err = PreRunProcessing(lr);
   if (!err.IsOk()) {
     return err;
   }
@@ -1224,11 +1211,9 @@ InferHttpContextImpl::Run(ResultMap* results)
     sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
 
-  // During this call both SEND_END (except in above case) and
-  // RECV_START will be set.
+  // During this call SEND_END (except in above case), RECV_START, and
+  // RECV_END will be set.
   sync_request->http_status_ = curl_easy_perform(sync_request->easy_handle_);
-
-  sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
 
   err = sync_request->GetResults(results);
 
@@ -1326,6 +1311,7 @@ InferHttpContextImpl::GetAsyncRunResults(
   if (!err.IsOk() || !(*is_ready)) {
     return err;
   }
+
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);
 
@@ -1433,6 +1419,10 @@ InferHttpContextImpl::ResponseHandler(
     return 0;
   }
 
+  // ResponseHandler may be called multiple times so we overwrite
+  // RECV_END so that we always have the time of the last.
+  request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
+
   return result_bytes;
 }
 
@@ -1527,7 +1517,7 @@ InferHttpContextImpl::PreRunProcessing(std::shared_ptr<Request>& request)
   }
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
 
-  // The list should be freed after the request
+  // The list will be freed when the request is destructed
   http_request->header_list_ = list;
 
   return Error::Success;
@@ -1582,7 +1572,6 @@ InferHttpContextImpl::AsyncTransfer()
         // Something wrong happened.
         fprintf(stderr, "Unexpected error: received CURLMsg=%d\n", msg->msg);
       } else {
-        http_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
         http_request->Timer().CaptureTimestamp(
             RequestTimers::Kind::REQUEST_END);
       }
