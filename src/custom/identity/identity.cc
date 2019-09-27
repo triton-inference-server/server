@@ -74,6 +74,9 @@ class Context : public CustomInstance {
 #endif  // TRTIS_ENABLE_GPU
 
  private:
+  // Delay to introduce into execution, in milliseconds.
+  int execute_delay_ms_;
+
   struct CopyInfo {
     std::string input_name_;
     DataType datatype_;
@@ -107,8 +110,15 @@ class Context : public CustomInstance {
 Context::Context(
     const std::string& instance_name, const ModelConfig& model_config,
     const int gpu_device)
-    : CustomInstance(instance_name, model_config, gpu_device)
+    : CustomInstance(instance_name, model_config, gpu_device),
+      execute_delay_ms_(0)
 {
+  if (model_config_.parameters_size() > 0) {
+    const auto itr = model_config_.parameters().find("execute_delay_ms");
+    if (itr != model_config_.parameters().end()) {
+      execute_delay_ms_ = std::stoi(itr->second.string_value());
+    }
+  }
 #ifdef TRTIS_ENABLE_GPU
   int device_cnt;
   auto cuerr = cudaGetDeviceCount(&device_cnt);
@@ -179,6 +189,11 @@ Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputV2Fn_t input_fn, CustomGetOutputV2Fn_t output_fn)
 {
+  // Delay if requested...
+  if (execute_delay_ms_ > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(execute_delay_ms_));
+  }
+
   bool cuda_copy = false;
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
     CustomPayload& payload = payloads[pidx];
@@ -303,6 +318,11 @@ Context::Execute(
     const uint32_t payload_cnt, CustomPayload* payloads,
     CustomGetNextInputFn_t input_fn, CustomGetOutputFn_t output_fn)
 {
+  // Delay if requested...
+  if (execute_delay_ms_ > 0) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(execute_delay_ms_));
+  }
+
   for (uint32_t pidx = 0; pidx < payload_cnt; ++pidx) {
     CustomPayload& payload = payloads[pidx];
 
