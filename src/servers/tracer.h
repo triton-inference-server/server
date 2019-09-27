@@ -56,7 +56,7 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
   // Return a trace object that should be used to collected trace
   // activities for an inference request. Return nullptr if no tracing
   // should occur.
-  Tracer* SampleTrace(const std::string& model_name, int64_t model_version);
+  Tracer* SampleTrace();
 
   // Write to the trace file.
   void WriteTrace(const std::stringstream& ss);
@@ -81,13 +81,19 @@ class TraceManager : public std::enable_shared_from_this<TraceManager> {
 class Tracer {
  public:
   Tracer(
-      const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level,
-      const std::string& model_name, int64_t model_version);
+      const std::shared_ptr<TraceManager>& manager,
+      TRTSERVER_Trace_Level level);
   ~Tracer();
 
   static void TraceActivity(
       TRTSERVER_Trace* trace, TRTSERVER_Trace_Activity activity,
       uint64_t timestamp_ns, void* userp);
+
+  void SetModel(const std::string& model_name, int64_t model_version)
+  {
+    model_name_ = model_name;
+    model_version_ = model_version;
+  }
 
   void SetServerTrace(TRTSERVER_Trace* trace) { trace_ = trace; }
   TRTSERVER_Trace* ServerTrace() const { return trace_; }
@@ -102,6 +108,9 @@ class Tracer {
  private:
   std::shared_ptr<TraceManager> manager_;
   const TRTSERVER_Trace_Level level_;
+
+  std::string model_name_;
+  int64_t model_version_;
 
   std::stringstream tout_;
   uint32_t timestamp_cnt_;

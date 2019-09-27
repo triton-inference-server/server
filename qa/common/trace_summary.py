@@ -33,6 +33,9 @@ import sys
 FLAGS = None
 
 def add_span(span_map, timestamps, span_name, ts_start, ts_end):
+    for tag in (ts_start, ts_end):
+        if tag not in timestamps:
+            raise ValueError('timestamps missing "{}": {}'.format(tag, timestamps))
     if timestamps[ts_end] < timestamps[ts_start]:
         raise ValueError('end timestamp "{}" < start timestamp "{}"'.format(ts_end, ts_start))
     if span_name not in span_map:
@@ -50,54 +53,55 @@ def summarize(traces):
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
 
-        key = (trace["model_name"], trace["model_version"])
-        if key not in model_count_map:
-            model_count_map[key] = 0
-            model_span_map[key] = dict()
+        if ("request handler start" in timestamps) and ("request handler end" in timestamps):
+            key = (trace["model_name"], trace["model_version"])
+            if key not in model_count_map:
+                model_count_map[key] = 0
+                model_span_map[key] = dict()
 
-        model_count_map[key] += 1
-        if ("http recv start" in timestamps) and ("http send end" in timestamps):
-            add_span(model_span_map[key], timestamps,
-                     "http infer", "http recv start", "http send end")
-            add_span(model_span_map[key], timestamps,
-                     "http recv", "http recv start", "http recv end")
-            add_span(model_span_map[key], timestamps,
-                     "http send", "http send start", "http send end")
-        elif "grpc infer start" in timestamps:
-            add_span(model_span_map[key], timestamps,
-                     "grpc infer", "grpc infer start", "grpc infer end")
-            add_span(model_span_map[key], timestamps,
-                     "grpc recv", "grpc infer start", "request handler start")
-            add_span(model_span_map[key], timestamps,
-                     "grpc send", "compute end", "grpc infer end")
+            model_count_map[key] += 1
+            if ("http recv start" in timestamps) and ("http send end" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                         "http infer", "http recv start", "http send end")
+                add_span(model_span_map[key], timestamps,
+                         "http recv", "http recv start", "http recv end")
+                add_span(model_span_map[key], timestamps,
+                         "http send", "http send start", "http send end")
+            elif ("grpc wait/read start" in timestamps) and ("grpc send end" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                         "grpc infer", "grpc wait/read start", "grpc send end")
+                add_span(model_span_map[key], timestamps,
+                         "grpc wait/read", "grpc wait/read start", "grpc wait/read end")
+                add_span(model_span_map[key], timestamps,
+                         "grpc send", "grpc send start", "grpc send end")
 
-        add_span(model_span_map[key], timestamps,
-                 "request handler", "request handler start", "request handler end")
-        add_span(model_span_map[key], timestamps,
-                 "queue", "queue start", "compute start")
-        add_span(model_span_map[key], timestamps,
-                 "compute", "compute start", "compute end")
-        if ("compute input end" in timestamps) and ("compute output start" in timestamps):
             add_span(model_span_map[key], timestamps,
-                     "compute input", "compute start", "compute input end")
+                     "request handler", "request handler start", "request handler end")
             add_span(model_span_map[key], timestamps,
-                     "compute infer", "compute input end", "compute output start")
+                     "queue", "queue start", "compute start")
             add_span(model_span_map[key], timestamps,
-                     "compute output", "compute output start", "compute end")
+                     "compute", "compute start", "compute end")
+            if ("compute input end" in timestamps) and ("compute output start" in timestamps):
+                add_span(model_span_map[key], timestamps,
+                         "compute input", "compute start", "compute input end")
+                add_span(model_span_map[key], timestamps,
+                         "compute infer", "compute input end", "compute output start")
+                add_span(model_span_map[key], timestamps,
+                         "compute output", "compute output start", "compute end")
 
-        if FLAGS.show_trace:
-            print("{} ({}):".format(trace["model_name"], trace["model_version"]));
-            ordered_timestamps = list()
-            for ts in trace["timestamps"]:
-                ordered_timestamps.append((ts["name"], ts["ns"]))
-            ordered_timestamps.sort(key=lambda tup: tup[1])
+            if FLAGS.show_trace:
+                print("{} ({}):".format(trace["model_name"], trace["model_version"]));
+                ordered_timestamps = list()
+                for ts in trace["timestamps"]:
+                    ordered_timestamps.append((ts["name"], ts["ns"]))
+                ordered_timestamps.sort(key=lambda tup: tup[1])
 
-            now = None
-            for ts in ordered_timestamps:
-                if now is not None:
-                    print("\t\t{}us".format((ts[1] - now) / 1000))
-                print("\t{}".format(ts[0]))
-                now = ts[1]
+                now = None
+                for ts in ordered_timestamps:
+                    if now is not None:
+                        print("\t\t{}us".format((ts[1] - now) / 1000))
+                    print("\t{}".format(ts[0]))
+                    now = ts[1]
 
     for key, cnt in model_count_map.items():
         model_name, model_value = key
@@ -118,10 +122,15 @@ def summarize(traces):
         elif "grpc infer" in model_span_map[key]:
             print("GRPC infer request (avg): {}us".format(
                 model_span_map[key]["grpc infer"] / (cnt * 1000)))
-            print("\tGRPC receive (avg): {}us".format(
-                model_span_map[key]["grpc recv"] / (cnt * 1000)))
-            print("\tGRPC send (avg): {}us".format(
+            print("\tWait/Read (avg): {}us".format(
+                model_span_map[key]["grpc wait/read"] / (cnt * 1000)))
+            print("\tSend (avg): {}us".format(
                 model_span_map[key]["grpc send"] / (cnt * 1000)))
+            print("\tOverhead (avg): {}us".format(
+                (model_span_map[key]["grpc infer"] -
+                 model_span_map[key]["request handler"] -
+                 model_span_map[key]["grpc wait/read"] -
+                 model_span_map[key]["grpc send"]) / (cnt * 1000)))
 
         print("\tHandler (avg): {}us".format(
             model_span_map[key]["request handler"] / (cnt * 1000)))

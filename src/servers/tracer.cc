@@ -73,7 +73,11 @@ TraceManager::TraceManager(std::unique_ptr<std::ofstream> trace_file)
 TraceManager::~TraceManager()
 {
   LOG_INFO << "Close trace";
-  *trace_file_ << "]";
+
+  if (trace_cnt_ > 0) {
+    *trace_file_ << "]";
+  }
+
   trace_file_->close();
 }
 
@@ -100,15 +104,14 @@ TraceManager::SetRate(uint32_t rate)
 }
 
 Tracer*
-TraceManager::SampleTrace(const std::string& model_name, int64_t model_version)
+TraceManager::SampleTrace()
 {
   uint64_t s = sample_.fetch_add(1);
   if ((s % rate_) != 0) {
     return nullptr;
   }
 
-  Tracer* tracer =
-      new Tracer(shared_from_this(), level_, model_name, model_version);
+  Tracer* tracer = new Tracer(shared_from_this(), level_);
 
   TRTSERVER_Trace* trace = nullptr;
   TRTSERVER_Error* err = TRTSERVER_TraceNew(
@@ -147,17 +150,16 @@ TraceManager::WriteTrace(const std::stringstream& ss)
 }
 
 Tracer::Tracer(
-    const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level,
-    const std::string& model_name, int64_t model_version)
-    : manager_(manager), level_(level), timestamp_cnt_(0)
+    const std::shared_ptr<TraceManager>& manager, TRTSERVER_Trace_Level level)
+    : manager_(manager), level_(level), model_version_(-1), timestamp_cnt_(0)
 {
-  tout_ << "{ \"model_name\": \"" << model_name
-        << "\", \"model_version\": " << model_version << ", \"timestamps\": [";
+  tout_ << "{ \"timestamps\": [";
 }
 
 Tracer::~Tracer()
 {
-  tout_ << "]}";
+  tout_ << "], \"model_name\": \"" << model_name_
+        << "\", \"model_version\": " << model_version_ << " }";
   manager_->WriteTrace(tout_);
 
   LOG_IF_ERR(TRTSERVER_TraceDelete(trace_), "deleting trace");
