@@ -28,10 +28,7 @@ import sys
 import os
 import numpy as np
 from tensorrtserver.api import *
-if "TEST_SHARED_MEMORY" in os.environ:
-    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
-else:
-    TEST_SHARED_MEMORY=0
+TEST_SHARED_MEMORY = int(os.environ.get('TEST_SHARED_MEMORY', 0))
 import tensorrtserver.shared_memory as shm
 import test_util as tu
 from sets import Set
@@ -76,8 +73,7 @@ def _match_registered(registered_shm_regions, shm_name, byte_size):
     if shm_name in registered_shm_regions:
         if byte_size == registered_shm_regions[shm_name][0]:
             return True
-    else:
-        return False
+    return False
 
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
@@ -221,14 +217,6 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                             registered_shm_regions['/output1'] = (output1_byte_size, shm_op1_handle)
                         else:
                             shm_op1_handle = registered_shm_regions['/output1'][1]
-
-            else:
-                if not _match_registered(registered_shm_regions, '/'+shm_region_names[0], input0_byte_size):
-                    shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
-                                                                    '/'+shm_region_names[0], input0_byte_size)
-                    registered_shm_regions['/'+shm_region_names[0]] = (input0_byte_size, shm_ip0_handle)
-                else:
-                    shm_ip0_handle = registered_shm_regions['/'+shm_region_names[0]][1]
 
                 if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
                     shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
@@ -425,14 +413,14 @@ def infer_zero(tester, pf, batch_size, tensor_dtype, input_shapes, output_shapes
             shm_op_handles = list()
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
             for io_num in range(io_cnt):
-                input0_byte_size = tu.shape_element_count(input_shapes[io_num]) *\
+                input_byte_size = tu.shape_element_count(input_shapes[io_num]) *\
                                     np.dtype(tensor_dtype).itemsize * batch_size
-                output0_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
+                output_byte_size = tu.shape_element_count(output_shapes[io_num]) *\
                                     np.dtype(tensor_dtype).itemsize * batch_size
                 shm_ip_handles.append(shm.create_shared_memory_region("input"+str(io_num)+"_data",\
-                                            "/input"+str(io_num), input0_byte_size))
+                                            "/input"+str(io_num), input_byte_size))
                 shm_op_handles.append(shm.create_shared_memory_region("output"+str(io_num)+"_data",\
-                                            "/output"+str(io_num), output0_byte_size))
+                                            "/output"+str(io_num), output_byte_size))
 
                 shm.register(shm_ip_handles[io_num])
                 shm.register(shm_op_handles[io_num])
