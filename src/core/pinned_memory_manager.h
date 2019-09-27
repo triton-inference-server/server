@@ -36,7 +36,9 @@ class PinnedMemoryManager {
  public:
   // Options to be checked before allocating pinned memeory
   struct Options {
-    size_t max_total_byte_size;
+    Options(size_t b = 0) : max_total_byte_size_(b) {}
+    
+    size_t max_total_byte_size_;
   };
 
   ~PinnedMemoryManager() = default;

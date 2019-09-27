@@ -140,6 +140,10 @@ class InferenceServer {
   bool StrictModelConfigEnabled() const { return strict_model_config_; }
   void SetStrictModelConfigEnabled(bool e) { strict_model_config_ = e; }
 
+  // Get / set the total pinned memory byte size.
+  int32_t TotalPinnedSize() const { return total_pinned_size_; }
+  void SetTotalPinnedSize(int32_t s) { total_pinned_size_ = std::max(0, s); }
+
   // Get / set strict readiness enable.
   bool StrictReadinessEnabled() const { return strict_readiness_; }
   void SetStrictReadinessEnabled(bool e) { strict_readiness_ = e; }
@@ -204,6 +208,7 @@ class InferenceServer {
   bool strict_model_config_;
   bool strict_readiness_;
   uint32_t exit_timeout_secs_;
+  uint32_t total_pinned_size_;
 
   // Tensorflow options
   bool tf_soft_placement_enabled_;

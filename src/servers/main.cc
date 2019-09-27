@@ -164,6 +164,7 @@ enum OptionId {
   OPTION_POLL_REPO_SECS,
   OPTION_ALLOW_MODEL_CONTROL,
   OPTION_STARTUP_MODEL,
+  OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
@@ -282,6 +283,12 @@ std::vector<Option> options_{
      "Name of the model to be loaded on server startup. It may be specified "
      "multiple times to add multiple models. Note that this option will only "
      "take affect if --allow-model-control is true."},
+    {OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE, "total-pinned-memory-byte-size",
+     "The total byte size that can be allocated as pinned system memory. "
+     "If GPU support is enabled, the server will allocate pinned system memory "
+     "to accelerate data transfer between host and devices until it exceeds "
+     "the specified byte size. This option will not affect the allocation "
+     "conducted by the backend frameworks. Default is 0."},
     {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
      "finish. After the timeout expires the server exits even if inferences "
@@ -755,6 +762,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   VgpuOption tf_vgpu;
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
+  int32_t total_pinned_size = 0;
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
@@ -903,6 +911,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_STARTUP_MODEL:
         startup_models_.insert(optarg);
         break;
+      case OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE:
+        total_pinned_size = ParseIntOption(optarg);
+        break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
         break;
@@ -1001,6 +1012,9 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         TRTSERVER_ServerOptionsSetStartupModel(server_options, model.c_str()),
         "setting startup model");
   }
+  FAIL_IF_ERR(
+      TRTSERVER_ServerOptionsSetTotalPinnedSize(server_options, total_pinned_size),
+      "setting total pinned memory byte size");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
       "setting exit on error");

@@ -204,10 +204,10 @@ PinnedMemoryManager::CheckPrerequisite(size_t requested_size)
   std::string error_message;
 #ifdef TRTIS_ENABLE_GPU
   if ((total_pinned_byte_size_ + requested_size) >
-      options_.max_total_byte_size) {
+      options_.max_total_byte_size_) {
     error_message =
         ("exceeding allowed total byte size '" +
-         std::to_string(options_.max_total_byte_size) + " < " +
+         std::to_string(options_.max_total_byte_size_) + " < " +
          std::to_string(requested_size) + " + " +
          std::to_string(total_pinned_byte_size_) + "'");
   }
