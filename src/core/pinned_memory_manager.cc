@@ -25,12 +25,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-// [TODO] configure based on ENABLE_GPU
-#include <cuda_runtime_api.h>
 #include <sstream>
 
 #include "src/core/logging.h"
 #include "src/core/pinned_memory_manager.h"
+
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -84,6 +86,7 @@ PinnedMemoryManager::Alloc(
   // allocate buffer
   bool is_pinned = true;
   if (status.IsOk()) {
+#ifdef TRTIS_ENABLE_GPU
     auto err = cudaHostAlloc(ptr, size, cudaHostAllocPortable);
     if (err != cudaSuccess) {
       // set to nullptr on error to avoid freeing invalid pointer
@@ -93,6 +96,13 @@ PinnedMemoryManager::Alloc(
           "failed to allocate pinned system memory: " +
               std::string(cudaGetErrorString(err)));
     }
+#else
+    *ptr = nullptr;
+    status = Status(
+        RequestStatusCode::INTERNAL,
+        "failed to allocate pinned system memory: " +
+            "TRTIS_ENABLE_GPU is not set"));
+#endif  // TRTIS_ENABLE_GPU
   }
   if ((!status.IsOk()) && allow_nonpinned_fallback) {
     static bool warning_logged = false;
@@ -131,11 +141,15 @@ PinnedMemoryManager::Alloc(
     }
   }
   if ((!status.IsOk()) && (*ptr != nullptr)) {
+#ifdef TRTIS_ENABLE_GPU
     if (is_pinned) {
       cudaFreeHost(*ptr);
     } else {
       free(*ptr);
     }
+#else
+    free(*ptr);
+#endif  // TRTIS_ENABLE_GPU
   }
 
   return status;
@@ -170,7 +184,14 @@ PinnedMemoryManager::Free(void* ptr)
   }
 
   if (is_pinned) {
+#ifdef TRTIS_ENABLE_GPU
     cudaFreeHost(ptr);
+#else
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unexpected pinned system memory is managed while " +
+            "TRTIS_ENABLE_GPU is not set"));
+#endif  // TRTIS_ENABLE_GPU
   } else {
     free(ptr);
   }
@@ -181,6 +202,7 @@ Status
 PinnedMemoryManager::CheckPrerequisite(size_t requested_size)
 {
   std::string error_message;
+#ifdef TRTIS_ENABLE_GPU
   if ((total_pinned_byte_size_ + requested_size) >
       options_.max_total_byte_size) {
     error_message =
@@ -189,6 +211,9 @@ PinnedMemoryManager::CheckPrerequisite(size_t requested_size)
          std::to_string(requested_size) + " + " +
          std::to_string(total_pinned_byte_size_) + "'");
   }
+#else
+  error_message = "TRTIS_ENABLE_GPU is not set";
+#endif  // TRTIS_ENABLE_GPU
 
   if (!error_message.empty()) {
     return Status(
