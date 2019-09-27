@@ -44,6 +44,7 @@
 #include "src/core/model_config.pb.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
+#include "src/core/pinned_memory_manager.h"
 #include "src/core/provider.h"
 #include "src/core/server.h"
 #include "src/core/server_status.pb.h"
@@ -118,6 +119,15 @@ InferenceServer::Init()
   // the shared memory regions that are current registered.
   status =
       SharedMemoryManager::Create(status_manager_, &shared_memory_manager_);
+  if (!status.IsOk()) {
+    ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
+    return status;
+  }
+
+  // [TODO] set option value
+  auto options = PinnedMemoryManager::Options();
+  options.max_total_byte_size = 1;
+  status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;

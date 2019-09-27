@@ -33,6 +33,7 @@
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/pinned_memory_manager.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -75,7 +76,11 @@ AllocatedSystemMemory::AllocatedSystemMemory(
   buffer_ = nullptr;
   if (byte_size != 0) {
     if (memory_type_ == TRTSERVER_MEMORY_CPU) {
-      buffer_ = new char[byte_size];
+      auto status = PinnedMemoryManager::Alloc((void**)&buffer_, byte_size, true);
+      if (!status.IsOk()) {
+        LOG_ERROR << status.Message();
+        buffer_ = nullptr;
+      }
     } else {
 #ifdef TRTIS_ENABLE_GPU
       cudaError_t err = cudaMalloc((void**)&buffer_, byte_size);
@@ -96,7 +101,11 @@ AllocatedSystemMemory::~AllocatedSystemMemory()
 {
   if (buffer_ != nullptr) {
     if (memory_type_ == TRTSERVER_MEMORY_CPU) {
-      delete buffer_;
+      auto status = PinnedMemoryManager::Free(buffer_);
+      if (!status.IsOk()) {
+        LOG_ERROR << status.Message();
+        buffer_ = nullptr;
+      }
     } else {
 #ifdef TRTIS_ENABLE_GPU
       cudaError_t err = cudaFree(buffer_);
