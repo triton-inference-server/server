@@ -76,7 +76,8 @@ AllocatedSystemMemory::AllocatedSystemMemory(
   buffer_ = nullptr;
   if (byte_size != 0) {
     if (memory_type_ == TRTSERVER_MEMORY_CPU) {
-      auto status = PinnedMemoryManager::Alloc((void**)&buffer_, byte_size, true);
+      auto status =
+          PinnedMemoryManager::Alloc((void**)&buffer_, byte_size, true);
       if (!status.IsOk()) {
         LOG_ERROR << status.Message();
         buffer_ = nullptr;

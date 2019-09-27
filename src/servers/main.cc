@@ -1013,7 +1013,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         "setting startup model");
   }
   FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetTotalPinnedSize(server_options, total_pinned_size),
+      TRTSERVER_ServerOptionsSetTotalPinnedSize(
+          server_options, total_pinned_size),
       "setting total pinned memory byte size");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),
