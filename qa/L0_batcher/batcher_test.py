@@ -826,7 +826,7 @@ class BatcherTest(unittest.TestCase):
                 threads.append(threading.Thread(target=self.check_response,
                                                 args=(trial, 5, (3000, None)),
                                                 kwargs={'input_size': 8,
-                                                'shm_region_names': ['ip30', 'ip31', 'op30', 'op31'],
+                                                'shm_region_names': shm3_region_names,
                                                 'precreated_shm_regions': precreated_shm3_regions}))
                 threads[0].start()
                 threads[1].start()
@@ -856,7 +856,7 @@ class BatcherTest(unittest.TestCase):
             shm2_region_names = ['ip20', 'ip21', 'op20', 'op21']
             shm3_region_names = ['ip30', 'ip31', 'op30', 'op31']
             shm4_region_names = ['ip40', 'ip41', 'op40', 'op41']
-            shm5_region_names = ['ip30', 'ip31', 'op30', 'op31']
+            shm5_region_names = ['ip50', 'ip51', 'op50', 'op51']
         else:
             shm0_region_names = None
             shm1_region_names = None
