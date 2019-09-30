@@ -164,7 +164,7 @@ enum OptionId {
   OPTION_POLL_REPO_SECS,
   OPTION_ALLOW_MODEL_CONTROL,
   OPTION_STARTUP_MODEL,
-  OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE,
+  OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_TF_ALLOW_SOFT_PLACEMENT,
   OPTION_TF_GPU_MEMORY_FRACTION,
@@ -283,12 +283,12 @@ std::vector<Option> options_{
      "Name of the model to be loaded on server startup. It may be specified "
      "multiple times to add multiple models. Note that this option will only "
      "take affect if --allow-model-control is true."},
-    {OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE, "total-pinned-memory-byte-size",
+    {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
      "The total byte size that can be allocated as pinned system memory. "
      "If GPU support is enabled, the server will allocate pinned system memory "
      "to accelerate data transfer between host and devices until it exceeds "
      "the specified byte size. This option will not affect the allocation "
-     "conducted by the backend frameworks. Default is 0."},
+     "conducted by the backend frameworks. Default is 256 MB."},
     {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs",
      "Timeout (in seconds) when exiting to wait for in-flight inferences to "
      "finish. After the timeout expires the server exits even if inferences "
@@ -639,6 +639,12 @@ ParseIntOption(const std::string arg)
   return std::stoi(arg);
 }
 
+int64_t
+ParseLongLongOption(const std::string arg)
+{
+  return std::stoll(arg);
+}
+
 float
 ParseFloatOption(const std::string arg)
 {
@@ -762,7 +768,7 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
   VgpuOption tf_vgpu;
   int32_t exit_timeout_secs = 30;
   int32_t repository_poll_secs = repository_poll_secs_;
-  int32_t total_pinned_size = 0;
+  int64_t pinned_memory_pool_byte_size = 1 << 28;
 
 #ifdef TRTIS_ENABLE_HTTP
   int32_t http_port = http_port_;
@@ -911,8 +917,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
       case OPTION_STARTUP_MODEL:
         startup_models_.insert(optarg);
         break;
-      case OPTION_TOTAL_PINNED_MEMORY_BYTE_SIZE:
-        total_pinned_size = ParseIntOption(optarg);
+      case OPTION_PINNED_MEMORY_POOL_BYTE_SIZE:
+        pinned_memory_pool_byte_size = ParseLongLongOption(optarg);
         break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
@@ -1013,8 +1019,8 @@ Parse(TRTSERVER_ServerOptions* server_options, int argc, char** argv)
         "setting startup model");
   }
   FAIL_IF_ERR(
-      TRTSERVER_ServerOptionsSetTotalPinnedSize(
-          server_options, total_pinned_size),
+      TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
+          server_options, pinned_memory_pool_byte_size),
       "setting total pinned memory byte size");
   FAIL_IF_ERR(
       TRTSERVER_ServerOptionsSetExitOnError(server_options, exit_on_error),

@@ -124,7 +124,7 @@ InferenceServer::Init()
     return status;
   }
 
-  PinnedMemoryManager::Options options(total_pinned_size_);
+  PinnedMemoryManager::Options options(pinned_memory_pool_size_);
   status = PinnedMemoryManager::Create(options);
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;

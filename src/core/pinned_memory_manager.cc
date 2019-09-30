@@ -25,10 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#include <sstream>
-
-#include "src/core/logging.h"
 #include "src/core/pinned_memory_manager.h"
+
+#include <sstream>
+#include "src/core/logging.h"
 
 #ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -65,7 +65,7 @@ PinnedMemoryManager::Create(const Options& options)
 
 Status
 PinnedMemoryManager::Alloc(
-    void** ptr, size_t size, bool allow_nonpinned_fallback)
+    void** ptr, uint64_t size, bool allow_nonpinned_fallback)
 {
   if (instance_ == nullptr) {
     return Status(
@@ -80,7 +80,7 @@ PinnedMemoryManager::Alloc(
 
     status = instance_->CheckPrerequisite(size);
     // treat as if the operation will succeed to avoid over-subscription
-    instance_->total_pinned_byte_size_ += size;
+    instance_->allocated_pinned_memory_byte_size_ += size;
   }
 
   // allocate buffer
@@ -101,14 +101,15 @@ PinnedMemoryManager::Alloc(
     status = Status(
         RequestStatusCode::INTERNAL,
         "failed to allocate pinned system memory: " +
-            "TRTIS_ENABLE_GPU is not set"));
+            "TRTIS_ENABLE_GPU is not set");
 #endif  // TRTIS_ENABLE_GPU
   }
+
   if ((!status.IsOk()) && allow_nonpinned_fallback) {
     static bool warning_logged = false;
     if (!warning_logged) {
       LOG_WARNING << status.Message()
-                  << ", allocating non-pinned system memory";
+                  << ", falling back to non-pinned system memory";
       warning_logged = true;
     }
     *ptr = malloc(size);
@@ -134,12 +135,16 @@ PinnedMemoryManager::Alloc(
             "unexpected memory address collision, '" + PointerToString(*ptr) +
                 "' has been managed");
       }
+      LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
+                     << "pinned memory allocation: "
+                     << "size " << size << ", addr " << *ptr;
     }
     // In either case, we need to adjust back the pinned byte size
     if ((!status.IsOk()) || (!is_pinned)) {
-      instance_->total_pinned_byte_size_ -= size;
+      instance_->allocated_pinned_memory_byte_size_ -= size;
     }
   }
+
   if ((!status.IsOk()) && (*ptr != nullptr)) {
 #ifdef TRTIS_ENABLE_GPU
     if (is_pinned) {
@@ -172,9 +177,12 @@ PinnedMemoryManager::Free(void* ptr)
       is_pinned = it->second.first;
       const auto& size = it->second.second;
       if (is_pinned) {
-        instance_->total_pinned_byte_size_ -= size;
+        instance_->allocated_pinned_memory_byte_size_ -= size;
       }
       instance_->memory_info_.erase(it);
+      LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
+                     << "pinned memory deallocation: "
+                     << "addr " << ptr;
     } else {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected memory address '" +
@@ -199,17 +207,17 @@ PinnedMemoryManager::Free(void* ptr)
 }
 
 Status
-PinnedMemoryManager::CheckPrerequisite(size_t requested_size)
+PinnedMemoryManager::CheckPrerequisite(uint64_t requested_size)
 {
   std::string error_message;
 #ifdef TRTIS_ENABLE_GPU
-  if ((total_pinned_byte_size_ + requested_size) >
-      options_.max_total_byte_size_) {
+  if ((allocated_pinned_memory_byte_size_ + requested_size) >
+      options_.pinned_memory_pool_byte_size_) {
     error_message =
-        ("exceeding allowed total byte size '" +
-         std::to_string(options_.max_total_byte_size_) + " < " +
+        ("pinned memory poll exceeded (" +
+         std::to_string(options_.pinned_memory_pool_byte_size_) + " < " +
          std::to_string(requested_size) + " + " +
-         std::to_string(total_pinned_byte_size_) + "'");
+         std::to_string(allocated_pinned_memory_byte_size_) + ")");
   }
 #else
   error_message = "TRTIS_ENABLE_GPU is not set";

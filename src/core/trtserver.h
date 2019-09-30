@@ -542,10 +542,11 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetStrictModelConfig(
 /// in a server options. This option will not affect the allocation conducted
 /// by the backend frameworks.
 /// \param options The server options object.
-/// \param size The total pinned memory byte size.
+/// \param size The pinned memory pool byte size.
 /// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerOptionsSetTotalPinnedSize(
-    TRTSERVER_ServerOptions* options, unsigned int size);
+TRTSERVER_EXPORT TRTSERVER_Error*
+TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
+    TRTSERVER_ServerOptions* options, uint64_t size);
 
 /// Enable or disable exit-on-error in a server options.
 /// \param options The server options object.

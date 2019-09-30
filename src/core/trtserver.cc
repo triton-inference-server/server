@@ -260,8 +260,8 @@ class TrtServerOptions {
   bool StrictModelConfig() const { return strict_model_config_; }
   void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
 
-  unsigned int TotalPinnedSize() const { return total_pinned_size_; }
-  void SetTotalPinnedSize(unsigned int s) { total_pinned_size_ = s; }
+  uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
+  void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
 
   bool StrictReadiness() const { return strict_readiness_; }
   void SetStrictReadiness(bool b) { strict_readiness_ = b; }
@@ -304,7 +304,7 @@ class TrtServerOptions {
   bool metrics_;
   bool gpu_metrics_;
   unsigned int exit_timeout_;
-  unsigned int total_pinned_size_;
+  uint64_t pinned_memory_pool_size_;
 
   bool tf_soft_placement_;
   float tf_gpu_mem_fraction_;
@@ -851,11 +851,11 @@ TRTSERVER_ServerOptionsSetStrictModelConfig(
 }
 
 TRTSERVER_Error*
-TRTSERVER_ServerOptionsSetTotalPinnedSize(
-    TRTSERVER_ServerOptions* options, unsigned int size)
+TRTSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
+    TRTSERVER_ServerOptions* options, uint64_t size)
 {
   TrtServerOptions* loptions = reinterpret_cast<TrtServerOptions*>(options);
-  loptions->SetTotalPinnedSize(size);
+  loptions->SetPinnedMemoryPoolByteSize(size);
   return nullptr;  // Success
 }
 
@@ -990,7 +990,7 @@ TRTSERVER_ServerNew(TRTSERVER_Server** server, TRTSERVER_ServerOptions* options)
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
   lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
-  lserver->SetTotalPinnedSize(loptions->TotalPinnedSize());
+  lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetTensorFlowSoftPlacementEnabled(
