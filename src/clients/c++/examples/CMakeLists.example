@@ -61,8 +61,8 @@ target_link_libraries(
   PRIVATE request_static
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
+  PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
-  PUBLIC CURL::libcurl
 )
 install(
   TARGETS simple_client_static
