@@ -851,7 +851,7 @@ message ModelConfig
   //@@
   //@@     Optional filename of the model file to use if a
   //@@     compute-capability specific model is not specified in
-  //@@     :cpp:var:`cc_model_names`. If not specified the default name
+  //@@     :cpp:var:`cc_model_filenames`. If not specified the default name
   //@@     is 'model.graphdef', 'model.savedmodel', 'model.plan' or
   //@@     'model.netdef' depending on the model type.
   //@@
