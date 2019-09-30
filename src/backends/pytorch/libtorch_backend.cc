@@ -254,6 +254,10 @@ LibTorchBackend::CreateExecutionContext(
     std::istringstream model_stream(lp_itr->second);
     context->torch_model_ = std::make_shared<torch::jit::script::Module>(
         torch::jit::load(model_stream, context->device_));
+
+    // load the torch model in eval mode (Solve PyTorch bug during saving model)
+    // https://github.com/pytorch/pytorch/issues/26884
+    context->torch_model_->eval();
   }
   catch (const std::exception& ex) {
     return Status(
