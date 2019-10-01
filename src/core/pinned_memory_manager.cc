@@ -100,8 +100,7 @@ PinnedMemoryManager::Alloc(
     *ptr = nullptr;
     status = Status(
         RequestStatusCode::INTERNAL,
-        "failed to allocate pinned system memory: " +
-            "TRTIS_ENABLE_GPU is not set");
+        "failed to allocate pinned system memory: TRTIS_ENABLE_GPU is not set");
 #endif  // TRTIS_ENABLE_GPU
   }
 
@@ -197,8 +196,8 @@ PinnedMemoryManager::Free(void* ptr)
 #else
     return Status(
         RequestStatusCode::INTERNAL,
-        "unexpected pinned system memory is managed while " +
-            "TRTIS_ENABLE_GPU is not set"));
+        "unexpected pinned system memory is managed while TRTIS_ENABLE_GPU is "
+        "not set");
 #endif  // TRTIS_ENABLE_GPU
   } else {
     free(ptr);
