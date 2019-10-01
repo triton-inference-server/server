@@ -120,8 +120,9 @@ for BACKEND in $BACKENDS; do
     # 16k 1m 2m 4m 8m 16m elements
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
-        $CLIENT -m${ENSEMBLE_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-                -n${MEASURE_ITERS} >> ${BACKEND}.${TENSOR_SIZE}.pinned.log 2>&1
+        $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
+                -b${BATCH_SIZE} -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                >> ${BACKEND}.${TENSOR_SIZE}.pinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
         fi
@@ -171,8 +172,9 @@ for BACKEND in $BACKENDS; do
     # 16k 1m 2m 4m 8m 16m elements
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
-        $CLIENT -m${ENSEMBLE_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-                -n${MEASURE_ITERS} >> ${BACKEND}.${TENSOR_SIZE}.nonpinned.log 2>&1
+        $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
+                -b${BATCH_SIZE} -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                >> ${BACKEND}.${TENSOR_SIZE}.nonpinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
         fi
