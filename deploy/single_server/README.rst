@@ -72,8 +72,45 @@ the GCS bucket::
 
   $ gsutil cp -r docs/examples/model_repository gs://tensorrt-inference-server-repository/model_repository
 
+GCS Permissions
+^^^^^^^^^^^^^^^
+
 Make sure the bucket permissions are set so that the inference server
-can access the model repository.
+can access the model repository. If the bucket is public then no
+additional changes are needed and you can proceed to running the
+inference server section.
+
+If bucket premissions need to be set with the
+GOOGLE_APPLICATION_CREDENTIALS environment variable then perform the
+following steps:
+
+* Generate Google service account JSON with proper permissions called
+  *gcp-creds.json*.
+
+* Create a Kubernetes secret from this file::
+
+  $ kubectl create configmap gcpcreds --from-literal "project-id=myproject"
+  $ kubectl create secret generic gcpcreds --from-file gcp-creds.json
+
+* Modify templates/deployment.yaml to include the
+  GOOGLE_APPLICATION_CREDENTIALS environment variable::
+
+    env:
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-creds.json
+
+* Modify templates/deployment.yaml to mount the secret in a volume at
+  /secret::
+
+    volumeMounts:
+      - name: vsecret
+        mountPath: "/secret"
+        readOnly: true
+    ...
+    volumes:
+    - name: vsecret
+      secret:
+        secretName: gcpcreds
 
 Running The Inference Server
 ----------------------------
