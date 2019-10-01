@@ -409,7 +409,9 @@ GPU 0 and two execution instances on GPUs 1 and 2::
   ]
 
 The instance group setting is also used to enable exection of a model
-on the CPU. The following places two execution instances on the CPU::
+on the CPU. A model can be executed on the CPU even if there is a GPU
+available in the system. The following places two execution instances
+on the CPU::
 
   instance_group [
     {
