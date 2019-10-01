@@ -130,6 +130,9 @@ class BaseBackend : public InferenceBackend {
 
     // TRTISTFModel for this context.
     TRTISTFModelHandle trtistf_model_;
+
+    // use for GPU allocator
+    int vgpu_device_;
   };
 
  private:

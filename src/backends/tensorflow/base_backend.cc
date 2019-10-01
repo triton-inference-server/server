@@ -289,6 +289,7 @@ BaseBackend::CreateExecutionContext(
     }
     tftrt_config_ptr = &tftrt_config;
   }
+  context->vgpu_device_ = vgpu_device;
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
       graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
@@ -460,10 +461,16 @@ BaseBackend::Context::SetInput(
     input_tensor_name = &tn_itr->second;
   }
 
+  // Only try to create a tensor on specific device if we know which TF device
+  // that the session is on
+  auto device_id =
+      (gpu_device_ == NO_GPU_DEVICE) || (gpu_device_ == MODEL_DEVICE)
+          ? -1
+          : vgpu_device_;
   const TRTISTF_DataType dtype = ConvertDataType(datatype);
   TRTISTF_Tensor* tensor = TRTISTF_TensorNew(
       input_tensor_name->c_str(), dtype, shape.size(),
-      (shape.size() == 0) ? nullptr : &shape[0]);
+      (shape.size() == 0) ? nullptr : &shape[0], device_id);
   if (tensor == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -513,8 +520,12 @@ BaseBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
+  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
+                                 ? TRTSERVER_MEMORY_GPU
+                                 : TRTSERVER_MEMORY_CPU;
+
   SetInputBuffer(
-      input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      input_name, expected_byte_sizes, payloads, content_memory_type, buffer);
 }
 
 void
@@ -634,12 +645,9 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
     const std::vector<int64_t>& shape, const size_t batch1_byte_size,
     std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
-  // [TODO] use the following statement. Right now we always create
-  // output tensor with default constructor that uses CPU allocator
-  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRTSERVER_MEMORY_CPU
-  //                                : TRTSERVER_MEMORY_GPU;
-  auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
+                                 ? TRTSERVER_MEMORY_GPU
+                                 : TRTSERVER_MEMORY_CPU;
   *cuda_copy |= SetFixedSizeOutputBuffer(
       output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
       content_memory_type, payloads);
@@ -746,6 +754,7 @@ BaseBackend::Context::Run(
   // expected by the model.
   std::vector<std::string> model_output_names;
   const char* output_names_cstr[required_outputs.size()];
+  bool prefer_gpu_outputs[required_outputs.size()];
   {
     size_t oidx = 0;
     for (const auto& name : required_outputs) {
@@ -756,6 +765,7 @@ BaseBackend::Context::Run(
       } else {
         output_names_cstr[oidx] = tn_itr->second.c_str();
       }
+      prefer_gpu_outputs[oidx] = (vgpu_device_ >= 0);
       oidx++;
     }
   }
@@ -775,7 +785,7 @@ BaseBackend::Context::Run(
     TRTISTF_TensorList* rtl;
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelRun(
         trtistf_model_.get(), *(input_tensors.release()),
-        required_outputs.size(), output_names_cstr, &rtl));
+        required_outputs.size(), output_names_cstr, prefer_gpu_outputs, &rtl));
     output_tensors.reset(rtl);
   }
 
