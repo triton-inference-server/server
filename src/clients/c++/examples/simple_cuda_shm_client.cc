@@ -29,12 +29,11 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include "src/clients/c++/examples/shm_utils.h"
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 
 #include <cuda_runtime_api.h>
-// CUDA utilities and system includes
-#include <helper_cuda.h>
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
@@ -80,68 +79,6 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
-int
-CreateSharedMemoryRegion(std::string shm_key, size_t batch_byte_size)
-{
-  // get shared memory region descriptor
-  int shm_fd = shm_open(shm_key.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (shm_fd == -1) {
-    std::cerr << "error: unable to get shared memory descriptor for "
-                 "shared-memory key '" +
-                     shm_key + "'"
-              << std::endl;
-    exit(1);
-  }
-  // extend shared memory object as by default it's initialized with size 0
-  int res = ftruncate(shm_fd, batch_byte_size);
-  if (res == -1) {
-    std::cerr << "error: unable to initialize shared-memory key '" + shm_key +
-                     "' to requested size " + std::to_string(batch_byte_size) +
-                     " bytes"
-              << std::endl;
-    exit(1);
-  }
-  return shm_fd;
-}
-
-void*
-MapSharedMemory(int shm_fd, size_t offset, size_t batch_byte_size)
-{
-  // map shared memory to process address space
-  void* shm_addr =
-      mmap(NULL, batch_byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
-  if (shm_addr == MAP_FAILED) {
-    std::cerr << "error: unable to process address space or shared-memory "
-                 "descriptor: " +
-                     std::to_string(shm_fd)
-              << std::endl;
-    exit(1);
-  }
-  return shm_addr;
-}
-
-void
-UnlinkSharedMemoryRegion(std::string shm_key)
-{
-  int shm_fd = shm_unlink(shm_key.c_str());
-  if (shm_fd == -1) {
-    std::cerr << "error: unable to unlink shared memory for key '" + shm_key +
-                     "'"
-              << std::endl;
-    exit(1);
-  }
-}
-
-void
-UnmapSharedMemory(void* shm_addr, size_t byte_size)
-{
-  int tmp_fd = munmap(shm_addr, byte_size);
-  if (tmp_fd == -1) {
-    std::cerr << "Unable to munmap shared memory region" << std::endl;
-    exit(1);
-  }
-}
-
 void
 CreateCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* input_d_ptr)
 {
@@ -157,10 +94,10 @@ CreateCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* input_d_ptr)
       (cudaIpcEventHandle_t*)&shm_cuda_rep->eventHandle, event));
   cudaIpcOpenMemHandle(
       (void**)&d_ptr, *(cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle,
-      cudaIpcMemLazyEnablePeerAccess)
+      cudaIpcMemLazyEnablePeerAccess));
 
-      // set device to default GPU - GPU0
-      checkCudaErrors(cudaSetDevice(DEVICE_ID));
+  // set device to default GPU - GPU0
+  checkCudaErrors(cudaSetDevice(DEVICE_ID));
 }
 
 void
@@ -182,10 +119,6 @@ ReadCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* output_data)
   checkCudaErrors(cudaMemcpy(
       (void*)output_data, (void*)d_ptr, 16 * sizeof(int),
       cudaMemcpyDeviceToHost));
-
-  // close IPC handle and free output data on GPU
-  checkCudaErrors(cudaIpcCloseMemHandle(d_ptr));
-  checkCudaErrors(cudaFree(d_ptr));
 
   // set device to default GPU - GPU0
   checkCudaErrors(cudaSetDevice(DEVICE_ID));
@@ -348,7 +281,20 @@ main(int argc, char** argv)
   ipcCUDA_t* output0_cuda_rep =
       (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size);
   ipcCUDA_t* output1_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, cuda_ipc_byte_size, cuda_ipc_byte_size);
+      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, cuda_ipc_byte_size,
+      cuda_ipc_byte_size);
+
+  // Create OUTPUT0 and OUTPUT1 on GPU
+  int *output0_d_ptr, *output1_d_ptr;
+
+  checkCudaErrors(cudaMalloc((void**)&output0_d_ptr, 16 * sizeof(int)));
+  checkCudaErrors(cudaMemset((void*)output0_d_ptr, 0, 16 * sizeof(int)));
+
+  checkCudaErrors(cudaMalloc((void**)&output1_d_ptr, 16 * sizeof(int)));
+  checkCudaErrors(cudaMemset((void*)output1_d_ptr, 0, 16 * sizeof(int)));
+
+  CreateCUDAIPCHandle(output0_cuda_rep, output0_d_ptr);
+  CreateCUDAIPCHandle(output1_cuda_rep, output1_d_ptr);
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
@@ -374,14 +320,16 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create Output0 and Output1 in CUDA Shared Memory and store handle in system shared memory. Initialize Input0 to unique
-  // integers and Input1 to all ones.
+  // Create Output0 and Output1 in CUDA Shared Memory and store handle in
+  // system shared memory. Initialize Input0 to unique integers and Input1 to
+  // all ones.
   shm_key = "/input_simple";
   int shm_fd_ip = CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
   ipcCUDA_t* input0_cuda_rep =
       (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size);
   ipcCUDA_t* input1_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size, cuda_ipc_byte_size);
+      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size,
+      cuda_ipc_byte_size);
 
   // Initialize data to load into shared memory region
   int input0_data[16];
@@ -393,14 +341,14 @@ main(int argc, char** argv)
 
   // copy INPUT0 and INPUT1 data onto GPU
   int *input0_d_ptr, *input1_d_ptr;
-  checkCudaErrors(cudaMalloc((void**)&d_ptr, 16 * sizeof(int)));
+  checkCudaErrors(cudaMalloc((void**)&input0_d_ptr, 16 * sizeof(int)));
   checkCudaErrors(cudaMemcpy(
-      (void*)d_ptr, (void*)input_data, 16 * sizeof(int),
+      (void*)input0_d_ptr, (void*)input0_data, 16 * sizeof(int),
       cudaMemcpyHostToDevice));
 
-  checkCudaErrors(cudaMalloc((void**)&d_ptr, 16 * sizeof(int)));
+  checkCudaErrors(cudaMalloc((void**)&input1_d_ptr, 16 * sizeof(int)));
   checkCudaErrors(cudaMemcpy(
-      (void*)d_ptr, (void*)input_data, 16 * sizeof(int),
+      (void*)input1_d_ptr, (void*)input1_data, 16 * sizeof(int),
       cudaMemcpyHostToDevice));
 
   CreateCUDAIPCHandle(input0_cuda_rep, input0_d_ptr);
@@ -484,9 +432,15 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // cleanup cuda shared memory
+  // Cleanup cuda IPC handle and free GPU memory
   checkCudaErrors(cudaIpcCloseMemHandle(input0_d_ptr));
+  checkCudaErrors(cudaFree(input0_d_ptr));
   checkCudaErrors(cudaIpcCloseMemHandle(input1_d_ptr));
+  checkCudaErrors(cudaFree(input1_d_ptr));
+  checkCudaErrors(cudaIpcCloseMemHandle(output0_d_ptr));
+  checkCudaErrors(cudaFree(output0_d_ptr));
+  checkCudaErrors(cudaIpcCloseMemHandle(output1_d_ptr));
+  checkCudaErrors(cudaFree(output1_d_ptr));
 
   // Cleanup system shared memory
   UnmapSharedMemory(input0_cuda_rep, cuda_ipc_byte_size * 2);

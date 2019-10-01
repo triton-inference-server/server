@@ -125,7 +125,17 @@ install(
 #
 # simple_shm_client
 #
-add_executable(simple_shm_client simple_shm_client.cc)
+set(
+  SIMPLE_SHM_SRCS
+  simple_shm_client.cc
+  shm_utils.cc
+)
+set(
+  SIMPLE_SHM_HDRS
+  shm_utils.h
+)
+add_executable(simple_shm_client simple_shm_client.cc
+  ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
 target_link_libraries(
   simple_shm_client
   PRIVATE TRTIS::request_static
@@ -135,6 +145,39 @@ install(
   TARGETS simple_shm_client
   RUNTIME DESTINATION bin
 )
+
+#
+# simple_cuda_shm_client
+#
+if(${TRTIS_ENABLE_CUDA_EXAMPLES})
+set(
+  SIMPLE_CUDA_SHM_SRCS
+  simple_cuda_shm_client.cc
+  shm_utils.cc
+)
+set(
+  SIMPLE_CUDA_SHM_HDRS
+  shm_utils.h
+)
+add_executable(simple_cuda_shm_client simple_cuda_shm_client.cc
+  ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
+target_link_libraries(
+  simple_cuda_shm_client
+  PRIVATE request_static
+  rt
+)
+
+target_include_directories(PRIVATE ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
+)
+install(
+  TARGETS simple_cuda_shm_client
+  RUNTIME DESTINATION bin
+)
+endif() # TRTIS_ENABLE_CUDA_EXAMPLES
 
 #
 # simple_sequence_client
