@@ -476,13 +476,17 @@ ConcurrencyManager::AsyncInfer(
     // released resources in the callback function.
     if (early_exit) {
       for (auto& ctx : ctxs) {
-        // lock on ctx's mutex so that the 'completed_requests' is synchronized
-        std::unique_lock<std::mutex> lk(ctx->mtx_);
-        cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
-          ctx->inflight_request_cnt_ -= ctx->completed_requests_.size();
-          ctx->completed_requests_.clear();
-          return (ctx->inflight_request_cnt_ == 0);
-        });
+        // Loop to ensure all the inflight requests have been completed.
+        while (ctx->inflight_request_cnt_ != 0) {
+          // lock on ctx's mutex so that the 'completed_requests' is
+          // synchronized
+          std::unique_lock<std::mutex> lk(ctx->mtx_);
+          cb_cv.wait_for(lk, std::chrono::milliseconds(500), [&ctx] {
+            ctx->inflight_request_cnt_ -= ctx->completed_requests_.size();
+            ctx->completed_requests_.clear();
+            return (ctx->inflight_request_cnt_ == 0);
+          });
+        }
       }
       // end loop
       break;
