@@ -28,6 +28,9 @@
 
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
+#include "tensorflow/core/common_runtime/gpu/gpu_id_utils.h"
+#include "tensorflow/core/common_runtime/gpu/gpu_mem_allocator.h"
+#include "tensorflow/core/common_runtime/gpu/gpu_process_state.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.pb.h"
@@ -39,6 +42,7 @@
 #include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
+#include "third_party/gpus/cuda/include/cuda_runtime_api.h"
 
 TRTISTF_Error* TRTISTF_ErrorNew(const std::string& str);
 TRTISTF_Shape* TRTISTF_ShapeNew(size_t rank, int64_t* dims);
@@ -259,7 +263,7 @@ class TensorImpl {
  public:
   TensorImpl(
       const char* name, TRTISTF_DataType dtype, TRTISTF_Shape* shape,
-      const tensorflow::TensorShape& tfshape);
+      const tensorflow::TensorShape& tfshape, const int tf_gpu_id);
   TensorImpl(tensorflow::Tensor&& tftensor);
   ~TensorImpl();
 
@@ -271,6 +275,7 @@ class TensorImpl {
 
   char* Base() const { return nonstring_base_; }
   size_t ByteSize() const { return nonstring_byte_size_; }
+  bool IsGPUTensor() const { return gpu_tensor_; }
 
   const std::string& String(size_t idx) const;
   void SetString(size_t idx, const std::string& str);
@@ -285,15 +290,26 @@ class TensorImpl {
   tensorflow::Tensor tftensor_;
   char* nonstring_base_;
   size_t nonstring_byte_size_;
+  bool gpu_tensor_;
 };
 
 
 TensorImpl::TensorImpl(
     const char* name, TRTISTF_DataType dtype, TRTISTF_Shape* shape,
-    const tensorflow::TensorShape& tfshape)
-    : name_(name), dtype_(dtype), shape_(shape),
-      tftensor_(ConvertDataType(dtype), tfshape)
+    const tensorflow::TensorShape& tfshape, const int tf_gpu_id)
+    : name_(name), dtype_(dtype), shape_(shape)
 {
+  // Only request for GPU allocator for non-string data type
+  auto a = ((tf_gpu_id >= 0) && (dtype != TRTISTF_TYPE_STRING))
+               ? nullptr
+               : tensorflow::GPUProcessState::singleton()->GetGPUAllocator(
+                     tensorflow::GPUOptions(), tensorflow::TfGpuId(tf_gpu_id),
+                     1 << 28 /* total_memory_size */);
+  if (a == nullptr) {
+    tftensor_ = tensorflow::Tensor(ConvertDataType(dtype), tfshape);
+  } else {
+    tftensor_ = tensorflow::Tensor(a, ConvertDataType(dtype), tfshape);
+  }
   Init();
 }
 
@@ -314,6 +330,7 @@ TensorImpl::Init()
 {
   nonstring_base_ = nullptr;
   nonstring_byte_size_ = 0;
+  gpu_tensor_ = false;
 
   // Implement differently for string and non-string
   if (tftensor_.dtype() != tensorflow::DT_STRING) {
@@ -322,6 +339,12 @@ TensorImpl::Init()
          tensorflow::DataTypeSize(tftensor_.dtype())});
     nonstring_base_ = static_cast<char*>(flat.data());
     nonstring_byte_size_ = flat.size();
+
+    cudaPointerAttributes attributes;
+    cudaError_t err = cudaPointerGetAttributes(&attributes, nonstring_base_);
+    gpu_tensor_ =
+        ((err == cudaSuccess) &&
+         (attributes.memoryType == cudaMemoryTypeDevice));
   }
 }
 
@@ -358,13 +381,18 @@ class ModelImpl {
 
   TRTISTF_Error* Run(
       TRTISTF_TensorList* input_tensors,
-      const std::vector<std::string>& output_names,
+      const std::vector<std::pair<std::string, bool>>& output_infos,
       TRTISTF_TensorList** output_tensors);
 
  private:
+  // Return the device name that the session is on, if multiple device names
+  // are present or the session is on CPU, return empty string;
+  std::string TFGPUDeviceName();
+
   const std::string model_name_;
   std::unique_ptr<tensorflow::SavedModelBundle> bundle_;
   tensorflow::Session* session_;
+  std::string device_name_;
   TRTISTF_IOList* inputs_;
   TRTISTF_IOList* outputs_;
 };
@@ -377,6 +405,7 @@ ModelImpl::ModelImpl(
       outputs_(outputs)
 {
   session_ = bundle_->session.release();
+  device_name_ = TFGPUDeviceName();
 }
 
 ModelImpl::ModelImpl(
@@ -402,24 +431,63 @@ ModelImpl::~ModelImpl()
 TRTISTF_Error*
 ModelImpl::Run(
     TRTISTF_TensorList* input_tensors,
-    const std::vector<std::string>& output_names,
+    const std::vector<std::pair<std::string, bool>>& output_infos,
     TRTISTF_TensorList** output_tensors)
 {
-  std::vector<std::pair<std::string, tensorflow::Tensor>> tfinputs;
+  std::vector<tensorflow::Tensor> tfinputs;
 
+  tensorflow::CallableOptions opts;
   for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
        itr = itr->next_) {
     if (itr->tensor_ != nullptr) {
       TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
-      tfinputs.emplace_back(
-          std::make_pair(tensor->Name(), std::move(tensor->TFTensor())));
+      tfinputs.emplace_back(std::move(tensor->TFTensor()));
+      opts.add_feed(tensor->Name());
+      // The tensor should be on GPU memory
+      if (!device_name_.empty()) {
+        if (tensor->IsGPUTensor()) {
+          opts.mutable_feed_devices()->insert({tensor->Name(), device_name_});
+        }
+      } else if (tensor->IsGPUTensor()) {
+        return TRTISTF_ErrorNew(
+            "failed to determine the GPU device for input '" + tensor->Name() +
+            "'");
+      }
+    }
+  }
+  TRTISTF_TensorListDelete(input_tensors);
+
+  for (const auto& output_info : output_infos) {
+    opts.add_fetch(output_info.first);
+    // Specify output to be on GPU memory if possible
+    if (!device_name_.empty() && output_info.second) {
+      for (auto node = outputs_; node != nullptr; node = node->next_) {
+        const auto* name = (node->io_->inmodel_name_ != nullptr)
+                               ? node->io_->inmodel_name_
+                               : node->io_->name_;
+        if ((output_info.first == name) &&
+            (node->io_->data_type_ != TRTISTF_TYPE_STRING)) {
+          opts.mutable_fetch_devices()->insert(
+              {output_info.first, device_name_});
+          break;
+        }
+      }
     }
   }
 
-  TRTISTF_TensorListDelete(input_tensors);
+  // CallableOptions.fetch_skip_sync = false is not yet implemented, we
+  // will have to synchronize after the callable is run.
+  opts.set_fetch_skip_sync(true);
 
+  tensorflow::Session::CallableHandle feed_fetch_location;
+  RETURN_IF_TF_ERROR(session_->MakeCallable(opts, &feed_fetch_location));
+
+  tensorflow::RunMetadata meta_data;
   std::vector<tensorflow::Tensor> tfoutputs;
-  RETURN_IF_TF_ERROR(session_->Run(tfinputs, output_names, {}, &tfoutputs));
+  RETURN_IF_TF_ERROR(session_->RunCallable(
+      feed_fetch_location, tfinputs, &tfoutputs, &meta_data));
+
+  RETURN_IF_TF_ERROR(session_->ReleaseCallable(feed_fetch_location));
 
   *output_tensors = nullptr;
   for (std::vector<tensorflow::Tensor>::reverse_iterator ri =
@@ -430,7 +498,26 @@ ModelImpl::Run(
     *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
   }
 
+  // [TODO] Device::Sync() (What if other contexts are on the same device?)
+
   return nullptr;
+}
+
+std::string
+ModelImpl::TFGPUDeviceName()
+{
+  std::string device_name;
+  std::vector<tensorflow::DeviceAttributes> devices;
+  session_->ListDevices(&devices);
+  for (const auto& d : devices) {
+    if (d.device_type() == "GPU" || d.device_type() == "gpu") {
+      if (!device_name.empty()) {
+        return "";
+      }
+      device_name = d.name();
+    }
+  }
+  return device_name;
 }
 
 }  // namespace
@@ -568,13 +655,13 @@ TRTISTF_TensorListDelete(TRTISTF_TensorList* list)
 TRTISTF_Tensor*
 TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
-    int64_t* shape_dims)
+    int64_t* shape_dims, int tf_gpu_id)
 {
   TRTISTF_Shape* shape = TRTISTF_ShapeNew(shape_rank, shape_dims);
   tensorflow::TensorShape tfshape;
   ConvertShape(shape, &tfshape);
 
-  TensorImpl* tensor = new TensorImpl(name, dtype, shape, tfshape);
+  TensorImpl* tensor = new TensorImpl(name, dtype, shape, tfshape, tf_gpu_id);
   // If data type is non-string, make sure TensorImpl contains valid TF tensor
   if (dtype != TRTISTF_DataType::TRTISTF_TYPE_STRING) {
     // tensor's byte size is set to value required and it is independent to
@@ -613,6 +700,13 @@ TRTISTF_TensorData(TRTISTF_Tensor* tensor)
 {
   TensorImpl* t = reinterpret_cast<TensorImpl*>(tensor);
   return t->Base();
+}
+
+bool
+TRTISTF_TensorIsGPUTensor(TRTISTF_Tensor* tensor)
+{
+  TensorImpl* t = reinterpret_cast<TensorImpl*>(tensor);
+  return t->IsGPUTensor();
 }
 
 size_t
@@ -894,14 +988,15 @@ TRTISTF_ModelOutputs(TRTISTF_Model* model)
 TRTISTF_Error*
 TRTISTF_ModelRun(
     TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
-    const char** output_names, TRTISTF_TensorList** output_tensors)
+    const char** output_names, const bool* prefer_gpu_tensors,
+    TRTISTF_TensorList** output_tensors)
 {
   ModelImpl* m = reinterpret_cast<ModelImpl*>(model);
 
-  std::vector<std::string> output_tensor_names;
+  std::vector<std::pair<std::string, bool>> output_tensor_infos;
   for (size_t i = 0; i < num_outputs; ++i) {
-    output_tensor_names.emplace_back(output_names[i]);
+    output_tensor_infos.emplace_back(output_names[i], prefer_gpu_tensors[i]);
   }
 
-  return m->Run(input_tensors, output_tensor_names, output_tensors);
+  return m->Run(input_tensors, output_tensor_infos, output_tensors);
 }

@@ -161,7 +161,7 @@ TRTISTF_EXPORT void TRTISTF_TensorListDelete(TRTISTF_TensorList* list);
 // Return nullptr if failed to create the tensor.
 TRTISTF_EXPORT TRTISTF_Tensor* TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
-    int64_t* shape_dims);
+    int64_t* shape_dims, int tf_gpu_id);
 
 // Return a tensor's datatype.
 TRTISTF_EXPORT TRTISTF_DataType TRTISTF_TensorDataType(TRTISTF_Tensor* tensor);
@@ -177,6 +177,9 @@ TRTISTF_Shape* TRTISTF_TensorShape(TRTISTF_Tensor* tensor);
 // Get the base of the tensor data. Defined only for non-string
 // types.. bad things might happen if called for string type tensor.
 TRTISTF_EXPORT char* TRTISTF_TensorData(TRTISTF_Tensor* tensor);
+
+// Check whether the memory type of the tensor data is GPU.
+TRTISTF_EXPORT bool TRTISTF_TensorIsGPUTensor(TRTISTF_Tensor* tensor);
 
 // Get the size, in bytes, of the tensor data. Defined only for
 // non-string types.. bad things might happen if called for string
@@ -244,7 +247,8 @@ TRTISTF_EXPORT TRTISTF_IOList* TRTISTF_ModelOutputs(TRTISTF_Model* model);
 // TRTISTF_TensorListDelete.
 TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelRun(
     TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
-    const char** output_names, TRTISTF_TensorList** output_tensors);
+    const char** output_names, const bool* prefer_gpu_tensors,
+    TRTISTF_TensorList** output_tensors);
 
 #ifdef __cplusplus
 }  // extern "C"
