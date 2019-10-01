@@ -170,7 +170,7 @@ ShowResults(
   var_us /= duration_ns.size();
   uint64_t stddev_us = std::sqrt(var_us);
 
-  std::cout << std::endl << name << " (" << protocol << ")" << std::endl;
+  std::cout << name << " (" << protocol << ")" << std::endl;
   std::cout << "Total time: " << (sum_us / 1000.0) << " ms" << std::endl;
   std::cout << "Mean time: " << (mean_us / 1000.0) << " ms" << std::endl;
   std::cout << "Stddev: " << (stddev_us / 1000.0) << " ms" << std::endl;
