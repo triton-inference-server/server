@@ -39,7 +39,8 @@ SharedMemoryBlockManager::~SharedMemoryBlockManager()
 TRTSERVER_Error*
 SharedMemoryBlockManager::Create(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    const int kind)
 {
   *smb = nullptr;
 
@@ -51,7 +52,7 @@ SharedMemoryBlockManager::Create(
   }
 
   RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockCpuNew(
-      smb, name.c_str(), shm_key.c_str(), offset, byte_size));
+      smb, name.c_str(), shm_key.c_str(), offset, byte_size, kind));
   blocks_.emplace(name, *smb);
 
   return nullptr;  // success

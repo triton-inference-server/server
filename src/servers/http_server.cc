@@ -643,11 +643,12 @@ HTTPAPIServer::HandleSharedMemoryControl(
     }
   }
 
-  re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
+  re2::RE2 register_regex_(
+      R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+)/([-+]?[0-9]+))");
   re2::RE2 unregister_regex_(R"(/([^/]+))");
 
   std::string action_type_str, remaining, name, shm_key;
-  std::string offset_str, byte_size_str;
+  std::string offset_str, byte_size_str, kind_str;
   if ((sharedmemorycontrol_uri.empty()) ||
       (!RE2::FullMatch(
           sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
@@ -664,7 +665,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
       if (action_type_str == "register" &&
           (!RE2::FullMatch(
               remaining, register_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str))) {
+              &byte_size_str, &kind_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       }
@@ -680,13 +681,14 @@ HTTPAPIServer::HandleSharedMemoryControl(
 
   size_t offset = std::atoll(offset_str.c_str());
   size_t byte_size = std::atoll(byte_size_str.c_str());
+  int kind = std::atoll(kind_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
   TRTSERVER_SharedMemoryBlock* smb = nullptr;
 
   if (action_type_str == "register") {
     err = smb_manager_->Create(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size);
+        &smb, name.c_str(), shm_key.c_str(), offset, byte_size, kind);
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }

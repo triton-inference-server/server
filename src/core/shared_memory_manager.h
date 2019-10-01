@@ -32,7 +32,16 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
+#include <cuda_runtime_api.h>
+
 namespace nvidia { namespace inferenceserver {
+
+typedef struct ipcCUDA_st {
+  int device;
+  cudaIpcEventHandle_t eventHandle;
+  cudaIpcMemHandle_t memHandle;
+  size_t byte_size;
+} ipcCUDA_t;
 
 class InferenceServer;
 class InferenceBackend;
@@ -47,9 +56,10 @@ class SharedMemoryManager {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr)
+        void* mapped_addr, void* cuda_ipc_addr, int kind)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr)
+          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
+          cuda_ipc_addr_(cuda_ipc_addr), kind_(kind)
     {
     }
 
@@ -59,6 +69,8 @@ class SharedMemoryManager {
     size_t byte_size_;
     int shm_fd_;
     void* mapped_addr_;
+    void* cuda_ipc_addr_;
+    int kind_;
   };
 
   using SharedMemoryStateMap =
@@ -81,7 +93,7 @@ class SharedMemoryManager {
   /// memory region that has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size);
+      const size_t byte_size, const int kind);
 
   /// Unregister a specified shared memory region if registered else do nothing
   /// and return success.

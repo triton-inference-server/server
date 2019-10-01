@@ -27,6 +27,10 @@
 
 #include "src/core/shared_memory_manager.h"
 
+#ifdef TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -35,9 +39,12 @@
 #include <deque>
 #include <exception>
 #include <future>
+
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.h"
+
+#define DEFAULT_GPU_ID 0
 
 namespace nvidia { namespace inferenceserver {
 
@@ -98,12 +105,40 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
   return Status::Success;
 }
 
+#ifdef TRTIS_ENABLE_GPU
+void
+OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr, int* device_id)
+{
+  cudaEvent_t event;
+
+  *device_id = shm_cuda_rep->device;
+  cudaError_t err = cudaSetDevice(*device_id);
+
+  // get cuda event and synchronize
+  err = cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle);
+  err = cudaEventSynchronize(event);
+
+  // allocate data on the gpu and read IPC data into it
+  err = cudaMalloc(data_ptr, shm_cuda_rep->byte_size);
+  if (err != cudaSuccess) {
+    LOG_ERROR << "failed to allocate GPU memory with byte size"
+              << shm_cuda_rep->byte_size << ": "
+              << std::string(cudaGetErrorString(err));
+  }
+  err = cudaIpcGetMemHandle(
+      (cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle, *data_ptr);
+
+  // set device to default GPU
+  err = cudaSetDevice(DEFAULT_GPU_ID);
+}
+#endif  // TRTIS_ENABLE_GPU
+
 }  // namespace
 
 Status
 SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const size_t byte_size, const int kind)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
@@ -117,8 +152,8 @@ SharedMemoryManager::RegisterSharedMemory(
   }
 
   // register (or re-register)
-  void* mapped_addr;
-  int shm_fd = -1;
+  void *mapped_addr, *cuda_ipc_addr;
+  int shm_fd = -1, device_id;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
@@ -141,9 +176,21 @@ SharedMemoryManager::RegisterSharedMemory(
         "failed to register shared memory region '" + name + "'");
   }
 
+  if (kind != -1) {
+    if (byte_size % sizeof(ipcCUDA_t) != 0) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "shared memory region '" + name +
+              "' must be a multiple of the size of cuda IPC representation");
+    }
+    ipcCUDA_t* shm_cuda_rep = reinterpret_cast<ipcCUDA_t*>(mapped_addr);
+    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr, &device_id);
+  }
+
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                name, shm_key, offset, byte_size, shm_fd, mapped_addr))));
+                name, shm_key, offset, byte_size, shm_fd, mapped_addr,
+                cuda_ipc_addr, kind))));
 
   return Status::Success;
 }

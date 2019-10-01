@@ -121,13 +121,14 @@ class TrtServerSharedMemoryBlock {
  public:
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-      const size_t offset, const size_t byte_size);
+      const size_t offset, const size_t byte_size, const int kind);
 
   TRTSERVER_Memory_Type Type() const { return type_; }
   const std::string& Name() const { return name_; }
   const std::string& ShmKey() const { return shm_key_; }
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
+  size_t Kind() const { return kind_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
@@ -135,13 +136,14 @@ class TrtServerSharedMemoryBlock {
   const std::string shm_key_;
   const size_t offset_;
   const size_t byte_size_;
+  const int kind_;
 };
 
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-    const size_t offset, const size_t byte_size)
+    const size_t offset, const size_t byte_size, const int kind)
     : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
-      byte_size_(byte_size)
+      byte_size_(byte_size), kind_(kind)
 {
 }
 
@@ -507,11 +509,12 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size)
+    const char* shm_key, const size_t offset, const size_t byte_size,
+    const int kind)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, kind));
   return nullptr;  // Success
 }
 
@@ -1151,7 +1154,8 @@ TRTSERVER_ServerRegisterSharedMemory(
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
-      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
+      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize(),
+      lsmb->Kind()));
 
   return nullptr;  // success
 }

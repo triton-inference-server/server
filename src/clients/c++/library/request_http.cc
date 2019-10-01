@@ -596,7 +596,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       bool verbose);
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size) override;
+      const size_t byte_size, const int kind) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -605,7 +605,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
+      const std::string& shm_key, const size_t offset, const size_t byte_size,
+      const int kind);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
   // URL for control endpoint on inference server.
@@ -647,22 +648,22 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const size_t byte_size, const int kind)
 {
-  return SendRequest("register", name, shm_key, offset, byte_size);
+  return SendRequest("register", name, shm_key, offset, byte_size, kind);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest("unregister", name, "", 0, 0);
+  return SendRequest("unregister", name, "", 0, 0, 0);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("unregisterall", "", "", 0, 0);
+  return SendRequest("unregisterall", "", "", 0, 0, 0);
 }
 
 Error
@@ -671,7 +672,7 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 {
   shm_status->Clear();
 
-  Error err = SendRequest("status", "", "", 0, 0);
+  Error err = SendRequest("status", "", "", 0, 0, 0);
   if (err.IsOk()) {
     if (!shm_status->ParseFromString(response_)) {
       return Error(
@@ -689,7 +690,8 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    const int kind)
 {
   response_.clear();
   request_status_.Clear();
@@ -708,7 +710,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   std::string full_url = url_ + "/" + action_str;
   if (action_str == "register") {
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
-                "/" + std::to_string(byte_size);
+                "/" + std::to_string(byte_size) + "/" + std::to_string(kind);
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }

@@ -305,7 +305,7 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size) override;
+      const size_t byte_size, const int kind) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
@@ -327,7 +327,7 @@ SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
 Error
 SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const size_t byte_size, const int kind)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
@@ -339,6 +339,7 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   shm_id->set_shared_memory_key(shm_key);
   rshm_region->set_offset(offset);
   rshm_region->set_byte_size(byte_size);
+  rshm_region->set_kind(kind);
 
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);
