@@ -56,10 +56,7 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = ("custom", "savedmodel", "graphdef", "netdef", "plan", "onnx")
 # Add ensemble to the _trials
-if TEST_SHARED_MEMORY:
-    ENSEMBLE_PREFIXES = []
-else:
-    ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
+ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 res = []
 for trial in _trials:
     res.append(trial)
@@ -153,24 +150,29 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
-                    input_info = input_list
-                    output_info = InferContext.ResultFormat.RAW
-
                     if config[3]:
-                        input_byte_size = input_list[0].size * input_list[0].itemsize * batch_size
-                        output_byte_size = np.dtype(input_dtype).itemsize
+                        if input_dtype == np.object:
+                            input_list_tmp = iu._prepend_string_size(input_list)
+                        else:
+                            input_list_tmp = input_list
+
+                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                        output_byte_size = np.dtype(input_dtype).itemsize + 2
                         # create and register shared memory region for inputs and outputs
                         shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
                         shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
                         # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle, input_list)
+                        shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                         shared_memory_ctx.unregister(shm_ip_handle)
                         shared_memory_ctx.register(shm_ip_handle)
                         shared_memory_ctx.unregister(shm_op_handle)
                         shared_memory_ctx.register(shm_op_handle)
 
-                        input_info = shm_ip_handle
+                        input_info = (shm_ip_handle, tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle)
+                    else:
+                        input_info = input_list
+                        output_info = InferContext.ResultFormat.RAW
 
                     start_ms = int(round(time.time() * 1000))
                     if "libtorch" not in trial:
@@ -305,12 +307,14 @@ class SequenceBatcherTest(unittest.TestCase):
                             in0 = np.full(tensor_shape, value, dtype=input_dtype)
                         input_list.append(in0)
 
-                    input_info = input_list
-                    output_info = InferContext.ResultFormat.RAW
-
                     if config[3]:
-                        input_byte_size = input_list[0].nbytes * batch_size
-                        output_byte_size = np.dtype(input_dtype).itemsize
+                        if input_dtype == np.object:
+                            input_list_tmp = iu._prepend_string_size(input_list)
+                        else:
+                            input_list_tmp = input_list
+
+                        input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
+                        output_byte_size = np.dtype(input_dtype).itemsize + 2
                         # create and register shared memory region for inputs and outputs
                         if shm_region_names is None:
                             shm_ip_handle.append(shm.create_shared_memory_region(
@@ -325,14 +329,17 @@ class SequenceBatcherTest(unittest.TestCase):
                                 shm_region_names[1]+str(i)+'_data', '/'+shm_region_names[1]+str(i),
                                 output_byte_size))
                         # copy data into shared memory region for input values
-                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list)
+                        shm.set_shared_memory_region(shm_ip_handle[-1], input_list_tmp)
                         shared_memory_ctx.unregister(shm_ip_handle[-1])
                         shared_memory_ctx.register(shm_ip_handle[-1])
                         shared_memory_ctx.unregister(shm_op_handle[-1])
                         shared_memory_ctx.register(shm_op_handle[-1])
 
-                        input_info = shm_ip_handle[-1]
+                        input_info = (shm_ip_handle[-1], tensor_shape)
                         output_info = (InferContext.ResultFormat.RAW, shm_op_handle[-1])
+                    else:
+                        input_info = input_list
+                        output_info = InferContext.ResultFormat.RAW
 
                     if pre_delay_ms is not None:
                         time.sleep(pre_delay_ms / 1000.0)
@@ -429,7 +436,7 @@ class SequenceBatcherTest(unittest.TestCase):
         # Get the datatype to use based on what models are available (see test.sh)
         if ("plan" in trial) or ("savedmodel" in trial):
             return np.float32
-        if ("graphdef" in trial) and (not TEST_SHARED_MEMORY):
+        if ("graphdef" in trial):
             return np.dtype(object)
         return np.int32
 
