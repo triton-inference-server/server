@@ -980,20 +980,27 @@ class InferContext:
         # specify an input directly as an array instead of as a list
         # containing one array.
         # An input's data may be specified as a list of numpy arrays,
-        # or as a shared memory handle.
+        # or as a shared memory handle or as a tuple of a shared memory
+        # handle and the shape of the input tensor.
         for inp_name, inp in inputs.items():
             if (not isinstance(inp, (list, tuple))) and (type(inp) != c_void_p):
                 _raise_error("input '" + inp_name +
                              "' values must be specified as a list of numpy arrays" \
-                             " or as a single c_void_p representing the shared memory handle")
+                             " or as a single c_void_p (representing the shared memory handle)" \
+                             " or as a tuple of c_void_p (representing the shared memory handle)" \
+                             " and list (representing the shape of the input tensor)")
             if type(inp) != c_void_p:
+                # Skip further checks for this input if it is a tuple of shared memory and shape
+                # of the form (c_void_p, list)
                 if (len(inp) == 2) and (type(inp[0]) == c_void_p) and (isinstance(inp[1], (list, tuple))):
                     continue
                 for ip in inp:
                     if not isinstance(ip, (np.ndarray, tuple)):
                         _raise_error("input '" + inp_name +
                                      "' values must be specified as a list of numpy arrays" \
-                                     " or as a single c_void_p representing the shared memory handle")
+                             " or as a single c_void_p (representing the shared memory handle)" \
+                             " or as a tuple of c_void_p (representing the shared memory handle)" \
+                             " and list (representing the shape of the input tensor)")
         # Set run options using formats specified in 'outputs'
         # An output format may be may be specified as a RAW or (CLASS, cnt)
         # or as a (RAW, shared_memory_handle).
