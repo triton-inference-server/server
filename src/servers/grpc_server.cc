@@ -665,15 +665,14 @@ InferResponseAlloc(
     if (shm_map != nullptr) {
       const auto& pr = shm_map->find(tensor_name);
       if (pr != shm_map->end()) {
-        // If the output is in shared memory then just need to check
-        // that the requested size matches what is expected by the
-        // request.
-        if (byte_size != pr->second.byte_size_) {
+        // If the output is in shared memory then check that the expected
+        // requested buffer size is at least the byte size of the output.
+        if (byte_size > pr->second.byte_size_) {
           return TRTSERVER_ErrorNew(
               TRTSERVER_ERROR_INTERNAL,
               std::string(
                   "for output " + std::string(tensor_name) +
-                  " expected requested buffer size to be " +
+                  " expected requested buffer size to be at least" +
                   std::to_string(pr->second.byte_size_) + " bytes but got " +
                   std::to_string(byte_size) + " in actual request")
                   .c_str());

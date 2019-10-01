@@ -335,12 +335,13 @@ HTTPAPIServer::ResponseAlloc(
 
     auto pr = output_shm_map.find(tensor_name);
     if (pr != output_shm_map.end()) {
-      // check for byte size mismatch
-      if (byte_size != pr->second.second) {
+      // If the output is in shared memory then check that the expected buffer
+      // size is at least the byte size of the output.
+      if (byte_size > pr->second.second) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
             std::string(
-                "expected buffer size to be " +
+                "expected buffer size to be at least " +
                 std::to_string(pr->second.second) + " bytes but gets " +
                 std::to_string(byte_size) + " bytes in output tensor")
                 .c_str());

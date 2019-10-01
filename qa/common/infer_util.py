@@ -55,6 +55,23 @@ def _range_repr_dtype(dtype):
         return np.int32
     return dtype
 
+def _prepend_string_size(input_values):
+    input_list = []
+    for input_value in input_values:
+        flattened = bytes()
+        for obj in np.nditer(input_value, flags=["refs_ok"], order='C'):
+            # If directly passing bytes to STRING type,
+            # don't convert it to str as Python will encode the
+            # bytes which may distort the meaning
+            if obj.dtype.type == np.bytes_:
+                s = bytes(obj)
+            else:
+                s = str(obj).encode('utf-8')
+            flattened += struct.pack("<I", len(s))
+            flattened += s
+        input_list.append(np.asarray(flattened))
+    return input_list
+
 # Perform inference using an "addsum" type verification backend.
 def infer_exact(tester, pf, tensor_shape, batch_size,
                 input_dtype, output0_dtype, output1_dtype,
@@ -147,14 +164,31 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             input1_list.append(in1)
 
         if config[3]:
-            input0_byte_size = input0_list[0].size * input0_list[0].itemsize * batch_size
-            output0_byte_size = expected0_list[0].size * expected0_list[0].itemsize * batch_size
-            output1_byte_size = expected1_list[0].size * expected1_list[0].itemsize * batch_size
+            # prepend size of string to string input string data
+            if input_dtype == np.object:
+                input0_list = _prepend_string_size(input0_list)
+                input1_list = _prepend_string_size(input1_list)
+
+            input0_byte_size = sum([i0.nbytes for i0 in input0_list])
+            input1_byte_size = sum([i1.nbytes for i1 in input1_list])
+
+            if output0_dtype == np.object:
+                expected0_list_tmp = _prepend_string_size(expected0_list)
+                output0_byte_size = sum([e0.nbytes for e0 in expected0_list_tmp])
+            else:
+                output0_byte_size = sum([e0.nbytes for e0 in expected0_list])
+
+            if output1_dtype == np.object:
+                expected1_list_tmp = _prepend_string_size(expected1_list)
+                output1_byte_size = sum([e1.nbytes for e1 in expected1_list_tmp])
+            else:
+                output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
+
 
             # create and register shared memory region for inputs and outputs
             if shm_region_names is None:
                 shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input0_byte_size)
+                shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
                 if "OUTPUT0" in outputs:
                     shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
                 if "OUTPUT1" in outputs:
@@ -163,7 +197,7 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                 shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
                                                                 '/'+shm_region_names[0], input0_byte_size)
                 shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                '/'+shm_region_names[1], input0_byte_size)
+                                                                '/'+shm_region_names[1], input1_byte_size)
                 i = 0
                 if "OUTPUT0" in outputs:
                     shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
@@ -178,11 +212,15 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             shm.set_shared_memory_region(shm_ip1_handle, input1_list)
 
             shared_memory_ctx = SharedMemoryControlContext(config[0], config[1], verbose=True)
+            shared_memory_ctx.unregister(shm_ip0_handle)
+            shared_memory_ctx.unregister(shm_ip1_handle)
             shared_memory_ctx.register(shm_ip0_handle)
             shared_memory_ctx.register(shm_ip1_handle)
             if "OUTPUT0" in outputs:
+                shared_memory_ctx.unregister(shm_op0_handle)
                 shared_memory_ctx.register(shm_op0_handle)
             if "OUTPUT1" in outputs:
+                shared_memory_ctx.unregister(shm_op1_handle)
                 shared_memory_ctx.register(shm_op1_handle)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
@@ -220,7 +258,8 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
                            verbose=True)
         if config[3]:
             results = ctx.run(
-                    { INPUT0 : shm_ip0_handle, INPUT1 : shm_ip1_handle },
+                    { INPUT0 : (shm_ip0_handle, tensor_shape),
+                    INPUT1 : (shm_ip1_handle, tensor_shape) },
                     output_req, batch_size)
         else:
             results = ctx.run(

@@ -168,29 +168,31 @@ class InferTest(unittest.TestCase):
         self._full_exact(np.int32, np.float16, np.int16,
                          output0_raw=True, output1_raw=True, swap=False)
 
-    if not TEST_SHARED_MEMORY:
-        def test_raw_oii(self):
-            self._full_exact(np_dtype_string, np.int32, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ooo(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_oio(self):
-            self._full_exact(np_dtype_string, np.int32, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ooi(self):
-            self._full_exact(np_dtype_string, np_dtype_string, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ioo(self):
-            self._full_exact(np.int32, np_dtype_string, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_iio(self):
-            self._full_exact(np.int32, np.int32, np_dtype_string,
-                             output0_raw=True, output1_raw=True, swap=False)
-        def test_raw_ioi(self):
-            self._full_exact(np.int32, np_dtype_string, np.int32,
-                             output0_raw=True, output1_raw=True, swap=False)
 
+    def test_raw_ooo(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oii(self):
+        self._full_exact(np_dtype_string, np.int32, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_oio(self):
+        self._full_exact(np_dtype_string, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ooi(self):
+        self._full_exact(np_dtype_string, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ioo(self):
+        self._full_exact(np.int32, np_dtype_string, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_iio(self):
+        self._full_exact(np.int32, np.int32, np_dtype_string,
+                         output0_raw=True, output1_raw=True, swap=False)
+    def test_raw_ioi(self):
+        self._full_exact(np.int32, np_dtype_string, np.int32,
+                         output0_raw=True, output1_raw=True, swap=False)
+
+    # shared memory does not support class output
+    if not TEST_SHARED_MEMORY:
         def test_class_bbb(self):
             self._full_exact(np.int8, np.int8, np.int8,
                              output0_raw=False, output1_raw=False, swap=True)
@@ -229,129 +231,129 @@ class InferTest(unittest.TestCase):
             self._full_exact(np.int32, np.float32, np.float32,
                              output0_raw=False, output1_raw=True, swap=False)
 
-        def test_raw_version_latest_1(self):
-            input_size = 16
-            tensor_shape = (input_size,)
+    def test_raw_version_latest_1(self):
+        input_size = 16
+        tensor_shape = (input_size,)
 
-            # There are 3 versions of graphdef_int8_int8_int8 but
-            # only version 3 should be available
-            for platform in ('graphdef', 'savedmodel'):
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.int8, np.int8, np.int8,
-                                   model_version=1, swap=False)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.int8, np.int8, np.int8,
-                                   model_version=2, swap=True)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
+        # There are 3 versions of graphdef_int8_int8_int8 but
+        # only version 3 should be available
+        for platform in ('graphdef', 'savedmodel'):
+            try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.int8, np.int8, np.int8,
-                               model_version=3, swap=True)
-
-        def test_raw_version_latest_2(self):
-            input_size = 16
-            tensor_shape = (input_size,)
-
-            # There are 3 versions of graphdef_int16_int16_int16 but only
-            # versions 2 and 3 should be available
-            for platform in ('graphdef', 'savedmodel'):
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.int16, np.int16, np.int16,
-                                   model_version=1, swap=False)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int16, np.int16, np.int16,
-                               model_version=2, swap=True)
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int16, np.int16, np.int16,
-                               model_version=3, swap=True)
-
-        def test_raw_version_all(self):
-            input_size = 16
-            tensor_shape = (input_size,)
-
-            # There are 3 versions of *_int32_int32_int32 and all should
-            # be available.
-            for platform in ('graphdef', 'savedmodel', 'netdef'):
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int32, np.int32, np.int32,
                                model_version=1, swap=False)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
+
+            try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int32, np.int32, np.int32,
+                               np.int8, np.int8, np.int8,
                                model_version=2, swap=True)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
+
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int8, np.int8, np.int8,
+                           model_version=3, swap=True)
+
+    def test_raw_version_latest_2(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # There are 3 versions of graphdef_int16_int16_int16 but only
+        # versions 2 and 3 should be available
+        for platform in ('graphdef', 'savedmodel'):
+            try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.int32, np.int32, np.int32,
-                               model_version=3, swap=True)
+                               np.int16, np.int16, np.int16,
+                               model_version=1, swap=False)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
 
-        def test_raw_version_specific_1(self):
-            input_size = 16
-            tensor_shape = (input_size,)
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int16, np.int16, np.int16,
+                           model_version=2, swap=True)
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int16, np.int16, np.int16,
+                           model_version=3, swap=True)
 
-            # There are 3 versions of *_float16_float16_float16 but only
-            # version 1 should be available.
-            for platform in ('graphdef', 'savedmodel'):
+    def test_raw_version_all(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # There are 3 versions of *_int32_int32_int32 and all should
+        # be available.
+        for platform in ('graphdef', 'savedmodel', 'netdef'):
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int32, np.int32, np.int32,
+                           model_version=1, swap=False)
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int32, np.int32, np.int32,
+                           model_version=2, swap=True)
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.int32, np.int32, np.int32,
+                           model_version=3, swap=True)
+
+    def test_raw_version_specific_1(self):
+        input_size = 16
+        tensor_shape = (input_size,)
+
+        # There are 3 versions of *_float16_float16_float16 but only
+        # version 1 should be available.
+        for platform in ('graphdef', 'savedmodel'):
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.float16, np.float16, np.float16,
+                           model_version=1, swap=False)
+
+            try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
                                np.float16, np.float16, np.float16,
-                               model_version=1, swap=False)
+                               model_version=2, swap=True)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
 
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.float16, np.float16, np.float16,
-                                   model_version=2, swap=True)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.float16, np.float16, np.float16,
-                                   model_version=3, swap=True)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
-        def test_raw_version_specific_1_3(self):
-            input_size = 16
-
-            # There are 3 versions of *_float32_float32_float32 but only
-            # versions 1 and 3 should be available.
-            for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
-                if platform == 'plan' and CPU_ONLY:
-                    continue
-                tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
+            try:
                 iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float32, np.float32, np.float32,
-                               model_version=1, swap=False)
-
-                try:
-                    iu.infer_exact(self, platform, tensor_shape, 1,
-                                   np.float32, np.float32, np.float32,
-                                   model_version=2, swap=True)
-                except InferenceServerException as ex:
-                    self.assertEqual("inference:0", ex.server_id())
-                    self.assertTrue(
-                        ex.message().startswith("Inference request for unknown model"))
-
-                iu.infer_exact(self, platform, tensor_shape, 1,
-                               np.float32, np.float32, np.float32,
+                               np.float16, np.float16, np.float16,
                                model_version=3, swap=True)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
+
+    def test_raw_version_specific_1_3(self):
+        input_size = 16
+
+        # There are 3 versions of *_float32_float32_float32 but only
+        # versions 1 and 3 should be available.
+        for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
+            if platform == 'plan' and CPU_ONLY:
+                continue
+            tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.float32, np.float32, np.float32,
+                           model_version=1, swap=False)
+
+            try:
+                iu.infer_exact(self, platform, tensor_shape, 1,
+                               np.float32, np.float32, np.float32,
+                               model_version=2, swap=True)
+            except InferenceServerException as ex:
+                self.assertEqual("inference:0", ex.server_id())
+                self.assertTrue(
+                    ex.message().startswith("Inference request for unknown model"))
+
+            iu.infer_exact(self, platform, tensor_shape, 1,
+                           np.float32, np.float32, np.float32,
+                           model_version=3, swap=True)
 
     def test_ensemble_mix_platform(self):
         # Skip on CPU only machine as TensorRT model is used in this ensemble

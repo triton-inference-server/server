@@ -352,18 +352,16 @@ main(int argc, char** argv)
   }
 
   for (size_t i = 0; i < 16; ++i) {
-    int32_t ip0, ip1;
-    ip0 = input0_shm[i];
-    ip1 = input1_shm[i];
+    std::cout << input0_shm[i] << " + " << input1_shm[i] << " = "
+              << output0_shm[i] << std::endl;
+    std::cout << input0_shm[i] << " - " << input1_shm[i] << " = "
+              << output1_shm[i] << std::endl;
 
-    std::cout << ip0 << " + " << ip1 << " = " << output0_shm[i] << std::endl;
-    std::cout << ip0 << " - " << ip1 << " = " << output1_shm[i] << std::endl;
-
-    if ((ip0 + ip1) != output0_shm[i]) {
+    if ((input0_shm[i] + input1_shm[i]) != output0_shm[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((ip0 - ip1) != output1_shm[i]) {
+    if ((input0_shm[i] - input1_shm[i]) != output1_shm[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
