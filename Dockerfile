@@ -173,6 +173,7 @@ ARG COMMON_BUILD_ARGS="--skip_submodule_sync --parallel --build_shared_lib --use
 RUN mkdir -p /workspace/build
 RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspace/build \
             --config Release $COMMON_BUILD_ARGS \
+            --cmake_extra_defines CMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
             --use_cuda \
             --cuda_home /usr/local/cuda \
             --cudnn_home /usr/local/cudnn-$(echo $CUDNN_VERSION | cut -d. -f1-2)/cuda \
