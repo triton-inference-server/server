@@ -188,8 +188,8 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
 ############################################################################
 FROM ${BASE_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=1.7.0dev
-ARG TRTIS_CONTAINER_VERSION=19.10dev
+ARG TRTIS_VERSION=1.8.0dev
+ARG TRTIS_CONTAINER_VERSION=19.11dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
@@ -344,8 +344,8 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.7.0dev
-ARG TRTIS_CONTAINER_VERSION=19.10dev
+ARG TRTIS_VERSION=1.8.0dev
+ARG TRTIS_CONTAINER_VERSION=19.11dev
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
