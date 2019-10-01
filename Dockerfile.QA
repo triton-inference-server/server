@@ -124,6 +124,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_savedmodel_shape/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_perf/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_large_payload/. && \

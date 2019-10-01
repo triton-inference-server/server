@@ -163,7 +163,7 @@ if __name__ == '__main__':
     for f in FLAGS.file:
         trace_data = json.loads(f.read())
         if FLAGS.verbose:
-            print json.dumps(trace_data, sort_keys=True, indent=2)
+            print(json.dumps(trace_data, sort_keys=True, indent=2))
 
         print("File: {}".format(f.name))
         summarize(trace_data)

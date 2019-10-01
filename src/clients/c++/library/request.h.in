@@ -689,7 +689,7 @@ class InferContext {
 
   /// Similar to AsyncRun() above. However, this function does not return the
   /// Request object for retrieving the inference results, and such Request
-  /// object will not be returned via GetAsyncRunResults(). Instead, once the
+  /// object will not be returned via GetReadyAsyncRequest(). Instead, once the
   /// request is completed, the InferContext pointer and the Request object will
   /// be passed to the provided 'callback' function. It is the function caller's
   /// choice on either retrieving the results inside the callback function or

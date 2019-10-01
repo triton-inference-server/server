@@ -158,5 +158,17 @@ install(
   RUNTIME DESTINATION bin
 )
 
-endif()
+#
+# simple_perf_client
+#
+add_executable(simple_perf_client simple_perf_client.cc)
+target_link_libraries(
+  simple_perf_client
+  PRIVATE request_static
+)
+install(
+  TARGETS simple_perf_client
+  RUNTIME DESTINATION bin
+)
 
+endif()
