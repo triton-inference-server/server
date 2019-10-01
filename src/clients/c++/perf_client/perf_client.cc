@@ -626,8 +626,13 @@ main(int argc, char** argv)
         summary.push_back(status_summary);
         uint64_t stabilizing_latency_ms =
             status_summary.stabilizing_latency_ns / (1000 * 1000);
-        if ((stabilizing_latency_ms >= latency_threshold_ms) || !err.IsOk()) {
+        if (!err.IsOk()) {
           std::cerr << err << std::endl;
+          break;
+        } else if (stabilizing_latency_ms >= latency_threshold_ms) {
+          std::cerr << "Aborting execution as measured latency went over "
+                       "the set limit of "
+                    << latency_threshold_ms << " msec. " << std::endl;
           break;
         }
       } else {
