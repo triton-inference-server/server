@@ -378,7 +378,7 @@ InferenceServer::UnloadModel(const std::string& model_name)
 Status
 InferenceServer::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const size_t byte_size, const int kind)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
@@ -387,7 +387,7 @@ InferenceServer::RegisterSharedMemory(
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   return shared_memory_manager_->RegisterSharedMemory(
-      name, shm_key, offset, byte_size);
+      name, shm_key, offset, byte_size, kind);
 }
 
 #ifdef TRTIS_ENABLE_GPU

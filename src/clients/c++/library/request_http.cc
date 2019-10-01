@@ -657,7 +657,7 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const size_t byte_size, const int kind)
 {
   return SendRequest("register", name, shm_key, offset, byte_size, 0);
 }

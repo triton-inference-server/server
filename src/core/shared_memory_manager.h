@@ -38,6 +38,13 @@
 
 namespace nvidia { namespace inferenceserver {
 
+typedef struct ipcCUDA_st {
+  int device;
+  cudaIpcEventHandle_t eventHandle;
+  cudaIpcMemHandle_t memHandle;
+  size_t byte_size;
+} ipcCUDA_t;
+
 class InferenceServer;
 class InferenceBackend;
 class ServerStatusManager;
@@ -86,7 +93,7 @@ class SharedMemoryManager {
   /// memory region that has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size);
+      const size_t byte_size, const int kind);
 
 #ifdef TRTIS_ENABLE_GPU
   /// Register a specified shared memory region if valid. If already registered

@@ -39,7 +39,8 @@ SharedMemoryBlockManager::~SharedMemoryBlockManager()
 TRTSERVER_Error*
 SharedMemoryBlockManager::CpuCreate(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    const int kind)
 {
   *smb = nullptr;
 

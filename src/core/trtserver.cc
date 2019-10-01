@@ -138,6 +138,7 @@ class TrtServerSharedMemoryBlock {
 #endif  // TRTIS_ENABLE_GPU
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
+  size_t Kind() const { return kind_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
@@ -149,6 +150,7 @@ class TrtServerSharedMemoryBlock {
 #endif  // TRTIS_ENABLE_GPU
   const size_t offset_;
   const size_t byte_size_;
+  const int kind_;
 };
 
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
@@ -538,11 +540,12 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size)
+    const char* shm_key, const size_t offset, const size_t byte_size,
+    const int kind)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, kind));
   return nullptr;  // Success
 }
 
