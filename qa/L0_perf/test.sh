@@ -84,13 +84,13 @@ for BACKEND in $BACKENDS; do
 
     set +e
     $CLIENT -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-            -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
 
-    $CLIENT -i grpc -u localhost:8001 -m${MODEL_NAME} -b${BATCH_SIZE} \
-            -s${TENSOR_SIZE} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+    $CLIENT -i grpc -u localhost:8001 -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -102,7 +102,7 @@ for BACKEND in $BACKENDS; do
 done
 
 for BACKEND in $BACKENDS; do
-    echo -e "${BACKEND}\n"
+    echo -e "\n${BACKEND}\n************"
     cat ${BACKEND}.log
 done
 

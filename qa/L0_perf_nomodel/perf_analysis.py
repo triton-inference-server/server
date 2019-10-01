@@ -77,6 +77,9 @@ def lower_is_better(name):
     return name != INFERPERSEC
 
 def get_delta(name, baseline, result, slowdown_threshold, speedup_threshold):
+    if (float(baseline) == 0) or (float(result) == 0):
+        return None
+
     if lower_is_better(name):
         speedup = float(baseline) / float(result)
     else:
@@ -131,7 +134,10 @@ def analysis(slowdown_threshold, speedup_threshold,
             else:
                 delta = get_delta(name, baseline_result[name], result,
                                   slowdown_threshold, speedup_threshold)
-                print("{:<28}{:>12}{:>12}{:>22}".format(name, baseline_result[name], result, delta))
+                if delta is None:
+                    print("{:<28}{:>12}{:>12}{:>12}".format(name, baseline_result[name], result, "n/a"))
+                else:
+                    print("{:<28}{:>12}{:>12}{:>22}".format(name, baseline_result[name], result, delta))
 
 
 if __name__ == '__main__':
