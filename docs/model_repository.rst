@@ -261,6 +261,19 @@ using `stale ONNX opset version
 <https://github.com/Microsoft/onnxruntime/blob/master/docs/Versioning.md#version-matrix>`_
 or containing operators with `unsupported types
 <https://github.com/microsoft/onnxruntime/issues/1122>`_).
+
+By default the ONNX Runtime uses a default *execution provider* when
+running models. For execution of models on CPU this default execution
+provider does not utilize MKL-DNN. The model configuration
+:ref:`section-optimization-policy` allows you to select the `OpenVino
+<https://01.org/openvinotoolkit>`_ execution provider for CPU
+execution of a model instead of the default execution provider. For
+execution of models on GPU the default CUDA execution provider uses
+CuDNN to accelerate inference. The model configuration
+:ref:`section-optimization-policy` allows you to select the *tensorrt*
+execution provider for GPU which causes the ONNX Runtime to use
+TensorRT to accelerate all or part of the model.
+
 A minimal model repository for a single ONNX model would look like::
 
   models/

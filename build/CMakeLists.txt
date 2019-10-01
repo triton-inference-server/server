@@ -35,7 +35,8 @@ option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 option(TRTIS_ENABLE_TENSORFLOW "Include TensorFlow backend in server" OFF)
 option(TRTIS_ENABLE_CAFFE2 "Include Caffe2 backend in server" OFF)
 option(TRTIS_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" OFF)
-option(TRTIS_ENABLE_ONNXRUNTIME_OPENVINO "Enable OpenVINO Execution Provider for ONNXRuntime backend in server" OFF)
+option(TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
+  "Enable OpenVINO execution provider for ONNXRuntime backend in server" OFF)
 option(TRTIS_ENABLE_PYTORCH "Include PyTorch backend in server" OFF)
 option(TRTIS_ENABLE_CUSTOM "Include Custom backend in server" OFF)
 

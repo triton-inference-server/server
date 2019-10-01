@@ -452,7 +452,7 @@ message ModelOptimizationPolicy
   //@@     for both GPU and CPU, in such case, the priority will be in the
   //@@     following order:
   //@@         <gpu_execution_accelerator> (if instance is on GPU)
-  //@@         CUDA Exectuion Provider     (if instance is on GPU)
+  //@@         CUDA Execution Provider     (if instance is on GPU)
   //@@         <cpu_execution_accelerator>
   //@@         Default CPU Execution Provider
   //@@

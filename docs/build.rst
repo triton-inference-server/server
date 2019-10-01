@@ -192,7 +192,10 @@ different build process but you may have build or execution issues.
 
 Your build should produce the ONNX Runtime library, libonnxruntime.so.
 You can enable the ONNX Runtime backend in the inference server with
-the CMake option -DTRTIS_ENABLE_ONNXRUNTIME=ON as described below.
+the CMake option -DTRTIS_ENABLE_ONNXRUNTIME=ON as described below. If
+you want to enable OpenVino within the ONNX Runtime you must also
+specify the CMake option TRTIS_ENABLE_ONNXRUNTIME_OPENVINO=ON and
+provide the necessary OpenVino dependencies.
 
 You can install the library in a system library path or you can
 specify the path with the CMake option TRTIS_EXTRA_LIB_PATHS. Multiple
@@ -372,10 +375,10 @@ the following command::
 Using the Custom Instance Wrapper Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The custom backend SDK provides a `CustomInstance Class 
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_. 
-The CustomInstance class is a C++ wrapper class that abstracts away the 
-backend C-API for ease of use. All of the example custom backends in 
+The custom backend SDK provides a `CustomInstance Class
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom/sdk/custom_instance.h>`_.
+The CustomInstance class is a C++ wrapper class that abstracts away the
+backend C-API for ease of use. All of the example custom backends in
 `src/custom directory
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/custom>`_
 derive from the CustomInstance class and can be referenced for usage.
