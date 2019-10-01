@@ -96,6 +96,36 @@ for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     done
 done
 
+# Testing with the new arguments
+set +e
+$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+set +e
+$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 --search-range 1:5:2 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec|Request concurrency: 2" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+
 kill $SERVER_PID
 wait $SERVER_PID
 

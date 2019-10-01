@@ -30,6 +30,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include <sys/stat.h>
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 #include "src/core/constants.h"
@@ -74,5 +75,8 @@ ProtocolType ParseProtocol(const std::string& str);
 // \return error status. Returns Non-Ok if an error is encountered during
 //  read operation.
 nic::Error ReadFile(const std::string& path, std::vector<char>* contents);
+
+// To check whether the path points to a valid system directory
+bool IsDirectory(const std::string& path);
 
 }  // namespace perfclient

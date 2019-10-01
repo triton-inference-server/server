@@ -75,4 +75,16 @@ ReadFile(const std::string& path, std::vector<char>* contents)
   return nic::Error::Success;
 }
 
+
+bool
+IsDirectory(const std::string& path)
+{
+  struct stat s;
+  if (stat(path.c_str(), &s) == 0 && (s.st_mode & S_IFDIR)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 }  // namespace perfclient
