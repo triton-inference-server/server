@@ -57,9 +57,6 @@ spec:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
 
           args: ["trtserver", "--model-store={{ .Values.image.modelRepositoryPath }}"]
-          env:
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /secret/gcp-creds.json
 
           ports:
             - containerPort: 8000
