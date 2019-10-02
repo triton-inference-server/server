@@ -414,6 +414,7 @@ ModelImpl::ModelImpl(
     : model_name_(model_name), session_(session), inputs_(inputs),
       outputs_(outputs)
 {
+  device_name_ = TFGPUDeviceName();
 }
 
 ModelImpl::~ModelImpl()
