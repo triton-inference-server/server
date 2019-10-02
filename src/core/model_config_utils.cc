@@ -503,10 +503,18 @@ ValidateModelConfig(
                 " has kind KIND_GPU but server does not support GPUs");
 #else
         if (group.gpus().size() == 0) {
-          return Status(
-              RequestStatusCode::INVALID_ARG,
-              "instance group " + group.name() + " of model " + config.name() +
-                  " has kind KIND_GPU but specifies no GPUs");
+          if (supported_gpus.size() == 0) {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "instance group " + group.name() + " of model " +
+                    config.name() +
+                    " has kind KIND_GPU but no GPUs are available");
+          } else {
+            return Status(
+                RequestStatusCode::INVALID_ARG,
+                "instance group " + group.name() + " of model " +
+                    config.name() + " has kind KIND_GPU but specifies no GPUs");
+          }
         }
 
         for (const int32_t gid : group.gpus()) {
