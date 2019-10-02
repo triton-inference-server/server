@@ -256,7 +256,6 @@ std::string
 FormatMessage(std::string str, int offset)
 {
   int width = 60;
-  int index = 1;
   int current_pos = offset;
   while (current_pos + width < int(str.length())) {
     int n = str.rfind(' ', current_pos + width);
@@ -264,7 +263,6 @@ FormatMessage(std::string str, int offset)
       str.replace(n, 1, "\n\t ");
       current_pos += (width + 10);
     }
-    index++;
   }
   return str;
 }
@@ -300,6 +298,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-t <number of concurrent requests>" << std::endl;
   std::cerr << "\t-c <maximum concurrency>" << std::endl;
   std::cerr << "\t-d" << std::endl;
+  std::cerr << "\t-a" << std::endl;
   std::cerr << std::endl;
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
@@ -319,7 +318,6 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-f <filename for storing report in csv format>" << std::endl;
   std::cerr << "\t-H <HTTP header>" << std::endl;
   std::cerr << "\t--streaming" << std::endl;
-  std::cerr << "\t-a" << std::endl;
   std::cerr << std::endl;
   std::cerr << "==== OPTIONS ==== \n \n";
 
@@ -354,19 +352,19 @@ Usage(char** argv, const std::string& msg = std::string())
       << FormatMessage(
              " --search-range <m:n:o>: Determines the range of concurrency "
              "levels covered by the perf_client. The perf_client will start "
-             "from the concurrency level of m to n with steps of o. The "
-             "default value of m and o are 1. If n is not specified then "
+             "from the concurrency level of 'm' to 'n' with steps of 'o'. The "
+             "default value of 'm' and 'o' are 1. If 'n' is not specified then "
              "perf_client will run for a single concurrency level determined "
-             "by m. If n is set as 0, then the concurrency limit will be "
-             "incremented till latency threshold is met. n and -l can not be "
-             "both 0 simultaneously.",
+             "by 'm'. If 'n' is set as 0, then the concurrency limit will be "
+             "incremented by 'o' till latency threshold is met. 'n' and -l can "
+             "not be both 0 simultaneously.",
              18)
       << std::endl;
   std::cerr << FormatMessage(
                    " --latency-threshold (-l): Sets the limit on the observed "
                    "latency. Client will top incrementing the concurrency and "
                    "abort the execution once the measured latency exceeds this "
-                   "threshold. By default, latency threshold  is set 0 and "
+                   "threshold. By default, latency threshold is set 0 and "
                    "the perf_client will run for entire --search-range.",
                    18)
             << std::endl;
@@ -398,7 +396,7 @@ Usage(char** argv, const std::string& msg = std::string())
       << FormatMessage(
              " --percentile: It indicates that the specified percentile in "
              "terms of latency will also be reported and used to detemine if "
-             "the  measurement is stable instead of average latency. Default "
+             "the measurement is stable instead of average latency. Default "
              "is -1 to indicate no percentile will be used.",
              18)
       << std::endl;
@@ -428,6 +426,10 @@ Usage(char** argv, const std::string& msg = std::string())
              "request latency is above the threshold set (see -l).",
              9)
       << std::endl;
+  std::cerr << std::setw(9) << std::left << " -a: "
+            << FormatMessage(
+                   "This flag is deprecated and will not affect client.", 9)
+            << std::endl;
 
   std::cerr << std::endl;
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
@@ -503,7 +505,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr
       << std::setw(9) << std::left << " -f: "
       << FormatMessage(
-             "The observation report will be stored in the file pointed by "
+             "The latency report will be stored in the file named by "
              "this option. By default, the result is not recorded in a file.",
              9)
       << std::endl;
@@ -521,10 +523,6 @@ Usage(char** argv, const std::string& msg = std::string())
              "only valid with gRPC protocol. By default, it is set false.",
              18)
       << std::endl;
-  std::cerr << std::setw(9) << std::left << " -a: "
-            << FormatMessage(
-                   "This flag is deprecated and will not affect client.", 9)
-            << std::endl;
 
   exit(1);
 }
@@ -602,7 +600,6 @@ main(int argc, char** argv)
         data_directory = optarg;
         break;
       case 5: {
-        using_search_range = true;
         std::string arg = optarg;
         std::string name = arg.substr(0, arg.rfind(":"));
         std::string shape_str = arg.substr(name.size() + 1);
@@ -636,6 +633,7 @@ main(int argc, char** argv)
         break;
       }
       case 7: {
+        using_search_range = true;
         std::string arg = optarg;
         size_t pos = 0;
         int index = 0;
