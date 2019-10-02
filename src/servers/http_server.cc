@@ -80,6 +80,7 @@ HTTPServerImpl::Start()
   if (!worker_.joinable()) {
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
+    evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
     evhtp_set_gencb(htp_, HTTPServerImpl::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
