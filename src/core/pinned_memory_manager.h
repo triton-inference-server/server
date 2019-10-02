@@ -39,7 +39,7 @@ class PinnedMemoryManager {
   // Options to be checked before allocating pinned memeory.
   // [DLIS-778] For now there is a hard-coded threshold on minimum byte size for
   // allocating pinned memory, as the overhead of (de)allocating it will cancel
-  // out the speed up in data transfer for small data size (< ~8MB)
+  // out the speed up in data transfer for small size (empirical value ~32MB)
   struct Options {
     Options(uint64_t b = 0)
         : pinned_memory_pool_byte_size_(b), min_request_size_(1 << 25)
