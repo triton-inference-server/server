@@ -189,84 +189,61 @@ def infer_exact(tester, pf, tensor_shape, batch_size,
             else:
                 output1_byte_size = sum([e1.nbytes for e1 in expected1_list])
 
-
             # create and register shared memory region for inputs and outputs
             if shm_region_names is None:
-                if not _match_registered(registered_shm_regions, '/input0', input0_byte_size):
-                    shm_ip0_handle = shm.create_shared_memory_region("input0_data", "/input0", input0_byte_size)
-                    registered_shm_regions['/input0'] = (input0_byte_size, shm_ip0_handle)
-                else:
-                    shm_ip0_handle = registered_shm_regions['/input0'][1]
+                shm_region_names = ['input0', 'input1', 'output0', 'output1']
 
-                if not _match_registered(registered_shm_regions, '/input1', input1_byte_size):
-                    shm_ip1_handle = shm.create_shared_memory_region("input1_data", "/input1", input1_byte_size)
-                    registered_shm_regions['/input1'] = (input1_byte_size, shm_ip1_handle)
-                else:
-                    shm_ip1_handle = registered_shm_regions['/input1'][1]
+            if not _match_registered(registered_shm_regions, '/'+shm_region_names[0], input0_byte_size):
+                shm_ip0_handle = shm.create_shared_memory_region(shm_region_names[0]+'_data',
+                                                                '/'+shm_region_names[0], input0_byte_size)
+                registered_shm_regions['/'+shm_region_names[0]] = (input0_byte_size, shm_ip0_handle)
+            else:
+                shm_ip0_handle = registered_shm_regions['/'+shm_region_names[0]][1]
 
-                if precreated_shm_regions is None:
-                    if "OUTPUT0" in outputs:
-                        if not _match_registered(registered_shm_regions, '/output0', output0_byte_size):
-                            shm_op0_handle = shm.create_shared_memory_region("output0_data", "/output0", output0_byte_size)
-                            registered_shm_regions['/output0'] = (output0_byte_size, shm_op0_handle)
-                        else:
-                            shm_op0_handle = registered_shm_regions['/output0'][1]
-                    if "OUTPUT1" in outputs:
-                        if not _match_registered(registered_shm_regions, '/output1', output1_byte_size):
-                            shm_op1_handle = shm.create_shared_memory_region("output1_data", "/output1", output1_byte_size)
-                            registered_shm_regions['/output1'] = (output1_byte_size, shm_op1_handle)
-                        else:
-                            shm_op1_handle = registered_shm_regions['/output1'][1]
+            if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
+                shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
+                                                                '/'+shm_region_names[1], input1_byte_size)
+                registered_shm_regions['/'+shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
+            else:
+                shm_ip1_handle = registered_shm_regions['/'+shm_region_names[1]][1]
 
-                if not _match_registered(registered_shm_regions, '/'+shm_region_names[1], input1_byte_size):
-                    shm_ip1_handle = shm.create_shared_memory_region(shm_region_names[1]+'_data',
-                                                                    '/'+shm_region_names[1], input1_byte_size)
-                    registered_shm_regions['/'+shm_region_names[1]] = (input1_byte_size, shm_ip1_handle)
-                else:
-                    shm_ip1_handle = registered_shm_regions['/'+shm_region_names[1]][1]
+            if precreated_shm_regions is None:
+                i = 0
+                if "OUTPUT0" in outputs:
+                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[2], output0_byte_size):
+                        shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
+                                                                        '/'+shm_region_names[2], output0_byte_size)
+                        registered_shm_regions['/'+shm_region_names[2]] = (output0_byte_size, shm_op0_handle)
+                    else:
+                        shm_op0_handle = registered_shm_regions['/'+shm_region_names[2]][1]
+                    shared_memory_ctx.unregister(shm_op0_handle)
+                    shared_memory_ctx.register(shm_op0_handle)
+                    i+=1
+                if "OUTPUT1" in outputs:
+                    if not _match_registered(registered_shm_regions, '/'+shm_region_names[2+i], output1_byte_size):
+                        shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
+                                                                        '/'+shm_region_names[2+i], output1_byte_size)
+                        registered_shm_regions['/'+shm_region_names[2+i]] = (output1_byte_size, shm_op1_handle)
+                    else:
+                        shm_op1_handle = registered_shm_regions['/'+shm_region_names[2+i]][1]
+                    shared_memory_ctx.unregister(shm_op1_handle)
+                    shared_memory_ctx.register(shm_op1_handle)
 
-                if precreated_shm_regions is None:
-                    i = 0
-                    if "OUTPUT0" in outputs:
-                        if not _match_registered(registered_shm_regions, '/'+shm_region_names[2], output0_byte_size):
-                            shm_op0_handle = shm.create_shared_memory_region(shm_region_names[2]+'_data',
-                                                                            '/'+shm_region_names[2], output0_byte_size)
-                            registered_shm_regions['/'+shm_region_names[2]] = (output0_byte_size, shm_op0_handle)
-                        else:
-                            shm_op0_handle = registered_shm_regions['/'+shm_region_names[2]][1]
-                        i+=1
-                    if "OUTPUT1" in outputs:
-                        if not _match_registered(registered_shm_regions, '/'+shm_region_names[2+i], output1_byte_size):
-                            shm_op1_handle = shm.create_shared_memory_region(shm_region_names[2+i]+'_data',
-                                                                            '/'+shm_region_names[2+i], output1_byte_size)
-                            registered_shm_regions['/'+shm_region_names[2+i]] = (output1_byte_size, shm_op1_handle)
-                        else:
-                            shm_op1_handle = registered_shm_regions['/'+shm_region_names[2+i]][1]
-
-            if precreated_shm_regions is not None:
+            else:
                 i = 0
                 if "OUTPUT0" in outputs:
                     shm_op0_handle = precreated_shm_regions[0]
                     i+=1
                 if "OUTPUT1" in outputs:
-                    shm_op1_handle = precreated_shm_regions[0+i]
-            else:
-                if "OUTPUT0" in outputs:
-                    shared_memory_ctx.register(shm_op0_handle)
-                if "OUTPUT1" in outputs:
-                    shared_memory_ctx.register(shm_op1_handle)
+                    shm_op1_handle = precreated_shm_regions[i]
 
             # copy data into shared memory region for input values
             shm.set_shared_memory_region(shm_ip0_handle, input0_list)
             shm.set_shared_memory_region(shm_ip1_handle, input1_list)
+            shared_memory_ctx.unregister(shm_ip0_handle)
+            shared_memory_ctx.unregister(shm_ip1_handle)
             shared_memory_ctx.register(shm_ip0_handle)
             shared_memory_ctx.register(shm_ip1_handle)
-            if "OUTPUT0" in outputs:
-                shared_memory_ctx.unregister(shm_op0_handle)
-                shared_memory_ctx.register(shm_op0_handle)
-            if "OUTPUT1" in outputs:
-                shared_memory_ctx.unregister(shm_op1_handle)
-                shared_memory_ctx.register(shm_op1_handle)
 
         expected0_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected0_val_list ]
         expected1_sort_idx = [ np.flip(np.argsort(x.flatten()), 0) for x in expected1_val_list ]

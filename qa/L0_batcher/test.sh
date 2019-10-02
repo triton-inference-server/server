@@ -116,7 +116,6 @@ for model_type in FIXED VARIABLE; do
         fi
 
         echo "Test: $i" >>$CLIENT_LOG
-        echo "Test: $i"
 
         set +e
         python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
@@ -149,7 +148,6 @@ for model_type in FIXED VARIABLE; do
         fi
 
         echo "Test: $i" >>$CLIENT_LOG
-        echo "Test: $i"
 
         set +e
         python $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
