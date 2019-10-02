@@ -53,7 +53,7 @@ class SharedMemoryBlockManager {
   TRTSERVER_Error* CpuCreate(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size,
-      const int kind);
+      const int kind, const int device_id);
 
 #if TRTIS_ENABLE_GPU
   /// Add a shared memory block representing shared memory in CUDA

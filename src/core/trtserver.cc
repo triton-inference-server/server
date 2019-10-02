@@ -540,12 +540,23 @@ TRTSERVER_ErrorMessage(TRTSERVER_Error* error)
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size,
-    const int kind)
+    const char* shm_key, const size_t offset, const size_t byte_size)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, kind));
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, -1));
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockGpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const char* shm_key, const size_t offset, const size_t byte_size,
+    const int device_id)
+{
+  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
+      new TrtServerSharedMemoryBlock(
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, device_id));
   return nullptr;  // Success
 }
 

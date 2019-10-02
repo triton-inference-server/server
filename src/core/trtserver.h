@@ -143,8 +143,12 @@ TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size,
-    const int kind);
+    const char* shm_key, const size_t offset, const size_t byte_size);
+
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const char* shm_name, const size_t offset, const size_t byte_size,
+    const int device_id);
 
 /// Create a new shared memory block object referencing a CUDA shared
 /// memory block residing in TRTSERVER_MEMORY_GPU type memory.

@@ -385,7 +385,6 @@ SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
   cuda_shm_id->set_device_id(device_id);
 
   rshm_region->set_byte_size(byte_size);
-  rshm_region->set_kind(kind);
 
   grpc::Status status =
       stub_->SharedMemoryControl(&context, request, &response);

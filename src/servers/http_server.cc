@@ -723,7 +723,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
       if (action_type_str == "register" &&
           (!RE2::FullMatch(
               remaining, register_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str, &kind_str))) {
+              &byte_size_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       } else if (
@@ -745,7 +745,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
 
   size_t offset = std::atoll(offset_str.c_str());
   size_t byte_size = std::atoll(byte_size_str.c_str());
-  int kind = std::atoll(kind_str.c_str());
+  int device_id = std::atoll(device_id_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
   TRTSERVER_SharedMemoryBlock* smb = nullptr;
