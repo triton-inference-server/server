@@ -153,7 +153,7 @@ that example you must install the following::
 
   $ apt-get install libopencv-dev libopencv-core-dev
 
-.. _section-image_classification_example:
+.. _section-image-classification-example:
 
 Image Classification Example Application
 ----------------------------------------
@@ -265,7 +265,7 @@ behaves the same as the image\_client except that instead of using the
 inference server client library it uses the GRPC generated client
 library to communicate with the server.
 
-.. _section-ensemble_image_classification_example:
+.. _section-ensemble-image-classification-example:
 
 Ensemble Image Classification Example Application
 -------------------------------------------------
@@ -346,6 +346,8 @@ will be sent::
       23 (VULTURE) = 0.992326
       8 (HEN) = 0.00231854
       84 (PEACOCK) = 0.00201471
+
+.. _section-performance-example:
 
 Performance Example Application
 -------------------------------

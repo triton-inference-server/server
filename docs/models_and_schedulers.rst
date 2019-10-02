@@ -275,7 +275,7 @@ ensemble as :cpp:var:`Step
 scheduler collects the output tensors in each step, provides them as input
 tensors for other steps according to the specification. In spite of that, the
 ensemble model is still viewed as a single model from an external view.
-:ref:`section-ensemble_image_classification_example` is an example that performs
+:ref:`section-ensemble-image-classification-example` is an example that performs
 image classification using an ensemble model.
 
 Note that the ensemble models will inherit the characteristics of the models
