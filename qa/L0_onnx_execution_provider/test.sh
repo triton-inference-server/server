@@ -35,6 +35,10 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+IMAGE_CLIENT=../clients/image_client
+IMAGE=../images/vulture.jpeg
+CLIENT_LOG="./client.log"
+
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tensorrtserver/bin/trtserver
@@ -142,6 +146,25 @@ fi
 grep "failed to load 'resnet50_unknown_cpu' version 1: Invalid argument: unknown Execution Accelerator 'unknown_cpu' is requested" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator returns error\n***"
+    RET=1
+fi
+
+# Send infer request to models that can be loaded
+for MODEL in \
+        resnet50_def \
+        resnet50_trt \
+        resnet50_openvino \
+        resnet50_cpu_openvino ; do
+    echo "Model: $MODEL" >>$CLIENT_LOG
+    $IMAGE_CLIENT -m $MODEL -s INCEPTION -c 1 -b 1 $IMAGE >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+if [ `grep -c VULTURE $CLIENT_LOG` != "4" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 VULTURE results\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 
