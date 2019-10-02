@@ -301,10 +301,10 @@ TensorImpl::TensorImpl(
 {
   // Only request for GPU allocator for non-string data type
   auto a = ((tf_gpu_id >= 0) && (dtype != TRTISTF_TYPE_STRING))
-               ? nullptr
-               : tensorflow::GPUProcessState::singleton()->GetGPUAllocator(
+               ? tensorflow::GPUProcessState::singleton()->GetGPUAllocator(
                      tensorflow::GPUOptions(), tensorflow::TfGpuId(tf_gpu_id),
-                     1 << 28 /* total_memory_size */);
+                     1 << 28 /* total_memory_size */)
+               : nullptr;
   if (a == nullptr) {
     tftensor_ = tensorflow::Tensor(ConvertDataType(dtype), tfshape);
   } else {
@@ -509,7 +509,9 @@ ModelImpl::TFGPUDeviceName()
   std::string device_name;
   std::vector<tensorflow::DeviceAttributes> devices;
   session_->ListDevices(&devices);
+  LOG(ERROR) << "getting devices: ";
   for (const auto& d : devices) {
+    LOG(ERROR) << d.name();
     if (d.device_type() == "GPU" || d.device_type() == "gpu") {
       if (!device_name.empty()) {
         return "";
