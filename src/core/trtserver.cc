@@ -121,7 +121,8 @@ class TrtServerSharedMemoryBlock {
  public:
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-      const size_t offset, const size_t byte_size, const int kind);
+      const size_t offset, const size_t byte_size, const int kind,
+      const int device_id);
 
   TRTSERVER_Memory_Type Type() const { return type_; }
   const std::string& Name() const { return name_; }
@@ -129,6 +130,7 @@ class TrtServerSharedMemoryBlock {
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
   size_t Kind() const { return kind_; }
+  size_t DeviceId() const { return device_id_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
@@ -137,13 +139,15 @@ class TrtServerSharedMemoryBlock {
   const size_t offset_;
   const size_t byte_size_;
   const int kind_;
+  const int device_id_;
 };
 
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-    const size_t offset, const size_t byte_size, const int kind)
+    const size_t offset, const size_t byte_size, const int kind,
+    const int device_id)
     : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
-      byte_size_(byte_size), kind_(kind)
+      byte_size_(byte_size), kind_(kind), device_id_(device_id)
 {
 }
 
@@ -513,7 +517,7 @@ TRTSERVER_SharedMemoryBlockCpuNew(
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, -1));
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, 0, 0));
   return nullptr;  // Success
 }
 
@@ -525,7 +529,8 @@ TRTSERVER_SharedMemoryBlockGpuNew(
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, device_id));
+          TRTSERVER_MEMORY_GPU, name, shm_key, offset, byte_size, 1,
+          device_id));
   return nullptr;  // Success
 }
 
@@ -1166,7 +1171,7 @@ TRTSERVER_ServerRegisterSharedMemory(
 
   RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
       lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize(),
-      lsmb->Kind()));
+      lsmb->Kind(), lsmb->DeviceId()));
 
   return nullptr;  // success
 }

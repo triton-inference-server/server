@@ -305,7 +305,7 @@ message SharedMemoryControlRequest
     //@@     memory block from the start of the shared memory region. In case
     //@@     of CUDA shared memory, this is the offset of the cudaIPC handle
     //@@     from the start of the shared memory region.
-    //@@     start = offset, end = offset + size;
+    //@@     start = offset, end = offset + byte_size;
     //@@
     uint64 offset = 4;
 

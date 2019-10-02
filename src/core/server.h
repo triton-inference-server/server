@@ -91,7 +91,7 @@ class InferenceServer {
   // memory region has been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind);
+      const size_t byte_size, const int kind, const int device_id);
 
   // Unregister the corresponding shared memory region.
   Status UnregisterSharedMemory(const std::string& name);

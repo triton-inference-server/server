@@ -107,12 +107,11 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 
 #ifdef TRTIS_ENABLE_GPU
 void
-OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr, int* device_id)
+OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr)
 {
   cudaEvent_t event;
 
-  *device_id = shm_cuda_rep->device;
-  cudaError_t err = cudaSetDevice(*device_id);
+  cudaError_t err = cudaSetDevice(shm_cuda_rep->device);
 
   // get cuda event and synchronize
   err = cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle);
@@ -138,7 +137,7 @@ OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr, int* device_id)
 Status
 SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind)
+    const size_t byte_size, const int kind, const int device_id)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
@@ -153,7 +152,7 @@ SharedMemoryManager::RegisterSharedMemory(
 
   // register (or re-register)
   void *mapped_addr, *cuda_ipc_addr;
-  int shm_fd = -1, device_id;
+  int shm_fd = -1;
 
   // don't re-open if shared memory is already open
   for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
@@ -176,7 +175,7 @@ SharedMemoryManager::RegisterSharedMemory(
         "failed to register shared memory region '" + name + "'");
   }
 
-  if (kind != -1) {
+  if (kind != 0) {
     if (byte_size % sizeof(ipcCUDA_t) != 0) {
       return Status(
           RequestStatusCode::INVALID_ARG,
@@ -184,13 +183,13 @@ SharedMemoryManager::RegisterSharedMemory(
               "' must be a multiple of the size of cuda IPC representation");
     }
     ipcCUDA_t* shm_cuda_rep = reinterpret_cast<ipcCUDA_t*>(mapped_addr);
-    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr, &device_id);
+    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr);
   }
 
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
                 name, shm_key, offset, byte_size, shm_fd, mapped_addr,
-                cuda_ipc_addr, kind))));
+                cuda_ipc_addr, kind, device_id))));
 
   return Status::Success;
 }
@@ -269,7 +268,14 @@ SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
   for (const auto& shm_info : shared_memory_map_) {
     auto rshm_region = shm_status->add_shared_memory_region();
     rshm_region->set_name(shm_info.second->name_);
-    rshm_region->set_shared_memory_key(shm_info.second->shm_key_);
+    if (shm_info.second->kind_ == 0) {
+      auto system_shm_info = rshm_region->mutable_system_shared_memory();
+      system_shm_info->set_shared_memory_key(shm_info.second->shm_key_);
+    } else {
+      auto cuda_shm_info = rshm_region->mutable_cuda_shared_memory();
+      cuda_shm_info->set_shared_memory_name(shm_info.second->shm_key_);
+      cuda_shm_info->set_device_id(shm_info.second->device_id_);
+    }
     rshm_region->set_offset(shm_info.second->offset_);
     rshm_region->set_byte_size(shm_info.second->byte_size_);
   }
