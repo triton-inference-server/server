@@ -40,7 +40,7 @@ TRTSERVER_Error*
 SharedMemoryBlockManager::Create(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
     const std::string& shm_key, const size_t offset, const size_t byte_size,
-    const int kind)
+    const int kind, const int device_id)
 {
   *smb = nullptr;
 
@@ -51,8 +51,14 @@ SharedMemoryBlockManager::Create(
             .c_str());
   }
 
-  RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockCpuNew(
-      smb, name.c_str(), shm_key.c_str(), offset, byte_size, kind));
+  if (kind == TRTSERVER_MEMORY_CPU) {
+    RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockCpuNew(
+        smb, name.c_str(), shm_key.c_str(), offset, byte_size));
+  } else {
+    RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockGpuNew(
+        smb, name.c_str(), shm_key.c_str(), offset, byte_size, device_id));
+  }
+
   blocks_.emplace(name, *smb);
 
   return nullptr;  // success

@@ -264,26 +264,18 @@ message SharedMemoryControlRequest
     //@@
     message CUDASharedMemoryIdentifier
     {
-      //@@  .. cpp:var:: string shared_memory_key
+      //@@  .. cpp:var:: string name
       //@@
-      //@@     The name of the system shared memory region that holds the
-      //@@     cudaIPC handle.
+      //@@     The name of the system shared memory region registered in TRTIS
+      //@@     that holds the cudaIPC handle.
       //@@
-      string shared_memory_key = 1;
+      string name = 1;
 
-      //@@  .. cpp:var:: uint64 offset
+      //@@  .. cpp:var:: int64 device_id
       //@@
-      //@@     The offset of the cudaIPC handle from the start of the shared
-      //@@     memory region.
-      //@@     start = offset, end = offset + size;
+      //@@     The GPU device ID on which the cudaIPC handle was created.
       //@@
-      uint64 offset = 2;
-
-      //@@  .. cpp:var:: uint64 byte_size
-      //@@
-      //@@     Size of the cudaIPC handle in the shared memory block, in bytes.
-      //@@
-      uint64 byte_size = 3;
+      int64 device_id = 2;
     }
 
     //@@  .. cpp:var:: oneof shared_memory_types
@@ -309,23 +301,20 @@ message SharedMemoryControlRequest
 
     //@@  .. cpp:var:: uint64 offset
     //@@
-    //@@     The offset from the start of the shared memory region.
+    //@@     In case of System shared memory this is the offset of the shared
+    //@@     memory block from the start of the shared memory region. In case
+    //@@     of CUDA shared memory, this is the offset of the cudaIPC handle
+    //@@     from the start of the shared memory region.
     //@@     start = offset, end = offset + size;
     //@@
     uint64 offset = 4;
 
     //@@  .. cpp:var:: uint64 byte_size
     //@@
-    //@@     Size of the memory block, in bytes.
+    //@@     Size of the shared memory block, in bytes. In case of CUDA shared
+    //@@     memory, this should equal to the size of the cudaIPC handle.
     //@@
     uint64 byte_size = 5;
-
-    //@@  .. cpp:var:: int64 kind
-    //@@
-    //@@     The kind of shared memory being used by the model. If CPU then set
-    //@@     to -1 else set to GPU device ID. Default to -1 (CPU) if not set.
-    //@@
-    int64 kind = 6;
   }
 
   //@@  .. cpp:var:: message Unregister

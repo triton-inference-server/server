@@ -207,7 +207,7 @@ class HTTPAPIServer : public HTTPServerImpl {
         infer_regex_(R"(/([^/]+)(?:/(\d+))?)"), status_regex_(R"(/(.*))"),
         modelcontrol_regex_(R"(/(load|unload)/([^/]+))"),
         sharedmemorycontrol_regex_(
-            R"(/(register|unregister|status)(.*))")
+            R"(/(register|cudaregister|unregister|status)(.*))")
   {
     TRTSERVER_Error* err = TRTSERVER_ServerId(server_.get(), &server_id_);
     if (err != nullptr) {
@@ -643,12 +643,13 @@ HTTPAPIServer::HandleSharedMemoryControl(
     }
   }
 
-  re2::RE2 register_regex_(
-      R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+)/([-+]?[0-9]+))");
+  re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
+  re2::RE2 cudaregister_regex_(
+      R"(/([^/]+)/([^/]+)/([0-9]+)/([0-9]+)/([0-9]+))");
   re2::RE2 unregister_regex_(R"(/([^/]+))");
 
   std::string action_type_str, remaining, name, shm_key;
-  std::string offset_str, byte_size_str, kind_str;
+  std::string offset_str, byte_size_str, device_id_str;
   if ((sharedmemorycontrol_uri.empty()) ||
       (!RE2::FullMatch(
           sharedmemorycontrol_uri, sharedmemorycontrol_regex_, &action_type_str,
@@ -665,11 +666,17 @@ HTTPAPIServer::HandleSharedMemoryControl(
       if (action_type_str == "register" &&
           (!RE2::FullMatch(
               remaining, register_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str, &kind_str))) {
+              &byte_size_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
-      }
-      if (action_type_str == "unregister") {
+      } else if (
+          action_type_str == "cudaregister" &&
+          (!RE2::FullMatch(
+              remaining, cudaregister_regex_, &name, &shm_key, &offset_str,
+              &byte_size_str, &device_id_str))) {
+        evhtp_send_reply(req, EVHTP_RES_BADREQ);
+        return;
+      } else if (action_type_str == "unregister") {
         if ((remaining != "all") &&
             (!RE2::FullMatch(remaining, unregister_regex_, &name))) {
           evhtp_send_reply(req, EVHTP_RES_BADREQ);
@@ -681,14 +688,22 @@ HTTPAPIServer::HandleSharedMemoryControl(
 
   size_t offset = std::atoll(offset_str.c_str());
   size_t byte_size = std::atoll(byte_size_str.c_str());
-  int kind = std::atoll(kind_str.c_str());
+  int device_id = std::atoll(device_id_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
   TRTSERVER_SharedMemoryBlock* smb = nullptr;
 
   if (action_type_str == "register") {
     err = smb_manager_->Create(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size, kind);
+        &smb, name.c_str(), shm_key.c_str(), offset, byte_size,
+        TRTSERVER_MEMORY_CPU, 0);
+    if (err == nullptr) {
+      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
+    }
+  } else if (action_type_str == "cudaregister") {
+    err = smb_manager_->Create(
+        &smb, name.c_str(), shm_key.c_str(), offset, byte_size,
+        TRTSERVER_MEMORY_GPU, device_id);
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }

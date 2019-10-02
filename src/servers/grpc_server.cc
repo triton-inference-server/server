@@ -1610,11 +1610,15 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
             &smb, request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
             request.register_().offset(), request.register_().byte_size(),
-            request.register_().kind());
+            TRTSERVER_MEMORY_CPU, 0);
       } else {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            "only system shared memory is supported currently");
+        // cuda shared memory
+        err = smb_manager_->Create(
+            &smb, request.register_().name(),
+            request.register_().cuda_shared_memory().name(),
+            request.register_().offset(), request.register_().byte_size(),
+            TRTSERVER_MEMORY_GPU,
+            request.register_().cuda_shared_memory().device_id());
       }
       if (err == nullptr) {
         err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);

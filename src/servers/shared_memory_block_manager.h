@@ -54,7 +54,7 @@ class SharedMemoryBlockManager {
   TRTSERVER_Error* Create(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size,
-      const int kind);
+      const int kind, const int device_id);
 
   /// Get a named shared memory block. Return
   /// TRTSERVER_ERROR_NOT_FOUND if named block doesn't exist.

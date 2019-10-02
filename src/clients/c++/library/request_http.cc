@@ -596,7 +596,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       bool verbose);
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind) override;
+      const size_t byte_size, const int kind, const int device_id) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -606,7 +606,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   Error SendRequest(
       const std::string& action_str, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size,
-      const int kind);
+      const int device_id);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
   // URL for control endpoint on inference server.
@@ -648,9 +648,13 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind)
+    const size_t byte_size, const int kind, const int device_id)
 {
-  return SendRequest("register", name, shm_key, offset, byte_size, kind);
+  if (kind == 0) {
+    return SendRequest("register", name, shm_key, offset, byte_size, 0);
+  }
+  return SendRequest(
+      "cudaregister", name, shm_key, offset, byte_size, device_id);
 }
 
 Error
@@ -691,7 +695,7 @@ Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
     const std::string& shm_key, const size_t offset, const size_t byte_size,
-    const int kind)
+    const int device_id)
 {
   response_.clear();
   request_status_.Clear();
@@ -710,7 +714,11 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   std::string full_url = url_ + "/" + action_str;
   if (action_str == "register") {
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
-                "/" + std::to_string(byte_size) + "/" + std::to_string(kind);
+                "/" + std::to_string(byte_size);
+  } else if (action_str == "cudaregister") {
+    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
+                "/" + std::to_string(byte_size) + "/" +
+                std::to_string(device_id);
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }
