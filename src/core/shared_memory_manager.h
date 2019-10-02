@@ -93,7 +93,7 @@ class SharedMemoryManager {
   /// memory region that has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind);
+      const size_t byte_size, const int kind, const int device_id);
 
 #ifdef TRTIS_ENABLE_GPU
   /// Register a specified shared memory region if valid. If already registered

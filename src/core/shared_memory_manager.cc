@@ -131,7 +131,7 @@ OpenCudaIPCRegion(
 Status
 SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind)
+    const size_t byte_size, const int kind, const int device_id)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);

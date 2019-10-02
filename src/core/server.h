@@ -91,7 +91,7 @@ class InferenceServer {
   // registered return an ALREADY_EXISTS error.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind);
+      const size_t byte_size, const int kind, const int device_id);
 
   // Register the corresponding CUDA shared memory region. If already
   // registered return an ALREADY_EXISTS error.

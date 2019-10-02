@@ -304,7 +304,7 @@ message SharedMemoryRegion
   //@@
   //@@  .. cpp:var:: string name
   //@@
-  //@@     The name for this shared memory region.
+  //@@     The name for this System/CUDA shared memory region in TRTIS.
   //@@
   string name = 1;
 
