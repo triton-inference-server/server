@@ -342,7 +342,7 @@ class InferTest(unittest.TestCase):
         for platform in ('graphdef', 'savedmodel', 'netdef', 'plan'):
             if platform == 'plan' and CPU_ONLY:
                 continue
-            tensor_shape = (input_size, 1, 1) if platform == 'plan' else (input_size,)
+            tensor_shape = (input_size,)
             iu.infer_exact(self, platform, tensor_shape, 1,
                            np.float32, np.float32, np.float32,
                            model_version=1, swap=False)
