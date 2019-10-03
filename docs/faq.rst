@@ -96,7 +96,7 @@ GPU utilization:
 
 * The inference server can :ref:`simultaneous perform inference for
   multiple models <section-concurrent-model-execution>` (using either
-  the same of different frameworks) using the same GPU.
+  the same or different frameworks) using the same GPU.
 
 * The inference server can increase inference throughput by using
   :ref:`multiple instances of the same model
