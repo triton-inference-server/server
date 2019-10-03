@@ -948,7 +948,7 @@ HttpRequestImpl::~HttpRequestImpl()
     header_list_ = nullptr;
   }
 
-if (easy_handle_ != nullptr) {
+  if (easy_handle_ != nullptr) {
     curl_easy_cleanup(easy_handle_);
   }
 }
@@ -956,9 +956,23 @@ if (easy_handle_ != nullptr) {
 Error
 HttpRequestImpl::InitializeRequest()
 {
+  if (easy_handle_ != nullptr) {
+    curl_easy_reset(easy_handle_);
+  }
+
+  ordered_results_.clear();
+  infer_response_buffer_.clear();
+
+  request_status_.Clear();
+  response_header_.Clear();
+
   for (auto& io : inputs_) {
     reinterpret_cast<InputImpl*>(io.get())->PrepareForRequest();
   }
+
+  total_input_byte_size_ = 0;
+  input_pos_idx_ = 0;
+  result_pos_idx_ = 0;
 
   return Error::Success;
 }
@@ -1179,6 +1193,11 @@ InferHttpContextImpl::InitHttp(const std::string& server_url)
       &sctx, server_url, headers_, model_name_, verbose_);
   if (err.IsOk()) {
     err = Init(std::move(sctx));
+    if (err.IsOk()) {
+      // Create request context for synchronous request.
+      sync_request_.reset(
+          static_cast<InferContext::Request*>(new HttpRequestImpl(0, inputs_)));
+    }
   }
 
   return err;
@@ -1188,7 +1207,7 @@ Error
 InferHttpContextImpl::Run(ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> sync_request =
-      std::make_shared<HttpRequestImpl>(0, inputs_);
+      std::static_pointer_cast<HttpRequestImpl>(sync_request_);
 
   sync_request->Timer().Reset();
   sync_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
@@ -1197,8 +1216,7 @@ InferHttpContextImpl::Run(ResultMap* results)
     return curl_global.Status();
   }
 
-  std::shared_ptr<Request> lr = std::static_pointer_cast<Request>(sync_request);
-  Error err = PreRunProcessing(lr);
+  Error err = PreRunProcessing(sync_request_);
   if (!err.IsOk()) {
     return err;
   }
