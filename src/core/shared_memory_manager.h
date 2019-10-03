@@ -129,6 +129,10 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
 
+  Status CudaSharedMemoryAddress(
+      const std::string& name, size_t offset, size_t byte_size,
+      void** cuda_shm_addr, size_t* cuda_byte_size);
+
   /// Get the list of all registered shared memory regions.
   Status GetSharedMemoryStatus(SharedMemoryStatus* shm_status);
 
