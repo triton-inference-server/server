@@ -28,9 +28,9 @@
 # Multistage build.
 #
 
-ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.09-py3
-ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.09-py3
-ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.09-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrtserver:19.10-py3
+ARG PYTORCH_IMAGE=nvcr.io/nvidia/pytorch:19.10-py3
+ARG TENSORFLOW_IMAGE=nvcr.io/nvidia/tensorflow:19.10-py3
 
 ############################################################################
 ## TensorFlow stage: Use TensorFlow container to build
@@ -188,8 +188,8 @@ RUN python3 /workspace/onnxruntime/tools/ci_build/build.py --build_dir /workspac
 ############################################################################
 FROM ${BASE_IMAGE} AS trtserver_build
 
-ARG TRTIS_VERSION=1.8.0dev
-ARG TRTIS_CONTAINER_VERSION=19.11dev
+ARG TRTIS_VERSION=1.7.0dev
+ARG TRTIS_CONTAINER_VERSION=19.10dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 RUN apt-get update && \
@@ -344,8 +344,8 @@ ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 ############################################################################
 FROM ${BASE_IMAGE}
 
-ARG TRTIS_VERSION=1.8.0dev
-ARG TRTIS_CONTAINER_VERSION=19.11dev
+ARG TRTIS_VERSION=1.7.0dev
+ARG TRTIS_CONTAINER_VERSION=19.10dev
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
