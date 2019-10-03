@@ -43,6 +43,7 @@
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
 #include "third_party/gpus/cuda/include/cuda_runtime_api.h"
+#include "tensorflow/core/util/device_name_utils.h"
 
 TRTISTF_Error* TRTISTF_ErrorNew(const std::string& str);
 TRTISTF_Shape* TRTISTF_ShapeNew(size_t rank, int64_t* dims);
@@ -393,10 +394,12 @@ class ModelImpl {
   ModelImpl(
       const std::string& model_name,
       std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+      const int device_id);
   ModelImpl(
       const std::string& model_name, tensorflow::Session* session,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+      const int device_id);
   ~ModelImpl();
 
   TRTISTF_IOList* Inputs() const { return inputs_; }
@@ -410,7 +413,7 @@ class ModelImpl {
  private:
   // Return the device name that the session is on, if multiple device names
   // are present or the session is on CPU, return empty string;
-  std::string TFGPUDeviceName();
+  std::string TFGPUDeviceName(const int device_id);
 
   const std::string model_name_;
   std::unique_ptr<tensorflow::SavedModelBundle> bundle_;
@@ -423,21 +426,23 @@ class ModelImpl {
 ModelImpl::ModelImpl(
     const std::string& model_name,
     std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+    const int device_id)
     : model_name_(model_name), bundle_(std::move(bundle)), inputs_(inputs),
       outputs_(outputs)
 {
   session_ = bundle_->session.release();
-  device_name_ = TFGPUDeviceName();
+  device_name_ = TFGPUDeviceName(device_id);
 }
 
 ModelImpl::ModelImpl(
     const std::string& model_name, tensorflow::Session* session,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+    const int device_id)
     : model_name_(model_name), session_(session), inputs_(inputs),
       outputs_(outputs)
 {
-  device_name_ = TFGPUDeviceName();
+  device_name_ = TFGPUDeviceName(device_id);
 }
 
 ModelImpl::~ModelImpl()
@@ -528,19 +533,26 @@ ModelImpl::Run(
 }
 
 std::string
-ModelImpl::TFGPUDeviceName()
+ModelImpl::TFGPUDeviceName(const int device_id)
 {
   std::string device_name;
-  std::vector<tensorflow::DeviceAttributes> devices;
-  session_->ListDevices(&devices);
-  LOG(ERROR) << "getting devices: ";
-  for (const auto& d : devices) {
-    LOG(ERROR) << d.name();
-    if (d.device_type() == "GPU" || d.device_type() == "gpu") {
-      if (!device_name.empty()) {
-        return "";
+  if (device_id >= 0) {
+    std::vector<tensorflow::DeviceAttributes> devices;
+    session_->ListDevices(&devices);
+    LOG(ERROR) << "getting devices: ";
+    for (const auto& d : devices) {
+      LOG(ERROR) << d.name();
+      if (d.device_type() == "GPU" || d.device_type() == "gpu") {
+        // Session seems to be aware of all devices on the system,
+        // thus need to filter out the correct full name for the device
+        tensorflow::DeviceNameUtils::ParsedName parsed;
+        if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
+          if (parsed.id == device_id) {
+            device_name = d.name();
+            break;
+          }
+        }
       }
-      device_name = d.name();
     }
   }
   return device_name;
@@ -830,7 +842,7 @@ TRTISTF_ModelCreateFromGraphDef(
   }
 
   ModelImpl* model =
-      new ModelImpl(model_name, session, potential_inputs, potential_outputs);
+      new ModelImpl(model_name, session, potential_inputs, potential_outputs, device_id);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
@@ -982,7 +994,7 @@ TRTISTF_ModelCreateFromSavedModel(
   }
 
   ModelImpl* model =
-      new ModelImpl(model_name, std::move(bundle), inputs, outputs);
+      new ModelImpl(model_name, std::move(bundle), inputs, outputs, device_id);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
