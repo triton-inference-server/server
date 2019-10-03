@@ -489,19 +489,18 @@ PlanBackend::Context::InitializeInputBinding(
     is_dynamic_ = true;
   }
 
-  if (!is_control) {
+  if (!(is_control && is_dynamic_)) {
     RETURN_IF_ERROR(CompareDimsSupported(
         name_, input_name, engine_dims, model_config_dims, support_batching,
         is_dynamic_));
   } else {
-    std::vector<int64_t> dims_vec;
-    DimsToDimVec(engine_dims, &dims_vec);
-    if (GetElementCount(dims_vec) != 1) {
+    Status status = ValidateControlDimsDynamic(engine_dims, support_batching);
+    if (!status.IsOk()) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "unexpected dimensions " + DimsDebugString(engine_dims) +
-              " for control input '" + input_name +
-              "', expecting a single element for " + name_);
+              " for control input '" + input_name + "' for " + name_ +
+              ". Error details: " + status.Message());
     }
   }
 

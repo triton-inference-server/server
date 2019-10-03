@@ -287,6 +287,30 @@ ValidateDimension(
   return Status::Success;
 }
 
+Status
+ValidateControlDimsDynamic(
+    const nvinfer1::Dims& dims, const bool support_batching)
+{
+  int expected_first_shape = (support_batching ? -1 : 1);
+  if (dims.d[0] != expected_first_shape) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "The shape of first dimension of a control input should be " +
+            std::to_string(expected_first_shape) + ". Got " +
+            std::to_string(dims.d[0]));
+  }
+  for (int i = 1; i < dims.nbDims; i++) {
+    if (dims.d[i] != 1) {
+      return Status(
+          RequestStatusCode::INTERNAL,
+          "All dimensions (conditionally first) of a control input should have "
+          "shape 1. Got " +
+              std::to_string(dims.d[i]) + " at " + std::to_string(i));
+    }
+  }
+  return Status::Success;
+}
+
 
 void
 DimsToDimVec(const nvinfer1::Dims& model_dims, std::vector<int64_t>* dims)

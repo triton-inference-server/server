@@ -543,15 +543,16 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
     builder = trt.infer.create_infer_builder(G_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
-    if max_batch == 0:
-        header = []
-    else:
-        header =  [-1]
-    
     unit_shape = ([1] * len(shape))
-    in0 = network.add_input("INPUT", trt_dtype, header + shape)
-    start0 = network.add_input("START", trt_dtype, header + unit_shape)
-    ready0 = network.add_input("READY", trt_dtype, header + unit_shape)
+    if max_batch != 0:
+        in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
+        start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+    else :
+        in0 = network.add_input("INPUT", trt_dtype, shape)
+        start0 = network.add_input("START", trt_dtype, unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+
     add = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     out0 = network.add_elementwise(add.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
 
@@ -577,9 +578,9 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, s
 
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
-    if max_shape != 0:
-        profile.set_shape("START", [1] + unit_shape, [max(1, max_batch)] + unit_shape, [max(1, max_batch)] + unit_shape)
-        profile.set_shape("READY", [1] + unit_shape, [max(1, max_batch)] + unit_shape, [max(1, max_batch)] + unit_shape)
+    if max_batch != 0:
+        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape, [max_batch] + unit_shape)
+        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape, [max_batch] + unit_shape)
     else:
         profile.set_shape("START", unit_shape, unit_shape, unit_shape)
         profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
@@ -615,15 +616,16 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
     builder = trt.infer.create_infer_builder(G_LOGGER)
     network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
-    if max_batch == 0:
-        header = []
-    else:
-        header =  [-1]
     unit_shape = ([1] * len(shape))
-
-    in0 = network.add_input("INPUT", trt_dtype, header + [i for i in shape])
-    start0 = network.add_input("START", trt_dtype, header + unit_shape)
-    ready0 = network.add_input("READY", trt_dtype, header + unit_shape)
+    if max_batch != 0:
+        in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
+        start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+    else :
+        in0 = network.add_input("INPUT", trt_dtype, shape)
+        start0 = network.add_input("START", trt_dtype, unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+    
     add = network.add_elementwise(in0, start0, trt.infer.ElementWiseOperation.SUM)
     out0 = network.add_elementwise(add.get_output(0), ready0, trt.infer.ElementWiseOperation.PROD)
 
@@ -672,12 +674,13 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch, dtype
 
     profile = builder.create_optimization_profile()
     profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
-    if max_shape != 0:
-        profile.set_shape("START", [1] + unit_shape, [max(1, max_batch)] + unit_shape, [max(1, max_batch)] + unit_shape)
-        profile.set_shape("READY", [1] + unit_shape, [max(1, max_batch)] + unit_shape, [max(1, max_batch)] + unit_shape)
+    if max_batch != 0:
+        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape, [max_batch] + unit_shape)
+        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape, [max_batch] + unit_shape)
     else:
         profile.set_shape("START", unit_shape, unit_shape, unit_shape)
         profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
+        
     config = builder.create_builder_config()
     config.flags=flags
     config.add_optimization_profile(profile)

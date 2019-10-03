@@ -108,10 +108,12 @@ done
 #   modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 for m in \
+        $DATADIR/qa_variable_sequence_model_repository/plan_sequence_float32 \
         $DATADIR/qa_variable_sequence_model_repository/netdef_sequence_int32 \
         $DATADIR/qa_variable_sequence_model_repository/graphdef_sequence_object \
         $DATADIR/qa_variable_sequence_model_repository/savedmodel_sequence_float32 \
         $DATADIR/qa_variable_sequence_model_repository/onnx_sequence_int32 \
+        $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_plan_sequence_float32 \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_netdef_sequence_int32 \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_graphdef_sequence_object \
         $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_savedmodel_sequence_float32 \
