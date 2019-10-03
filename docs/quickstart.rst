@@ -271,4 +271,4 @@ arguments::
   Image '../images/mug.jpg':
       504 (COFFEE MUG) = 0.778078556061
 
-For more information, see :ref:`section-image_classification_example`.
+For more information, see :ref:`section-image-classification-example`.

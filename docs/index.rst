@@ -76,6 +76,7 @@ NVIDIA TensorRT Inference Server
    :maxdepth: 2
    :caption: Reference
 
+   faq
    capabilities
    protobuf_api/protobuf_api_root
    cpp_api/cpp_api_root

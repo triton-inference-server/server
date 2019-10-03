@@ -160,13 +160,17 @@ Documentation
 The User Guide, Developer Guide, and API Reference `documentation for
 the current release
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-guide/docs/index.html>`_
-provide guidance on installing, building and running the TensorRT
+provide guidance on installing, building, and running the TensorRT
 Inference Server.
 
 You can also view the `documentation for the master branch
 <https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/index.html>`_
 and for `earlier releases
 <https://docs.nvidia.com/deeplearning/sdk/inference-server-archived/index.html>`_.
+
+An `FAQ
+<https://docs.nvidia.com/deeplearning/sdk/tensorrt-inference-server-master-branch-guide/docs/faq.html>`_
+provides answers for frequently asked questions.
 
 READMEs for deployment examples can be found in subdirectories of
 deploy/, for example, `deploy/single_server/README.rst
