@@ -210,7 +210,13 @@ PinnedMemoryManager::CheckPrerequisite(uint64_t requested_size)
 {
   std::string error_message;
 #ifdef TRTIS_ENABLE_GPU
-  if ((allocated_pinned_memory_byte_size_ + requested_size) >
+  if (requested_size < options_.min_request_size_) {
+    error_message =
+        ("minimum pinned memory allocation is " +
+         std::to_string(options_.min_request_size_) + " bytes, requested " +
+         std::to_string(requested_size));
+  } else if (
+      (allocated_pinned_memory_byte_size_ + requested_size) >
       options_.pinned_memory_pool_byte_size_) {
     error_message =
         ("pinned memory poll exceeded (" +
