@@ -178,6 +178,29 @@ PrecisionModeToString(const TRTISTF_TFTRTPrecisionMode m)
   }
 }
 
+// Helper function to help setting Callable related parts properly,
+// adapoted from
+// https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/common_runtime/graph_execution_state.cc#L382
+bool IsGPUFeedAndFetchSupported(TRTISTF_DataType dtype) {
+  switch (ConvertDataType(dtype)) {
+    case tensorflow::DT_BFLOAT16:
+    case tensorflow::DT_BOOL:
+    case tensorflow::DT_COMPLEX128:
+    case tensorflow::DT_COMPLEX64:
+    case tensorflow::DT_DOUBLE:
+    case tensorflow::DT_FLOAT:
+    case tensorflow::DT_HALF:
+    case tensorflow::DT_INT16:
+    case tensorflow::DT_INT64:
+    case tensorflow::DT_INT8:
+    case tensorflow::DT_UINT16:
+    case tensorflow::DT_UINT8:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void
 NewSessionOptions(
     const bool has_graph_level, const int graph_level,
@@ -299,8 +322,8 @@ TensorImpl::TensorImpl(
     const tensorflow::TensorShape& tfshape, const int tf_gpu_id)
     : name_(name), dtype_(dtype), shape_(shape)
 {
-  // Only request for GPU allocator for non-string data type
-  auto a = ((tf_gpu_id >= 0) && (dtype != TRTISTF_TYPE_STRING))
+  // Only request for GPU allocator for supported data type
+  auto a = ((tf_gpu_id >= 0) && IsGPUFeedAndFetchSupported(dtype))
                ? tensorflow::GPUProcessState::singleton()->GetGPUAllocator(
                      tensorflow::GPUOptions(), tensorflow::TfGpuId(tf_gpu_id),
                      1 << 28 /* total_memory_size */)
@@ -467,7 +490,7 @@ ModelImpl::Run(
                                ? node->io_->inmodel_name_
                                : node->io_->name_;
         if ((output_info.first == name) &&
-            (node->io_->data_type_ != TRTISTF_TYPE_STRING)) {
+            IsGPUFeedAndFetchSupported(node->io_->data_type_)) {
           opts.mutable_fetch_devices()->insert(
               {output_info.first, device_name_});
           break;
