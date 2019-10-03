@@ -76,6 +76,9 @@ Status CompareDimsSupported(
     const nvinfer1::Dims& model_dims, const DimsList& dims,
     const bool supports_batching, const bool is_dynamic);
 
+Status ValidateControlDimsDynamic(
+    const nvinfer1::Dims& dims, const bool support_batching);
+
 Status MaximumDims(
     const nvinfer1::Dims& max_dims, const DimsList& dims,
     std::vector<int64_t>* normalized_dims, const bool support_batching);
