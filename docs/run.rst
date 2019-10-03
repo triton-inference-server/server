@@ -71,7 +71,7 @@ An example ensemble model repository is also provided in the
 <https://github.com/NVIDIA/tensorrt-inference-server/tree/master/docs/examples/ensemble_model_repository>`_
 directory. It contains a custom image preprocess model, Caffe2
 ResNet50, and an ensemble (used by the :ref:`ensemble_image_client
-example <section-ensemble_image_classification_example>`).
+example <section-ensemble-image-classification-example>`).
 
 Before using the example ensemble model repository, in addition to
 fetching public model definition files as mentioned above, you must

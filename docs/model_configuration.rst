@@ -456,12 +456,12 @@ Dynamic Batcher
 ^^^^^^^^^^^^^^^
 
 Dynamic batching is a feature of the inference server that allows
-non-batched inference requests to be combined by the server, so that a
-batch is created dynamically, resulting in the same increased
-throughput seen for batched inference requests. The dynamic batcher
-should be used for :ref:`stateless <section-models-and-schedulers>`
-models. The dynamically created batches are distributed to all
-:ref:`instances <section-instance-groups>` configured for the model.
+inference requests to be combined by the server, so that a batch is
+created dynamically, resulting in the same increased throughput seen
+for batched inference requests. The dynamic batcher should be used for
+:ref:`stateless <section-models-and-schedulers>` models. The
+dynamically created batches are distributed to all :ref:`instances
+<section-instance-groups>` configured for the model.
 
 Dynamic batching is enabled and configured independently for each
 model using the :cpp:var:`ModelDynamicBatching
