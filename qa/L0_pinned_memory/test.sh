@@ -90,9 +90,9 @@ for BACKEND in $BACKENDS; do
         exit 1
     fi
 
-    # Sanity check that the server allocates pinned memory
+    # Sanity check that the server allocates pinned memory for large size
     set +e
-    $CLIENT -m${ENSEMBLE_NAME} -b1 -s1 -n1
+    $CLIENT -m${ENSEMBLE_NAME} -b1 -s16777216 -n1
     if (( $? != 0 )); then
         RET=1
     fi
