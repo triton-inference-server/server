@@ -94,14 +94,6 @@ class BatcherTest(unittest.TestCase):
                                use_grpc=False, skip_request_id_check=True,
                                use_streaming=False, shm_region_names=shm_region_names,
                                precreated_shm_regions=precreated_shm_regions)
-            elif trial == "plan":
-                tensor_shape = (input_size,1,1)
-                iu.infer_exact(self, trial, tensor_shape, bs,
-                               np.float32, np.float32, np.float32, swap=False,
-                               model_version=1, outputs=requested_outputs,
-                               use_grpc=False, skip_request_id_check=True,
-                               use_streaming=False, shm_region_names=shm_region_names,
-                               precreated_shm_regions=precreated_shm_regions)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
