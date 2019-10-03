@@ -84,8 +84,8 @@ target_link_libraries(
   request_static
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
+  PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
-  PUBLIC CURL::libcurl
 )
 if(NOT WIN32)
   target_link_libraries(
@@ -114,8 +114,8 @@ target_link_libraries(
   request
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
+  PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
-  PUBLIC CURL::libcurl
 )
 if(NOT WIN32)
   target_link_libraries(
