@@ -797,6 +797,14 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
     size_t offset, size_t byte_size, void** base);
 
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaSharedMemoryAddress(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    size_t offset, size_t byte_size, void** cuda_base, size_t* cuda_byte_size);
+
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryDevice(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block, int* kind,
+    int* device_id);
+
 /// Get the list of all active shared memory region on the inference server.
 /// If there are none then the list is empty. Returned error indicates if it
 /// was able to successfully get all active shared memory regions or not.

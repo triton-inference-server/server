@@ -151,45 +151,65 @@ SharedMemoryManager::RegisterSharedMemory(
   }
 
   // register (or re-register)
-  void *mapped_addr, *cuda_ipc_addr;
-  int shm_fd = -1;
+  if (kind == 0) {
+    void* mapped_addr;
+    int shm_fd = -1;
 
-  // don't re-open if shared memory is already open
-  for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
-       ++itr) {
-    if (itr->second->shm_key_ == shm_key) {
-      shm_fd = itr->second->shm_fd_;
-      break;
+    // don't re-open if shared memory is already open
+    for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
+         ++itr) {
+      if (itr->second->shm_key_ == shm_key) {
+        shm_fd = itr->second->shm_fd_;
+        break;
+      }
     }
-  }
 
-  // open and set new shm_fd if new shared memory key
-  if (shm_fd == -1) {
-    RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
-  }
+    // open and set new shm_fd if new shared memory key
+    if (shm_fd == -1) {
+      RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+    }
 
-  Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
-  if (!status.IsOk()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "failed to register shared memory region '" + name + "'");
-  }
+    Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
+    if (!status.IsOk()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "failed to register shared memory region '" + name + "'");
+    }
+    shared_memory_map_.insert(std::make_pair(
+        name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
+                  name, shm_key, offset, byte_size, shm_fd, mapped_addr,
+                  nullptr, kind, device_id))));
+  } else {
+    void *mapped_addr = nullptr, *cuda_ipc_addr;
+    size_t shm_byte_size = 0, shm_offset = 0;
 
-  if (kind != 0) {
-    if (byte_size % sizeof(ipcCUDA_t) != 0) {
+    for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
+         ++itr) {
+      if (itr->second->shm_key_ == shm_key) {
+        mapped_addr = itr->second->mapped_addr_;
+        shm_byte_size = itr->second->byte_size_;
+        shm_offset = itr->second->offset_;
+        break;
+      }
+    }
+
+    if (shm_byte_size < sizeof(ipcCUDA_t)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "shared memory region '" + name +
-              "' must be a multiple of the size of cuda IPC representation");
+              "' must be at least of the size of cuda IPC representation");
     }
-    ipcCUDA_t* shm_cuda_rep = reinterpret_cast<ipcCUDA_t*>(mapped_addr);
-    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr);
-  }
 
-  shared_memory_map_.insert(std::make_pair(
-      name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                name, shm_key, offset, byte_size, shm_fd, mapped_addr,
-                cuda_ipc_addr, kind, device_id))));
+    // Get CUDA shared memory base address
+    void* shm_mapped_addr = (void*)((uint8_t*)mapped_addr + shm_offset);
+    ipcCUDA_t* shm_cuda_rep = reinterpret_cast<ipcCUDA_t*>(shm_mapped_addr);
+    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr);
+
+    shared_memory_map_.insert(std::make_pair(
+        name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
+                  name, shm_key, offset, byte_size, -1, nullptr, cuda_ipc_addr,
+                  kind, device_id))));
+  }
 
   return Status::Success;
 }
@@ -316,11 +336,38 @@ SharedMemoryManager::SharedMemoryAddress(
   if (it == shared_memory_map_.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "Unable to find shared memory region: '" + name + "'");
+        "Unable to find system shared memory region: '" + name + "'");
+  }
+  if (it->second->kind_ == 1) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "Not a valid system shared memory region: '" + name + "'");
   }
 
   *shm_mapped_addr =
       (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
+  return Status::Success;
+}
+
+Status
+SharedMemoryManager::CudaSharedMemoryAddress(
+    const std::string& name, size_t offset, size_t byte_size,
+    void** cuda_shm_addr, size_t* cuda_byte_size)
+{
+  auto it = shared_memory_map_.find(name);
+  if (it == shared_memory_map_.end()) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "Unable to find CUDA shared memory region: '" + name + "'");
+  }
+  if (it->second->kind_ == 0) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "Not a valid CUDA shared memory region: '" + name + "'");
+  }
+  *cuda_shm_addr = (void*)((uint8_t*)it->second->cuda_ipc_addr_ + offset);
+  *cuda_byte_size = it->second->byte_size_;
+
   return Status::Success;
 }
 

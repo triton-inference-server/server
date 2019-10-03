@@ -1227,6 +1227,37 @@ TRTSERVER_ServerSharedMemoryAddress(
 }
 
 TRTSERVER_Error*
+TRTSERVER_ServerCudaSharedMemoryAddress(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    size_t offset, size_t byte_size, void** cuda_base, size_t* cuda_byte_size)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->CudaSharedMemoryAddress(
+      lsmb->Name(), offset, byte_size, cuda_base, cuda_byte_size));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerSharedMemoryDevice(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block, int* kind, int* device_id)
+{
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  *kind = lsmb->Kind();
+  *device_id = lsmb->DeviceId();
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
 TRTSERVER_ServerSharedMemoryStatus(
     TRTSERVER_Server* server, TRTSERVER_Protobuf** status)
 {

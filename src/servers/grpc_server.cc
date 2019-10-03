@@ -134,6 +134,8 @@ struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
+    int kind;
+    int device_id;
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
@@ -732,18 +734,35 @@ InferAllocatorPayload(
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
 
-      void* base;
-      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-          trtserver.get(), smb, io.shared_memory().offset(),
-          io.shared_memory().byte_size(), &base));
-
       if (alloc_payload->shm_map_ == nullptr) {
         alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
       }
 
-      alloc_payload->shm_map_->emplace(
-          io.name(),
-          AllocPayload::ShmInfo{base, io.shared_memory().byte_size()});
+      int kind, device_id;
+      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryDevice(smb, &kind, &device_id));
+
+      if (kind == 0) {
+        void* base;
+        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+            trtserver.get(), smb, io.shared_memory().offset(),
+            io.shared_memory().byte_size(), &base));
+
+        alloc_payload->shm_map_->emplace(
+            io.name(),
+            AllocPayload::ShmInfo{base, io.shared_memory().byte_size(), 0, 0});
+      } else {
+        void* cuda_shm_addr;
+        size_t cuda_byte_size;
+        // Get cuda shared memory base address from system shared memory base
+        // address
+        TRTSERVER_ServerCudaSharedMemoryAddress(
+            trtserver.get(), smb, io.shared_memory().offset(),
+            io.shared_memory().byte_size(), &cuda_shm_addr, &cuda_byte_size);
+        alloc_payload->shm_map_->emplace(
+            io.name(),
+            AllocPayload::ShmInfo{cuda_shm_addr, io.shared_memory().byte_size(),
+                                  kind, device_id});
+      }
     }
   }
 

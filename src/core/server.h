@@ -99,10 +99,15 @@ class InferenceServer {
   // Unregister all active shared memory regions.
   Status UnregisterAllSharedMemory();
 
-  // Get the address at 'offset' within a shared memory region
+  // Get the address at 'offset' within a system shared memory region
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
+
+  // Get the address at 'offset' and byte size of a CUDA shared memory region
+  Status CudaSharedMemoryAddress(
+      const std::string& name, size_t offset, size_t byte_size,
+      void** cuda_shm_addr, size_t* cuda_byte_size);
 
   // Get list of active shared memory regions.
   Status GetSharedMemoryStatus(SharedMemoryStatus* shm_status);
