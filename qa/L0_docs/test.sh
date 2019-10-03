@@ -38,6 +38,11 @@ apt-get update && \
 
 set +e
 
+(cd src/clients/c++/library && 
+    cp -f request.h.in request.h
+    cp -f request_grpc.h.in request_grpc.h
+    cp -f request_http.h.in request_http.h)
+
 (cd docs && rm -f trtis_docs.zip && \
         make BUILDDIR=/opt/tensorrtserver/qa/L0_docs/build clean html) > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
