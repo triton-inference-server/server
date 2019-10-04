@@ -36,11 +36,15 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 CLIENT=../clients/simple_perf_client
+REPORTER=../common/reporter.py
+
+# The tensorrt identity model only allows variable size up to 32 so we
+# can't use it for the large tensor size runs we do here
 BACKENDS=${BACKENDS:="custom graphdef savedmodel onnx libtorch netdef"}
-WARMUP_ITERS=20
-MEASURE_ITERS=100
+WARMUP_ITERS=10
+MEASURE_ITERS=50
 BATCH_SIZE=1
-TENSOR_SIZE=16384
+TENSOR_SIZES="16384 16777216"   # 16k and 16m fp32 elements
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -50,7 +54,7 @@ source ../common/util.sh
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
 
-rm -f *.log *.serverlog *.csv *.metrics
+rm -f *.json *.log *.serverlog
 RET=0
 
 rm -fr ./custom_models && mkdir ./custom_models && \
@@ -74,7 +78,7 @@ for BACKEND in $BACKENDS; do
                 echo "instance_group [ { kind: ${KIND} }]" >> config.pbtxt)
 
     SERVER_ARGS=--model-repository=`pwd`/models
-    SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
+    SERVER_LOG="${BACKEND}.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -82,28 +86,54 @@ for BACKEND in $BACKENDS; do
         exit 1
     fi
 
-    set +e
-    $CLIENT -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-    if (( $? != 0 )); then
-        RET=1
-    fi
+    echo -e "[" > ${BACKEND}.log
 
-    $CLIENT -i grpc -u localhost:8001 -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-    if (( $? != 0 )); then
-        RET=1
-    fi
+    FIRST=1
+    for TENSOR_SIZE in $TENSOR_SIZES; do
+        set +e
 
-    set -e
+        if (( $FIRST != 1 )); then
+            echo -e "," >> ${BACKEND}.log
+        fi
+        FIRST=0
+
+        $CLIENT -j -f${BACKEND} -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+                -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+        if (( $? != 0 )); then
+            RET=1
+        fi
+
+        echo -e "," >> ${BACKEND}.log
+
+        $CLIENT -i grpc -u localhost:8001 -j -f${BACKEND} -m${MODEL_NAME} -b${BATCH_SIZE} \
+                -s${TENSOR_SIZE} -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+        if (( $? != 0 )); then
+            RET=1
+        fi
+
+        set -e
+    done
+
+    echo -e "]" >> ${BACKEND}.log
 
     kill $SERVER_PID
     wait $SERVER_PID
-done
 
-for BACKEND in $BACKENDS; do
-    echo -e "\n${BACKEND}\n************"
-    cat ${BACKEND}.log
+    if [ -f $REPORTER ]; then
+        set +e
+
+        URL_FLAG=
+        if [ ! -z ${BENCHMARK_REPORTER_URL} ]; then
+            URL_FLAG="-u ${BENCHMARK_REPORTER_URL}"
+        fi
+
+        $REPORTER -v -o ${BACKEND}.json ${URL_FLAG} ${BACKEND}.log
+        if (( $? != 0 )); then
+            RET=1
+        fi
+
+        set -e
+    fi
 done
 
 if (( $RET == 0 )); then
