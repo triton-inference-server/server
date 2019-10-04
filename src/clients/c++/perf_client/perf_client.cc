@@ -369,10 +369,10 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::endl;
   std::cerr << FormatMessage(
                    " --latency-threshold (-l): Sets the limit on the observed "
-                   "latency. Client will top incrementing the concurrency and "
-                   "abort the execution once the measured latency exceeds this "
-                   "threshold. By default, latency threshold is set 0 and "
-                   "the perf_client will run for entire --concurrency-range.",
+                   "latency. Client will terminate the concurrency search once "
+                   "the measured latency exceeds this threshold. By default, "
+                   "latency threshold is set 0 and the perf_client will run "
+                   "for entire --concurrency-range.",
                    18)
             << std::endl;
   std::cerr
@@ -383,28 +383,31 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::endl;
   std::cerr
       << FormatMessage(
-             " --stability-percentage (-s): Indicates the deviation threshold "
-             "for the measurements. The measurement is considered as stable if "
-             "the recent 3 measurements are within +/- (deviation threshold)% "
-             "of their average in terms of both infer per second and latency. "
-             "Default is 10(%).",
+             " --stability-percentage (-s): Indicates the allowed variation in "
+             "latency measurements when determining if a result is stable. The "
+             "measurement is considered as stable if the recent 3 measurements "
+             "are within +/- (stability percentage)% of their average in terms "
+             "of both infer per second and latency. Default is 10(%).",
              18)
       << std::endl;
   std::cerr << FormatMessage(
                    " --max-trials (-r): Indicates the maximum number of "
-                   "measurements for each profiling setting. The perf client "
-                   "will take multiple measurements and report the measurement "
-                   "until it is stable. The perf client will abort if the "
-                   "measurement is still unstable after the maximum number of "
-                   "measuremnts. The default value is 10.",
+                   "measurements for each concurrency level visited during "
+                   "search. The perf client will take multiple measurements "
+                   "and report the measurement until it is stable. The perf "
+                   "client will abort if the measurement is still unstable "
+                   "after the maximum number of measurements. The default "
+                   "value is 10.",
                    18)
             << std::endl;
   std::cerr
       << FormatMessage(
-             " --percentile: Indicates that the specified percentile in "
-             "terms of latency will also be reported and used to detemine if "
-             "the measurement is stable instead of average latency. Default "
-             "is -1 to indicate no percentile will be used.",
+             " --percentile: Indicates the confidence value as a percentile "
+             "that will be used to determine if a measurement is stable. For "
+             "example, a value of 85 indicates that the 85th percentile "
+             "latency will be used to determine stability. The percentile will "
+             "also be reported in the results. The default is -1 indicating "
+             "that the average latency is used to determine stability",
              18)
       << std::endl;
   std::cerr << std::endl;
@@ -759,15 +762,15 @@ main(int argc, char** argv)
     concurrency_range[CONCURRENCY_RANGE::kSTART] = concurrent_request_count;
   }
 
-  if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT &&
-      latency_threshold_ms == NO_LIMIT) {
+  if ((concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT) &&
+      (latency_threshold_ms == NO_LIMIT)) {
     Usage(
         argv,
         "The end of the search range and the latency limit can not be both 0 "
         "simultaneously");
   }
 
-  if ((!url_specified) && protocol == perfclient::ProtocolType::GRPC) {
+  if (!url_specified && (protocol == perfclient::ProtocolType::GRPC)) {
     url = "localhost:8001";
   }
 
