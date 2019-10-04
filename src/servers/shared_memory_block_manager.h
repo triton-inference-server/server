@@ -49,6 +49,10 @@ class SharedMemoryBlockManager {
   /// \param offset The offset within the shared memory object to the
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
+  /// \param kind The kind of device the shared memory region is in (CPU
+  ///  = 0, GPU = 1)
+  /// \param device id The GPU number the shared memory region is in. Not
+  /// required for CPU.
   /// \return a TRTSERVER_Error indicating success or failure.
   TRTSERVER_Error* CpuCreate(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,

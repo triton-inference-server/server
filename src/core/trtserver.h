@@ -145,6 +145,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
     const char* shm_key, const size_t offset, const size_t byte_size);
 
+/// Create a new shared memory block object referencing a CUDA shared
+/// memory block residing in TRTSERVER_MEMORY_GPU type memory.
+/// \param shared_memory_block Returns the new shared memory block object.
+/// \param name A unique name for the shared memory block. This name
+/// is used in inference requests to refer to this shared memory
+/// block.
+/// \param shm_name The name of the system shared memory block containing
+/// the CUDA IPC handle.
+/// \param offset The offset within the CUDA shared memory object to the
+/// start of the block.
+/// \param byte_size The size, in bytes of the block.
+/// \param device id The GPU number the CUDA shared memory region is in.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
     const char* shm_name, const size_t offset, const size_t byte_size,
@@ -838,10 +851,24 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
     size_t offset, size_t byte_size, void** base);
 
+/// \param server The inference server object.
+/// \param shared_memory_block The system shared memory block.
+/// \param offset The offset within the shared memory block to get the
+/// address for.
+/// \param byte_size The size of the memory block within the shared memory
+/// block. Returns error if a block of this size (starting at
+/// 'offset') isn't completely contained in the shared memory block.
+/// \param base Returns the base address.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaSharedMemoryAddress(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
     size_t offset, size_t byte_size, void** cuda_base, size_t* cuda_byte_size);
 
+/// \param shared_memory_block The CUDA shared memory block.
+/// \param kind Returns the kind of device the shared memory region is in (CPU
+///  = 0, GPU = 1)
+/// \param device id Returns the GPU number the shared memory region is in.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryDevice(
     TRTSERVER_SharedMemoryBlock* shared_memory_block, int* kind,
     int* device_id);
