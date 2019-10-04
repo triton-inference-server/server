@@ -158,7 +158,7 @@ The version of TensorFlow used in the Dockerfile build can be found in
 the `Framework Containers Support Matrix
 <https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 The trtserver_tf section of the Dockerfile shows how to build the
-required TensorFlow libary from the `NGC <https://ngc.nvidia.com>`_
+required TensorFlow library from the `NGC <https://ngc.nvidia.com>`_
 TensorFlow container.
 
 You can build and install a different version of the TensorFlow
@@ -213,7 +213,7 @@ The version of PyTorch and Caffe2 used in the Dockerfile build can be
 found in the `Framework Containers Support Matrix
 <https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html>`_.
 The trtserver_caffe2 section of the Dockerfile shows how to build the
-required PyTorch and Caffe2 libaries from the `NGC
+required PyTorch and Caffe2 libraries from the `NGC
 <https://ngc.nvidia.com>`_ PyTorch container.
 
 You can build and install a different version of the libraries but if
@@ -333,7 +333,7 @@ A custom backend is not built-into the inference server. Instead it is
 built as a separate shared library that the inference server
 dynamically loads when the model repository contains a model that uses
 that custom backend. There are a couple of ways you can build your
-custom backend into a shared libary, as described in the following
+custom backend into a shared library, as described in the following
 sections.
 
 Build Using CMake

@@ -222,29 +222,22 @@ For more information, see
 Getting The Client Examples
 ---------------------------
 
-The provided Dockerfile.client can be used to build the client
-libraries and examples. First change directory to the root of the repo
-and checkout the release version of the branch that you want to build
-(or the master branch if you want to build the under-development
-version). The branch you use for the client build should match the
-version of the inference server you are using::
+Make sure you log into NGC as described in
+:ref:`section-prerequisites` before attempting the steps in this
+section. Use docker pull to get the client libraries and examples
+container from NGC::
 
-  $ git checkout r19.10
+  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
 
-Then use docker to build the C++ client library, C++ and Python
-examples, and a Python wheel file for the Python client library::
+Where <xx.yy> is the version that you want to pull. Run the client
+image so that the client examples can access the inference server::
 
-  $ docker build -t tensorrtserver_client -f Dockerfile.client .
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
 
-After the build completes, the tensorrtserver_client Docker image will
-contain the built client libraries and examples. Run the client image
-so that the client examples can access the inference server::
-
-  $ docker run -it --rm --net=host tensorrtserver_client
-
-It is also possible to build the client examples without Docker and
-for some platforms pre-compiled client examples are available. For
-more information, see :ref:`section-getting-the-client-examples`.
+It is also possible to build the client examples with or without
+Docker and for some platforms pre-compiled client examples are
+available. For more information, see
+:ref:`section-getting-the-client-examples`.
 
 .. _section-running-the-image-classification-example:
 
