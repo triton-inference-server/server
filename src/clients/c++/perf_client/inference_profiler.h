@@ -122,8 +122,8 @@ class InferenceProfiler {
   /// Create a profiler that collects and summarizes inference statistic.
   /// \param verbose Whether to print verbose logging.
   /// \param stability_threshold The range that the measurement is considered as
-  /// stable. i.e. within (1 +/- stability_threshold) * average value of the last
-  /// 3 measurements. The criterias are "infer per second" and "average
+  /// stable. i.e. within (1 +/- stability_threshold) * average value of the
+  /// last 3 measurements. The criterias are "infer per second" and "average
   /// latency", or "infer per second" and "percentile latency" if valid
   /// percentile is set (see 'percentile' below).
   /// \param measurement_window_ms The duration of each measurement in msec.

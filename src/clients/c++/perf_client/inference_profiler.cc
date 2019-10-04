@@ -42,10 +42,10 @@ InferenceProfiler::Create(
   RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
 
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
-      verbose, stability_threshold, measurement_window_ms, max_measurement_count,
-      (percentile != -1), percentile, factory->SchedulerType(),
-      factory->ModelName(), factory->ModelVersion(), std::move(status_ctx),
-      std::move(manager)));
+      verbose, stability_threshold, measurement_window_ms,
+      max_measurement_count, (percentile != -1), percentile,
+      factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
+      std::move(status_ctx), std::move(manager)));
 
   if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
     ni::ServerStatus server_status;
@@ -167,15 +167,19 @@ InferenceProfiler::Profile(
         // We call it complete only if stability_window measurements are within
         // +/-(stability_threshold)% of the average infer per second and latency
         if ((load_status.infer_per_sec[idx] <
-             load_status.avg_ips * (1 - load_parameters_.stability_threshold)) ||
+             load_status.avg_ips *
+                 (1 - load_parameters_.stability_threshold)) ||
             (load_status.infer_per_sec[idx] >
-             load_status.avg_ips * (1 + load_parameters_.stability_threshold))) {
+             load_status.avg_ips *
+                 (1 + load_parameters_.stability_threshold))) {
           is_stable = false;
         }
         if ((load_status.latencies[idx] <
-             load_status.avg_latency * (1 - load_parameters_.stability_threshold)) ||
+             load_status.avg_latency *
+                 (1 - load_parameters_.stability_threshold)) ||
             (load_status.latencies[idx] >
-             load_status.avg_latency * (1 + load_parameters_.stability_threshold))) {
+             load_status.avg_latency *
+                 (1 + load_parameters_.stability_threshold))) {
           is_stable = false;
         }
       }

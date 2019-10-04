@@ -65,6 +65,7 @@ ConcurrencyManager::Create(
 
   size_t max_input_byte_size = 0;
   size_t max_batch1_num_strings = 0;
+  bool needs_string_input = false;
 
   for (const auto& input : ctx->Inputs()) {
     // Validate user provided shape
@@ -122,28 +123,6 @@ ConcurrencyManager::Create(
       }
     }
 
-    // Get the number of strings in a batch
-    size_t batch1_num_strings = 1;
-    if (input->DType() == ni::DataType::TYPE_STRING) {
-      if (!input->Shape().empty()) {
-        for (const auto dim : input->Shape()) {
-          batch1_num_strings *= dim;
-        }
-      } else {
-        for (const auto dim : input->Dims()) {
-          batch1_num_strings *= dim;
-        }
-      }
-    }
-
-    if (input->DType() == ni::DataType::TYPE_STRING) {
-      max_batch1_num_strings =
-          std::max(max_batch1_num_strings, batch1_num_strings);
-    } else {
-      max_input_byte_size =
-          std::max(max_input_byte_size, (size_t)input->ByteSize());
-    }
-
     // Read provided data
     if (!data_directory.empty()) {
       if (input->DType() != ni::DataType::TYPE_STRING) {
@@ -159,23 +138,46 @@ ConcurrencyManager::Create(
                       .first;
         RETURN_IF_ERROR(ReadTextFile(file_path, &it->second));
       }
+    } else {
+      if (input->DType() != ni::DataType::TYPE_STRING) {
+        max_input_byte_size =
+            std::max(max_input_byte_size, (size_t)input->ByteSize());
+      } else {
+        // Get the number of strings needed for this input batch-1
+        size_t batch1_num_strings = 1;
+        if (!input->Shape().empty()) {
+          for (const auto dim : input->Shape()) {
+            batch1_num_strings *= dim;
+          }
+        } else {
+          for (const auto dim : input->Dims()) {
+            batch1_num_strings *= dim;
+          }
+        }
+
+        needs_string_input = true;
+        max_batch1_num_strings =
+            std::max(max_batch1_num_strings, batch1_num_strings);
+      }
     }
   }
 
   // Create a zero or randomly (as indicated by zero_input_)
   // initialized buffer that is large enough to provide the largest
   // needed input. We (re)use this buffer for all input values.
-  if (zero_input) {
-    local_manager->input_buf_.resize(max_input_byte_size, 0);
-  } else {
-    local_manager->input_buf_.resize(max_input_byte_size);
-    for (auto& byte : local_manager->input_buf_) {
-      byte = rand();
+  if (max_input_byte_size > 0) {
+    if (zero_input) {
+      local_manager->input_buf_.resize(max_input_byte_size, 0);
+    } else {
+      local_manager->input_buf_.resize(max_input_byte_size);
+      for (auto& byte : local_manager->input_buf_) {
+        byte = rand();
+      }
     }
   }
 
   // Similarly, handle the input_string_buf_
-  if (max_batch1_num_strings > 0) {
+  if (needs_string_input) {
     local_manager->input_string_buf_.resize(max_batch1_num_strings);
     if (!string_data.empty()) {
       for (size_t i = 0; i < max_batch1_num_strings; i++) {
@@ -333,7 +335,7 @@ ConcurrencyManager::PrepareInfer(
 
     if (input->DType() != ni::DataType::TYPE_STRING) {
       size_t batch1_size = (size_t)input->ByteSize();
-      const uint8_t* data = &input_buf_[0];
+      const uint8_t* data;
       // if available, use provided data instead
       auto it = input_data_.find(input->Name());
       if (it != input_data_.end()) {
@@ -346,6 +348,21 @@ ConcurrencyManager::PrepareInfer(
                   std::to_string(it->second.size()) + " bytes");
         }
         data = (const uint8_t*)&(it->second)[0];
+      } else if (input_buf_.size() != 0) {
+        if (batch1_size > input_buf_.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INTERNAL,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_size) +
+                  " bytes for each batch, but generated data has " +
+                  std::to_string(input_buf_.size()) + " bytes");
+        } else {
+          data = &input_buf_[0];
+        }
+      } else {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "unable to find data for input '" + input->Name() + "'.");
       }
 
       for (size_t i = 0; i < batch_size_; ++i) {
@@ -362,10 +379,9 @@ ConcurrencyManager::PrepareInfer(
           batch1_num_strings *= dim;
         }
       }
+
+      bool used_new_allocation = false;
       std::vector<std::string>* data;
-      std::vector<std::string> synthetic_data(
-          input_string_buf_.begin(),
-          input_string_buf_.begin() + batch1_num_strings);
 
       // if available, use provided data instead
       auto it = input_string_data_.find(input->Name());
@@ -379,11 +395,30 @@ ConcurrencyManager::PrepareInfer(
                   std::to_string(it->second.size()) + " strings.");
         }
         data = &it->second;
+      } else if (input_string_buf_.size() != 0) {
+        if (batch1_num_strings > input_string_buf_.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INTERNAL,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_num_strings) +
+                  " strings for each batch, but generated data has " +
+                  std::to_string(input_string_buf_.size()) + " strings.");
+        } else {
+          used_new_allocation = true;
+          data = new std::vector<std::string>(
+              input_string_buf_.begin(),
+              input_string_buf_.begin() + batch1_num_strings);
+        }
       } else {
-        data = &synthetic_data;
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "unable to find data for input '" + input->Name() + "'.");
       }
       for (size_t i = 0; i < batch_size_; ++i) {
         RETURN_IF_ERROR(input->SetFromString(*data));
+      }
+      if (used_new_allocation) {
+        delete data;
       }
     }
   }
