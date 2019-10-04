@@ -41,7 +41,7 @@ struct LoadParams {
   // status
   uint32_t stability_window;
   // The +/- range to account for while assessing load status
-  double stable_offset;
+  double stability_threshold;
 };
 
 
@@ -121,8 +121,8 @@ class InferenceProfiler {
  public:
   /// Create a profiler that collects and summarizes inference statistic.
   /// \param verbose Whether to print verbose logging.
-  /// \param stable_offset The range that the measurement is considered as
-  /// stable. i.e. within (1 +/- stable_offset) * average value of the last
+  /// \param stability_threshold The range that the measurement is considered as
+  /// stable. i.e. within (1 +/- stability_threshold) * average value of the last
   /// 3 measurements. The criterias are "infer per second" and "average
   /// latency", or "infer per second" and "percentile latency" if valid
   /// percentile is set (see 'percentile' below).
@@ -137,7 +137,7 @@ class InferenceProfiler {
   /// \param manger Returns a new InferenceProfiler object.
   /// \return Error object indicating success or failure.
   static nic::Error Create(
-      const bool verbose, const double stable_offset,
+      const bool verbose, const double stability_threshold,
       const uint64_t measurement_window_ms, const size_t max_measurement_count,
       const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager> manager,
@@ -159,7 +159,7 @@ class InferenceProfiler {
 
  private:
   InferenceProfiler(
-      const bool verbose, const double stable_offset,
+      const bool verbose, const double stability_threshold,
       const int32_t measurement_window_ms, const size_t max_measurement_count,
       const bool extra_percentile, const size_t percentile,
       const ContextFactory::ModelSchedulerType scheduler_type,
