@@ -260,7 +260,7 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'input_size': 16,
                                                 'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
@@ -356,11 +356,11 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
+                                                args=(trial, 3, (6000, None)),
                                                 kwargs={'shm_region_names': shm1_region_names,
                                                 'precreated_shm_regions': precreated_shm1_regions}))
                 threads.append(threading.Thread(target=self.check_response,
@@ -416,20 +416,20 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
+                                                args=(trial, 3, (6000, None)),
                                                 kwargs={'shm_region_names': shm1_region_names,
                                                 'precreated_shm_regions': precreated_shm1_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (12000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'input_size': 8,
                                                 'shm_region_names': shm2_region_names,
                                                 'precreated_shm_regions': precreated_shm2_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 5, (12000, None)),
+                                                args=(trial, 5, (6000, None)),
                                                 kwargs={'input_size': 8,
                                                 'shm_region_names': shm3_region_names,
                                                 'precreated_shm_regions': precreated_shm3_regions}))
@@ -654,12 +654,12 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0",),
                                                 'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1",),
                                                 'shm_region_names': shm1_region_names,
                                                 'precreated_shm_regions': precreated_shm1_regions}))
@@ -696,11 +696,11 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT0","OUTPUT1"),
                                                 'shm_region_names': shm0_region_names}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'requested_outputs': ("OUTPUT1","OUTPUT0"),
                                                 'shm_region_names': shm1_region_names}))
                 threads[0].start()
@@ -743,7 +743,7 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 3, (3000, None)),
+                                                args=(trial, 3, (6000, None)),
                                                 kwargs={'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
@@ -874,27 +874,27 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm1_region_names,
                                                 'precreated_shm_regions': precreated_shm1_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm2_region_names,
                                                 'precreated_shm_regions': precreated_shm2_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm3_region_names,
                                                 'precreated_shm_regions': precreated_shm3_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm4_region_names,
                                                 'precreated_shm_regions': precreated_shm4_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm5_region_names,
                                                 'precreated_shm_regions': precreated_shm5_regions}))
                 for t in threads:
@@ -945,11 +945,11 @@ class BatcherTest(unittest.TestCase):
 
                 threads = []
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm0_region_names,
                                                 'precreated_shm_regions': precreated_shm0_regions}))
                 threads.append(threading.Thread(target=self.check_response,
-                                                args=(trial, 1, (3000, None)),
+                                                args=(trial, 1, (6000, None)),
                                                 kwargs={'shm_region_names': shm1_region_names,
                                                 'precreated_shm_regions': precreated_shm1_regions}))
                 threads.append(threading.Thread(target=self.check_response,
