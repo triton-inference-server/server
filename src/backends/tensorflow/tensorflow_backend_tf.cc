@@ -465,6 +465,10 @@ ModelImpl::Run(
 {
   std::vector<tensorflow::Tensor> tfinputs;
 
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  LOG(ERROR) << "prepare callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
+
   tensorflow::CallableOptions opts;
   for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
        itr = itr->next_) {
@@ -489,15 +493,22 @@ ModelImpl::Run(
   for (const auto& output_info : output_infos) {
     opts.add_fetch(output_info.first);
     // Specify output to be on GPU memory if possible
+    LOG(ERROR) << "generating output infoi for " << output_info.first;
     if (!device_name_.empty() && output_info.second) {
       for (auto node = outputs_; node != nullptr; node = node->next_) {
         const auto* name = (node->io_->inmodel_name_ != nullptr)
                                ? node->io_->inmodel_name_
                                : node->io_->name_;
+        if ((output_info.first == name)) {
+          LOG(ERROR) << "name in model: " << name;
+          LOG(ERROR) << "name match: " << (output_info.first == name) << ", type :" << node->io_->data_type_ << " is allowed: " << IsGPUFeedAndFetchSupported(node->io_->data_type_);
+        }
         if ((output_info.first == name) &&
             IsGPUFeedAndFetchSupported(node->io_->data_type_)) {
           opts.mutable_fetch_devices()->insert(
               {output_info.first, device_name_});
+          LOG(ERROR) << "requested output: " << output_info.first << " on "
+                     << device_name_;
           break;
         }
       }
@@ -508,13 +519,22 @@ ModelImpl::Run(
   // will have to synchronize after the callable is run.
   opts.set_fetch_skip_sync(true);
 
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  LOG(ERROR) << "make callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
+
   tensorflow::Session::CallableHandle feed_fetch_location;
   RETURN_IF_TF_ERROR(session_->MakeCallable(opts, &feed_fetch_location));
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  LOG(ERROR) << "run callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
 
   tensorflow::RunMetadata meta_data;
   std::vector<tensorflow::Tensor> tfoutputs;
   RETURN_IF_TF_ERROR(session_->RunCallable(
       feed_fetch_location, tfinputs, &tfoutputs, &meta_data));
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  LOG(ERROR) << "release callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
 
   RETURN_IF_TF_ERROR(session_->ReleaseCallable(feed_fetch_location));
 
@@ -526,6 +546,10 @@ ModelImpl::Run(
         reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(*ri)));
     *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
   }
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  LOG(ERROR) << "done: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
+
 
   // [TODO] Device::Sync() (What if other contexts are on the same device?)
 
