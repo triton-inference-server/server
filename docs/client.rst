@@ -57,16 +57,18 @@ Getting the Client Libraries
 
 The provided Dockerfile.client and CMake support can be used to build
 the client libraries. As an alternative to building, it is also
-possible to download the pre-build client libraries from GitHub.
+possible to download the pre-build client libraries from GitHub or a
+pre-built Docker image containing the client libraries from `NVIDIA
+GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
 
 .. build-client-begin-marker-do-not-remove
 
-.. _section-client-libaries-build-using-dockerfile:
+.. _section-client-libraries-build-using-dockerfile:
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
 
-To build the libaries using Docker, first change directory to the root
+To build the libraries using Docker, first change directory to the root
 of the repo and checkout the release version of the branch that you
 want to build (or the master branch if you want to build the
 under-development version). The branch you use for the client build
@@ -96,7 +98,7 @@ wheel file in /workspace/install/python. The image will also contain
 the built client examples that you can learn more about in
 :ref:`section-client-examples`.
 
-.. _section-client-libaries-build-using-cmake:
+.. _section-client-libraries-build-using-cmake:
 
 Build Using CMake
 ^^^^^^^^^^^^^^^^^
@@ -109,7 +111,7 @@ describes the client build for Ubuntu 16.04, Ubuntu 18.04, and Windows
 platforms. We welcome any updates that expand the build functionality
 and allow the clients to be built on additional platforms.
 
-To build the libaries using CMake, first change directory to the root
+To build the libraries using CMake, first change directory to the root
 of the repo and checkout the release version of the branch that you
 want to build (or the master branch if you want to build the
 under-development version)::
@@ -178,7 +180,7 @@ build.
 
 .. build-client-end-marker-do-not-remove
 
-.. _section-client-libaries-download-from-github:
+.. _section-client-libraries-download-from-github:
 
 Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
@@ -206,6 +208,32 @@ headers in include/, and the Python wheel file in python/. The bin/
 and python/ directories contain the built examples that you can learn
 more about in :ref:`section-client-examples`.
 
+.. _section-client-libraries-download-from-ngc:
+
+Download Docker Image From NGC
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A Docker image containing the client libraries and examples is
+available from `NVIDIA GPU Cloud (NGC)
+<https://ngc.nvidia.com>`_. Before attempting to pull the container
+ensure you have access and are logged into NGC.  For step-by-step
+instructions, see the `NGC Getting Started Guide
+<http://docs.nvidia.com/ngc/ngc-getting-started-guide/index.html>`_.
+
+Use docker pull to get the client libraries and examples container
+from NGC::
+
+  $ docker pull nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+
+Where <xx.yy> is the version that you want to pull.
+
+Within the container the client libraries are in
+/workspace/install/lib, the corresponding headers in
+/workspace/install/include, and the Python wheel file in
+/workspace/install/python. The image will also contain the built
+client examples that you can learn more about in
+:ref:`section-client-examples`.
+
 .. _section-building-your-own-client:
 
 Building Your Own Client
@@ -222,12 +250,11 @@ the inference server from you Python application, as shown in
 :ref:`section-client-examples`.
 
 For C++ the lib/ directory contains both shared and static libraries
-and the include/ directory contains the corresponding headers. The
-src/ directory contains an example application. The build/ directory
-contains a CMake file to show how you can build your C++ application
-to use the libaries and includes. To build the example you must first
-install dependencies appropriate for your platform. For example, for
-Ubuntu 18.04::
+and then include/ directory contains the corresponding headers. The
+src/ directory contains an example application and CMake file to show
+how you can build your C++ application to use the libraries and
+includes. To build the example you must first install dependencies
+appropriate for your platform. For example, for Ubuntu 18.04::
 
   $ apt-get update
   $ apt-get install build-essential cmake git zlib1g-dev libssl-dev
