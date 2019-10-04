@@ -32,7 +32,7 @@ namespace perfclient {
 
 nic::Error
 InferenceProfiler::Create(
-    const bool verbose, const double stable_offset,
+    const bool verbose, const double stability_threshold,
     const uint64_t measurement_window_ms, const size_t max_measurement_count,
     const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager> manager,
@@ -42,7 +42,7 @@ InferenceProfiler::Create(
   RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
 
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
-      verbose, stable_offset, measurement_window_ms, max_measurement_count,
+      verbose, stability_threshold, measurement_window_ms, max_measurement_count,
       (percentile != -1), percentile, factory->SchedulerType(),
       factory->ModelName(), factory->ModelVersion(), std::move(status_ctx),
       std::move(manager)));
@@ -91,7 +91,7 @@ InferenceProfiler::BuildComposingModelMap(
 }
 
 InferenceProfiler::InferenceProfiler(
-    const bool verbose, const double stable_offset,
+    const bool verbose, const double stability_threshold,
     const int32_t measurement_window_ms, const size_t max_measurement_count,
     const bool extra_percentile, const size_t percentile,
     const ContextFactory::ModelSchedulerType scheduler_type,
@@ -105,7 +105,7 @@ InferenceProfiler::InferenceProfiler(
       model_version_(model_version), status_ctx_(std::move(status_ctx)),
       manager_(std::move(manager))
 {
-  load_parameters_.stable_offset = stable_offset;
+  load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
 }
 
@@ -165,17 +165,17 @@ InferenceProfiler::Profile(
       is_stable = true;
       for (; idx < load_status.infer_per_sec.size(); idx++) {
         // We call it complete only if stability_window measurements are within
-        // +/-(stable_offset)% of the average infer per second and latency
+        // +/-(stability_threshold)% of the average infer per second and latency
         if ((load_status.infer_per_sec[idx] <
-             load_status.avg_ips * (1 - load_parameters_.stable_offset)) ||
+             load_status.avg_ips * (1 - load_parameters_.stability_threshold)) ||
             (load_status.infer_per_sec[idx] >
-             load_status.avg_ips * (1 + load_parameters_.stable_offset))) {
+             load_status.avg_ips * (1 + load_parameters_.stability_threshold))) {
           is_stable = false;
         }
         if ((load_status.latencies[idx] <
-             load_status.avg_latency * (1 - load_parameters_.stable_offset)) ||
+             load_status.avg_latency * (1 - load_parameters_.stability_threshold)) ||
             (load_status.latencies[idx] >
-             load_status.avg_latency * (1 + load_parameters_.stable_offset))) {
+             load_status.avg_latency * (1 + load_parameters_.stability_threshold))) {
           is_stable = false;
         }
       }
