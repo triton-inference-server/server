@@ -305,7 +305,7 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind, const int device_id) override;
+      const size_t byte_size, MemoryType kind, const int device_id) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
@@ -327,7 +327,7 @@ SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
 Error
 SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind, const int device_id)
+    const size_t byte_size, MemoryType kind, const int device_id)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
@@ -335,12 +335,12 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
 
   auto rshm_region = request.mutable_register_();
   rshm_region->set_name(name);
-  if (kind == 0) {
+  if (kind == MemoryType::CPU) {
     auto shm_id = rshm_region->mutable_system_shared_memory();
     shm_id->set_shared_memory_key(shm_key);
   } else {
     auto cuda_shm_id = rshm_region->mutable_cuda_shared_memory();
-    cuda_shm_id->set_name(shm_key);
+    cuda_shm_id->set_handle_region_name(shm_key);
     cuda_shm_id->set_device_id(device_id);
   }
   rshm_region->set_offset(offset);

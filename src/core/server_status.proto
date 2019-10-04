@@ -304,11 +304,11 @@ message SharedMemoryRegion
   //@@
   //@@  .. cpp:var:: string name
   //@@
-  //@@     The name for this System/CUDA shared memory region in TRTIS.
+  //@@     The name for this shared memory region.
   //@@
   string name = 1;
 
-  message SystemSharedMemoryInfo
+  message SystemSharedMemory
   {
     //@@  .. cpp:var:: string shared_memory_key
     //@@
@@ -318,14 +318,14 @@ message SharedMemoryRegion
     string shared_memory_key = 1;
   }
 
-  message CudaSharedMemoryInfo
+  message CudaSharedMemory
   {
-    //@@  .. cpp:var:: string shared_memory_name
+    //@@  .. cpp:var:: string handle_region_name
     //@@
-    //@@     The name of the shared memory region in TRTIS that holds the
+    //@@     The name of the registered shared memory region in that holds the
     //@@     cudaIPC handle.
     //@@
-    string shared_memory_name = 1;
+    string handle_region_name = 1;
 
     //@@  .. cpp:var:: int64 device_id
     //@@
@@ -341,18 +341,18 @@ message SharedMemoryRegion
   oneof shared_memory_types
   {
     //@@
-    //@@  .. cpp:var:: SystemSharedMemoryInfo system_shared_memory
+    //@@  .. cpp:var:: SystemSharedMemory system_shared_memory
     //@@
-    //@@     The information for this system shared memory region.
+    //@@     The status of this system shared memory region.
     //@@
-    SystemSharedMemoryInfo system_shared_memory = 2;
+    SystemSharedMemory system_shared_memory = 2;
 
     //@@
-    //@@  .. cpp:var:: CudaSharedMemoryInfo cuda_shared_memory
+    //@@  .. cpp:var:: CudaSharedMemory cuda_shared_memory
     //@@
-    //@@     The information for this CUDA shared memory region.
+    //@@     The status of this CUDA shared memory region.
     //@@
-    CudaSharedMemoryInfo cuda_shared_memory = 3;
+    CudaSharedMemory cuda_shared_memory = 3;
   }
 
   //@@  .. cpp:var:: uint64 offset

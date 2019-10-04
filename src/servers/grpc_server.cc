@@ -1634,7 +1634,7 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
         // cuda shared memory
         err = smb_manager_->Create(
             &smb, request.register_().name(),
-            request.register_().cuda_shared_memory().name(),
+            request.register_().cuda_shared_memory().handle_region_name(),
             request.register_().offset(), request.register_().byte_size(),
             TRTSERVER_MEMORY_GPU,
             request.register_().cuda_shared_memory().device_id());

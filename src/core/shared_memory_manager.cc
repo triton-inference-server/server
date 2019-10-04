@@ -44,8 +44,6 @@
 #include "src/core/logging.h"
 #include "src/core/server_status.h"
 
-#define DEFAULT_GPU_ID 0
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -107,9 +105,11 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 
 #ifdef TRTIS_ENABLE_GPU
 void
-OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr)
+OpenCUDAIPCRegion(cudaIpcHandle* shm_cuda_rep, void** data_ptr)
 {
   cudaEvent_t event;
+  int previous_device;
+  cudaGetDevice(&previous_device);
 
   cudaError_t err = cudaSetDevice(shm_cuda_rep->device);
 
@@ -127,8 +127,8 @@ OpenCUDAIPCRegion(ipcCUDA_t* shm_cuda_rep, void** data_ptr)
   err = cudaIpcGetMemHandle(
       (cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle, *data_ptr);
 
-  // set device to default GPU
-  err = cudaSetDevice(DEFAULT_GPU_ID);
+  // Set device to previous device
+  err = cudaSetDevice(previous_device);
 }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -194,7 +194,7 @@ SharedMemoryManager::RegisterSharedMemory(
       }
     }
 
-    if (shm_byte_size < sizeof(ipcCUDA_t)) {
+    if (shm_byte_size < sizeof(cudaIpcHandle)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "shared memory region '" + name +
@@ -203,7 +203,8 @@ SharedMemoryManager::RegisterSharedMemory(
 
     // Get CUDA shared memory base address
     void* shm_mapped_addr = (void*)((uint8_t*)mapped_addr + shm_offset);
-    ipcCUDA_t* shm_cuda_rep = reinterpret_cast<ipcCUDA_t*>(shm_mapped_addr);
+    cudaIpcHandle* shm_cuda_rep =
+        reinterpret_cast<cudaIpcHandle*>(shm_mapped_addr);
     OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr);
 
     shared_memory_map_.insert(std::make_pair(
@@ -213,8 +214,8 @@ SharedMemoryManager::RegisterSharedMemory(
 #else
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "Cannot register CUDA shared memory region '" + name +
-            "' when no valid GPU");
+        "failed to register CUDA shared memory region: '" + name +
+            "', GPUs not supported");
 #endif  // TRTIS_ENABLE_GPU
   }
 
@@ -300,7 +301,7 @@ SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
       system_shm_info->set_shared_memory_key(shm_info.second->shm_key_);
     } else {
       auto cuda_shm_info = rshm_region->mutable_cuda_shared_memory();
-      cuda_shm_info->set_shared_memory_name(shm_info.second->shm_key_);
+      cuda_shm_info->set_handle_region_name(shm_info.second->shm_key_);
       cuda_shm_info->set_device_id(shm_info.second->device_id_);
     }
     rshm_region->set_offset(shm_info.second->offset_);

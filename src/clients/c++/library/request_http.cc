@@ -596,7 +596,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       bool verbose);
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind, const int device_id) override;
+      const size_t byte_size, const MemoryType kind,
+      const int device_id) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -648,9 +649,9 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind, const int device_id)
+    const size_t byte_size, const MemoryType kind, const int device_id)
 {
-  if (kind == 0) {
+  if (kind == MemoryType::CPU) {
     return SendRequest("register", name, shm_key, offset, byte_size, 0);
   }
   return SendRequest(
