@@ -75,6 +75,28 @@ ReadFile(const std::string& path, std::vector<char>* contents)
   return nic::Error::Success;
 }
 
+nic::Error
+ReadTextFile(const std::string& path, std::vector<std::string>* contents)
+{
+  std::ifstream in(path);
+  if (!in) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG,
+        "failed to open file '" + path + "'");
+  }
+
+  std::string current_string;
+  while (std::getline(in, current_string)) {
+    contents->push_back(current_string);
+  }
+  in.close();
+
+  if (contents->size() == 0) {
+    return nic::Error(
+        ni::RequestStatusCode::INVALID_ARG, "file '" + path + "' is empty");
+  }
+  return nic::Error::Success;
+}
 
 bool
 IsDirectory(const std::string& path)
@@ -85,6 +107,18 @@ IsDirectory(const std::string& path)
   } else {
     return false;
   }
+}
+
+std::string
+GetRandomString(const int string_length)
+{
+  std::mt19937_64 gen{std::random_device()()};
+  std::uniform_int_distribution<size_t> dist{0, character_set.length() - 1};
+  std::string random_string;
+  std::generate_n(std::back_inserter(random_string), string_length, [&] {
+    return character_set[dist(gen)];
+  });
+  return random_string;
 }
 
 }  // namespace perfclient
