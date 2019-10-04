@@ -791,8 +791,8 @@ class SharedMemoryControlContext {
   /// \param byte_size The size, in bytes of the shared memory region.
   /// \return Error object indicating success or failure.
   virtual Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind = 0, const int device_id = 0) = 0;
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size, MemoryType type = CPU, int device_id = 0) = 0;
 
 #if TRTIS_ENABLE_GPU
   /// Register a CUDA shared memory region on the inference server. If the

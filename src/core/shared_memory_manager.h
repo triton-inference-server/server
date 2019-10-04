@@ -39,12 +39,12 @@
 namespace nvidia { namespace inferenceserver {
 
 #ifdef TRTIS_ENABLE_GPU
-typedef struct ipcCUDA_st {
+struct cudaIpcHandle {
   int device;
   cudaIpcEventHandle_t eventHandle;
   cudaIpcMemHandle_t memHandle;
   size_t byte_size;
-} ipcCUDA_t;
+};
 #endif  // TRTIS_ENABLE_GPU
 
 class InferenceServer;

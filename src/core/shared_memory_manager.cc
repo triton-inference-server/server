@@ -44,8 +44,6 @@
 #include "src/core/logging.h"
 #include "src/core/server_status.h"
 
-#define DEFAULT_GPU_ID 0
-
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -194,7 +192,7 @@ SharedMemoryManager::RegisterCudaSharedMemory(
 
   // register
   void* mapped_addr;
-  
+
   // Get CUDA shared memory base address
   Status status = OpenCudaIPCRegion(
       const_cast<cudaIpcMemHandle_t*>(cuda_shm_handle), &mapped_addr,
