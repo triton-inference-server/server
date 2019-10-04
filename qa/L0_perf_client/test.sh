@@ -58,7 +58,7 @@ fi
 
 # Sanity check on measurements are not all zero
 set +e
-$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -75,7 +75,7 @@ set -e
 for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Valid batch size
     set +e
-    $PERF_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -t 1 -p20000 -b 1 >$CLIENT_LOG 2>&1
+    $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p20000 -b 1 >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -86,7 +86,7 @@ for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
     # Invalid batch sizes
     for STATIC_BATCH in 0 10; do
         set +e
-        $PERF_CLIENT -v -i grpc -u localhost:8001 -m $MODEL -t 1 -p20000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
+        $PERF_CLIENT -v -i grpc -m $MODEL -t 1 -p20000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
         if [ $? -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -98,7 +98,7 @@ done
 
 # Testing with the new arguments
 set +e
-$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -112,7 +112,7 @@ fi
 set -e
 
 set +e
-$PERF_CLIENT -v -i grpc -u localhost:8001 -m graphdef_int32_int32_int32 --search-range 1:5:2 >$CLIENT_LOG 2>&1
+$PERF_CLIENT -v -i grpc -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"

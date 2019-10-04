@@ -79,16 +79,19 @@ SignalHandler(int signum)
 // There are two settings (see -d option) for the data collection:
 // - Fixed concurrent request mode:
 //     In this setting, the client will maintain a fixed number of concurrent
-//     requests sent to the server (see -t option). See ConcurrencyManager for
-//     more detail. The number of requests will be the total number of requests
-//     sent within the time interval for measurement (see -p option) and
-//     the latency will be the average latency across all requests.
+//     requests sent to the server (see --concurrency-range option). See
+//     ConcurrencyManager for more detail. The number of requests will be the
+//     total number of requests sent within the time interval for measurement
+//     (see --measurement-interval option) and the latency will be the average
+//     latency across all requests.
 //
 //     Besides throughput and latency, which is measured in client side,
 //     the following data measured by the server will also be reported
 //     in this setting:
 //     - Concurrent request: the number of concurrent requests as specified
-//         in -t option
+//         in --concurrency-range option. Note, for fixed concurrent request
+//         mode, user must specify --concurrency-range <'start'>,
+//         omitting 'end' and 'step' values.
 //     - Batch size: the batch size of each request as specified in -b option
 //     - Inference count: batch size * number of inference requests
 //     - Cumulative time: the total time between request received and
@@ -106,10 +109,13 @@ SignalHandler(int signum)
 // - Dynamic concurrent request mode:
 //     In this setting, the client will perform the following procedure:
 //       1. Follows the procedure in fixed concurrent request mode using
-//          k concurrent requests (k starts at 1).
+//          k concurrent requests (k starts at 'start').
 //       2. Gathers data reported from step 1.
-//       3. Increases k by 1 and repeats step 1 and 2 until latency from current
-//          iteration exceeds latency threshold (see -l option)
+//       3. Increases k by 'step' and repeats step 1 and 2 until latency from
+//          current iteration exceeds latency threshold (see --latency-threshold
+//          option) or concurrency level reaches 'end'. Note, by setting
+//          --latency-threshold or 'end' to 0 the effect of each threshold can
+//          be removed. However, both can not be 0 simultaneously.
 //     At each iteration, the data mentioned in fixed concurrent request mode
 //     will be reported. Besides that, after the procedure above, a collection
 //     of "throughput, latency, concurrent request count" tuples will be
@@ -117,11 +123,10 @@ SignalHandler(int signum)
 //
 // Options:
 // -b: batch size for each request sent.
-// -t: number of concurrent requests sent. If -d is set, -t indicate the number
-//     of concurrent requests to start with ("starting concurrency" level).
-// -d: enable dynamic concurrent request mode.
-// -l: latency threshold in msec, will have no effect if -d is not set.
-// -p: time interval for each measurement window in msec.
+// --concurrency-range: The range of concurrency levels perf_client will use.
+//     A concurrency level indicates the number of concurrent requests in queue.
+// --latency-threshold: latency threshold in msec.
+// --measurement-interval: time interval for each measurement window in msec.
 //
 // For detail of the options not listed, please refer to the usage.
 //
@@ -283,11 +288,11 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
   std::cerr << "\t--measurement-interval (-p) <measurement window (in msec)>"
             << std::endl;
-  std::cerr << "\t--search-range <m:n:o>" << std::endl;
+  std::cerr << "\t--concurrency-range <start:end:step>" << std::endl;
   std::cerr << "\t--latency-threshold (-l) <latency threshold (in msec)>"
             << std::endl;
   std::cerr << "\t--max-threads <thread counts>" << std::endl;
-  std::cerr << "\t--stability-offset (-s) <deviation threshold for stable "
+  std::cerr << "\t--stability-percentage (-s) <deviation threshold for stable "
                "measurement (in percentage)>"
             << std::endl;
   std::cerr << "\t--max-trials (-r)  <maximum number of measurements for each "
@@ -340,24 +345,26 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr << std::endl;
   std::cerr << "I. MEASUREMENT PARAMETERS: " << std::endl;
-  std::cerr << FormatMessage(
-                   " --measurement-interval (-p): It indicates the time "
-                   "interval used for each measurement. The perf client will "
-                   "sample a time interval specified by -p and take "
-                   "measurement over the requests completed within that time "
-                   "interval. The default value is 5000 msec.",
-                   18)
-            << std::endl;
   std::cerr
       << FormatMessage(
-             " --search-range <m:n:o>: Determines the range of concurrency "
-             "levels covered by the perf_client. The perf_client will start "
-             "from the concurrency level of 'm' to 'n' with steps of 'o'. The "
-             "default value of 'm' and 'o' are 1. If 'n' is not specified then "
-             "perf_client will run for a single concurrency level determined "
-             "by 'm'. If 'n' is set as 0, then the concurrency limit will be "
-             "incremented by 'o' till latency threshold is met. 'n' and -l can "
-             "not be both 0 simultaneously.",
+             " --measurement-interval (-p): Indicates the time interval used "
+             "for each measurement in milliseconds. The perf client will "
+             "sample a time interval specified by -p and take measurement over "
+             "the requests completed within that time interval. The default "
+             "value is 5000 msec.",
+             18)
+      << std::endl;
+  std::cerr
+      << FormatMessage(
+             " --concurrency-range <start:end:step>: Determines the range of "
+             "concurrency levels covered by the perf_client. The perf_client "
+             "will start from the concurrency level of 'start' and go till "
+             "'end' with a stride of 'step'. The default value of 'end' and "
+             "'step' are 1. If 'end' is not specified then perf_client will "
+             "run for a single concurrency level determined by 'start'. If "
+             "'end' is set as 0, then the concurrency limit will be "
+             "incremented by 'step' till latency threshold is met. 'end' and "
+             "--latency-threshold can not be both 0 simultaneously.",
              18)
       << std::endl;
   std::cerr << FormatMessage(
@@ -365,7 +372,7 @@ Usage(char** argv, const std::string& msg = std::string())
                    "latency. Client will top incrementing the concurrency and "
                    "abort the execution once the measured latency exceeds this "
                    "threshold. By default, latency threshold is set 0 and "
-                   "the perf_client will run for entire --search-range.",
+                   "the perf_client will run for entire --concurrency-range.",
                    18)
             << std::endl;
   std::cerr
@@ -376,7 +383,7 @@ Usage(char** argv, const std::string& msg = std::string())
       << std::endl;
   std::cerr
       << FormatMessage(
-             " --stability-offset (-s): It indicates the deviation threshold "
+             " --stability-percentage (-s): Indicates the deviation threshold "
              "for the measurements. The measurement is considered as stable if "
              "the recent 3 measurements are within +/- (deviation threshold)% "
              "of their average in terms of both infer per second and latency. "
@@ -384,7 +391,7 @@ Usage(char** argv, const std::string& msg = std::string())
              18)
       << std::endl;
   std::cerr << FormatMessage(
-                   " --max-trials (-r): It indicates the maximum number of "
+                   " --max-trials (-r): Indicates the maximum number of "
                    "measurements for each profiling setting. The perf client "
                    "will take multiple measurements and report the measurement "
                    "until it is stable. The perf client will abort if the "
@@ -394,112 +401,60 @@ Usage(char** argv, const std::string& msg = std::string())
             << std::endl;
   std::cerr
       << FormatMessage(
-             " --percentile: It indicates that the specified percentile in "
+             " --percentile: Indicates that the specified percentile in "
              "terms of latency will also be reported and used to detemine if "
              "the measurement is stable instead of average latency. Default "
              "is -1 to indicate no percentile will be used.",
              18)
       << std::endl;
-
-  std::cerr << "\tDEPRECATED OPTIONS" << std::endl;
-  std::cerr << std::setw(9) << std::left << " -t: "
-            << FormatMessage(
-                   "It indicates the number of starting concurrent requests if "
-                   "-d flag is set.",
-                   9)
-            << std::endl;
-  std::cerr
-      << std::setw(9) << std::left << " -c: "
-      << FormatMessage(
-             "It indicates the maximum number of concurrent requests allowed "
-             "if -d flag is set. Once the number of concurrent requests "
-             "exceeds the maximum, the perf client will stop and exit "
-             "regardless of the latency threshold. Default is 0 to indicate "
-             "that no limit is set on the number of concurrent requests.",
-             9)
-      << std::endl;
-  std::cerr
-      << std::setw(9) << std::left << " -d: "
-      << FormatMessage(
-             "This flag enables dynamic concurrent request count where the "
-             "number of concurrent requests will increase linearly until the "
-             "request latency is above the threshold set (see -l).",
-             9)
-      << std::endl;
-  std::cerr << std::setw(9) << std::left << " -a: "
-            << FormatMessage(
-                   "This flag is deprecated and will not affect client.", 9)
-            << std::endl;
-
   std::cerr << std::endl;
   std::cerr << "II. INPUT DATA OPTIONS: " << std::endl;
   std::cerr << std::setw(9) << std::left
             << " -b: " << FormatMessage("Batch size for each request sent.", 9)
             << std::endl;
   std::cerr << FormatMessage(
-                   " --input-data: This option can be used to select data, "
-                   "client will use in it's inference requests. The available "
+                   " --input-data: Select the type of data that will be used "
+                   "for input in inference requests. The available "
                    "options are \"zero\", \"random\" or path to a directory. "
-                   "If the option is path to a directory then there must be a "
-                   "binary file for each input required by the model. The file "
-                   "must be named the same as the input and must contain data "
-                   "required for sending the input in a batch-1 request. The "
-                   "client will reuse the data to match the specified batch "
-                   "size. Note that the files should contain only the raw "
-                   "binary representation of the data in row major order. By "
-                   "default, the client will use random data in its requests.",
+                   "If the option is path to a directory then the directory "
+                   "must contain a binary file for each input, named the same "
+                   "as the input. Each file must contain the data required for "
+                   "that input for a batch-1 request. Each file should contain "
+                   "the raw binary representation of the input in row-major "
+                   "order. Default is \"random\".",
                    18)
             << std::endl;
   std::cerr << FormatMessage(
                    " --shape: The shape used for the specified input. The "
                    "argument must be specified as 'name:shape' where the shape "
                    "is a comma-separated list for dimension sizes, for example "
-                   "'--shape input_name:1,2,3'. --shape may be specified "
-                   "multiple times to specify shapes for different inputs.",
+                   "'--shape input_name:1,2,3' indicate tensor shape [ 1, 2, 3 "
+                   "]. --shape may be specified multiple times to specify "
+                   "shapes for different inputs.",
                    18)
             << std::endl;
   std::cerr << FormatMessage(
-                   " --sequence-length: It indicates the base length of a "
+                   " --sequence-length: Indicates the base length of a "
                    "sequence used for sequence models. A sequence with length "
                    "x will be composed of x requests to be sent as the "
                    "elements in the sequence. The length of the actual "
                    "sequence will be within +/- 20% of the base length.",
                    18)
             << std::endl;
-  std::cerr << "\tDEPRECATED OPTIONS" << std::endl;
-  std::cerr << std::setw(9) << std::left << " -z: "
-            << FormatMessage(
-                   "This flag causes input tensors to be initialized with "
-                   "zeros instead of random data",
-                   9)
-            << std::endl;
-  std::cerr
-      << FormatMessage(
-             " --data-directory: It indicates that the perf client will use "
-             "user provided data instead of synthetic data for model inputs. "
-             "There must be a binary file for each input required by the "
-             "model. The file must be named the same as the input and must "
-             "contain data required for sending the input in a batch-1 "
-             "request. The perf client will reuse the data to match the "
-             "specified batch size. Note that the files should contain only "
-             "the raw binary representation of the data in row major order.",
-             18)
-      << std::endl;
   std::cerr << std::endl;
   std::cerr << "III. SERVER DETAILS: " << std::endl;
   std::cerr << std::setw(9) << std::left << " -u: "
             << FormatMessage(
-                   "This option is used to specify URL to the server. Default "
-                   "is \"localhost:8000\"",
+                   "Specify URL to the server. Default is \"localhost:8000\" "
+                   "if using HTTP and \"localhost:8001\" if using gRPC. ",
                    9)
             << std::endl;
-  std::cerr
-      << std::setw(9) << std::left << " -i: "
-      << FormatMessage(
-             "This option indicates the communication protocol to use. The "
-             "available protocols are gRPC and HTTP. Default is HTTP.",
-             9)
-      << std::endl;
+  std::cerr << std::setw(9) << std::left << " -i: "
+            << FormatMessage(
+                   "The communication protocol to use. The available protocols "
+                   "are gRPC and HTTP. Default is HTTP.",
+                   9)
+            << std::endl;
   std::cerr << std::endl;
   std::cerr << "IV. OTHER OPTIONS: " << std::endl;
   std::cerr
@@ -527,7 +482,7 @@ Usage(char** argv, const std::string& msg = std::string())
   exit(1);
 }
 
-enum SEARCH_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
+enum CONCURRENCY_RANGE { kSTART = 0, kEND = 1, kSTEP = 2 };
 const uint64_t NO_LIMIT = 0;
 
 int
@@ -541,8 +496,8 @@ main(int argc, char** argv)
   int32_t percentile = -1;
   uint64_t latency_threshold_ms = NO_LIMIT;
   int32_t batch_size = 1;
-  uint64_t search_range[3] = {1, 1, 1};
-  double stable_offset = 0.1;
+  uint64_t concurrency_range[3] = {1, 1, 1};
+  double stability_threshold = 0.1;
   uint64_t measurement_window_ms = 5000;
   size_t max_measurement_count = 10;
   std::string model_name;
@@ -559,8 +514,9 @@ main(int argc, char** argv)
   bool dynamic_concurrency_mode = false;
 
   // Required for detecting the use of conflicting options
-  bool using_search_range = false;
+  bool using_concurrency_range = false;
   bool using_old_options = false;
+  bool url_specified = false;
 
 
   // {name, has_arg, *flag, val}
@@ -571,9 +527,9 @@ main(int argc, char** argv)
                                          {"data-directory", 1, 0, 4},
                                          {"shape", 1, 0, 5},
                                          {"measurement-interval", 1, 0, 6},
-                                         {"search-range", 1, 0, 7},
+                                         {"concurrency-range", 1, 0, 7},
                                          {"latency-threshold", 1, 0, 8},
-                                         {"stability-offset", 1, 0, 9},
+                                         {"stability-percentage", 1, 0, 9},
                                          {"max-trials", 1, 0, 10},
                                          {"input-data", 1, 0, 11},
                                          {0, 0, 0, 0}};
@@ -633,7 +589,7 @@ main(int argc, char** argv)
         break;
       }
       case 7: {
-        using_search_range = true;
+        using_concurrency_range = true;
         std::string arg = optarg;
         size_t pos = 0;
         int index = 0;
@@ -643,13 +599,14 @@ main(int argc, char** argv)
             if (index > 2) {
               Usage(
                   argv,
-                  "option search-range can have maximum of three elements");
+                  "option concurrency-range can have maximum of three "
+                  "elements");
             }
             if (colon_pos == std::string::npos) {
-              search_range[index] = std::stoll(arg.substr(pos, colon_pos));
+              concurrency_range[index] = std::stoll(arg.substr(pos, colon_pos));
               pos = colon_pos;
             } else {
-              search_range[index] =
+              concurrency_range[index] =
                   std::stoll(arg.substr(pos, colon_pos - pos));
               pos = colon_pos + 1;
               index++;
@@ -666,7 +623,7 @@ main(int argc, char** argv)
         break;
       }
       case 9: {
-        stable_offset = atof(optarg) / 100;
+        stability_threshold = atof(optarg) / 100;
         break;
       }
       case 10: {
@@ -698,6 +655,7 @@ main(int argc, char** argv)
         dynamic_concurrency_mode = true;
         break;
       case 'u':
+        url_specified = true;
         url = optarg;
         break;
       case 'm':
@@ -736,7 +694,7 @@ main(int argc, char** argv)
         max_measurement_count = std::atoi(optarg);
         break;
       case 's':
-        stable_offset = atof(optarg) / 100;
+        stability_threshold = atof(optarg) / 100;
         break;
       case 'f':
         filename = optarg;
@@ -760,7 +718,8 @@ main(int argc, char** argv)
   if (measurement_window_ms <= 0) {
     Usage(argv, "measurement window must be > 0 in msec");
   }
-  if (search_range[SEARCH_RANGE::kSTART] <= 0 || concurrent_request_count < 0) {
+  if (concurrency_range[CONCURRENCY_RANGE::kSTART] <= 0 ||
+      concurrent_request_count < 0) {
     Usage(argv, "The start of the search range must be > 0");
   }
   if (protocol == perfclient::ProtocolType::UNKNOWN) {
@@ -791,21 +750,25 @@ main(int argc, char** argv)
   }
 
 
-  if (using_search_range && using_old_options) {
-    Usage(argv, "can not use deprecated options with search_range");
+  if (using_concurrency_range && using_old_options) {
+    Usage(argv, "can not use deprecated options with concurrency_range");
   } else if (using_old_options) {
     if (dynamic_concurrency_mode) {
-      search_range[SEARCH_RANGE::kEND] = max_concurrency;
+      concurrency_range[CONCURRENCY_RANGE::kEND] = max_concurrency;
     }
-    search_range[SEARCH_RANGE::kSTART] = concurrent_request_count;
+    concurrency_range[CONCURRENCY_RANGE::kSTART] = concurrent_request_count;
   }
 
-  if (search_range[SEARCH_RANGE::kEND] == NO_LIMIT &&
+  if (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT &&
       latency_threshold_ms == NO_LIMIT) {
     Usage(
         argv,
         "The end of the search range and the latency limit can not be both 0 "
         "simultaneously");
+  }
+
+  if ((!url_specified) && protocol == perfclient::ProtocolType::GRPC) {
+    url = "localhost:8001";
   }
 
   // trap SIGINT to allow threads to exit gracefully
@@ -830,8 +793,9 @@ main(int argc, char** argv)
     return 1;
   }
   err = perfclient::InferenceProfiler::Create(
-      verbose, stable_offset, measurement_window_ms, max_measurement_count,
-      percentile, factory, std::move(manager), &profiler);
+      verbose, stability_threshold, measurement_window_ms,
+      max_measurement_count, percentile, factory, std::move(manager),
+      &profiler);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
@@ -842,14 +806,14 @@ main(int argc, char** argv)
             << "  Batch size: " << batch_size << std::endl
             << "  Measurement window: " << measurement_window_ms << " msec"
             << std::endl;
-  if (search_range[SEARCH_RANGE::kEND] != 1) {
+  if (concurrency_range[CONCURRENCY_RANGE::kEND] != 1) {
     std::cout << "  Latency limit: " << latency_threshold_ms << " msec"
               << std::endl;
-    if (search_range[SEARCH_RANGE::kEND] != NO_LIMIT) {
+    if (concurrency_range[CONCURRENCY_RANGE::kEND] != NO_LIMIT) {
       std::cout << "  Concurrency limit: "
                 << std::max(
-                       search_range[SEARCH_RANGE::kSTART],
-                       search_range[SEARCH_RANGE::kEND])
+                       concurrency_range[CONCURRENCY_RANGE::kSTART],
+                       concurrency_range[CONCURRENCY_RANGE::kEND])
                 << " concurrent requests" << std::endl;
     }
   }
@@ -864,7 +828,7 @@ main(int argc, char** argv)
   perfclient::PerfStatus status_summary;
   std::vector<perfclient::PerfStatus> summary;
 
-  size_t count = search_range[SEARCH_RANGE::kSTART];
+  size_t count = concurrency_range[CONCURRENCY_RANGE::kSTART];
   do {
     err = profiler->Profile(count, status_summary);
     if (err.IsOk()) {
@@ -887,9 +851,9 @@ main(int argc, char** argv)
     } else {
       break;
     }
-    count += search_range[SEARCH_RANGE::kSTEP];
-  } while ((count <= search_range[SEARCH_RANGE::kEND]) ||
-           (search_range[SEARCH_RANGE::kEND] == NO_LIMIT));
+    count += concurrency_range[CONCURRENCY_RANGE::kSTEP];
+  } while ((count <= concurrency_range[CONCURRENCY_RANGE::kEND]) ||
+           (concurrency_range[CONCURRENCY_RANGE::kEND] == NO_LIMIT));
 
 
   if (!err.IsOk()) {
