@@ -39,6 +39,7 @@ CLIENT_LOG="./perf_client.log"
 PERF_CLIENT=../clients/perf_client
 
 DATADIR=`pwd`/models
+TESTDATADIR=`pwd`/test_data
 
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS=--model-repository=$DATADIR
@@ -46,7 +47,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
-rm -rf $DATADIR
+rm -rf $DATADIR $TESTDATADIR
 
 mkdir -p $DATADIR
 # Copy fixed-shape models
@@ -58,6 +59,14 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch
 # Copy a variable-shape model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
+
+# Generating test data
+mkdir -p $TESTDATADIR
+for INPUT in INPUT0 INPUT1; do
+    for i in {1..16}; do
+        echo '1' >> $TESTDATADIR/${INPUT}
+    done
+done
 
 RET=0
 
@@ -159,7 +168,7 @@ set -e
 
 # Testing with file input
 set +e
-$PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=test_data -p2000 \
+$PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -175,7 +184,7 @@ set -e
 
 # Testing with variable shaped tensors
 set +e
-$PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=test_data \
+$PERF_CLIENT -v -i grpc -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
