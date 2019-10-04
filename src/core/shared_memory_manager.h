@@ -32,16 +32,20 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/status.h"
 
+#ifdef TRTIS_ENABLE_GPU
 #include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
+#ifdef TRTIS_ENABLE_GPU
 typedef struct ipcCUDA_st {
   int device;
   cudaIpcEventHandle_t eventHandle;
   cudaIpcMemHandle_t memHandle;
   size_t byte_size;
 } ipcCUDA_t;
+#endif  // TRTIS_ENABLE_GPU
 
 class InferenceServer;
 class InferenceBackend;

@@ -180,6 +180,7 @@ SharedMemoryManager::RegisterSharedMemory(
                   name, shm_key, offset, byte_size, shm_fd, mapped_addr,
                   nullptr, kind, device_id))));
   } else {
+#ifdef TRTIS_ENABLE_GPU
     void *mapped_addr = nullptr, *cuda_ipc_addr;
     size_t shm_byte_size = 0, shm_offset = 0;
 
@@ -209,6 +210,12 @@ SharedMemoryManager::RegisterSharedMemory(
         name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
                   name, shm_key, offset, byte_size, -1, nullptr, cuda_ipc_addr,
                   kind, device_id))));
+#else
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "Cannot register CUDA shared memory region '" + name +
+            "' when no valid GPU");
+#endif  // TRTIS_ENABLE_GPU
   }
 
   return Status::Success;
