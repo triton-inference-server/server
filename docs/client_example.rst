@@ -65,13 +65,15 @@ Getting the Client Examples
 ---------------------------
 
 The provided Dockerfile.client and CMake support can be used to build
-the examples, or the pre-built examples can be downloaded from GitHub.
+the examples, or the pre-built examples can be downloaded from GitHub
+or a pre-built Docker image containing the client libraries from
+`NVIDIA GPU Cloud (NGC) <https://ngc.nvidia.com>`_.
 
 Build Using Dockerfile
 ^^^^^^^^^^^^^^^^^^^^^^
 
 To build the examples using Docker follow the description in
-:ref:`section-client-libaries-build-using-dockerfile`.
+:ref:`section-client-libraries-build-using-dockerfile`.
 
 After the build completes the tensorrtserver_client docker image will
 contain the built client examples, and will also be configured with
@@ -97,7 +99,7 @@ Build Using CMake
 ^^^^^^^^^^^^^^^^^
 
 To build the examples using CMake follow the description in
-:ref:`section-client-libaries-build-using-cmake`.
+:ref:`section-client-libraries-build-using-cmake`.
 
 Ubuntu 16.04 / Ubuntu 18.04
 ...........................
@@ -128,7 +130,7 @@ Download From GitHub
 ^^^^^^^^^^^^^^^^^^^^
 
 To download the examples follow the description in
-:ref:`section-client-libaries-download-from-github`.
+:ref:`section-client-libraries-download-from-github`.
 
 To use the C++ examples you must install some dependencies. What
 dependencies you need to install depends on your OS. For Ubuntu
@@ -152,6 +154,31 @@ The C++ image_client example uses OpenCV for image manipulation so for
 that example you must install the following::
 
   $ apt-get install libopencv-dev libopencv-core-dev
+
+Download Docker Image From NGC
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To download the Docker image follow the description in
+:ref:`section-client-libraries-download-from-ngc`.
+
+The docker image contains the built client examples and will also be
+configured with all the dependencies required to run those examples
+within the container. The easiest way to try the examples described in
+the following sections is to run the client image with -\\-net=host so
+that the client examples can access the inference server running in
+its own container. To be able to use shared memory you need to run the
+client and server image with -\\-ipc=host so that the inference server
+can access the shared memory in the client container. Additionally, to
+create shared memory regions that are larger than 64MB, the
+-\\-shm-size=1g flag is needed while running the client image (see
+:ref:`section-running-the-inference-server` for more information about
+running the inference server)::
+
+  $ docker run -it --rm --net=host nvcr.io/nvidia/tensorrtserver:<xx.yy>-clientsdk-py3
+
+In the image you can find the example executables in
+/workspace/install/bin, and the Python examples in
+/workspace/install/python.
 
 .. _section-image-classification-example:
 
