@@ -64,7 +64,8 @@ class ConcurrencyManager : public LoadManager {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const int32_t batch_size, const size_t max_threads,
-      const size_t sequence_length, const bool zero_input,
+      const size_t sequence_length, const size_t string_length,
+      const std::string& string_data, const bool zero_input,
       const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
       const std::string& data_directory,
       const std::shared_ptr<ContextFactory>& factory,
@@ -156,9 +157,14 @@ class ConcurrencyManager : public LoadManager {
 
   // User provided input data, it will be preferred over synthetic data
   std::unordered_map<std::string, std::vector<char>> input_data_;
+  std::unordered_map<std::string, std::vector<std::string>> input_string_data_;
 
   // Placeholder for generated input data, which will be used for all inputs
+  // except string
   std::vector<uint8_t> input_buf_;
+  // Placeholder for generated string data, which will be used for all string
+  // inputs
+  std::vector<std::string> input_string_buf_;
 
   // Note: early_exit signal is kept global
   std::vector<std::thread> threads_;

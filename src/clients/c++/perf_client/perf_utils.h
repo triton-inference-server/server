@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <random>
 
 #include <sys/stat.h>
 #include "src/clients/c++/library/request_grpc.h"
@@ -42,6 +43,10 @@ namespace perfclient {
 
 using TimestampVector =
     std::vector<std::tuple<struct timespec, struct timespec, uint32_t>>;
+
+// Will use the characters specified here to construct random strings
+std::string const character_set =
+    "abcdefghijklmnaoqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890 .?!";
 
 // A boolean flag to mark an interrupt and commencement of early exit
 extern volatile bool early_exit;
@@ -76,7 +81,19 @@ ProtocolType ParseProtocol(const std::string& str);
 //  read operation.
 nic::Error ReadFile(const std::string& path, std::vector<char>* contents);
 
+// Reads the string from file specified by path into vector of strings
+// \param path The complete path to the file to be read
+// \param contents The string vector that will contain the data read
+// \return error status. Returns Non-Ok if an error is encountered during
+//  read operation.
+nic::Error ReadTextFile(
+    const std::string& path, std::vector<std::string>* contents);
+
 // To check whether the path points to a valid system directory
 bool IsDirectory(const std::string& path);
+
+// Generates a random string of specified length using characters specified in
+// character_set.
+std::string GetRandomString(const int string_length);
 
 }  // namespace perfclient
