@@ -148,18 +148,13 @@ set -e
 
 # Testing with string inputs
 set +e
-$PERF_CLIENT -v -i grpc -m graphdef_object_object_object --input-data=1 -p2000 >$CLIENT_LOG 2>&1
+$PERF_CLIENT -v -i grpc -m graphdef_object_object_object --string-data=1 -p2000 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG | grep "WARNING" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
