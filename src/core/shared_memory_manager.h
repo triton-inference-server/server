@@ -92,9 +92,10 @@ class SharedMemoryManager {
   /// registered.
   /// \param offset The offset into the shared memory region.
   /// \param byte_size The size, in bytes of the tensor data.
-  /// \parm type The type action to be performed. If the action is REGISTER and
-  /// the shared memory region has been registered, the shared memory region
-  /// will be re-registered.
+  /// \param kind The kind of device the shared memory region is in (CPU = 0,
+  /// GPU = 1)
+  /// \param device id The GPU number the shared memory region is in. Ignored
+  /// if CPU.
   /// \return error status. Return an error if it tries to register a shared
   /// memory region that has already been registered.
   Status RegisterSharedMemory(
@@ -112,12 +113,14 @@ class SharedMemoryManager {
   /// automatically when destroying the shared memory manager.
   Status UnregisterAllSharedMemory();
 
-  // Get the base address + offset for the specific shared memory region. If
-  // the shared memory region is not valid return an error message
+  // Get the base address + offset for the specific System shared memory region.
+  // If the shared memory region is not valid return an error message
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
 
+  // Get the base address + offset for the specific CUDA shared memory region.
+  // If the shared memory region is not valid return an error message
   Status CudaSharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** cuda_shm_addr, size_t* cuda_byte_size);

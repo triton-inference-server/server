@@ -780,7 +780,8 @@ class ModelControlContext {
 ///   SharedMemoryControlGrpcContext::Create(&ctx, "localhost:8000");
 ///   std::string name = "shared_memory";
 ///   std::string shm_key = "/input";
-///   ctx->RegisterSharedMemory(name, shm_key, 0, 104, -1);
+///   int kind = 0;
+///   ctx->RegisterSharedMemory(name, shm_key, 0, 104, kind);
 ///   ...
 ///   ctx->UnregisterSharedMemory(name);
 ///   ...
@@ -804,6 +805,10 @@ class SharedMemoryControlContext {
   /// registered.
   /// \param offset The offset into the shared memory region.
   /// \param byte_size The size, in bytes of the tensor data.
+  /// \param kind The kind of device the shared memory region is in (CPU = 0,
+  /// GPU = 1). Defaults to CPU if not passed.
+  /// \param device id The GPU number the shared memory region is in. Not
+  /// necessary if CPU, defaults to 0.
   /// \return Error object indicating success or failure.
   virtual Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,

@@ -88,7 +88,7 @@ class InferenceServer {
   Status UnloadModel(const std::string& model_name);
 
   // Register the corresponding shared memory region. Re-register the shared
-  // memory region has been registered.
+  // memory region if it has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size, const int kind, const int device_id);
