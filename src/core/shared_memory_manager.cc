@@ -194,6 +194,7 @@ SharedMemoryManager::RegisterCudaSharedMemory(
 
   // register
   void* mapped_addr;
+  
   // Get CUDA shared memory base address
   Status status = OpenCudaIPCRegion(
       const_cast<cudaIpcMemHandle_t*>(cuda_shm_handle), &mapped_addr,
