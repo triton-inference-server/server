@@ -159,6 +159,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     const char* handle_block_name, const size_t offset, const size_t byte_size,
     const int device_id);
 
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryDevice(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    TRTSERVER_Memory_Type* kind, int* device_id);
+
 /// Delete a shared memory block object.
 /// \param shared_memory_block The object to delete.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -809,28 +813,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnregisterAllSharedMemory(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryAddress(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
     size_t offset, size_t byte_size, void** base);
-
-/// \param server The inference server object.
-/// \param shared_memory_block The system shared memory block.
-/// \param offset The offset within the shared memory block to get the
-/// address for.
-/// \param byte_size The size of the memory block within the shared memory
-/// block. Returns error if a block of this size (starting at
-/// 'offset') isn't completely contained in the shared memory block.
-/// \param base Returns the base address.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaSharedMemoryAddress(
-    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    size_t offset, size_t byte_size, void** cuda_base, size_t* cuda_byte_size);
-
-/// \param shared_memory_block The CUDA shared memory block.
-/// \param kind Returns the kind of device the shared memory region is in (CPU
-///  = 0, GPU = 1)
-/// \param device id Returns the GPU number the shared memory region is in.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerSharedMemoryDevice(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block, int* kind,
-    int* device_id);
 
 /// Get the list of all active shared memory region on the inference server.
 /// If there are none then the list is empty. Returned error indicates if it

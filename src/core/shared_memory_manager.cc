@@ -151,8 +151,8 @@ SharedMemoryManager::RegisterSharedMemory(
   }
 
   // register (or re-register)
+  void* mapped_addr;
   if (kind == 0) {
-    void* mapped_addr;
     int shm_fd = -1;
 
     // don't re-open if shared memory is already open
@@ -177,24 +177,30 @@ SharedMemoryManager::RegisterSharedMemory(
     }
     shared_memory_map_.insert(std::make_pair(
         name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                  name, shm_key, offset, byte_size, shm_fd, mapped_addr,
-                  nullptr, kind, device_id))));
+                  name, shm_key, offset, byte_size, shm_fd, mapped_addr, kind,
+                  device_id))));
   } else {
 #ifdef TRTIS_ENABLE_GPU
-    void *mapped_addr = nullptr, *cuda_ipc_addr;
     size_t shm_byte_size = 0, shm_offset = 0;
 
+    bool already_registered = false;
     for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
          ++itr) {
       if (itr->second->shm_key_ == shm_key) {
         mapped_addr = itr->second->mapped_addr_;
         shm_byte_size = itr->second->byte_size_;
         shm_offset = itr->second->offset_;
+        already_registered = true;
         break;
       }
     }
 
-    if (shm_byte_size < sizeof(cudaIpcHandle)) {
+    if (!already_registered) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "shared memory region '" + shm_key +
+              "' must be registered when using it for storing cuda IPC handle");
+    } else if (shm_byte_size < sizeof(cudaIpcHandle)) {
       return Status(
           RequestStatusCode::INVALID_ARG,
           "shared memory region '" + name +
@@ -205,12 +211,12 @@ SharedMemoryManager::RegisterSharedMemory(
     void* shm_mapped_addr = (void*)((uint8_t*)mapped_addr + shm_offset);
     cudaIpcHandle* shm_cuda_rep =
         reinterpret_cast<cudaIpcHandle*>(shm_mapped_addr);
-    OpenCUDAIPCRegion(shm_cuda_rep, &cuda_ipc_addr);
+    OpenCUDAIPCRegion(shm_cuda_rep, &mapped_addr);
 
     shared_memory_map_.insert(std::make_pair(
         name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-                  name, shm_key, offset, byte_size, -1, nullptr, cuda_ipc_addr,
-                  kind, device_id))));
+                  name, shm_key, offset, byte_size, -1, mapped_addr, kind,
+                  device_id))));
 #else
     return Status(
         RequestStatusCode::INVALID_ARG,
@@ -344,37 +350,14 @@ SharedMemoryManager::SharedMemoryAddress(
   if (it == shared_memory_map_.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "Unable to find system shared memory region: '" + name + "'");
-  }
-  if (it->second->kind_ == 1) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Not a valid system shared memory region: '" + name + "'");
-  }
-
-  *shm_mapped_addr =
-      (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
-  return Status::Success;
-}
-
-Status
-SharedMemoryManager::CudaSharedMemoryAddress(
-    const std::string& name, size_t offset, size_t byte_size,
-    void** cuda_shm_addr, size_t* cuda_byte_size)
-{
-  auto it = shared_memory_map_.find(name);
-  if (it == shared_memory_map_.end()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Unable to find CUDA shared memory region: '" + name + "'");
+        "Unable to find shared memory region: '" + name + "'");
   }
   if (it->second->kind_ == 0) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Not a valid CUDA shared memory region: '" + name + "'");
+    *shm_mapped_addr =
+        (void*)((uint8_t*)it->second->mapped_addr_ + it->second->offset_ + offset);
+  } else {
+    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
   }
-  *cuda_shm_addr = (void*)((uint8_t*)it->second->cuda_ipc_addr_ + offset);
-  *cuda_byte_size = it->second->byte_size_;
 
   return Status::Success;
 }

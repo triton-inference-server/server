@@ -60,11 +60,10 @@ class SharedMemoryManager {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr, void* cuda_ipc_addr, const int kind,
-        const int device_id)
+        void* mapped_addr, const int kind, const int device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          cuda_ipc_addr_(cuda_ipc_addr), kind_(kind), device_id_(device_id)
+          kind_(kind), device_id_(device_id)
     {
     }
 
@@ -74,7 +73,6 @@ class SharedMemoryManager {
     size_t byte_size_;
     int shm_fd_;
     void* mapped_addr_;
-    void* cuda_ipc_addr_;
     int kind_;
     int device_id_;
   };
@@ -118,12 +116,6 @@ class SharedMemoryManager {
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);
-
-  // Get the base address + offset for the specific CUDA shared memory region.
-  // If the shared memory region is not valid return an error message
-  Status CudaSharedMemoryAddress(
-      const std::string& name, size_t offset, size_t byte_size,
-      void** cuda_shm_addr, size_t* cuda_byte_size);
 
   /// Get the list of all registered shared memory regions.
   Status GetSharedMemoryStatus(SharedMemoryStatus* shm_status);
