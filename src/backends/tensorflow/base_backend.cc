@@ -45,7 +45,7 @@ namespace nvidia { namespace inferenceserver {
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
-      trtistf_model_(nullptr, TRTISTF_ModelDelete)
+      trtistf_model_(nullptr, TRTISTF_ModelDelete), input_device_id_(-1)
 {
 }
 
@@ -289,13 +289,20 @@ BaseBackend::CreateExecutionContext(
     }
     tftrt_config_ptr = &tftrt_config;
   }
-  context->vgpu_device_ = vgpu_device;
 
   RETURN_IF_ERROR(CreateTRTISTFModel(
       graphdef_backend_config, vgpu_device, Config().optimization().has_graph(),
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
+
+  // [TODO] if MakeCallable (get I/O infos from model config)
+  // if (Config().optimization().GPUIO()) {
+  //   if ((gpu_device != Context::NO_GPU_DEVICE) && (gpu_device != Context::MODEL_DEVICE)) {
+  //     TRTISTF_ModelMakeCallable(...)
+  //     context->input_device_id_ = vgpu_device;
+  //   }
+  // }
 
   return Status::Success;
 }
@@ -461,16 +468,11 @@ BaseBackend::Context::SetInput(
     input_tensor_name = &tn_itr->second;
   }
 
-  // Only try to create a tensor on specific device if we know which TF device
-  // that the session is on
-  auto device_id =
-      (gpu_device_ == NO_GPU_DEVICE) || (gpu_device_ == MODEL_DEVICE)
-          ? -1
-          : vgpu_device_;
+  // Only try to create a tensor on specific device if 'input_device_id_' is set
   const TRTISTF_DataType dtype = ConvertDataType(datatype);
   TRTISTF_Tensor* tensor = TRTISTF_TensorNew(
       input_tensor_name->c_str(), dtype, shape.size(),
-      (shape.size() == 0) ? nullptr : &shape[0], device_id);
+      (shape.size() == 0) ? nullptr : &shape[0], input_device_id_);
   if (tensor == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -755,7 +757,6 @@ BaseBackend::Context::Run(
   // expected by the model.
   std::vector<std::string> model_output_names;
   const char* output_names_cstr[required_outputs.size()];
-  bool prefer_gpu_outputs[required_outputs.size()];
   {
     size_t oidx = 0;
     for (const auto& name : required_outputs) {
@@ -766,7 +767,6 @@ BaseBackend::Context::Run(
       } else {
         output_names_cstr[oidx] = tn_itr->second.c_str();
       }
-      prefer_gpu_outputs[oidx] = (vgpu_device_ >= 0);
       oidx++;
     }
   }
@@ -786,7 +786,7 @@ BaseBackend::Context::Run(
     TRTISTF_TensorList* rtl;
     RETURN_IF_TRTISTF_ERROR(TRTISTF_ModelRun(
         trtistf_model_.get(), *(input_tensors.release()),
-        required_outputs.size(), output_names_cstr, prefer_gpu_outputs, &rtl));
+        required_outputs.size(), output_names_cstr, &rtl));
     output_tensors.reset(rtl);
   }
 

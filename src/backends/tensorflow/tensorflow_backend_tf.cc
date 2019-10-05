@@ -404,15 +404,18 @@ class ModelImpl {
 
   TRTISTF_IOList* Inputs() const { return inputs_; }
   TRTISTF_IOList* Outputs() const { return outputs_; }
+  const std::string& DeviceName() const { return device_name_; }
+
+  TRTISTF_Error* MakeCallable(const tensorflow::CallableOptions& opts);
 
   TRTISTF_Error* Run(
       TRTISTF_TensorList* input_tensors,
-      const std::vector<std::pair<std::string, bool>>& output_infos,
+      const std::vector<std::string>& output_names,
       TRTISTF_TensorList** output_tensors);
 
  private:
   // Return the device name that the session is on, if multiple device names
-  // are present or the session is on CPU, return empty string;
+  // are present or the session is on CPU, return empty string.
   std::string TFGPUDeviceName(const int device_id);
 
   const std::string model_name_;
@@ -421,6 +424,12 @@ class ModelImpl {
   std::string device_name_;
   TRTISTF_IOList* inputs_;
   TRTISTF_IOList* outputs_;
+
+  bool has_callable_;
+  tensorflow::Session::CallableHandle callable_;
+  // RunCallable will return all outputs specified in callable option in order,
+  // using map to quickly locate the requested output for each request.
+  std::map<std::string, size_t> output_index_map_;
 };
 
 ModelImpl::ModelImpl(
@@ -429,7 +438,7 @@ ModelImpl::ModelImpl(
     TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
     const int device_id)
     : model_name_(model_name), bundle_(std::move(bundle)), inputs_(inputs),
-      outputs_(outputs)
+      outputs_(outputs), has_callable_(false)
 {
   session_ = bundle_->session.release();
   device_name_ = TFGPUDeviceName(device_id);
@@ -440,7 +449,7 @@ ModelImpl::ModelImpl(
     TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
     const int device_id)
     : model_name_(model_name), session_(session), inputs_(inputs),
-      outputs_(outputs)
+      outputs_(outputs), has_callable_(false)
 {
   device_name_ = TFGPUDeviceName(device_id);
 }
@@ -448,6 +457,9 @@ ModelImpl::ModelImpl(
 ModelImpl::~ModelImpl()
 {
   if (session_ != nullptr) {
+    if (has_callable_) {
+      session_->ReleaseCallable(callable_).IgnoreError();
+    }
     session_->Close().IgnoreError();
     delete session_;
     session_ = nullptr;
@@ -458,100 +470,80 @@ ModelImpl::~ModelImpl()
 }
 
 TRTISTF_Error*
+ModelImpl::MakeCallable(const tensorflow::CallableOptions& opts)
+{
+  if (has_callable_) {
+    session_->ReleaseCallable(callable_).IgnoreError();
+    has_callable_ = false;
+  }
+
+  RETURN_IF_TF_ERROR(session_->MakeCallable(opts, &callable_));
+  for (int idx = 0; idx < opts.fetch_size(); idx++) {
+    output_index_map_[opts.fetch(idx)] = idx;
+  }
+  has_callable_ = true;
+  return nullptr;
+}
+
+TRTISTF_Error*
 ModelImpl::Run(
     TRTISTF_TensorList* input_tensors,
-    const std::vector<std::pair<std::string, bool>>& output_infos,
+    const std::vector<std::string>& output_names,
     TRTISTF_TensorList** output_tensors)
 {
-  std::vector<tensorflow::Tensor> tfinputs;
+  // I/O needs to be prepared differently for callable
+  if (has_callable_) {
+    std::vector<tensorflow::Tensor> tfinputs;
 
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  LOG(ERROR) << "prepare callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
-
-  tensorflow::CallableOptions opts;
-  for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
+    for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
        itr = itr->next_) {
-    if (itr->tensor_ != nullptr) {
-      TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
-      tfinputs.emplace_back(std::move(tensor->TFTensor()));
-      opts.add_feed(tensor->Name());
-      // The tensor should be on GPU memory
-      if (!device_name_.empty()) {
-        if (tensor->IsGPUTensor()) {
-          opts.mutable_feed_devices()->insert({tensor->Name(), device_name_});
-        }
-      } else if (tensor->IsGPUTensor()) {
-        return TRTISTF_ErrorNew(
-            "failed to determine the GPU device for input '" + tensor->Name() +
-            "'");
+      if (itr->tensor_ != nullptr) {
+        TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
+        tfinputs.emplace_back(std::move(tensor->TFTensor()));
       }
     }
-  }
-  TRTISTF_TensorListDelete(input_tensors);
+    TRTISTF_TensorListDelete(input_tensors);
 
-  for (const auto& output_info : output_infos) {
-    opts.add_fetch(output_info.first);
-    // Specify output to be on GPU memory if possible
-    LOG(ERROR) << "generating output infoi for " << output_info.first;
-    if (!device_name_.empty() && output_info.second) {
-      for (auto node = outputs_; node != nullptr; node = node->next_) {
-        const auto* name = (node->io_->inmodel_name_ != nullptr)
-                               ? node->io_->inmodel_name_
-                               : node->io_->name_;
-        if ((output_info.first == name)) {
-          LOG(ERROR) << "name in model: " << name;
-          LOG(ERROR) << "name match: " << (output_info.first == name) << ", type :" << node->io_->data_type_ << " is allowed: " << IsGPUFeedAndFetchSupported(node->io_->data_type_);
-        }
-        if ((output_info.first == name) &&
-            IsGPUFeedAndFetchSupported(node->io_->data_type_)) {
-          opts.mutable_fetch_devices()->insert(
-              {output_info.first, device_name_});
-          LOG(ERROR) << "requested output: " << output_info.first << " on "
-                     << device_name_;
-          break;
-        }
+    tensorflow::RunMetadata meta_data;
+    std::vector<tensorflow::Tensor> tfoutputs;
+    RETURN_IF_TF_ERROR(session_->RunCallable(
+        callable_, tfinputs, &tfoutputs, &meta_data));
+
+    *output_tensors = nullptr;
+    for (std::vector<std::string>::reverse_iterator ri =
+            output_names.rbegin(); ri != output_names.rend(); ++ri) {
+      const auto oidx = output_index_map_[*ri];
+      TRTISTF_Tensor* tensor =
+          reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(tfoutputs[oidx])));
+      *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
+    }
+
+    // [TODO] Device::Sync() (What if other contexts are on the same device?)
+  } else {
+    std::vector<std::pair<std::string, tensorflow::Tensor>> tfinputs;
+
+    for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
+        itr = itr->next_) {
+      if (itr->tensor_ != nullptr) {
+        TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
+        tfinputs.emplace_back(
+            std::make_pair(tensor->Name(), std::move(tensor->TFTensor())));
       }
     }
+    TRTISTF_TensorListDelete(input_tensors);
+
+    std::vector<tensorflow::Tensor> tfoutputs;
+    RETURN_IF_TF_ERROR(session_->Run(tfinputs, output_names, {}, &tfoutputs));
+
+    *output_tensors = nullptr;
+    for (std::vector<tensorflow::Tensor>::reverse_iterator ri =
+            tfoutputs.rbegin();
+        ri != tfoutputs.rend(); ++ri) {
+      TRTISTF_Tensor* tensor =
+          reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(*ri)));
+      *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
+    }
   }
-
-  // CallableOptions.fetch_skip_sync = false is not yet implemented, we
-  // will have to synchronize after the callable is run.
-  opts.set_fetch_skip_sync(true);
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  LOG(ERROR) << "make callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
-
-  tensorflow::Session::CallableHandle feed_fetch_location;
-  RETURN_IF_TF_ERROR(session_->MakeCallable(opts, &feed_fetch_location));
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  LOG(ERROR) << "run callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
-
-  tensorflow::RunMetadata meta_data;
-  std::vector<tensorflow::Tensor> tfoutputs;
-  RETURN_IF_TF_ERROR(session_->RunCallable(
-      feed_fetch_location, tfinputs, &tfoutputs, &meta_data));
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  LOG(ERROR) << "release callable: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
-
-  RETURN_IF_TF_ERROR(session_->ReleaseCallable(feed_fetch_location));
-
-  *output_tensors = nullptr;
-  for (std::vector<tensorflow::Tensor>::reverse_iterator ri =
-           tfoutputs.rbegin();
-       ri != tfoutputs.rend(); ++ri) {
-    TRTISTF_Tensor* tensor =
-        reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(*ri)));
-    *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
-  }
-
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  LOG(ERROR) << "done: " << ts.tv_sec << " s " << ts.tv_nsec << " ns";
-
-
-  // [TODO] Device::Sync() (What if other contexts are on the same device?)
 
   return nullptr;
 }
@@ -1048,17 +1040,55 @@ TRTISTF_ModelOutputs(TRTISTF_Model* model)
 }
 
 TRTISTF_Error*
-TRTISTF_ModelRun(
-    TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
-    const char** output_names, const bool* prefer_gpu_tensors,
-    TRTISTF_TensorList** output_tensors)
+TRTISTF_ModelMakeCallable(
+    TRTISTF_Model* model, const char**  input_names,
+    const TRTISTF_DataType* input_types, const size_t num_inputs,
+    const char** output_names, const TRTISTF_DataType* output_types,
+    const size_t num_outputs)
 {
   ModelImpl* m = reinterpret_cast<ModelImpl*>(model);
 
-  std::vector<std::pair<std::string, bool>> output_tensor_infos;
-  for (size_t i = 0; i < num_outputs; ++i) {
-    output_tensor_infos.emplace_back(output_names[i], prefer_gpu_tensors[i]);
+  const auto& device_name = m->DeviceName();
+  if (device_name.empty()) {
+    return TRTISTF_ErrorNew(
+        "model session does not have an assigned GPU device");
   }
 
-  return m->Run(input_tensors, output_tensor_infos, output_tensors);
+  tensorflow::CallableOptions opts;
+  for (size_t i = 0; i < num_inputs; ++i) {
+    const std::string input_name = input_names[i];
+    opts.add_feed(input_name);
+    if (IsGPUFeedAndFetchSupported(input_types[i])) {
+      opts.mutable_feed_devices()->insert({input_name, device_name});
+    }
+  }
+
+  for (size_t i = 0; i < num_outputs; ++i) {
+    const std::string output_name = output_names[i];
+    opts.add_fetch(output_name);
+    if (IsGPUFeedAndFetchSupported(output_types[i])) {
+      opts.mutable_fetch_devices()->insert({output_name, device_name});
+    }
+  }
+
+  // CallableOptions.fetch_skip_sync = false is not yet implemented, we
+  // will have to synchronize after the callable is run.
+  opts.set_fetch_skip_sync(true);
+
+  return m->MakeCallable(opts);
+}
+
+TRTISTF_Error*
+TRTISTF_ModelRun(
+    TRTISTF_Model* model, TRTISTF_TensorList* input_tensors, size_t num_outputs,
+    const char** output_names, TRTISTF_TensorList** output_tensors)
+{
+  ModelImpl* m = reinterpret_cast<ModelImpl*>(model);
+
+  std::vector<std::string> output_names;
+  for (size_t i = 0; i < num_outputs; ++i) {
+    output_names.emplace_back(output_names[i]);
+  }
+
+  return m->Run(input_tensors, output_names, output_tensors);
 }
