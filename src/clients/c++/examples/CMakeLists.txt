@@ -150,6 +150,9 @@ install(
 # simple_cuda_shm_client
 #
 if(${TRTIS_ENABLE_CUDA_EXAMPLES})
+find_package(CUDA REQUIRED)
+message(STATUS "Using CUDA ${CUDA_VERSION}")
+set(CUDA_NVCC_FLAGS -std=c++11)
 set(
   SIMPLE_CUDA_SHM_SRCS
   simple_cuda_shm_client.cc
@@ -167,10 +170,11 @@ target_link_libraries(
   rt
 )
 
-target_include_directories(PRIVATE ${CUDA_INCLUDE_DIRS})
+target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
+  simple_cuda_shm_client
+  PRIVATE -L/usr/local/cuda/lib64/stubs
+  PRIVATE -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
 install(

@@ -67,6 +67,13 @@ COPY build build
 COPY src/clients src/clients
 COPY src/core src/core
 
+RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcuda.so | wc -l) && \
+    if [[ "$LIBCUDA_FOUND" -eq 0 ]]; then \
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/stubs; \
+        ln -fs /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1; \
+    fi && \
+    echo $LD_LIBRARY_PATH
+
 RUN cd build && \
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=/workspace/install && \
     make -j16 trtis-clients

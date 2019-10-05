@@ -49,6 +49,16 @@ namespace nic = nvidia::inferenceserver::client;
 
 #define DEVICE_ID 0
 
+#define checkCudaErrors(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess)
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 typedef struct ipcCUDA_st {
   int device;
   cudaIpcEventHandle_t eventHandle;
@@ -89,11 +99,11 @@ CreateCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* input_d_ptr)
 
   //  allocate data on gpu to ipc handle, create an event
   checkCudaErrors(
-      cudaEventCreate(&event, cudaEventDisableTiming | cudaEventInterprocess));
+      cudaEventCreate(&event));//, cudaEventDisableTiming | cudaEventInterprocess));
   checkCudaErrors(cudaIpcGetEventHandle(
       (cudaIpcEventHandle_t*)&shm_cuda_rep->eventHandle, event));
-  cudaIpcOpenMemHandle(
-      (void**)&d_ptr, *(cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle,
+  checkCudaErrors(cudaIpcOpenMemHandle(
+      (void**)&input_d_ptr, *(cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle,
       cudaIpcMemLazyEnablePeerAccess));
 
   // set device to default GPU - GPU0
@@ -269,9 +279,7 @@ main(int argc, char** argv)
   // Get the size of the inputs and outputs from the Shape and DataType
   int input_byte_size =
       infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
-  int output_byte_size =
-      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
-  size cuda_ipc_byte_size = sizeof(ipcCUDA_t);
+  size_t cuda_ipc_byte_size = sizeof(ipcCUDA_t);
 
   // Create Output0 and Output1 in CUDA Shared Memory and store handle in system
   // shared memory
@@ -279,10 +287,10 @@ main(int argc, char** argv)
   // shared memory for CUDA IPC memory and event handlers
   int shm_fd_op = CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
   ipcCUDA_t* output0_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size);
+      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size));
   ipcCUDA_t* output1_cuda_rep =
       (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, cuda_ipc_byte_size,
-      cuda_ipc_byte_size);
+      cuda_ipc_byte_size));
 
   // Create OUTPUT0 and OUTPUT1 on GPU
   int *output0_d_ptr, *output1_d_ptr;
@@ -326,10 +334,10 @@ main(int argc, char** argv)
   shm_key = "/input_simple";
   int shm_fd_ip = CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
   ipcCUDA_t* input0_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size);
+      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size));
   ipcCUDA_t* input1_cuda_rep =
       (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size,
-      cuda_ipc_byte_size);
+      cuda_ipc_byte_size));
 
   // Initialize data to load into shared memory region
   int input0_data[16];
@@ -381,8 +389,8 @@ main(int argc, char** argv)
 
   int output0_data[16];
   int output1_data[16];
-  ReadCUDAIPCHandle(output0_cuda_rep, output0_data)
-  ReadCUDAIPCHandle(output1_cuda_rep, output1_data)
+  ReadCUDAIPCHandle(output0_cuda_rep, output0_data);
+  ReadCUDAIPCHandle(output1_cuda_rep, output1_data);
 
   // Client should use ipcCUDA_t handle to return data
   // We expect there to be 2 results. Walk over all 16 result elements
