@@ -349,12 +349,7 @@ SharedMemoryManager::SharedMemoryAddress(
   if (it == shared_memory_map_.end()) {
     return Status(
         RequestStatusCode::INTERNAL,
-        "Unable to find system shared memory region: '" + name + "'");
-  }
-  if (it->second->kind_ == 1) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Not a valid system shared memory region: '" + name + "'");
+        "Unable to find shared memory region: '" + name + "'");
   }
   if (it->second->kind_ == MEMORY_CPU) {
     *shm_mapped_addr =
@@ -362,28 +357,6 @@ SharedMemoryManager::SharedMemoryAddress(
   } else {
     *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
   }
-
-  return Status::Success;
-}
-
-Status
-SharedMemoryManager::CudaSharedMemoryAddress(
-    const std::string& name, size_t offset, size_t byte_size,
-    void** cuda_shm_addr, size_t* cuda_byte_size)
-{
-  auto it = shared_memory_map_.find(name);
-  if (it == shared_memory_map_.end()) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "Unable to find CUDA shared memory region: '" + name + "'");
-  }
-  if (it->second->kind_ == 0) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "Not a valid CUDA shared memory region: '" + name + "'");
-  }
-  *cuda_shm_addr = (void*)((uint8_t*)it->second->cuda_ipc_addr_ + offset);
-  *cuda_byte_size = it->second->byte_size_;
 
   return Status::Success;
 }

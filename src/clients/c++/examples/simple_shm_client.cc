@@ -288,7 +288,7 @@ main(int argc, char** argv)
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
       "output_data", "/output_simple", 0, output_byte_size * 2,
-      nic::SharedMemoryControlContext::MemoryType::CPU);
+      nic::SharedMemoryControlContext::MemoryType::GPU);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;

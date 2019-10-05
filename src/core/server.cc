@@ -441,15 +441,6 @@ InferenceServer::SharedMemoryAddress(
 }
 
 Status
-InferenceServer::CudaSharedMemoryAddress(
-    const std::string& name, size_t offset, size_t byte_size,
-    void** cuda_shm_addr, size_t* cuda_byte_size)
-{
-  return shared_memory_manager_->CudaSharedMemoryAddress(
-      name, offset, byte_size, cuda_shm_addr, cuda_byte_size);
-}
-
-Status
 InferenceServer::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
