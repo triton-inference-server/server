@@ -510,8 +510,7 @@ ModelImpl::Run(
         callable_, tfinputs, &tfoutputs, &meta_data));
 
     *output_tensors = nullptr;
-    for (std::vector<std::string>::reverse_iterator ri =
-            output_names.rbegin(); ri != output_names.rend(); ++ri) {
+    for (auto ri = output_names.rbegin(); ri != output_names.rend(); ++ri) {
       const auto oidx = output_index_map_[*ri];
       TRTISTF_Tensor* tensor =
           reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(tfoutputs[oidx])));
@@ -1085,10 +1084,10 @@ TRTISTF_ModelRun(
 {
   ModelImpl* m = reinterpret_cast<ModelImpl*>(model);
 
-  std::vector<std::string> output_names;
+  std::vector<std::string> output_tensor_names;
   for (size_t i = 0; i < num_outputs; ++i) {
-    output_names.emplace_back(output_names[i]);
+    output_tensor_names.emplace_back(output_names[i]);
   }
 
-  return m->Run(input_tensors, output_names, output_tensors);
+  return m->Run(input_tensors, output_tensor_names, output_tensors);
 }
