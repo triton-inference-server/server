@@ -50,7 +50,8 @@ ConcurrencyManager::~ConcurrencyManager()
 nic::Error
 ConcurrencyManager::Create(
     const int32_t batch_size, const size_t max_threads,
-    const size_t sequence_length, const bool zero_input,
+    const size_t sequence_length, const size_t string_length,
+    const std::string& string_data, const bool zero_input,
     const std::unordered_map<std::string, std::vector<int64_t>>& input_shapes,
     const std::string& data_directory,
     const std::shared_ptr<ContextFactory>& factory,
@@ -63,6 +64,9 @@ ConcurrencyManager::Create(
   RETURN_IF_ERROR(local_manager->factory_->CreateInferContext(&ctx));
 
   size_t max_input_byte_size = 0;
+  size_t max_batch1_num_strings = 0;
+  bool needs_string_input = false;
+
   for (const auto& input : ctx->Inputs()) {
     // Validate user provided shape
     if (!input_shapes.empty()) {
@@ -87,47 +91,105 @@ ConcurrencyManager::Create(
         input->SetShape(it->second);
       }
     }
+
     const int64_t bs = input->ByteSize();
-    if (bs < 0) {
-      std::string error_detail;
+    if (bs < 0 && input->DType() != ni::DataType::TYPE_STRING) {
       if (input->Shape().empty()) {
-        error_detail =
-            "has variable-size shape and the shape to be used is not specified";
-      } else {
-        error_detail = "has STRING data type";
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() +
+                "' has variable-size shape and the shape to be used is not "
+                "specified, unable to create input values for model '" +
+                ctx->ModelName() + "'");
       }
-      return nic::Error(
-          ni::RequestStatusCode::INVALID_ARG,
-          "input '" + input->Name() + "' " + error_detail +
-              ", unable to create input values for "
-              "model '" +
-              ctx->ModelName() + "'");
     }
 
-    max_input_byte_size =
-        std::max(max_input_byte_size, (size_t)input->ByteSize());
+    // Validate the shape specification for TYPE_STRING
+    if (input->DType() == ni::DataType::TYPE_STRING) {
+      bool is_variable_shape = false;
+      for (const auto dim : input->Dims()) {
+        if (dim == -1) {
+          is_variable_shape = true;
+          break;
+        }
+      }
+      if (is_variable_shape && input->Shape().empty()) {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "input '" + input->Name() +
+                "' has variable-size shape and the shape to be used is not "
+                "specified, unable to create input values for model '" +
+                ctx->ModelName() + "'");
+      }
+    }
 
     // Read provided data
     if (!data_directory.empty()) {
-      const auto file_path = data_directory + "/" + input->Name();
-      auto it =
-          local_manager->input_data_.emplace(input->Name(), std::vector<char>())
-              .first;
-      RETURN_IF_ERROR(ReadFile(file_path, &it->second));
+      if (input->DType() != ni::DataType::TYPE_STRING) {
+        const auto file_path = data_directory + "/" + input->Name();
+        auto it = local_manager->input_data_
+                      .emplace(input->Name(), std::vector<char>())
+                      .first;
+        RETURN_IF_ERROR(ReadFile(file_path, &it->second));
+      } else {
+        const auto file_path = data_directory + "/" + input->Name();
+        auto it = local_manager->input_string_data_
+                      .emplace(input->Name(), std::vector<std::string>())
+                      .first;
+        RETURN_IF_ERROR(ReadTextFile(file_path, &it->second));
+      }
+    } else {
+      if (input->DType() != ni::DataType::TYPE_STRING) {
+        max_input_byte_size =
+            std::max(max_input_byte_size, (size_t)input->ByteSize());
+      } else {
+        // Get the number of strings needed for this input batch-1
+        size_t batch1_num_strings = 1;
+        if (!input->Shape().empty()) {
+          for (const auto dim : input->Shape()) {
+            batch1_num_strings *= dim;
+          }
+        } else {
+          for (const auto dim : input->Dims()) {
+            batch1_num_strings *= dim;
+          }
+        }
+
+        needs_string_input = true;
+        max_batch1_num_strings =
+            std::max(max_batch1_num_strings, batch1_num_strings);
+      }
     }
   }
 
   // Create a zero or randomly (as indicated by zero_input_)
   // initialized buffer that is large enough to provide the largest
   // needed input. We (re)use this buffer for all input values.
-  if (zero_input) {
-    local_manager->input_buf_.resize(max_input_byte_size, 0);
-  } else {
-    local_manager->input_buf_.resize(max_input_byte_size);
-    for (auto& byte : local_manager->input_buf_) {
-      byte = rand();
+  if (max_input_byte_size > 0) {
+    if (zero_input) {
+      local_manager->input_buf_.resize(max_input_byte_size, 0);
+    } else {
+      local_manager->input_buf_.resize(max_input_byte_size);
+      for (auto& byte : local_manager->input_buf_) {
+        byte = rand();
+      }
     }
   }
+
+  // Similarly, handle the input_string_buf_
+  if (needs_string_input) {
+    local_manager->input_string_buf_.resize(max_batch1_num_strings);
+    if (!string_data.empty()) {
+      for (size_t i = 0; i < max_batch1_num_strings; i++) {
+        local_manager->input_string_buf_[i] = string_data;
+      }
+    } else {
+      for (size_t i = 0; i < max_batch1_num_strings; i++) {
+        local_manager->input_string_buf_[i] = GetRandomString(string_length);
+      }
+    }
+  }
+
 
   *manager = std::move(local_manager);
   return nic::Error::Success;
@@ -271,24 +333,93 @@ ConcurrencyManager::PrepareInfer(
   for (const auto& input : (*ctx)->Inputs()) {
     RETURN_IF_ERROR(input->Reset());
 
-    size_t batch1_size = (size_t)input->ByteSize();
-    const uint8_t* data = &input_buf_[0];
-    // if available, use provided data instead
-    auto it = input_data_.find(input->Name());
-    if (it != input_data_.end()) {
-      if (batch1_size != it->second.size()) {
+    if (input->DType() != ni::DataType::TYPE_STRING) {
+      size_t batch1_size = (size_t)input->ByteSize();
+      const uint8_t* data;
+      // if available, use provided data instead
+      auto it = input_data_.find(input->Name());
+      if (it != input_data_.end()) {
+        if (batch1_size != it->second.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_size) +
+                  " bytes for each batch, but provided data has " +
+                  std::to_string(it->second.size()) + " bytes");
+        }
+        data = (const uint8_t*)&(it->second)[0];
+      } else if (input_buf_.size() != 0) {
+        if (batch1_size > input_buf_.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INTERNAL,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_size) +
+                  " bytes for each batch, but generated data has " +
+                  std::to_string(input_buf_.size()) + " bytes");
+        } else {
+          data = &input_buf_[0];
+        }
+      } else {
         return nic::Error(
             ni::RequestStatusCode::INVALID_ARG,
-            "input '" + input->Name() + "' requires " +
-                std::to_string(batch1_size) +
-                " bytes for each batch, but provided data has " +
-                std::to_string(it->second.size()) + " bytes");
+            "unable to find data for input '" + input->Name() + "'.");
       }
-      data = (const uint8_t*)&(it->second)[0];
-    }
 
-    for (size_t i = 0; i < batch_size_; ++i) {
-      RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
+      for (size_t i = 0; i < batch_size_; ++i) {
+        RETURN_IF_ERROR(input->SetRaw(data, batch1_size));
+      }
+    } else {
+      size_t batch1_num_strings = 1;
+      if (!input->Shape().empty()) {
+        for (const auto dim : input->Shape()) {
+          batch1_num_strings *= dim;
+        }
+      } else {
+        for (const auto dim : input->Dims()) {
+          batch1_num_strings *= dim;
+        }
+      }
+
+      bool used_new_allocation = false;
+      std::vector<std::string>* data;
+
+      // if available, use provided data instead
+      auto it = input_string_data_.find(input->Name());
+      if (it != input_string_data_.end()) {
+        if (it->second.size() != batch1_num_strings) {
+          return nic::Error(
+              ni::RequestStatusCode::INVALID_ARG,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_num_strings) +
+                  " strings for each batch, but provided data has " +
+                  std::to_string(it->second.size()) + " strings.");
+        }
+        data = &it->second;
+      } else if (input_string_buf_.size() != 0) {
+        if (batch1_num_strings > input_string_buf_.size()) {
+          return nic::Error(
+              ni::RequestStatusCode::INTERNAL,
+              "input '" + input->Name() + "' requires " +
+                  std::to_string(batch1_num_strings) +
+                  " strings for each batch, but generated data has " +
+                  std::to_string(input_string_buf_.size()) + " strings.");
+        } else {
+          used_new_allocation = true;
+          data = new std::vector<std::string>(
+              input_string_buf_.begin(),
+              input_string_buf_.begin() + batch1_num_strings);
+        }
+      } else {
+        return nic::Error(
+            ni::RequestStatusCode::INVALID_ARG,
+            "unable to find data for input '" + input->Name() + "'.");
+      }
+      for (size_t i = 0; i < batch_size_; ++i) {
+        RETURN_IF_ERROR(input->SetFromString(*data));
+      }
+      if (used_new_allocation) {
+        delete data;
+      }
     }
   }
 
