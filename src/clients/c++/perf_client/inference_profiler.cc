@@ -164,7 +164,7 @@ InferenceProfiler::Profile(
                     << std::endl;
         }
       } else {
-        std::cerr << "  Pass [" << (completed_trials + 1)
+        std::cout << "  Pass [" << (completed_trials + 1)
                   << "] Error: " << error.back().Message() << std::endl;
       }
     }
