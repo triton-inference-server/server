@@ -286,7 +286,9 @@ NewSessionOptions(
 
 // Get the device and its name in a model session given a non-zero device_id.
 TRTISTF_Error*
-GetTFGPUDevice(std::string* device_name, tensorflow::Device** device, tensorflow::Session* session, const int device_id)
+GetTFGPUDevice(
+    std::string* device_name, tensorflow::Device** device,
+    tensorflow::Session* session, const int device_id)
 {
   if (device_id >= 0) {
     std::vector<tensorflow::DeviceAttributes> devices;
@@ -446,7 +448,6 @@ class ModelImpl {
       TRTISTF_TensorList** output_tensors);
 
  private:
-
   const std::string model_name_;
   std::unique_ptr<tensorflow::SavedModelBundle> bundle_;
   tensorflow::Session* session_;
@@ -866,14 +867,18 @@ TRTISTF_ModelCreateFromGraphDef(
 
   std::string device_name;
   tensorflow::Device* device = nullptr;
-  if (device_id != TRTISTF_MODEL_DEVICE) && (device_id != TRTISTF_NO_GPU_DEVICE) {
-    TRTISTF_Error* err = GetTFGPUDevice(&device_name, &device, session, device_id);
-    if (err != nullptr) {
-      return err;
+  if (device_id != TRTISTF_MODEL_DEVICE)
+    &&(device_id != TRTISTF_NO_GPU_DEVICE)
+    {
+      TRTISTF_Error* err =
+          GetTFGPUDevice(&device_name, &device, session, device_id);
+      if (err != nullptr) {
+        return err;
+      }
     }
-  }
   ModelImpl* model = new ModelImpl(
-      model_name, session, potential_inputs, potential_outputs, device_name, device);
+      model_name, session, potential_inputs, potential_outputs, device_name,
+      device);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
@@ -1026,14 +1031,17 @@ TRTISTF_ModelCreateFromSavedModel(
 
   std::string device_name;
   tensorflow::Device* device = nullptr;
-  if (device_id != TRTISTF_MODEL_DEVICE) && (device_id != TRTISTF_NO_GPU_DEVICE) {
-    TRTISTF_Error* err = GetTFGPUDevice(&device_name, &device, bundle->session_.get(), device_id);
-    if (err != nullptr) {
-      return err;
+  if (device_id != TRTISTF_MODEL_DEVICE)
+    &&(device_id != TRTISTF_NO_GPU_DEVICE)
+    {
+      TRTISTF_Error* err = GetTFGPUDevice(
+          &device_name, &device, bundle->session_.get(), device_id);
+      if (err != nullptr) {
+        return err;
+      }
     }
-  }
-  ModelImpl* model =
-      new ModelImpl(model_name, std::move(bundle), inputs, outputs, device_name_, device);
+  ModelImpl* model = new ModelImpl(
+      model_name, std::move(bundle), inputs, outputs, device_name_, device);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
