@@ -27,13 +27,15 @@
 #include "src/clients/c++/perf_client/inference_profiler.h"
 
 #include <math.h>
+#include <limits>
+#include <queue>
 
 namespace perfclient {
 
 nic::Error
 InferenceProfiler::Create(
     const bool verbose, const double stability_threshold,
-    const uint64_t measurement_window_ms, const size_t max_measurement_count,
+    const uint64_t measurement_window_ms, const size_t max_trials,
     const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
     std::unique_ptr<LoadManager> manager,
     std::unique_ptr<InferenceProfiler>* profiler)
@@ -42,10 +44,10 @@ InferenceProfiler::Create(
   RETURN_IF_ERROR(factory->CreateServerStatusContext(&status_ctx));
 
   std::unique_ptr<InferenceProfiler> local_profiler(new InferenceProfiler(
-      verbose, stability_threshold, measurement_window_ms,
-      max_measurement_count, (percentile != -1), percentile,
-      factory->SchedulerType(), factory->ModelName(), factory->ModelVersion(),
-      std::move(status_ctx), std::move(manager)));
+      verbose, stability_threshold, measurement_window_ms, max_trials,
+      (percentile != -1), percentile, factory->SchedulerType(),
+      factory->ModelName(), factory->ModelVersion(), std::move(status_ctx),
+      std::move(manager)));
 
   if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
     ni::ServerStatus server_status;
@@ -92,18 +94,17 @@ InferenceProfiler::BuildComposingModelMap(
 
 InferenceProfiler::InferenceProfiler(
     const bool verbose, const double stability_threshold,
-    const int32_t measurement_window_ms, const size_t max_measurement_count,
+    const int32_t measurement_window_ms, const size_t max_trials,
     const bool extra_percentile, const size_t percentile,
     const ContextFactory::ModelSchedulerType scheduler_type,
     const std::string& model_name, const int64_t model_version,
     std::unique_ptr<nic::ServerStatusContext> status_ctx,
     std::unique_ptr<LoadManager> manager)
     : verbose_(verbose), measurement_window_ms_(measurement_window_ms),
-      max_measurement_count_(max_measurement_count),
-      extra_percentile_(extra_percentile), percentile_(percentile),
-      scheduler_type_(scheduler_type), model_name_(model_name),
-      model_version_(model_version), status_ctx_(std::move(status_ctx)),
-      manager_(std::move(manager))
+      max_trials_(max_trials), extra_percentile_(extra_percentile),
+      percentile_(percentile), scheduler_type_(scheduler_type),
+      model_name_(model_name), model_version_(model_version),
+      status_ctx_(std::move(status_ctx)), manager_(std::move(manager))
 {
   load_parameters_.stability_threshold = stability_threshold;
   load_parameters_.stability_window = 3;
@@ -118,37 +119,53 @@ InferenceProfiler::Profile(
   RETURN_IF_ERROR(manager_->ChangeConcurrencyLevel(concurrent_request_count));
 
   // Start measurement
-  bool is_stable = true;
+  bool is_stable = false;
   LoadStatus load_status;
+  size_t completed_trials = 0;
+  std::queue<nic::Error> error;
 
   do {
     RETURN_IF_ERROR(manager_->CheckHealth());
 
-    RETURN_IF_ERROR(Measure(status_summary));
+    error.push(Measure(status_summary));
+    if (error.size() >= load_parameters_.stability_window) {
+      error.pop();
+    }
 
-    load_status.infer_per_sec.push_back(status_summary.client_infer_per_sec);
-    load_status.latencies.push_back(status_summary.stabilizing_latency_ns);
+    if (error.back().IsOk()) {
+      load_status.infer_per_sec.push_back(status_summary.client_infer_per_sec);
+      load_status.latencies.push_back(status_summary.stabilizing_latency_ns);
+    } else {
+      load_status.infer_per_sec.push_back(0);
+      load_status.latencies.push_back(std::numeric_limits<uint64_t>::max());
+    }
+
     load_status.avg_ips += (double)load_status.infer_per_sec.back() /
                            load_parameters_.stability_window;
     load_status.avg_latency +=
         load_status.latencies.back() / load_parameters_.stability_window;
 
     if (verbose_) {
-      std::cout << "  Pass [" << load_status.infer_per_sec.size()
-                << "] throughput: " << load_status.infer_per_sec.back()
-                << " infer/sec. ";
-      if (extra_percentile_) {
-        std::cout << "p" << percentile_ << " latency: "
-                  << (status_summary.client_percentile_latency_ns
-                          .find(percentile_)
-                          ->second /
-                      1000)
-                  << " usec" << std::endl;
+      if (error.back().IsOk()) {
+        std::cout << "  Pass [" << (completed_trials + 1)
+                  << "] throughput: " << load_status.infer_per_sec.back()
+                  << " infer/sec. ";
+        if (extra_percentile_) {
+          std::cout << "p" << percentile_ << " latency: "
+                    << (status_summary.client_percentile_latency_ns
+                            .find(percentile_)
+                            ->second /
+                        1000)
+                    << " usec" << std::endl;
+        } else {
+          std::cout << "Avg latency: "
+                    << (status_summary.client_avg_latency_ns / 1000)
+                    << " usec (std " << status_summary.std_us << " usec)"
+                    << std::endl;
+        }
       } else {
-        std::cout << "Avg latency: "
-                  << (status_summary.client_avg_latency_ns / 1000)
-                  << " usec (std " << status_summary.std_us << " usec)"
-                  << std::endl;
+        std::cout << "  Pass [" << (completed_trials + 1)
+                  << "] Error: " << error.back().Message() << std::endl;
       }
     }
 
@@ -166,6 +183,9 @@ InferenceProfiler::Profile(
       for (; idx < load_status.infer_per_sec.size(); idx++) {
         // We call it complete only if stability_window measurements are within
         // +/-(stability_threshold)% of the average infer per second and latency
+        if (load_status.infer_per_sec[idx] == 0) {
+          is_stable = false;
+        }
         if ((load_status.infer_per_sec[idx] <
              load_status.avg_ips *
                  (1 - load_parameters_.stability_threshold)) ||
@@ -187,16 +207,26 @@ InferenceProfiler::Profile(
         break;
       }
     }
-  } while ((!early_exit) &&
-           (load_status.infer_per_sec.size() < max_measurement_count_));
+    completed_trials++;
+  } while ((!early_exit) && (completed_trials < max_trials_));
+
+  // return the appropriate error which might have occured in the
+  // stability_window for its proper handling.
+  while (!error.empty()) {
+    if (!error.front().IsOk()) {
+      return error.front();
+    } else {
+      error.pop();
+    }
+  }
+
   if (early_exit) {
     return nic::Error(ni::RequestStatusCode::INTERNAL, "Received exit signal.");
   } else if (!is_stable) {
-    std::cerr << "Failed to obtain stable measurement within "
-              << max_measurement_count_
+    std::cerr << "Failed to obtain stable measurement within " << max_trials_
               << " measurement windows for concurrency "
               << concurrent_request_count << ". Please try to "
-              << "increase the time window." << std::endl;
+              << "increase the --measurement-interval." << std::endl;
   }
 
   return nic::Error::Success;

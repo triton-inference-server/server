@@ -127,7 +127,7 @@ class InferenceProfiler {
   /// latency", or "infer per second" and "percentile latency" if valid
   /// percentile is set (see 'percentile' below).
   /// \param measurement_window_ms The duration of each measurement in msec.
-  /// \param max_measurement_count The maximum number of attempts to obtain
+  /// \param max_trials The maximum number of attempts to obtain
   /// stable measurement.
   /// \param percentile The percentile in terms of latency to be reported.
   /// if it is a valid percentile value, the percentile latency will reported
@@ -138,7 +138,7 @@ class InferenceProfiler {
   /// \return Error object indicating success or failure.
   static nic::Error Create(
       const bool verbose, const double stability_threshold,
-      const uint64_t measurement_window_ms, const size_t max_measurement_count,
+      const uint64_t measurement_window_ms, const size_t max_trials,
       const int64_t percentile, std::shared_ptr<ContextFactory>& factory,
       std::unique_ptr<LoadManager> manager,
       std::unique_ptr<InferenceProfiler>* profiler);
@@ -160,7 +160,7 @@ class InferenceProfiler {
  private:
   InferenceProfiler(
       const bool verbose, const double stability_threshold,
-      const int32_t measurement_window_ms, const size_t max_measurement_count,
+      const int32_t measurement_window_ms, const size_t max_trials,
       const bool extra_percentile, const size_t percentile,
       const ContextFactory::ModelSchedulerType scheduler_type,
       const std::string& model_name, const int64_t model_version,
@@ -291,7 +291,7 @@ class InferenceProfiler {
 
   bool verbose_;
   uint64_t measurement_window_ms_;
-  size_t max_measurement_count_;
+  size_t max_trials_;
   bool extra_percentile_;
   size_t percentile_;
 

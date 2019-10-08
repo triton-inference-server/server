@@ -519,7 +519,7 @@ main(int argc, char** argv)
   uint64_t concurrency_range[3] = {1, 1, 1};
   double stability_threshold = 0.1;
   uint64_t measurement_window_ms = 5000;
-  size_t max_measurement_count = 10;
+  size_t max_trials = 10;
   std::string model_name;
   int64_t model_version = -1;
   std::string url("localhost:8000");
@@ -651,7 +651,7 @@ main(int argc, char** argv)
         break;
       }
       case 10: {
-        max_measurement_count = std::atoi(optarg);
+        max_trials = std::atoi(optarg);
         break;
       }
       case 11: {
@@ -723,7 +723,7 @@ main(int argc, char** argv)
         max_concurrency = std::atoi(optarg);
         break;
       case 'r':
-        max_measurement_count = std::atoi(optarg);
+        max_trials = std::atoi(optarg);
         break;
       case 's':
         stability_threshold = atof(optarg) / 100;
@@ -825,9 +825,8 @@ main(int argc, char** argv)
     return 1;
   }
   err = perfclient::InferenceProfiler::Create(
-      verbose, stability_threshold, measurement_window_ms,
-      max_measurement_count, percentile, factory, std::move(manager),
-      &profiler);
+      verbose, stability_threshold, measurement_window_ms, max_trials,
+      percentile, factory, std::move(manager), &profiler);
   if (!err.IsOk()) {
     std::cerr << err << std::endl;
     return 1;
