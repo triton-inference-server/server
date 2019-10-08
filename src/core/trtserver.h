@@ -160,7 +160,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* handle_block_name, const size_t offset, const size_t byte_size,
+    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset, const size_t byte_size,
     const int device_id);
 
 /// Create a new shared memory block object referencing a CUDA shared
@@ -807,7 +807,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerLoadModel(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 
-/// Register a shared memory block on the inference server. After a
+/// Register a system shared memory block on the inference server. After a
 /// block is registered, addresses within the block can be used for
 /// input and output tensors in inference requests. If a shared memory
 /// block with the same name is already registered
@@ -816,6 +816,17 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
 /// \param shared_memory_block The shared memory block to register.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
+
+/// Register a CUDA shared memory block on the inference server. After a
+/// block is registered, addresses within the block can be used for
+/// input and output tensors in inference requests. If a shared memory
+/// block with the same name is already registered
+/// TRTSERVER_ERROR_ALREADY_EXISTS is returned.
+/// \param server The inference server object.
+/// \param shared_memory_block The shared memory block to register.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaRegisterSharedMemory(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
 
 /// Unregister a shared memory block on the inference server. No

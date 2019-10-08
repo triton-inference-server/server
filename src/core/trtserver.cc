@@ -38,6 +38,10 @@
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace ni = nvidia::inferenceserver;
 
 namespace {
@@ -139,12 +143,7 @@ class TrtServerSharedMemoryBlock {
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
   size_t DeviceId() const { return device_id_; }
-
-  void GetSharedMemoryDevice(TRTSERVER_Memory_Type* kind, int* device_id) const
-  {
-    *kind = type_;
-    *device_id = device_id_;
-  }
+  const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
@@ -550,19 +549,19 @@ TRTSERVER_SharedMemoryBlockCpuNew(
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, 0));
+          TRTSERVER_MEMORY_CPU, name, shm_key, nullptr, offset, byte_size, 0));
   return nullptr;  // Success
 }
 
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size,
+    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset, const size_t byte_size,
     const int device_id)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, shm_key, offset, byte_size, device_id));
+          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size, device_id));
   return nullptr;  // Success
 }
 

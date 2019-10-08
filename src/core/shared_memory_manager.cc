@@ -129,7 +129,7 @@ OpenCudaIPCRegion(
 Status
 SharedMemoryManager::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const int kind, const int device_id)
+    const size_t byte_size)
 {
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(register_mu_);
@@ -153,11 +153,12 @@ SharedMemoryManager::RegisterSharedMemory(
       shm_fd = itr->second->shm_fd_;
       break;
     }
+  }
 
-    // open and set new shm_fd if new shared memory key
-    if (shm_fd == -1) {
-      RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
-    }
+  // open and set new shm_fd if new shared memory key
+  if (shm_fd == -1) {
+    RETURN_IF_ERROR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  }
 
   Status status = MapSharedMemory(shm_fd, offset, byte_size, &mapped_addr);
   if (!status.IsOk()) {
