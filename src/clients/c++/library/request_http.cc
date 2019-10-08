@@ -595,9 +595,11 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
   Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const MemoryType kind,
-      const int device_id) override;
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size) override;
+  Error CudaRegisterSharedMemory(
+      const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+      size_t byte_size, int device_id) override;
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -649,13 +651,18 @@ SharedMemoryControlHttpContextImpl::SharedMemoryControlHttpContextImpl(
 Error
 SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const MemoryType kind, const int device_id)
+    const size_t byte_size)
 {
-  if (kind == MemoryType::CPU) {
-    return SendRequest("register", name, shm_key, offset, byte_size, 0);
-  }
+  return SendRequest("register", name, shm_key, offset, byte_size, 0);
+}
+
+Error
+SharedMemoryControlHttpContextImpl::CudaRegisterSharedMemory(
+    const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+    size_t byte_size, int device_id)
+{
   return SendRequest(
-      "cudaregister", name, shm_key, offset, byte_size, device_id);
+      "cudaregister", name, cuda_shm_handle, 0, byte_size, device_id);
 }
 
 Error
@@ -717,6 +724,7 @@ SharedMemoryControlHttpContextImpl::SendRequest(
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size);
   } else if (action_str == "cudaregister") {
+    // TODO set cuda-shm_handle as raw bytes in body
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size) + "/" +
                 std::to_string(device_id);

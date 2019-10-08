@@ -287,8 +287,7 @@ main(int argc, char** argv)
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, output_byte_size * 2,
-      nic::SharedMemoryControlContext::MemoryType::CPU);
+      "output_data", "/output_simple", 0, output_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;
@@ -322,7 +321,7 @@ main(int argc, char** argv)
   }
   // Register Input shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
-      "input_data", "/input_simple", 0, input_byte_size * 2, nic::SharedMemoryControlContext::MemoryType::CPU);
+      "input_data", "/input_simple", 0, input_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory input region: " << err
               << std::endl;

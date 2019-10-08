@@ -254,7 +254,15 @@ message SharedMemoryControlRequest
       //@@     The name of the shared memory region that holds the input data
       //@@     (or where the output data should be written).
       //@@
-      string shared_memory_key = 2;
+      string shared_memory_key = 1;
+
+      //@@  .. cpp:var:: uint64 offset
+      //@@
+      //@@     This is the offset of the shared
+      //@@     memory block from the start of the shared memory region.
+      //@@     start = offset, end = offset + byte_size;
+      //@@
+      uint64 offset = 2;
     }
 
     //@@
@@ -264,12 +272,11 @@ message SharedMemoryControlRequest
     //@@
     message CUDASharedMemoryIdentifier
     {
-      //@@  .. cpp:var:: string handle_region_name
+      //@@  .. cpp:var:: bytes raw_handle (repeated)
       //@@
-      //@@     The name of the system shared memory region that holds the
-      //@@     cudaIPC handle. This region must currently be registered.
+      //@@     The raw serialized cudaIPC handle.
       //@@
-      string handle_region_name = 1;
+      repeated bytes raw_handle = 1;
 
       //@@  .. cpp:var:: int64 device_id
       //@@
@@ -299,22 +306,11 @@ message SharedMemoryControlRequest
       CUDASharedMemoryIdentifier cuda_shared_memory = 3;
     }
 
-    //@@  .. cpp:var:: uint64 offset
-    //@@
-    //@@     In case of System shared memory this is the offset of the shared
-    //@@     memory block from the start of the shared memory region. In case
-    //@@     of CUDA shared memory, this is the offset of the cudaIPC handle
-    //@@     from the start of the shared memory region.
-    //@@     start = offset, end = offset + byte_size;
-    //@@
-    uint64 offset = 4;
-
     //@@  .. cpp:var:: uint64 byte_size
     //@@
-    //@@     Size of the shared memory block, in bytes. In case of CUDA shared
-    //@@     memory, this must be equal to the size of the cudaIPC handle.
+    //@@     Size of the shared memory block, in bytes.
     //@@
-    uint64 byte_size = 5;
+    uint64 byte_size = 4;
   }
 
   //@@  .. cpp:var:: message Unregister

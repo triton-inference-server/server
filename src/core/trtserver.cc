@@ -125,7 +125,8 @@ class TrtServerSharedMemoryBlock {
  public:
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-      const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset, const size_t byte_size, const int device_id);
+      const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset,
+      const size_t byte_size, const int device_id);
 
   TRTSERVER_Memory_Type Type() const { return type_; }
   const std::string& Name() const { return name_; }
@@ -147,9 +148,11 @@ class TrtServerSharedMemoryBlock {
 
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset, const size_t byte_size, const int device_id)
-    : type_(type), name_(name), shm_key_(shm_key), cuda_shm_handle_(cuda_shm_handle), offset_(offset),
-      byte_size_(byte_size), device_id_(device_id)
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset,
+    const size_t byte_size, const int device_id)
+    : type_(type), name_(name), shm_key_(shm_key),
+      cuda_shm_handle_(cuda_shm_handle), offset_(offset), byte_size_(byte_size),
+      device_id_(device_id)
 {
 }
 
@@ -526,12 +529,13 @@ TRTSERVER_SharedMemoryBlockCpuNew(
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset, const size_t byte_size,
-    const int device_id)
+    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset,
+    const size_t byte_size, const int device_id)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size, device_id));
+          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size,
+          device_id));
   return nullptr;  // Success
 }
 
@@ -1201,8 +1205,7 @@ TRTSERVER_ServerCudaRegisterSharedMemory(
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
   RETURN_IF_STATUS_ERROR(lserver->CudaRegisterSharedMemory(
-      lsmb->Name(), lsmb->CudaHandle(), lsmb->ByteSize(),
-      lsmb->DeviceId()));
+      lsmb->Name(), lsmb->CudaHandle(), lsmb->ByteSize(), lsmb->DeviceId()));
 
   return nullptr;  // success
 }
