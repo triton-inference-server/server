@@ -47,7 +47,7 @@ add_executable(perf_client
   ${PERF_CLIENT_SRCS} ${PERF_CLIENT_HDRS})
 target_link_libraries(
   perf_client
-  PRIVATE request_static
+  PRIVATE TRTIS::request_static
 )
 install(
   TARGETS perf_client

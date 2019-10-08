@@ -26,12 +26,13 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-
 #
 # librequest.so and librequest_static.a
 #
 find_package(CURL CONFIG REQUIRED)
 message(STATUS "Using curl ${CURL_VERSION}")
+
+find_package(Threads REQUIRED)
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
 
@@ -80,22 +81,29 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
+add_library(
+  TRTIS::request_static ALIAS request_static
+)
+
 if(${TRTIS_ENABLE_GPU})
   target_include_directories(request_static PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
+
+target_include_directories(
+  request_static
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/flat_include>
+)
 target_link_libraries(
   request_static
   PRIVATE gRPC::grpc++
   PRIVATE gRPC::grpc
   PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
+  PUBLIC Threads::Threads
 )
-if(NOT WIN32)
-  target_link_libraries(
-    request_static
-    PUBLIC -lpthread
-  )
-endif()
 
 # librequest.so
 add_library(
@@ -105,13 +113,20 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
-set_target_properties(
-  request
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
+add_library(
+  TRTIS::request ALIAS request
 )
 set_target_properties(
   request
-  PROPERTIES LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
+  PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
+    LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
+)
+target_include_directories (request
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/flat_include>
 )
 target_link_libraries(
   request
@@ -119,20 +134,15 @@ target_link_libraries(
   PRIVATE gRPC::grpc
   PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
+  PUBLIC Threads::Threads
 )
-if(NOT WIN32)
-  target_link_libraries(
-    request
-    PUBLIC -lpthread
-  )
-endif()
 
 install(
-  TARGETS request
+  TARGETS
+    request
+    request_static
+  EXPORT trtis-export
   LIBRARY DESTINATION lib
-)
-install(
-  TARGETS request_static
   ARCHIVE DESTINATION lib
 )
 install(
@@ -150,3 +160,30 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/../../../core/server_status.pb.h
   DESTINATION include
 )
+
+# cmake configuration
+include (CMakePackageConfigHelpers)
+set (_LIB_CMAKE_DIR lib/cmake/TRTIS)
+install(
+  EXPORT trtis-export
+  FILE TRTISTargets.cmake
+  NAMESPACE TRTIS::
+  DESTINATION ${_LIB_CMAKE_DIR}
+)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfigVersion.cmake
+  VERSION ${TRTIS_VERSION}
+  COMPATIBILITY ExactVersion
+)
+configure_package_config_file (
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/TRTISConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfig.cmake
+  INSTALL_DESTINATION ${_LIB_CMAKE_DIR}
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfigVersion.cmake
+  DESTINATION ${_LIB_CMAKE_DIR}
+)
+

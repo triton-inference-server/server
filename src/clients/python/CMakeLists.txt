@@ -32,7 +32,7 @@ cmake_minimum_required (VERSION 3.5)
 add_library(crequest SHARED crequest.cc)
 target_link_libraries(
   crequest
-  PUBLIC request
+  PUBLIC TRTIS::request
 )
 
 if(NOT WIN32)
