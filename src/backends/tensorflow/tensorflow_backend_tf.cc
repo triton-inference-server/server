@@ -301,7 +301,7 @@ GetTFGPUDevice(
         if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
           if (parsed.id == device_id) {
             const tensorflow::DeviceMgr* device_mgr;
-            RETURN_IF_TF_ERROR(session_->LocalDeviceManager(&device_mgr));
+            RETURN_IF_TF_ERROR(session->LocalDeviceManager(&device_mgr));
             RETURN_IF_TF_ERROR(device_mgr->LookupDevice(d.name(), device));
 
             *device_name = d.name();
