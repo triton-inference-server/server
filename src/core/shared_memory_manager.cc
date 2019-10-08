@@ -104,31 +104,52 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 }
 
 #ifdef TRTIS_ENABLE_GPU
-void
+Status
 OpenCUDAIPCRegion(cudaIpcHandle* shm_cuda_rep, void** data_ptr)
 {
   cudaEvent_t event;
   int previous_device;
   cudaGetDevice(&previous_device);
 
-  cudaError_t err = cudaSetDevice(shm_cuda_rep->device);
+  cudaSetDevice(shm_cuda_rep->device);
 
   // get cuda event and synchronize
-  err = cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle);
-  err = cudaEventSynchronize(event);
+  cudaError_t err = cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle);
+  if (err != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to get event handle: " + std::string(cudaGetErrorString(err)));
+  }
 
+  err = cudaEventSynchronize(event);
+  if (err != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to synchronize event: " + std::string(cudaGetErrorString(err)));
+  }
   // allocate data on the gpu and read IPC data into it
   err = cudaMalloc(data_ptr, shm_cuda_rep->byte_size);
   if (err != cudaSuccess) {
-    LOG_ERROR << "failed to allocate GPU memory with byte size"
-              << shm_cuda_rep->byte_size << ": "
-              << std::string(cudaGetErrorString(err));
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to allocate GPU memory with byte size " +
+                std::to_string(shm_cuda_rep->byte_size)
+            + ": " + std::string(cudaGetErrorString(err)));
   }
+
   err = cudaIpcGetMemHandle(
       (cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle, *data_ptr);
+  if (err != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "failed to get address from CUDA IPC handle: " +
+            std::string(cudaGetErrorString(err)));
+  }
 
   // Set device to previous device
-  err = cudaSetDevice(previous_device);
+  cudaSetDevice(previous_device);
+
+  return Status::Success;
 }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -211,7 +232,12 @@ SharedMemoryManager::RegisterSharedMemory(
     void* shm_mapped_addr = (void*)((uint8_t*)mapped_addr + shm_offset);
     cudaIpcHandle* shm_cuda_rep =
         reinterpret_cast<cudaIpcHandle*>(shm_mapped_addr);
-    OpenCUDAIPCRegion(shm_cuda_rep, &mapped_addr);
+    Status status = OpenCUDAIPCRegion(shm_cuda_rep, &mapped_addr);
+    if (!status.IsOk()) {
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "failed to register shared memory region '" + name + "'");
+    }
 
     shared_memory_map_.insert(std::make_pair(
         name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
