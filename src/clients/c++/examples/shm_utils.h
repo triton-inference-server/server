@@ -26,7 +26,7 @@
 #pragma once
 
 
-// namespace nvidia { namespace inferenceserver {
+namespace nvidia { namespace inferenceserver { namespace client {
 
 /// \return true if a TensorFlow shape exactly matches a model
 /// configuration shape. Dimensions with variable size are represented
@@ -53,3 +53,5 @@ void UnlinkSharedMemoryRegion(std::string shm_key);
 // Munmap the shared memory region from the base address with the given
 // byte_size.
 void UnmapSharedMemory(void* shm_addr, size_t byte_size);
+
+}}}  // namespace nvidia::inferenceserver::client

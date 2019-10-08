@@ -47,24 +47,6 @@ namespace nic = nvidia::inferenceserver::client;
     }                                                              \
   }
 
-#define DEVICE_ID 0
-
-#define checkCudaErrors(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-   if (code != cudaSuccess)
-   {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
-   }
-}
-
-typedef struct ipcCUDA_st {
-  int device;
-  cudaIpcEventHandle_t eventHandle;
-  cudaIpcMemHandle_t memHandle;
-} ipcCUDA_t;
-
 namespace {
 
 void
@@ -89,51 +71,6 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
-void
-CreateCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* input_d_ptr)
-{
-  shm_cuda_rep->device = 0;
-  checkCudaErrors(cudaSetDevice(shm_cuda_rep->device));
-
-  cudaEvent_t event;
-
-  //  allocate data on gpu to ipc handle, create an event
-  checkCudaErrors(
-      cudaEventCreate(&event));//, cudaEventDisableTiming | cudaEventInterprocess));
-  checkCudaErrors(cudaIpcGetEventHandle(
-      (cudaIpcEventHandle_t*)&shm_cuda_rep->eventHandle, event));
-  checkCudaErrors(cudaIpcOpenMemHandle(
-      (void**)&input_d_ptr, *(cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle,
-      cudaIpcMemLazyEnablePeerAccess));
-
-  // set device to default GPU - GPU0
-  checkCudaErrors(cudaSetDevice(DEVICE_ID));
-}
-
-void
-ReadCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* output_data)
-{
-  checkCudaErrors(cudaSetDevice(shm_cuda_rep->device));
-
-  int* d_ptr;
-  cudaEvent_t event;
-
-  // get cuda event and synchronize
-  checkCudaErrors(cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle));
-  checkCudaErrors(cudaEventSynchronize(event));
-
-  // allocate data on the gpu and copy out output data
-  checkCudaErrors(cudaMalloc((void**)&d_ptr, 16 * sizeof(int)));
-  checkCudaErrors(cudaIpcGetMemHandle(
-      (cudaIpcMemHandle_t*)&shm_cuda_rep->memHandle, (void*)d_ptr));
-  checkCudaErrors(cudaMemcpy(
-      (void*)output_data, (void*)d_ptr, 16 * sizeof(int),
-      cudaMemcpyDeviceToHost));
-
-  // set device to default GPU - GPU0
-  checkCudaErrors(cudaSetDevice(DEVICE_ID));
-}
-
 int
 main(int argc, char** argv)
 {
@@ -143,6 +80,7 @@ main(int argc, char** argv)
   std::map<std::string, std::string> http_headers;
 
   // Parse commandline...
+
   int opt;
   while ((opt = getopt(argc, argv, "vi:u:")) != -1) {
     switch (opt) {
@@ -285,24 +223,25 @@ main(int argc, char** argv)
   // shared memory
   std::string shm_key = "/output_simple";
   // shared memory for CUDA IPC memory and event handlers
-  int shm_fd_op = CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
+  int shm_fd_op =
+      nic::CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
   ipcCUDA_t* output0_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size));
-  ipcCUDA_t* output1_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_op, cuda_ipc_byte_size,
-      cuda_ipc_byte_size));
+      (ipcCUDA_t*)(nic::MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size));
+  ipcCUDA_t* output1_cuda_rep = reinterpret_cast<ipcCUDA_t*>(
+      (uint8_t*)output0_cuda_rep + cuda_ipc_byte_size);
 
   // Create OUTPUT0 and OUTPUT1 on GPU
   int *output0_d_ptr, *output1_d_ptr;
+  cudaMalloc((void**)&output0_d_ptr, 16 * sizeof(int));
+  cudaMemset((void*)output0_d_ptr, 0, 16 * sizeof(int));
 
-  checkCudaErrors(cudaMalloc((void**)&output0_d_ptr, 16 * sizeof(int)));
-  checkCudaErrors(cudaMemset((void*)output0_d_ptr, 0, 16 * sizeof(int)));
+  cudaMalloc((void**)&output1_d_ptr, 16 * sizeof(int));
+  cudaMemset((void*)output1_d_ptr, 0, 16 * sizeof(int));
 
-  checkCudaErrors(cudaMalloc((void**)&output1_d_ptr, 16 * sizeof(int)));
-  checkCudaErrors(cudaMemset((void*)output1_d_ptr, 0, 16 * sizeof(int)));
-
-  CreateCUDAIPCHandle(output0_cuda_rep, output0_d_ptr);
-  CreateCUDAIPCHandle(output1_cuda_rep, output1_d_ptr);
+  std::cerr << "Creating output CUDA shm regions" << '\n';
+  nic::CreateCUDAIPCHandle(output0_cuda_rep, output0_d_ptr);
+  nic::CreateCUDAIPCHandle(output1_cuda_rep, output1_d_ptr);
+  std::cerr << "Created output CUDA IPC regions" << '\n';
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
@@ -332,12 +271,14 @@ main(int argc, char** argv)
   // system shared memory. Initialize Input0 to unique integers and Input1 to
   // all ones.
   shm_key = "/input_simple";
-  int shm_fd_ip = CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
+  int shm_fd_ip =
+      nic::CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
   ipcCUDA_t* input0_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size));
-  ipcCUDA_t* input1_cuda_rep =
-      (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size,
-      cuda_ipc_byte_size));
+      (ipcCUDA_t*)(nic::MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size * 2));
+  ipcCUDA_t* input1_cuda_rep = reinterpret_cast<ipcCUDA_t*>(
+      (uint8_t*)input0_cuda_rep + cuda_ipc_byte_size);
+  // (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size,
+  // cuda_ipc_byte_size));
 
   // Initialize data to load into shared memory region
   int input0_data[16];
@@ -349,18 +290,20 @@ main(int argc, char** argv)
 
   // copy INPUT0 and INPUT1 data onto GPU
   int *input0_d_ptr, *input1_d_ptr;
-  checkCudaErrors(cudaMalloc((void**)&input0_d_ptr, 16 * sizeof(int)));
-  checkCudaErrors(cudaMemcpy(
+  cudaMalloc((void**)&input0_d_ptr, 16 * sizeof(int));
+  cudaMemcpy(
       (void*)input0_d_ptr, (void*)input0_data, 16 * sizeof(int),
-      cudaMemcpyHostToDevice));
+      cudaMemcpyHostToDevice);
 
-  checkCudaErrors(cudaMalloc((void**)&input1_d_ptr, 16 * sizeof(int)));
-  checkCudaErrors(cudaMemcpy(
+  cudaMalloc((void**)&input1_d_ptr, 16 * sizeof(int));
+  cudaMemcpy(
       (void*)input1_d_ptr, (void*)input1_data, 16 * sizeof(int),
-      cudaMemcpyHostToDevice));
+      cudaMemcpyHostToDevice);
 
-  CreateCUDAIPCHandle(input0_cuda_rep, input0_d_ptr);
-  CreateCUDAIPCHandle(input1_cuda_rep, input1_d_ptr);
+  std::cerr << "Creating input CUDA shm regions" << '\n';
+  nic::CreateCUDAIPCHandle(input0_cuda_rep, input0_d_ptr);
+  nic::CreateCUDAIPCHandle(input1_cuda_rep, input1_d_ptr);
+  std::cerr << "Created input CUDA IPC regions" << '\n';
 
   // Register Input shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
@@ -389,8 +332,8 @@ main(int argc, char** argv)
 
   int output0_data[16];
   int output1_data[16];
-  ReadCUDAIPCHandle(output0_cuda_rep, output0_data);
-  ReadCUDAIPCHandle(output1_cuda_rep, output1_data);
+  nic::ReadCUDAIPCHandle(output0_cuda_rep, output0_data);
+  nic::ReadCUDAIPCHandle(output1_cuda_rep, output1_data);
 
   // Client should use ipcCUDA_t handle to return data
   // We expect there to be 2 results. Walk over all 16 result elements
@@ -441,19 +384,19 @@ main(int argc, char** argv)
   }
 
   // Cleanup cuda IPC handle and free GPU memory
-  checkCudaErrors(cudaIpcCloseMemHandle(input0_d_ptr));
-  checkCudaErrors(cudaFree(input0_d_ptr));
-  checkCudaErrors(cudaIpcCloseMemHandle(input1_d_ptr));
-  checkCudaErrors(cudaFree(input1_d_ptr));
-  checkCudaErrors(cudaIpcCloseMemHandle(output0_d_ptr));
-  checkCudaErrors(cudaFree(output0_d_ptr));
-  checkCudaErrors(cudaIpcCloseMemHandle(output1_d_ptr));
-  checkCudaErrors(cudaFree(output1_d_ptr));
+  cudaIpcCloseMemHandle(input0_d_ptr);
+  cudaFree(input0_d_ptr);
+  cudaIpcCloseMemHandle(input1_d_ptr);
+  cudaFree(input1_d_ptr);
+  cudaIpcCloseMemHandle(output0_d_ptr);
+  cudaFree(output0_d_ptr);
+  cudaIpcCloseMemHandle(output1_d_ptr);
+  cudaFree(output1_d_ptr);
 
   // Cleanup system shared memory
-  UnmapSharedMemory(input0_cuda_rep, cuda_ipc_byte_size * 2);
-  UnlinkSharedMemoryRegion("/input_simple");
-  UnmapSharedMemory(output0_cuda_rep, cuda_ipc_byte_size * 2);
-  UnlinkSharedMemoryRegion("/output_simple");
+  nic::UnmapSharedMemory(input0_cuda_rep, cuda_ipc_byte_size * 2);
+  nic::UnlinkSharedMemoryRegion("/input_simple");
+  nic::UnmapSharedMemory(output0_cuda_rep, cuda_ipc_byte_size * 2);
+  nic::UnlinkSharedMemoryRegion("/output_simple");
   return 0;
 }

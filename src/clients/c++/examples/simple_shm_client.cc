@@ -219,14 +219,15 @@ main(int argc, char** argv)
 
   // Create Output0 and Output1 in Shared Memory
   std::string shm_key = "/output_simple";
-  int shm_fd_op = CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
+  int shm_fd_op = nic::CreateSharedMemoryRegion(shm_key, output_byte_size * 2);
   int* output0_shm =
-      (int*)(MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
+      (int*)(nic::MapSharedMemory(shm_fd_op, 0, output_byte_size * 2));
   int* output1_shm = (int*)(output0_shm + 16);
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, output_byte_size * 2);
+      "output_data", "/output_simple", 0, output_byte_size * 2,
+      nic::SharedMemoryControlContext::MemoryType::CPU);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;
@@ -251,8 +252,9 @@ main(int argc, char** argv)
   // Create Input0 and Input1 in Shared Memory. Initialize Input0 to unique
   // integers and Input1 to all ones.
   shm_key = "/input_simple";
-  int shm_fd_ip = CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
-  int* input0_shm = (int*)(MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
+  int shm_fd_ip = nic::CreateSharedMemoryRegion(shm_key, input_byte_size * 2);
+  int* input0_shm =
+      (int*)(nic::MapSharedMemory(shm_fd_ip, 0, input_byte_size * 2));
   int* input1_shm = (int*)(input0_shm + 16);
   for (size_t i = 0; i < 16; ++i) {
     *(input0_shm + i) = i;
@@ -331,9 +333,9 @@ main(int argc, char** argv)
   }
 
   // Cleanup shared memory
-  UnmapSharedMemory(input0_shm, input_byte_size * 2);
-  UnlinkSharedMemoryRegion("/input_simple");
-  UnmapSharedMemory(output0_shm, output_byte_size * 2);
-  UnlinkSharedMemoryRegion("/output_simple");
+  nic::UnmapSharedMemory(input0_shm, input_byte_size * 2);
+  nic::UnlinkSharedMemoryRegion("/input_simple");
+  nic::UnmapSharedMemory(output0_shm, output_byte_size * 2);
+  nic::UnlinkSharedMemoryRegion("/output_simple");
   return 0;
 }

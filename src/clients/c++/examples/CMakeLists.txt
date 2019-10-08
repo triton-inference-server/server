@@ -123,6 +123,38 @@ install(
 )
 
 #
+# shm_utils
+#
+if(TRTIS_ENABLE_CUDA_EXAMPLES)
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+  add_library(shm_utils shm_utils.cc)
+  target_include_directories(shm_utils PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(
+    shm_utils
+    PRIVATE -L/usr/local/cuda/lib64/stubs
+    PRIVATE -lnvidia-ml
+    PRIVATE ${CUDA_LIBRARIES}
+    rt
+  )
+  install(
+    TARGETS shm_utils
+    ARCHIVE DESTINATION lib
+  )
+else()
+  add_library(shm_utils shm_utils.cc)
+  target_link_libraries(
+    shm_utils
+    rt
+  )
+  install(
+    TARGETS shm_utils
+    ARCHIVE DESTINATION lib
+  )
+endif() #TRTIS_ENABLE_CUDA_EXAMPLES
+
+#
 # simple_shm_client
 #
 set(
@@ -138,8 +170,7 @@ add_executable(simple_shm_client simple_shm_client.cc
   ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
 target_link_libraries(
   simple_shm_client
-  PRIVATE TRTIS::request_static
-  rt
+  PRIVATE request_static
 )
 install(
   TARGETS simple_shm_client
@@ -149,38 +180,38 @@ install(
 #
 # simple_cuda_shm_client
 #
-if(${TRTIS_ENABLE_CUDA_EXAMPLES})
-find_package(CUDA REQUIRED)
-message(STATUS "Using CUDA ${CUDA_VERSION}")
-set(CUDA_NVCC_FLAGS -std=c++11)
-set(
-  SIMPLE_CUDA_SHM_SRCS
-  simple_cuda_shm_client.cc
-  shm_utils.cc
-)
-set(
-  SIMPLE_CUDA_SHM_HDRS
-  shm_utils.h
-)
-add_executable(simple_cuda_shm_client simple_cuda_shm_client.cc
-  ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
-target_link_libraries(
-  simple_cuda_shm_client
-  PRIVATE request_static
-  rt
-)
+if(TRTIS_ENABLE_CUDA_EXAMPLES)
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+  set(
+    SIMPLE_CUDA_SHM_SRCS
+    simple_cuda_shm_client.cc
+    shm_utils.cc
+  )
+  set(
+    SIMPLE_CUDA_SHM_HDRS
+    shm_utils.h
+  )
+  add_executable(simple_cuda_shm_client simple_cuda_shm_client.cc
+    ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
+  target_link_libraries(
+    simple_cuda_shm_client
+    PRIVATE request_static
+    rt
+  )
 
-target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  simple_cuda_shm_client
-  PRIVATE -L/usr/local/cuda/lib64/stubs
-  PRIVATE -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
-install(
-  TARGETS simple_cuda_shm_client
-  RUNTIME DESTINATION bin
-)
+  target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(
+    simple_cuda_shm_client
+    PRIVATE -L/usr/local/cuda/lib64/stubs
+    PRIVATE -lnvidia-ml
+    PRIVATE ${CUDA_LIBRARIES}
+  )
+  install(
+    TARGETS simple_cuda_shm_client
+    RUNTIME DESTINATION bin
+  )
 endif() # TRTIS_ENABLE_CUDA_EXAMPLES
 
 #
