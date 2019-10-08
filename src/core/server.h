@@ -46,6 +46,7 @@ namespace nvidia { namespace inferenceserver {
 class InferenceBackend;
 
 enum ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
+enum MemoryType { MEMORY_CPU, MEMORY_GPU };
 
 // Inference server information.
 class InferenceServer {
@@ -91,7 +92,7 @@ class InferenceServer {
   // memory region if it has already been registered.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const int kind, const int device_id);
+      const size_t byte_size, const MemoryType kind, const int device_id);
 
   // Unregister the corresponding shared memory region.
   Status UnregisterSharedMemory(const std::string& name);

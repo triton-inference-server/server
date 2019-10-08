@@ -1182,9 +1182,12 @@ TRTSERVER_ServerRegisterSharedMemory(
       lserver->StatusManager(),
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
+  ni::MemoryType memory_type =
+      (lsmb->Type() == TRTSERVER_MEMORY_CPU) ? ni::MEMORY_CPU : ni::MEMORY_GPU;
+
   RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
       lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize(),
-      lsmb->Type(), lsmb->DeviceId()));
+      memory_type, lsmb->DeviceId()));
 
   return nullptr;  // success
 }

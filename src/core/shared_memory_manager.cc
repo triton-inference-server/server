@@ -133,8 +133,8 @@ OpenCUDAIPCRegion(cudaIpcHandle* shm_cuda_rep, void** data_ptr)
     return Status(
         RequestStatusCode::INTERNAL,
         "failed to allocate GPU memory with byte size " +
-                std::to_string(shm_cuda_rep->byte_size)
-            + ": " + std::string(cudaGetErrorString(err)));
+            std::to_string(shm_cuda_rep->byte_size) + ": " +
+            std::string(cudaGetErrorString(err)));
   }
 
   err = cudaIpcGetMemHandle(
