@@ -26,12 +26,13 @@
 
 cmake_minimum_required (VERSION 3.5)
 
-
 #
 # librequest.so and librequest_static.a
 #
 find_package(CURL CONFIG REQUIRED)
 message(STATUS "Using curl ${CURL_VERSION}")
+
+find_package(Threads REQUIRED)
 
 configure_file(librequest.ldscript librequest.ldscript COPYONLY)
 
@@ -86,13 +87,8 @@ target_link_libraries(
   PRIVATE gRPC::grpc
   PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
+  PUBLIC Threads::Threads
 )
-if(NOT WIN32)
-  target_link_libraries(
-    request_static
-    PUBLIC -lpthread
-  )
-endif()
 
 # librequest.so
 add_library(
@@ -116,22 +112,14 @@ target_link_libraries(
   PRIVATE gRPC::grpc
   PRIVATE CURL::libcurl
   PUBLIC protobuf::libprotobuf
+  PUBLIC Threads::Threads
 )
-if(NOT WIN32)
-  target_link_libraries(
-    request
-    PUBLIC -lpthread
-  )
-endif()
 
 install(
-  TARGETS request
+  TARGETS request request_static
   LIBRARY DESTINATION lib
 )
-install(
-  TARGETS request_static
-  ARCHIVE DESTINATION lib
-)
+
 install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/flat_include/request.h
