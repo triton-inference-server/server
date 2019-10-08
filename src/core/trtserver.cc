@@ -556,12 +556,13 @@ TRTSERVER_SharedMemoryBlockCpuNew(
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset, const size_t byte_size,
-    const int device_id)
+    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset,
+    const size_t byte_size, const int device_id)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size, device_id));
+          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size,
+          device_id));
   return nullptr;  // Success
 }
 
