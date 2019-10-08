@@ -161,7 +161,7 @@ TRTISTF_EXPORT void TRTISTF_TensorListDelete(TRTISTF_TensorList* list);
 // GPU input for model that supports GPU I/O (see TRTISTF_ModelMakeCallable),
 // 'tf_gpu_id' must be the same as the model's device id. Otherwise, negative
 // value should be provided. Note that a tensor may be created on CPU if
-// the data type is not supported for GPU tensor. 
+// the data type is not supported for GPU tensor.
 // Return nullptr if failed to create the tensor.
 TRTISTF_EXPORT TRTISTF_Tensor* TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
@@ -240,7 +240,7 @@ TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);
 // data type, GPU tensor may not be supported, in such case, the callable will
 // expect those unsupported I/O to be on CPU.
 TRTISTF_Error* TRTISTF_ModelMakeCallable(
-    TRTISTF_Model* model, const char**  input_names,
+    TRTISTF_Model* model, const char** input_names,
     const TRTISTF_DataType* input_types, const size_t num_inputs,
     const char** output_names, const TRTISTF_DataType* output_types,
     const size_t num_outputs);

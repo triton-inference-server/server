@@ -45,7 +45,8 @@ namespace nvidia { namespace inferenceserver {
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
-      trtistf_model_(nullptr, TRTISTF_ModelDelete), input_device_id_(-1)
+      trtistf_model_(nullptr, TRTISTF_ModelDelete),
+      input_device_id_(MODEL_DEVICE)
 {
 }
 
@@ -296,13 +297,29 @@ BaseBackend::CreateExecutionContext(
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
 
-  // [TODO] if MakeCallable (get I/O infos from model config)
-  // if (Config().optimization().GPUIO()) {
-  //   if ((gpu_device != Context::NO_GPU_DEVICE) && (gpu_device != Context::MODEL_DEVICE)) {
-  //     TRTISTF_ModelMakeCallable(...)
-  //     context->input_device_id_ = vgpu_device;
-  //   }
-  // }
+  // GPU I/O may be preferred
+  if ((gpu_device != Context::NO_GPU_DEVICE) &&
+      (gpu_device != Context::MODEL_DEVICE)) {
+    if ((Config().optimization().has_tensorflow()) &&
+        (Config().optimization().tensorflow().gpu_io())) {
+      context->input_device_id_ = vgpu_device;
+      const size_t num_inputs = Config().input_size();
+      const size_t num_outputs = Config().output_size();
+      std::vector<const char*> input_names, output_names;
+      std::vector<TRTISTF_DataType> input_types, output_types;
+      for (const auto& io : Config().input()) {
+        input_names.push_back(io.name().c_str());
+        input_types.push_back(ConvertDataType(io.data_type()));
+      }
+      for (const auto& io : Config().output()) {
+        output_names.push_back(io.name().c_str());
+        output_types.push_back(ConvertDataType(io.data_type()));
+      }
+      TRTISTF_ModelMakeCallable(
+          context->trtistf_model_.get(), input_names.data(), input_types.data(),
+          num_inputs, output_names.data(), output_types.data(), num_outputs);
+    }
+  }
 
   return Status::Success;
 }
@@ -525,7 +542,8 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
                                  ? TRTSERVER_MEMORY_GPU
                                  : TRTSERVER_MEMORY_CPU;
-  LOG_ERROR << "input '" << input_name << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
+  LOG_VERBOSE(1) << "input '" << input_name
+            << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   SetInputBuffer(
       input_name, expected_byte_sizes, payloads, content_memory_type, buffer);
 }
@@ -650,7 +668,8 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
   auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
                                  ? TRTSERVER_MEMORY_GPU
                                  : TRTSERVER_MEMORY_CPU;
-  LOG_ERROR << "output '" << output_name << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
+  LOG_VERBOSE(1) << "output '" << output_name
+            << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   *cuda_copy |= SetFixedSizeOutputBuffer(
       output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
       content_memory_type, payloads);

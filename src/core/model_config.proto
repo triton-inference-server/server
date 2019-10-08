@@ -443,6 +443,27 @@ message ModelOptimizationPolicy
   }
 
   //@@
+  //@@  .. cpp:var:: message Tensorflow
+  //@@
+  //@@     TensorFlow-specific optimization settings.
+  //@@
+  message Tensorflow
+  {
+    //@@    .. cpp:var:: bool gpu_io
+    //@@
+    //@@       Use TensorFlow Callable API to set input and output tensors in
+    //@@       GPU memory if possible, which can reduce data transfer overhead
+    //@@       if the model is used in ensemble. However, the Callable object
+    //@@       will be created on model creation and it will request all outputs
+    //@@       for every model execution, which may impact the performance if
+    //@@       a request does not require all outputs. This optimization will
+    //@@       only take affect if model instance is created with KIND_GPU.
+    //@@       Currently only recognized by TensorFlow backend.
+    //@@
+    bool gpu_io = 1;
+  }
+
+  //@@
   //@@  .. cpp:var:: message ExecutionAccelerators
   //@@
   //@@     Specify the preferred execution accelerators to be used to execute
@@ -540,6 +561,12 @@ message ModelOptimizationPolicy
   //@@     The accelerators used for the model. Optional.
   //@@
   ExecutionAccelerators execution_accelerators = 4;
+
+  //@@  .. cpp:var:: Tensorflow tensorflow
+  //@@
+  //@@     TensorFlow-specific optimization settings. Optional.
+  //@@
+  Tensorflow tensorflow = 5;
 }
 
 //@@

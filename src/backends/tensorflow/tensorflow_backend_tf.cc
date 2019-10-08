@@ -42,8 +42,8 @@
 #include "tensorflow/core/protobuf/rewriter_config.pb.h"
 #include "tensorflow/core/public/session.h"
 #include "tensorflow/core/public/session_options.h"
-#include "third_party/gpus/cuda/include/cuda_runtime_api.h"
 #include "tensorflow/core/util/device_name_utils.h"
+#include "third_party/gpus/cuda/include/cuda_runtime_api.h"
 
 TRTISTF_Error* TRTISTF_ErrorNew(const std::string& str);
 TRTISTF_Shape* TRTISTF_ShapeNew(size_t rank, int64_t* dims);
@@ -182,7 +182,9 @@ PrecisionModeToString(const TRTISTF_TFTRTPrecisionMode m)
 // Helper function to help setting Callable related parts properly,
 // adapoted from
 // https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/common_runtime/graph_execution_state.cc#L382
-bool IsGPUFeedAndFetchSupported(TRTISTF_DataType dtype) {
+bool
+IsGPUFeedAndFetchSupported(TRTISTF_DataType dtype)
+{
   switch (ConvertDataType(dtype)) {
     case tensorflow::DT_BFLOAT16:
     case tensorflow::DT_BOOL:
@@ -394,12 +396,10 @@ class ModelImpl {
   ModelImpl(
       const std::string& model_name,
       std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-      const int device_id);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id);
   ModelImpl(
       const std::string& model_name, tensorflow::Session* session,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-      const int device_id);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id);
   ~ModelImpl();
 
   TRTISTF_IOList* Inputs() const { return inputs_; }
@@ -435,8 +435,7 @@ class ModelImpl {
 ModelImpl::ModelImpl(
     const std::string& model_name,
     std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-    const int device_id)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id)
     : model_name_(model_name), bundle_(std::move(bundle)), inputs_(inputs),
       outputs_(outputs), has_callable_(false)
 {
@@ -446,8 +445,7 @@ ModelImpl::ModelImpl(
 
 ModelImpl::ModelImpl(
     const std::string& model_name, tensorflow::Session* session,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-    const int device_id)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id)
     : model_name_(model_name), session_(session), inputs_(inputs),
       outputs_(outputs), has_callable_(false)
 {
@@ -496,7 +494,7 @@ ModelImpl::Run(
     std::vector<tensorflow::Tensor> tfinputs;
 
     for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
-       itr = itr->next_) {
+         itr = itr->next_) {
       if (itr->tensor_ != nullptr) {
         TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
         tfinputs.emplace_back(std::move(tensor->TFTensor()));
@@ -506,14 +504,14 @@ ModelImpl::Run(
 
     tensorflow::RunMetadata meta_data;
     std::vector<tensorflow::Tensor> tfoutputs;
-    RETURN_IF_TF_ERROR(session_->RunCallable(
-        callable_, tfinputs, &tfoutputs, &meta_data));
+    RETURN_IF_TF_ERROR(
+        session_->RunCallable(callable_, tfinputs, &tfoutputs, &meta_data));
 
     *output_tensors = nullptr;
     for (auto ri = output_names.rbegin(); ri != output_names.rend(); ++ri) {
       const auto oidx = output_index_map_[*ri];
-      TRTISTF_Tensor* tensor =
-          reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(tfoutputs[oidx])));
+      TRTISTF_Tensor* tensor = reinterpret_cast<TRTISTF_Tensor*>(
+          new TensorImpl(std::move(tfoutputs[oidx])));
       *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
     }
 
@@ -522,7 +520,7 @@ ModelImpl::Run(
     std::vector<std::pair<std::string, tensorflow::Tensor>> tfinputs;
 
     for (TRTISTF_TensorList* itr = input_tensors; itr != nullptr;
-        itr = itr->next_) {
+         itr = itr->next_) {
       if (itr->tensor_ != nullptr) {
         TensorImpl* tensor = reinterpret_cast<TensorImpl*>(itr->tensor_);
         tfinputs.emplace_back(
@@ -536,8 +534,8 @@ ModelImpl::Run(
 
     *output_tensors = nullptr;
     for (std::vector<tensorflow::Tensor>::reverse_iterator ri =
-            tfoutputs.rbegin();
-        ri != tfoutputs.rend(); ++ri) {
+             tfoutputs.rbegin();
+         ri != tfoutputs.rend(); ++ri) {
       TRTISTF_Tensor* tensor =
           reinterpret_cast<TRTISTF_Tensor*>(new TensorImpl(std::move(*ri)));
       *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
@@ -554,9 +552,7 @@ ModelImpl::TFGPUDeviceName(const int device_id)
   if (device_id >= 0) {
     std::vector<tensorflow::DeviceAttributes> devices;
     session_->ListDevices(&devices);
-    LOG(ERROR) << "getting devices: ";
     for (const auto& d : devices) {
-      LOG(ERROR) << d.name();
       if (d.device_type() == "GPU" || d.device_type() == "gpu") {
         // Session seems to be aware of all devices on the system,
         // thus need to filter out the correct full name for the device
@@ -856,8 +852,8 @@ TRTISTF_ModelCreateFromGraphDef(
     }
   }
 
-  ModelImpl* model =
-      new ModelImpl(model_name, session, potential_inputs, potential_outputs, device_id);
+  ModelImpl* model = new ModelImpl(
+      model_name, session, potential_inputs, potential_outputs, device_id);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
@@ -1040,7 +1036,7 @@ TRTISTF_ModelOutputs(TRTISTF_Model* model)
 
 TRTISTF_Error*
 TRTISTF_ModelMakeCallable(
-    TRTISTF_Model* model, const char**  input_names,
+    TRTISTF_Model* model, const char** input_names,
     const TRTISTF_DataType* input_types, const size_t num_inputs,
     const char** output_names, const TRTISTF_DataType* output_types,
     const size_t num_outputs)
