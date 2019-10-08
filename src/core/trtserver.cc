@@ -38,6 +38,10 @@
 #include "src/core/status.h"
 #include "src/core/tracing.h"
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace ni = nvidia::inferenceserver;
 
 namespace {
@@ -121,7 +125,7 @@ class TrtServerSharedMemoryBlock {
  public:
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-      const size_t offset, const size_t byte_size, const int device_id);
+      const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset, const size_t byte_size, const int device_id);
 
   TRTSERVER_Memory_Type Type() const { return type_; }
   const std::string& Name() const { return name_; }
@@ -129,17 +133,13 @@ class TrtServerSharedMemoryBlock {
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
   size_t DeviceId() const { return device_id_; }
-
-  void GetSharedMemoryDevice(TRTSERVER_Memory_Type* kind, int* device_id) const
-  {
-    *kind = type_;
-    *device_id = device_id_;
-  }
+  const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
   const std::string name_;
   const std::string shm_key_;
+  const cudaIpcMemHandle_t* cuda_shm_handle_;
   const size_t offset_;
   const size_t byte_size_;
   const int device_id_;
@@ -147,8 +147,8 @@ class TrtServerSharedMemoryBlock {
 
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
-    const size_t offset, const size_t byte_size, const int device_id)
-    : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t offset, const size_t byte_size, const int device_id)
+    : type_(type), name_(name), shm_key_(shm_key), cuda_shm_handle_(cuda_shm_handle), offset_(offset),
       byte_size_(byte_size), device_id_(device_id)
 {
 }
@@ -519,19 +519,19 @@ TRTSERVER_SharedMemoryBlockCpuNew(
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, 0));
+          TRTSERVER_MEMORY_CPU, name, shm_key, nullptr, offset, byte_size, 0));
   return nullptr;  // Success
 }
 
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const char* shm_key, const size_t offset, const size_t byte_size,
+    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset, const size_t byte_size,
     const int device_id)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, shm_key, offset, byte_size, device_id));
+          TRTSERVER_MEMORY_GPU, name, "", &cuda_shm_handle, offset, byte_size, device_id));
   return nullptr;  // Success
 }
 
@@ -1182,12 +1182,27 @@ TRTSERVER_ServerRegisterSharedMemory(
       lserver->StatusManager(),
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
-  ni::MemoryType memory_type =
-      (lsmb->Type() == TRTSERVER_MEMORY_CPU) ? ni::MEMORY_CPU : ni::MEMORY_GPU;
-
   RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
-      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize(),
-      memory_type, lsmb->DeviceId()));
+      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
+
+  return nullptr;  // success
+}
+
+TRTSERVER_Error*
+TRTSERVER_ServerCudaRegisterSharedMemory(
+    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block)
+{
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+
+  ni::ServerStatTimerScoped timer(
+      lserver->StatusManager(),
+      ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
+
+  RETURN_IF_STATUS_ERROR(lserver->CudaRegisterSharedMemory(
+      lsmb->Name(), lsmb->CudaHandle(), lsmb->ByteSize(),
+      lsmb->DeviceId()));
 
   return nullptr;  // success
 }

@@ -377,7 +377,7 @@ InferenceServer::UnloadModel(const std::string& model_name)
 Status
 InferenceServer::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size, const MemoryType kind, const int device_id)
+    const size_t byte_size)
 {
   if (ready_state_ != ServerReadyState::SERVER_READY) {
     return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
@@ -385,9 +385,23 @@ InferenceServer::RegisterSharedMemory(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  int memory_kind = (kind == MEMORY_CPU) ? 0 : 1;
   return shared_memory_manager_->RegisterSharedMemory(
-      name, shm_key, offset, byte_size, memory_kind, device_id);
+      name, shm_key, offset, byte_size);
+}
+
+Status
+InferenceServer::CudaRegisterSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+    const size_t byte_size, const int device_id)
+{
+  if (ready_state_ != ServerReadyState::SERVER_READY) {
+    return Status(RequestStatusCode::UNAVAILABLE, "Server not ready");
+  }
+
+  ScopedAtomicIncrement inflight(inflight_request_counter_);
+
+  return shared_memory_manager_->CudaRegisterSharedMemory(
+      name, cuda_shm_handle, byte_size, device_id);
 }
 
 Status

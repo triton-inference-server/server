@@ -264,7 +264,7 @@ message SharedMemoryControlRequest
     //@@
     message CUDASharedMemoryIdentifier
     {
-      //@@  .. cpp:var:: string name
+      //@@  .. cpp:var:: string handle_region_name
       //@@
       //@@     The name of the system shared memory region that holds the
       //@@     cudaIPC handle. This region must currently be registered.

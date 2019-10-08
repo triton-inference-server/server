@@ -88,11 +88,17 @@ class InferenceServer {
   // Unload the corresponding model.
   Status UnloadModel(const std::string& model_name);
 
-  // Register the corresponding shared memory region. Re-register the shared
-  // memory region if it has already been registered.
+  // Register the corresponding system shared memory region. If already
+  // registered return an ALREADY_EXISTS error.
   Status RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size, const MemoryType kind, const int device_id);
+      const size_t byte_size);
+
+  // Register the corresponding CUDA shared memory region. If already
+  // registered return an ALREADY_EXISTS error.
+  Status CudaRegisterSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+      const size_t byte_size, const int device_id);
 
   // Unregister the corresponding shared memory region.
   Status UnregisterSharedMemory(const std::string& name);
@@ -100,7 +106,7 @@ class InferenceServer {
   // Unregister all active shared memory regions.
   Status UnregisterAllSharedMemory();
 
-  // Get the address at 'offset' within a system shared memory region
+  // Get the address at 'offset' within a shared memory region.
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
       void** shm_mapped_addr);

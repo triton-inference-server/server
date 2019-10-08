@@ -795,7 +795,7 @@ class SharedMemoryControlContext {
  public:
   virtual ~SharedMemoryControlContext() = 0;
 
-  /// Format in which result is returned.
+  /// The kind of device the shared memory region resides in (CPU/GPU)
   enum MemoryType {
     /// CPU denotes that the memory type is System memory
     CPU = 0,
