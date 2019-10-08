@@ -33,6 +33,7 @@ import numpy as np
 from numpy.ctypeslib import ndpointer
 import pkg_resources
 import struct
+import threading
 import tensorrtserver.api.model_config_pb2
 from tensorrtserver.api.server_status_pb2 import ServerStatus
 from tensorrtserver.api.server_status_pb2 import SharedMemoryStatus
@@ -904,6 +905,8 @@ class InferContext:
         self._callback_resources_dict = dict()
         self._callback_resources_dict_id = 0
         self._ctx = c_void_p()
+        # Lock for the thread-safety across asynchronous requests 
+        self._lock = threading.Lock()
 
         if http_headers is None:
             http_headers = list()
@@ -1501,6 +1504,7 @@ class InferContext:
         wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)
         c_cb = _async_run_callback_prototype(wrapped_cb)
 
+        self._lock.acquire()
         # Run asynchronous inference...
         _raise_if_error(
             c_void_p(
@@ -1509,6 +1513,7 @@ class InferContext:
         self._callback_resources_dict[self._callback_resources_dict_id] = \
             (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
         self._callback_resources_dict_id += 1
+        self._lock.release()
 
     def get_async_run_results(self, request_id, wait):
         """Retrieve the results of a previous async_run() using the supplied
@@ -1548,10 +1553,11 @@ class InferContext:
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
             self._ctx, byref(c_is_ready), request_id, wait))
 
-
+        self._lock.acquire()
         self._last_request_id = _raise_if_error(err)
 
         if not c_is_ready.value:
+            self._lock.release()
             return None
 
         requested_outputs = self._requested_outputs_dict[request_id]
@@ -1560,6 +1566,7 @@ class InferContext:
             requested_outputs = self._callback_resources_dict[idx]
             del self._callback_resources_dict[idx]
         del self._requested_outputs_dict[request_id]
+        self._lock.release()
 
         return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
 
