@@ -867,8 +867,8 @@ TRTISTF_ModelCreateFromGraphDef(
 
   std::string device_name;
   tensorflow::Device* device = nullptr;
-  if (device_id != TRTISTF_MODEL_DEVICE)
-    &&(device_id != TRTISTF_NO_GPU_DEVICE)
+  if ((device_id != TRTISTF_MODEL_DEVICE)
+    &&(device_id != TRTISTF_NO_GPU_DEVICE))
     {
       TRTISTF_Error* err =
           GetTFGPUDevice(&device_name, &device, session, device_id);
@@ -1031,11 +1031,11 @@ TRTISTF_ModelCreateFromSavedModel(
 
   std::string device_name;
   tensorflow::Device* device = nullptr;
-  if (device_id != TRTISTF_MODEL_DEVICE)
-    &&(device_id != TRTISTF_NO_GPU_DEVICE)
+  if ((device_id != TRTISTF_MODEL_DEVICE)
+    &&(device_id != TRTISTF_NO_GPU_DEVICE))
     {
       TRTISTF_Error* err = GetTFGPUDevice(
-          &device_name, &device, bundle->session_.get(), device_id);
+          &device_name, &device, bundle->session.get(), device_id);
       if (err != nullptr) {
         return err;
       }
