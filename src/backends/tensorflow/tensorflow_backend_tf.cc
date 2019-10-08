@@ -28,6 +28,8 @@
 
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/cc/saved_model/tag_constants.h"
+#include "tensorflow/core/common_runtime/device.h"
+#include "tensorflow/core/common_runtime/device_mgr.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_id_utils.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_mem_allocator.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_process_state.h"
@@ -414,14 +416,15 @@ class ModelImpl {
       TRTISTF_TensorList** output_tensors);
 
  private:
-  // Return the device name that the session is on, if multiple device names
-  // are present or the session is on CPU, return empty string.
-  std::string TFGPUDeviceName(const int device_id);
+  // Set the device and its name given a non-zero device_id, otherwise, set name
+  // to empty string and leave device uninitialized.
+  void SetTFGPUDevice(const int device_id);
 
   const std::string model_name_;
   std::unique_ptr<tensorflow::SavedModelBundle> bundle_;
   tensorflow::Session* session_;
   std::string device_name_;
+  tensorflow::Device* device_;
   TRTISTF_IOList* inputs_;
   TRTISTF_IOList* outputs_;
 
@@ -440,7 +443,7 @@ ModelImpl::ModelImpl(
       outputs_(outputs), has_callable_(false)
 {
   session_ = bundle_->session.release();
-  device_name_ = TFGPUDeviceName(device_id);
+  SetTFGPUDevice(device_id);
 }
 
 ModelImpl::ModelImpl(
@@ -449,7 +452,7 @@ ModelImpl::ModelImpl(
     : model_name_(model_name), session_(session), inputs_(inputs),
       outputs_(outputs), has_callable_(false)
 {
-  device_name_ = TFGPUDeviceName(device_id);
+  SetTFGPUDevice(device_id);
 }
 
 ModelImpl::~ModelImpl()
@@ -515,7 +518,10 @@ ModelImpl::Run(
       *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
     }
 
-    // [TODO] Device::Sync() (What if other contexts are on the same device?)
+    // Have to sync device to ensure output tensors are ready,
+    // because the Callable is created with 'fetch_skip_sync = true'
+    // (false is not implemented).
+    device_->Sync();
   } else {
     std::vector<std::pair<std::string, tensorflow::Tensor>> tfinputs;
 
@@ -545,10 +551,9 @@ ModelImpl::Run(
   return nullptr;
 }
 
-std::string
-ModelImpl::TFGPUDeviceName(const int device_id)
+void
+ModelImpl::SetTFGPUDevice(const int device_id)
 {
-  std::string device_name;
   if (device_id >= 0) {
     std::vector<tensorflow::DeviceAttributes> devices;
     session_->ListDevices(&devices);
@@ -559,14 +564,17 @@ ModelImpl::TFGPUDeviceName(const int device_id)
         tensorflow::DeviceNameUtils::ParsedName parsed;
         if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
           if (parsed.id == device_id) {
-            device_name = d.name();
+            const tensorflow::DeviceMgr* device_mgr;
+            session_->LocalDeviceManager(&device_mgr);
+            device_mgr->LookupDevice(d.name(), &device_);
+
+            device_name_ = d.name();
             break;
           }
         }
       }
     }
   }
-  return device_name;
 }
 
 }  // namespace
