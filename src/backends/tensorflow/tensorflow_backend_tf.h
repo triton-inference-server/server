@@ -236,9 +236,10 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);
 
 // Create a Callable for the model so that the inputs will be assumed to be from
-// GPU while the outputs will be produced on GPU. Note that depending on the
-// data type, GPU tensor may not be supported, in such case, the callable will
-// expect those unsupported I/O to be on CPU.
+// GPU while the outputs will be produced on GPU. The Callable will assume the
+// inputs are on the same TF device (vGPU) as the model session.
+// Note that depending on the data type, GPU tensor may not be supported,
+// in such case, the callable will expect those unsupported I/Os to be on CPU.
 TRTISTF_Error* TRTISTF_ModelMakeCallable(
     TRTISTF_Model* model, const char** input_names,
     const TRTISTF_DataType* input_types, const size_t num_inputs,

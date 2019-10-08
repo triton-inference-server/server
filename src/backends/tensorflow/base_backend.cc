@@ -302,6 +302,7 @@ BaseBackend::CreateExecutionContext(
       (gpu_device != Context::MODEL_DEVICE)) {
     if ((Config().optimization().has_tensorflow()) &&
         (Config().optimization().tensorflow().gpu_io())) {
+      // In TensorFlow, TF device (vGPU) is used for device utilities
       context->input_device_id_ = vgpu_device;
       const size_t num_inputs = Config().input_size();
       const size_t num_outputs = Config().output_size();

@@ -284,7 +284,7 @@ NewSessionOptions(
   }
 }
 
-// Get the device and its name in a model session given a non-zero device_id.
+// Get the device and its name in model session given a non-negative device_id.
 TRTISTF_Error*
 GetTFGPUDevice(
     std::string* device_name, tensorflow::Device** device,
@@ -717,7 +717,7 @@ TRTISTF_TensorListDelete(TRTISTF_TensorList* list)
 TRTISTF_Tensor*
 TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
-    int64_t* shape_dims, int tf_gpu_id)
+    int64_t* shape_dims, const int tf_gpu_id)
 {
   TRTISTF_Shape* shape = TRTISTF_ShapeNew(shape_rank, shape_dims);
   tensorflow::TensorShape tfshape;
@@ -1041,7 +1041,7 @@ TRTISTF_ModelCreateFromSavedModel(
       }
     }
   ModelImpl* model = new ModelImpl(
-      model_name, std::move(bundle), inputs, outputs, device_name_, device);
+      model_name, std::move(bundle), inputs, outputs, device_name, device);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
