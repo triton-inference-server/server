@@ -284,6 +284,34 @@ NewSessionOptions(
   }
 }
 
+// Get the device and its name in a model session given a non-zero device_id.
+TRTISTF_Error*
+GetTFGPUDevice(std::string* device_name, tensorflow::Device** device, tensorflow::Session* session, const int device_id)
+{
+  if (device_id >= 0) {
+    std::vector<tensorflow::DeviceAttributes> devices;
+    RETURN_IF_TF_ERROR(session->ListDevices(&devices));
+    for (const auto& d : devices) {
+      if (d.device_type() == "GPU" || d.device_type() == "gpu") {
+        // Session seems to be aware of all devices on the system,
+        // thus need to filter out the correct full name for the device
+        tensorflow::DeviceNameUtils::ParsedName parsed;
+        if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
+          if (parsed.id == device_id) {
+            const tensorflow::DeviceMgr* device_mgr;
+            RETURN_IF_TF_ERROR(session_->LocalDeviceManager(&device_mgr));
+            RETURN_IF_TF_ERROR(device_mgr->LookupDevice(d.name(), device));
+
+            *device_name = d.name();
+            break;
+          }
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
 //
 // TensorImpl
 //
@@ -398,10 +426,12 @@ class ModelImpl {
   ModelImpl(
       const std::string& model_name,
       std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+      const std::string& device_name, tensorflow::Device* device);
   ModelImpl(
       const std::string& model_name, tensorflow::Session* session,
-      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id);
+      TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+      const std::string& device_name, tensorflow::Device* device);
   ~ModelImpl();
 
   TRTISTF_IOList* Inputs() const { return inputs_; }
@@ -416,19 +446,17 @@ class ModelImpl {
       TRTISTF_TensorList** output_tensors);
 
  private:
-  // Set the device and its name given a non-zero device_id, otherwise, set name
-  // to empty string and leave device uninitialized.
-  void SetTFGPUDevice(const int device_id);
 
   const std::string model_name_;
   std::unique_ptr<tensorflow::SavedModelBundle> bundle_;
   tensorflow::Session* session_;
-  std::string device_name_;
-  tensorflow::Device* device_;
   TRTISTF_IOList* inputs_;
   TRTISTF_IOList* outputs_;
 
+  // Variables for callable
   bool has_callable_;
+  std::string device_name_;
+  tensorflow::Device* device_;
   tensorflow::Session::CallableHandle callable_;
   // RunCallable will return all outputs specified in callable option in order,
   // using map to quickly locate the requested output for each request.
@@ -438,21 +466,23 @@ class ModelImpl {
 ModelImpl::ModelImpl(
     const std::string& model_name,
     std::unique_ptr<tensorflow::SavedModelBundle> bundle,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+    const std::string& device_name, tensorflow::Device* device)
     : model_name_(model_name), bundle_(std::move(bundle)), inputs_(inputs),
-      outputs_(outputs), has_callable_(false)
+      outputs_(outputs), has_callable_(false), device_name_(device_name),
+      device_(device)
 {
   session_ = bundle_->session.release();
-  SetTFGPUDevice(device_id);
 }
 
 ModelImpl::ModelImpl(
     const std::string& model_name, tensorflow::Session* session,
-    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs, const int device_id)
+    TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
+    const std::string& device_name, tensorflow::Device* device)
     : model_name_(model_name), session_(session), inputs_(inputs),
-      outputs_(outputs), has_callable_(false)
+      outputs_(outputs), has_callable_(false), device_name_(device_name),
+      device_(device)
 {
-  SetTFGPUDevice(device_id);
 }
 
 ModelImpl::~ModelImpl()
@@ -549,32 +579,6 @@ ModelImpl::Run(
   }
 
   return nullptr;
-}
-
-void
-ModelImpl::SetTFGPUDevice(const int device_id)
-{
-  if (device_id >= 0) {
-    std::vector<tensorflow::DeviceAttributes> devices;
-    session_->ListDevices(&devices);
-    for (const auto& d : devices) {
-      if (d.device_type() == "GPU" || d.device_type() == "gpu") {
-        // Session seems to be aware of all devices on the system,
-        // thus need to filter out the correct full name for the device
-        tensorflow::DeviceNameUtils::ParsedName parsed;
-        if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
-          if (parsed.id == device_id) {
-            const tensorflow::DeviceMgr* device_mgr;
-            session_->LocalDeviceManager(&device_mgr);
-            device_mgr->LookupDevice(d.name(), &device_);
-
-            device_name_ = d.name();
-            break;
-          }
-        }
-      }
-    }
-  }
 }
 
 }  // namespace
@@ -860,8 +864,16 @@ TRTISTF_ModelCreateFromGraphDef(
     }
   }
 
+  std::string device_name;
+  tensorflow::Device* device = nullptr;
+  if (device_id != TRTISTF_MODEL_DEVICE) && (device_id != TRTISTF_NO_GPU_DEVICE) {
+    TRTISTF_Error* err = GetTFGPUDevice(&device_name, &device, session, device_id);
+    if (err != nullptr) {
+      return err;
+    }
+  }
   ModelImpl* model = new ModelImpl(
-      model_name, session, potential_inputs, potential_outputs, device_id);
+      model_name, session, potential_inputs, potential_outputs, device_name, device);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
@@ -1012,8 +1024,16 @@ TRTISTF_ModelCreateFromSavedModel(
     io->shape_ = TRTISTF_ShapeNew(shape.dim().size(), shape_dims);
   }
 
+  std::string device_name;
+  tensorflow::Device* device = nullptr;
+  if (device_id != TRTISTF_MODEL_DEVICE) && (device_id != TRTISTF_NO_GPU_DEVICE) {
+    TRTISTF_Error* err = GetTFGPUDevice(&device_name, &device, bundle->session_.get(), device_id);
+    if (err != nullptr) {
+      return err;
+    }
+  }
   ModelImpl* model =
-      new ModelImpl(model_name, std::move(bundle), inputs, outputs, device_id);
+      new ModelImpl(model_name, std::move(bundle), inputs, outputs, device_name_, device);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
