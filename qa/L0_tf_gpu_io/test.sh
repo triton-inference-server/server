@@ -56,13 +56,13 @@ for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32
     rm -f ./*.log
     rm -fr models && mkdir -p models
-    cp -r $DATADIR/qa_identity_model_repository/${MODEL} \
-       models/${MODEL}_def && \
-    (cd models/${MODEL}_def && \
+    cp -r $DATADIR/qa_identity_model_repository/${MODEL_NAME} \
+       models/${MODEL_NAME}_def && \
+    (cd models/${MODEL_NAME}_def && \
             sed -i 's/_zero_1_float32/&_def/' config.pbtxt) && \
     # Enable GPU I/O for TensorFlow model
-    cp -r models/${MODEL}_def models/${MODEL}_gpu && \
-    (cd models/${MODEL}_gpu && \
+    cp -r models/${MODEL_NAME}_def models/${MODEL_NAME}_gpu && \
+    (cd models/${MODEL_NAME}_gpu && \
             sed -i 's/_zero_1_float32_def/_zero_1_float32_gpu/' \
                 config.pbtxt && \
             echo "optimization { tensorflow { gpu_io : true } }" >> config.pbtxt)
