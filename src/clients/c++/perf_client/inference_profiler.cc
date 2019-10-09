@@ -49,7 +49,8 @@ InferenceProfiler::Create(
       factory->ModelName(), factory->ModelVersion(), std::move(status_ctx),
       std::move(manager)));
 
-  if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE) {
+  if (local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE ||
+      local_profiler->scheduler_type_ == ContextFactory::ENSEMBLE_SEQUENCE) {
     ni::ServerStatus server_status;
     RETURN_IF_ERROR(
         local_profiler->status_ctx_->GetServerStatus(&server_status));
@@ -463,7 +464,9 @@ InferenceProfiler::SummarizeClientStat(
     const size_t valid_request_count, const size_t valid_sequence_count,
     PerfStatus& summary)
 {
-  summary.on_sequence_model = (scheduler_type_ == ContextFactory::SEQUENCE);
+  summary.on_sequence_model =
+      ((scheduler_type_ == ContextFactory::SEQUENCE) ||
+       (scheduler_type_ == ContextFactory::ENSEMBLE_SEQUENCE));
   summary.batch_size = manager_->BatchSize();
   summary.client_request_count = valid_request_count;
   summary.client_sequence_count = valid_sequence_count;

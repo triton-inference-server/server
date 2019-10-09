@@ -205,7 +205,9 @@ ConcurrencyManager::ConcurrencyManager(
       input_shapes_(input_shapes)
 {
   request_timestamps_.reset(new TimestampVector());
-  on_sequence_model_ = (factory_->SchedulerType() == ContextFactory::SEQUENCE);
+  on_sequence_model_ =
+      ((factory_->SchedulerType() == ContextFactory::SEQUENCE) ||
+       (factory_->SchedulerType() == ContextFactory::ENSEMBLE_SEQUENCE));
 }
 
 nic::Error
