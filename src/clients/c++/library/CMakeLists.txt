@@ -81,6 +81,15 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
+add_library(
+  Trtis::request_static ALIAS request_static
+)
+target_include_directories (request_static
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/flat_include>
+)
 target_link_libraries(
   request_static
   PRIVATE gRPC::grpc++
@@ -98,13 +107,20 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
-set_target_properties(
-  request
-  PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
+add_library(
+  Trtis::request ALIAS request
 )
 set_target_properties(
   request
-  PROPERTIES LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
+  PROPERTIES
+    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
+    LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
+)
+target_include_directories (request
+  PUBLIC
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/flat_include>
 )
 target_link_libraries(
   request
@@ -116,10 +132,13 @@ target_link_libraries(
 )
 
 install(
-  TARGETS request request_static
+  TARGETS 
+    request
+    request_static
+  EXPORT trtis-export
   LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
 )
-
 install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/flat_include/request.h
@@ -134,5 +153,31 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/../../../core/request_status.pb.h
     ${CMAKE_CURRENT_BINARY_DIR}/../../../core/server_status.pb.h
   DESTINATION include
+)
+
+# cmake configuration
+include (CMakePackageConfigHelpers)
+set (_LIB_CMAKE_DIR lib/cmake/Trtis)
+install(
+  EXPORT trtis-export
+  FILE TrtisTargets.cmake
+  NAMESPACE Trtis::
+  DESTINATION ${_LIB_CMAKE_DIR}
+)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/TrtisConfigVersion.cmake
+  VERSION ${TRTIS_VERSION}
+  COMPATIBILITY ExactVersion
+)
+configure_package_config_file (
+  ${CMAKE_CURRENT_LIST_DIR}/cmake/TrtisConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TrtisConfig.cmake
+  INSTALL_DESTINATION ${_LIB_CMAKE_DIR}
+)
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/TrtisConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/TrtisConfigVersion.cmake
+  DESTINATION ${_LIB_CMAKE_DIR}
 )
 
