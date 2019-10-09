@@ -1504,16 +1504,15 @@ class InferContext:
         wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)
         c_cb = _async_run_callback_prototype(wrapped_cb)
 
-        self._lock.acquire()
-        # Run asynchronous inference...
-        _raise_if_error(
-            c_void_p(
-                _crequest_infer_ctx_async_run_with_cb(self._ctx, c_cb)))
+        with self._lock:
+            # Run asynchronous inference...
+            _raise_if_error(
+                c_void_p(
+                    _crequest_infer_ctx_async_run_with_cb(self._ctx, c_cb)))
 
-        self._callback_resources_dict[self._callback_resources_dict_id] = \
-            (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
-        self._callback_resources_dict_id += 1
-        self._lock.release()
+            self._callback_resources_dict[self._callback_resources_dict_id] = \
+                (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
+            self._callback_resources_dict_id += 1
 
     def get_async_run_results(self, request_id, wait):
         """Retrieve the results of a previous async_run() using the supplied
@@ -1553,20 +1552,18 @@ class InferContext:
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
             self._ctx, byref(c_is_ready), request_id, wait))
 
-        self._lock.acquire()
         self._last_request_id = _raise_if_error(err)
 
         if not c_is_ready.value:
-            self._lock.release()
             return None
 
-        requested_outputs = self._requested_outputs_dict[request_id]
-        if isinstance(requested_outputs, int):
-            idx = requested_outputs
-            requested_outputs = self._callback_resources_dict[idx]
-            del self._callback_resources_dict[idx]
-        del self._requested_outputs_dict[request_id]
-        self._lock.release()
+        with self._lock:
+            requested_outputs = self._requested_outputs_dict[request_id]
+            if isinstance(requested_outputs, int):
+                idx = requested_outputs
+                requested_outputs = self._callback_resources_dict[idx]
+                del self._callback_resources_dict[idx]
+            del self._requested_outputs_dict[request_id]
 
         return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
 
