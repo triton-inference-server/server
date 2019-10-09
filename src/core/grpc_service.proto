@@ -258,8 +258,8 @@ message SharedMemoryControlRequest
 
       //@@  .. cpp:var:: uint64 offset
       //@@
-      //@@     This is the offset of the shared
-      //@@     memory block from the start of the shared memory region.
+      //@@     This is the offset of the shared memory block from the start
+      //@@     of the shared memory region.
       //@@     start = offset, end = offset + byte_size;
       //@@
       uint64 offset = 2;

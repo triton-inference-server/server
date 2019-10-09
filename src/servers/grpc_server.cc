@@ -742,28 +742,14 @@ InferAllocatorPayload(
       int device_id;
       RETURN_IF_ERR(TRTSERVER_SharedMemoryDevice(smb, &kind, &device_id));
 
-      if (kind == TRTSERVER_MEMORY_CPU) {
-        void* base;
-        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-            trtserver.get(), smb, io.shared_memory().offset(),
-            io.shared_memory().byte_size(), &base));
+      void* base;
+      RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
+          trtserver.get(), smb, io.shared_memory().offset(),
+          io.shared_memory().byte_size(), &base));
 
-        alloc_payload->shm_map_->emplace(
-            io.name(),
-            AllocPayload::ShmInfo{base, io.shared_memory().byte_size(), kind,
-                                  device_id});
-      } else {
-        void* cuda_shm_addr;
-        // Get cuda shared memory base address from system shared memory base
-        // address
-        RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
-            trtserver.get(), smb, io.shared_memory().offset(),
-            io.shared_memory().byte_size(), &cuda_shm_addr));
-        alloc_payload->shm_map_->emplace(
-            io.name(),
-            AllocPayload::ShmInfo{cuda_shm_addr, io.shared_memory().byte_size(),
-                                  kind, device_id});
-      }
+      alloc_payload->shm_map_->emplace(
+          io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
+                                           kind, device_id});
     }
   }
 

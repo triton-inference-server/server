@@ -235,24 +235,34 @@ SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
   // Must hold the lock on register_mu_ while calling this function.
   auto it = shared_memory_map_.find(name);
   if (it != shared_memory_map_.end()) {
-    RETURN_IF_ERROR(
-        UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+    if (it->second->kind_ == 0) {
+      RETURN_IF_ERROR(
+          UnmapSharedMemory(it->second->mapped_addr_, it->second->byte_size_));
+      // if no other region with same shm_key then close
+      bool last_one = true;
+      for (auto itr = shared_memory_map_.begin();
+           itr != shared_memory_map_.end(); ++itr) {
+        if (itr->second->shm_key_ == it->second->shm_key_) {
+          last_one = false;
+          break;
+        }
+      }
+      if (last_one) {
+        RETURN_IF_ERROR(CloseSharedMemoryRegion(it->second->shm_fd_));
+      }
+    } else {
+#ifdef TRTIS_ENABLE_GPU
+      RETURN_IF_ERROR(cudaIpcCloseMemHandle(it->second->mapped_addr_));
+#else
+      return Status(
+          RequestStatusCode::INVALID_ARG,
+          "failed to unregister CUDA shared memory region: '" + name +
+              "', GPUs not supported");
+#endif  // TRTIS_ENABLE_GPU
+    }
 
     // remove region info from shared_memory_map_
     shared_memory_map_.erase(it);
-
-    // if no other region with same shm_key then close
-    bool last_one = true;
-    for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
-         ++itr) {
-      if (itr->second->shm_key_ == it->second->shm_key_) {
-        last_one = false;
-        break;
-      }
-    }
-    if (last_one) {
-      RETURN_IF_ERROR(CloseSharedMemoryRegion(it->second->shm_fd_));
-    }
   }
 
   return Status::Success;
@@ -306,12 +316,13 @@ SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
     if (shm_info.second->kind_ == 0) {
       auto system_shm_info = rshm_region->mutable_system_shared_memory();
       system_shm_info->set_shared_memory_key(shm_info.second->shm_key_);
+      system_shm_info->set_offset(shm_info.second->offset_);
     } else {
       auto cuda_shm_info = rshm_region->mutable_cuda_shared_memory();
-      cuda_shm_info->set_handle_region_name(shm_info.second->shm_key_);
+      // TODO serialize shared memory handle
+      // cuda_shm_info->set_raw_handle(shm_info.second->shm_handle);
       cuda_shm_info->set_device_id(shm_info.second->device_id_);
     }
-    rshm_region->set_offset(shm_info.second->offset_);
     rshm_region->set_byte_size(shm_info.second->byte_size_);
   }
 
