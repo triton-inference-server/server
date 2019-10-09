@@ -548,12 +548,6 @@ message ModelOptimizationPolicy
   //@@     The accelerators used for the model. Optional.
   //@@
   ExecutionAccelerators execution_accelerators = 4;
-
-  //@@  .. cpp:var:: Tensorflow tensorflow
-  //@@
-  //@@     TensorFlow-specific optimization settings. Optional.
-  //@@
-  Tensorflow tensorflow = 5;
 }
 
 //@@
