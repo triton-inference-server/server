@@ -29,9 +29,6 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-// #ifdef TRTIS_ENABLE_CUDA_EXAMPLES
-#include <cuda_runtime_api.h>
-// #endif  // TRTIS_ENABLE_CUDA_EXAMPLES
 
 #include "src/clients/c++/examples/shm_utils.h"
 
@@ -103,72 +100,6 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
     exit(1);
   }
 }
-
-// #ifdef TRTIS_ENABLE_CUDA_EXAMPLES
-struct ipcCUDA_t {
-  int device;
-  cudaIpcEventHandle_t eventHandle;
-  cudaIpcMemHandle_t memHandle;
-};
-
-#define CudaRTCheck(FUNC)                                                     \
-    {                                                                         \
-        const cudaError_t result = FUNC;                                      \
-        if (result != cudaSuccess)                                            \
-        {                                                                     \
-            std::cout << "CUDA exception (line " << __LINE__ << "): "         \
-                      << cudaGetErrorName(result) << " ("                     \
-                      << cudaGetErrorString(result) << ")" << std::endl;      \
-            exit(1);                                                          \
-        }                                                                     \
-    }
-
-
-void
-CreateCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, void* input_d_ptr)
-{
-  int previous_device;
-  cudaGetDevice(&previous_device);
-
-  shm_cuda_rep->device = 0;
-  CudaRTCheck(cudaSetDevice(shm_cuda_rep->device));
-
-  //  allocate data on gpu to ipc handle, create an event
-  cudaEvent_t event;
-  CudaRTCheck(cudaEventCreate(&event));
-  CudaRTCheck(cudaIpcGetEventHandle(&shm_cuda_rep->eventHandle, event));
-  CudaRTCheck(cudaIpcGetMemHandle(&shm_cuda_rep->memHandle, input_d_ptr));
-
-  // set device to previous GPU
-  CudaRTCheck(cudaSetDevice(previous_device));
-}
-
-void
-ReadCUDAIPCHandle(ipcCUDA_t* shm_cuda_rep, int* output_data)
-{
-  int previous_device;
-  cudaGetDevice(&previous_device);
-  CudaRTCheck(cudaSetDevice(shm_cuda_rep->device));
-
-  // get cuda event and synchronize
-  cudaEvent_t event;
-  CudaRTCheck(cudaIpcOpenEventHandle(&event, shm_cuda_rep->eventHandle));
-  CudaRTCheck(cudaEventSynchronize(event));
-
-  // allocate data on the gpu and copy out output data
-  void* d_ptr;
-  CudaRTCheck(cudaMalloc(&d_ptr, 16 * sizeof(int)));
-  CudaRTCheck(cudaIpcOpenMemHandle(
-    &d_ptr, shm_cuda_rep->memHandle,
-      cudaIpcMemLazyEnablePeerAccess));
-  CudaRTCheck(cudaMemcpy(
-      (void*)output_data, d_ptr, 16 * sizeof(int),
-      cudaMemcpyDeviceToHost));
-
-  // set device to default GPU - GPU0
-  CudaRTCheck(cudaSetDevice(previous_device));
-}
-// #endif  // TRTIS_ENABLE_CUDA_EXAMPLES
 
 }
 }}

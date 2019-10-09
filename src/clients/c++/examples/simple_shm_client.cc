@@ -24,8 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include <fcntl.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #include <iostream>
 #include <string>
@@ -226,8 +224,7 @@ main(int argc, char** argv)
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, output_byte_size * 2,
-      nic::SharedMemoryControlContext::MemoryType::CPU);
+      "output_data", "/output_simple", 0, output_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;

@@ -71,6 +71,33 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
+#define CudaRTCheck(FUNC, previous_device)                                    \
+    {                                                                         \
+        const cudaError_t result = FUNC;                                      \
+        if (result != cudaSuccess)                                            \
+        {                                                                     \
+            std::cout << "CUDA exception (line " << __LINE__ << "): "         \
+                      << cudaGetErrorName(result) << " ("                     \
+                      << cudaGetErrorString(result) << ")" << std::endl;      \
+            cudaSetDevice(previous_device);                                   \
+            exit(1);                                                          \
+        }                                                                     \
+    }
+
+void
+CreateCUDAIPCHandle(cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
+{
+  int previous_device;
+  cudaGetDevice(&previous_device);
+  CudaRTCheck(cudaSetDevice(device_id), previous_device);
+
+  //  Create IPC handle for data on the gpu
+  CudaRTCheck(cudaIpcGetMemHandle(cuda_handle, input_d_ptr), previous_device);
+
+  // set device to previous GPU
+  cudaSetDevice(previous_device);
+}
+
 int
 main(int argc, char** argv)
 {
@@ -217,35 +244,23 @@ main(int argc, char** argv)
   // Get the size of the inputs and outputs from the Shape and DataType
   int input_byte_size =
       infer_ctx->ByteSize(input0->Dims(), ni::DataType::TYPE_INT32);
-  size_t cuda_ipc_byte_size = sizeof(ipcCUDA_t);
+  int output_byte_size =
+      infer_ctx->ByteSize(output0->Dims(), ni::DataType::TYPE_INT32);
 
-  // Create Output0 and Output1 in CUDA Shared Memory and store handle in system
-  // shared memory
-  std::string shm_key = "/output_simple";
-  // shared memory for CUDA IPC memory and event handlers
-  int shm_fd_op =
-      nic::CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
-  ipcCUDA_t* output0_cuda_rep =
-      (ipcCUDA_t*)(nic::MapSharedMemory(shm_fd_op, 0, cuda_ipc_byte_size));
-  ipcCUDA_t* output1_cuda_rep = reinterpret_cast<ipcCUDA_t*>(
-      (uint8_t*)output0_cuda_rep + cuda_ipc_byte_size);
-
-  // Create OUTPUT0 and OUTPUT1 on GPU
+  // Create Output0 and Output1 in CUDA Shared Memory
   int *output0_d_ptr, *output1_d_ptr;
-  cudaMalloc((void**)&output0_d_ptr, 16 * sizeof(int));
-  cudaMemset((void*)output0_d_ptr, 0, 16 * sizeof(int));
+  cudaMalloc((void**)&output0_d_ptr, output_byte_size * 2);
+  cudaMemset((void*)output0_d_ptr, 0, output_byte_size * 2);
+  output1_d_ptr = (int*)output0_d_ptr + 16;
 
-  cudaMalloc((void**)&output1_d_ptr, 16 * sizeof(int));
-  cudaMemset((void*)output1_d_ptr, 0, 16 * sizeof(int));
-
+  cudaIpcMemHandle_t* output_cuda_handle;
   std::cerr << "Creating output CUDA shm regions" << '\n';
-  nic::CreateCUDAIPCHandle(output0_cuda_rep, output0_d_ptr);
-  nic::CreateCUDAIPCHandle(output1_cuda_rep, output1_d_ptr);
+  CreateCUDAIPCHandle(output_cuda_handle, output0_d_ptr);
   std::cerr << "Created output CUDA IPC regions" << '\n';
 
   // Register Output shared memory with TRTIS
-  err = shared_memory_ctx->RegisterSharedMemory(
-      "output_data", "/output_simple", 0, cuda_ipc_byte_size * 2);
+  err = shared_memory_ctx->CudaRegisterSharedMemory(
+      "output_data", output_cuda_handle, output_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;
@@ -260,54 +275,36 @@ main(int argc, char** argv)
       "unable to create inference options");
 
   options->SetBatchSize(1);
-  options->AddSharedMemoryResult(output0, "output_data", 0, cuda_ipc_byte_size);
+  options->AddSharedMemoryResult(output0, "output_data", 0, output_byte_size);
   options->AddSharedMemoryResult(
-      output1, "output_data", cuda_ipc_byte_size, cuda_ipc_byte_size);
+      output1, "output_data", output_byte_size, output_byte_size);
 
   FAIL_IF_ERR(
       infer_ctx->SetRunOptions(*options), "unable to set inference options");
 
-  // Create Output0 and Output1 in CUDA Shared Memory and store handle in
-  // system shared memory. Initialize Input0 to unique integers and Input1 to
-  // all ones.
-  shm_key = "/input_simple";
-  int shm_fd_ip =
-      nic::CreateSharedMemoryRegion(shm_key, cuda_ipc_byte_size * 2);
-  ipcCUDA_t* input0_cuda_rep =
-      (ipcCUDA_t*)(nic::MapSharedMemory(shm_fd_ip, 0, cuda_ipc_byte_size * 2));
-  ipcCUDA_t* input1_cuda_rep = reinterpret_cast<ipcCUDA_t*>(
-      (uint8_t*)input0_cuda_rep + cuda_ipc_byte_size);
-  // (ipcCUDA_t*)(MapSharedMemory(shm_fd_ip, cuda_ipc_byte_size,
-  // cuda_ipc_byte_size));
-
-  // Initialize data to load into shared memory region
-  int input0_data[16];
-  int input1_data[16];
+  // Create Output0 and Output1 in CUDA Shared Memory. Initialize Input0 to
+  // unique integers and Input1 to all ones.
+  int input_data[32];
   for (size_t i = 0; i < 16; ++i) {
-    input0_data[i] = i;
-    input1_data[i] = 1;
+    input_data[i] = i;
+    input_data[16+i] = 1;
   }
 
   // copy INPUT0 and INPUT1 data onto GPU
   int *input0_d_ptr, *input1_d_ptr;
-  cudaMalloc((void**)&input0_d_ptr, 16 * sizeof(int));
+  cudaMalloc((void**)&input0_d_ptr, input_byte_size * 2);
   cudaMemcpy(
-      (void*)input0_d_ptr, (void*)input0_data, 16 * sizeof(int),
+      (void*)input0_d_ptr, (void*)input_data, input_byte_size * 2,
       cudaMemcpyHostToDevice);
 
-  cudaMalloc((void**)&input1_d_ptr, 16 * sizeof(int));
-  cudaMemcpy(
-      (void*)input1_d_ptr, (void*)input1_data, 16 * sizeof(int),
-      cudaMemcpyHostToDevice);
-
+  cudaIpcMemHandle_t* input_cuda_handle;
   std::cerr << "Creating input CUDA shm regions" << '\n';
-  nic::CreateCUDAIPCHandle(input0_cuda_rep, input0_d_ptr);
-  nic::CreateCUDAIPCHandle(input1_cuda_rep, input1_d_ptr);
+  CreateCUDAIPCHandle(input_cuda_handle, input0_d_ptr);
   std::cerr << "Created input CUDA IPC regions" << '\n';
 
   // Register Input shared memory with TRTIS
-  err = shared_memory_ctx->RegisterSharedMemory(
-      "input_data", "/input_simple", 0, input_byte_size * 2);
+  err = shared_memory_ctx->CudaRegisterSharedMemory(
+      "input_data", input_cuda_handle, input_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory input region: " << err
               << std::endl;
@@ -330,12 +327,6 @@ main(int argc, char** argv)
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(infer_ctx->Run(&results), "unable to run model");
 
-  int output0_data[16];
-  int output1_data[16];
-  nic::ReadCUDAIPCHandle(output0_cuda_rep, output0_data);
-  nic::ReadCUDAIPCHandle(output1_cuda_rep, output1_data);
-
-  // Client should use ipcCUDA_t handle to return data
   // We expect there to be 2 results. Walk over all 16 result elements
   // and print the sum and difference calculated by the model.
   if (results.size() != 2) {
@@ -344,16 +335,16 @@ main(int argc, char** argv)
   }
 
   for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
-              << output0_data[i] << std::endl;
-    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
-              << output1_data[i] << std::endl;
+    std::cout << input0_d_ptr[i] << " + " << input1_d_ptr[i] << " = "
+              << output0_d_ptr[i] << std::endl;
+    std::cout << input0_d_ptr[i] << " - " << input1_d_ptr[i] << " = "
+              << output1_d_ptr[i] << std::endl;
 
-    if ((input0_data[i] + input1_data[i]) != output0_data[i]) {
+    if ((input0_d_ptr[i] + input1_d_ptr[i]) != output0_d_ptr[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_data[i] - input1_data[i]) != output1_data[i]) {
+    if ((input0_d_ptr[i] - input1_d_ptr[i]) != output1_d_ptr[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
@@ -393,10 +384,5 @@ main(int argc, char** argv)
   cudaIpcCloseMemHandle(output1_d_ptr);
   cudaFree(output1_d_ptr);
 
-  // Cleanup system shared memory
-  nic::UnmapSharedMemory(input0_cuda_rep, cuda_ipc_byte_size * 2);
-  nic::UnlinkSharedMemoryRegion("/input_simple");
-  nic::UnmapSharedMemory(output0_cuda_rep, cuda_ipc_byte_size * 2);
-  nic::UnlinkSharedMemoryRegion("/output_simple");
   return 0;
 }

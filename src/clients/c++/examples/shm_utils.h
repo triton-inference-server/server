@@ -25,19 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-
 namespace nvidia { namespace inferenceserver { namespace client {
-
-/// \return true if a TensorFlow shape exactly matches a model
-/// configuration shape. Dimensions with variable size are represented
-/// by -1 in both the TensorFlow shape and the model configuration
-/// shape and these must match as well.
-/// \param supports_batching If True then the configuration expects
-/// the model to support batching and so the shape must have the
-/// appropriate batch dimension.
-
-
-// }}  // namespace nvidia::inferenceserver
 
 // Create a shared memory region of the size 'byte_size' and return the unique
 // identifier.
