@@ -52,9 +52,9 @@ RET=0
 #
 # Use "identity" model for all model types.
 #
+rm -f ./*.log
 for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32
-    rm -f ./*.log
     rm -fr models && mkdir -p models
     cp -r $DATADIR/qa_identity_model_repository/${MODEL_NAME} \
        models/${MODEL_NAME}_def && \
@@ -79,7 +79,7 @@ for BACKEND in $BACKENDS; do
     set +e
 
     $CLIENT -m${MODEL_NAME}_def -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            -w1 -n1 >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -91,7 +91,7 @@ for BACKEND in $BACKENDS; do
     fi
 
     $CLIENT -m${MODEL_NAME}_gpu -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.gpu.log 2>&1
+            -w1 -n1 >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -99,6 +99,19 @@ for BACKEND in $BACKENDS; do
     grep "is GPU tensor: 1" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
+        RET=1
+    fi
+
+    # Sample latency results
+    $CLIENT -m${MODEL_NAME}_def -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+    if (( $? != 0 )); then
+        RET=1
+    fi
+
+    $CLIENT -m${MODEL_NAME}_gpu -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+            -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.gpu.log 2>&1
+    if (( $? != 0 )); then
         RET=1
     fi
 
