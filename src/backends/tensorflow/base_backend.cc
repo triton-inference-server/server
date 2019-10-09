@@ -604,12 +604,10 @@ BaseBackend::Context::SetStringInputTensor(
         break;
       }
 
-      std::string str(content, len);
+      TRTISTF_TensorSetString(
+          tensor, tensor_element_idx + element_idx, content, len);
       content += len;
       content_byte_size -= len;
-
-      TRTISTF_TensorSetString(
-          tensor, tensor_element_idx + element_idx, str.c_str(), len);
       element_idx++;
     }
 
