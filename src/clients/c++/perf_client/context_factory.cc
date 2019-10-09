@@ -49,7 +49,7 @@ ContextFactory::Create(
     if (itr->second.config().has_ensemble_scheduling()) {
       bool is_sequential = false;
       RETURN_IF_ERROR(GetEnsembleSchedulerType(
-          model_name, model_version, server_status, is_sequential));
+          model_name, model_version, server_status, &is_sequential));
       if (is_sequential) {
         (*factory)->scheduler_type_ = ENSEMBLE_SEQUENCE;
       } else {
@@ -69,7 +69,7 @@ ContextFactory::Create(
 nic::Error
 ContextFactory::GetEnsembleSchedulerType(
     const std::string& model_name, const int64_t model_version,
-    ni::ServerStatus& server_status, bool& is_sequential)
+    const ni::ServerStatus& server_status, bool* is_sequential)
 {
   const auto& itr = server_status.model_status().find(model_name);
   if (itr == server_status.model_status().end()) {
@@ -78,7 +78,7 @@ ContextFactory::GetEnsembleSchedulerType(
         "unable to find status for model" + model_name);
   } else {
     if (itr->second.config().has_sequence_batching()) {
-      is_sequential = true;
+      *is_sequential = true;
     } else if (itr->second.config().platform() == "ensemble") {
       for (const auto& step :
            itr->second.config().ensemble_scheduling().step()) {

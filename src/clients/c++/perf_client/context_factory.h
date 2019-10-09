@@ -95,7 +95,7 @@ class ContextFactory {
 
   static nic::Error GetEnsembleSchedulerType(
       const std::string& model_name, const int64_t model_version,
-      ni::ServerStatus& server_status, bool& is_sequential);
+      const ni::ServerStatus& server_status, bool* is_sequential);
 
   const std::string url_;
   const ProtocolType protocol_;
