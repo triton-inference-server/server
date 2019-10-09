@@ -65,7 +65,7 @@ for BACKEND in $BACKENDS; do
     (cd models/${MODEL_NAME}_gpu && \
             sed -i 's/_zero_1_float32_def/_zero_1_float32_gpu/' \
                 config.pbtxt && \
-            echo "optimization { tensorflow { gpu_io : true } }" >> config.pbtxt)
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     SERVER_LOG="${MODEL_NAME}.serverlog"

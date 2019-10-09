@@ -281,6 +281,13 @@ BaseBackend::CreateExecutionContext(
         }
         LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                        << instance_name;
+      } else if (execution_accelerator.name() == kGPUIOExecutionAccelerator) {
+        // GPU I/O can be set, set hint
+        if ((gpu_device != Context::NO_GPU_DEVICE) &&
+            (gpu_device != Context::MODEL_DEVICE)) {
+          // In TensorFlow, TF device (vGPU) is used for device utilities
+          context->input_device_id_ = vgpu_device;
+        }
       } else {
         return Status(
             RequestStatusCode::INVALID_ARG, "unknown Execution Accelerator '" +
@@ -297,29 +304,23 @@ BaseBackend::CreateExecutionContext(
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
 
-  // GPU I/O may be preferred
-  if ((gpu_device != Context::NO_GPU_DEVICE) &&
-      (gpu_device != Context::MODEL_DEVICE)) {
-    if ((Config().optimization().has_tensorflow()) &&
-        (Config().optimization().tensorflow().gpu_io())) {
-      // In TensorFlow, TF device (vGPU) is used for device utilities
-      context->input_device_id_ = vgpu_device;
-      const size_t num_inputs = Config().input_size();
-      const size_t num_outputs = Config().output_size();
-      std::vector<const char*> input_names, output_names;
-      std::vector<TRTISTF_DataType> input_types, output_types;
-      for (const auto& io : Config().input()) {
-        input_names.push_back(io.name().c_str());
-        input_types.push_back(ConvertDataType(io.data_type()));
-      }
-      for (const auto& io : Config().output()) {
-        output_names.push_back(io.name().c_str());
-        output_types.push_back(ConvertDataType(io.data_type()));
-      }
-      TRTISTF_ModelMakeCallable(
-          context->trtistf_model_.get(), input_names.data(), input_types.data(),
-          num_inputs, output_names.data(), output_types.data(), num_outputs);
+  
+  if (context->input_device_id_ != Context::MODEL_DEVICE) { 
+    const size_t num_inputs = Config().input_size();
+    const size_t num_outputs = Config().output_size();
+    std::vector<const char*> input_names, output_names;
+    std::vector<TRTISTF_DataType> input_types, output_types;
+    for (const auto& io : Config().input()) {
+      input_names.push_back(io.name().c_str());
+      input_types.push_back(ConvertDataType(io.data_type()));
     }
+    for (const auto& io : Config().output()) {
+      output_names.push_back(io.name().c_str());
+      output_types.push_back(ConvertDataType(io.data_type()));
+    }
+    TRTISTF_ModelMakeCallable(
+        context->trtistf_model_.get(), input_names.data(), input_types.data(),
+        num_inputs, output_names.data(), output_types.data(), num_outputs);
   }
 
   return Status::Success;
