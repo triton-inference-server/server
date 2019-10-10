@@ -328,17 +328,11 @@ message SharedMemoryRegion
 
   message CudaSharedMemory
   {
-    //@@  .. cpp:var:: bytes raw_handle (repeated)
-    //@@
-    //@@     The raw serialized cudaIPC handle.
-    //@@
-    repeated bytes raw_handle = 1;
-
     //@@  .. cpp:var:: int64 device_id
     //@@
     //@@     The GPU device ID on which the cudaIPC handle was created.
     //@@
-    int64 device_id = 2;
+    int64 device_id = 1;
   }
 
   //@@  .. cpp:var:: oneof shared_memory_types

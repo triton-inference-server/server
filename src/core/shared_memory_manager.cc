@@ -306,8 +306,6 @@ SharedMemoryManager::GetSharedMemoryStatus(SharedMemoryStatus* shm_status)
       system_shm_info->set_offset(shm_info.second->offset_);
     } else {
       auto cuda_shm_info = rshm_region->mutable_cuda_shared_memory();
-      // TODO serialize shared memory handle
-      // cuda_shm_info->set_raw_handle(shm_info.second->shm_handle);
       cuda_shm_info->set_device_id(shm_info.second->device_id_);
     }
     rshm_region->set_byte_size(shm_info.second->byte_size_);
