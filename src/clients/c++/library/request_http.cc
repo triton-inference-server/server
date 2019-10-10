@@ -1614,7 +1614,7 @@ InferHttpContextImpl::AsyncTransfer()
     for (auto& request : request_with_callback) {
       HttpRequestImpl* request_ptr =
           static_cast<HttpRequestImpl*>(request.get());
-      request_ptr->callback_(this, std::move(request));
+      request_ptr->callback_(this, request);
     }
   } while (!exiting_);
 }
