@@ -194,9 +194,10 @@ TRTISTF_EXPORT const char* TRTISTF_TensorString(
 // string type.. bad things might happen if called for non-string type
 // tensor. The provided string is copied by the tensor so the caller
 // retains ownership of 'str'. 'str' may be NULL to indicate that the
-// string should be set to empty.
+// string should be set to empty. 'length' denotes the size of the
+// character sequence to copy into the string within the tensor.
 TRTISTF_EXPORT void TRTISTF_TensorSetString(
-    TRTISTF_Tensor* tensor, size_t idx, const char* str);
+    TRTISTF_Tensor* tensor, size_t idx, const char* str, size_t length);
 
 //
 // Model
