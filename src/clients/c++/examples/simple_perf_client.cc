@@ -148,7 +148,9 @@ RunAsyncSerial(
 void
 ShowResults(
     const std::vector<uint64_t>& duration_ns, const std::string& name,
-    const std::string& protocol, const bool verbose)
+    const std::string& framework, const std::string& model_name,
+    const std::string& protocol, const uint32_t batch_size,
+    const uint32_t tensor_size, const bool json, const bool verbose)
 {
   uint64_t sum_ns = 0;
   for (const auto ns : duration_ns) {
@@ -170,10 +172,22 @@ ShowResults(
   var_us /= duration_ns.size();
   uint64_t stddev_us = std::sqrt(var_us);
 
-  std::cout << name << " (" << protocol << ")" << std::endl;
-  std::cout << "Total time: " << (sum_us / 1000.0) << " ms" << std::endl;
-  std::cout << "Mean time: " << (mean_us / 1000.0) << " ms" << std::endl;
-  std::cout << "Stddev: " << (stddev_us / 1000.0) << " ms" << std::endl;
+  if (json) {
+    std::cout << "{\"s_benchmark_kind\":\"simple_perf\",";
+    std::cout << "\"s_benchmark_name\":\"" << name << "\",";
+    std::cout << "\"s_protocol\":\"" << protocol << "\",";
+    std::cout << "\"s_framework\":\"" << framework << "\",";
+    std::cout << "\"s_model\":\"" << model_name << "\",";
+    std::cout << "\"l_batch_size\":" << batch_size << ",";
+    std::cout << "\"l_size\":" << tensor_size << ",";
+    std::cout << "\"d_latency_avg_ms\":" << (mean_us / 1000.0) << ",";
+    std::cout << "\"d_latency_avg_stddev_ms\":" << (stddev_us / 1000.0) << "}";
+  } else {
+    std::cout << name << " (" << protocol << ")" << std::endl;
+    std::cout << "Total time: " << (sum_us / 1000.0) << " ms" << std::endl;
+    std::cout << "Mean time: " << (mean_us / 1000.0) << " ms" << std::endl;
+    std::cout << "Stddev: " << (stddev_us / 1000.0) << " ms" << std::endl;
+  }
 }
 
 void
@@ -188,6 +202,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-i <Protocol used to communicate with inference service>"
             << std::endl;
   std::cerr << "\t-u <URL for inference service>" << std::endl;
+  std::cerr << "\t-f <model framework>" << std::endl;
   std::cerr << "\t-m <model name>" << std::endl;
   std::cerr << "\t-b <batch size>" << std::endl;
   std::cerr << "\t-s <inference size>" << std::endl;
@@ -212,9 +227,11 @@ int
 main(int argc, char** argv)
 {
   bool verbose = false;
+  bool json = false;
   std::string url("localhost:8000");
   std::string protocol = "http";
   std::string model_name;
+  std::string framework;
   uint32_t batch_size = 1;
   uint32_t tensor_size = 1;
   uint32_t warmup_iters = 10;
@@ -222,10 +239,13 @@ main(int argc, char** argv)
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vi:u:m:b:s:w:n:")) != -1) {
+  while ((opt = getopt(argc, argv, "vji:u:m:f:b:s:w:n:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
+        break;
+      case 'j':
+        json = true;
         break;
       case 'i':
         protocol = optarg;
@@ -235,6 +255,9 @@ main(int argc, char** argv)
         break;
       case 'm':
         model_name = optarg;
+        break;
+      case 'f':
+        framework = optarg;
         break;
       case 'b':
         batch_size = std::stoul(optarg);
@@ -304,11 +327,13 @@ main(int argc, char** argv)
 
   std::vector<int64_t> input_shape{tensor_size};
   FAIL_IF_ERR(input->SetShape(input_shape), "unable to set shape for input");
-  FAIL_IF_ERR(
-      input->SetRaw(
-          reinterpret_cast<uint8_t*>(&input_data[0]),
-          input_data.size() * sizeof(float)),
-      "unable to set data for input");
+  for (uint32_t b = 0; b < batch_size; ++b) {
+    FAIL_IF_ERR(
+        input->SetRaw(
+            reinterpret_cast<uint8_t*>(&input_data[0]),
+            input_data.size() * sizeof(float)),
+        "unable to set data for input");
+  }
 
   std::vector<uint64_t> duration_ns;
 
@@ -317,11 +342,19 @@ main(int argc, char** argv)
 
   // Test sync serial
   RunSyncSerial(ctx.get(), measure_iters, &duration_ns);
-  ShowResults(duration_ns, "Sync Serial Run", protocol, verbose);
+  ShowResults(
+      duration_ns, "sync_serial", framework, model_name, protocol, batch_size,
+      tensor_size, json, verbose);
+
+  if (json) {
+    std::cout << ",";
+  }
 
   // Test async serial
   RunAsyncSerial(ctx.get(), measure_iters, &duration_ns);
-  ShowResults(duration_ns, "Async Serial Run", protocol, verbose);
+  ShowResults(
+      duration_ns, "async_serial", framework, model_name, protocol, batch_size,
+      tensor_size, json, verbose);
 
   return 0;
 }
