@@ -128,6 +128,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_perf_client/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_large_payload/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_model_config/. && \

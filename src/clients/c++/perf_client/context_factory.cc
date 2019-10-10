@@ -46,14 +46,46 @@ ContextFactory::Create(
     return nic::Error(
         ni::RequestStatusCode::INTERNAL, "unable to find status for model");
   } else {
-    if (itr->second.config().has_sequence_batching()) {
+    if (itr->second.config().has_ensemble_scheduling()) {
+      bool is_sequential = false;
+      RETURN_IF_ERROR(GetEnsembleSchedulerType(
+          model_name, model_version, server_status, &is_sequential));
+      if (is_sequential) {
+        (*factory)->scheduler_type_ = ENSEMBLE_SEQUENCE;
+      } else {
+        (*factory)->scheduler_type_ = ENSEMBLE;
+      }
+    } else if (itr->second.config().has_sequence_batching()) {
       (*factory)->scheduler_type_ = SEQUENCE;
-    } else if (itr->second.config().has_ensemble_scheduling()) {
-      (*factory)->scheduler_type_ = ENSEMBLE;
     } else if (itr->second.config().has_dynamic_batching()) {
       (*factory)->scheduler_type_ = DYNAMIC;
     } else {
       (*factory)->scheduler_type_ = NONE;
+    }
+  }
+  return nic::Error::Success;
+}
+
+nic::Error
+ContextFactory::GetEnsembleSchedulerType(
+    const std::string& model_name, const int64_t model_version,
+    const ni::ServerStatus& server_status, bool* is_sequential)
+{
+  const auto& itr = server_status.model_status().find(model_name);
+  if (itr == server_status.model_status().end()) {
+    return nic::Error(
+        ni::RequestStatusCode::INTERNAL,
+        "unable to find status for model" + model_name);
+  } else {
+    if (itr->second.config().has_sequence_batching()) {
+      *is_sequential = true;
+    } else if (itr->second.config().platform() == "ensemble") {
+      for (const auto& step :
+           itr->second.config().ensemble_scheduling().step()) {
+        RETURN_IF_ERROR(GetEnsembleSchedulerType(
+            step.model_name(), step.model_version(), server_status,
+            is_sequential));
+      }
     }
   }
   return nic::Error::Success;
@@ -80,7 +112,7 @@ ContextFactory::CreateInferContext(std::unique_ptr<nic::InferContext>* ctx)
   // make sure to use an unused correlation id if requested.
   ni::CorrelationID correlation_id = 0;
 
-  if (scheduler_type_ == SEQUENCE) {
+  if ((scheduler_type_ == SEQUENCE) || (scheduler_type_ == ENSEMBLE_SEQUENCE)) {
     std::lock_guard<std::mutex> lock(correlation_id_mutex_);
     current_correlation_id_++;
     correlation_id = current_correlation_id_;

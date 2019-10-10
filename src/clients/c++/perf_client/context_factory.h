@@ -37,7 +37,13 @@ namespace perfclient {
 ///
 class ContextFactory {
  public:
-  enum ModelSchedulerType { NONE, DYNAMIC, SEQUENCE, ENSEMBLE };
+  enum ModelSchedulerType {
+    NONE,
+    DYNAMIC,
+    SEQUENCE,
+    ENSEMBLE,
+    ENSEMBLE_SEQUENCE
+  };
   /// Create a context factory that is responsible to create different types of
   /// contexts that is directly related to the specified model.
   /// \param url The inference server name and port.
@@ -86,6 +92,10 @@ class ContextFactory {
         model_version_(model_version), current_correlation_id_(0)
   {
   }
+
+  static nic::Error GetEnsembleSchedulerType(
+      const std::string& model_name, const int64_t model_version,
+      const ni::ServerStatus& server_status, bool* is_sequential);
 
   const std::string url_;
   const ProtocolType protocol_;
