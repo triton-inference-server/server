@@ -282,6 +282,8 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleSharedMemoryControl(
       evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
+  TRTSERVER_Error* EVBufferToCudaHandle(
+      evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
@@ -627,6 +629,41 @@ HTTPAPIServer::HandleModelControl(
   TRTSERVER_ErrorDelete(err);
 }
 
+TRTSERVER_Error*
+HTTPAPIServer::EVBufferToCudaHandle(
+    evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle)
+{
+  // Extract serialzied cuda IPC handle from HTTP body and store in
+  // 'cuda_shm_handle'.
+  struct evbuffer_iovec* v = nullptr;
+  *cuda_shm_handle = nullptr;
+  size_t byte_size = sizeof(cudaIpcMemHandle_t);
+
+  int n = evbuffer_peek(handle_buffer, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(handle_buffer, -1, NULL, v, n) != n) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL, "unexpected error getting input buffers ");
+    }
+  }
+
+  if (byte_size != v[0].iov_len) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected size for cuda handle, expecting " +
+            std::to_string(byte_size) + " bytes")
+            .c_str());
+  }
+
+  // Deserialize the cuda IPC handle
+  *cuda_shm_handle = reinterpret_cast<cudaIpcMemHandle_t*>(v[0].iov_base);
+
+  return nullptr;  // success
+}
+
 void
 HTTPAPIServer::HandleSharedMemoryControl(
     evhtp_request_t* req, const std::string& sharedmemorycontrol_uri)
@@ -703,13 +740,17 @@ HTTPAPIServer::HandleSharedMemoryControl(
 #if TRTIS_ENABLE_GPU
     int device_id = std::atoll(device_id_str.c_str());
     std::string empty_key = "";
-    // TODO
-    cudaIpcMemHandle_t* cuda_shm_handle = nullptr;
-    err = smb_manager_->Create(
-        &smb, name.c_str(), empty_key.c_str(), cuda_shm_handle, 0, byte_size,
-        TRTSERVER_MEMORY_GPU, device_id);
+
+    // Get cuda ipc handle from raw bytes in http body
+    cudaIpcMemHandle_t* cuda_shm_handle;
+    err = EVBufferToCudaHandle(req->buffer_in, &cuda_shm_handle);
     if (err == nullptr) {
-      err = TRTSERVER_ServerCudaRegisterSharedMemory(server_.get(), smb);
+      err = smb_manager_->Create(
+          &smb, name.c_str(), empty_key.c_str(), cuda_shm_handle, 0, byte_size,
+          TRTSERVER_MEMORY_GPU, device_id);
+      if (err == nullptr) {
+        err = TRTSERVER_ServerCudaRegisterSharedMemory(server_.get(), smb);
+      }
     }
 #else
     err = TRTSERVER_ErrorNew(
@@ -913,10 +954,14 @@ HTTPAPIServer::EVBufferToInput(
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           server_.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
+      TRTSERVER_Memory_Type kind;
+      int device_id;
+      RETURN_IF_ERR(TRTSERVER_SharedMemoryDevice(smb, &kind, &device_id));
+
       output_shm_map.emplace(
-          io.name(),
-          std::make_pair(
-              static_cast<const void*>(base), io.shared_memory().byte_size()));
+          io.name(), std::make_tuple(
+                         static_cast<const void*>(base),
+                         io.shared_memory().byte_size(), kind, device_id));
     }
   }
 
