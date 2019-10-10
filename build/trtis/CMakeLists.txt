@@ -127,6 +127,13 @@ if(${TRTIS_ENABLE_GPU})
 endif() # TRTIS_ENABLE_GPU
 
 #
+# Boost
+#
+find_package(Boost REQUIRED)
+message(STATUS "Using Boost ${Boost_VERSION}")
+include_directories(${Boost_INCLUDE_DIRS})
+
+#
 # libevent
 #
 find_package(Libevent CONFIG REQUIRED)
