@@ -148,7 +148,7 @@ install(
 #
 # simple_cuda_shm_client
 #
-#if($(TRTIS_ENABLE_CUDA_EXAMPLES))
+if($(TRTIS_ENABLE_CUDA_EXAMPLES))
   find_package(CUDA REQUIRED)
   message(STATUS "Using CUDA ${CUDA_VERSION}")
   set(CUDA_NVCC_FLAGS -std=c++11)
@@ -166,7 +166,6 @@ install(
   target_link_libraries(
     simple_cuda_shm_client
     PRIVATE request_static
-    rt
   )
 
   target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -180,7 +179,7 @@ install(
     TARGETS simple_cuda_shm_client
     RUNTIME DESTINATION bin
   )
-#endif() # TRTIS_ENABLE_CUDA_EXAMPLES
+endif() # TRTIS_ENABLE_CUDA_EXAMPLES
 
 #
 # simple_sequence_client

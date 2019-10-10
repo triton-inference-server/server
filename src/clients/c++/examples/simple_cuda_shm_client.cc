@@ -29,7 +29,6 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
-#include "src/clients/c++/examples/shm_utils.h"
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
 
@@ -71,21 +70,21 @@ Usage(char** argv, const std::string& msg = std::string())
 
 }  // namespace
 
-#define CudaRTCheck(FUNC, previous_device)                                    \
-    {                                                                         \
-        const cudaError_t result = FUNC;                                      \
-        if (result != cudaSuccess)                                            \
-        {                                                                     \
-            std::cout << "CUDA exception (line " << __LINE__ << "): "         \
-                      << cudaGetErrorName(result) << " ("                     \
-                      << cudaGetErrorString(result) << ")" << std::endl;      \
-            cudaSetDevice(previous_device);                                   \
-            exit(1);                                                          \
-        }                                                                     \
-    }
+#define CudaRTCheck(FUNC, previous_device)                         \
+  {                                                                \
+    const cudaError_t result = FUNC;                               \
+    if (result != cudaSuccess) {                                   \
+      std::cout << "CUDA exception (line " << __LINE__             \
+                << "): " << cudaGetErrorName(result) << " ("       \
+                << cudaGetErrorString(result) << ")" << std::endl; \
+      cudaSetDevice(previous_device);                              \
+      exit(1);                                                     \
+    }                                                              \
+  }
 
 void
-CreateCUDAIPCHandle(cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
+CreateCUDAIPCHandle(
+    cudaIpcMemHandle_t* cuda_handle, void* input_d_ptr, int device_id = 0)
 {
   int previous_device;
   cudaGetDevice(&previous_device);
@@ -253,14 +252,12 @@ main(int argc, char** argv)
   cudaMemset((void*)output0_d_ptr, 0, output_byte_size * 2);
   output1_d_ptr = (int*)output0_d_ptr + 16;
 
-  cudaIpcMemHandle_t* output_cuda_handle;
-  std::cerr << "Creating output CUDA shm regions" << '\n';
-  CreateCUDAIPCHandle(output_cuda_handle, output0_d_ptr);
-  std::cerr << "Created output CUDA IPC regions" << '\n';
+  cudaIpcMemHandle_t output_cuda_handle;
+  CreateCUDAIPCHandle(&output_cuda_handle, (void*)output0_d_ptr);
 
   // Register Output shared memory with TRTIS
   err = shared_memory_ctx->CudaRegisterSharedMemory(
-      "output_data", output_cuda_handle, output_byte_size * 2);
+      "output_data", &output_cuda_handle, output_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory output region: "
               << err << std::endl;
@@ -287,24 +284,23 @@ main(int argc, char** argv)
   int input_data[32];
   for (size_t i = 0; i < 16; ++i) {
     input_data[i] = i;
-    input_data[16+i] = 1;
+    input_data[16 + i] = 1;
   }
 
-  // copy INPUT0 and INPUT1 data onto GPU
+  // copy INPUT0 and INPUT1 data in GPU shared memory
   int *input0_d_ptr, *input1_d_ptr;
   cudaMalloc((void**)&input0_d_ptr, input_byte_size * 2);
   cudaMemcpy(
       (void*)input0_d_ptr, (void*)input_data, input_byte_size * 2,
       cudaMemcpyHostToDevice);
+  input1_d_ptr = (int*)input0_d_ptr + 16;
 
-  cudaIpcMemHandle_t* input_cuda_handle;
-  std::cerr << "Creating input CUDA shm regions" << '\n';
-  CreateCUDAIPCHandle(input_cuda_handle, input0_d_ptr);
-  std::cerr << "Created input CUDA IPC regions" << '\n';
+  cudaIpcMemHandle_t input_cuda_handle;
+  CreateCUDAIPCHandle(&input_cuda_handle, (void*)input0_d_ptr);
 
   // Register Input shared memory with TRTIS
   err = shared_memory_ctx->CudaRegisterSharedMemory(
-      "input_data", input_cuda_handle, input_byte_size * 2);
+      "input_data", &input_cuda_handle, input_byte_size * 2);
   if (!err.IsOk()) {
     std::cerr << "error: unable to register shared memory input region: " << err
               << std::endl;
@@ -334,17 +330,29 @@ main(int argc, char** argv)
               << std::endl;
   }
 
-  for (size_t i = 0; i < 16; ++i) {
-    std::cout << input0_d_ptr[i] << " + " << input1_d_ptr[i] << " = "
-              << output0_d_ptr[i] << std::endl;
-    std::cout << input0_d_ptr[i] << " - " << input1_d_ptr[i] << " = "
-              << output1_d_ptr[i] << std::endl;
+  // Copy input and output data back to the CPU
+  int input0_data[16], input1_data[16];
+  int output0_data[16], output1_data[16];
+  cudaMemcpy(
+      input0_data, input0_d_ptr, input_byte_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(
+      input1_data, input1_d_ptr, input_byte_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(
+      output0_data, output0_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
+  cudaMemcpy(
+      output1_data, output1_d_ptr, output_byte_size, cudaMemcpyDeviceToHost);
 
-    if ((input0_d_ptr[i] + input1_d_ptr[i]) != output0_d_ptr[i]) {
+  for (size_t i = 0; i < 16; ++i) {
+    std::cout << input0_data[i] << " + " << input1_data[i] << " = "
+              << output0_data[i] << std::endl;
+    std::cout << input0_data[i] << " - " << input1_data[i] << " = "
+              << output1_data[i] << std::endl;
+
+    if ((input0_data[i] + input1_data[i]) != output0_data[i]) {
       std::cerr << "error: incorrect sum" << std::endl;
       exit(1);
     }
-    if ((input0_d_ptr[i] - input1_d_ptr[i]) != output1_d_ptr[i]) {
+    if ((input0_data[i] - input1_data[i]) != output1_data[i]) {
       std::cerr << "error: incorrect difference" << std::endl;
       exit(1);
     }
@@ -377,12 +385,8 @@ main(int argc, char** argv)
   // Cleanup cuda IPC handle and free GPU memory
   cudaIpcCloseMemHandle(input0_d_ptr);
   cudaFree(input0_d_ptr);
-  cudaIpcCloseMemHandle(input1_d_ptr);
-  cudaFree(input1_d_ptr);
   cudaIpcCloseMemHandle(output0_d_ptr);
   cudaFree(output0_d_ptr);
-  cudaIpcCloseMemHandle(output1_d_ptr);
-  cudaFree(output1_d_ptr);
 
   return 0;
 }

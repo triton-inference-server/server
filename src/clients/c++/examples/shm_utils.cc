@@ -33,7 +33,6 @@
 #include "src/clients/c++/examples/shm_utils.h"
 
 
-
 // namespace ni = nvidia::inferenceserver;
 // namespace nic = nvidia::inferenceserver::client;
 
@@ -101,5 +100,4 @@ UnmapSharedMemory(void* shm_addr, size_t byte_size)
   }
 }
 
-}
-}}
+}}}  // namespace nvidia::inferenceserver::client
