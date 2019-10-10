@@ -631,12 +631,13 @@ TRTISTF_TensorString(TRTISTF_Tensor* tensor, size_t idx)
 }
 
 void
-TRTISTF_TensorSetString(TRTISTF_Tensor* tensor, size_t idx, const char* cstr)
+TRTISTF_TensorSetString(
+    TRTISTF_Tensor* tensor, size_t idx, const char* cstr, size_t length)
 {
   TensorImpl* t = reinterpret_cast<TensorImpl*>(tensor);
   std::string str;
   if (cstr != nullptr) {
-    str = cstr;
+    str = std::string(cstr, length);
   }
 
   t->SetString(idx, str);

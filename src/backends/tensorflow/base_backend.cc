@@ -377,7 +377,7 @@ void
 FillStringTensor(TRTISTF_Tensor* tensor, const size_t idx, const size_t cnt)
 {
   for (size_t c = 0; c < cnt; ++c) {
-    TRTISTF_TensorSetString(tensor, idx + c, nullptr);
+    TRTISTF_TensorSetString(tensor, idx + c, nullptr, 0);
   }
 }
 
@@ -604,12 +604,10 @@ BaseBackend::Context::SetStringInputTensor(
         break;
       }
 
-      std::string str(content, len);
+      TRTISTF_TensorSetString(
+          tensor, tensor_element_idx + element_idx, content, len);
       content += len;
       content_byte_size -= len;
-
-      TRTISTF_TensorSetString(
-          tensor, tensor_element_idx + element_idx, str.c_str());
       element_idx++;
     }
 
