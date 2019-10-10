@@ -597,9 +597,11 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
+#if TRTIS_ENABLE_GPU
   Error CudaRegisterSharedMemory(
       const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
       size_t byte_size, int device_id) override;
+#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -656,6 +658,7 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
   return SendRequest("register", name, shm_key, offset, byte_size, 0);
 }
 
+#if TRTIS_ENABLE_GPU
 Error
 SharedMemoryControlHttpContextImpl::CudaRegisterSharedMemory(
     const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
@@ -664,6 +667,7 @@ SharedMemoryControlHttpContextImpl::CudaRegisterSharedMemory(
   return SendRequest(
       "cudaregister", name, cuda_shm_handle, 0, byte_size, device_id);
 }
+#endif  // TRTIS_ENABLE_GPU
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
@@ -724,10 +728,12 @@ SharedMemoryControlHttpContextImpl::SendRequest(
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size);
   } else if (action_str == "cudaregister") {
+#if TRTIS_ENABLE_GPU
     // TODO set cuda-shm_handle as raw bytes in body
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size) + "/" +
                 std::to_string(device_id);
+#endif  // TRTIS_ENABLE_GPU
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }

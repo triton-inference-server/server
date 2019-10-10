@@ -306,9 +306,11 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
   Error RegisterSharedMemory(
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
+#if TRTIS_ENABLE_GPU
   Error CudaRegisterSharedMemory(
       const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
       size_t byte_size, int device_id) override;
+#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
@@ -356,6 +358,7 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   }
 }
 
+#if TRTIS_ENABLE_GPU
 Error
 SharedMemoryControlGrpcContextImpl::CudaRegisterSharedMemory(
     const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
@@ -390,6 +393,7 @@ SharedMemoryControlGrpcContextImpl::CudaRegisterSharedMemory(
             status.error_message());
   }
 }
+#endif  // TRTIS_ENABLE_GPU
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(
