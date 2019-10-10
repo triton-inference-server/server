@@ -151,26 +151,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
 /// \param name A unique name for the shared memory block. This name
 /// is used in inference requests to refer to this shared memory
 /// block.
-/// \param handle_block_name The name of the system shared memory block
-/// containing the CUDA IPC handle.
-/// \param offset The offset within the CUDA shared memory object to the
-/// start of the block.
-/// \param byte_size The size, in bytes of the block.
-/// \param device id The GPU number the CUDA shared memory region is in.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
-    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset,
-    const size_t byte_size, const int device_id);
-
-/// Create a new shared memory block object referencing a CUDA shared
-/// memory block residing in TRTSERVER_MEMORY_GPU type memory.
-/// \param shared_memory_block Returns the new shared memory block object.
-/// \param name A unique name for the shared memory block. This name
-/// is used in inference requests to refer to this shared memory
-/// block.
-/// \param handle_block_name The name of the system shared memory block
-/// containing the CUDA IPC handle.
+/// \param cuda_shm_handle The CUDA IPC handle.
 /// \param byte_size The size, in bytes of the block.
 /// \param device_id The GPU number the CUDA shared memory region is in.
 /// \return a TRTSERVER_Error indicating success or failure.
@@ -826,8 +807,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
 /// \param server The inference server object.
 /// \param shared_memory_block The shared memory block to register.
 /// \return a TRTSERVER_Error indicating success or failure.
+#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaRegisterSharedMemory(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
+#endif  // TRTIS_ENABLE_GPU
 
 /// Unregister a shared memory block on the inference server. No
 /// operation is performed if the shared memory block is not

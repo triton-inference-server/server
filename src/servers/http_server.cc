@@ -745,7 +745,6 @@ HTTPAPIServer::HandleSharedMemoryControl(
 
   size_t offset = std::atoll(offset_str.c_str());
   size_t byte_size = std::atoll(byte_size_str.c_str());
-  int device_id = std::atoll(device_id_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
   TRTSERVER_SharedMemoryBlock* smb = nullptr;

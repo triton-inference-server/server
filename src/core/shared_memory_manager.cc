@@ -27,10 +27,6 @@
 
 #include "src/core/shared_memory_manager.h"
 
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>

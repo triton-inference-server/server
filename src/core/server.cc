@@ -390,6 +390,7 @@ InferenceServer::RegisterSharedMemory(
       name, shm_key, offset, byte_size);
 }
 
+#ifdef TRTIS_ENABLE_GPU
 Status
 InferenceServer::CudaRegisterSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
@@ -404,6 +405,7 @@ InferenceServer::CudaRegisterSharedMemory(
   return shared_memory_manager_->CudaRegisterSharedMemory(
       name, cuda_shm_handle, byte_size, device_id);
 }
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_GPU
 Status

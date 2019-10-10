@@ -88,11 +88,12 @@ class SharedMemoryManager {
       const std::string& name, const std::string& shm_key, const size_t offset,
       const size_t byte_size);
 
+#ifdef TRTIS_ENABLE_GPU
   /// Register a specified shared memory region if valid. If already registered
   /// return an ALREADY_EXISTS error.
   /// \param name The user-given name for the shared memory region to be
   /// registered.
-  /// \param cuda_shm_handle The unique memory handle to the location
+  /// \param cuda_shm_handle The unique memory handle to the location.
   /// in CUDA shared memory being registered.
   /// \param device id The GPU number the shared memory region is in. Ignored
   /// if CPU.
@@ -101,6 +102,7 @@ class SharedMemoryManager {
   Status CudaRegisterSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
+#endif  // TRTIS_ENABLE_GPU
 
 #ifdef TRTIS_ENABLE_GPU
   /// Register a specified shared memory region if valid. If already registered

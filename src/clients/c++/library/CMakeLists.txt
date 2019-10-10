@@ -81,6 +81,7 @@ add_library(
   $<TARGET_OBJECTS:model-config-library>
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
+  ${CUDA_OBJS}
 )
 add_library(
   TRTIS::request_static ALIAS request_static
