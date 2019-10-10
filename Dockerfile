@@ -108,7 +108,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git
 # Use a fixed commit after rel-0.5.0
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
-            git checkout a0ba25f98f210fa506300bb5040695e2b7a636a8 && \
+            git checkout af9dbb70f2eb9ef0baffab2e3325087d57f8f5c7 && \
             git submodule update --init --recursive)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
