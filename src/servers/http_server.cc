@@ -688,25 +688,37 @@ HTTPAPIServer::HandleSharedMemoryControl(
 
   size_t offset = std::atoll(offset_str.c_str());
   size_t byte_size = std::atoll(byte_size_str.c_str());
-  int device_id = std::atoll(device_id_str.c_str());
 
   TRTSERVER_Error* err = nullptr;
   TRTSERVER_SharedMemoryBlock* smb = nullptr;
 
   if (action_type_str == "register") {
     err = smb_manager_->Create(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size,
+        &smb, name.c_str(), shm_key.c_str(), nullptr, offset, byte_size,
         TRTSERVER_MEMORY_CPU, 0);
     if (err == nullptr) {
       err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
     }
   } else if (action_type_str == "cudaregister") {
+#if TRTIS_ENABLE_GPU
+    int device_id = std::atoll(device_id_str.c_str());
+    std::string empty_key = "";
+    // TODO
+    cudaIpcMemHandle_t* cuda_shm_handle = nullptr;
     err = smb_manager_->Create(
-        &smb, name.c_str(), shm_key.c_str(), offset, byte_size,
+        &smb, name.c_str(), empty_key.c_str(), cuda_shm_handle, 0, byte_size,
         TRTSERVER_MEMORY_GPU, device_id);
     if (err == nullptr) {
-      err = TRTSERVER_ServerRegisterSharedMemory(server_.get(), smb);
+      err = TRTSERVER_ServerCudaRegisterSharedMemory(server_.get(), smb);
     }
+#else
+    err = TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register CUDA shared memory region: '" + name +
+            "', GPUs not supported")
+            .c_str());
+#endif  // TRTIS_ENABLE_GPU
   } else if ((action_type_str == "unregister") && (remaining == "all")) {
     err = smb_manager_->Clear();
     if (err == nullptr) {

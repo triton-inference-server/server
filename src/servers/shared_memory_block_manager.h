@@ -47,6 +47,7 @@ class SharedMemoryBlockManager {
   /// \param name The name of the memory block.
   /// \param shm_key The name of the posix shared memory object
   /// containing the block of memory.
+  /// \param cuda_shm_handle The unique memory handle to the location.
   /// \param offset The offset within the shared memory object to the
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
@@ -55,10 +56,19 @@ class SharedMemoryBlockManager {
   /// \param device id The GPU number the shared memory region is in. Not
   /// required for CPU.
   /// \return a TRTSERVER_Error indicating success or failure.
+#if TRTIS_ENABLE_GPU
   TRTSERVER_Error* Create(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size,
+      const std::string& shm_key, const cudaIpcMemHandle_t* cuda_shm_handle,
+      const size_t offset, const size_t byte_size,
       const TRTSERVER_Memory_Type kind, const int device_id);
+#else
+  TRTSERVER_Error* Create(
+      TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
+      const std::string& shm_key, const void* cuda_shm_handle,
+      const size_t offset, const size_t byte_size,
+      const TRTSERVER_Memory_Type kind, const int device_id);
+#endif  // TRTIS_ENABLE_GPU  TRTSERVER_Error* Create(
 
   /// Get a named shared memory block. Return
   /// TRTSERVER_ERROR_NOT_FOUND if named block doesn't exist.

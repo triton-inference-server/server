@@ -153,16 +153,19 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
 /// block.
 /// \param handle_block_name The name of the system shared memory block
 /// containing the CUDA IPC handle.
-/// \param offset The offset within the CUDA shared memory object to the
-/// start of the block.
 /// \param byte_size The size, in bytes of the block.
-/// \param device id The GPU number the CUDA shared memory region is in.
+/// \param device_id The GPU number the CUDA shared memory region is in.
 /// \return a TRTSERVER_Error indicating success or failure.
+#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t cuda_shm_handle, const size_t offset,
-    const size_t byte_size, const int device_id);
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
+    const int device_id);
+#endif  // TRTIS_ENABLE_GPU
 
+/// \param kind Returns the kind of device the shared memory resides in.
+/// \param device_id Returns the GPU device id where shared memory region is.
+/// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryDevice(
     TRTSERVER_SharedMemoryBlock* shared_memory_block,
     TRTSERVER_Memory_Type* kind, int* device_id);
@@ -793,8 +796,10 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
 /// \param server The inference server object.
 /// \param shared_memory_block The shared memory block to register.
 /// \return a TRTSERVER_Error indicating success or failure.
+#ifdef TRTIS_ENABLE_GPU
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaRegisterSharedMemory(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
+#endif  // TRTIS_ENABLE_GPU
 
 /// Unregister a shared memory block on the inference server. No
 /// operation is performed if the shared memory block is not

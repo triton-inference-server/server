@@ -27,10 +27,6 @@
 
 #include "src/core/shared_memory_manager.h"
 
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -112,23 +108,13 @@ OpenCudaIPCRegion(
   // cudaGetDevice(&previous_device);
   // cudaSetDevice(shm_cuda_rep->device);
 
-  // allocate data on the gpu and read IPC data into it
-  cudaError_t err = cudaMalloc(data_ptr, byte_size);
-  if (err != cudaSuccess) {
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to allocate GPU memory with byte size " +
-            std::to_string(byte_size) + ": " +
-            std::string(cudaGetErrorString(err)));
-  }
-
-  err = cudaIpcOpenMemHandle(
+  // Open CUDA IPC handle and read data from it
+  cudaError_t err = cudaIpcOpenMemHandle(
       data_ptr, *cuda_shm_handle, cudaIpcMemLazyEnablePeerAccess);
   if (err != cudaSuccess) {
     return Status(
-        RequestStatusCode::INTERNAL,
-        "failed to get address from CUDA IPC handle: " +
-            std::string(cudaGetErrorString(err)));
+        RequestStatusCode::INTERNAL, "failed to open CUDA IPC handle: " +
+                                         std::string(cudaGetErrorString(err)));
   }
 
   // Set device to previous device
@@ -156,7 +142,7 @@ SharedMemoryManager::RegisterSharedMemory(
         "shared memory region '" + name + "' is already registered");
   }
 
-  // register (or re-register)
+  // register
   void* mapped_addr;
   int shm_fd = -1;
 
@@ -187,6 +173,7 @@ SharedMemoryManager::RegisterSharedMemory(
   return Status::Success;
 }
 
+#ifdef TRTIS_ENABLE_GPU
 Status
 SharedMemoryManager::CudaRegisterSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
@@ -203,9 +190,8 @@ SharedMemoryManager::CudaRegisterSharedMemory(
         "shared memory region '" + name + "' is already registered");
   }
 
-  // register (or re-register)
+  // register
   void* mapped_addr;
-#ifdef TRTIS_ENABLE_GPU
   // Get CUDA shared memory base address
   Status status = OpenCudaIPCRegion(
       const_cast<cudaIpcMemHandle_t*>(cuda_shm_handle), &mapped_addr,
@@ -219,15 +205,10 @@ SharedMemoryManager::CudaRegisterSharedMemory(
   shared_memory_map_.insert(std::make_pair(
       name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
                 name, "", 0, byte_size, -1, mapped_addr, 1, device_id))));
-#else
-  return Status(
-      RequestStatusCode::INVALID_ARG,
-      "failed to register CUDA shared memory region: '" + name +
-          "', GPUs not supported");
-#endif  // TRTIS_ENABLE_GPU
 
   return Status::Success;
 }
+#endif  // TRTIS_ENABLE_GPU
 
 Status
 SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
@@ -252,7 +233,13 @@ SharedMemoryManager::UnregisterSharedMemoryHelper(const std::string& name)
       }
     } else {
 #ifdef TRTIS_ENABLE_GPU
-      RETURN_IF_ERROR(cudaIpcCloseMemHandle(it->second->mapped_addr_));
+      cudaError_t err = cudaIpcCloseMemHandle(it->second->mapped_addr_);
+      if (err != cudaSuccess) {
+        return Status(
+            RequestStatusCode::INTERNAL,
+            "failed to close CUDA IPC handle: " +
+                std::string(cudaGetErrorString(err)));
+      }
 #else
       return Status(
           RequestStatusCode::INVALID_ARG,

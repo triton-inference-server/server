@@ -36,11 +36,21 @@ SharedMemoryBlockManager::~SharedMemoryBlockManager()
   }
 }
 
+#if TRTIS_ENABLE_GPU
 TRTSERVER_Error*
 SharedMemoryBlockManager::Create(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    const std::string& shm_key, const cudaIpcMemHandle_t* cuda_shm_handle,
+    const size_t offset, const size_t byte_size,
     const TRTSERVER_Memory_Type kind, const int device_id)
+#else
+TRTSERVER_Error*
+SharedMemoryBlockManager::Create(
+    TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
+    const std::string& shm_key, const void* cuda_shm_handle,
+    const size_t offset, const size_t byte_size,
+    const TRTSERVER_Memory_Type kind, const int device_id)
+#endif  // TRTIS_ENABLE_GPU
 {
   *smb = nullptr;
 
@@ -55,8 +65,10 @@ SharedMemoryBlockManager::Create(
     RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockCpuNew(
         smb, name.c_str(), shm_key.c_str(), offset, byte_size));
   } else {
+#if TRTIS_ENABLE_GPU
     RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockGpuNew(
-        smb, name.c_str(), shm_key.c_str(), offset, byte_size, device_id));
+        smb, name.c_str(), cuda_shm_handle, byte_size, device_id));
+#endif  // TRTIS_ENABLE_GPU
   }
 
   blocks_.emplace(name, *smb);
