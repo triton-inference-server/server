@@ -56,9 +56,17 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_object_object_object $DATADIR/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_nobatch_object_object_object $DATADIR/
 
-# Copy a variable-shape model
+# Copy a variable-shape models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_object_int32_int32 $DATADIR/
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/graphdef_int32_int32_float32 $DATADIR/
+
+# Copying ensemble including a sequential model
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/savedmodel_sequence_float32 $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/simple_savedmodel_sequence_float32 $DATADIR
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequence_model_repository/nop_TYPE_FP32_-1 $DATADIR
+
+mkdir $DATADIR/nop_TYPE_FP32_-1/1
+cp libidentity.so $DATADIR/nop_TYPE_FP32_-1/1/
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -196,6 +204,22 @@ set -e
 set +e
 $PERF_CLIENT -v -i grpc -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+# Testing with ensemble and sequential model variants
+set +e
+$PERF_CLIENT -v -i grpc -m  simple_savedmodel_sequence_float32 -p 20000 -t5 --streaming \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
