@@ -69,6 +69,7 @@ class PinnedMemoryManagerImpl : public PinnedMemoryManager {
   std::map<void*, std::pair<bool, uint64_t>> memory_info_;
 
   void* pinned_memory_buffer_;
+  std::mutex buffer_mtx_;
   boost::interprocess::managed_external_buffer managed_pinned_memory_;
 };
 
@@ -81,13 +82,12 @@ PinnedMemoryManagerImpl::Create(
   auto err = cudaHostAlloc(
       &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
   if (err != cudaSuccess) {
-    // set to nullptr on error to avoid freeing invalid pointer
-    buffer = nullptr;
     return Status(
         RequestStatusCode::INTERNAL,
         "failed to allocate pinned system memory: " +
             std::string(cudaGetErrorString(err)));
   }
+  LOG_VERBOSE(1) << "Pinned memory pool is created at '" << PointerToString(buffer) << "' with size " << options.pinned_memory_pool_byte_size_;
 #endif  // TRTIS_ENABLE_GPU
   manager->reset(new PinnedMemoryManagerImpl(
       buffer, options.pinned_memory_pool_byte_size_));
@@ -99,9 +99,11 @@ PinnedMemoryManagerImpl::PinnedMemoryManagerImpl(
     : pinned_memory_buffer_(pinned_memory_buffer)
 {
   if (pinned_memory_buffer_ != nullptr) {
-    // [TODO] check if we need to configure 'size_type'
     managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
         boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
+    // Sanity check on whether we need to configure 'size_type'
+    LOG_VERBOSE(1) << "Memory at '" << PointerToString(managed_pinned_memory_.get_address()) << "' with size " <<
+        managed_pinned_memory_.get_size() << " is being managed";
   }
 }
 
@@ -110,9 +112,7 @@ PinnedMemoryManagerImpl::~PinnedMemoryManagerImpl()
   // Clean up
   for (const auto& memory_info : memory_info_) {
     const auto& is_pinned = memory_info.second.first;
-    if (is_pinned) {
-      managed_pinned_memory_.deallocate(memory_info.first);
-    } else {
+    if (!is_pinned) {
       free(memory_info.first);
     }
   }
@@ -129,6 +129,7 @@ PinnedMemoryManagerImpl::AllocInternal(
 {
   auto status = Status::Success;
   if (pinned_memory_buffer_ != nullptr) {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
     *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t{});
     if (*ptr == nullptr) {
       status = Status(
@@ -179,6 +180,7 @@ PinnedMemoryManagerImpl::AllocInternal(
 
   if ((!status.IsOk()) && (*ptr != nullptr)) {
     if (is_pinned) {
+      std::lock_guard<std::mutex> lk(buffer_mtx_);
       managed_pinned_memory_.deallocate(*ptr);
     } else {
       free(*ptr);
@@ -211,6 +213,7 @@ PinnedMemoryManagerImpl::FreeInternal(void* ptr)
   }
 
   if (is_pinned) {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
     managed_pinned_memory_.deallocate(ptr);
   } else {
     free(ptr);
