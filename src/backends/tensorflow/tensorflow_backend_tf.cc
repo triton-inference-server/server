@@ -284,10 +284,10 @@ NewSessionOptions(
   }
 }
 
-// Get the device and its name in model session given a non-negative device_id.
+// Get the device name in model session given a non-negative device_id.
 TRTISTF_Error*
-GetTFGPUDevice(
-    std::string* device_name, tensorflow::Device** device,
+GetTFGPUDeviceName(
+    std::string* device_name,
     tensorflow::Session* session, const int device_id)
 {
   if (device_id >= 0) {
@@ -300,10 +300,6 @@ GetTFGPUDevice(
         tensorflow::DeviceNameUtils::ParsedName parsed;
         if (tensorflow::DeviceNameUtils::ParseFullName(d.name(), &parsed)) {
           if (parsed.id == device_id) {
-            const tensorflow::DeviceMgr* device_mgr;
-            RETURN_IF_TF_ERROR(session->LocalDeviceManager(&device_mgr));
-            RETURN_IF_TF_ERROR(device_mgr->LookupDevice(d.name(), device));
-
             *device_name = d.name();
             break;
           }
@@ -429,11 +425,11 @@ class ModelImpl {
       const std::string& model_name,
       std::unique_ptr<tensorflow::SavedModelBundle> bundle,
       TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-      const std::string& device_name, tensorflow::Device* device);
+      const std::string& device_name);
   ModelImpl(
       const std::string& model_name, tensorflow::Session* session,
       TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-      const std::string& device_name, tensorflow::Device* device);
+      const std::string& device_name);
   ~ModelImpl();
 
   TRTISTF_IOList* Inputs() const { return inputs_; }
@@ -457,7 +453,6 @@ class ModelImpl {
   // Variables for callable
   bool has_callable_;
   std::string device_name_;
-  tensorflow::Device* device_;
   tensorflow::Session::CallableHandle callable_;
   // RunCallable will return all outputs specified in callable option in order,
   // using map to quickly locate the requested output for each request.
@@ -468,10 +463,9 @@ ModelImpl::ModelImpl(
     const std::string& model_name,
     std::unique_ptr<tensorflow::SavedModelBundle> bundle,
     TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-    const std::string& device_name, tensorflow::Device* device)
+    const std::string& device_name)
     : model_name_(model_name), bundle_(std::move(bundle)), inputs_(inputs),
-      outputs_(outputs), has_callable_(false), device_name_(device_name),
-      device_(device)
+      outputs_(outputs), has_callable_(false), device_name_(device_name)
 {
   session_ = bundle_->session.release();
 }
@@ -481,8 +475,7 @@ ModelImpl::ModelImpl(
     TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
     const std::string& device_name, tensorflow::Device* device)
     : model_name_(model_name), session_(session), inputs_(inputs),
-      outputs_(outputs), has_callable_(false), device_name_(device_name),
-      device_(device)
+      outputs_(outputs), has_callable_(false), device_name_(device_name)
 {
 }
 
@@ -549,10 +542,11 @@ ModelImpl::Run(
       *output_tensors = TRTISTF_TensorListNew(tensor, *output_tensors);
     }
 
-    // Have to sync device to ensure output tensors are ready,
-    // because the Callable is created with 'fetch_skip_sync = true'
-    // (false is not implemented).
-    device_->Sync();
+    // Callable documentation suggested caller to use Device::Sync() to ensure
+    // that GPU outputs are ready. But it appears that in the default setting,
+    // TensorFlow will issue the Sync() call at the end of execution, so we
+    // won't do it twice. Ref:
+    // https://github.com/tensorflow/tensorflow/blob/master/tensorflow/core/common_runtime/executor.cc#L2578
   } else {
     std::vector<std::pair<std::string, tensorflow::Tensor>> tfinputs;
 
@@ -866,19 +860,17 @@ TRTISTF_ModelCreateFromGraphDef(
   }
 
   std::string device_name;
-  tensorflow::Device* device = nullptr;
   if ((device_id != TRTISTF_MODEL_DEVICE)
     &&(device_id != TRTISTF_NO_GPU_DEVICE))
     {
       TRTISTF_Error* err =
-          GetTFGPUDevice(&device_name, &device, session, device_id);
+          GetTFGPUDeviceName(&device_name, session, device_id);
       if (err != nullptr) {
         return err;
       }
     }
   ModelImpl* model = new ModelImpl(
-      model_name, session, potential_inputs, potential_outputs, device_name,
-      device);
+      model_name, session, potential_inputs, potential_outputs, device_name);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
@@ -1030,18 +1022,17 @@ TRTISTF_ModelCreateFromSavedModel(
   }
 
   std::string device_name;
-  tensorflow::Device* device = nullptr;
   if ((device_id != TRTISTF_MODEL_DEVICE)
     &&(device_id != TRTISTF_NO_GPU_DEVICE))
     {
-      TRTISTF_Error* err = GetTFGPUDevice(
-          &device_name, &device, bundle->session.get(), device_id);
+      TRTISTF_Error* err = GetTFGPUDeviceName(
+          &device_name, bundle->session.get(), device_id);
       if (err != nullptr) {
         return err;
       }
     }
   ModelImpl* model = new ModelImpl(
-      model_name, std::move(bundle), inputs, outputs, device_name, device);
+      model_name, std::move(bundle), inputs, outputs, device_name);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
 
   return nullptr;
