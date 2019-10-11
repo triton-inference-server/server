@@ -485,7 +485,7 @@ message ModelOptimizationPolicy
     //@@    .. cpp:var:: Accelerator gpu_execution_accelerator (repeated)
     //@@
     //@@       The preferred execution provider to be used if the model instance
-    //@@       is deployed on GPU. 
+    //@@       is deployed on GPU.
     //@@
     //@@       For ONNX Runtime backend, possible value is "tensorrt" as name,
     //@@       and no parameters are required.

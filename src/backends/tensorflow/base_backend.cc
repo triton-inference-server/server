@@ -304,8 +304,8 @@ BaseBackend::CreateExecutionContext(
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
 
-  
-  if (context->input_device_id_ != Context::MODEL_DEVICE) { 
+
+  if (context->input_device_id_ != Context::MODEL_DEVICE) {
     const size_t num_inputs = Config().input_size();
     const size_t num_outputs = Config().output_size();
     std::vector<const char*> input_names, output_names;

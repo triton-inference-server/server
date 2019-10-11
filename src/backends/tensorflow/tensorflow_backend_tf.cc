@@ -287,8 +287,7 @@ NewSessionOptions(
 // Get the device name in model session given a non-negative device_id.
 TRTISTF_Error*
 GetTFGPUDeviceName(
-    std::string* device_name,
-    tensorflow::Session* session, const int device_id)
+    std::string* device_name, tensorflow::Session* session, const int device_id)
 {
   if (device_id >= 0) {
     std::vector<tensorflow::DeviceAttributes> devices;
@@ -860,15 +859,13 @@ TRTISTF_ModelCreateFromGraphDef(
   }
 
   std::string device_name;
-  if ((device_id != TRTISTF_MODEL_DEVICE)
-    &&(device_id != TRTISTF_NO_GPU_DEVICE))
-    {
-      TRTISTF_Error* err =
-          GetTFGPUDeviceName(&device_name, session, device_id);
-      if (err != nullptr) {
-        return err;
-      }
+  if ((device_id != TRTISTF_MODEL_DEVICE) &&
+      (device_id != TRTISTF_NO_GPU_DEVICE)) {
+    TRTISTF_Error* err = GetTFGPUDeviceName(&device_name, session, device_id);
+    if (err != nullptr) {
+      return err;
     }
+  }
   ModelImpl* model = new ModelImpl(
       model_name, session, potential_inputs, potential_outputs, device_name);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
@@ -1022,15 +1019,14 @@ TRTISTF_ModelCreateFromSavedModel(
   }
 
   std::string device_name;
-  if ((device_id != TRTISTF_MODEL_DEVICE)
-    &&(device_id != TRTISTF_NO_GPU_DEVICE))
-    {
-      TRTISTF_Error* err = GetTFGPUDeviceName(
-          &device_name, bundle->session.get(), device_id);
-      if (err != nullptr) {
-        return err;
-      }
+  if ((device_id != TRTISTF_MODEL_DEVICE) &&
+      (device_id != TRTISTF_NO_GPU_DEVICE)) {
+    TRTISTF_Error* err =
+        GetTFGPUDeviceName(&device_name, bundle->session.get(), device_id);
+    if (err != nullptr) {
+      return err;
     }
+  }
   ModelImpl* model = new ModelImpl(
       model_name, std::move(bundle), inputs, outputs, device_name);
   *trtistf_model = reinterpret_cast<TRTISTF_Model*>(model);
