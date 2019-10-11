@@ -56,7 +56,7 @@ class PinnedMemoryManagerImpl : public PinnedMemoryManager {
   static Status Create(
       std::unique_ptr<PinnedMemoryManager>* manager, const Options& options);
 
-  ~PinnedMemoryManagerImpl() = default;
+  ~PinnedMemoryManagerImpl();
 
   Status AllocInternal(
       void** ptr, uint64_t size,
@@ -101,7 +101,7 @@ PinnedMemoryManagerImpl::PinnedMemoryManagerImpl(
   if (pinned_memory_buffer_ != nullptr) {
     // [TODO] check if we need to configure 'size_type'
     managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
-        boost::interprocess::create_only_t, pinned_memory_buffer_, size);
+        boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
   }
 }
 
@@ -125,11 +125,11 @@ PinnedMemoryManagerImpl::~PinnedMemoryManagerImpl()
 
 Status
 PinnedMemoryManagerImpl::AllocInternal(
-    void** ptr, uint64_t size, bool allow_nonpinned_fallback = false)
+    void** ptr, uint64_t size, bool allow_nonpinned_fallback)
 {
   auto status = Status::Success;
   if (pinned_memory_buffer_ != nullptr) {
-    *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t);
+    *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t{});
     if (*ptr == nullptr) {
       status = Status(
           RequestStatusCode::INTERNAL,
@@ -198,10 +198,10 @@ PinnedMemoryManagerImpl::FreeInternal(void* ptr)
     if (it != memory_info_.end()) {
       is_pinned = it->second.first;
       const auto& size = it->second.second;
-      memory_info_.erase(it);
       LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
                      << "pinned memory deallocation: "
-                     << "addr " << ptr;
+                     << "size " << size << ", addr " << ptr;
+      memory_info_.erase(it);
     } else {
       return Status(
           RequestStatusCode::INTERNAL, "unexpected memory address '" +
