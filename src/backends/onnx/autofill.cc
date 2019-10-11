@@ -313,10 +313,10 @@ AutoFillOnnx::Create(
   RETURN_IF_ORT_ERROR(ort_api->CreateSessionOptions(&session_options));
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, &ort_api->ReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(ort_api->SetSessionThreadPoolSize(session_options, 1));
-  RETURN_IF_ORT_ERROR(
-      ort_api->SetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
+      session_options, ort_api->ReleaseSessionOptions);
+  RETURN_IF_ORT_ERROR(ort_api->SetIntraOpNumThreads(session_options, 1));
+  RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
+      session_options, ORT_DISABLE_ALL));
 
   OrtSession* session;
 

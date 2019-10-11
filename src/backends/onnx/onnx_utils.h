@@ -38,9 +38,9 @@ extern const OrtApi* ort_api;
   do {                                                                   \
     OrtStatus* status__ = (S);                                           \
     if (status__ != nullptr) {                                           \
-      OrtErrorCode code = ort_api->GetErrorCode(status__);                     \
-      std::string msg = std::string(ort_api->GetErrorMessage(status__));       \
-      ort_api->ReleaseStatus(status__);                                        \
+      OrtErrorCode code = ort_api->GetErrorCode(status__);               \
+      std::string msg = std::string(ort_api->GetErrorMessage(status__)); \
+      ort_api->ReleaseStatus(status__);                                  \
       return Status(                                                     \
           RequestStatusCode::INTERNAL, "onnx runtime error " +           \
                                            std::to_string(code) + ": " + \

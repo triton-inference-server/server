@@ -87,11 +87,11 @@ OnnxBackend::CreateExecutionContexts(
   RETURN_IF_ORT_ERROR(ort_api->CreateSessionOptions(&session_options));
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, &ort_api->ReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(ort_api->SetSessionThreadPoolSize(session_options, 1));
+      session_options, ort_api->ReleaseSessionOptions);
+  RETURN_IF_ORT_ERROR(ort_api->SetIntraOpNumThreads(session_options, 1));
   // disable graph optimization
-  RETURN_IF_ORT_ERROR(
-      ort_api->SetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
+  RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
+      session_options, ORT_DISABLE_ALL));
 
   Status status = CreateExecutionContextsHelper(session_options, models);
 
@@ -208,7 +208,7 @@ OnnxBackend::CreateExecutionContext(
       ort_api->CloneSessionOptions(base_session_options, &session_options));
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, &ort_api->ReleaseSessionOptions);
+      session_options, ort_api->ReleaseSessionOptions);
 
   // Set execution execution_accelerators (execution providers in ONNX Runtime)
   if (gpu_device != Context::NO_GPU_DEVICE) {
@@ -263,8 +263,9 @@ OnnxBackend::CreateExecutionContext(
       if (execution_accelerator.name() == kOpenVINOExecutionAccelerator) {
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
-        RETURN_IF_ORT_ERROR(ort_api->SessionOptionsAppendExecutionProvider_OpenVINO(
-            session_options, "CPU"));
+        RETURN_IF_ORT_ERROR(
+            ort_api->SessionOptionsAppendExecutionProvider_OpenVINO(
+                session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
                        << instance_name << " on device CPU";
 #else
@@ -291,7 +292,8 @@ OnnxBackend::CreateExecutionContext(
 
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
-  RETURN_IF_ORT_ERROR(ort_api->GetAllocatorWithDefaultOptions(&context->allocator_));
+  RETURN_IF_ORT_ERROR(
+      ort_api->GetAllocatorWithDefaultOptions(&context->allocator_));
 
   // If this is a sequence model then make sure that the required
   // inputs are present in the model and have the correct shape and
@@ -795,10 +797,11 @@ OnnxBackend::Context::ReadOutputTensors(
     OrtTypeInfo* typeinfo;
     RETURN_IF_ORT_ERROR(ort_api->GetTypeInfo(output_tensor, &typeinfo));
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
-        typeinfo, &ort_api->ReleaseTypeInfo);
+        typeinfo, ort_api->ReleaseTypeInfo);
 
     const OrtTensorTypeAndShapeInfo* type_and_shape;
-    RETURN_IF_ORT_ERROR(ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
+    RETURN_IF_ORT_ERROR(
+        ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
     std::vector<int64_t> content_shape;
 

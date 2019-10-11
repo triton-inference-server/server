@@ -52,9 +52,11 @@ InputOutputNames(
   for (size_t i = 0; i < num_nodes; i++) {
     char* node_name;
     if (is_input) {
-      onnx_status = ort_api->SessionGetInputName(session, i, allocator, &node_name);
+      onnx_status =
+          ort_api->SessionGetInputName(session, i, allocator, &node_name);
     } else {
-      onnx_status = ort_api->SessionGetOutputName(session, i, allocator, &node_name);
+      onnx_status =
+          ort_api->SessionGetOutputName(session, i, allocator, &node_name);
     }
 
     if (onnx_status != nullptr) {
@@ -85,7 +87,8 @@ InputOutputInfos(
   for (size_t i = 0; i < num_nodes; i++) {
     char* name;
     if (is_input) {
-      RETURN_IF_ORT_ERROR(ort_api->SessionGetInputName(session, i, allocator, &name));
+      RETURN_IF_ORT_ERROR(
+          ort_api->SessionGetInputName(session, i, allocator, &name));
     } else {
       RETURN_IF_ORT_ERROR(
           ort_api->SessionGetOutputName(session, i, allocator, &name));
@@ -93,15 +96,18 @@ InputOutputInfos(
 
     OrtTypeInfo* typeinfo;
     if (is_input) {
-      RETURN_IF_ORT_ERROR(ort_api->SessionGetInputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(
+          ort_api->SessionGetInputTypeInfo(session, i, &typeinfo));
     } else {
-      RETURN_IF_ORT_ERROR(ort_api->SessionGetOutputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(
+          ort_api->SessionGetOutputTypeInfo(session, i, &typeinfo));
     }
 
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
-        typeinfo, &ort_api->ReleaseTypeInfo);
+        typeinfo, ort_api->ReleaseTypeInfo);
     const OrtTensorTypeAndShapeInfo* tensor_info;
-    RETURN_IF_ORT_ERROR(ort_api->CastTypeInfoToTensorInfo(typeinfo, &tensor_info));
+    RETURN_IF_ORT_ERROR(
+        ort_api->CastTypeInfoToTensorInfo(typeinfo, &tensor_info));
 
     ONNXTensorElementDataType type;
     RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(tensor_info, &type));

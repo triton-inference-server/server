@@ -46,8 +46,10 @@ OnnxLoader::Init()
 {
   if (loader == nullptr) {
     OrtEnv* env;
-    // If needed, provide custom logger with ort_api->CreateEnvWithCustomLogger()
-    OrtStatus* status = ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
+    // If needed, provide custom logger with
+    // ort_api->CreateEnvWithCustomLogger()
+    OrtStatus* status =
+        ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
     loader = new OnnxLoader(env);
     RETURN_IF_ORT_ERROR(status);
   } else {
