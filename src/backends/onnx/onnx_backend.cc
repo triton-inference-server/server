@@ -222,21 +222,11 @@ OnnxBackend::CreateExecutionContext(
                .execution_accelerators()
                .gpu_execution_accelerator()) {
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
-          if (gpu_device == 0) {
-            RETURN_IF_ORT_ERROR(
-                OrtSessionOptionsAppendExecutionProvider_Tensorrt(
-                    session_options, gpu_device));
-            LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
-                           << instance_name << " on device " << gpu_device;
-          } else {
-            // [DLIS-729] For TensorRT, only deploy it on gpu 0 as deploying on
-            // other devices will cause segfault
-            // https://github.com/microsoft/onnxruntime/issues/1881
-            return Status(
-                RequestStatusCode::INVALID_ARG,
-                "Setting TensorRT Execution Accelerator for device other than "
-                "device 0 is not supported");
-          }
+          RETURN_IF_ORT_ERROR(
+              OrtSessionOptionsAppendExecutionProvider_Tensorrt(
+                  session_options, gpu_device));
+          LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
+                          << instance_name << " on device " << gpu_device;
         } else {
           return Status(
               RequestStatusCode::INVALID_ARG,
