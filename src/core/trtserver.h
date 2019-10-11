@@ -163,13 +163,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
     const int device_id);
 #endif  // TRTIS_ENABLE_GPU
 
-/// \param kind Returns the kind of device the shared memory resides in.
-/// \param device_id Returns the GPU device id where shared memory region is.
-/// \return a TRTSERVER_Error indicating success or failure.
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryDevice(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    TRTSERVER_Memory_Type* kind, int* device_id);
-
 /// Delete a shared memory block object.
 /// \param shared_memory_block The object to delete.
 /// \return a TRTSERVER_Error indicating success or failure.

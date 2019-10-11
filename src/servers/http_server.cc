@@ -282,8 +282,10 @@ class HTTPAPIServer : public HTTPServerImpl {
   void HandleSharedMemoryControl(
       evhtp_request_t* req, const std::string& sharedmemorycontrol_uri);
 
+#if TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToCudaHandle(
       evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle);
+#endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* EVBufferToInput(
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
@@ -629,6 +631,7 @@ HTTPAPIServer::HandleModelControl(
   TRTSERVER_ErrorDelete(err);
 }
 
+#if TRTIS_ENABLE_GPU
 TRTSERVER_Error*
 HTTPAPIServer::EVBufferToCudaHandle(
     evbuffer* handle_buffer, cudaIpcMemHandle_t** cuda_shm_handle)
@@ -663,6 +666,7 @@ HTTPAPIServer::EVBufferToCudaHandle(
 
   return nullptr;  // success
 }
+#endif  // TRTIS_ENABLE_GPU
 
 void
 HTTPAPIServer::HandleSharedMemoryControl(
@@ -954,14 +958,11 @@ HTTPAPIServer::EVBufferToInput(
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           server_.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
-      TRTSERVER_Memory_Type kind;
-      int device_id;
-      RETURN_IF_ERR(TRTSERVER_SharedMemoryDevice(smb, &kind, &device_id));
 
       output_shm_map.emplace(
-          io.name(), std::make_tuple(
-                         static_cast<const void*>(base),
-                         io.shared_memory().byte_size(), kind, device_id));
+          io.name(),
+          std::make_pair(
+              static_cast<const void*>(base), io.shared_memory().byte_size()));
     }
   }
 

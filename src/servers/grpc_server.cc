@@ -134,8 +134,6 @@ struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
-    TRTSERVER_Memory_Type kind;
-    int device_id;
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
@@ -738,18 +736,14 @@ InferAllocatorPayload(
         alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
       }
 
-      TRTSERVER_Memory_Type kind;
-      int device_id;
-      RETURN_IF_ERR(TRTSERVER_SharedMemoryDevice(smb, &kind, &device_id));
-
       void* base;
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
 
       alloc_payload->shm_map_->emplace(
-          io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
-                                           kind, device_id});
+          io.name(),
+          AllocPayload::ShmInfo{base, io.shared_memory().byte_size()});
     }
   }
 
