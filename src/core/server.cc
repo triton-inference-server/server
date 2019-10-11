@@ -89,6 +89,7 @@ InferenceServer::InferenceServer()
   strict_model_config_ = true;
   strict_readiness_ = true;
   exit_timeout_secs_ = 30;
+  pinned_memory_pool_size_ = 1 << 28;
 
   tf_soft_placement_enabled_ = true;
   tf_gpu_memory_fraction_ = 0.0;
