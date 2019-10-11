@@ -115,7 +115,7 @@ ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
-    ${SCRIPT_DIR}/install_ubuntu.sh -o 18.04 && ${SCRIPT_DIR}/install_deps.sh
+    ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
 
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
