@@ -611,6 +611,9 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
 
  private:
+#if TRTIS_ENABLE_GPU
+   static size_t RequestProvider(void*, size_t, size_t, void*);
+#endif  // TRTIS_ENABLE_GPU
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
@@ -632,7 +635,35 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
 
   // Serialized SharedMemoryStatus response from server.
   std::string response_;
+
+  // Serialized cuda ipc handle
+  struct SerialCudaHandle {
+    SerialCudaHandle(const char* ptr, size_t bytes) : ptr_(ptr), bytes_(bytes)
+    {
+    }
+    const char* ptr_;
+    size_t bytes_;
+  };
 };
+
+#if TRTIS_ENABLE_GPU
+size_t
+SharedMemoryControlHttpContextImpl::RequestProvider(
+    void* contents, size_t size, size_t nmemb, void* userp)
+{
+  SerialCudaHandle* serialized_cuda_handle =
+      reinterpret_cast<SerialCudaHandle*>(userp);
+  size_t handle_byte_size = sizeof(cudaIpcMemHandle_t);
+
+  if (serialized_cuda_handle->bytes_) {
+    memcpy(contents, serialized_cuda_handle->ptr_, handle_byte_size);
+    serialized_cuda_handle->bytes_ -= handle_byte_size;
+    return handle_byte_size;
+  }
+
+  return 0;
+}
+#endif  // TRTIS_ENABLE_GPU
 
 size_t
 SharedMemoryControlHttpContextImpl::ResponseHandler(
@@ -668,8 +699,90 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
-  return SendRequest(
-      "cudaregister", name, cuda_shm_handle, 0, byte_size, device_id);
+  response_.clear();
+  request_status_.Clear();
+
+  if (!curl_global.Status().IsOk()) {
+    return curl_global.Status();
+  }
+
+  CURL* curl = curl_easy_init();
+  if (!curl) {
+    return Error(
+        RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
+  }
+
+  // TODO set cuda-shm_handle as raw bytes in body
+  std::string full_url = url_ + "/" + action_str + "/" + name + "/" +
+                         std::to_string(byte_size) + "/" +
+                         std::to_string(device_id);
+  full_url += "?format=binary";
+
+  curl_easy_setopt(curl, CURLOPT_URL, full_url.c_str());
+  curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+  curl_easy_setopt(curl, CURLOPT_POST, 1L);
+  curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
+
+  const long buffer_byte_size = 16 * 1024 * 1024;
+  curl_easy_setopt(curl, CURLOPT_UPLOAD_BUFFERSIZE, buffer_byte_size);
+  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
+
+  // use POST method
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
+  if (verbose_) {
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  }
+
+  // request data provided by RequestProvider()
+  SerialCudaHandle serial_cuda_handle(
+      reinterpret_cast<char*>(cuda_shm_handle), sizeof(cudaIpcMemHandle_t));
+  curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
+  curl_easy_setopt(curl, CURLOPT_READDATA, serial_cuda_handle);
+
+  // response headers handled by ResponseHeaderHandler()
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);
+  curl_easy_setopt(curl, CURLOPT_HEADERDATA, this);
+
+  // Response data handled by ResponseHandler()
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, ResponseHandler);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
+
+  // Add custom headers...
+  struct curl_slist* header_list = nullptr;
+  for (const auto& pr : headers_) {
+    std::string hdr = pr.first + ": " + pr.second;
+    header_list = curl_slist_append(header_list, hdr.c_str());
+  }
+
+  if (header_list != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_list);
+  }
+
+  CURLcode res = curl_easy_perform(curl);
+  if (res != CURLE_OK) {
+    curl_slist_free_all(header_list);
+    curl_easy_cleanup(curl);
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "HTTP client failed: " + std::string(curl_easy_strerror(res)));
+  }
+
+  // Must use long with curl_easy_getinfo
+  long http_code;
+  curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+  curl_slist_free_all(header_list);
+  curl_easy_cleanup(curl);
+
+  // Should have a request status, if not then create an error status.
+  if (request_status_.code() == RequestStatusCode::INVALID) {
+    request_status_.Clear();
+    request_status_.set_code(RequestStatusCode::INTERNAL);
+    request_status_.set_msg(
+        "sharedmemorycontrol request did not return status");
+  }
+
+  return Error(request_status_);
 }
 #endif  // TRTIS_ENABLE_GPU
 
@@ -731,13 +844,6 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (action_str == "register") {
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size);
-  } else if (action_str == "cudaregister") {
-#if TRTIS_ENABLE_GPU
-    // TODO set cuda-shm_handle as raw bytes in body
-    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
-                "/" + std::to_string(byte_size) + "/" +
-                std::to_string(device_id);
-#endif  // TRTIS_ENABLE_GPU
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }
