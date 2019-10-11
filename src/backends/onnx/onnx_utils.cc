@@ -28,6 +28,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+const OrtApi* ort_api = OrtGetApi(ORT_API_VERSION);
+
 namespace {
 
 Status
@@ -38,21 +40,21 @@ InputOutputNames(
 
   size_t num_nodes;
   if (is_input) {
-    RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session, &num_nodes));
+    RETURN_IF_ORT_ERROR(ort_api->SessionGetInputCount(session, &num_nodes));
   } else {
-    RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session, &num_nodes));
+    RETURN_IF_ORT_ERROR(ort_api->SessionGetOutputCount(session, &num_nodes));
   }
 
   // iterate over all input / output nodes
   OrtAllocator* allocator;
-  RETURN_IF_ORT_ERROR(OrtGetAllocatorWithDefaultOptions(&allocator));
+  RETURN_IF_ORT_ERROR(ort_api->GetAllocatorWithDefaultOptions(&allocator));
   OrtStatus* onnx_status = nullptr;
   for (size_t i = 0; i < num_nodes; i++) {
     char* node_name;
     if (is_input) {
-      onnx_status = OrtSessionGetInputName(session, i, allocator, &node_name);
+      onnx_status = ort_api->SessionGetInputName(session, i, allocator, &node_name);
     } else {
-      onnx_status = OrtSessionGetOutputName(session, i, allocator, &node_name);
+      onnx_status = ort_api->SessionGetOutputName(session, i, allocator, &node_name);
     }
 
     if (onnx_status != nullptr) {
@@ -74,42 +76,42 @@ InputOutputInfos(
 
   size_t num_nodes;
   if (is_input) {
-    RETURN_IF_ORT_ERROR(OrtSessionGetInputCount(session, &num_nodes));
+    RETURN_IF_ORT_ERROR(ort_api->SessionGetInputCount(session, &num_nodes));
   } else {
-    RETURN_IF_ORT_ERROR(OrtSessionGetOutputCount(session, &num_nodes));
+    RETURN_IF_ORT_ERROR(ort_api->SessionGetOutputCount(session, &num_nodes));
   }
 
   // iterate over all nodes
   for (size_t i = 0; i < num_nodes; i++) {
     char* name;
     if (is_input) {
-      RETURN_IF_ORT_ERROR(OrtSessionGetInputName(session, i, allocator, &name));
+      RETURN_IF_ORT_ERROR(ort_api->SessionGetInputName(session, i, allocator, &name));
     } else {
       RETURN_IF_ORT_ERROR(
-          OrtSessionGetOutputName(session, i, allocator, &name));
+          ort_api->SessionGetOutputName(session, i, allocator, &name));
     }
 
     OrtTypeInfo* typeinfo;
     if (is_input) {
-      RETURN_IF_ORT_ERROR(OrtSessionGetInputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(ort_api->SessionGetInputTypeInfo(session, i, &typeinfo));
     } else {
-      RETURN_IF_ORT_ERROR(OrtSessionGetOutputTypeInfo(session, i, &typeinfo));
+      RETURN_IF_ORT_ERROR(ort_api->SessionGetOutputTypeInfo(session, i, &typeinfo));
     }
 
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
-        typeinfo, &OrtReleaseTypeInfo);
+        typeinfo, &ort_api->ReleaseTypeInfo);
     const OrtTensorTypeAndShapeInfo* tensor_info;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &tensor_info));
+    RETURN_IF_ORT_ERROR(ort_api->CastTypeInfoToTensorInfo(typeinfo, &tensor_info));
 
     ONNXTensorElementDataType type;
-    RETURN_IF_ORT_ERROR(OrtGetTensorElementType(tensor_info, &type));
+    RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(tensor_info, &type));
 
     size_t num_dims;
-    RETURN_IF_ORT_ERROR(OrtGetDimensionsCount(tensor_info, &num_dims));
+    RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(tensor_info, &num_dims));
 
     std::vector<int64_t> dims(num_dims);
     RETURN_IF_ORT_ERROR(
-        OrtGetDimensions(tensor_info, (int64_t*)dims.data(), num_dims));
+        ort_api->GetDimensions(tensor_info, (int64_t*)dims.data(), num_dims));
 
     infos.emplace(name, OnnxTensorInfo(type, dims));
   }
