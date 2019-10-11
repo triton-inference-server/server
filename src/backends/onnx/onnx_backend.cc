@@ -84,14 +84,14 @@ OnnxBackend::CreateExecutionContexts(
   // Create a "prototype" session option, which will be cloned and set
   // context-specific option on context creation.
   OrtSessionOptions* session_options;
-  RETURN_IF_ORT_ERROR(OrtCreateSessionOptions(&session_options));
+  RETURN_IF_ORT_ERROR(ort_api->CreateSessionOptions(&session_options));
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, &OrtReleaseSessionOptions);
-  RETURN_IF_ORT_ERROR(OrtSetSessionThreadPoolSize(session_options, 1));
+      session_options, &ort_api->ReleaseSessionOptions);
+  RETURN_IF_ORT_ERROR(ort_api->SetSessionThreadPoolSize(session_options, 1));
   // disable graph optimization
   RETURN_IF_ORT_ERROR(
-      OrtSetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
+      ort_api->SetSessionGraphOptimizationLevel(session_options, ORT_DISABLE_ALL));
 
   Status status = CreateExecutionContextsHelper(session_options, models);
 
@@ -205,10 +205,10 @@ OnnxBackend::CreateExecutionContext(
   // Set Onnx session option with proper device
   OrtSessionOptions* session_options;
   RETURN_IF_ORT_ERROR(
-      OrtCloneSessionOptions(base_session_options, &session_options));
+      ort_api->CloneSessionOptions(base_session_options, &session_options));
 
   OrtResourceWrapper<OrtSessionOptions*> options_wrapper(
-      session_options, &OrtReleaseSessionOptions);
+      session_options, &ort_api->ReleaseSessionOptions);
 
   // Set execution execution_accelerators (execution providers in ONNX Runtime)
   if (gpu_device != Context::NO_GPU_DEVICE) {
@@ -224,7 +224,7 @@ OnnxBackend::CreateExecutionContext(
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
           if (gpu_device == 0) {
             RETURN_IF_ORT_ERROR(
-                OrtSessionOptionsAppendExecutionProvider_Tensorrt(
+                ort_api->SessionOptionsAppendExecutionProvider_Tensorrt(
                     session_options, gpu_device));
             LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                            << instance_name << " on device " << gpu_device;
@@ -245,7 +245,7 @@ OnnxBackend::CreateExecutionContext(
         }
       }
     }
-    RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
+    RETURN_IF_ORT_ERROR(ort_api->SessionOptionsAppendExecutionProvider_CUDA(
         session_options, gpu_device));
     LOG_VERBOSE(1) << "CUDA Execution Accelerator is set for " << instance_name
                    << " on device " << gpu_device;
@@ -263,7 +263,7 @@ OnnxBackend::CreateExecutionContext(
       if (execution_accelerator.name() == kOpenVINOExecutionAccelerator) {
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
-        RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
+        RETURN_IF_ORT_ERROR(ort_api->SessionOptionsAppendExecutionProvider_OpenVINO(
             session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
                        << instance_name << " on device CPU";
@@ -291,7 +291,7 @@ OnnxBackend::CreateExecutionContext(
 
   RETURN_IF_ERROR(OnnxLoader::LoadSession(
       op_itr->second, session_options, &context->session_));
-  RETURN_IF_ORT_ERROR(OrtGetAllocatorWithDefaultOptions(&context->allocator_));
+  RETURN_IF_ORT_ERROR(ort_api->GetAllocatorWithDefaultOptions(&context->allocator_));
 
   // If this is a sequence model then make sure that the required
   // inputs are present in the model and have the correct shape and
@@ -596,7 +596,7 @@ OnnxBackend::Context::Run(
   }
 
   // Run...
-  RETURN_IF_ORT_ERROR(OrtRun(
+  RETURN_IF_ORT_ERROR(ort_api->Run(
       session_, NULL /* run options */, input_names.data(),
       (const OrtValue* const*)input_tensors_.data(), input_tensors_.size(),
       output_names.data(), output_names.size(), output_tensors_.data()));
@@ -677,8 +677,8 @@ OnnxBackend::Context::SetInputTensor(
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
-    RETURN_IF_ORT_ERROR(OrtAllocatorGetInfo(allocator_, &allocator_info));
-    RETURN_IF_ORT_ERROR(OrtCreateTensorWithDataAsOrtValue(
+    RETURN_IF_ORT_ERROR(ort_api->AllocatorGetInfo(allocator_, &allocator_info));
+    RETURN_IF_ORT_ERROR(ort_api->CreateTensorWithDataAsOrtValue(
         allocator_info, (void*)input_buffers->back().get(), total_byte_size,
         input_dims.data(), input_dims.size(), ConvertToOnnxDataType(data_type),
         &input_tensors_.back()));
@@ -692,10 +692,10 @@ OnnxBackend::Context::SetInputTensor(
     // Make sure to make the last string data valid C string
     buffer[total_byte_size] = 0;
 
-    RETURN_IF_ORT_ERROR(OrtCreateTensorAsOrtValue(
+    RETURN_IF_ORT_ERROR(ort_api->CreateTensorAsOrtValue(
         allocator_, input_dims.data(), input_dims.size(),
         ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING, &input_tensors_.back()));
-    RETURN_IF_ORT_ERROR(OrtFillStringTensor(
+    RETURN_IF_ORT_ERROR(ort_api->FillStringTensor(
         input_tensors_.back(), string_data.data(), string_data.size()));
   }
 
@@ -793,35 +793,35 @@ OnnxBackend::Context::ReadOutputTensors(
 
     // Get output type and shape
     OrtTypeInfo* typeinfo;
-    RETURN_IF_ORT_ERROR(OrtGetTypeInfo(output_tensor, &typeinfo));
+    RETURN_IF_ORT_ERROR(ort_api->GetTypeInfo(output_tensor, &typeinfo));
     OrtResourceWrapper<OrtTypeInfo*> typeinfo_wrapper(
-        typeinfo, &OrtReleaseTypeInfo);
+        typeinfo, &ort_api->ReleaseTypeInfo);
 
     const OrtTensorTypeAndShapeInfo* type_and_shape;
-    RETURN_IF_ORT_ERROR(OrtCastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
+    RETURN_IF_ORT_ERROR(ort_api->CastTypeInfoToTensorInfo(typeinfo, &type_and_shape));
 
     std::vector<int64_t> content_shape;
 
     size_t num_dims;
-    RETURN_IF_ORT_ERROR(OrtGetDimensionsCount(type_and_shape, &num_dims));
+    RETURN_IF_ORT_ERROR(ort_api->GetDimensionsCount(type_and_shape, &num_dims));
 
     content_shape.resize(num_dims);
-    RETURN_IF_ORT_ERROR(OrtGetDimensions(
+    RETURN_IF_ORT_ERROR(ort_api->GetDimensions(
         type_and_shape, content_shape.data(), content_shape.size()));
     const size_t element_count = GetElementCount(content_shape);
 
     ONNXTensorElementDataType type;
-    RETURN_IF_ORT_ERROR(OrtGetTensorElementType(type_and_shape, &type));
+    RETURN_IF_ORT_ERROR(ort_api->GetTensorElementType(type_and_shape, &type));
 
     if (type == ONNX_TENSOR_ELEMENT_DATA_TYPE_STRING) {
       const size_t batch1_element_cnt = element_count / total_batch_size;
       size_t total_length = 0;
       RETURN_IF_ORT_ERROR(
-          OrtGetStringTensorDataLength(output_tensor, &total_length));
+          ort_api->GetStringTensorDataLength(output_tensor, &total_length));
 
       char content[total_length];
       size_t offsets[element_count + 1];
-      RETURN_IF_ORT_ERROR(OrtGetStringTensorContent(
+      RETURN_IF_ORT_ERROR(ort_api->GetStringTensorContent(
           output_tensor, content, total_length, offsets, element_count));
       // Mark "passed end byte offset"
       offsets[element_count] = total_length;
@@ -846,7 +846,7 @@ OnnxBackend::Context::ReadOutputTensors(
 
       char* content = nullptr;
       RETURN_IF_ORT_ERROR(
-          OrtGetTensorMutableData(output_tensor, (void**)&content));
+          ort_api->GetTensorMutableData(output_tensor, (void**)&content));
 
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
@@ -923,7 +923,7 @@ OnnxBackend::Context::ReleaseOrtRunResources()
   // Release input tensor if set
   for (auto& tensor : input_tensors_) {
     if (tensor != nullptr) {
-      OrtReleaseValue(tensor);
+      ort_api->ReleaseValue(tensor);
     }
   }
   input_tensors_.clear();
@@ -931,7 +931,7 @@ OnnxBackend::Context::ReleaseOrtRunResources()
   // Release output tensor if set
   for (auto& tensor : output_tensors_) {
     if (tensor != nullptr) {
-      OrtReleaseValue(tensor);
+      ort_api->ReleaseValue(tensor);
     }
   }
   output_tensors_.clear();
