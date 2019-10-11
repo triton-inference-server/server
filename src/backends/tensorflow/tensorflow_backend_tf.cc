@@ -472,7 +472,7 @@ ModelImpl::ModelImpl(
 ModelImpl::ModelImpl(
     const std::string& model_name, tensorflow::Session* session,
     TRTISTF_IOList* inputs, TRTISTF_IOList* outputs,
-    const std::string& device_name, tensorflow::Device* device)
+    const std::string& device_name)
     : model_name_(model_name), session_(session), inputs_(inputs),
       outputs_(outputs), has_callable_(false), device_name_(device_name)
 {
