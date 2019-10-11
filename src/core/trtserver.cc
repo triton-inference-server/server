@@ -574,32 +574,6 @@ TRTSERVER_SharedMemoryBlockGpuNew(
 #endif  // TRTIS_ENABLE_GPU
 
 TRTSERVER_Error*
-TRTSERVER_SharedMemoryDevice(
-    TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    TRTSERVER_Memory_Type* kind, int* device_id)
-{
-  TrtServerSharedMemoryBlock* lsmb =
-      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-  *kind = lsmb->Type();
-  *device_id = lsmb->DeviceId();
-  return nullptr;  // Success
-}
-
-#ifdef TRTIS_ENABLE_GPU
-TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockGpuNew(
-    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
-    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
-    const int device_id)
-{
-  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
-      new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, cuda_shm_handle, device_id, byte_size));
-  return nullptr;  // Success
-}
-#endif  // TRTIS_ENABLE_GPU
-
-TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockDelete(
     TRTSERVER_SharedMemoryBlock* shared_memory_block)
 {
