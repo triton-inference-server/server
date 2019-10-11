@@ -224,7 +224,7 @@ OnnxBackend::CreateExecutionContext(
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
           if (gpu_device == 0) {
             RETURN_IF_ORT_ERROR(
-                ort_api->SessionOptionsAppendExecutionProvider_Tensorrt(
+                OrtSessionOptionsAppendExecutionProvider_Tensorrt(
                     session_options, gpu_device));
             LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                            << instance_name << " on device " << gpu_device;
@@ -245,7 +245,7 @@ OnnxBackend::CreateExecutionContext(
         }
       }
     }
-    RETURN_IF_ORT_ERROR(ort_api->SessionOptionsAppendExecutionProvider_CUDA(
+    RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_CUDA(
         session_options, gpu_device));
     LOG_VERBOSE(1) << "CUDA Execution Accelerator is set for " << instance_name
                    << " on device " << gpu_device;
@@ -264,7 +264,7 @@ OnnxBackend::CreateExecutionContext(
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
         RETURN_IF_ORT_ERROR(
-            ort_api->SessionOptionsAppendExecutionProvider_OpenVINO(
+            OrtSessionOptionsAppendExecutionProvider_OpenVINO(
                 session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
                        << instance_name << " on device CPU";
