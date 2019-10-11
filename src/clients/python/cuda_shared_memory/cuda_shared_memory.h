@@ -25,10 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <fcntl.h>
 #include <stddef.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,12 +33,12 @@ extern "C" {
 
 //==============================================================================
 // SharedMemoryControlContext
-int SharedMemoryRegionCreate(
-    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
-    void** shm_handle);
-int SharedMemoryRegionSet(
-    void* shm_handle, size_t offset, size_t byte_size, const void* data);
-int SharedMemoryRegionDestroy(void* shm_handle);
+int CudaSharedMemoryRegionCreate(
+    const char* trtis_shm_name, size_t byte_size, int device_id,
+    void** cuda_shm_handle);
+int CudaSharedMemoryRegionSet(
+    void* cuda_shm_handle, size_t offset, size_t byte_size, const void* data);
+int CudaSharedMemoryRegionDestroy(void* cuda_shm_handle);
 
 //==============================================================================
 

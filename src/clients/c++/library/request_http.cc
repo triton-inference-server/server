@@ -612,7 +612,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
 
  private:
 #if TRTIS_ENABLE_GPU
-   static size_t RequestProvider(void*, size_t, size_t, void*);
+  static size_t RequestProvider(void*, size_t, size_t, void*);
 #endif  // TRTIS_ENABLE_GPU
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(

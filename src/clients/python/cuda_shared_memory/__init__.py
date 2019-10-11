@@ -45,78 +45,77 @@ class _utf8(object):
             return value.encode('utf8')
 
 import os
-_cshm_lib = "cshm" if os.name == 'nt' else 'libcshm.so'
-_cshm_path = pkg_resources.resource_filename('tensorrtserver.shared_memory', _cshm_lib)
-_cshm = cdll.LoadLibrary(_cshm_path)
+_ccudashm_lib = "ccudashm" if os.name == 'nt' else 'libccudashm.so'
+_ccudashm_path = pkg_resources.resource_filename('tensorrtserver.cuda_shared_memory', _ccudashm_lib)
+_ccudashm = cdll.LoadLibrary(_ccudashm_path)
 
-_cshm_shared_memory_region_create = _cshm.SharedMemoryRegionCreate
-_cshm_shared_memory_region_create.restype = c_int
-_cshm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
-_cshm_shared_memory_region_set = _cshm.SharedMemoryRegionSet
-_cshm_shared_memory_region_set.restype = c_int
-_cshm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]
-_cshm_shared_memory_region_destroy = _cshm.SharedMemoryRegionDestroy
-_cshm_shared_memory_region_destroy.restype = c_int
-_cshm_shared_memory_region_destroy.argtypes = [c_void_p]
+_ccudashm_shared_memory_region_create = _ccudashm.CudaSharedMemoryRegionCreate
+_ccudashm_shared_memory_region_create.restype = c_int
+_ccudashm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
+_ccudashm_shared_memory_region_set = _ccudashm.CudaSharedMemoryRegionSet
+_ccudashm_shared_memory_region_set.restype = c_int
+_ccudashm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]
+_ccudashm_shared_memory_region_destroy = _ccudashm.CudaSharedMemoryRegionDestroy
+_ccudashm_shared_memory_region_destroy.restype = c_int
+_ccudashm_shared_memory_region_destroy.argtypes = [c_void_p]
 
 def _raise_if_error(errno):
     """
-    Raise SharedMemoryException if 'err' is non-success.
+    Raise CudaSharedMemoryException if 'err' is non-success.
     Otherwise return nothing.
     """
     if errno.value != 0:
-        ex = SharedMemoryException(errno)
+        ex = CudaSharedMemoryException(errno)
         raise ex
     return
 
 def _raise_error(msg):
-    ex = SharedMemoryException(msg)
+    ex = CudaSharedMemoryException(msg)
     raise ex
 
-def create_shared_memory_region(trtis_shm_name, shm_key, byte_size):
+def create_shared_memory_region(trtis_shm_name, byte_size, device_id):
     """Creates a shared memory region with the specified name and size.
 
     Parameters
     ----------
     trtis_shm_name : str
-        The unique name of the shared memory region to be created.
-    shm_key : str
-        The unique key of the shared memory object.
+        The unique name of the cuda shared memory region to be created.
     byte_size : int
-        The size in bytes of the shared memory region to be created.
-
+        The size in bytes of the cuda shared memory region to be created.
+    device_id : int
+        The GPU device ID of the cuda shared memory region to be created.
     Returns
     -------
-    shm_handle : c_void_p
-        The handle for the shared memory region.
+    cuda_shm_handle : c_void_p
+        The handle for the cuda shared memory region.
 
     Raises
     ------
-    SharedMemoryException
-        If unable to create the shared memory region.
+    CudaSharedMemoryException
+        If unable to create the cuda shared memory region on the specified device.
     """
 
-    shm_handle = c_void_p()
+    cuda_shm_handle = c_void_p()
     _raise_if_error(
-        c_int(_cshm_shared_memory_region_create(trtis_shm_name, shm_key, byte_size, byref(shm_handle))))
+        c_int(_ccudashm_shared_memory_region_create(trtis_shm_name, byte_size, device_id, byref(cuda_shm_handle))))
 
-    return shm_handle
+    return cuda_shm_handle
 
-def set_shared_memory_region(shm_handle, input_values):
+def set_shared_memory_region(cuda_shm_handle, input_values):
     """Copy the contents of the numpy array into a shared memory region with
     the specified identifier, offset and size.
 
     Parameters
     ----------
-    shm_handle : c_void_p
-        The handle for the shared memory region.
+    cuda_shm_handle : c_void_p
+        The handle for the cuda shared memory region.
     input_values : np.array
         The list of numpy arrays to be copied into the shared memory region.
 
     Raises
     ------
-    SharedMemoryException
-        If unable to mmap or set values in the shared memory region.
+    CudaSharedMemoryException
+        If unable to set values in the cuda shared memory region.
     """
 
     if not isinstance(input_values, (list,tuple)):
@@ -130,30 +129,30 @@ def set_shared_memory_region(shm_handle, input_values):
         input_value = np.ascontiguousarray(input_value).flatten()
         byte_size = input_value.size * input_value.itemsize
         _raise_if_error(
-            c_int(_cshm_shared_memory_region_set(shm_handle, c_uint64(offset_current), \
+            c_int(_ccudashm_shared_memory_region_set(cuda_shm_handle, c_uint64(offset_current), \
                 c_uint64(byte_size), input_value.ctypes.data_as(c_void_p))))
         offset_current += byte_size
     return
 
-def destroy_shared_memory_region(shm_handle):
-    """Unlink a shared memory region with the specified handle.
+def destroy_shared_memory_region(cuda_shm_handle):
+    """Close a cuda shared memory region with the specified handle.
 
     Parameters
     ----------
-    shm_handle : c_void_p
-        The handle for the shared memory region.
+    cuda_shm_handle : c_void_p
+        The handle for the cuda shared memory region.
 
     Raises
     ------
-    SharedMemoryException
-        If unable to unlink the shared memory region.
+    CudaSharedMemoryException
+        If unable to close the cuda_shm_handle shared memory region and free the device memory.
     """
 
     _raise_if_error(
-        c_int(_cshm_shared_memory_region_destroy(shm_handle)))
+        c_int(_ccudashm_shared_memory_region_destroy(cuda_shm_handle)))
     return
 
-class SharedMemoryException(Exception):
+class CudaSharedMemoryException(Exception):
     """Exception indicating non-Success status.
 
     Parameters
@@ -163,10 +162,11 @@ class SharedMemoryException(Exception):
 
     """
     def __init__(self, err):
-        self.err_code_map = { -2: "unable to get shared memory descriptor",
-                            -3: "unable to initialize the size",
-                            -4: "unable to read/mmap the shared memory region",
-                            -5: "unable to unlink the shared memory region"}
+        self.err_code_map = { -2: "unable to set device successfully",
+                            -2: "unable to create cuda shared memory",
+                            -3: "unable to set values in cuda shared memory",
+                            -4: "unable to close the cuda shared memory region",
+                            -5: "unable to free GPU device memory"}
         self._msg = None
         if err.value != 0 and err.value in self.err_code_map:
             self._msg = self.err_code_map[err.value]

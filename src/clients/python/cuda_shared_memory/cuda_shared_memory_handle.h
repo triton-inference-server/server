@@ -23,28 +23,13 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 #pragma once
 
-#include <fcntl.h>
-#include <stddef.h>
-#include <sys/mman.h>
-#include <unistd.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-//==============================================================================
-// SharedMemoryControlContext
-int SharedMemoryRegionCreate(
-    const char* trtis_shm_name, const char* shm_key, size_t byte_size,
-    void** shm_handle);
-int SharedMemoryRegionSet(
-    void* shm_handle, size_t offset, size_t byte_size, const void* data);
-int SharedMemoryRegionDestroy(void* shm_handle);
-
-//==============================================================================
-
-#ifdef __cplusplus
-}
-#endif
+struct CudaSharedMemoryHandle {
+  std::string trtis_shm_name_;
+  cudaIpcMemHandle_t* cuda_shm_handle_;
+  void* base_addr_;
+  size_t byte_size_;
+  int device_id;
+};
