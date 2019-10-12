@@ -41,16 +41,21 @@ if(WIN32)
           "clients in Windows. Because the examples use functionalities that "
 		      "are UNIX specific.")
 else()
+install(
+  FILES
+    ${CMAKE_SOURCE_DIR}/../../VERSION
+  DESTINATION .
+)
 # Install cmake files that builds the samples within the client install.
 install(
   FILES
     ${CMAKE_BINARY_DIR}/../CMakeLists.txt
-  DESTINATION src/cmake
+  DESTINATION build
 )
 install(
   FILES
     CMakeLists.example
-  DESTINATION src/cmake/trtis-clients
+  DESTINATION build/trtis-clients
   RENAME CMakeLists.txt
 )
 

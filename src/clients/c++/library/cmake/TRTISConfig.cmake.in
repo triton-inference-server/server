@@ -26,20 +26,17 @@
 
 # specific version required for protobuf
 if(NOT PROTOBUF_FOUND AND NOT Protobuf_FOUND)
+  set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
   find_package(Protobuf @Protobuf_VERSION@ CONFIG REQUIRED)
-endif()
-
-if(NOT c-ares_FOUND)
-  find_package(c-ares CONFIG REQUIRED)
-endif()
-
-if(NOT CURL_FOUND)
-  find_package(CURL REQUIRED)
 endif()
 
 # specific version required for grpc
 if(NOT GRPC_FOUND AND NOT gRPC_FOUND)
   find_package(gRPC @gRPC_VERSION@ CONFIG REQUIRED)
+endif()
+
+if(NOT CURL_FOUND)
+  find_package(CURL CONFIG REQUIRED)
 endif()
 
 if(NOT Threads_FOUND)

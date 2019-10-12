@@ -55,6 +55,9 @@ set(TRTIS_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes
 set(TRTIS_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
+# Client
+set(TRTIS_CLIENT_CMAKE_DIR "" CACHE PATH "Path to TRTIS client library cmake configuration")
+
 option(TRTIS_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
 option(TRTIS_ENABLE_GPU "Enable GPU support in server/client" ON)
@@ -340,6 +343,13 @@ else()
   set(TRTIS_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
+# If TRTIS_CLIENT_CMAKE_DIR is set then use it to find TRTIS cmake
+# config
+set(_CMAKE_TRTIS_DIR "")
+if (TRTIS_CLIENT_CMAKE_DIR)
+  set(_CMAKE_TRTIS_DIR "-DTRTIS_DIR:PATH=${TRTIS_CLIENT_CMAKE_DIR}")
+endif()
+
 # version
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRTIS_VERSION)
 
@@ -354,6 +364,7 @@ ExternalProject_Add(trtis-clients
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
+    ${_CMAKE_TRTIS_DIR}
     -DTRTIS_ENABLE_METRICS:BOOL=OFF
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
