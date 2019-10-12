@@ -46,7 +46,6 @@ if(${TRTIS_ENABLE_GRPC})
   add_library(
     grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
-    ${CUDA_OBJS}
   )
   if(${TRTIS_ENABLE_GPU})
     target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -90,7 +89,6 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
   add_library(
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
-    ${CUDA_OBJS}
   )
 
   if(${TRTIS_ENABLE_GPU})
@@ -139,7 +137,6 @@ if(${TRTIS_ENABLE_TRACING})
   add_library(
     tracing-library EXCLUDE_FROM_ALL OBJECT
     ${TRACING_SRCS} ${TRACING_HDRS}
-    ${CUDA_OBJS}
   )
   if(${TRTIS_ENABLE_GPU})
     target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
@@ -227,7 +224,6 @@ target_link_libraries(
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRTIS_ENABLE_GPU
-
 install(
   TARGETS simple
   RUNTIME DESTINATION bin

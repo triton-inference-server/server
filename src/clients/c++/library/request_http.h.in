@@ -35,10 +35,6 @@
 #include "src/clients/c++/library/request.h"
 #endif
 
-#if TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace client {
 
 //==============================================================================

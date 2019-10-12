@@ -96,7 +96,7 @@ class InferenceServer {
   // Register the corresponding CUDA shared memory region. If already
   // registered return an ALREADY_EXISTS error.
 #ifdef TRTIS_ENABLE_GPU
-  Status CudaRegisterSharedMemory(
+  Status RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
 #endif  // TRTIS_ENABLE_GPU

@@ -35,7 +35,6 @@
 #include <deque>
 #include <exception>
 #include <future>
-
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/server_status.h"

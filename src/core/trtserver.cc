@@ -119,7 +119,6 @@ TrtServerError::TrtServerError(
 //
 class TrtServerSharedMemoryBlock {
  public:
-#ifdef TRTIS_ENABLE_GPU
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
       const size_t offset, const size_t byte_size);
@@ -142,7 +141,10 @@ class TrtServerSharedMemoryBlock {
   size_t DeviceId() const { return device_id_; }
 #ifdef TRTIS_ENABLE_GPU
   const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
+  size_t DeviceId() const { return device_id_; }
 #endif  // TRTIS_ENABLE_GPU
+  size_t Offset() const { return offset_; }
+  size_t ByteSize() const { return byte_size_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
@@ -154,10 +156,8 @@ class TrtServerSharedMemoryBlock {
 #endif  // TRTIS_ENABLE_GPU
   const size_t offset_;
   const size_t byte_size_;
-  const int device_id_;
 };
 
-#ifdef TRTIS_ENABLE_GPU
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
     const size_t offset, const size_t byte_size)
@@ -548,13 +548,8 @@ TRTSERVER_SharedMemoryBlockCpuNew(
     const char* shm_key, const size_t offset, const size_t byte_size)
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
-#ifdef TRTIS_ENABLE_GPU
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, nullptr, offset, byte_size, 0));
-#else
-      new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size, 0));
-#endif
+          TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
   return nullptr;  // Success
 }
 
@@ -567,8 +562,7 @@ TRTSERVER_SharedMemoryBlockGpuNew(
 {
   *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
       new TrtServerSharedMemoryBlock(
-          TRTSERVER_MEMORY_GPU, name, "", cuda_shm_handle, 0, byte_size,
-          device_id));
+          TRTSERVER_MEMORY_GPU, name, cuda_shm_handle, device_id, byte_size));
   return nullptr;  // Success
 }
 #endif  // TRTIS_ENABLE_GPU
@@ -1248,7 +1242,6 @@ TRTSERVER_ServerRegisterSharedMemory(
 
   return nullptr;  // success
 }
-#endif  // TRTIS_ENABLE_GPU
 
 TRTSERVER_Error*
 TRTSERVER_ServerUnregisterSharedMemory(

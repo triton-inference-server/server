@@ -392,7 +392,7 @@ InferenceServer::RegisterSharedMemory(
 
 #ifdef TRTIS_ENABLE_GPU
 Status
-InferenceServer::CudaRegisterSharedMemory(
+InferenceServer::RegisterCudaSharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
     const size_t byte_size, const int device_id)
 {
@@ -402,7 +402,7 @@ InferenceServer::CudaRegisterSharedMemory(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  return shared_memory_manager_->CudaRegisterSharedMemory(
+  return shared_memory_manager_->RegisterCudaSharedMemory(
       name, cuda_shm_handle, byte_size, device_id);
 }
 #endif  // TRTIS_ENABLE_GPU
