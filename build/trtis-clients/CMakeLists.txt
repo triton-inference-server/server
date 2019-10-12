@@ -31,6 +31,16 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+#
+# CUDA
+#
+if(${TRTIS_ENABLE_GPU})
+  add_definitions(-DTRTIS_ENABLE_GPU=1)
+  find_package(CUDA REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+  set(CUDA_NVCC_FLAGS -std=c++11)
+endif() # TRTIS_ENABLE_GPU
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   message("Using MSVC as compiler, default target on Windows 10. "
 		  "If the target system is not Windows 10, please update _WIN32_WINNT "

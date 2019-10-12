@@ -37,10 +37,6 @@
 #define strncasecmp _strnicmp
 #endif
 
-#if TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
@@ -713,7 +709,7 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
   }
 
   // TODO set cuda-shm_handle as raw bytes in body
-  std::string full_url = url_ + "/" + action_str + "/" + name + "/" +
+  std::string full_url = url_ + "/cudaregister/" + name + "/" +
                          std::to_string(byte_size) + "/" +
                          std::to_string(device_id);
   full_url += "?format=binary";
@@ -735,7 +731,7 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
 
   // request data provided by RequestProvider()
   SerialCudaHandle serial_cuda_handle(
-      reinterpret_cast<char*>(cuda_shm_handle), sizeof(cudaIpcMemHandle_t));
+      reinterpret_cast<const char*>(&cuda_shm_handle), sizeof(cudaIpcMemHandle_t));
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
   curl_easy_setopt(curl, CURLOPT_READDATA, serial_cuda_handle);
 

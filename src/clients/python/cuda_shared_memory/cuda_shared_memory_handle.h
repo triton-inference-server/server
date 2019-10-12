@@ -31,5 +31,5 @@ struct CudaSharedMemoryHandle {
   cudaIpcMemHandle_t* cuda_shm_handle_;
   void* base_addr_;
   size_t byte_size_;
-  int device_id;
+  int device_id_;
 };

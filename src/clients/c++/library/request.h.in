@@ -52,6 +52,10 @@
 #include "src/core/server_status.pb.h"
 #endif
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 // From model_config.h, repeat here to avoid introducing dependence on
