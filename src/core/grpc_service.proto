@@ -272,11 +272,11 @@ message SharedMemoryControlRequest
     //@@
     message CUDASharedMemoryIdentifier
     {
-      //@@  .. cpp:var:: bytes raw_handle (repeated)
+      //@@  .. cpp:var:: bytes raw_handle
       //@@
       //@@     The raw serialized cudaIPC handle.
       //@@
-      repeated bytes raw_handle = 1;
+      bytes raw_handle = 1;
 
       //@@  .. cpp:var:: int64 device_id
       //@@

@@ -56,8 +56,7 @@ set(TRTIS_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for TRTIS build")
 
 option(TRTIS_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRTIS_ENABLE_ASAN "Build with address sanitizer" OFF)
-option(TRTIS_ENABLE_GPU "Enable GPU support in server" ON)
-option(TRTIS_ENABLE_CUDA_EXAMPLES "Build CUDA shared memory examples" ON)
+option(TRTIS_ENABLE_GPU "Enable GPU support in server/client" ON)
 set(TRTIS_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
     "The minimum CUDA compute capability supported by TRTIS" )
 
@@ -362,7 +361,6 @@ ExternalProject_Add(trtis-clients
     -DTRTIS_ENABLE_METRICS:BOOL=OFF
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
-    -DTRTIS_ENABLE_CUDA_EXAMPLES:BOOL=${TRTIS_ENABLE_CUDA_EXAMPLES}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
   DEPENDS curl protobuf grpc
 )

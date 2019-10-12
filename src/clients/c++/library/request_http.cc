@@ -37,6 +37,10 @@
 #define strncasecmp _strnicmp
 #endif
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
@@ -598,8 +602,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
 #if TRTIS_ENABLE_GPU
-  Error CudaRegisterSharedMemory(
-      const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+  Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
       size_t byte_size, int device_id) override;
 #endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
@@ -660,8 +664,8 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
 
 #if TRTIS_ENABLE_GPU
 Error
-SharedMemoryControlHttpContextImpl::CudaRegisterSharedMemory(
-    const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
   return SendRequest(

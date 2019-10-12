@@ -35,6 +35,10 @@
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class InferGrpcContextImpl;
@@ -307,8 +311,8 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
       const std::string& name, const std::string& shm_key, size_t offset,
       size_t byte_size) override;
 #if TRTIS_ENABLE_GPU
-  Error CudaRegisterSharedMemory(
-      const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+  Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
       size_t byte_size, int device_id) override;
 #endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
@@ -360,8 +364,8 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
 
 #if TRTIS_ENABLE_GPU
 Error
-SharedMemoryControlGrpcContextImpl::CudaRegisterSharedMemory(
-    const std::string& name, cudaIpcMemHandle_t cuda_shm_handle,
+SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
     size_t byte_size, int device_id)
 {
   SharedMemoryControlRequest request;
@@ -373,9 +377,9 @@ SharedMemoryControlGrpcContextImpl::CudaRegisterSharedMemory(
   auto cuda_shm_id = rshm_region->mutable_cuda_shared_memory();
 
   // serialize cuda shm handle
-  std::string* ipc_handle = cuda_shm_id->add_raw_handle();
+  std::string* ipc_handle = cuda_shm_id->mutable_raw_handle();
   ipc_handle->append(
-      reinterpret_cast<const char*>(&cuda_shm_handle),
+      reinterpret_cast<const char*>(cuda_shm_handle),
       sizeof(cudaIpcMemHandle_t));
   cuda_shm_id->set_device_id(device_id);
 

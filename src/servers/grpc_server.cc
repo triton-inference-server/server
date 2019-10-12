@@ -1607,29 +1607,28 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     if (request.has_register_()) {
       if (request.register_().has_system_shared_memory()) {
         // system shared memory
-        err = smb_manager_->Create(
+        err = smb_manager_->CpuCreate(
             &smb, request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
-            nullptr, request.register_().system_shared_memory().offset(),
-            request.register_().byte_size(), TRTSERVER_MEMORY_CPU, 0);
+            request.register_().system_shared_memory().offset(),
+            request.register_().byte_size());
         if (err == nullptr) {
           err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
         }
-      } else {
+      } else if (request.register_().has_cuda_shared_memory()) {
         // cuda shared memory
 #if TRTIS_ENABLE_GPU
         const std::string& raw_handle =
-            request.register_().cuda_shared_memory().raw_handle(0);
+            request.register_().cuda_shared_memory().raw_handle();
         char* handle_base = const_cast<char*>(raw_handle.c_str());
         cudaIpcMemHandle_t* cuda_shm_handle =
             reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
-        std::string empty_key = "";
-        err = smb_manager_->Create(
-            &smb, request.register_().name(), empty_key, cuda_shm_handle, 0,
-            request.register_().byte_size(), TRTSERVER_MEMORY_GPU,
+        err = smb_manager_->GpuCreate(
+            &smb, request.register_().name(), cuda_shm_handle,
+            request.register_().byte_size(),
             request.register_().cuda_shared_memory().device_id());
         if (err == nullptr) {
-          err = TRTSERVER_ServerCudaRegisterSharedMemory(trtserver_.get(), smb);
+          err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
         }
 #else
         err = TRTSERVER_ErrorNew(
@@ -1639,6 +1638,13 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
                 request.register_().name() + "', GPUs not supported")
                 .c_str());
 #endif  // TRTIS_ENABLE_GPU
+      } else {
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "failed to register shared memory region: '" +
+                request.register_().name() + "', improperly formed request.")
+                .c_str());
       }
     } else if (request.has_unregister()) {
       err = smb_manager_->Remove(&smb, request.unregister().name());

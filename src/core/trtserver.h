@@ -770,7 +770,7 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerLoadModel(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
     TRTSERVER_Server* server, const char* model_name);
 
-/// Register a system shared memory block on the inference server. After a
+/// Register a shared memory block on the inference server. After a
 /// block is registered, addresses within the block can be used for
 /// input and output tensors in inference requests. If a shared memory
 /// block with the same name is already registered
@@ -780,19 +780,6 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerUnloadModel(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerRegisterSharedMemory(
     TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
-
-/// Register a CUDA shared memory block on the inference server. After a
-/// block is registered, addresses within the block can be used for
-/// input and output tensors in inference requests. If a shared memory
-/// block with the same name is already registered
-/// TRTSERVER_ERROR_ALREADY_EXISTS is returned.
-/// \param server The inference server object.
-/// \param shared_memory_block The shared memory block to register.
-/// \return a TRTSERVER_Error indicating success or failure.
-#ifdef TRTIS_ENABLE_GPU
-TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_ServerCudaRegisterSharedMemory(
-    TRTSERVER_Server* server, TRTSERVER_SharedMemoryBlock* shared_memory_block);
-#endif  // TRTIS_ENABLE_GPU
 
 /// Unregister a shared memory block on the inference server. No
 /// operation is performed if the shared memory block is not

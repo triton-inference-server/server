@@ -45,13 +45,16 @@ class ServerStatusManager;
 /// An object to manage the registered shared memory regions in the server.
 class SharedMemoryManager {
  public:
+  /// Types of memory recognized by the shared memory manager.
+  enum MemoryType { MEMORY_CPU, MEMORY_GPU };
+
   /// A struct that records the shared memory regions registered by the shared
   /// memory manager.
   struct SharedMemoryInfo {
     SharedMemoryInfo(
         const std::string& name, const std::string& shm_key,
         const size_t offset, const size_t byte_size, int shm_fd,
-        void* mapped_addr, const int kind, const int device_id)
+        void* mapped_addr, const MemoryType kind, const int device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
           byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
           kind_(kind), device_id_(device_id)
@@ -64,7 +67,7 @@ class SharedMemoryManager {
     size_t byte_size_;
     int shm_fd_;
     void* mapped_addr_;
-    int kind_;
+    MemoryType kind_;
     int device_id_;
   };
 
@@ -78,7 +81,7 @@ class SharedMemoryManager {
   /// \param shm_key The unique name of the location in shared memory being
   /// registered.
   /// \param offset The offset into the shared memory region.
-  /// \param byte_size The size, in bytes of the tensor data.
+  /// \param byte_size The size, in bytes of the shared memory region.
   /// \return error status. Return an error if it tries to register a shared
   /// memory region that has already been registered.
   Status RegisterSharedMemory(
@@ -92,11 +95,12 @@ class SharedMemoryManager {
   /// registered.
   /// \param cuda_shm_handle The unique memory handle to the location.
   /// in CUDA shared memory being registered.
+  /// \param byte_size The size, in bytes of the shared memory region.
   /// \param device id The GPU number the shared memory region is in. Ignored
   /// if CPU.
   /// \return error status. Return an error if it tries to register a shared
   /// memory region that has already been registered.
-  Status CudaRegisterSharedMemory(
+  Status RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
 #endif  // TRTIS_ENABLE_GPU
@@ -112,7 +116,7 @@ class SharedMemoryManager {
   /// automatically when destroying the shared memory manager.
   Status UnregisterAllSharedMemory();
 
-  // Get the base address + offset for the specific System shared memory region.
+  // Get the base address + offset for the specific shared memory region.
   // If the shared memory region is not valid return an error message
   Status SharedMemoryAddress(
       const std::string& name, size_t offset, size_t byte_size,
