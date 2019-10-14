@@ -157,11 +157,15 @@ TRTISTF_EXPORT void TRTISTF_TensorListDelete(TRTISTF_TensorList* list);
 
 
 // Create a new tensor with a given name, type and shape. 'shape_dims'
-// must be nullptr if shape_rank is 0.
+// must be nullptr if shape_rank is 0. If a tensor is intended to be used as
+// GPU input for model that supports GPU I/O (see TRTISTF_ModelMakeCallable),
+// 'tf_gpu_id' must be the same as the model's device id. Otherwise, negative
+// value should be provided. Note that a tensor may be created on CPU if
+// the data type is not supported for GPU tensor.
 // Return nullptr if failed to create the tensor.
 TRTISTF_EXPORT TRTISTF_Tensor* TRTISTF_TensorNew(
     const char* name, TRTISTF_DataType dtype, size_t shape_rank,
-    int64_t* shape_dims);
+    int64_t* shape_dims, int tf_gpu_id);
 
 // Return a tensor's datatype.
 TRTISTF_EXPORT TRTISTF_DataType TRTISTF_TensorDataType(TRTISTF_Tensor* tensor);
@@ -177,6 +181,9 @@ TRTISTF_Shape* TRTISTF_TensorShape(TRTISTF_Tensor* tensor);
 // Get the base of the tensor data. Defined only for non-string
 // types.. bad things might happen if called for string type tensor.
 TRTISTF_EXPORT char* TRTISTF_TensorData(TRTISTF_Tensor* tensor);
+
+// Check whether the memory type of the tensor data is GPU.
+TRTISTF_EXPORT bool TRTISTF_TensorIsGPUTensor(TRTISTF_Tensor* tensor);
 
 // Get the size, in bytes, of the tensor data. Defined only for
 // non-string types.. bad things might happen if called for string
@@ -228,6 +235,17 @@ TRTISTF_EXPORT TRTISTF_Error* TRTISTF_ModelCreateFromSavedModel(
 
 // Delete a model.
 TRTISTF_EXPORT void TRTISTF_ModelDelete(TRTISTF_Model* model);
+
+// Create a Callable for the model so that the inputs will be assumed to be from
+// GPU while the outputs will be produced on GPU. The Callable will assume the
+// inputs are on the same TF device (vGPU) as the model session.
+// Note that depending on the data type, GPU tensor may not be supported,
+// in such case, the callable will expect those unsupported I/Os to be on CPU.
+TRTISTF_Error* TRTISTF_ModelMakeCallable(
+    TRTISTF_Model* model, const char** input_names,
+    const TRTISTF_DataType* input_types, const size_t num_inputs,
+    const char** output_names, const TRTISTF_DataType* output_types,
+    const size_t num_outputs);
 
 // Get information about a model inputs. The returned list is owned by
 // the model and should not be modified or freed by the caller.

@@ -74,6 +74,7 @@ constexpr char kCustomFilename[] = "libcustom.so";
 
 constexpr char kTensorRTExecutionAccelerator[] = "tensorrt";
 constexpr char kOpenVINOExecutionAccelerator[] = "openvino";
+constexpr char kGPUIOExecutionAccelerator[] = "gpu_io";
 
 constexpr char kEnsemblePlatform[] = "ensemble";
 constexpr char kModelConfigPbTxt[] = "config.pbtxt";
