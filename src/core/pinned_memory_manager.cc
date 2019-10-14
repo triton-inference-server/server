@@ -66,7 +66,7 @@ class PinnedMemoryManagerImpl : public PinnedMemoryManager {
  private:
   PinnedMemoryManagerImpl(void* pinned_memory_buffer, uint64_t size);
   std::mutex info_mtx_;
-  std::map<void*, std::pair<bool, uint64_t>> memory_info_;
+  std::map<void*, bool> memory_info_;
 
   void* pinned_memory_buffer_;
   std::mutex buffer_mtx_;
@@ -115,7 +115,7 @@ PinnedMemoryManagerImpl::~PinnedMemoryManagerImpl()
 {
   // Clean up
   for (const auto& memory_info : memory_info_) {
-    const auto& is_pinned = memory_info.second.first;
+    const auto& is_pinned = memory_info.second;
     if (!is_pinned) {
       free(memory_info.first);
     }
@@ -169,7 +169,7 @@ PinnedMemoryManagerImpl::AllocInternal(
   {
     std::lock_guard<std::mutex> lk(info_mtx_);
     if (status.IsOk()) {
-      auto res = memory_info_.emplace(*ptr, std::make_pair(is_pinned, size));
+      auto res = memory_info_.emplace(*ptr, is_pinned);
       if (!res.second) {
         status = Status(
             RequestStatusCode::INTERNAL,
@@ -202,11 +202,10 @@ PinnedMemoryManagerImpl::FreeInternal(void* ptr)
     std::lock_guard<std::mutex> lk(info_mtx_);
     auto it = memory_info_.find(ptr);
     if (it != memory_info_.end()) {
-      is_pinned = it->second.first;
-      const auto& size = it->second.second;
+      is_pinned = it->second;
       LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
                      << "pinned memory deallocation: "
-                     << "size " << size << ", addr " << ptr;
+                     << "addr " << ptr;
       memory_info_.erase(it);
     } else {
       return Status(
