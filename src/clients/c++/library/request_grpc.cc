@@ -946,7 +946,7 @@ InferGrpcContextImpl::AsyncTransfer()
       if (request_with_callback != nullptr) {
         GrpcRequestImpl* request =
             static_cast<GrpcRequestImpl*>(request_with_callback.get());
-        request->callback_(this, std::move(request_with_callback));
+        request->callback_(this, request_with_callback);
       }
     }
   } while (!exiting_);
@@ -1113,7 +1113,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
     if (request_with_callback != nullptr) {
       GrpcRequestImpl* request =
           static_cast<GrpcRequestImpl*>(request_with_callback.get());
-      request->callback_(this, std::move(request_with_callback));
+      request->callback_(this, request_with_callback);
     }
   }
   stream_->Finish();
