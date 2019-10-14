@@ -129,8 +129,8 @@ inference server HTTP or GRPC APIs (either directly or through the
 client libraries) from releases prior to 1.0.0 you should edit
 and rebuild those as necessary to match the version 1.0.0 APIs.
 
-These inferfaces will maintain backwards compatibility for all future
-1.x.y releases (see below for exceptions):
+The following inferfaces will maintain backwards compatibility for all
+future 1.x.y releases (see below for exceptions):
 
 * Model configuration as defined in `model_config.proto
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/model_config.proto>`_.
@@ -138,7 +138,8 @@ These inferfaces will maintain backwards compatibility for all future
 * The inference server HTTP and GRPC APIs as defined in `api.proto
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/api.proto>`_
   and `grpc_service.proto
-  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_.
+  <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/grpc_service.proto>`_,
+  except as noted below.
 
 * The custom backend interface as defined in `custom.h
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/backends/custom/custom.h>`_.
@@ -153,6 +154,14 @@ following features are in beta:
   <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/trtserver.h>`_
   is currently in beta and may undergo non-backwards-compatible
   changes.
+
+* The inference server HTTP and GRPC APIs related to system and CUDA
+  shared memory are currently in beta and may undergo
+  non-backwards-compatible changes.
+
+* The C++ and Python client libraries are not stictly included in the
+  inference server compatibility guarantees and so should be
+  considered as beta status.
 
 Documentation
 -------------
