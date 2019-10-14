@@ -26,6 +26,7 @@
 //
 #pragma once
 
+#include <boost/interprocess/managed_external_buffer.hpp>
 #include <memory>
 #include "src/core/status.h"
 
@@ -43,7 +44,7 @@ class PinnedMemoryManager {
     uint64_t pinned_memory_pool_byte_size_;
   };
 
-  virtual ~PinnedMemoryManager() = default;
+  ~PinnedMemoryManager();
 
   // Create the pinned memory manager based on 'options' specified.
   // Return true on success, false otherwise.
@@ -61,14 +62,21 @@ class PinnedMemoryManager {
   static Status Free(void* ptr);
 
  protected:
-  PinnedMemoryManager() = default;
+  PinnedMemoryManager(void* pinned_memory_buffer, uint64_t size);
 
-  virtual Status AllocInternal(
-      void** ptr, uint64_t size, bool allow_nonpinned_fallback = false) = 0;
-  virtual Status FreeInternal(void* ptr) = 0;
+  Status AllocInternal(
+      void** ptr, uint64_t size, bool allow_nonpinned_fallback = false);
+  Status FreeInternal(void* ptr);
 
  private:
   static std::unique_ptr<PinnedMemoryManager> instance_;
+
+  std::mutex info_mtx_;
+  std::map<void*, bool> memory_info_;
+
+  void* pinned_memory_buffer_;
+  std::mutex buffer_mtx_;
+  boost::interprocess::managed_external_buffer managed_pinned_memory_;
 };
 
 }}  // namespace nvidia::inferenceserver

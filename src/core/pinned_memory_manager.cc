@@ -27,7 +27,6 @@
 
 #include "src/core/pinned_memory_manager.h"
 
-#include <boost/interprocess/managed_external_buffer.hpp>
 #include <sstream>
 #include "src/core/logging.h"
 
@@ -51,52 +50,7 @@ PointerToString(void* ptr)
 
 std::unique_ptr<PinnedMemoryManager> PinnedMemoryManager::instance_;
 
-class PinnedMemoryManagerImpl : public PinnedMemoryManager {
- public:
-  static Status Create(
-      std::unique_ptr<PinnedMemoryManager>* manager, const Options& options);
-
-  ~PinnedMemoryManagerImpl();
-
-  Status AllocInternal(
-      void** ptr, uint64_t size,
-      bool allow_nonpinned_fallback = false) override;
-  Status FreeInternal(void* ptr) override;
-
- private:
-  PinnedMemoryManagerImpl(void* pinned_memory_buffer, uint64_t size);
-  std::mutex info_mtx_;
-  std::map<void*, bool> memory_info_;
-
-  void* pinned_memory_buffer_;
-  std::mutex buffer_mtx_;
-  boost::interprocess::managed_external_buffer managed_pinned_memory_;
-};
-
-Status
-PinnedMemoryManagerImpl::Create(
-    std::unique_ptr<PinnedMemoryManager>* manager, const Options& options)
-{
-  void* buffer = nullptr;
-#ifdef TRTIS_ENABLE_GPU
-  auto err = cudaHostAlloc(
-      &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
-  if (err != cudaSuccess) {
-    buffer = nullptr;
-    LOG_ERROR << "failed to allocate pinned system memory: "
-              << std::string(cudaGetErrorString(err));
-  } else {
-    LOG_VERBOSE(1) << "Pinned memory pool is created at '"
-                   << PointerToString(buffer) << "' with size "
-                   << options.pinned_memory_pool_byte_size_;
-  }
-#endif  // TRTIS_ENABLE_GPU
-  manager->reset(new PinnedMemoryManagerImpl(
-      buffer, options.pinned_memory_pool_byte_size_));
-  return Status::Success;
-}
-
-PinnedMemoryManagerImpl::PinnedMemoryManagerImpl(
+PinnedMemoryManager::PinnedMemoryManager(
     void* pinned_memory_buffer, uint64_t size)
     : pinned_memory_buffer_(pinned_memory_buffer)
 {
@@ -106,7 +60,7 @@ PinnedMemoryManagerImpl::PinnedMemoryManagerImpl(
   }
 }
 
-PinnedMemoryManagerImpl::~PinnedMemoryManagerImpl()
+PinnedMemoryManager::~PinnedMemoryManager()
 {
   // Clean up
   for (const auto& memory_info : memory_info_) {
@@ -123,7 +77,7 @@ PinnedMemoryManagerImpl::~PinnedMemoryManagerImpl()
 }
 
 Status
-PinnedMemoryManagerImpl::AllocInternal(
+PinnedMemoryManager::AllocInternal(
     void** ptr, uint64_t size, bool allow_nonpinned_fallback)
 {
   auto status = Status::Success;
@@ -190,7 +144,7 @@ PinnedMemoryManagerImpl::AllocInternal(
 }
 
 Status
-PinnedMemoryManagerImpl::FreeInternal(void* ptr)
+PinnedMemoryManager::FreeInternal(void* ptr)
 {
   bool is_pinned = true;
   {
@@ -228,7 +182,23 @@ PinnedMemoryManager::Create(const Options& options)
         "PinnedMemoryManager has been created");
   }
 
-  return PinnedMemoryManagerImpl::Create(&instance_, options);
+  void* buffer = nullptr;
+#ifdef TRTIS_ENABLE_GPU
+  auto err = cudaHostAlloc(
+      &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
+  if (err != cudaSuccess) {
+    buffer = nullptr;
+    LOG_ERROR << "failed to allocate pinned system memory: "
+              << std::string(cudaGetErrorString(err));
+  } else {
+    LOG_VERBOSE(1) << "Pinned memory pool is created at '"
+                   << PointerToString(buffer) << "' with size "
+                   << options.pinned_memory_pool_byte_size_;
+  }
+#endif  // TRTIS_ENABLE_GPU
+  manager->reset(
+      new PinnedMemoryManager(buffer, options.pinned_memory_pool_byte_size_));
+  return Status::Success;
 }
 
 Status
