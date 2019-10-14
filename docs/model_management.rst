@@ -111,11 +111,13 @@ repository changes:
 Model Control Mode EXPLICIT
 ---------------------------
 
-The server does not load any models from the model repository at
-startup. All model load and unload action must be initiated explicitly
-by using the :ref:`Model Control API <section-api-model-control>`. The
-response status of the model control request indicates success or
-failure of the load or unload action.
+At startup, the server loads only those models specified explicitly
+with the -\\-load-model command-line option. If -\\-load-model is not
+specified then no models are loaded at startup. After startup, all
+model load and unload actions must be initiated explicitly by using
+the :ref:`Model Control API <section-api-model-control>`. The response
+status of the model control request indicates success or failure of
+the load or unload action.
 
 This model control mode is enabled by specifing
 -\\-allow-poll-model-repository=false and
