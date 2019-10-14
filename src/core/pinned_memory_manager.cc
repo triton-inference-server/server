@@ -103,11 +103,6 @@ PinnedMemoryManagerImpl::PinnedMemoryManagerImpl(
   if (pinned_memory_buffer_ != nullptr) {
     managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
         boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
-    // Sanity check on whether we need to configure 'size_type'
-    LOG_VERBOSE(1) << "Memory at '"
-                   << PointerToString(managed_pinned_memory_.get_address())
-                   << "' with size " << managed_pinned_memory_.get_size()
-                   << " is being managed";
   }
 }
 
