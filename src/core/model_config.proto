@@ -446,11 +446,13 @@ message ModelOptimizationPolicy
   //@@  .. cpp:var:: message ExecutionAccelerators
   //@@
   //@@     Specify the preferred execution accelerators to be used to execute
-  //@@     the model. Currently only recognized by ONNX Runtime backend.
+  //@@     the model. Currently only recognized by ONNX Runtime backend and
+  //@@     TensorFlow backend.
   //@@
-  //@@     For ONNX Runtime backend, multiple execution accelerators may be set
-  //@@     for both GPU and CPU, in such case, the priority will be in the
-  //@@     following order:
+  //@@     For ONNX Runtime backend, it will deploy the model with the execution
+  //@@     accelerators by priority, the priority is determined based on the
+  //@@     order that they are set, i.e. the provider at the front has highest
+  //@@     priority. Overall, the priority will be in the following order:
   //@@         <gpu_execution_accelerator> (if instance is on GPU)
   //@@         CUDA Execution Provider     (if instance is on GPU)
   //@@         <cpu_execution_accelerator>
@@ -483,14 +485,13 @@ message ModelOptimizationPolicy
     //@@    .. cpp:var:: Accelerator gpu_execution_accelerator (repeated)
     //@@
     //@@       The preferred execution provider to be used if the model instance
-    //@@       is deployed on GPU. The order priority implies priority, i.e. the
-    //@@       provider at the front has highest priority.
+    //@@       is deployed on GPU.
     //@@
     //@@       For ONNX Runtime backend, possible value is "tensorrt" as name,
     //@@       and no parameters are required.
     //@@
-    //@@       For TensorFlow backend, possible value is "tensorrt" as name,
-    //@@       with the following parameters:
+    //@@       For TensorFlow backend, possible values are "tensorrt", "gpu_io".
+    //@@       For "tensorrt", the following parameters can be specified:
     //@@         "precision_mode" The precission used for optimization.
     //@@         The value can be one of "FP32", "FP16" and "INT8".
     //@@         Default value is "FP32".
@@ -501,15 +502,22 @@ message ModelOptimizationPolicy
     //@@         "max_workspace_size_bytes" The maximum GPU memory the model
     //@@         can use temporarily during execution. Default value is 1GB.
     //@@
+    //@@       For "gpu_io", no parameters are required. If set, the model will
+    //@@       be executed using TensorFlow Callable API to set input and output
+    //@@       tensors in GPU memory if possible, which can reduce data transfer
+    //@@       overhead if the model is used in ensemble. However, the Callable
+    //@@       object will be created on model creation and it will request all
+    //@@       outputs for every model execution, which may impact the
+    //@@       performance if a request does not require all outputs. This
+    //@@       optimization will only take affect if the model instance is
+    //@@       created with KIND_GPU.
+    //@@
     repeated Accelerator gpu_execution_accelerator = 1;
 
     //@@    .. cpp:var:: Accelerator cpu_execution_accelerator (repeated)
     //@@
     //@@       The preferred execution provider to be used if the model instance
-    //@@       is deployed on CPU, or if the model instance is deployed on GPU
-    //@@       but both 'gpu_execution_accelerator' and CUDA Execution Provider
-    //@@       don't support the operators. The order priority implies priority,
-    //@@       i.e. the provider at the front has highest priority.
+    //@@       is deployed on CPU.
     //@@
     //@@       For ONNX Runtime backend, possible value is "openvino" as name,
     //@@       and no parameters are required.

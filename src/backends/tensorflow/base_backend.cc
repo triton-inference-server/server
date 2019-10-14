@@ -45,7 +45,8 @@ namespace nvidia { namespace inferenceserver {
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
-      trtistf_model_(nullptr, TRTISTF_ModelDelete)
+      trtistf_model_(nullptr, TRTISTF_ModelDelete),
+      input_device_id_(MODEL_DEVICE)
 {
 }
 
@@ -280,6 +281,13 @@ BaseBackend::CreateExecutionContext(
         }
         LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                        << instance_name;
+      } else if (execution_accelerator.name() == kGPUIOExecutionAccelerator) {
+        // GPU I/O can be set, set hint
+        if ((gpu_device != Context::NO_GPU_DEVICE) &&
+            (gpu_device != Context::MODEL_DEVICE)) {
+          // In TensorFlow, TF device (vGPU) is used for device utilities
+          context->input_device_id_ = vgpu_device;
+        }
       } else {
         return Status(
             RequestStatusCode::INVALID_ARG, "unknown Execution Accelerator '" +
@@ -295,6 +303,25 @@ BaseBackend::CreateExecutionContext(
       Config().optimization().graph().level(), gdp_itr->second,
       &context->trtistf_model_, &context->input_name_map_,
       &context->output_name_map_, tftrt_config_ptr));
+
+
+  if (context->input_device_id_ != Context::MODEL_DEVICE) {
+    const size_t num_inputs = Config().input_size();
+    const size_t num_outputs = Config().output_size();
+    std::vector<const char*> input_names, output_names;
+    std::vector<TRTISTF_DataType> input_types, output_types;
+    for (const auto& io : Config().input()) {
+      input_names.push_back(io.name().c_str());
+      input_types.push_back(ConvertDataType(io.data_type()));
+    }
+    for (const auto& io : Config().output()) {
+      output_names.push_back(io.name().c_str());
+      output_types.push_back(ConvertDataType(io.data_type()));
+    }
+    TRTISTF_ModelMakeCallable(
+        context->trtistf_model_.get(), input_names.data(), input_types.data(),
+        num_inputs, output_names.data(), output_types.data(), num_outputs);
+  }
 
   return Status::Success;
 }
@@ -460,10 +487,11 @@ BaseBackend::Context::SetInput(
     input_tensor_name = &tn_itr->second;
   }
 
+  // Only try to create a tensor on specific device if 'input_device_id_' is set
   const TRTISTF_DataType dtype = ConvertDataType(datatype);
   TRTISTF_Tensor* tensor = TRTISTF_TensorNew(
       input_tensor_name->c_str(), dtype, shape.size(),
-      (shape.size() == 0) ? nullptr : &shape[0]);
+      (shape.size() == 0) ? nullptr : &shape[0], input_device_id_);
   if (tensor == nullptr) {
     return Status(
         RequestStatusCode::INTERNAL,
@@ -513,8 +541,13 @@ BaseBackend::Context::SetFixedSizedInputTensor(
         request_header.batch_size() * batch1_byte_size);
   }
 
+  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
+                                 ? TRTSERVER_MEMORY_GPU
+                                 : TRTSERVER_MEMORY_CPU;
+  LOG_VERBOSE(1) << "input '" << input_name
+                 << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   SetInputBuffer(
-      input_name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      input_name, expected_byte_sizes, payloads, content_memory_type, buffer);
 }
 
 void
@@ -632,12 +665,11 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
     const std::vector<int64_t>& shape, const size_t batch1_byte_size,
     std::vector<Scheduler::Payload>* payloads, bool* cuda_copy)
 {
-  // [TODO] use the following statement. Right now we always create
-  // output tensor with default constructor that uses CPU allocator
-  // auto content_memory_type = (gpu_device_ == NO_GPU_DEVICE)
-  //                                ? TRTSERVER_MEMORY_CPU
-  //                                : TRTSERVER_MEMORY_GPU;
-  auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
+                                 ? TRTSERVER_MEMORY_GPU
+                                 : TRTSERVER_MEMORY_CPU;
+  LOG_VERBOSE(1) << "output '" << output_name
+                 << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   *cuda_copy |= SetFixedSizeOutputBuffer(
       output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
       content_memory_type, payloads);
