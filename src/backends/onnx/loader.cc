@@ -37,7 +37,7 @@ OnnxLoader* OnnxLoader::loader = nullptr;
 OnnxLoader::~OnnxLoader()
 {
   if (env_ != nullptr) {
-    OrtReleaseEnv(env_);
+    ort_api->ReleaseEnv(env_);
   }
 }
 
@@ -46,8 +46,10 @@ OnnxLoader::Init()
 {
   if (loader == nullptr) {
     OrtEnv* env;
-    // If needed, provide custom logger with OrtCreateEnvWithCustomLogger()
-    OrtStatus* status = OrtCreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
+    // If needed, provide custom logger with
+    // ort_api->CreateEnvWithCustomLogger()
+    OrtStatus* status =
+        ort_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "log", &env);
     loader = new OnnxLoader(env);
     RETURN_IF_ORT_ERROR(status);
   } else {
@@ -102,7 +104,7 @@ OnnxLoader::LoadSession(
       }
     }
 
-    OrtStatus* status = OrtCreateSessionFromArray(
+    OrtStatus* status = ort_api->CreateSessionFromArray(
         loader->env_, model_data.c_str(), model_data.size(), session_options,
         session);
 
@@ -122,7 +124,7 @@ Status
 OnnxLoader::UnloadSession(OrtSession* session)
 {
   if (loader != nullptr) {
-    OrtReleaseSession(session);
+    ort_api->ReleaseSession(session);
     TryRelease(true);
   } else {
     return Status(
