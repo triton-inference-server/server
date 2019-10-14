@@ -732,14 +732,14 @@ InferAllocatorPayload(
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
 
+      if (alloc_payload->shm_map_ == nullptr) {
+        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
+      }
+
       void* base;
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
-
-      if (alloc_payload->shm_map_ == nullptr) {
-        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
-      }
 
       alloc_payload->shm_map_->emplace(
           io.name(),
@@ -1606,17 +1606,45 @@ SharedMemoryControlHandler::Process(Handler::State* state, bool rpc_ok)
     TRTSERVER_Error* err = nullptr;
     if (request.has_register_()) {
       if (request.register_().has_system_shared_memory()) {
-        err = smb_manager_->Create(
+        // system shared memory
+        err = smb_manager_->CpuCreate(
             &smb, request.register_().name(),
             request.register_().system_shared_memory().shared_memory_key(),
-            request.register_().offset(), request.register_().byte_size());
+            request.register_().system_shared_memory().offset(),
+            request.register_().byte_size());
+        if (err == nullptr) {
+          err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
+        }
+      } else if (request.register_().has_cuda_shared_memory()) {
+        // cuda shared memory
+#if TRTIS_ENABLE_GPU
+        const std::string& raw_handle =
+            request.register_().cuda_shared_memory().raw_handle();
+        char* handle_base = const_cast<char*>(raw_handle.c_str());
+        cudaIpcMemHandle_t* cuda_shm_handle =
+            reinterpret_cast<cudaIpcMemHandle_t*>(handle_base);
+        err = smb_manager_->GpuCreate(
+            &smb, request.register_().name(), cuda_shm_handle,
+            request.register_().byte_size(),
+            request.register_().cuda_shared_memory().device_id());
+        if (err == nullptr) {
+          err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
+        }
+#else
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "failed to register CUDA shared memory region: '" +
+                request.register_().name() + "', GPUs not supported")
+                .c_str());
+#endif  // TRTIS_ENABLE_GPU
       } else {
-        return TRTSERVER_ErrorNew(
-            TRTSERVER_ERROR_INTERNAL,
-            "only system shared memory is supported currently");
-      }
-      if (err == nullptr) {
-        err = TRTSERVER_ServerRegisterSharedMemory(trtserver_.get(), smb);
+        err = TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "failed to register shared memory region: '" +
+                request.register_().name() + "', improperly formed request.")
+                .c_str());
       }
     } else if (request.has_unregister()) {
       err = smb_manager_->Remove(&smb, request.unregister().name());

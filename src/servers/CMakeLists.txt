@@ -47,6 +47,9 @@ if(${TRTIS_ENABLE_GRPC})
     grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
   )
+  if(${TRTIS_ENABLE_GPU})
+    target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRTIS_ENABLE_GPU
   add_dependencies(grpc-endpoint-library grpc-library proto-library)
 
   set(
@@ -87,6 +90,11 @@ if(${TRTIS_ENABLE_HTTP} OR ${TRTIS_ENABLE_METRICS})
     http-endpoint-library EXCLUDE_FROM_ALL OBJECT
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
+
+  if(${TRTIS_ENABLE_GPU})
+    target_include_directories(http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRTIS_ENABLE_GPU
+
   add_dependencies(http-endpoint-library proto-library)
   target_include_directories(
     http-endpoint-library
@@ -130,7 +138,9 @@ if(${TRTIS_ENABLE_TRACING})
     tracing-library EXCLUDE_FROM_ALL OBJECT
     ${TRACING_SRCS} ${TRACING_HDRS}
   )
-
+  if(${TRTIS_ENABLE_GPU})
+    target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  endif() # TRTIS_ENABLE_GPU
   set(
     TRACING_OBJECTS
     $<TARGET_OBJECTS:tracing-library>
@@ -164,6 +174,9 @@ add_executable(
   ${TRACING_OBJECTS}
 )
 set_property(TARGET main PROPERTY OUTPUT_NAME trtserver)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   main
   ${HTTP_ENDPOINT_LIBRARIES}
@@ -351,12 +364,12 @@ if(${TRTIS_ENABLE_S3})
 endif() # TRTIS_ENABLE_S3
 
 if(${TRTIS_ENABLE_GPU})
-target_link_libraries(
-  trtserver
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
+  target_link_libraries(
+    trtserver
+    PUBLIC -L/usr/local/cuda/lib64/stubs
+    PUBLIC -lnvidia-ml
+    PRIVATE ${CUDA_LIBRARIES}
+  )
 endif() # TRTIS_ENABLE_GPU
 
 install(

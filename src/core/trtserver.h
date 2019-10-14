@@ -43,6 +43,10 @@ extern "C" {
 #define TRTSERVER_EXPORT
 #endif
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 struct TRTSERVER_Error;
 struct TRTSERVER_InferenceRequestProvider;
 struct TRTSERVER_InferenceResponse;
@@ -125,21 +129,39 @@ TRTSERVER_EXPORT const char* TRTSERVER_ErrorMessage(TRTSERVER_Error* error);
 /// maintains a reference into the block.
 ///
 
-/// Create a new shared memory block object referencing a shared
+/// Create a new shared memory block object referencing a system shared
 /// memory block residing in TRTSERVER_MEMORY_CPU type memory.
 /// \param shared_memory_block Returns the new shared memory block object.
 /// \param name A unique name for the shared memory block. This name
 /// is used in inference requests to refer to this shared memory
 /// block.
-/// \param shm_key The name of the posix shared memory object
-/// containing the block of memory.
-/// \param offset The offset within the shared memory object to the
+/// \param shm_key The name of the posix shared memory object containing
+/// the block of memory.
+/// \param offset The offset within the system shared memory object to the
 /// start of the block.
 /// \param byte_size The size, in bytes of the block.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockCpuNew(
     TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
     const char* shm_key, const size_t offset, const size_t byte_size);
+
+/// Create a new shared memory block object referencing a CUDA shared
+/// memory block residing in TRTSERVER_MEMORY_GPU type memory.
+/// \param shared_memory_block Returns the new shared memory block object.
+/// \param name A unique name for the shared memory block. This name
+/// is used in inference requests to refer to this shared memory
+/// block.
+/// \param handle_block_name The name of the system shared memory block
+/// containing the CUDA IPC handle.
+/// \param byte_size The size, in bytes of the block.
+/// \param device_id The GPU number the CUDA shared memory region is in.
+/// \return a TRTSERVER_Error indicating success or failure.
+#ifdef TRTIS_ENABLE_GPU
+TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
+    const int device_id);
+#endif  // TRTIS_ENABLE_GPU
 
 /// Delete a shared memory block object.
 /// \param shared_memory_block The object to delete.

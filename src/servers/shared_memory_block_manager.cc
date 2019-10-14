@@ -37,7 +37,7 @@ SharedMemoryBlockManager::~SharedMemoryBlockManager()
 }
 
 TRTSERVER_Error*
-SharedMemoryBlockManager::Create(
+SharedMemoryBlockManager::CpuCreate(
     TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
     const std::string& shm_key, const size_t offset, const size_t byte_size)
 {
@@ -52,10 +52,36 @@ SharedMemoryBlockManager::Create(
 
   RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockCpuNew(
       smb, name.c_str(), shm_key.c_str(), offset, byte_size));
+
   blocks_.emplace(name, *smb);
 
   return nullptr;  // success
 }
+
+#if TRTIS_ENABLE_GPU
+TRTSERVER_Error*
+SharedMemoryBlockManager::GpuCreate(
+    TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
+    const int device_id)
+{
+  *smb = nullptr;
+
+  if (blocks_.find(name) != blocks_.end()) {
+    return TRTSERVER_ErrorNew(
+        TRTSERVER_ERROR_ALREADY_EXISTS,
+        std::string("shared memory block '" + name + "' already in manager")
+            .c_str());
+  }
+
+  RETURN_IF_ERR(TRTSERVER_SharedMemoryBlockGpuNew(
+      smb, name.c_str(), cuda_shm_handle, byte_size, device_id));
+
+  blocks_.emplace(name, *smb);
+
+  return nullptr;  // success
+}
+#endif  // TRTIS_ENABLE_GPU
 
 TRTSERVER_Error*
 SharedMemoryBlockManager::Get(
