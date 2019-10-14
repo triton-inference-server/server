@@ -240,7 +240,7 @@ class ServerStatusContext {
 ///   objects are owned by the caller and may be retained and accessed
 ///   even after the InferContext object is destroyed.
 /// \par
-///   AsyncRun() and GetAsyncRunStatus() calls are not thread-safe.
+///   AsyncRun() and GetReadyAsyncRequest() calls are not thread-safe.
 ///   What's more, calling one method while the other one is running
 ///   will result in undefined behavior given that they will modify the
 ///   shared data internally.

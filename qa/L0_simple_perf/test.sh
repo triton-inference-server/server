@@ -41,10 +41,8 @@ REPORTER=../common/reporter.py
 # The tensorrt identity model only allows variable size up to 32 so we
 # can't use it for the large tensor size runs we do here
 BACKENDS=${BACKENDS:="custom graphdef savedmodel onnx libtorch netdef"}
-WARMUP_ITERS=10
-MEASURE_ITERS=50
-BATCH_SIZE=1
 TENSOR_SIZES="16384 16777216"   # 16k and 16m fp32 elements
+CONCURRENCIES="1 8"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -92,25 +90,58 @@ for BACKEND in $BACKENDS; do
     for TENSOR_SIZE in $TENSOR_SIZES; do
         set +e
 
-        if (( $FIRST != 1 )); then
+        for CONCURRENCY in $CONCURRENCIES; do
+            WARMUP_ITERS=10
+            MEASURE_ITERS=200 && [[ "$TENSOR_SIZE" != "16384" ]] && \
+                MEASURE_ITERS=50
+
+            if (( $FIRST != 1 )); then
+                echo -e "," >> ${BACKEND}.log
+            fi
+            FIRST=0
+
+            # sync HTTP API
+            $CLIENT -l"sync_concurrent_${CONCURRENCY}" \
+                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            if (( $? != 0 )); then
+                RET=1
+            fi
+
             echo -e "," >> ${BACKEND}.log
-        fi
-        FIRST=0
 
-        $CLIENT -j -f${BACKEND} -m${MODEL_NAME} -b${BATCH_SIZE} -s${TENSOR_SIZE} \
-                -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-        if (( $? != 0 )); then
-            RET=1
-        fi
+            # sync GRPC API
+            $CLIENT -l"sync_concurrent_${CONCURRENCY}" -i grpc -u localhost:8001 \
+                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            if (( $? != 0 )); then
+                RET=1
+            fi
 
-        echo -e "," >> ${BACKEND}.log
+            # FIXME bug with >1 concurrency in clients
+            if (( $CONCURRENCY == 1 )); then
 
-        $CLIENT -i grpc -u localhost:8001 -j -f${BACKEND} -m${MODEL_NAME} -b${BATCH_SIZE} \
-                -s${TENSOR_SIZE} -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-        if (( $? != 0 )); then
-            RET=1
-        fi
+                echo -e "," >> ${BACKEND}.log
 
+                # async HTTP API
+                $CLIENT -a -l"async_concurrent_${CONCURRENCY}" \
+                        -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                        -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+                if (( $? != 0 )); then
+                    RET=1
+                fi
+
+                echo -e "," >> ${BACKEND}.log
+
+                # async GRPC API
+                $CLIENT -a -l"async_concurrent_${CONCURRENCY}" -i grpc -u localhost:8001 \
+                        -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                        -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+                if (( $? != 0 )); then
+                    RET=1
+                fi
+            fi
+        done
         set -e
     done
 

@@ -215,16 +215,17 @@ main(int argc, char** argv)
   size_t done_cnt = 0;
   for (size_t i = 0; i < repeat_cnt; i++) {
     FAIL_IF_ERR(
-        ctx->AsyncRun([&, i](
-                          nic::InferContext* ctx,
-                          std::shared_ptr<nic::InferContext::Request> request) {
-          std::lock_guard<std::mutex> lk(mtx);
-          std::cout << "Callback no." << i << " is called" << std::endl;
-          done_cnt++;
-          ValidateResults(ctx, request, input0_data, input1_data);
-          cv.notify_all();
-          return;
-        }),
+        ctx->AsyncRun(
+            [&, i](
+                nic::InferContext* ctx,
+                const std::shared_ptr<nic::InferContext::Request>& request) {
+              std::lock_guard<std::mutex> lk(mtx);
+              std::cout << "Callback no." << i << " is called" << std::endl;
+              done_cnt++;
+              ValidateResults(ctx, request, input0_data, input1_data);
+              cv.notify_all();
+              return;
+            }),
         "unable to run model");
   }
 
