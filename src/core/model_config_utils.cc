@@ -371,6 +371,12 @@ ValidateModelConfig(
         "must specify 'platform' for " + config.name());
   }
 
+  if (config.max_batch_size() < 0) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "'max_batch_size' must be non-negative value for " + config.name());
+  }
+
   if (!expected_platform.empty() && (config.platform() != expected_platform)) {
     return Status(
         RequestStatusCode::NOT_FOUND, "expected model of type " +
