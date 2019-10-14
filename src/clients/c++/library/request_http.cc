@@ -600,7 +600,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
 #if TRTIS_ENABLE_GPU
   Error RegisterCudaSharedMemory(
       const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
-      size_t byte_size, int device_id) override;
+      size_t byte_size, int device_id = 0) override;
 #endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;

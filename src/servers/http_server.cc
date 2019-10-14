@@ -701,8 +701,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
   }
 
   re2::RE2 register_regex_(R"(/([^/]+)/(/[^/]+)/([0-9]+)/([0-9]+))");
-  re2::RE2 cudaregister_regex_(
-      R"(/([^/]+)/([^/]+)/([0-9]+)/([0-9]+)/([0-9]+))");
+  re2::RE2 cudaregister_regex_(R"(/([^/]+)/([0-9]+)/([0-9]+))");
   re2::RE2 unregister_regex_(R"(/([^/]+))");
 
   std::string action_type_str, remaining, name, shm_key;
@@ -729,8 +728,7 @@ HTTPAPIServer::HandleSharedMemoryControl(
       } else if (
           action_type_str == "cudaregister" &&
           (!RE2::FullMatch(
-              remaining, cudaregister_regex_, &name, &shm_key, &offset_str,
-              &byte_size_str, &device_id_str))) {
+              remaining, cudaregister_regex_, &name, &byte_size_str, &device_id_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       } else if (action_type_str == "unregister") {
