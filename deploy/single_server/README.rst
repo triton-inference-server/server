@@ -30,11 +30,12 @@
 TensorRT Inference Server Helm Chart
 ====================================
 
-    **NOTE: Google Kubernetes Engine (GKE) version 1.14 contains a
+    **NOTE: Some versions of Google Kubernetes Engine (GKE) contain a
     regression in the handling of LD_LIBRARY_PATH that prevents the
     inference server container from running correctly. See
     https://issuetracker.google.com/issues/141255952. Use a GKE 1.13
-    or earlier version to avoid this issue.**
+    or earlier version or a GKE 1.14.6 or later version to avoid this
+    issue.**
 
 Simple helm chart for installing a single instance of the NVIDIA
 TensorRT Inference Server. This guide assumes you already have a
