@@ -731,7 +731,8 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
 
   // request data provided by RequestProvider()
   SerialCudaHandle serial_cuda_handle(
-      reinterpret_cast<const char*>(&cuda_shm_handle), sizeof(cudaIpcMemHandle_t));
+      reinterpret_cast<const char*>(&cuda_shm_handle),
+      sizeof(cudaIpcMemHandle_t));
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
   curl_easy_setopt(curl, CURLOPT_READDATA, serial_cuda_handle);
 

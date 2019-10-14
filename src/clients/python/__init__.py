@@ -164,6 +164,9 @@ _crequest_infer_ctx_options_add_class.argtypes = [c_void_p, c_void_p, _utf8, c_u
 _crequest_infer_ctx_options_add_shared_memory = _crequest.InferContextOptionsAddSharedMemory
 _crequest_infer_ctx_options_add_shared_memory.restype = c_void_p
 _crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
+_crequest_infer_ctx_options_add_cuda_shared_memory = _crequest.InferContextOptionsAddCudaSharedMemory
+_crequest_infer_ctx_options_add_cuda_shared_memory.restype = c_void_p
+_crequest_infer_ctx_options_add_cuda_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
 _crequest_correlation_id = _crequest.CorrelationId
 _crequest_correlation_id.restype = c_uint64
 _crequest_correlation_id.argtypes = [c_void_p]
@@ -185,6 +188,9 @@ _crequest_infer_ctx_input_set_raw.argtypes = [c_void_p, c_void_p, c_uint64]
 _crequest_infer_ctx_input_set_shared_memory = _crequest.InferContextInputSetSharedMemory
 _crequest_infer_ctx_input_set_shared_memory.restype = c_void_p
 _crequest_infer_ctx_input_set_shared_memory.argtypes = [c_void_p, c_void_p]
+_crequest_infer_ctx_input_set_cuda_shared_memory = _crequest.InferContextInputSetCudaSharedMemory
+_crequest_infer_ctx_input_set_cuda_shared_memory.restype = c_void_p
+_crequest_infer_ctx_input_set_cuda_shared_memory.argtypes = [c_void_p, c_void_p]
 
 _crequest_infer_ctx_result_new = _crequest.InferContextResultNew
 _crequest_infer_ctx_result_new.restype = c_void_p
@@ -222,6 +228,9 @@ _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_
 _crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandle
 _crequest_get_shared_memory_handle_info.restype = c_void_p
 _crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
+_crequest_get_cuda_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetCudaSharedMemoryHandle
+_crequest_get_cuda_shared_memory_handle_info.restype = c_void_p
+_crequest_get_cuda_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_uint64), POINTER(c_int)]
 
 def _raise_if_error(err):
     """
@@ -902,7 +911,7 @@ class InferContext:
         self._callback_resources_dict = dict()
         self._callback_resources_dict_id = 0
         self._ctx = c_void_p()
-        # Lock for the thread-safety across asynchronous requests 
+        # Lock for the thread-safety across asynchronous requests
         self._lock = threading.Lock()
 
         if http_headers is None:

@@ -815,23 +815,6 @@ class SharedMemoryControlContext {
       size_t byte_size, int device_id = 0) = 0;
 #endif  // TRTIS_ENABLE_GPU
 
-#if TRTIS_ENABLE_GPU
-  /// Register a CUDA shared memory region on the inference server. If the
-  /// shared memory region is already registered, it will return error
-  /// 'TRTSERVER_ERROR_ALEADY_EXISTS'.
-  /// \param name The user-given name for the shared memory region to be
-  /// registered.
-  /// \param cuda_shm_handle The CUDA memory handle representing the location
-  /// in shared memory being registered.
-  /// \param byte_size The size, in bytes of the shared memory region.
-  /// \param device id The GPU device ID the shared memory region is in.
-  /// Defaults to 0.
-  /// \return Error object indicating success or failure.
-  virtual Error RegisterCudaSharedMemory(
-      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
-      size_t byte_size, int device_id = 0) = 0;
-#endif  // TRTIS_ENABLE_GPU
-
   /// Unregister a registered shared memory region on the inference server. If
   /// the shared memory region is not registered, do nothing and return success.
   /// \param name The user-given name for the shared memory region to be

@@ -78,7 +78,8 @@ CudaSharedMemoryRegionCreate(
 
   // create a handle for the shared memory region
   *cuda_shm_handle = CudaSharedMemoryHandleCreate(
-      std::string(trtis_shm_name), &cuda_handle, data_ptr, byte_size, device_id);
+      std::string(trtis_shm_name), &cuda_handle, data_ptr, byte_size,
+      device_id);
 
   // Set device to previous GPU
   cudaSetDevice(previous_device);

@@ -138,13 +138,6 @@ class TrtServerSharedMemoryBlock {
 #endif  // TRTIS_ENABLE_GPU
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
-  size_t DeviceId() const { return device_id_; }
-#ifdef TRTIS_ENABLE_GPU
-  const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
-  size_t DeviceId() const { return device_id_; }
-#endif  // TRTIS_ENABLE_GPU
-  size_t Offset() const { return offset_; }
-  size_t ByteSize() const { return byte_size_; }
 
  private:
   const TRTSERVER_Memory_Type type_;
