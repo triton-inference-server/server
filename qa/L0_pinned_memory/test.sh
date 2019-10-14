@@ -40,7 +40,6 @@ CLIENT=../clients/simple_perf_client
 BACKENDS=${BACKENDS:="libtorch"}
 WARMUP_ITERS=20
 MEASURE_ITERS=100
-BATCH_SIZE=1
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -92,7 +91,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates pinned memory for large size
     set +e
-    $CLIENT -m${ENSEMBLE_NAME} -b1 -s16777216 -n1
+    $CLIENT -lsanity_large_size -m${ENSEMBLE_NAME} -s16777216 -n1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -121,7 +120,7 @@ for BACKEND in $BACKENDS; do
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
-                -b${BATCH_SIZE} -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                -lelements -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
                 >> ${BACKEND}.${TENSOR_SIZE}.pinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
@@ -144,7 +143,7 @@ for BACKEND in $BACKENDS; do
 
     # Sanity check that the server allocates non-pinned memory
     set +e
-    $CLIENT -m${ENSEMBLE_NAME} -b1 -s1 -n1
+    $CLIENT -l sanity_non_pinned -m${ENSEMBLE_NAME} -s1 -n1
     if (( $? != 0 )); then
         RET=1
     fi
@@ -173,7 +172,7 @@ for BACKEND in $BACKENDS; do
     set +e
     for TENSOR_SIZE in 16384 1048576 2097152 4194304 8388608 16777216; do
         $CLIENT -i grpc -u localhost:8001 -m${ENSEMBLE_NAME} \
-                -b${BATCH_SIZE} -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
+                -lelements -s${TENSOR_SIZE} -n${MEASURE_ITERS} \
                 >> ${BACKEND}.${TENSOR_SIZE}.nonpinned.log 2>&1
         if (( $? != 0 )); then
             RET=1
