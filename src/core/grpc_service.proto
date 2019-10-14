@@ -254,7 +254,15 @@ message SharedMemoryControlRequest
       //@@     The name of the shared memory region that holds the input data
       //@@     (or where the output data should be written).
       //@@
-      string shared_memory_key = 2;
+      string shared_memory_key = 1;
+
+      //@@  .. cpp:var:: uint64 offset
+      //@@
+      //@@     This is the offset of the shared memory block from the start
+      //@@     of the shared memory region.
+      //@@     start = offset, end = offset + byte_size;
+      //@@
+      uint64 offset = 2;
     }
 
     //@@
@@ -264,26 +272,17 @@ message SharedMemoryControlRequest
     //@@
     message CUDASharedMemoryIdentifier
     {
-      //@@  .. cpp:var:: string shared_memory_key
+      //@@  .. cpp:var:: bytes raw_handle
       //@@
-      //@@     The name of the system shared memory region that holds the
-      //@@     cudaIPC handle.
+      //@@     The raw serialized cudaIPC handle.
       //@@
-      string shared_memory_key = 1;
+      bytes raw_handle = 1;
 
-      //@@  .. cpp:var:: uint64 offset
+      //@@  .. cpp:var:: int64 device_id
       //@@
-      //@@     The offset of the cudaIPC handle from the start of the shared
-      //@@     memory region.
-      //@@     start = offset, end = offset + size;
+      //@@     The GPU device ID on which the cudaIPC handle was created.
       //@@
-      uint64 offset = 2;
-
-      //@@  .. cpp:var:: uint64 byte_size
-      //@@
-      //@@     Size of the cudaIPC handle in the shared memory block, in bytes.
-      //@@
-      uint64 byte_size = 3;
+      int64 device_id = 2;
     }
 
     //@@  .. cpp:var:: oneof shared_memory_types
@@ -307,18 +306,11 @@ message SharedMemoryControlRequest
       CUDASharedMemoryIdentifier cuda_shared_memory = 3;
     }
 
-    //@@  .. cpp:var:: uint64 offset
-    //@@
-    //@@     The offset from the start of the shared memory region.
-    //@@     start = offset, end = offset + size;
-    //@@
-    uint64 offset = 4;
-
     //@@  .. cpp:var:: uint64 byte_size
     //@@
-    //@@     Size of the memory block, in bytes.
+    //@@     Size of the shared memory block, in bytes.
     //@@
-    uint64 byte_size = 5;
+    uint64 byte_size = 4;
   }
 
   //@@  .. cpp:var:: message Unregister

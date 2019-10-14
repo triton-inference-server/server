@@ -122,10 +122,20 @@ class TrtServerSharedMemoryBlock {
   explicit TrtServerSharedMemoryBlock(
       TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
       const size_t offset, const size_t byte_size);
+#ifdef TRTIS_ENABLE_GPU
+  explicit TrtServerSharedMemoryBlock(
+      TRTSERVER_Memory_Type type, const char* name,
+      const cudaIpcMemHandle_t* cuda_shm_handle, const int device_id,
+      const size_t byte_size);
+#endif  // TRTIS_ENABLE_GPU
 
   TRTSERVER_Memory_Type Type() const { return type_; }
   const std::string& Name() const { return name_; }
   const std::string& ShmKey() const { return shm_key_; }
+#ifdef TRTIS_ENABLE_GPU
+  const cudaIpcMemHandle_t* CudaHandle() const { return cuda_shm_handle_; }
+  size_t DeviceId() const { return device_id_; }
+#endif  // TRTIS_ENABLE_GPU
   size_t Offset() const { return offset_; }
   size_t ByteSize() const { return byte_size_; }
 
@@ -133,6 +143,10 @@ class TrtServerSharedMemoryBlock {
   const TRTSERVER_Memory_Type type_;
   const std::string name_;
   const std::string shm_key_;
+#ifdef TRTIS_ENABLE_GPU
+  const cudaIpcMemHandle_t* cuda_shm_handle_;
+  const int device_id_;
+#endif  // TRTIS_ENABLE_GPU
   const size_t offset_;
   const size_t byte_size_;
 };
@@ -140,10 +154,26 @@ class TrtServerSharedMemoryBlock {
 TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
     TRTSERVER_Memory_Type type, const char* name, const char* shm_key,
     const size_t offset, const size_t byte_size)
+#ifdef TRTIS_ENABLE_GPU
+    : type_(type), name_(name), shm_key_(shm_key), cuda_shm_handle_(nullptr),
+      device_id_(0), offset_(offset), byte_size_(byte_size)
+#else
     : type_(type), name_(name), shm_key_(shm_key), offset_(offset),
       byte_size_(byte_size)
+#endif  // TRTIS_ENABLE_GPU
 {
 }
+
+#ifdef TRTIS_ENABLE_GPU
+TrtServerSharedMemoryBlock::TrtServerSharedMemoryBlock(
+    TRTSERVER_Memory_Type type, const char* name,
+    const cudaIpcMemHandle_t* cuda_shm_handle, const int device_id,
+    const size_t byte_size)
+    : type_(type), name_(name), shm_key_(""), cuda_shm_handle_(cuda_shm_handle),
+      device_id_(device_id), offset_(0), byte_size_(byte_size)
+{
+}
+#endif  // TRTIS_ENABLE_GPU
 
 //
 // TrtServerResponseAllocator
@@ -514,6 +544,20 @@ TRTSERVER_SharedMemoryBlockCpuNew(
           TRTSERVER_MEMORY_CPU, name, shm_key, offset, byte_size));
   return nullptr;  // Success
 }
+
+#ifdef TRTIS_ENABLE_GPU
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockGpuNew(
+    TRTSERVER_SharedMemoryBlock** shared_memory_block, const char* name,
+    const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
+    const int device_id)
+{
+  *shared_memory_block = reinterpret_cast<TRTSERVER_SharedMemoryBlock*>(
+      new TrtServerSharedMemoryBlock(
+          TRTSERVER_MEMORY_GPU, name, cuda_shm_handle, device_id, byte_size));
+  return nullptr;  // Success
+}
+#endif  // TRTIS_ENABLE_GPU
 
 TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockDelete(
@@ -1150,8 +1194,15 @@ TRTSERVER_ServerRegisterSharedMemory(
       lserver->StatusManager(),
       ni::ServerStatTimerScoped::Kind::SHARED_MEMORY_CONTROL);
 
-  RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
-      lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
+  if (lsmb->Type() == TRTSERVER_MEMORY_CPU) {
+    RETURN_IF_STATUS_ERROR(lserver->RegisterSharedMemory(
+        lsmb->Name(), lsmb->ShmKey(), lsmb->Offset(), lsmb->ByteSize()));
+  } else {
+#ifdef TRTIS_ENABLE_GPU
+    RETURN_IF_STATUS_ERROR(lserver->RegisterCudaSharedMemory(
+        lsmb->Name(), lsmb->CudaHandle(), lsmb->ByteSize(), lsmb->DeviceId()));
+#endif  // TRTIS_ENABLE_GPU
+  }
 
   return nullptr;  // success
 }

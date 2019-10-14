@@ -40,9 +40,8 @@ class SharedMemoryBlockManager {
   ~SharedMemoryBlockManager();
 
   /// Add a shared memory block representing shared memory in system
-  /// (CPU) memory to the manager. Return
-  /// TRTSERVER_ERROR_ALREADY_EXISTS if a shared memory block of the
-  /// same name already exists in the manager.
+  /// (CPU) memory to the manager. Return TRTSERVER_ERROR_ALREADY_EXISTS
+  /// if a shared memory block of the same name already exists in the manager.
   /// \param smb Returns the shared memory block.
   /// \param name The name of the memory block.
   /// \param shm_key The name of the posix shared memory object
@@ -51,9 +50,26 @@ class SharedMemoryBlockManager {
   /// start of the block.
   /// \param byte_size The size, in bytes of the block.
   /// \return a TRTSERVER_Error indicating success or failure.
-  TRTSERVER_Error* Create(
+  TRTSERVER_Error* CpuCreate(
       TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
       const std::string& shm_key, const size_t offset, const size_t byte_size);
+
+#if TRTIS_ENABLE_GPU
+  /// Add a shared memory block representing shared memory in CUDA
+  /// (GPU) memory to the manager. Return TRTSERVER_ERROR_ALREADY_EXISTS
+  /// if a shared memory block of the same name already exists in the manager.
+  /// \param smb Returns the shared memory block.
+  /// \param name The name of the memory block.
+  /// \param cuda_shm_handle The unique memory handle to the cuda shared
+  /// memory block.
+  /// \param byte_size The size, in bytes of the block.
+  /// \param device id The GPU number the shared memory region is in.
+  /// \return a TRTSERVER_Error indicating success or failure.
+  TRTSERVER_Error* GpuCreate(
+      TRTSERVER_SharedMemoryBlock** smb, const std::string& name,
+      const cudaIpcMemHandle_t* cuda_shm_handle, const size_t byte_size,
+      const int device_id);
+#endif  // TRTIS_ENABLE_GPU
 
   /// Get a named shared memory block. Return
   /// TRTSERVER_ERROR_NOT_FOUND if named block doesn't exist.

@@ -37,6 +37,10 @@
 #define strncasecmp _strnicmp
 #endif
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class HttpRequestImpl;
@@ -595,8 +599,13 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
       const std::string& url, const std::map<std::string, std::string>& headers,
       bool verbose);
   Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size) override;
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size) override;
+#if TRTIS_ENABLE_GPU
+  Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
+      size_t byte_size, int device_id) override;
+#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* status) override;
@@ -605,7 +614,8 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
   static size_t ResponseHeaderHandler(void*, size_t, size_t, void*);
   Error SendRequest(
       const std::string& action_str, const std::string& name,
-      const std::string& shm_key, const size_t offset, const size_t byte_size);
+      const std::string& shm_key, const size_t offset, const size_t byte_size,
+      const int device_id);
   static size_t ResponseHandler(void*, size_t, size_t, void*);
 
   // URL for control endpoint on inference server.
@@ -649,20 +659,31 @@ SharedMemoryControlHttpContextImpl::RegisterSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  return SendRequest("register", name, shm_key, offset, byte_size);
+  return SendRequest("register", name, shm_key, offset, byte_size, 0);
 }
+
+#if TRTIS_ENABLE_GPU
+Error
+SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
+    size_t byte_size, int device_id)
+{
+  return SendRequest(
+      "cudaregister", name, cuda_shm_handle, 0, byte_size, device_id);
+}
+#endif  // TRTIS_ENABLE_GPU
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterSharedMemory(
     const std::string& name)
 {
-  return SendRequest("unregister", name, "", 0, 0);
+  return SendRequest("unregister", name, "", 0, 0, 0);
 }
 
 Error
 SharedMemoryControlHttpContextImpl::UnregisterAllSharedMemory()
 {
-  return SendRequest("unregisterall", "", "", 0, 0);
+  return SendRequest("unregisterall", "", "", 0, 0, 0);
 }
 
 Error
@@ -671,7 +692,7 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 {
   shm_status->Clear();
 
-  Error err = SendRequest("status", "", "", 0, 0);
+  Error err = SendRequest("status", "", "", 0, 0, 0);
   if (err.IsOk()) {
     if (!shm_status->ParseFromString(response_)) {
       return Error(
@@ -689,7 +710,8 @@ SharedMemoryControlHttpContextImpl::GetSharedMemoryStatus(
 Error
 SharedMemoryControlHttpContextImpl::SendRequest(
     const std::string& action_str, const std::string& name,
-    const std::string& shm_key, const size_t offset, const size_t byte_size)
+    const std::string& shm_key, const size_t offset, const size_t byte_size,
+    const int device_id)
 {
   response_.clear();
   request_status_.Clear();
@@ -709,6 +731,13 @@ SharedMemoryControlHttpContextImpl::SendRequest(
   if (action_str == "register") {
     full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
                 "/" + std::to_string(byte_size);
+  } else if (action_str == "cudaregister") {
+#if TRTIS_ENABLE_GPU
+    // TODO set cuda-shm_handle as raw bytes in body
+    full_url += +"/" + name + "/" + shm_key + "/" + std::to_string(offset) +
+                "/" + std::to_string(byte_size) + "/" +
+                std::to_string(device_id);
+#endif  // TRTIS_ENABLE_GPU
   } else if (action_str == "unregister") {
     full_url += +"/" + name;
   }

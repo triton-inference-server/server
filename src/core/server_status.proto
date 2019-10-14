@@ -308,25 +308,60 @@ message SharedMemoryRegion
   //@@
   string name = 1;
 
-  //@@  .. cpp:var:: string shared_memory_key
-  //@@
-  //@@     The name of the shared memory region that holds the input data
-  //@@     (or where the output data should be written).
-  //@@
-  string shared_memory_key = 2;
+  message SystemSharedMemory
+  {
+    //@@  .. cpp:var:: string shared_memory_key
+    //@@
+    //@@     The name of the shared memory region that holds the input data
+    //@@     (or where the output data should be written).
+    //@@
+    string shared_memory_key = 1;
 
-  //@@  .. cpp:var:: uint64 offset
+    //@@  .. cpp:var:: uint64 offset
+    //@@
+    //@@     This is the offset of the shared memory block from the start
+    //@@     of the shared memory region.
+    //@@     start = offset, end = offset + byte_size;
+    //@@
+    uint64 offset = 2;
+  }
+
+  message CudaSharedMemory
+  {
+    //@@  .. cpp:var:: int64 device_id
+    //@@
+    //@@     The GPU device ID on which the cudaIPC handle was created.
+    //@@
+    int64 device_id = 1;
+  }
+
+  //@@  .. cpp:var:: oneof shared_memory_types
   //@@
-  //@@     The offset from the start of the shared memory region.
-  //@@     start = offset, end = offset + size;
+  //@@     Types of shared memory identifiers
   //@@
-  uint64 offset = 3;
+  oneof shared_memory_types
+  {
+    //@@
+    //@@  .. cpp:var:: SystemSharedMemory system_shared_memory
+    //@@
+    //@@     The status of this system shared memory region.
+    //@@
+    SystemSharedMemory system_shared_memory = 2;
+
+    //@@
+    //@@  .. cpp:var:: CudaSharedMemory cuda_shared_memory
+    //@@
+    //@@     The status of this CUDA shared memory region.
+    //@@
+    CudaSharedMemory cuda_shared_memory = 3;
+  }
+
 
   //@@  .. cpp:var:: uint64 byte_size
   //@@
-  //@@     Size of the memory block, in bytes.
+  //@@     Size of the shared memory block, in bytes.
   //@@
-  uint64 byte_size = 4;
+  uint64 byte_size = 5;
 }
 
 //@@

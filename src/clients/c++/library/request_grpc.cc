@@ -35,6 +35,10 @@
 #include "src/core/grpc_service.grpc.pb.h"
 #include "src/core/model_config.pb.h"
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver { namespace client {
 
 class InferGrpcContextImpl;
@@ -304,8 +308,13 @@ class SharedMemoryControlGrpcContextImpl : public SharedMemoryControlContext {
  public:
   SharedMemoryControlGrpcContextImpl(const std::string& url, bool verbose);
   Error RegisterSharedMemory(
-      const std::string& name, const std::string& shm_key, const size_t offset,
-      const size_t byte_size) override;
+      const std::string& name, const std::string& shm_key, size_t offset,
+      size_t byte_size) override;
+#if TRTIS_ENABLE_GPU
+  Error RegisterCudaSharedMemory(
+      const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
+      size_t byte_size, int device_id) override;
+#endif  // TRTIS_ENABLE_GPU
   Error UnregisterSharedMemory(const std::string& name) override;
   Error UnregisterAllSharedMemory() override;
   Error GetSharedMemoryStatus(SharedMemoryStatus* shm_status) override;
@@ -326,8 +335,8 @@ SharedMemoryControlGrpcContextImpl::SharedMemoryControlGrpcContextImpl(
 
 Error
 SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
-    const std::string& name, const std::string& shm_key, const size_t offset,
-    const size_t byte_size)
+    const std::string& name, const std::string& shm_key, size_t offset,
+    size_t byte_size)
 {
   SharedMemoryControlRequest request;
   SharedMemoryControlResponse response;
@@ -337,7 +346,7 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
   rshm_region->set_name(name);
   auto shm_id = rshm_region->mutable_system_shared_memory();
   shm_id->set_shared_memory_key(shm_key);
-  rshm_region->set_offset(offset);
+  shm_id->set_offset(offset);
   rshm_region->set_byte_size(byte_size);
 
   grpc::Status status =
@@ -352,6 +361,43 @@ SharedMemoryControlGrpcContextImpl::RegisterSharedMemory(
             status.error_message());
   }
 }
+
+#if TRTIS_ENABLE_GPU
+Error
+SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
+    const std::string& name, const cudaIpcMemHandle_t& cuda_shm_handle,
+    size_t byte_size, int device_id)
+{
+  SharedMemoryControlRequest request;
+  SharedMemoryControlResponse response;
+  grpc::ClientContext context;
+
+  auto rshm_region = request.mutable_register_();
+  rshm_region->set_name(name);
+  auto cuda_shm_id = rshm_region->mutable_cuda_shared_memory();
+
+  // serialize cuda shm handle
+  std::string* ipc_handle = cuda_shm_id->mutable_raw_handle();
+  ipc_handle->append(
+      reinterpret_cast<const char*>(cuda_shm_handle),
+      sizeof(cudaIpcMemHandle_t));
+  cuda_shm_id->set_device_id(device_id);
+
+  rshm_region->set_byte_size(byte_size);
+
+  grpc::Status status =
+      stub_->SharedMemoryControl(&context, request, &response);
+  if (status.ok()) {
+    return Error(response.request_status());
+  } else {
+    // Something wrong with the GRPC conncection
+    return Error(
+        RequestStatusCode::INTERNAL,
+        "GRPC client failed: " + std::to_string(status.error_code()) + ": " +
+            status.error_message());
+  }
+}
+#endif  // TRTIS_ENABLE_GPU
 
 Error
 SharedMemoryControlGrpcContextImpl::UnregisterSharedMemory(

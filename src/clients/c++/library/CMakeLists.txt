@@ -80,6 +80,9 @@ add_library(
   $<TARGET_OBJECTS:proto-library>
   $<TARGET_OBJECTS:request-library>
 )
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(request_static PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   request_static
   PRIVATE gRPC::grpc++
@@ -147,4 +150,3 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/../../../core/server_status.pb.h
   DESTINATION include
 )
-
