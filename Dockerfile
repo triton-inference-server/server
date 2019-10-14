@@ -108,20 +108,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends git
 # Use a fixed commit after rel-0.5.0
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
     (cd onnxruntime && \
-            git checkout a0ba25f98f210fa506300bb5040695e2b7a636a8 && \
+            git checkout c24d7a8a0a95002cfde70db8ffdac1a1d95b3ca7 && \
             git submodule update --init --recursive)
 
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
-# Modify install dependencies to corresponding packages in Ubuntu 18.04
-RUN sed -i "s/libicu55/libicu60/" ${SCRIPT_DIR}/install_ubuntu.sh && \
-    sed -i "s/libpng16/libpng/" ${SCRIPT_DIR}/install_ubuntu.sh && \
-    sed -i "s/libprotobuf9v5/libprotobuf10/" ${SCRIPT_DIR}/install_ubuntu.sh && \
-    sed -i "s/libcurl3/libcurl4/" ${SCRIPT_DIR}/install_ubuntu.sh && \
-    sed -i "s/3\.5/3.6/" ${SCRIPT_DIR}/install_ubuntu.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
-    ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
+    ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
 
 # Install OpenVINO
 # https://github.com/microsoft/onnxruntime/blob/master/tools/ci_build/github/linux/docker/Dockerfile.ubuntu_openvino
