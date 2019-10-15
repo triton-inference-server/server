@@ -84,11 +84,12 @@ add_library(
 add_library(
   TRTIS::request_static ALIAS request_static
 )
-
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(request_static PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(
+    request_static
+    PRIVATE ${CUDA_INCLUDE_DIRS}
+  )
 endif() # TRTIS_ENABLE_GPU
-
 target_include_directories(
   request_static
   PUBLIC
@@ -163,7 +164,7 @@ install(
 
 # cmake configuration
 include (CMakePackageConfigHelpers)
-set (_LIB_CMAKE_DIR lib/cmake/TRTIS)
+set(_LIB_CMAKE_DIR lib/cmake/TRTIS)
 install(
   EXPORT trtis-export
   FILE TRTISTargets.cmake
@@ -186,4 +187,3 @@ install(
     ${CMAKE_CURRENT_BINARY_DIR}/TRTISConfigVersion.cmake
   DESTINATION ${_LIB_CMAKE_DIR}
 )
-
