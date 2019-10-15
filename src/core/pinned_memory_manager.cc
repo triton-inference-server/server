@@ -196,7 +196,7 @@ PinnedMemoryManager::Create(const Options& options)
                    << options.pinned_memory_pool_byte_size_;
   }
 #endif  // TRTIS_ENABLE_GPU
-  manager->reset(
+  instance_.reset(
       new PinnedMemoryManager(buffer, options.pinned_memory_pool_byte_size_));
   return Status::Success;
 }
