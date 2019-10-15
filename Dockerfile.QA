@@ -202,7 +202,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
-                              python \
+                              python-dev \
                               python-protobuf \
                               swig && \
     rm -rf /var/lib/apt/lists/*
