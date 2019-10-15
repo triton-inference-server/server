@@ -492,9 +492,6 @@ CustomBackend::Context::Run(
     }
   }
 
-  // After execution, input buffer can be clean up if any
-  input_buffers_.clear();
-
   if (err != 0) {
     return Status(
         RequestStatusCode::INTERNAL, "execute error for '" + name_ + "': (" +
@@ -529,8 +526,8 @@ CustomBackend::Context::GetNextInput(
   // If the memory type is on GPU, implicitly copying it to CPU memory
   // to ensure backward capability
   if (ok && (src_memory_type == CUSTOM_MEMORY_GPU)) {
-    input_buffers_.emplace_back();
-    auto& buffer_unique_ptr = input_buffers_.back();
+    input_context->input_buffers_.emplace_back();
+    auto& buffer_unique_ptr = input_context->input_buffers_.back();
     buffer_unique_ptr.reset(new char[*content_byte_size]);
     cudaError_t err = cudaMemcpyAsync(
         buffer_unique_ptr.get(), *content, *content_byte_size,
