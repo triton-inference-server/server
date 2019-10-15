@@ -104,6 +104,7 @@ class CustomBackend : public InferenceBackend {
       }
       CustomBackend::Context* context_;
       Scheduler::Payload* payload_;
+      std::vector<std::unique_ptr<char[]>> input_buffers_;
     };
 
     // Callback used by custom backends to get the next block of input
@@ -143,8 +144,6 @@ class CustomBackend : public InferenceBackend {
 
     // The version of the custom interface.
     int custom_version_;
-
-    std::vector<std::unique_ptr<char[]>> input_buffers_;
   };
 
   std::vector<std::string> server_params_;
