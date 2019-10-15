@@ -106,18 +106,17 @@ int32_t trace_rate_ = 1000;
 #ifdef TRTIS_ENABLE_GRPC
 // The number of threads to initialize for handling GRPC infer
 // requests.
-int grpc_infer_thread_cnt_ = 4;
+int grpc_infer_thread_cnt_ = 1;
 
 // The number of threads to initialize for handling GRPC stream infer
 // requests.
-int grpc_stream_infer_thread_cnt_ = 4;
+int grpc_stream_infer_thread_cnt_ = 1;
 
 // The maximum number of inference request/response objects that
 // remain allocated for reuse. As long as the number of in-flight
 // requests doesn't exceed this value there will be no
-// allocation/deallocation of request/response objects. Higher values
-// trade-off increased memory usage for higher performance.
-int grpc_infer_allocation_pool_size_ = 128;
+// allocation/deallocation of request/response objects.
+int grpc_infer_allocation_pool_size_ = 0;
 #endif  // TRTIS_ENABLE_GRPC
 
 #ifdef TRTIS_ENABLE_HTTP
@@ -246,8 +245,7 @@ std::vector<Option> options_{
      "The maximum number of inference request/response objects that remain "
      "allocated for reuse. As long as the number of in-flight requests doesn't "
      "exceed this value there will be no allocation/deallocation of "
-     "request/response objects. Higher values trade-off increased memory usage "
-     "for higher performance."},
+     "request/response objects."},
 #endif  // TRTIS_ENABLE_GRPC
 #ifdef TRTIS_ENABLE_METRICS
     {OPTION_ALLOW_METRICS, "allow-metrics",
