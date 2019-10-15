@@ -39,7 +39,6 @@ CLIENT=../clients/simple_perf_client
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
 WARMUP_ITERS=20
 MEASURE_ITERS=100
-BATCH_SIZE=1
 TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -78,7 +77,7 @@ for BACKEND in $BACKENDS; do
 
     set +e
 
-    $CLIENT -m${MODEL_NAME}_def -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
             -w1 -n1 >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
@@ -90,7 +89,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
             -w1 -n1 >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
@@ -103,13 +102,13 @@ for BACKEND in $BACKENDS; do
     fi
 
     # Sample latency results
-    $CLIENT -m${MODEL_NAME}_def -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
             -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -b${BATCH_SIZE} -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
             -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.gpu.log 2>&1
     if (( $? != 0 )); then
         RET=1
