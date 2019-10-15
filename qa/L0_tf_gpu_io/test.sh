@@ -77,7 +77,7 @@ for BACKEND in $BACKENDS; do
 
     set +e
 
-    $CLIENT -m${MODEL_NAME}_def -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
             -w1 -n1 >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
@@ -89,7 +89,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
             -w1 -n1 >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
         RET=1
@@ -102,13 +102,13 @@ for BACKEND in $BACKENDS; do
     fi
 
     # Sample latency results
-    $CLIENT -m${MODEL_NAME}_def -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_def -l${MODEL_NAME}_def -s${TENSOR_SIZE} \
             -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
+    $CLIENT -m${MODEL_NAME}_gpu -l${MODEL_NAME}_gpu -s${TENSOR_SIZE} \
             -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.gpu.log 2>&1
     if (( $? != 0 )); then
         RET=1
