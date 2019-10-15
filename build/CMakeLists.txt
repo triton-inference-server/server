@@ -29,6 +29,7 @@ project (tensorrt-inference-server)
 
 include(CMakeDependentOption)
 include(ExternalProject)
+include(GNUInstallDirs)
 
 # Backends
 option(TRTIS_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
@@ -110,14 +111,6 @@ ExternalProject_Add(protobuf
   DEPENDS grpc-repo
 )
 
-# Location where protobuf-config.cmake will be installed varies by
-# platform
-if (WIN32)
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/cmake")
-else()
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/lib/cmake/protobuf")
-endif()
-
 #
 # Build c-area project from grpc-repo
 #
@@ -146,7 +139,7 @@ ExternalProject_Add(grpc
     -DgRPC_BUILD_TESTS:BOOL=OFF
     -DgRPC_PROTOBUF_PROVIDER:STRING=package
     -DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DProtobuf_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf/${CMAKE_INSTALL_LIBDIR}/cmake/protobuf
     -DgRPC_ZLIB_PROVIDER:STRING=package
     -DgRPC_CARES_PROVIDER:STRING=package
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
@@ -254,7 +247,7 @@ set(GCS_CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH}
    ${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
    ${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
    ${CMAKE_CURRENT_BINARY_DIR}/crc32c/lib/cmake/Crc32c
-   ${_FINDPACKAGE_PROTOBUF_CONFIG_DIR})
+   ${CMAKE_CURRENT_BINARY_DIR}/protobuf/${CMAKE_INSTALL_LIBDIR}/cmake/protobuf)
 
 #
 # Build google-cloud-cpp
@@ -327,7 +320,7 @@ ExternalProject_Add(trtis-custom-backends
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-custom-backends"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DProtobuf_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf/${CMAKE_INSTALL_LIBDIR}/cmake/protobuf
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
@@ -347,14 +340,17 @@ else()
   set(TRTIS_CLIENTS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
+# version
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION" TRTIS_VERSION)
+
 ExternalProject_Add(trtis-clients
   PREFIX trtis-clients
   SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/trtis-clients"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis-clients"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
-    -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/lib/cmake/CURL
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DCURL_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/curl/install/${CMAKE_INSTALL_LIBDIR}/cmake/CURL
+    -DProtobuf_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf/${CMAKE_INSTALL_LIBDIR}/cmake/protobuf
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc
@@ -362,6 +358,7 @@ ExternalProject_Add(trtis-clients
     -DCMAKE_BUILD_TYPE:BOOL=${CMAKE_BUILD_TYPE}
     -DTRTIS_ENABLE_GPU:BOOL=${TRTIS_ENABLE_GPU}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRTIS_CLIENTS_INSTALL_PREFIX}
+    -DTRTIS_VERSION:STRING=${TRTIS_VERSION}
   DEPENDS curl protobuf grpc
 )
 
@@ -397,7 +394,7 @@ ExternalProject_Add(trtis
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/trtis"
   BUILD_ALWAYS 1
   CMAKE_CACHE_ARGS
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -DProtobuf_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf/${CMAKE_INSTALL_LIBDIR}/cmake/protobuf
     -Dc-ares_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares/lib/cmake/c-ares
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     -DgRPC_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc

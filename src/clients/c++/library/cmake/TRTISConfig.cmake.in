@@ -24,64 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.5)
+# specific version required for protobuf
+if(NOT PROTOBUF_FOUND AND NOT Protobuf_FOUND)
+  find_package(Protobuf @Protobuf_VERSION@ CONFIG REQUIRED)
+endif()
 
-#
-# Dependencies
-#
+if(NOT c-ares_FOUND)
+  find_package(c-ares CONFIG REQUIRED)
+endif()
 
-# Protobuf
-set(protobuf_MODULE_COMPATIBLE TRUE CACHE BOOL "protobuf_MODULE_COMPATIBLE" FORCE)
-find_package(Protobuf CONFIG REQUIRED)
-message(STATUS "Using protobuf ${Protobuf_VERSION}")
-include_directories(${Protobuf_INCLUDE_DIRS})
+if(NOT CURL_FOUND)
+  find_package(CURL REQUIRED)
+endif()
 
-# GRPC
-find_package(gRPC CONFIG REQUIRED)
-message(STATUS "Using gRPC ${gRPC_VERSION}")
-include_directories($<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>)
+# specific version required for grpc
+if(NOT GRPC_FOUND AND NOT gRPC_FOUND)
+  find_package(gRPC @gRPC_VERSION@ CONFIG REQUIRED)
+endif()
 
-# Curl
-find_package(CURL CONFIG REQUIRED)
-message(STATUS "Using curl ${CURL_VERSION}")
+if(NOT Threads_FOUND)
+  find_package(Threads REQUIRED)
+endif()
 
-#
-# Example applications
-#
-include_directories("${PROJECT_SOURCE_DIR}/../../../include")
-
-# simple_client using static library, librequest_static.a
-add_executable(
-  simple_client_static
-  ${PROJECT_SOURCE_DIR}/../../simple_client.cc
-)
-target_link_libraries(
-  simple_client_static
-  PRIVATE -L${PROJECT_SOURCE_DIR}/../../../lib
-  PRIVATE TRTIS::request_static
-  PRIVATE gRPC::grpc++
-  PRIVATE gRPC::grpc
-  PRIVATE CURL::libcurl
-  PUBLIC protobuf::libprotobuf
-)
-install(
-  TARGETS simple_client_static
-  RUNTIME DESTINATION bin
-)
-
-# simple_client using shared library, librequest.so
-add_executable(
-  simple_client_shared
-  ${PROJECT_SOURCE_DIR}/../../simple_client.cc
-)
-target_link_libraries(
-  simple_client_shared
-  PRIVATE -L${PROJECT_SOURCE_DIR}/../../../lib
-  PRIVATE TRTIS::request
-  PUBLIC protobuf::libprotobuf
-)
-install(
-  TARGETS simple_client_shared
-  RUNTIME DESTINATION bin
-)
-
+if (NOT (TARGET TRTIS::request))
+  include ("${CMAKE_CURRENT_LIST_DIR}/TRTISTargets.cmake")
+endif ()
