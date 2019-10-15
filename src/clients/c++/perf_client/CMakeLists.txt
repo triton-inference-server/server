@@ -26,6 +26,11 @@
 
 cmake_minimum_required (VERSION 3.5)
 
+if(WIN32)
+  message("Currently, CMake will not build perf_client because it uses functionalities that "
+		      "are UNIX specific.")
+else()
+
 set(
   PERF_CLIENT_SRCS
   perf_client.cc
@@ -54,3 +59,4 @@ install(
   RUNTIME DESTINATION bin
 )
 
+endif()

@@ -31,6 +31,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 find_package(CURL CONFIG REQUIRED)
 message(STATUS "Using curl ${CURL_VERSION}")
+add_definitions(-DCURL_STATICLIB)
 
 find_package(Threads REQUIRED)
 
