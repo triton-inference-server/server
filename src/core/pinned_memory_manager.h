@@ -26,6 +26,7 @@
 //
 #pragma once
 
+#include <boost/interprocess/managed_external_buffer.hpp>
 #include <memory>
 #include "src/core/status.h"
 
@@ -36,21 +37,14 @@ namespace nvidia { namespace inferenceserver {
 // must be requested via functions provided by this class.
 class PinnedMemoryManager {
  public:
-  // Options to be checked before allocating pinned memeory.
-  // [DLIS-778] For now there is a hard-coded threshold on minimum byte size for
-  // allocating pinned memory, as the overhead of (de)allocating it will cancel
-  // out the speed up in data transfer for small size (empirical value ~32MB)
+  // Options to configure pinned memeory manager.
   struct Options {
-    Options(uint64_t b = 0)
-        : pinned_memory_pool_byte_size_(b), min_request_size_(1 << 25)
-    {
-    }
+    Options(uint64_t b = 0) : pinned_memory_pool_byte_size_(b) {}
 
     uint64_t pinned_memory_pool_byte_size_;
-    uint64_t min_request_size_;
   };
 
-  ~PinnedMemoryManager() = default;
+  ~PinnedMemoryManager();
 
   // Create the pinned memory manager based on 'options' specified.
   // Return true on success, false otherwise.
@@ -67,21 +61,22 @@ class PinnedMemoryManager {
   // Free the memory allocated by the pinned memory manager.
   static Status Free(void* ptr);
 
+ protected:
+  PinnedMemoryManager(void* pinned_memory_buffer, uint64_t size);
+
+  Status AllocInternal(
+      void** ptr, uint64_t size, bool allow_nonpinned_fallback = false);
+  Status FreeInternal(void* ptr);
+
  private:
-  PinnedMemoryManager(const Options& options)
-      : options_(options), allocated_pinned_memory_byte_size_(0)
-  {
-  }
-
-  // Helper function to check if the pinned memory should be allocated.
-  Status CheckPrerequisite(uint64_t requested_size);
-
   static std::unique_ptr<PinnedMemoryManager> instance_;
 
-  Options options_;
-  std::mutex mtx_;
-  uint64_t allocated_pinned_memory_byte_size_;
-  std::map<void*, std::pair<bool, uint64_t>> memory_info_;
+  std::mutex info_mtx_;
+  std::map<void*, bool> memory_info_;
+
+  void* pinned_memory_buffer_;
+  std::mutex buffer_mtx_;
+  boost::interprocess::managed_external_buffer managed_pinned_memory_;
 };
 
 }}  // namespace nvidia::inferenceserver

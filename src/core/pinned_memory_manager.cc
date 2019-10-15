@@ -50,60 +50,52 @@ PointerToString(void* ptr)
 
 std::unique_ptr<PinnedMemoryManager> PinnedMemoryManager::instance_;
 
-Status
-PinnedMemoryManager::Create(const Options& options)
+PinnedMemoryManager::PinnedMemoryManager(
+    void* pinned_memory_buffer, uint64_t size)
+    : pinned_memory_buffer_(pinned_memory_buffer)
 {
-  if (instance_ != nullptr) {
-    return Status(
-        RequestStatusCode::ALREADY_EXISTS,
-        "PinnedMemoryManager has been created");
+  if (pinned_memory_buffer_ != nullptr) {
+    managed_pinned_memory_ = boost::interprocess::managed_external_buffer(
+        boost::interprocess::create_only_t{}, pinned_memory_buffer_, size);
   }
+}
 
-  instance_.reset(new PinnedMemoryManager(options));
-  return Status::Success;
+PinnedMemoryManager::~PinnedMemoryManager()
+{
+  // Clean up
+  for (const auto& memory_info : memory_info_) {
+    const auto& is_pinned = memory_info.second;
+    if (!is_pinned) {
+      free(memory_info.first);
+    }
+  }
+#ifdef TRTIS_ENABLE_GPU
+  if (pinned_memory_buffer_ != nullptr) {
+    cudaFreeHost(pinned_memory_buffer_);
+  }
+#endif  // TRTIS_ENABLE_GPU
 }
 
 Status
-PinnedMemoryManager::Alloc(
+PinnedMemoryManager::AllocInternal(
     void** ptr, uint64_t size, bool allow_nonpinned_fallback)
 {
-  if (instance_ == nullptr) {
-    return Status(
-        RequestStatusCode::UNAVAILABLE,
-        "PinnedMemoryManager has not been created");
-  }
-
   auto status = Status::Success;
-  {
-    // only holds the lock on accessing manager member
-    std::lock_guard<std::mutex> lk(instance_->mtx_);
-
-    status = instance_->CheckPrerequisite(size);
-    // treat as if the operation will succeed to avoid over-subscription
-    instance_->allocated_pinned_memory_byte_size_ += size;
-  }
-
-  // allocate buffer
-  bool is_pinned = true;
-  if (status.IsOk()) {
-#ifdef TRTIS_ENABLE_GPU
-    auto err = cudaHostAlloc(ptr, size, cudaHostAllocPortable);
-    if (err != cudaSuccess) {
-      // set to nullptr on error to avoid freeing invalid pointer
-      *ptr = nullptr;
+  if (pinned_memory_buffer_ != nullptr) {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
+    *ptr = managed_pinned_memory_.allocate(size, std::nothrow_t{});
+    if (*ptr == nullptr) {
       status = Status(
           RequestStatusCode::INTERNAL,
-          "failed to allocate pinned system memory: " +
-              std::string(cudaGetErrorString(err)));
+          "failed to allocate pinned system memory");
     }
-#else
-    *ptr = nullptr;
+  } else {
     status = Status(
         RequestStatusCode::INTERNAL,
-        "failed to allocate pinned system memory: TRTIS_ENABLE_GPU is not set");
-#endif  // TRTIS_ENABLE_GPU
+        "failed to allocate pinned system memory: no pinned memory pool");
   }
 
+  bool is_pinned = true;
   if ((!status.IsOk()) && allow_nonpinned_fallback) {
     static bool warning_logged = false;
     if (!warning_logged) {
@@ -122,12 +114,11 @@ PinnedMemoryManager::Alloc(
     }
   }
 
-  // manage allocated buffer or clean up
+  // keep track of allocated buffer or clean up
   {
-    std::lock_guard<std::mutex> lk(instance_->mtx_);
+    std::lock_guard<std::mutex> lk(info_mtx_);
     if (status.IsOk()) {
-      auto res = instance_->memory_info_.emplace(
-          *ptr, std::make_pair(is_pinned, size));
+      auto res = memory_info_.emplace(*ptr, is_pinned);
       if (!res.second) {
         status = Status(
             RequestStatusCode::INTERNAL,
@@ -138,25 +129,89 @@ PinnedMemoryManager::Alloc(
                      << "pinned memory allocation: "
                      << "size " << size << ", addr " << *ptr;
     }
-    // In either case, we need to adjust back the pinned byte size
-    if ((!status.IsOk()) || (!is_pinned)) {
-      instance_->allocated_pinned_memory_byte_size_ -= size;
-    }
   }
 
   if ((!status.IsOk()) && (*ptr != nullptr)) {
-#ifdef TRTIS_ENABLE_GPU
     if (is_pinned) {
-      cudaFreeHost(*ptr);
+      std::lock_guard<std::mutex> lk(buffer_mtx_);
+      managed_pinned_memory_.deallocate(*ptr);
     } else {
       free(*ptr);
     }
-#else
-    free(*ptr);
-#endif  // TRTIS_ENABLE_GPU
   }
 
   return status;
+}
+
+Status
+PinnedMemoryManager::FreeInternal(void* ptr)
+{
+  bool is_pinned = true;
+  {
+    std::lock_guard<std::mutex> lk(info_mtx_);
+    auto it = memory_info_.find(ptr);
+    if (it != memory_info_.end()) {
+      is_pinned = it->second;
+      LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
+                     << "pinned memory deallocation: "
+                     << "addr " << ptr;
+      memory_info_.erase(it);
+    } else {
+      return Status(
+          RequestStatusCode::INTERNAL, "unexpected memory address '" +
+                                           PointerToString(ptr) +
+                                           "' is not being managed");
+    }
+  }
+
+  if (is_pinned) {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
+    managed_pinned_memory_.deallocate(ptr);
+  } else {
+    free(ptr);
+  }
+  return Status::Success;
+}
+
+Status
+PinnedMemoryManager::Create(const Options& options)
+{
+  if (instance_ != nullptr) {
+    return Status(
+        RequestStatusCode::ALREADY_EXISTS,
+        "PinnedMemoryManager has been created");
+  }
+
+  void* buffer = nullptr;
+#ifdef TRTIS_ENABLE_GPU
+  auto err = cudaHostAlloc(
+      &buffer, options.pinned_memory_pool_byte_size_, cudaHostAllocPortable);
+  if (err != cudaSuccess) {
+    buffer = nullptr;
+    LOG_ERROR << "failed to allocate pinned system memory: "
+              << std::string(cudaGetErrorString(err));
+  } else {
+    LOG_VERBOSE(1) << "Pinned memory pool is created at '"
+                   << PointerToString(buffer) << "' with size "
+                   << options.pinned_memory_pool_byte_size_;
+  }
+#endif  // TRTIS_ENABLE_GPU
+  instance_.reset(
+      new PinnedMemoryManager(buffer, options.pinned_memory_pool_byte_size_));
+  return Status::Success;
+}
+
+Status
+PinnedMemoryManager::Alloc(
+    void** ptr, uint64_t size, bool allow_nonpinned_fallback)
+{
+  if (instance_ == nullptr) {
+    return Status(
+        RequestStatusCode::UNAVAILABLE,
+        "PinnedMemoryManager has not been created");
+  }
+
+  return instance_->AllocInternal(ptr, size, allow_nonpinned_fallback);
 }
 
 Status
@@ -168,72 +223,7 @@ PinnedMemoryManager::Free(void* ptr)
         "PinnedMemoryManager has not been created");
   }
 
-  bool is_pinned = true;
-  {
-    std::lock_guard<std::mutex> lk(instance_->mtx_);
-    auto it = instance_->memory_info_.find(ptr);
-    if (it != instance_->memory_info_.end()) {
-      is_pinned = it->second.first;
-      const auto& size = it->second.second;
-      if (is_pinned) {
-        instance_->allocated_pinned_memory_byte_size_ -= size;
-      }
-      instance_->memory_info_.erase(it);
-      LOG_VERBOSE(1) << (is_pinned ? "" : "non-")
-                     << "pinned memory deallocation: "
-                     << "addr " << ptr;
-    } else {
-      return Status(
-          RequestStatusCode::INTERNAL, "unexpected memory address '" +
-                                           PointerToString(ptr) +
-                                           "' is not being managed");
-    }
-  }
-
-  if (is_pinned) {
-#ifdef TRTIS_ENABLE_GPU
-    cudaFreeHost(ptr);
-#else
-    return Status(
-        RequestStatusCode::INTERNAL,
-        "unexpected pinned system memory is managed while TRTIS_ENABLE_GPU is "
-        "not set");
-#endif  // TRTIS_ENABLE_GPU
-  } else {
-    free(ptr);
-  }
-  return Status::Success;
-}
-
-Status
-PinnedMemoryManager::CheckPrerequisite(uint64_t requested_size)
-{
-  std::string error_message;
-#ifdef TRTIS_ENABLE_GPU
-  if (requested_size < options_.min_request_size_) {
-    error_message =
-        ("minimum pinned memory allocation is " +
-         std::to_string(options_.min_request_size_) + " bytes, requested " +
-         std::to_string(requested_size));
-  } else if (
-      (allocated_pinned_memory_byte_size_ + requested_size) >
-      options_.pinned_memory_pool_byte_size_) {
-    error_message =
-        ("pinned memory poll exceeded (" +
-         std::to_string(options_.pinned_memory_pool_byte_size_) + " < " +
-         std::to_string(requested_size) + " + " +
-         std::to_string(allocated_pinned_memory_byte_size_) + ")");
-  }
-#else
-  error_message = "TRTIS_ENABLE_GPU is not set";
-#endif  // TRTIS_ENABLE_GPU
-
-  if (!error_message.empty()) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "reject pinned memory allocation request: " + error_message);
-  }
-  return Status::Success;
+  return instance_->FreeInternal(ptr);
 }
 
 }}  // namespace nvidia::inferenceserver

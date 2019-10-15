@@ -197,7 +197,8 @@ RUN apt-get update && \
             libgoogle-glog0v5 \
             libre2-dev \
             libssl-dev \
-            libtool
+            libtool \
+            libboost-dev
 
 # libcurl4-openSSL-dev is needed for GCS
 RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
