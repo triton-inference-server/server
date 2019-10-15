@@ -173,6 +173,9 @@ also contain the built client Python examples that you can learn more
 about in :ref:`section-client-examples`. At this time the Windows
 build does not include the C++ examples.
 
+The MSBuild.exe may need to be invoked twice for a successfull
+build.
+
 .. build-client-end-marker-do-not-remove
 
 .. _section-client-libaries-download-from-github:

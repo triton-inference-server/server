@@ -118,12 +118,16 @@ add_library(
 add_library(
   TRTIS::request ALIAS request
 )
+
+if (NOT WIN32)
 set_target_properties(
   request
   PROPERTIES
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
     LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
+endif()
+
 target_include_directories (request
   PUBLIC
     $<INSTALL_INTERFACE:include>
