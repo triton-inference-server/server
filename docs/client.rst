@@ -146,13 +146,15 @@ management tool on Windows. The following shows how to install the dependencies
 using them, and you can also install the dependencies in other ways that you
 prefer::
 
-  > .\vcpkg.exe install curl[openssl]:x64-windows
-  > pip install grpcio-tools wheel
+  > .\vcpkg.exe install openssl:x64-windows zlib:x64-windows
+  > .\pip.exe install grpcio-tools wheel
 
-The vcpkg step above installs curl and openssl, ":x64-windows" specifies the
+The vcpkg step above installs openssl and zlib, ":x64-windows" specifies the
 target and it is optional. The path to the libraries should be added to
 environment variable "PATH", by default it is
-\\path\\to\\vcpkg\\installed\\<target>\\bin.
+\\path\\to\\vcpkg\\installed\\<target>\\bin. Update the pip to get the proper
+wheel from PyPi. Users may need to invoke pip.exe from a command line ran as
+an administrator.
 
 To build the client for Windows, as there is no default
 build system available, you will need to specify the generator for
