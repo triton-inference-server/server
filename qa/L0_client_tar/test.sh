@@ -33,8 +33,8 @@ mkdir trtis_client
 (cd trtis_client && tar xzvf /workspace/*.tar.gz)
 
 # Build
-cd trtis_client/src/cmake
-cmake -DCMAKE_BUILD_TYPE=Release .
+cd trtis_client/build
+cmake -DCMAKE_BUILD_TYPE=Release -DTRTIS_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRTIS .
 make -j16 trtis-clients
 
 # There is no server running but can still check to make sure that the

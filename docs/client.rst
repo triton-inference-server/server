@@ -217,25 +217,26 @@ the inference server from you Python application, as shown in
 :ref:`section-client-examples`.
 
 For C++ the lib/ directory contains both shared and static libraries
-and then include/ directory contains the corresponding headers. The
-src/ directory contains an example application and CMake file to show
-how you can build your C++ application to use the libaries and
-includes. To build the example you must first install dependencies
-appropriate for your platform. For example, for Ubuntu 18.04::
+and the include/ directory contains the corresponding headers. The
+src/ directory contains an example application. The build/ directory
+contains a CMake file to show how you can build your C++ application
+to use the libaries and includes. To build the example you must first
+install dependencies appropriate for your platform. For example, for
+Ubuntu 18.04::
 
   $ apt-get update
-  $ apt-get install software-properties-common build-essential curl git zlib1g zlib1g-dev libssl-dev libcurl4-openssl-dev
+  $ apt-get install build-essential cmake git zlib1g-dev libssl-dev
 
 Then you can build the example application::
 
-  $ cd src/cmake
-  $ cmake .
+  $ cd build
+  $ cmake -DTRTIS_CLIENT_CMAKE_DIR:PATH=`pwd`/../lib/cmake/TRTIS .
   $ make -j8 trtis-clients
 
 The example CMake file that illustrates how to build is in
-src/cmake/trtis-clients/CMakeLists.txt. The build produces both a
+build/trtis-clients/CMakeLists.txt. The build produces both a
 statically and dynamically linked version of the example application
-into src/cmake/trtis-clients/install/bin.
+into build/trtis-clients/install/bin.
 
 .. _section-client-api:
 
