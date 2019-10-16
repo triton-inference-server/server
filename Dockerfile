@@ -103,7 +103,9 @@ ARG ONNX_RUNTIME_VERSION=0.5.0
 
 # Get release version of Onnx Runtime
 WORKDIR /workspace
-RUN apt-get update && apt-get install -y --no-install-recommends git
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
 
 # Use a fixed commit after rel-0.5.0
 RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
@@ -186,6 +188,7 @@ ARG TRTIS_VERSION=1.8.0dev
 ARG TRTIS_CONTAINER_VERSION=19.11dev
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
+# libcurl4-openSSL-dev is needed for GCS
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
@@ -198,22 +201,19 @@ RUN apt-get update && \
             libre2-dev \
             libssl-dev \
             libtool \
-            libboost-dev
-
-# libcurl4-openSSL-dev is needed for GCS
-RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
+            libboost-dev && \
+    if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
         apt-get install -y --no-install-recommends \
                 libcurl4-openssl-dev \
                 zlib1g-dev; \
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
-    fi
+    fi && \
+    rm -rf /var/lib/apt/lists/*
 
 # TensorFlow libraries. Install the monolithic libtensorflow_cc and
 # create a link libtensorflow_framework.so -> libtensorflow_cc.so so
@@ -323,7 +323,8 @@ RUN LIBCUDA_FOUND=$(ldconfig -p | grep -v compat | awk '{print $1}' | grep libcu
             cp -r trtis/install/bin /opt/tensorrtserver/. && \
             cp -r trtis/install/lib /opt/tensorrtserver/. && \
             cp -r trtis/install/include /opt/tensorrtserver/include/trtserver) && \
-    (cd /opt/tensorrtserver && ln -sf /workspace/qa qa)
+    (cd /opt/tensorrtserver && ln -sf /workspace/qa qa) && \
+    (cd /opt/tensorrtserver/lib && chmod ugo-w+rx *.so)
 
 ENV TENSORRT_SERVER_VERSION ${TRTIS_VERSION}
 ENV NVIDIA_TENSORRT_SERVER_VERSION ${TRTIS_CONTAINER_VERSION}
@@ -368,14 +369,13 @@ RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
 
 # libgoogle-glog0v5 is needed by caffe2 libraries.
 # libcurl is needed for GCS
-RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
+RUN apt-get update && \
+    if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; then \
         apt-get install -y --no-install-recommends \
                 libcurl3-dev \
                 libgoogle-glog0v5 \
                 libre2-1v5; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
-        apt-get update && \
         apt-get install -y --no-install-recommends \
                 libcurl4-openssl-dev \
                 libgoogle-glog0v5 \
@@ -383,7 +383,8 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="16.04"' | wc -l) -ne 0 ]; the
     else \
         echo "Ubuntu version must be either 16.04 or 18.04" && \
         exit 1; \
-    fi
+    fi && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
@@ -395,8 +396,6 @@ COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
 COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
 COPY --from=trtserver_build /opt/tensorrtserver/lib lib
 COPY --from=trtserver_build /opt/tensorrtserver/include include
-
-RUN chmod ugo-w+rx /opt/tensorrtserver/lib/*.so
 
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
 COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
@@ -410,8 +409,10 @@ ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deploymen
 
 # ONNX Runtime requires Python3 to convert ONNX models to OpenVINO models
 # in its OpenVINO execution accelerator
-RUN apt-get update && apt-get install -y --no-install-recommends python3-pip
-RUN pip3 install --upgrade wheel setuptools && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3-pip && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip3 install --upgrade wheel setuptools && \
     (cd $INTEL_CVSDK_DIR/deployment_tools/model_optimizer && \
         pip3 install -r requirements_onnx.txt)
 
