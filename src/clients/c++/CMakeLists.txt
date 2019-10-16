@@ -29,3 +29,7 @@ cmake_minimum_required (VERSION 3.5)
 add_subdirectory(library)
 add_subdirectory(examples)
 add_subdirectory(perf_client)
+
+if(${TRTIS_ENABLE_GPU})
+  add_definitions(-DTRTIS_ENABLE_GPU=1)
+endif() # TRTIS_ENABLE_GPU

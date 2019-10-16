@@ -63,6 +63,9 @@ install(
 # ensemble_image_client
 #
 add_executable(ensemble_image_client ensemble_image_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(ensemble_image_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   ensemble_image_client
   PRIVATE TRTIS::request_static
@@ -77,6 +80,9 @@ install(
 #
 find_package(OpenCV REQUIRED)
 add_executable(image_client image_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(image_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_include_directories(image_client PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(
   image_client
@@ -92,6 +98,9 @@ install(
 # simple_callback_client
 #
 add_executable(simple_callback_client simple_callback_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_callback_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_callback_client
   PRIVATE TRTIS::request_static
@@ -108,6 +117,9 @@ add_executable(
   simple_client
   ${CMAKE_CURRENT_BINARY_DIR}/simple_client.cc
 )
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_client
   PRIVATE TRTIS::request_static
@@ -136,6 +148,9 @@ set(
 )
 add_executable(simple_shm_client simple_shm_client.cc
   ${SIMPLE_SHM_SRCS} ${SIMPLE_SHM_HDRS})
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_shm_client
   PRIVATE request_static
@@ -148,29 +163,20 @@ install(
 #
 # simple_cuda_shm_client
 #
-if($(TRTIS_ENABLE_CUDA_EXAMPLES))
-  find_package(CUDA REQUIRED)
-  message(STATUS "Using CUDA ${CUDA_VERSION}")
-  set(CUDA_NVCC_FLAGS -std=c++11)
+if(${TRTIS_ENABLE_GPU})
   set(
     SIMPLE_CUDA_SHM_SRCS
     simple_cuda_shm_client.cc
-    shm_utils.cc
   )
   set(
     SIMPLE_CUDA_SHM_HDRS
-    shm_utils.h
   )
   add_executable(simple_cuda_shm_client simple_cuda_shm_client.cc
     ${SIMPLE_CUDA_SHM_SRCS} ${SIMPLE_CUDA_SHM_HDRS})
-  target_link_libraries(
-    simple_cuda_shm_client
-    PRIVATE request_static
-  )
-
   target_include_directories(simple_cuda_shm_client PRIVATE ${CUDA_INCLUDE_DIRS})
   target_link_libraries(
     simple_cuda_shm_client
+    PRIVATE request_static
     PRIVATE -L/usr/local/cuda/lib64/stubs
     PRIVATE -lnvidia-ml
     PRIVATE ${CUDA_LIBRARIES}
@@ -179,12 +185,15 @@ if($(TRTIS_ENABLE_CUDA_EXAMPLES))
     TARGETS simple_cuda_shm_client
     RUNTIME DESTINATION bin
   )
-endif() # TRTIS_ENABLE_CUDA_EXAMPLES
+endif() # TRTIS_ENABLE_GPU
 
 #
 # simple_sequence_client
 #
 add_executable(simple_sequence_client simple_sequence_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_sequence_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_sequence_client
   PRIVATE TRTIS::request_static
@@ -199,6 +208,9 @@ install(
 # simple_string_client
 #
 add_executable(simple_string_client simple_string_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_string_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_string_client
   PRIVATE TRTIS::request_static
@@ -212,6 +224,9 @@ install(
 # simple_perf_client
 #
 add_executable(simple_perf_client simple_perf_client.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(simple_perf_client PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   simple_perf_client
   PRIVATE TRTIS::request_static
