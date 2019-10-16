@@ -28,7 +28,7 @@
 
 #include <cuda_runtime_api.h>
 #include <iostream>
-#include "src/clients/python/cuda_shared_memory/cuda_shared_memory_handle.h"
+#include "src/clients/python/shared_memory/shared_memory_handle.h"
 
 //==============================================================================
 // SharedMemoryControlContext
@@ -40,7 +40,7 @@ CudaSharedMemoryHandleCreate(
     std::string trtis_shm_name, cudaIpcMemHandle_t* cuda_shm_handle,
     void* base_addr, size_t byte_size, int device_id)
 {
-  CudaSharedMemoryHandle* handle = new CudaSharedMemoryHandle();
+  SharedMemoryHandle* handle = new SharedMemoryHandle();
   handle->trtis_shm_name_ = trtis_shm_name;
   handle->cuda_shm_handle_ = cuda_shm_handle;
   handle->base_addr_ = base_addr;
@@ -95,7 +95,7 @@ CudaSharedMemoryRegionSet(
   int previous_device;
   cudaGetDevice(&previous_device);
   cudaError_t err = cudaSetDevice(
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle)->device_id_);
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->device_id_);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
     return -1;
@@ -103,7 +103,7 @@ CudaSharedMemoryRegionSet(
 
   // Copy data into cuda shared memory
   void* base_addr =
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
   uint8_t* base_addr_offset = reinterpret_cast<uint8_t*>(base_addr);
   err = cudaMemcpy(
       base_addr_offset + offset, data, byte_size, cudaMemcpyHostToDevice);
@@ -125,7 +125,7 @@ CudaSharedMemoryRegionDestroy(void* cuda_shm_handle)
   int previous_device;
   cudaGetDevice(&previous_device);
   cudaError_t err = cudaSetDevice(
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle)->device_id_);
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->device_id_);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
     return -1;
@@ -133,7 +133,7 @@ CudaSharedMemoryRegionDestroy(void* cuda_shm_handle)
 
   // Close cuda IPC handle
   void* base_addr =
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
   err = cudaIpcCloseMemHandle(base_addr);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);

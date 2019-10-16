@@ -31,10 +31,6 @@
 #include "src/clients/c++/library/request_http.h"
 #include "src/clients/python/shared_memory/shared_memory_handle.h"
 
-#if TRTIS_ENABLE_GPU
-#include "src/clients/python/cuda_shared_memory/cuda_shared_memory_handle.h"
-#endif  // TRTIS_ENABLE_GPU
-
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
 
@@ -458,8 +454,8 @@ nic::Error*
 SharedMemoryControlContextGetCudaSharedMemoryHandle(
     void* cuda_shm_handle, void** shm_addr, size_t* byte_size, int* device_id)
 {
-  CudaSharedMemoryHandle* handle =
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle);
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
   *shm_addr = handle->base_addr_;
   *device_id = handle->device_id_;
   *byte_size = handle->byte_size_;
@@ -663,8 +659,8 @@ InferContextOptionsAddCudaSharedMemory(
 {
   std::shared_ptr<nic::InferContext::Output> output;
   nic::Error err = infer_ctx->ctx->GetOutput(std::string(output_name), &output);
-  CudaSharedMemoryHandle* handle =
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle);
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
   if (err.IsOk()) {
     err = ctx->AddSharedMemoryResult(
         output, handle->trtis_shm_name_, 0, handle->byte_size_);
@@ -744,8 +740,8 @@ nic::Error*
 InferContextInputSetCudaSharedMemory(
     InferContextInputCtx* ctx, void* cuda_shm_handle)
 {
-  CudaSharedMemoryHandle* handle =
-      reinterpret_cast<CudaSharedMemoryHandle*>(cuda_shm_handle);
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
   nic::Error err = ctx->input->SetSharedMemory(
       handle->trtis_shm_name_, 0, handle->byte_size_);
   return new nic::Error(err);

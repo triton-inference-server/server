@@ -26,10 +26,18 @@
 
 #pragma once
 
+#if TRTIS_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRTIS_ENABLE_GPU
+
 struct SharedMemoryHandle {
   std::string trtis_shm_name_;
-  void* base_addr_;
   std::string shm_key_;
+#if TRTIS_ENABLE_GPU
+  cudaIpcMemHandle_t* cuda_shm_handle_;
+  int device_id_;
+#endif  // TRTIS_ENABLE_GPU
+  void* base_addr_;
   int shm_fd_;
   size_t offset_;
   size_t byte_size_;

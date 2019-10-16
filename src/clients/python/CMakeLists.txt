@@ -43,6 +43,9 @@ if(NOT WIN32)
 # libcshm.so
 #
 add_library(cshm SHARED shared_memory/shared_memory.cc)
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(cshm PRIVATE ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_link_libraries(
   cshm
   rt
