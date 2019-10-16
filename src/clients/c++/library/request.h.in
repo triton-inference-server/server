@@ -528,6 +528,16 @@ class InferContext {
     /// \param batch_size The batch size.
     virtual void SetBatchSize(size_t batch_size) = 0;
 
+    /// \return The correlation id for the inferences.
+    virtual CorrelationID CorrelationId() const = 0;
+
+    /// Set the correlation id to use for subsequent inferences.
+    /// \param correlation_id The value of correlation id to be set.
+    /// CorrelationID of the context will only be modified if 
+    /// correlation_id is non-zero, otherwise the current 
+    /// correlation_id will be retained.  
+    virtual void SetCorrelationId(CorrelationID correlation_id) = 0;
+
     /// Add 'output' to the list of requested RAW results. Run() will
     /// return the output's full tensor as a result.
     /// \param output The output.
