@@ -533,9 +533,9 @@ class InferContext {
 
     /// Set the correlation id to use for subsequent inferences.
     /// \param correlation_id The value of correlation id to be set.
-    /// CorrelationID of the context will only be modified if 
-    /// correlation_id is non-zero, otherwise the current 
-    /// correlation_id will be retained.  
+    /// If non-zero this correlation ID overrides the context's 
+    /// correlation ID for all subsequent inference requests, else
+    /// the context retains its current correlation ID.
     virtual void SetCorrelationId(CorrelationID correlation_id) = 0;
 
     /// Add 'output' to the list of requested RAW results. Run() will

@@ -274,8 +274,6 @@ main(int argc, char** argv)
   std::vector<int32_t> result0_list;
   std::vector<int32_t> result1_list;
 
-  std::vector<std::unique_ptr<nic::InferContext>> ctxs;
-
   if (async) {
     std::vector<std::shared_ptr<nic::InferContext::Request>> request0_list;
     std::vector<std::shared_ptr<nic::InferContext::Request>> request1_list;
@@ -302,6 +300,8 @@ main(int argc, char** argv)
       result1_list.push_back(AsyncReceive(ctx0, request1_list[i]));
     }
   } else {
+    std::vector<std::unique_ptr<nic::InferContext>> ctxs;
+
     if (!reverse) {
       ctxs.emplace_back(std::move(ctx0));
       ctxs.emplace_back(std::move(ctx1));
