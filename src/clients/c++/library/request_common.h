@@ -113,10 +113,10 @@ class RequestTimers {
     // If the start or end timestamp is 0 then can't calculate the
     // duration, so return max to indicate error.
     if ((stime == 0) || (etime == 0)) {
-      return std::numeric_limits<uint64_t>::max();
+      return (std::numeric_limits<uint64_t>::max)();
     }
 
-    return (stime > etime) ? std::numeric_limits<uint64_t>::max()
+    return (stime > etime) ? (std::numeric_limits<uint64_t>::max)()
                            : etime - stime;
   }
 

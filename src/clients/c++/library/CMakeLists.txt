@@ -31,6 +31,7 @@ cmake_minimum_required (VERSION 3.5)
 #
 find_package(CURL CONFIG REQUIRED)
 message(STATUS "Using curl ${CURL_VERSION}")
+add_definitions(-DCURL_STATICLIB)
 
 find_package(Threads REQUIRED)
 
@@ -117,12 +118,16 @@ add_library(
 add_library(
   TRTIS::request ALIAS request
 )
+
+if (NOT WIN32)
 set_target_properties(
   request
   PROPERTIES
     LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/librequest.ldscript
     LINK_FLAGS "-Wl,--version-script=librequest.ldscript"
 )
+endif()
+
 target_include_directories (request
   PUBLIC
     $<INSTALL_INTERFACE:include>
