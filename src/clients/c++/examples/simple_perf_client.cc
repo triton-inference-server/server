@@ -380,8 +380,8 @@ ShowResults(
     const std::vector<uint64_t>& request_duration_ns, const std::string& name,
     const std::string& framework, const std::string& model_name,
     const std::string& protocol, const uint32_t iters,
-    const uint32_t concurrency, const uint32_t batch_size,
-    const uint32_t tensor_size, const bool verbose)
+    const uint32_t concurrency, const uint32_t dynamic_batch_size,
+    const uint32_t batch_size, const uint32_t tensor_size, const bool verbose)
 {
   uint64_t request_duration_mean_us;
   uint64_t request_duration_stddev_us =
@@ -398,6 +398,7 @@ ShowResults(
   std::cout << "\"s_framework\":\"" << framework << "\",";
   std::cout << "\"s_model\":\"" << model_name << "\",";
   std::cout << "\"l_concurrency\":" << concurrency << ",";
+  std::cout << "\"l_dynamic_batch_size\":" << dynamic_batch_size << ",";
   std::cout << "\"l_batch_size\":" << batch_size << ",";
   std::cout << "\"l_iters\":" << iters << ",";
   std::cout << "\"l_size\":" << tensor_size << ",";
@@ -425,6 +426,7 @@ Usage(char** argv, const std::string& msg = std::string())
   std::cerr << "\t-f <model framework>" << std::endl;
   std::cerr << "\t-m <model name>" << std::endl;
   std::cerr << "\t-c <concurrency>" << std::endl;
+  std::cerr << "\t-d <dynamic batch size>" << std::endl;
   std::cerr << "\t-s <inference size>" << std::endl;
   std::cerr << "\t-w <warmup iterations>" << std::endl;
   std::cerr << "\t-n <measurement iterations>" << std::endl;
@@ -455,13 +457,14 @@ main(int argc, char** argv)
   std::string model_name;
   std::string framework;
   uint32_t concurrency = 1;
+  uint32_t dynamic_batch_size = 1;
   uint32_t tensor_size = 1;
   uint32_t warmup_iters = 10;
   uint32_t measure_iters = 10;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "avl:i:u:m:f:c:s:w:n:")) != -1) {
+  while ((opt = getopt(argc, argv, "avl:i:u:m:f:c:d:s:w:n:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -486,6 +489,9 @@ main(int argc, char** argv)
         break;
       case 'c':
         concurrency = std::stoul(optarg);
+        break;
+      case 'd':
+        dynamic_batch_size = std::stoul(optarg);
         break;
       case 's':
         tensor_size = std::stoul(optarg);
@@ -532,8 +538,8 @@ main(int argc, char** argv)
         &request_duration_ns);
     ShowResults(
         total_duration_ns, request_duration_ns, benchmark_name, framework,
-        model_name, protocol, measure_iters, concurrency, batch_size,
-        tensor_size, verbose);
+        model_name, protocol, measure_iters, concurrency, dynamic_batch_size,
+        batch_size, tensor_size, verbose);
   } else {
     // async
     total_duration_ns.clear();
@@ -543,8 +549,8 @@ main(int argc, char** argv)
         &request_duration_ns);
     ShowResults(
         total_duration_ns, request_duration_ns, benchmark_name, framework,
-        model_name, protocol, measure_iters, concurrency, batch_size,
-        tensor_size, verbose);
+        model_name, protocol, measure_iters, concurrency, dynamic_batch_size,
+        batch_size, tensor_size, verbose);
   }
 
   return 0;

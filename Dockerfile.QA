@@ -126,6 +126,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_simple_perf/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_simple_dbatch_perf/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_nomodel/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_perf_client/. && \

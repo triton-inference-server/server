@@ -38,11 +38,14 @@ fi
 CLIENT=../clients/simple_perf_client
 REPORTER=../common/reporter.py
 
-# The tensorrt identity model only allows variable size up to 32 so we
-# can't use it for the large tensor size runs we do here
-BACKENDS=${BACKENDS:="custom graphdef savedmodel onnx libtorch netdef"}
-TENSOR_SIZES="16384 16777216"   # 16k and 16m fp32 elements
-CONCURRENCIES="1 8"
+# L0_simple_perf tests across different backends. Here just use custom
+# backend as a proxy for all backends since the dynamic batcher
+# behaves the same for all.
+BACKENDS=${BACKENDS:="custom"}
+TENSOR_SIZES=16384   # 16k fp32 elements
+CONCURRENCIES=16
+DBATCH_PREFS="1 4 8"
+MODEL_LATENCY_MS=5
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -69,86 +72,57 @@ for BACKEND in $BACKENDS; do
         [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
     KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
 
-    rm -fr models && mkdir -p models && \
-        cp -r $REPO_DIR/$MODEL_NAME models/. && \
-        (cd models/$MODEL_NAME && \
-                sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
-                echo "instance_group [ { kind: ${KIND} }]" >> config.pbtxt)
-
-    SERVER_ARGS=--model-repository=`pwd`/models
-    SERVER_LOG="${BACKEND}.serverlog"
-    run_server
-    if (( $SERVER_PID == 0 )); then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
     echo -e "[" > ${BACKEND}.log
 
     FIRST=1
-    for TENSOR_SIZE in $TENSOR_SIZES; do
-        set +e
+    for DBATCH_PREF in $DBATCH_PREFS; do
+        rm -fr models && mkdir -p models && \
+            cp -r $REPO_DIR/$MODEL_NAME models/. && \
+            (cd models/$MODEL_NAME && \
+                    sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+                    sed -i "s/max_batch_size:.*/max_batch_size: ${DBATCH_PREF}/g" config.pbtxt && \
+                    echo "dynamic_batching { preferred_batch_size: [${DBATCH_PREF}] }" >> config.pbtxt && \
+                    echo "instance_group [ { kind: ${KIND} }]" >> config.pbtxt && \
+                    echo "parameters [ { key: \"execute_delay_ms\"; value: { string_value: \"${MODEL_LATENCY_MS}\" }}]" >> config.pbtxt)
+        SERVER_ARGS=--model-repository=`pwd`/models
+        SERVER_LOG="${BACKEND}.serverlog"
+        run_server
+        if (( $SERVER_PID == 0 )); then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-        for CONCURRENCY in $CONCURRENCIES; do
-            WARMUP_ITERS=10
-            MEASURE_ITERS=200 && [[ "$TENSOR_SIZE" != "16384" ]] && \
-                MEASURE_ITERS=50
+        for TENSOR_SIZE in $TENSOR_SIZES; do
+            set +e
 
-            if (( $FIRST != 1 )); then
-                echo -e "," >> ${BACKEND}.log
-            fi
-            FIRST=0
+            for CONCURRENCY in $CONCURRENCIES; do
+                WARMUP_ITERS=10
+                MEASURE_ITERS=200 && [[ "$TENSOR_SIZE" != "16384" ]] && \
+                    MEASURE_ITERS=50
 
-            # sync HTTP API
-            $CLIENT -l"sync" \
-                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
-                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-            if (( $? != 0 )); then
-                RET=1
-            fi
+                if (( $FIRST != 1 )); then
+                    echo -e "," >> ${BACKEND}.log
+                fi
+                FIRST=0
 
-            echo -e "," >> ${BACKEND}.log
-
-            # sync GRPC API
-            $CLIENT -l"sync" -i grpc -u localhost:8001 \
-                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
-                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-            if (( $? != 0 )); then
-                RET=1
-            fi
-
-            # FIXME bug with >1 concurrency in clients
-            if (( $CONCURRENCY == 1 )); then
-
-                echo -e "," >> ${BACKEND}.log
-
-                # async HTTP API
-                $CLIENT -a -l"async" \
+                # sync GRPC API
+                $CLIENT -i grpc -u localhost:8001 \
+                        -l"sync" -d${DBATCH_PREF} \
                         -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
                         -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
                 if (( $? != 0 )); then
                     RET=1
                 fi
-
-                echo -e "," >> ${BACKEND}.log
-
-                # async GRPC API
-                $CLIENT -a -l"async" -i grpc -u localhost:8001 \
-                        -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
-                        -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-                if (( $? != 0 )); then
-                    RET=1
-                fi
-            fi
+            done
+            set -e
         done
-        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
     done
 
     echo -e "]" >> ${BACKEND}.log
-
-    kill $SERVER_PID
-    wait $SERVER_PID
 
     if [ -f $REPORTER ]; then
         set +e
