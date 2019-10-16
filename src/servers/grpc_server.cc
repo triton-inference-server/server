@@ -174,7 +174,7 @@ class HandlerState {
     // correct order.
     void EnqueueForResponse(HandlerStateType* state)
     {
-      std::unique_lock<std::mutex> lock(mu_);
+      std::lock_guard<std::mutex> lock(mu_);
       states_.push(state);
     }
 
@@ -182,7 +182,7 @@ class HandlerState {
     // then return it, otherwise return nullptr.
     HandlerStateType* ReadyResponse()
     {
-      std::unique_lock<std::mutex> lock(mu_);
+      std::lock_guard<std::mutex> lock(mu_);
       if (states_.empty()) {
         return nullptr;
       }
@@ -199,7 +199,7 @@ class HandlerState {
     // return true. Other return false.
     bool PopCompletedResponse(HandlerStateType* state)
     {
-      std::unique_lock<std::mutex> lock(mu_);
+      std::lock_guard<std::mutex> lock(mu_);
       if (states_.empty()) {
         return false;
       }
@@ -216,7 +216,7 @@ class HandlerState {
     // Return true if this context has completed all reads and writes.
     bool IsRequestsCompleted()
     {
-      std::unique_lock<std::mutex> lock(mu_);
+      std::lock_guard<std::mutex> lock(mu_);
       return ((step_ == Steps::WRITEREADY) && states_.empty());
     }
 
@@ -266,8 +266,6 @@ class HandlerState {
   void Release()
   {
     context_ = nullptr;
-    request_.Clear();
-    response_.Clear();
   }
 
   std::shared_ptr<Context> context_;
@@ -321,8 +319,8 @@ class Handler : public GRPCServer::HandlerBase {
   {
     State* state = nullptr;
 
-    {
-      std::unique_lock<std::mutex> lock(alloc_mu_);
+    if (max_state_bucket_count_ > 0) {
+      std::lock_guard<std::mutex> lock(alloc_mu_);
 
       if (!state_bucket_.empty()) {
         state = state_bucket_.back();
@@ -340,14 +338,17 @@ class Handler : public GRPCServer::HandlerBase {
 
   void StateRelease(State* state)
   {
-    std::unique_lock<std::mutex> lock(alloc_mu_);
+    if (max_state_bucket_count_ > 0) {
+      std::lock_guard<std::mutex> lock(alloc_mu_);
 
-    state->Release();
-    if (state_bucket_.size() < max_state_bucket_count_) {
-      state_bucket_.push_back(state);
-    } else {
-      delete state;
+      if (state_bucket_.size() < max_state_bucket_count_) {
+        state->Release();
+        state_bucket_.push_back(state);
+        return;
+      }
     }
+
+    delete state;
   }
 
   virtual void StartNewRequest() = 0;
