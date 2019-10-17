@@ -63,10 +63,10 @@ install(
 )
 install(
   FILES
-    custom_instance.cc 
+    custom_instance.cc
     custom_instance.h
     error_codes.cc
-    error_codes.h 
+    error_codes.h
   DESTINATION include/src/custom/sdk
 )
 
@@ -85,6 +85,16 @@ install(
 install(
   DIRECTORY ${Protobuf_INCLUDE_DIRS}/google
   DESTINATION include
+)
+
+# Install protoc with same version as the protobuf headers. This makes
+# it easy for custom backends that want to compile their own protobufs
+# in a way that is compatible with the protobuf version in
+# libcustombackend library.
+set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
+install(
+  PROGRAMS ${_PROTOBUF_PROTOC}
+  DESTINATION bin
 )
 
 # Install the param custom backend source as an example
