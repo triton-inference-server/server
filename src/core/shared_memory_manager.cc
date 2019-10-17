@@ -101,7 +101,7 @@ UnmapSharedMemory(void* mapped_addr, size_t byte_size)
 #ifdef TRTIS_ENABLE_GPU
 Status
 OpenCudaIPCRegion(
-    cudaIpcMemHandle_t* cuda_shm_handle, void** data_ptr, int device_id)
+    const cudaIpcMemHandle_t* cuda_shm_handle, void** data_ptr, int device_id)
 {
   // Set to device curres
   cudaSetDevice(device_id);
@@ -190,19 +190,17 @@ SharedMemoryManager::RegisterCudaSharedMemory(
   void* mapped_addr;
 
   // Get CUDA shared memory base address
-  Status status = OpenCudaIPCRegion(
-      const_cast<cudaIpcMemHandle_t*>(cuda_shm_handle), &mapped_addr,
-      device_id);
+  Status status = OpenCudaIPCRegion(cuda_shm_handle, &mapped_addr, device_id);
   if (!status.IsOk()) {
     return Status(
         RequestStatusCode::INVALID_ARG,
-        "failed to register shared memory region '" + name + "'");
+        "failed to register CUDA shared memory region '" + name + "'");
   }
 
   shared_memory_map_.insert(std::make_pair(
       name,
       std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
-          name, "", 0, byte_size, -1, mapped_addr, MEMORY_GPU, device_id))));
+          name, "", 0, byte_size, 0, mapped_addr, MEMORY_GPU, device_id))));
 
   return Status::Success;
 }

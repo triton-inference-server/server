@@ -728,7 +728,8 @@ HTTPAPIServer::HandleSharedMemoryControl(
       } else if (
           action_type_str == "cudaregister" &&
           (!RE2::FullMatch(
-              remaining, cudaregister_regex_, &name, &byte_size_str, &device_id_str))) {
+              remaining, cudaregister_regex_, &name, &byte_size_str,
+              &device_id_str))) {
         evhtp_send_reply(req, EVHTP_RES_BADREQ);
         return;
       } else if (action_type_str == "unregister") {

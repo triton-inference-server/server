@@ -631,35 +631,7 @@ class SharedMemoryControlHttpContextImpl : public SharedMemoryControlContext {
 
   // Serialized SharedMemoryStatus response from server.
   std::string response_;
-
-  // Serialized cuda ipc handle
-  struct SerialCudaHandle {
-    SerialCudaHandle(const char* ptr, size_t bytes) : ptr_(ptr), bytes_(bytes)
-    {
-    }
-    const char* ptr_;
-    size_t bytes_;
-  };
 };
-
-#if TRTIS_ENABLE_GPU
-size_t
-SharedMemoryControlHttpContextImpl::RequestProvider(
-    void* contents, size_t size, size_t nmemb, void* userp)
-{
-  SerialCudaHandle* serialized_cuda_handle =
-      reinterpret_cast<SerialCudaHandle*>(userp);
-  size_t handle_byte_size = sizeof(cudaIpcMemHandle_t);
-
-  if (serialized_cuda_handle->bytes_) {
-    memcpy(contents, serialized_cuda_handle->ptr_, handle_byte_size);
-    serialized_cuda_handle->bytes_ -= handle_byte_size;
-    return handle_byte_size;
-  }
-
-  return 0;
-}
-#endif  // TRTIS_ENABLE_GPU
 
 size_t
 SharedMemoryControlHttpContextImpl::ResponseHandler(
@@ -708,7 +680,6 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
         RequestStatusCode::INTERNAL, "failed to initialize HTTP client");
   }
 
-  // TODO set cuda-shm_handle as raw bytes in body
   std::string full_url = url_ + "/cudaregister/" + name + "/" +
                          std::to_string(byte_size) + "/" +
                          std::to_string(device_id);
@@ -718,23 +689,15 @@ SharedMemoryControlHttpContextImpl::RegisterCudaSharedMemory(
   curl_easy_setopt(curl, CURLOPT_USERAGENT, "libcurl-agent/1.0");
   curl_easy_setopt(curl, CURLOPT_POST, 1L);
   curl_easy_setopt(curl, CURLOPT_TCP_NODELAY, 1L);
-
-  const long buffer_byte_size = 16 * 1024 * 1024;
-  curl_easy_setopt(curl, CURLOPT_UPLOAD_BUFFERSIZE, buffer_byte_size);
-  curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, buffer_byte_size);
-
-  // use POST method
-  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
   if (verbose_) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   }
 
-  // request data provided by RequestProvider()
-  SerialCudaHandle serial_cuda_handle(
-      reinterpret_cast<const char*>(&cuda_shm_handle),
-      sizeof(cudaIpcMemHandle_t));
-  curl_easy_setopt(curl, CURLOPT_READFUNCTION, RequestProvider);
-  curl_easy_setopt(curl, CURLOPT_READDATA, serial_cuda_handle);
+  // Serialize cuda ipc handle to HTTP body
+  size_t handle_byte_size = sizeof(cudaIpcMemHandle_t);
+  std::string reserved_handle_memory((char*)&cuda_shm_handle, handle_byte_size);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)handle_byte_size);
+  curl_easy_setopt(curl, CURLOPT_POSTFIELDS, reserved_handle_memory.c_str());
 
   // response headers handled by ResponseHeaderHandler()
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, ResponseHeaderHandler);

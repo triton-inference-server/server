@@ -378,8 +378,8 @@ SharedMemoryControlGrpcContextImpl::RegisterCudaSharedMemory(
   ipc_handle->append(
       reinterpret_cast<const char*>(&cuda_shm_handle),
       sizeof(cudaIpcMemHandle_t));
-  cuda_shm_id->set_device_id(device_id);
 
+  cuda_shm_id->set_device_id(device_id);
   rshm_region->set_byte_size(byte_size);
 
   grpc::Status status =
