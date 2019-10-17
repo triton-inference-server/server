@@ -73,7 +73,8 @@ Usage(char** argv, const std::string& msg = std::string())
 int32_t
 Send(
     const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
-    bool start_of_sequence = false, bool end_of_sequence = false)
+    const uint64_t correlation_id = 0, bool start_of_sequence = false,
+    bool end_of_sequence = false)
 {
   // Set the context options to do batch-size 1 requests. Also request
   // that all output tensors be returned.
@@ -91,6 +92,7 @@ Send(
   }
 
   options->SetBatchSize(1);
+  options->SetCorrelationId(correlation_id);
   for (const auto& output : ctx->Outputs()) {
     options->AddRawResult(output);
   }
@@ -104,7 +106,6 @@ Send(
   FAIL_IF_ERR(
       ivalue->SetRaw(reinterpret_cast<uint8_t*>(&value), sizeof(int32_t)),
       "unable to set data for INPUT");
-
   // Send inference request to the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
   FAIL_IF_ERR(ctx->Run(&results), "unable to run model");
@@ -126,7 +127,8 @@ Send(
 std::shared_ptr<nic::InferContext::Request>
 AsyncSend(
     const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
-    bool start_of_sequence = false, bool end_of_sequence = false)
+    const uint64_t correlation_id = 0, bool start_of_sequence = false,
+    bool end_of_sequence = false)
 {
   std::shared_ptr<nic::InferContext::Request> request;
 
@@ -146,6 +148,7 @@ AsyncSend(
   }
 
   options->SetBatchSize(1);
+  options->SetCorrelationId(correlation_id);
   for (const auto& output : ctx->Outputs()) {
     options->AddRawResult(output);
   }
@@ -246,17 +249,13 @@ main(int argc, char** argv)
             << "sequence 1 correlation ID " << correlation_id1 << std::endl;
 
   // Create two different contexts, in the sync case we can use one
-  // streaming and one not streaming. In the async case must use
-  // streaming for both since async+non-streaming means that order of
-  // requests reaching inference server is not guaranteed.
+  // streaming and one not streaming. In the async case, use a
+  // single streaming context since async+non-streaming means that
+  // order of requests reaching inference server is not guaranteed.
   err = nic::InferGrpcStreamContext::Create(
       &ctx0, correlation_id0, url, model_name, -1 /* model_version */, verbose);
   if (err.IsOk()) {
-    if (async) {
-      err = nic::InferGrpcStreamContext::Create(
-          &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
-          verbose);
-    } else {
+    if (!async) {
       err = nic::InferGrpcContext::Create(
           &ctx1, correlation_id1, url, model_name, -1 /* model_version */,
           verbose);
@@ -275,48 +274,49 @@ main(int argc, char** argv)
   std::vector<int32_t> result0_list;
   std::vector<int32_t> result1_list;
 
-  std::vector<std::unique_ptr<nic::InferContext>> ctxs;
-  if (!reverse) {
-    ctxs.emplace_back(std::move(ctx0));
-    ctxs.emplace_back(std::move(ctx1));
-  } else {
-    ctxs.emplace_back(std::move(ctx1));
-    ctxs.emplace_back(std::move(ctx0));
-  }
-
   if (async) {
     std::vector<std::shared_ptr<nic::InferContext::Request>> request0_list;
     std::vector<std::shared_ptr<nic::InferContext::Request>> request1_list;
 
     // Send requests, first reset accumulator for the sequence.
     request0_list.emplace_back(
-        AsyncSend(ctxs[0], 0, true /* start-of-sequence */));
+        AsyncSend(ctx0, 0, correlation_id0, true /* start-of-sequence */));
     request1_list.emplace_back(
-        AsyncSend(ctxs[1], 100, true /* start-of-sequence */));
+        AsyncSend(ctx0, 100, correlation_id1, true /* start-of-sequence */));
     // Now send a sequence of values...
     for (int32_t v : values) {
       request0_list.emplace_back(AsyncSend(
-          ctxs[0], v, false /* start-of-sequence */,
+          ctx0, v, correlation_id0, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
       request1_list.emplace_back(AsyncSend(
-          ctxs[1], -v, false /* start-of-sequence */,
+          ctx0, -v, correlation_id1, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
-      result0_list.push_back(AsyncReceive(ctxs[0], request0_list[i]));
+      result0_list.push_back(AsyncReceive(ctx0, request0_list[i]));
     }
     for (size_t i = 0; i < request1_list.size(); i++) {
-      result1_list.push_back(AsyncReceive(ctxs[1], request1_list[i]));
+      result1_list.push_back(AsyncReceive(ctx0, request1_list[i]));
     }
   } else {
+    std::vector<std::unique_ptr<nic::InferContext>> ctxs;
+
+    if (!reverse) {
+      ctxs.emplace_back(std::move(ctx0));
+      ctxs.emplace_back(std::move(ctx1));
+    } else {
+      ctxs.emplace_back(std::move(ctx1));
+      ctxs.emplace_back(std::move(ctx0));
+    }
+
     // Send requests, first reset accumulator for the sequence.
-    result0_list.push_back(Send(ctxs[0], 0, true /* start-of-sequence */));
+    result0_list.push_back(Send(ctxs[0], 0, 0, true /* start-of-sequence */));
 
     // Now send a sequence of values...
     for (int32_t v : values) {
       result0_list.push_back(Send(
-          ctxs[0], v, false /* start-of-sequence */,
+          ctxs[0], v, 0, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
     }
 
@@ -325,10 +325,10 @@ main(int argc, char** argv)
     // where one sequence is waiting for available slot while the other sequence
     // has started the sequence, the other sequence may be terminated due to
     // idleness.
-    result1_list.push_back(Send(ctxs[1], 100, true /* start-of-sequence */));
+    result1_list.push_back(Send(ctxs[1], 100, 0, true /* start-of-sequence */));
     for (int32_t v : values) {
       result1_list.push_back(Send(
-          ctxs[1], -v, false /* start-of-sequence */,
+          ctxs[1], -v, 0, false /* start-of-sequence */,
           (v == 1) /* end-of-sequence */));
     }
   }

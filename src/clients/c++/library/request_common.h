@@ -128,7 +128,7 @@ class RequestTimers {
 
 class InferOptionsImpl : public InferContext::Options {
  public:
-  InferOptionsImpl() : flags_(0), batch_size_(0) {}
+  InferOptionsImpl() : flags_(0), batch_size_(0), correlation_id_(0) {}
   ~InferOptionsImpl() = default;
 
   bool Flag(InferRequestHeader::Flag flag) const override;
@@ -138,6 +138,12 @@ class InferOptionsImpl : public InferContext::Options {
 
   size_t BatchSize() const override { return batch_size_; }
   void SetBatchSize(size_t batch_size) override { batch_size_ = batch_size; }
+
+  CorrelationID CorrelationId() const override { return correlation_id_; }
+  void SetCorrelationId(CorrelationID correlation_id) override
+  {
+    correlation_id_ = correlation_id;
+  }
 
   Error AddRawResult(
       const std::shared_ptr<InferContext::Output>& output) override;
@@ -170,6 +176,7 @@ class InferOptionsImpl : public InferContext::Options {
  private:
   uint32_t flags_;
   size_t batch_size_;
+  CorrelationID correlation_id_;
   std::deque<OutputOptionsPair> outputs_;
 };
 
@@ -504,9 +511,8 @@ class InferContextImpl : public InferContext {
   // Model version
   const int64_t model_version_;
 
-  // The correlation ID to use with all inference requests using this
-  // context. A value of 0 (zero) indicates no correlation ID.
-  const CorrelationID correlation_id_;
+  // Requested correlation id for the inference request
+  CorrelationID correlation_id_;
 
   // If true print verbose output
   const bool verbose_;

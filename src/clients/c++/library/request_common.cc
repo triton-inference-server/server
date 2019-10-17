@@ -894,6 +894,9 @@ InferContextImpl::SetRunOptions(const InferContext::Options& boptions)
   // batch-size 1.
   batch_size_ = std::max((uint64_t)1, options.BatchSize());
 
+  correlation_id_ =
+      options.CorrelationId() == 0 ? correlation_id_ : options.CorrelationId();
+
   // Create the InferRequestHeader protobuf. This protobuf will be
   // used for all subsequent requests.
   infer_request_.Clear();
