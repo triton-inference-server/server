@@ -38,6 +38,7 @@ FLAGS = None
 ENVS = [ "CUDA_DRIVER_VERSION", "CUDA_VERSION",
          "TENSORRT_SERVER_VERSION", "NVIDIA_TENSORRT_SERVER_VERSION",
          "TRT_VERSION", "CUDNN_VERSION", "CUBLAS_VERSION",
+         "BENCHMARK_PIPELINE",
          "BENCHMARK_REPO_BRANCH", "BENCHMARK_REPO_COMMIT",
          "BENCHMARK_CLUSTER", "BENCHMARK_GPU_COUNT"]
 
@@ -49,8 +50,8 @@ def annotate(datas):
                 val = os.environ[env]
                 data['s_' + env.lower()] = val
 
-    # Add this system's name
-    data['s_benchmark_system'] = socket.gethostname()
+        # Add this system's name
+        data['s_benchmark_system'] = socket.gethostname()
 
 def post_to_url(url, data):
     headers = {'Content-Type': 'application/json', 'Accept-Charset': 'UTF-8'}
