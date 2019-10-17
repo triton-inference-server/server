@@ -50,8 +50,14 @@ def annotate(datas):
                 val = os.environ[env]
                 data['s_' + env.lower()] = val
 
-        # Add this system's name
-        data['s_benchmark_system'] = socket.gethostname()
+        # Add this system's name. If running within slurm use
+        # SLURM_JOB_NODELIST as the name (this assumes that the slurm
+        # job was scheduled on a single node, otherwise
+        # SLURM_JOB_NODELIST will list multiple nodes).
+        if 'SLURM_JOB_NODELIST' in os.environ:
+            data['s_benchmark_system'] = os.environ['SLURM_JOB_NODELIST']
+        else:
+            data['s_benchmark_system'] = socket.gethostname()
 
 def post_to_url(url, data):
     headers = {'Content-Type': 'application/json', 'Accept-Charset': 'UTF-8'}
