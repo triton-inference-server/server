@@ -360,7 +360,8 @@ ENV TF_AUTOTUNE_THRESHOLD       2
 ENV MKL_THREADING_LAYER GNU
 
 # Create a user that can be used to run the tensorrt-server as
-# non-root. Make sure that this user to given ID 1000.
+# non-root. Make sure that this user to given ID 1000. All server
+# artifacts copied below are assign to this user.
 ENV TENSORRT_SERVER_USER=tensorrt-server
 RUN id -u $TENSORRT_SERVER_USER > /dev/null 2>&1 || \
     useradd $TENSORRT_SERVER_USER && \
@@ -388,21 +389,21 @@ RUN apt-get update && \
 
 WORKDIR /opt/tensorrtserver
 RUN rm -fr /opt/tensorrtserver/*
-COPY LICENSE .
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/LICENSE LICENSE.openvino
-COPY --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
-COPY --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
-COPY --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
-COPY --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
-COPY --from=trtserver_build /opt/tensorrtserver/lib lib
-COPY --from=trtserver_build /opt/tensorrtserver/include include
+COPY --chown=1000:1000 LICENSE .
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/LICENSE LICENSE.openvino
+COPY --chown=1000:1000 --from=trtserver_onnx /workspace/onnxruntime/LICENSE LICENSE.onnxruntime
+COPY --chown=1000:1000 --from=trtserver_tf /opt/tensorflow/tensorflow-source/LICENSE LICENSE.tensorflow
+COPY --chown=1000:1000 --from=trtserver_caffe2 /opt/pytorch/pytorch/LICENSE LICENSE.pytorch
+COPY --chown=1000:1000 --from=trtserver_build /opt/tensorrtserver/bin/trtserver bin/
+COPY --chown=1000:1000 --from=trtserver_build /opt/tensorrtserver/lib lib
+COPY --chown=1000:1000 --from=trtserver_build /opt/tensorrtserver/include include
 
 # Install ONNX-Runtime-OpenVINO dependencies to use it in base container
-COPY --from=trtserver_onnx /workspace/build/Release/openvino_* \
+COPY --chown=1000:1000 --from=trtserver_onnx /workspace/build/Release/openvino_* \
      /opt/openvino_scripts/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model_optimizer \
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/deployment_tools/model_optimizer \
      /opt/openvino_scripts/openvino_2019.1.144/deployment_tools/model_optimizer/
-COPY --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
+COPY --chown=1000:1000 --from=trtserver_onnx /data/dldt/openvino_2019.1.144/tools \
      /opt/openvino_scripts/openvino_2019.1.144/tools
 ENV INTEL_CVSDK_DIR /opt/openvino_scripts/openvino_2019.1.144
 ENV PYTHONPATH /opt/openvino_scripts:$INTEL_CVSDK_DIR:$INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
@@ -422,7 +423,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 
-COPY nvidia_entrypoint.sh /opt/tensorrtserver
+COPY --chown=1000:1000 nvidia_entrypoint.sh /opt/tensorrtserver
 ENTRYPOINT ["/opt/tensorrtserver/nvidia_entrypoint.sh"]
 
 ARG NVIDIA_BUILD_ID

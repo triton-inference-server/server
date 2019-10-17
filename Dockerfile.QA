@@ -214,9 +214,11 @@ RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
     rm get-pip.py
 RUN pip install --upgrade numpy pillow future grpcio requests gsutil awscli
 
-# CI expects tests in /opt/tensorrtserver/qa
+# CI expects tests in /opt/tensorrtserver/qa. The tensorrt-server
+# (1000) user should own all artifacts in case CI is run using
+# tensorrt-server user.
 WORKDIR /opt/tensorrtserver
-COPY --from=cbe /workspace/qa/ qa/
+COPY --chown=1000:1000 --from=cbe /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tensorrtserver python client APIs.
