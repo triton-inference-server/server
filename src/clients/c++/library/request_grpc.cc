@@ -957,7 +957,7 @@ InferGrpcContextImpl::AsyncTransfer()
     lock.unlock();
     // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
     if (!exiting_) {
-      std::shared_ptr<Request> request_with_callback;
+      std::shared_ptr<Request> request;
       size_t got;
       bool ok = true;
       bool status = async_request_completion_queue_.Next((void**)(&got), &ok);
@@ -977,23 +977,19 @@ InferGrpcContextImpl::AsyncTransfer()
               " is not in the list of asynchronous requests.\n");
           continue;
         }
+        request = itr->second;
+      }
 
-        std::shared_ptr<GrpcRequestImpl> grpc_request =
-            std::static_pointer_cast<GrpcRequestImpl>(itr->second);
-        grpc_request->Timer().CaptureTimestamp(
-            RequestTimers::Kind::REQUEST_END);
-        grpc_request->SetIsReady(true);
-        if (grpc_request->HasCallback()) {
-          request_with_callback = itr->second;
-        }
+      // GRPC ensures that only a single polling thread is woken per tag_id
+      std::shared_ptr<GrpcRequestImpl> grpc_request =
+          std::static_pointer_cast<GrpcRequestImpl>(request);
+      grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+      grpc_request->SetIsReady(true);
+      if (grpc_request->HasCallback()) {
+        grpc_request->callback_(this, request);
       }
       // send signal in case the main thread is waiting
       cv_.notify_all();
-      if (request_with_callback != nullptr) {
-        GrpcRequestImpl* request =
-            static_cast<GrpcRequestImpl*>(request_with_callback.get());
-        request->callback_(this, request_with_callback);
-      }
     }
   } while (!exiting_);
 }
@@ -1132,7 +1128,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
       continue;
     }
 
-    std::shared_ptr<Request> request_with_callback;
+    std::shared_ptr<Request> request;
     uintptr_t run_index = response.meta_data().id();
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -1144,23 +1140,19 @@ InferGrpcStreamContextImpl::AsyncTransfer()
             " is not in the list of asynchronous requests.\n");
         continue;
       }
+      request = itr->second;
+    }
 
-      std::shared_ptr<GrpcRequestImpl> grpc_request =
-          std::static_pointer_cast<GrpcRequestImpl>(itr->second);
-      grpc_request->grpc_response_->Swap(&response);
-      grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-      grpc_request->SetIsReady(true);
-      if (grpc_request->HasCallback()) {
-        request_with_callback = itr->second;
-      }
+    std::shared_ptr<GrpcRequestImpl> grpc_request =
+        std::static_pointer_cast<GrpcRequestImpl>(request);
+    grpc_request->grpc_response_->Swap(&response);
+    grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
+    grpc_request->SetIsReady(true);
+    if (grpc_request->HasCallback()) {
+      grpc_request->callback_(this, request);
     }
     // send signal in case the main thread is waiting for response
     cv_.notify_all();
-    if (request_with_callback != nullptr) {
-      GrpcRequestImpl* request =
-          static_cast<GrpcRequestImpl*>(request_with_callback.get());
-      request->callback_(this, request_with_callback);
-    }
   }
   stream_->Finish();
 }
