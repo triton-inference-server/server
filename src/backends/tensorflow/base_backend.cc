@@ -42,6 +42,46 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+Status
+ParseBoolOption(const std::string& key, std::string arg, bool* val)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if ((arg == "true") || (arg == "1")) {
+    *val = true;
+  } else if ((arg == "false") || (arg == "0")) {
+    *val = false;
+  } else {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "failed to convert " + key + " '" + arg + "' to boolean value");
+  }
+
+  return Status::Success;
+}
+
+Status
+ParseLongLongOption(
+    const std::string& key, const std::string& arg, int64_t* val)
+{
+  try {
+    *val = std::stoll(arg);
+  }
+  catch (const std::invalid_argument& ia) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "failed to convert " + key + " '" + arg + "' to integral number");
+  }
+
+  return Status::Success;
+}
+
+}  // namespace
+
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
@@ -199,8 +239,10 @@ BaseBackend::CreateExecutionContext(
     // Set default values
     tftrt_config.minimum_segment_size_ = 3;
     tftrt_config.max_workspace_size_bytes_ = 1 << 30;
+    tftrt_config.max_cached_engines_ = 100;
     tftrt_config.max_batch_size_ = std::max(Config().max_batch_size(), 1);
     tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
+    tftrt_config.use_calibration_ = false;
     tftrt_config.is_dynamic_op_ = false;
     for (const auto& io : Config().input()) {
       const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
@@ -237,6 +279,7 @@ BaseBackend::CreateExecutionContext(
                                                  .gpu_execution_accelerator()) {
       if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
         // Validate and set parameters
+        bool is_calibration_specified = false;
         for (const auto& parameter : execution_accelerator.parameters()) {
           if (parameter.first == "precision_mode") {
             if (parameter.second == "FP32") {
@@ -252,32 +295,37 @@ BaseBackend::CreateExecutionContext(
                                                       "' is requested");
             }
           } else if (parameter.first == "minimum_segment_size") {
-            try {
-              tftrt_config.minimum_segment_size_ = std::stoul(parameter.second);
-            }
-            catch (const std::invalid_argument& ia) {
-              return Status(
-                  RequestStatusCode::INVALID_ARG,
-                  "failed to convert minimum_segment_size '" +
-                      parameter.second + "' to integral number");
-            }
+            RETURN_IF_ERROR(ParseLongLongOption(
+                parameter.first, parameter.second,
+                &tftrt_config.minimum_segment_size_));
           } else if (parameter.first == "max_workspace_size_bytes") {
-            try {
-              tftrt_config.max_workspace_size_bytes_ =
-                  std::stoul(parameter.second);
-            }
-            catch (const std::invalid_argument& ia) {
-              return Status(
-                  RequestStatusCode::INVALID_ARG,
-                  "failed to convert max_workspace_size_bytes '" +
-                      parameter.second + "' to integral number");
-            }
+            RETURN_IF_ERROR(ParseLongLongOption(
+                parameter.first, parameter.second,
+                &tftrt_config.max_workspace_size_bytes_));
+          } else if (parameter.first == "max_cached_engines") {
+            RETURN_IF_ERROR(ParseLongLongOption(
+                parameter.first, parameter.second,
+                &tftrt_config.max_cached_engines_));
+          } else if (parameter.first == "use_calibration") {
+            is_calibration_specified = true;
+            RETURN_IF_ERROR(ParseBoolOption(
+                parameter.first, parameter.second,
+                &tftrt_config.use_calibration_));
+          } else if (parameter.first == "is_dynamic_op") {
+            RETURN_IF_ERROR(ParseBoolOption(
+                parameter.first, parameter.second,
+                &tftrt_config.is_dynamic_op_));
           } else {
             return Status(
                 RequestStatusCode::INVALID_ARG,
                 "unknown parameter '" + parameter.first +
                     "' is provided for TensorRT Execution Accelerator");
           }
+        }
+        // If needed, set 'use_calibration' at hindsight
+        if (!is_calibration_specified) {
+          tftrt_config.use_calibration_ =
+              (tftrt_config.precision_mode_ == TRTISTF_MODE_INT8);
         }
         LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                        << instance_name;
