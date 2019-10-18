@@ -278,9 +278,13 @@ NewSessionOptions(
         tftrt_config->minimum_segment_size_);
     (*trt_parameter_map)["precision_mode"].set_s(
         PrecisionModeToString(tftrt_config->precision_mode_));
+    (*trt_parameter_map)["use_calibration"].set_b(
+        tftrt_config->use_calibration_);
     (*trt_parameter_map)["max_batch_size"].set_i(tftrt_config->max_batch_size_);
     (*trt_parameter_map)["max_workspace_size_bytes"].set_i(
         tftrt_config->max_workspace_size_bytes_);
+    (*trt_parameter_map)["max_cached_engines"].set_i(
+        tftrt_config->max_cached_engines_);
   }
 }
 

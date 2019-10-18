@@ -95,10 +95,12 @@ typedef enum {
 // Config for TF-TRT optimization if specified
 typedef struct {
   bool is_dynamic_op_;
-  size_t max_batch_size_;
-  size_t max_workspace_size_bytes_;
+  int64_t max_batch_size_;
+  int64_t max_workspace_size_bytes_;
   TRTISTF_TFTRTPrecisionMode precision_mode_;
-  size_t minimum_segment_size_;
+  bool use_calibration_;
+  int64_t minimum_segment_size_;
+  int64_t max_cached_engines_;
 } TRTISTF_TFTRTConfig;
 
 // A shape
