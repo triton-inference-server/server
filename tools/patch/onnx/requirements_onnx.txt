@@ -1,0 +1,5 @@
+onnx==1.6.0
+networkx==2.3
+numpy==1.17.2
+test-generator==0.1.1
+defusedxml==0.6.0

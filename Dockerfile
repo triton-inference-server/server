@@ -132,6 +132,12 @@ ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
 ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
 
+# [TODO] make it in patch form
+# [TODO] refine the range of dependency version
+# Fixing OpenVINO Python dependencies to stabel version before the ONNX Runtime
+# issue is resolved https://github.com/microsoft/onnxruntime/issues/2169
+COPY tools/patch/onnx/requirements_onnx.txt $INTEL_OPENVINO_DIR/deployment_tools/model_optimizer/requirements_onnx.txt
+
 RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-opencl_1.0.2-1787_amd64.deb && \
