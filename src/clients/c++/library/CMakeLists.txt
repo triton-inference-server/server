@@ -70,7 +70,7 @@ target_include_directories(
   request-library PRIVATE
   $<TARGET_PROPERTY:CURL::libcurl,INTERFACE_INCLUDE_DIRECTORIES>)
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(request-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(request-library PUBLIC ${CUDA_INCLUDE_DIRS})
 endif() # TRTIS_ENABLE_GPU
 add_dependencies(
   request-library
@@ -89,13 +89,8 @@ add_library(
   TRTIS::request_static ALIAS request_static
 )
 if(${TRTIS_ENABLE_GPU})
-  target_include_directories(request_static PRIVATE ${CUDA_INCLUDE_DIRS})
-  target_link_libraries(
-    request_static
-    PRIVATE -L/usr/local/cuda/lib64/stubs
-    PRIVATE -lnvidia-ml
-    PRIVATE ${CUDA_LIBRARIES}
-  )
+  target_include_directories(request_static PUBLIC ${CUDA_INCLUDE_DIRS})
+  target_link_libraries(request_static PRIVATE ${CUDA_LIBRARIES})
 endif() # TRTIS_ENABLE_GPU
 target_include_directories(
   request_static

@@ -57,11 +57,9 @@ if(${TRTIS_ENABLE_GPU})
 # libccudashm.so
 #
 add_library(ccudashm SHARED cuda_shared_memory/cuda_shared_memory.cc)
-target_include_directories(ccudashm PRIVATE ${CUDA_INCLUDE_DIRS})
+target_include_directories(ccudashm PUBLIC ${CUDA_INCLUDE_DIRS})
 target_link_libraries(
   ccudashm
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif()
