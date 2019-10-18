@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import csv
 import json
 import os
 import requests
@@ -59,6 +60,41 @@ def annotate(datas):
         else:
             data['s_benchmark_system'] = socket.gethostname()
 
+def annotate_csv(data, csv_file):
+    csv_reader = csv.reader(csv_file, delimiter=',')
+    linenum = 0
+    header_row = None
+    concurrency_row = None
+    for row in csv_reader:
+        if linenum == 0:
+            header_row = row
+        else:
+            concurrency_row = row
+            break
+        linenum += 1
+
+    if (header_row is not None) and (concurrency_row is not None):
+        avg_latency_us = 0
+        for header, result in zip(header_row, concurrency_row):
+            if header == 'Inferences/Second':
+                data['d_infer_per_sec'] = float(result)
+            elif ((header == 'Client Send') or
+                  (header == 'Network+Server Send/Recv') or
+                  (header == 'Server Queue') or
+                  (header == 'Server Compute') or
+                  (header == 'Client Recv')):
+                avg_latency_us += float(result)
+            elif header == 'p50 latency':
+                data['d_latency_p50_ms'] = float(result) / 1000.0
+            elif header == 'p90 latency':
+                data['d_latency_p90_ms'] = float(result) / 1000.0
+            elif header == 'p95 latency':
+                data['d_latency_p95_ms'] = float(result) / 1000.0
+            elif header == 'p99 latency':
+                data['d_latency_p99_ms'] = float(result) / 1000.0
+
+        data['d_latency_avg_ms'] = avg_latency_us / 1000.0
+
 def post_to_url(url, data):
     headers = {'Content-Type': 'application/json', 'Accept-Charset': 'UTF-8'}
     r = requests.post(url, data=data, headers=headers)
@@ -72,12 +108,29 @@ if __name__ == '__main__':
                         help='Output filename')
     parser.add_argument('-u', '--url', type=str, required=False,
                         help='Post results to a URL')
+    parser.add_argument('--csv', type=argparse.FileType('r'), required=False,
+                        help='perf_client generated CSV')
     parser.add_argument('file', type=argparse.FileType('r'))
     FLAGS = parser.parse_args()
 
     data = json.loads(FLAGS.file.read())
-    annotate(data)
+
     if FLAGS.verbose:
+        print("*** Load json ***")
+        print(json.dumps(data, sort_keys=True, indent=2))
+
+    if FLAGS.csv is not None:
+        if len(data) != 1:
+            raise('--csv requires that json data have a single array entry')
+        annotate_csv(data[0], FLAGS.csv)
+        if FLAGS.verbose:
+            print("*** Annotate CSV ***")
+            print(json.dumps(data, sort_keys=True, indent=2))
+
+    annotate(data)
+
+    if FLAGS.verbose:
+        print("*** Post Annotate ***")
         print(json.dumps(data, sort_keys=True, indent=2))
 
     if FLAGS.output is not None:
