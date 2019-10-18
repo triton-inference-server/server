@@ -119,6 +119,9 @@ _crequest_shm_control_ctx_del.argtypes = [c_void_p]
 _crequest_shm_control_ctx_register = _crequest.SharedMemoryControlContextRegister
 _crequest_shm_control_ctx_register.restype = c_void_p
 _crequest_shm_control_ctx_register.argtypes = [c_void_p, c_void_p]
+_crequest_shm_control_ctx_cuda_register = _crequest.SharedMemoryControlContextCudaRegister
+_crequest_shm_control_ctx_cuda_register.restype = c_void_p
+_crequest_shm_control_ctx_cuda_register.argtypes = [c_void_p, c_void_p]
 _crequest_shm_control_ctx_unregister = _crequest.SharedMemoryControlContextUnregister
 _crequest_shm_control_ctx_unregister.restype = c_void_p
 _crequest_shm_control_ctx_unregister.argtypes = [c_void_p, c_void_p]
@@ -761,6 +764,28 @@ class SharedMemoryControlContext:
 
         self._last_request_id = _raise_if_error(
             c_void_p(_crequest_shm_control_ctx_register(self._ctx, shm_handle)))
+        return
+
+    def cuda_register(self, cuda_shm_handle):
+        """Request the inference server to register specified shared memory region.
+
+        Parameters
+        ----------
+        cuda_shm_handle : c_void_p
+            The handle for the CUDA shared memory region.
+
+        Raises
+        ------
+        InferenceServerException
+            If unable to register the shared memory region.
+
+        """
+        self._last_request_id = None
+        if self._ctx is None:
+            _raise_error("SharedMemoryControlContext is closed")
+
+        self._last_request_id = _raise_if_error(
+            c_void_p(_crequest_shm_control_ctx_cuda_register(self._ctx, cuda_shm_handle)))
         return
 
     def unregister(self, shm_handle):

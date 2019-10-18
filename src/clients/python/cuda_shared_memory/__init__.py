@@ -51,7 +51,7 @@ _ccudashm = cdll.LoadLibrary(_ccudashm_path)
 
 _ccudashm_shared_memory_region_create = _ccudashm.CudaSharedMemoryRegionCreate
 _ccudashm_shared_memory_region_create.restype = c_int
-_ccudashm_shared_memory_region_create.argtypes = [_utf8, _utf8, c_uint64, POINTER(c_void_p)]
+_ccudashm_shared_memory_region_create.argtypes = [_utf8, c_uint64, c_uint64, POINTER(c_void_p)]
 _ccudashm_shared_memory_region_set = _ccudashm.CudaSharedMemoryRegionSet
 _ccudashm_shared_memory_region_set.restype = c_int
 _ccudashm_shared_memory_region_set.argtypes = [c_void_p, c_uint64, c_uint64, c_void_p]

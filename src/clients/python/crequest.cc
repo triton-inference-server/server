@@ -388,6 +388,24 @@ SharedMemoryControlContextRegister(
   return new nic::Error(err);
 }
 
+#if TRTIS_ENABLE_GPU
+nic::Error*
+SharedMemoryControlContextCudaRegister(
+    SharedMemoryControlContextCtx* ctx, void* cuda_shm_handle)
+{
+  SharedMemoryHandle* handle =
+      reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
+  nic::Error err = ctx->ctx->RegisterCudaSharedMemory(
+      handle->trtis_shm_name_, *(handle->cuda_shm_handle_), handle->byte_size_,
+      handle->device_id_);
+  if (err.IsOk()) {
+    return nullptr;
+  }
+
+  return new nic::Error(err);
+}
+#endif  // TRTIS_ENABLE_GPU
+
 nic::Error*
 SharedMemoryControlContextUnregister(
     SharedMemoryControlContextCtx* ctx, void* shm_handle)

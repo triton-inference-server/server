@@ -76,6 +76,14 @@ function main() {
       "${WHLDIR}/tensorrtserver/shared_memory/."
   fi
 
+  if [ -z "$TRTIS_ENABLE_GPU" ]; then
+    mkdir -p ${WHLDIR}/tensorrtserver/cuda_shared_memory
+    cp libccudashm.so \
+      "${WHLDIR}/tensorrtserver/cuda_shared_memory/."
+    cp cuda_shared_memory/__init__.py \
+      "${WHLDIR}/tensorrtserver/cuda_shared_memory/."
+  fi
+
   cp setup.py "${WHLDIR}"
 	touch ${WHLDIR}/tensorrtserver/__init__.py
 

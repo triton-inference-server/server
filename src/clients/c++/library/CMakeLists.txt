@@ -129,6 +129,9 @@ set_target_properties(
 )
 endif()
 
+if(${TRTIS_ENABLE_GPU})
+  target_include_directories(request PUBLIC ${CUDA_INCLUDE_DIRS})
+endif() # TRTIS_ENABLE_GPU
 target_include_directories (request
   PUBLIC
     $<INSTALL_INTERFACE:include>

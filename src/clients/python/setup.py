@@ -59,6 +59,9 @@ if os.name == 'nt':
 else:
     platform_package_data = [ 'libcrequest.so', 'librequest.so', 'libcshm.so' ]
 
+if int(os.environ.get('TRTIS_ENABLE_GPU', 0)):
+    platform_package_data += ['libccudashm.so']
+
 setup(
     name='tensorrtserver',
     version=VERSION,
