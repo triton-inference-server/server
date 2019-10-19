@@ -442,6 +442,15 @@ TRTSERVER_InferenceRequestProviderSetInputData(
     const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
     int64_t memory_type_id);
 
+/// Store the memory type for an output.
+/// \param request_provider The request provider object.
+/// \param name The name of the output.
+/// \param memory_type The memory type of the output data.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_Error* TRTSERVER_InferenceRequestProviderSetOutputMemoryType(
+    TRTSERVER_InferenceRequestProvider* request_provider,
+    const char* output_name, TRTSERVER_Memory_Type memory_type);
+
 /// TRTSERVER_InferenceResponse
 ///
 /// Object representing the response for an inference request. The

@@ -724,7 +724,8 @@ InferAllocatorPayload(
     const std::shared_ptr<TRTSERVER_Server>& trtserver,
     const std::shared_ptr<SharedMemoryBlockManager>& smb_manager,
     const InferRequestHeader& request_header, InferResponse& response,
-    AllocPayload* alloc_payload)
+    AllocPayload* alloc_payload,
+    TRTSERVER_InferenceRequestProvider* request_provider)
 {
   alloc_payload->response_ = &response;
   if (alloc_payload->shm_map_ != nullptr) {
@@ -736,6 +737,7 @@ InferAllocatorPayload(
   // payload so that it is available when the allocation callback is
   // invoked.
   for (const auto& io : request_header.output()) {
+    TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     if (io.has_shared_memory()) {
       void* base;
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
@@ -758,6 +760,9 @@ InferAllocatorPayload(
           io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
                                            memory_type, memory_type_id});
     }
+
+    RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetOutputMemoryType(
+        request_provider, io.name().c_str(), memory_type));
   }
 
   return nullptr;  // Success
@@ -776,6 +781,7 @@ InferGRPCToInput(
   for (const auto& io : request_header.input()) {
     const void* base;
     size_t byte_size;
+    TRTSERVER_Memory_Type memory_type = TRTSERVER_MEMORY_CPU;
     if (io.has_shared_memory()) {
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
@@ -783,6 +789,7 @@ InferGRPCToInput(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), const_cast<void**>(&base)));
       byte_size = io.shared_memory().byte_size();
+      TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type);
     } else if ((int)idx >= request.raw_input_size()) {
       return TRTSERVER_ErrorNew(
           TRTSERVER_ERROR_INVALID_ARG,
@@ -813,8 +820,7 @@ InferGRPCToInput(
     }
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
-        request_provider, io.name().c_str(), base, byte_size,
-        TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+        request_provider, io.name().c_str(), base, byte_size, memory_type, 0 /* memory_type_id */));
   }
 
   return nullptr;  // success
@@ -944,7 +950,7 @@ InferHandler::Process(Handler::State* state, bool rpc_ok)
         if (err == nullptr) {
           err = InferAllocatorPayload(
               trtserver_, smb_manager_, request.meta_data(), response,
-              &state->alloc_payload_);
+              &state->alloc_payload_, request_provider);
           if (err == nullptr) {
             // Get the trace object to use for this request. If
             // nullptr then no tracing will be performed.
@@ -1250,7 +1256,7 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
         if (err == nullptr) {
           err = InferAllocatorPayload(
               trtserver_, smb_manager_, request.meta_data(), response,
-              &state->alloc_payload_);
+              &state->alloc_payload_, request_provider);
           if (err == nullptr) {
             // Get the trace object to use for this request. If
             // nullptr then no tracing will be performed.

@@ -94,8 +94,8 @@ class EnsembleContext {
       std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
   // Storing each tensor's meta data in 1st element, batch size in 2nd
   // (0 for non-batchable), and the raw data in 3rd.
-  using TensorData = std::tuple<
-      InferRequestHeader::Input, size_t, std::shared_ptr<SystemMemory>>;
+  using TensorData =
+      std::tuple<InferRequestHeader::Input, size_t, std::shared_ptr<Memory>>;
 
   // Return the list of step that becomes ready due to tensor update
   // from 'completed_step'
@@ -279,8 +279,7 @@ EnsembleContext::EnsembleContext(
         auto& tensor_data = it->second;
         std::get<0>(tensor_data) = input;
         std::get<1>(tensor_data) = (info_->allow_batching_ ? batch_size_ : 0);
-        request_provider_->GetSystemMemory(
-            it->first, &(std::get<2>(tensor_data)));
+        request_provider_->GetMemory(it->first, &(std::get<2>(tensor_data)));
       } else {
         ensemble_status_ = Status(
             RequestStatusCode::INVALID_ARG,
@@ -515,7 +514,8 @@ EnsembleContext::GetNextSteps(
 Status
 EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
 {
-  std::unordered_map<std::string, std::shared_ptr<SystemMemory>> input_map;
+  std::unordered_map<std::string, std::shared_ptr<Memory>> input_map;
+  std::unordered_map<std::string, TRTSERVER_Memory_Type> output_map;
   InferRequestHeader request_header;
   auto& version_map = handles_[info_->steps_[step_idx].model_name_];
   auto& backend = version_map[info_->steps_[step_idx].model_version_];
@@ -561,7 +561,7 @@ EnsembleContext::InitStep(size_t step_idx, std::shared_ptr<Step>* step)
   RETURN_IF_ERROR(InferResponseProvider::Create(
       (*step)->request_provider_->RequestHeader(),
       (*step)->backend_->GetLabelProvider(), allocator_.get(), ResponseAlloc,
-      &((*step)->output_map_), ResponseRelease,
+      &((*step)->output_map_), ResponseRelease, output_map,
       &((*step)->response_provider_)));
 
   return Status::Success;
