@@ -246,13 +246,11 @@ BaseBackend::CreateExecutionContext(
               tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
             } else if (parameter.second == "FP16") {
               tftrt_config.precision_mode_ = TRTISTF_MODE_FP16;
-            } else if (parameter.second == "INT8") {
-              tftrt_config.precision_mode_ = TRTISTF_MODE_INT8;
             } else {
               return Status(
-                  RequestStatusCode::INVALID_ARG, "unknown precision mode '" +
-                                                      parameter.second +
-                                                      "' is requested");
+                  RequestStatusCode::INVALID_ARG,
+                  "unsupported precision mode '" + parameter.second +
+                      "' is requested");
             }
           } else if (parameter.first == "minimum_segment_size") {
             RETURN_IF_ERROR(ParseLongLongParameter(
@@ -266,11 +264,6 @@ BaseBackend::CreateExecutionContext(
             RETURN_IF_ERROR(ParseLongLongParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.max_cached_engines_));
-          } else if (parameter.first == "use_calibration") {
-            is_calibration_specified = true;
-            RETURN_IF_ERROR(ParseBoolParameter(
-                parameter.first, parameter.second,
-                &tftrt_config.use_calibration_));
           } else if (parameter.first == "is_dynamic_op") {
             RETURN_IF_ERROR(ParseBoolParameter(
                 parameter.first, parameter.second,

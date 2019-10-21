@@ -493,13 +493,8 @@ message ModelOptimizationPolicy
     //@@       For TensorFlow backend, possible values are "tensorrt", "gpu_io".
     //@@       For "tensorrt", the following parameters can be specified:
     //@@         "precision_mode" The precission used for optimization.
-    //@@         The value can be one of "FP32", "FP16" and "INT8".
+    //@@         The value can be one of "FP32" and "FP16".
     //@@         Default value is "FP32".
-    //@@
-    //@@         "use_calibration" Whether to perform INT8 quantization with
-    //@@         TensorRT calibration. If set to False, quantization nodes are
-    //@@         expected for every tensor in the graph. Default value is true.
-    //@@         This argument is ignored if 'precision_mode' is not 'INT8'.
     //@@
     //@@         "is_dynamic_op" Whether at least one input has dynamic shape.
     //@@         If not specified, the value will be inferred based on input
