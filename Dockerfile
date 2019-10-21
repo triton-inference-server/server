@@ -132,6 +132,14 @@ ENV PATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$PATH
 ENV PYTHONPATH $INTEL_CVSDK_DIR/deployment_tools/model_optimizer:$INTEL_CVSDK_DIR/tools:$PYTHONPATH
 ENV IE_PLUGINS_PATH $INTEL_CVSDK_DIR/deployment_tools/inference_engine/lib/intel64
 
+# [DLIS-816] Patch OpenVINO dependency (networkx) to fixed version until
+# the incompatible change is addressed:
+# https://github.com/microsoft/onnxruntime/issues/2169
+COPY tools/patch/onnx /tmp/trtis/tools/patch/onnx
+RUN sha1sum -c /tmp/trtis/tools/patch/onnx/checksums && \
+    patch -i /tmp/trtis/tools/patch/onnx/requirements_onnx.txt \
+          $INTEL_OPENVINO_DIR/deployment_tools/model_optimizer/requirements_onnx.txt
+
 RUN wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-gmmlib_19.1.1_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-core_1.0.2-1787_amd64.deb && \
     wget https://github.com/intel/compute-runtime/releases/download/19.15.12831/intel-igc-opencl_1.0.2-1787_amd64.deb && \
