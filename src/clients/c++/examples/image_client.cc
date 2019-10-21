@@ -30,9 +30,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <algorithm>
+#include <condition_variable>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <mutex>
+#include <queue>
 #include <string>
 #include "src/clients/c++/library/request_grpc.h"
 #include "src/clients/c++/library/request_http.h"
@@ -681,7 +684,13 @@ main(int argc, char** argv)
   std::vector<std::vector<std::string>> result_filenames;
   std::vector<std::shared_ptr<nic::InferContext::Request>> requests;
   size_t image_idx = 0;
+  size_t done_cnt = 0;
   bool last_request = false;
+  std::mutex mtx;
+  std::condition_variable cv;
+
+  std::queue<std::shared_ptr<nic::InferContext::Request>> request_buffer_;
+
   while (!last_request) {
     // Already verified that there is 1 input...
     const auto& input = ctx->Inputs()[0];
@@ -721,29 +730,46 @@ main(int argc, char** argv)
         exit(1);
       }
     } else {
-      std::shared_ptr<nic::InferContext::Request> req;
-      err = ctx->AsyncRun(&req);
+      err = ctx->AsyncRun(
+          [&](nic::InferContext* ctx,
+              const std::shared_ptr<nic::InferContext::Request>& request) {
+            std::lock_guard<std::mutex> lk(mtx);
+            done_cnt++;
+            request_buffer_.push(request);
+            cv.notify_all();
+            return;
+          });
       if (!err.IsOk()) {
         std::cerr << "failed sending asynchronous infer request: " << err
                   << std::endl;
         exit(1);
       }
-
-      requests.emplace_back(std::move(req));
     }
   }
 
   // For async, retrieve results according to the send order
   if (async) {
+    // Wait until all callbacks are invoked
+    {
+      std::unique_lock<std::mutex> lk(mtx);
+      cv.wait(lk, [&]() {
+        if (done_cnt >= image_data.size()) {
+          return true;
+        } else {
+          return false;
+        }
+      });
+    }
     bool is_ready;
-    for (auto& request : requests) {
+    while (!request_buffer_.empty()) {
       results.emplace_back();
-      err =
-          ctx->GetAsyncRunResults(&(results.back()), &is_ready, request, true);
+      err = ctx->GetAsyncRunResults(
+          &(results.back()), &is_ready, request_buffer_.front(), true);
       if (!err.IsOk()) {
         std::cerr << "failed receiving infer response: " << err << std::endl;
         exit(1);
       }
+      request_buffer_.pop();
     }
   }
 

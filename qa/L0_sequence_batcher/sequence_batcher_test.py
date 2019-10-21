@@ -38,6 +38,7 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
+from functools import partial
 from tensorrtserver.api import *
 if "TEST_SHARED_MEMORY" in os.environ:
     TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
@@ -45,6 +46,10 @@ else:
     TEST_SHARED_MEMORY=0
 import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
+if sys.version_info >= (3, 0):
+  import queue
+else:
+  import Queue as queue
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
@@ -69,6 +74,15 @@ _trials = tuple(res)
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
 _check_exception = None
+
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+# Callback function used for async_run_with_cb()
+def completion_callback(user_data, infer_ctx, request_id):
+    user_data._completed_requests.put(request_id)
+
 
 class SequenceBatcherTest(unittest.TestCase):
     def setUp(self):
@@ -280,7 +294,7 @@ class SequenceBatcherTest(unittest.TestCase):
             # Execute the sequence of inference...
             try:
                 seq_start_ms = int(round(time.time() * 1000))
-                result_ids = list()
+                user_data = UserData()
 
                 if config[3]:
                     shm_ip_handle = []
@@ -343,25 +357,29 @@ class SequenceBatcherTest(unittest.TestCase):
                         time.sleep(pre_delay_ms / 1000.0)
 
                     if "libtorch" not in trial:
-                        result_ids.append(ctx.async_run(
-                            { "INPUT" : input_info }, { "OUTPUT" : output_info},
-                            batch_size=batch_size, flags=flags))
+
+                        ctx.async_run_with_cb(partial(completion_callback, user_data), 
+                            { 'INPUT' :input_info }, { 'OUTPUT' :output_info },
+                               batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT"
                     else:
-                        result_ids.append(ctx.async_run(
-                            { "INPUT__0" : input_info }, { "OUTPUT__0" : output_info},
-                            batch_size=batch_size, flags=flags))
+                        ctx.async_run_with_cb(partial(completion_callback, user_data), 
+                            { 'INPUT__0' :input_info }, { 'OUTPUT__0' :output_info },
+                               batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"
                     i+=1
 
                 # Wait for the results in the order sent
                 result = None
-                for id in result_ids:
+                processed_count = 0
+                while processed_count < i:
+                    id = user_data._completed_requests.get()
                     results = ctx.get_async_run_results(id, True)
                     self.assertEqual(len(results), 1)
                     self.assertTrue(OUTPUT in results)
                     result = results[OUTPUT][0][0]
                     print("{}: {}".format(sequence_name, result))
+                    processed_count+=1
 
                 seq_end_ms = int(round(time.time() * 1000))
 

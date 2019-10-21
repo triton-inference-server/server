@@ -996,55 +996,6 @@ InferContextImpl::UpdateStat(const RequestTimers& timer)
 }
 
 Error
-InferContextImpl::GetReadyAsyncRequest(
-    std::shared_ptr<Request>* request, bool* is_ready, bool wait)
-{
-  *is_ready = false;
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (ongoing_async_requests_.size() == 0) {
-    return Error(
-        RequestStatusCode::UNAVAILABLE,
-        "No asynchronous requests have been sent");
-  } else {
-    bool has_dangling_request = false;
-    for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-      auto request_impl =
-          static_cast<RequestImpl*>(ongoing_async_request.second.get());
-      if (!request_impl->HasCallback()) {
-        has_dangling_request = true;
-        break;
-      }
-    }
-    if (!has_dangling_request) {
-      return Error(
-          RequestStatusCode::UNAVAILABLE,
-          "No asynchronous requests can be returned, all outstanding requests "
-          "will signal completion via their callback function");
-    }
-  }
-
-  cv_.wait(lock, [is_ready, request, this, wait] {
-    for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-      auto request_impl =
-          static_cast<RequestImpl*>(ongoing_async_request.second.get());
-      if (!request_impl->HasCallback() && request_impl->IsReady()) {
-        *request = ongoing_async_request.second;
-        *is_ready = true;
-        return true;
-      }
-    }
-
-    if (!wait) {
-      return true;
-    } else {
-      return false;
-    }
-  });
-
-  return Error::Success;
-}
-
-Error
 InferContextImpl::IsRequestReady(
     const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait)
 {

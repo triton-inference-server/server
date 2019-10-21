@@ -142,9 +142,6 @@ _crequest_infer_ctx_set_options.argtypes = [c_void_p, c_void_p]
 _crequest_infer_ctx_run = _crequest.InferContextRun
 _crequest_infer_ctx_run.restype = c_void_p
 _crequest_infer_ctx_run.argtypes = [c_void_p]
-_crequest_infer_ctx_async_run = _crequest.InferContextAsyncRun
-_crequest_infer_ctx_async_run.restype = c_void_p
-_crequest_infer_ctx_async_run.argtypes = [c_void_p, POINTER(c_uint64)]
 _async_run_callback_prototype = CFUNCTYPE(None, c_void_p, c_uint64)
 _crequest_infer_ctx_async_run_with_cb = _crequest.InferContextAsyncRunWithCallback
 _crequest_infer_ctx_async_run_with_cb.restype = c_void_p
@@ -152,13 +149,10 @@ _crequest_infer_ctx_async_run_with_cb.argtypes = [c_void_p, _async_run_callback_
 _crequest_infer_ctx_get_async_run_results = _crequest.InferContextGetAsyncRunResults
 _crequest_infer_ctx_get_async_run_results.restype = c_void_p
 _crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, POINTER(c_bool), c_uint64, c_bool]
-_crequest_infer_ctx_get_ready_async_request = _crequest.InferContextGetReadyAsyncRequest
-_crequest_infer_ctx_get_ready_async_request.restype = c_void_p
-_crequest_infer_ctx_get_ready_async_request.argtypes = [c_void_p, POINTER(c_bool), POINTER(c_uint64), c_bool]
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
-_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint32, c_uint64]
+_crequest_infer_ctx_options_new.argtypes = [POINTER(c_void_p), c_uint32, c_uint64, c_uint64]
 _crequest_infer_ctx_options_del = _crequest.InferContextOptionsDelete
 _crequest_infer_ctx_options_del.argtypes = [c_void_p]
 _crequest_infer_ctx_options_add_raw = _crequest.InferContextOptionsAddRaw
@@ -170,6 +164,9 @@ _crequest_infer_ctx_options_add_class.argtypes = [c_void_p, c_void_p, _utf8, c_u
 _crequest_infer_ctx_options_add_shared_memory = _crequest.InferContextOptionsAddSharedMemory
 _crequest_infer_ctx_options_add_shared_memory.restype = c_void_p
 _crequest_infer_ctx_options_add_shared_memory.argtypes = [c_void_p, c_void_p, _utf8, c_void_p]
+_crequest_correlation_id = _crequest.CorrelationId
+_crequest_correlation_id.restype = c_uint64
+_crequest_correlation_id.argtypes = [c_void_p]
 
 _crequest_infer_ctx_input_new = _crequest.InferContextInputNew
 _crequest_infer_ctx_input_new.restype = c_void_p
@@ -977,7 +974,7 @@ class InferContext:
         _raise_error("unknown result datatype " + ctype.value)
 
     def _prepare_request(self, inputs, outputs,
-                         flags, batch_size, contiguous_input_values):
+                         flags, batch_size, corr_id, contiguous_input_values):
         # Make sure each input is given as a list (one entry per
         # batch). It is a common error when using batch-size 1 to
         # specify an input directly as an array instead of as a list
@@ -1010,7 +1007,7 @@ class InferContext:
         options = c_void_p()
         try:
             _raise_if_error(c_void_p(
-                _crequest_infer_ctx_options_new(byref(options), flags, batch_size)))
+                _crequest_infer_ctx_options_new(byref(options), flags, batch_size, corr_id)))
 
             for (output_name, output_format) in iteritems(outputs):
                 if len(output_format) == 2 and isinstance(output_format, (list, tuple)) \
@@ -1307,9 +1304,9 @@ class InferContext:
             The correlation ID.
 
         """
-        return self._correlation_id
+        return _crequest_correlation_id(self._ctx)
 
-    def run(self, inputs, outputs, batch_size=1, flags=0):
+    def run(self, inputs, outputs, batch_size=1, flags=0, corr_id=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1333,10 +1330,14 @@ class InferContext:
         batch_size : int
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
-
+        
         flags : int
             The flags to use for the inference. The bitwise-or of
             InferRequestHeader.Flag values.
+        
+        corr_id : int
+            The correlation id of the inference. Used to differentiate
+            sequences.
 
         Returns
         -------
@@ -1368,83 +1369,14 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, flags, batch_size, corr_id, contiguous_input)
 
         # Run inference...
         self._last_request_id = _raise_if_error(c_void_p(_crequest_infer_ctx_run(self._ctx)))
 
         return self._get_results(outputs, batch_size)
 
-    def async_run(self, inputs, outputs, batch_size=1, flags=0):
-        """DEPRECATED: This function is deprecated and will be removed in
-        a future version of this API. Instead use async_run_with_cb().
-
-        Run inference using the supplied 'inputs' to calculate the outputs
-        specified by 'outputs'.
-
-        Unlike run(), async_run() returns immediately after sending
-        the inference request to the server. The returned integer
-        identifier must be used subsequently to wait on and retrieve
-        the actual inference results.
-
-        Parameters
-        ----------
-        inputs : dict
-            Dictionary from input name to the value(s) for that
-            input. An input value is specified as a numpy array. Each
-            input in the dictionary maps to a list of values (i.e. a
-            list of numpy array objects), where the length of the list
-            must equal the 'batch_size'.
-
-        outputs : dict
-            Dictionary from output name to a value indicating the
-            ResultFormat that should be used for that output. For RAW
-            the value should be ResultFormat.RAW. For CLASS the value
-            should be a tuple (ResultFormat.CLASS, k), where 'k'
-            indicates how many classification results should be
-            returned for the output.
-
-        batch_size : int
-            The batch size of the inference. Each input must provide
-            an appropriately sized batch of inputs.
-
-        flags : int
-            The flags to use for the inference. The bitwise-or of
-            InferRequestHeader.Flag values.
-
-        Returns
-        -------
-        int
-            Integer identifier which must be passed to
-            get_async_run_results() to wait on and retrieve the
-            inference results.
-
-        Raises
-        ------
-        InferenceServerException
-            If all inputs are not specified, if the size of input data
-            does not match expectations, if unknown output names are
-            specified or if server fails to perform inference.
-
-        """
-        # Same situation as in run(), but the list will be kept inside
-        # the object given that the request is asynchronous
-        contiguous_input = list()
-
-        # Set run option and input values
-        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
-
-        # Run asynchronous inference...
-        c_request_id = c_uint64()
-        _raise_if_error(
-            c_void_p(
-                _crequest_infer_ctx_async_run(self._ctx, byref(c_request_id))))
-
-        self._requested_outputs_dict[c_request_id.value] = (outputs, batch_size, contiguous_input)
-
-        return c_request_id.value
-
-    def async_run_with_cb(self, callback, inputs, outputs, batch_size=1, flags=0):
+    def async_run_with_cb(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1481,6 +1413,11 @@ class InferContext:
             The batch size of the inference. Each input must provide
             an appropriately sized batch of inputs.
 
+        corr_id : int
+            The correlation id of the inference. Used by the sequence
+            scheduler to allocate the requests with identical 
+            correlation ids to same slot.
+
         flags : int
             The flags to use for the inference. The bitwise-or of
             InferRequestHeader.Flag values.
@@ -1498,7 +1435,7 @@ class InferContext:
         contiguous_input = list()
 
         # Set run option and input values
-        self._prepare_request(inputs, outputs, flags, batch_size, contiguous_input)
+        self._prepare_request(inputs, outputs, flags, batch_size, corr_id, contiguous_input)
 
         # Wrap over the provided callback
         wrapped_cb = partial(self._async_callback_wrapper, self._callback_resources_dict_id, callback)
@@ -1566,47 +1503,6 @@ class InferContext:
             del self._requested_outputs_dict[request_id]
 
         return self._get_results(requested_outputs[0], requested_outputs[1], request_id)
-
-    def get_ready_async_request(self, wait):
-        """DEPRECATED: This function is deprecated and will be removed in
-        a future version of this API. This function is only useful with
-        the deprecated version of async_run(). Instead use async_run_with_cb().
-
-        Get the request ID of an async_run() request that has completed but
-        not yet had results read with get_async_run_results().
-
-        Parameters
-        ----------
-        wait : bool
-            If True block until an async request is ready. If False return
-            immediately even if results are not ready.
-
-        Returns
-        -------
-        int
-            None if no asynchronous results are ready and 'wait' is
-            False. An integer identifier which must be passed to
-            get_async_run_results() to wait on and retrieve the
-            inference results.
-
-        Raises
-        ------
-        InferenceServerException
-            If no asynchronous request is in flight or completed.
-
-        """
-        # Get async run results
-        c_is_ready = c_bool()
-        c_request_id = c_uint64()
-        err = c_void_p(_crequest_infer_ctx_get_ready_async_request(
-            self._ctx, byref(c_is_ready), byref(c_request_id), wait))
-
-        _raise_if_error(err)
-
-        if not c_is_ready.value:
-            return None
-
-        return c_request_id.value
 
     def get_last_request_id(self):
         """Get the request ID of the most recent run() request.

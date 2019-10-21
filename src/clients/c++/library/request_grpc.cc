@@ -550,7 +550,6 @@ class InferGrpcContextImpl : public InferContextImpl {
   Error InitGrpc(const std::string& server_url);
 
   virtual Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
       ResultMap* results, bool* is_ready,
@@ -769,12 +768,6 @@ InferGrpcContextImpl::Run(ResultMap* results)
   }
 
   return request_status;
-}
-
-Error
-InferGrpcContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
-{
-  return AsyncRun(async_request, nullptr);
 }
 
 Error
@@ -1069,9 +1062,25 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
 {
   // Actually calling AsyncRun() and GetAsyncRunResults()
   std::shared_ptr<Request> req;
-  Error err = AsyncRun(&req);
+  bool callback_invoked = false;
+  std::mutex mtx;
+  std::condition_variable cv;
+  Error err =
+      AsyncRun([&](InferContext* ctx, std::shared_ptr<Request> request) {
+        // Defer the response retrieval to main thread
+        std::lock_guard<std::mutex> lk(mtx);
+        callback_invoked = true;
+        req = std::move(request);
+        cv.notify_all();
+        return;
+      });
   if (!err.IsOk()) {
     return err;
+  }
+  // Wait for the callback
+  {
+    std::unique_lock<std::mutex> lk(mtx);
+    cv.wait(lk, [&callback_invoked]() { return callback_invoked; });
   }
   bool is_ready;
   return GetAsyncRunResults(results, &is_ready, req, true);

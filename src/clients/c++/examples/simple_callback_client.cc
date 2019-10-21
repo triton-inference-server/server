@@ -264,22 +264,6 @@ main(int argc, char** argv)
       }),
       "unable to run model");
 
-  std::shared_ptr<nic::InferContext::Request> request;
-  bool is_ready = false;
-  nic::Error error = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
-  if (error.IsOk()) {
-    std::cerr << "Expecting error on GetReadyAsyncRequest" << std::endl;
-    exit(1);
-  } else if (
-      error.Message() !=
-      "No asynchronous requests can be returned, all outstanding requests "
-      "will signal completion via their callback function") {
-    std::cerr
-        << "Expecting different error message on GetReadyAsyncRequest, got: "
-        << error.Message() << std::endl;
-    exit(1);
-  }
-
   // Ensure callback is completed
   {
     std::unique_lock<std::mutex> lk(mtx);
@@ -289,18 +273,6 @@ main(int argc, char** argv)
   // Get deferred response
   std::cout << "Getting results from deferred response" << std::endl;
   ValidateResults(ctx.get(), request_placeholder, input0_data, input1_data);
-
-  // Check again, should return different error message
-  error = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
-  if (error.IsOk()) {
-    std::cerr << "Expecting error on GetReadyAsyncRequest" << std::endl;
-    exit(1);
-  } else if (error.Message() != "No asynchronous requests have been sent") {
-    std::cerr
-        << "Expecting different error message on GetReadyAsyncRequest, got: "
-        << error.Message() << std::endl;
-    exit(1);
-  }
 
   return 0;
 }

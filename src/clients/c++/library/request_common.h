@@ -483,10 +483,6 @@ class InferContextImpl : public InferContext {
   Error GetStat(Stat* stat) const override;
   int64_t ByteSize(const DimsList& dims, DataType dtype) const override;
 
-  virtual Error GetReadyAsyncRequest(
-      std::shared_ptr<Request>* async_request, bool* is_ready,
-      bool wait) override;
-
  protected:
   Error Init(std::unique_ptr<ServerStatusContext> sctx);
 

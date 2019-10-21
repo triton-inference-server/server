@@ -527,16 +527,6 @@ InferContextRun(InferContextCtx* ctx)
 }
 
 nic::Error*
-InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id)
-{
-  std::shared_ptr<nic::InferContext::Request> request;
-  nic::Error err = ctx->ctx->AsyncRun(&request);
-  ctx->requests.emplace(request->Id(), request);
-  *request_id = request->Id();
-  return new nic::Error(err);
-}
-
-nic::Error*
 InferContextAsyncRunWithCallback(
     InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t))
 {
@@ -571,24 +561,11 @@ InferContextGetAsyncRunResults(
       "The request ID doesn't match any existing asynchrnous requests");
 }
 
-nic::Error*
-InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, bool* is_ready, uint64_t* request_id, bool wait)
-{
-  // Here we assume that all asynchronous request is created by calling
-  // InferContextAsyncRun(). Thus we don't need to check ctx->requests.
-  std::shared_ptr<nic::InferContext::Request> request;
-  nic::Error err = ctx->ctx->GetReadyAsyncRequest(&request, is_ready, wait);
-  if (*is_ready) {
-    *request_id = request->Id();
-  }
-  return new nic::Error(err);
-}
-
 //==============================================================================
 nic::Error*
 InferContextOptionsNew(
-    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size)
+    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size,
+    ni::CorrelationID corr_id = 0)
 {
   std::unique_ptr<nic::InferContext::Options> uctx;
   nic::Error err = nic::InferContext::Options::Create(&uctx);
@@ -596,6 +573,7 @@ InferContextOptionsNew(
     *ctx = uctx.release();
     (*ctx)->SetFlags(flags);
     (*ctx)->SetBatchSize(batch_size);
+    (*ctx)->SetCorrelationId(corr_id);
     return nullptr;
   }
 
@@ -654,6 +632,11 @@ InferContextOptionsAddSharedMemory(
   return new nic::Error(err);
 }
 
+ni::CorrelationID
+CorrelationId(InferContextCtx* infer_ctx)
+{
+  return infer_ctx->ctx->CorrelationId();
+}
 //==============================================================================
 struct InferContextInputCtx {
   std::shared_ptr<nic::InferContext::Input> input;
