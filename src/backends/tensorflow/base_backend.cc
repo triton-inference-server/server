@@ -202,7 +202,6 @@ BaseBackend::CreateExecutionContext(
     tftrt_config.max_cached_engines_ = 100;
     tftrt_config.max_batch_size_ = std::max(Config().max_batch_size(), 1);
     tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
-    tftrt_config.use_calibration_ = false;
     tftrt_config.is_dynamic_op_ = false;
     for (const auto& io : Config().input()) {
       const auto& dims = io.has_reshape() ? io.reshape().shape() : io.dims();
@@ -239,7 +238,6 @@ BaseBackend::CreateExecutionContext(
                                                  .gpu_execution_accelerator()) {
       if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
         // Validate and set parameters
-        bool is_calibration_specified = false;
         for (const auto& parameter : execution_accelerator.parameters()) {
           if (parameter.first == "precision_mode") {
             if (parameter.second == "FP32") {
@@ -274,11 +272,6 @@ BaseBackend::CreateExecutionContext(
                 "unknown parameter '" + parameter.first +
                     "' is provided for TensorRT Execution Accelerator");
           }
-        }
-        // If needed, set 'use_calibration' at hindsight
-        if (!is_calibration_specified) {
-          tftrt_config.use_calibration_ =
-              (tftrt_config.precision_mode_ == TRTISTF_MODE_INT8);
         }
         LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
                        << instance_name;

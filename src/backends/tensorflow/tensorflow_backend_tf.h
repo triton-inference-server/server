@@ -98,7 +98,6 @@ typedef struct {
   int64_t max_batch_size_;
   int64_t max_workspace_size_bytes_;
   TRTISTF_TFTRTPrecisionMode precision_mode_;
-  bool use_calibration_;
   int64_t minimum_segment_size_;
   int64_t max_cached_engines_;
 } TRTISTF_TFTRTConfig;
