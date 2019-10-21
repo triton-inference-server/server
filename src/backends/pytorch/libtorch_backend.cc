@@ -468,7 +468,7 @@ LibTorchBackend::Context::GetOutputTensor(
     size_t* byte_size, std::vector<int64_t>* content_shape)
 {
   try {
-    torch::Tensor output_flat = (*outputs_)[op_index].flatten();
+    torch::Tensor output_flat = (*outputs_)[op_index].contiguous().flatten();
 
     // verify output datatype matches datatype from model config
     DataType rec_dtype = ConvertTorchTypeToDataType(output_flat.scalar_type());
