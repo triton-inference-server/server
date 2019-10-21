@@ -42,46 +42,6 @@
 
 namespace nvidia { namespace inferenceserver {
 
-namespace {
-
-Status
-ParseBoolOption(const std::string& key, std::string arg, bool* val)
-{
-  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
-    return std::tolower(c);
-  });
-
-  if ((arg == "true") || (arg == "1")) {
-    *val = true;
-  } else if ((arg == "false") || (arg == "0")) {
-    *val = false;
-  } else {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "failed to convert " + key + " '" + arg + "' to boolean value");
-  }
-
-  return Status::Success;
-}
-
-Status
-ParseLongLongOption(
-    const std::string& key, const std::string& arg, int64_t* val)
-{
-  try {
-    *val = std::stoll(arg);
-  }
-  catch (const std::invalid_argument& ia) {
-    return Status(
-        RequestStatusCode::INVALID_ARG,
-        "failed to convert " + key + " '" + arg + "' to integral number");
-  }
-
-  return Status::Success;
-}
-
-}  // namespace
-
 BaseBackend::Context::Context(
     const std::string& name, const int gpu_device, const int max_batch_size)
     : BackendContext(name, gpu_device, max_batch_size),
@@ -295,24 +255,24 @@ BaseBackend::CreateExecutionContext(
                                                       "' is requested");
             }
           } else if (parameter.first == "minimum_segment_size") {
-            RETURN_IF_ERROR(ParseLongLongOption(
+            RETURN_IF_ERROR(ParseLongLongParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.minimum_segment_size_));
           } else if (parameter.first == "max_workspace_size_bytes") {
-            RETURN_IF_ERROR(ParseLongLongOption(
+            RETURN_IF_ERROR(ParseLongLongParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.max_workspace_size_bytes_));
           } else if (parameter.first == "max_cached_engines") {
-            RETURN_IF_ERROR(ParseLongLongOption(
+            RETURN_IF_ERROR(ParseLongLongParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.max_cached_engines_));
           } else if (parameter.first == "use_calibration") {
             is_calibration_specified = true;
-            RETURN_IF_ERROR(ParseBoolOption(
+            RETURN_IF_ERROR(ParseBoolParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.use_calibration_));
           } else if (parameter.first == "is_dynamic_op") {
-            RETURN_IF_ERROR(ParseBoolOption(
+            RETURN_IF_ERROR(ParseBoolParameter(
                 parameter.first, parameter.second,
                 &tftrt_config.is_dynamic_op_));
           } else {

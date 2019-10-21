@@ -131,6 +131,24 @@ Status ValidateModelOutput(const ModelOutput& io, int32_t max_batch_size);
 Status CheckAllowedModelOutput(
     const ModelOutput& io, const std::set<std::string>& allowed);
 
+/// Parse the 'value' of the parameter 'key' into a boolean value.
+/// \param key The name of the parameter.
+/// \param value The value of the parameter in string.
+/// \param parsed_value Return the boolean of the parameter.
+/// \return The error status. A non-OK status indicates failure on parsing the
+/// value.
+Status ParseBoolParameter(
+    const std::string& key, std::string value, bool* parsed_value);
+
+/// Parse the 'value' of the parameter 'key' into a long long integer value.
+/// \param key The name of the parameter.
+/// \param value The value of the parameter in string.
+/// \param parsed_value Return the numerical value of the parameter.
+/// \return The error status. A non-OK status indicates failure on parsing the
+/// value.
+Status ParseLongLongParameter(
+    const std::string& key, const std::string& value, int64_t* parsed_value);
+
 #ifdef TRTIS_ENABLE_GPU
 /// Validates the compute capability of the GPU indexed
 /// \param The index of the target GPU.
