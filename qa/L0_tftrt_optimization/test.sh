@@ -37,6 +37,9 @@ fi
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
+CLIENT_LOG="./client.log"
+TFTRT_OPTIMIZATION_TEST=tftrt_optimization_test.py
+
 SERVER=/opt/tensorrtserver/bin/trtserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --exit-on-error=false"
 SERVER_LOG="./inference_server.log"
@@ -172,6 +175,18 @@ for MODEL in \
     grep "failed to load '${MODEL}_unknown_cpu' version 1: Invalid argument: CPU Execution Accelerator is not supported in TensorFlow backend" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected 'unknown_cpu' Execution Accelerator returns error\n***"
+        RET=1
+    fi
+
+    TEST_TYPE=test_graphdef && \
+            [[ "$MODEL" == "savedmodel_float32_float32_float32" ]] && \
+            TEST_TYPE=test_savedmodel
+    echo "Test: $MODEL" >>$CLIENT_LOG
+    python $TFTRT_OPTIMIZATION_TEST TFTRTOptimizationTest.$TEST_TYPE \
+            >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
         RET=1
     fi
 
