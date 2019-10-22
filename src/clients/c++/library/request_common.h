@@ -492,7 +492,7 @@ class InferContextImpl : public InferContext {
   using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<Request>>;
 
   // map to record ongoing asynchronous requests with pointer to easy handle
-  // as key
+  // or tag id as key
   AsyncReqMap ongoing_async_requests_;
 
   // Model name

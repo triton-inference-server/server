@@ -841,10 +841,6 @@ InferGrpcContextImpl::GetAsyncRunResults(
   Error request_status = grpc_request->GetResults(*this, results);
   grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
   Error err = UpdateStat(grpc_request->Timer());
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    ongoing_async_requests_.erase(grpc_request->RunIndex());
-  }
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }
@@ -931,13 +927,9 @@ InferGrpcContextImpl::AsyncTransfer()
       if (this->exiting_) {
         return true;
       }
-      // wake up if at least one request is not ready
-      for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (std::static_pointer_cast<GrpcRequestImpl>(
-                ongoing_async_request.second)
-                ->IsReady() == false) {
-          return true;
-        }
+      // wake up if an async request has been generated
+      if (!this->ongoing_async_requests_.empty()) {
+        return true;
       }
       return false;
     });
@@ -965,6 +957,7 @@ InferGrpcContextImpl::AsyncTransfer()
           continue;
         }
         request = itr->second;
+        ongoing_async_requests_.erase(got);
       }
 
       // GRPC ensures that only a single polling thread is woken per tag_id
@@ -1143,6 +1136,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
         continue;
       }
       request = itr->second;
+      ongoing_async_requests_.erase(run_index);
     }
 
     std::shared_ptr<GrpcRequestImpl> grpc_request =

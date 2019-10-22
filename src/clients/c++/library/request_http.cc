@@ -1349,12 +1349,6 @@ InferHttpContextImpl::GetAsyncRunResults(
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    ongoing_async_requests_.erase(http_request->RunIndex());
-    curl_multi_remove_handle(multi_handle_, http_request->easy_handle_);
-  }
-
   Error err = UpdateStat(http_request->Timer());
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
@@ -1563,7 +1557,7 @@ InferHttpContextImpl::AsyncTransfer()
   int place_holder = 0;
   CURLMsg* msg = nullptr;
   do {
-    std::vector<std::shared_ptr<Request>> request_with_callback;
+    std::vector<std::shared_ptr<Request>> request_list;
     bool has_completed = false;
 
     // sleep if no work is available
@@ -1572,13 +1566,9 @@ InferHttpContextImpl::AsyncTransfer()
       if (this->exiting_) {
         return true;
       }
-      // wake up if at least one request is not ready
-      for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (!std::static_pointer_cast<HttpRequestImpl>(
-                 ongoing_async_request.second)
-                 ->IsReady()) {
-          return true;
-        }
+      // wake up if an async request has been generated
+      if (!this->ongoing_async_requests_.empty()) {
+        return true;
       }
       return false;
     });
@@ -1598,9 +1588,11 @@ InferHttpContextImpl::AsyncTransfer()
         curl_easy_cleanup(msg->easy_handle);
         continue;
       }
-
+      request_list.emplace_back(itr->second);
+      ongoing_async_requests_.erase(identifier);
+      curl_multi_remove_handle(multi_handle_, msg->easy_handle);
       std::shared_ptr<HttpRequestImpl> http_request =
-          std::static_pointer_cast<HttpRequestImpl>(itr->second);
+          std::static_pointer_cast<HttpRequestImpl>(request_list.back());
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
@@ -1609,28 +1601,23 @@ InferHttpContextImpl::AsyncTransfer()
         http_request->Timer().CaptureTimestamp(
             RequestTimers::Kind::REQUEST_END);
       }
-
       http_request->http_status_ = msg->data.result;
-      http_request->SetIsReady(true);
+    }
+    lock.unlock();
 
+    for (auto& request : request_list) {
       has_completed = true;
+      std::shared_ptr<HttpRequestImpl> http_request =
+          std::static_pointer_cast<HttpRequestImpl>(request);
       if (http_request->HasCallback()) {
-        request_with_callback.emplace_back(itr->second);
+        http_request->callback_(this, request);
       }
     }
-
-    lock.unlock();
 
     // Were task(s) completed? If so send signal in case the main
     // thread is waiting
     if (has_completed) {
       cv_.notify_all();
-    }
-
-    for (auto& request : request_with_callback) {
-      HttpRequestImpl* request_ptr =
-          static_cast<HttpRequestImpl*>(request.get());
-      request_ptr->callback_(this, request);
     }
   } while (!exiting_);
 }
