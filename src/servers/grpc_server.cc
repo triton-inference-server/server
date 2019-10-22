@@ -635,7 +635,8 @@ TRTSERVER_Error*
 InferResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+    TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
+    void* userp, TRTSERVER_Memory_Type* actual_memory_type)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   InferResponse* response = payload->response_;
@@ -646,9 +647,9 @@ InferResponseAlloc(
 
   // Can't allocate for any memory type other than CPU. If byte size is 0,
   // proceed regardless of memory type as no allocation is required.
-  if ((memory_type != TRTSERVER_MEMORY_CPU) && (byte_size != 0)) {
-    LOG_VERBOSE(1) << "GRPC allocation failed for type " << memory_type
-                   << " for " << tensor_name;
+  if ((preferred_memory_type != TRTSERVER_MEMORY_CPU) && (byte_size != 0)) {
+    LOG_VERBOSE(1) << "GRPC allocation failed for type "
+                   << preferred_memory_type << " for " << tensor_name;
     return nullptr;
   }
 

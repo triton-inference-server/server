@@ -197,9 +197,11 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
 ///
 /// If the function is called with 'byte_size' non-zero but an
 /// allocation is not possible for the requested 'memory_type', the
-/// function should return success and set 'buffer' == nullptr to
-/// indicate that an allocation in the requested 'memory_type' is not
-/// possible. In this case the function may be called again for the
+/// function will try a different memory type and return that as the
+/// 'actual_memory_type'. If this too fails then it returns failure and
+/// sets 'buffer' == nullptr to indicate that an allocation in the requested
+/// 'memory_type' as well as the 'actual_memory_type' is not possible.
+/// In this case the function may be called again for the
 /// same 'tensor_name' but with a different 'memory_type'.
 ///
 /// The function should return a TRTSERVER_Error object if a failure
@@ -211,7 +213,8 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
 typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
+    TRTSERVER_Memory_Type* actual_memory_type);
 
 /// Type for function that is called when the server no longer holds
 /// any reference to a buffer allocated by

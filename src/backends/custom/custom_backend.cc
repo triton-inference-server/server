@@ -583,28 +583,23 @@ CustomBackend::Context::GetOutput(
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
+
+    auto dst_memory_type = ToTRTServerMemoryType(*memory_type);
+    auto actual_memory_type = dst_memory_type;
     Status status = payload->response_provider_->AllocateOutputBuffer(
-        name, content, content_byte_size, shape,
-        ToTRTServerMemoryType(*memory_type), *memory_type_id);
+        name, content, content_byte_size, shape, dst_memory_type,
+        *memory_type_id, &actual_memory_type);
 
     // Done with this output if 'content_byte_size' is 0
     if (content_byte_size == 0) {
       *content = nullptr;
     } else if (*content == nullptr) {
-      // If first attempt is CPU and failed, then allocation failed
-      if ((!status.IsOk()) || (*memory_type == CUSTOM_MEMORY_CPU)) {
-        return false;
-      }
-
-      *memory_type = CUSTOM_MEMORY_CPU;
-      *memory_type_id = 0;
-      status = payload->response_provider_->AllocateOutputBuffer(
-          name, content, content_byte_size, shape,
-          ToTRTServerMemoryType(*memory_type), *memory_type_id);
-      if (*content == nullptr) {
-        return false;
-      }
+      return false;
     }
+
+    // Update memory type with actual memory type
+    *memory_type = ToCustomMemoryType(actual_memory_type);
+
     return status.IsOk();
   }
 

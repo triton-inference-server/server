@@ -267,7 +267,8 @@ class HTTPAPIServer : public HTTPServerImpl {
   static TRTSERVER_Error* ResponseAlloc(
       TRTSERVER_ResponseAllocator* allocator, void** buffer,
       void** buffer_userp, const char* tensor_name, size_t byte_size,
-      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp);
+      TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
+      void* userp, TRTSERVER_Memory_Type* actual_memory_type);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
@@ -319,7 +320,8 @@ TRTSERVER_Error*
 HTTPAPIServer::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+    TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
+    void* userp, TRTSERVER_Memory_Type* actual_memory_type)
 {
   auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
   evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
@@ -332,9 +334,9 @@ HTTPAPIServer::ResponseAlloc(
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
     // Can't allocate for any memory type other than CPU.
-    if (memory_type != TRTSERVER_MEMORY_CPU) {
-      LOG_VERBOSE(1) << "HTTP allocation failed for type " << memory_type
-                     << " for " << tensor_name;
+    if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
+      LOG_VERBOSE(1) << "HTTP allocation failed for type "
+                     << preferred_memory_type << " for " << tensor_name;
       return nullptr;
     }
 

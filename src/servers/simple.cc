@@ -93,7 +93,8 @@ TRTSERVER_Error*
 ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp)
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
+    TRTSERVER_Memory_Type* allocated_memory_type)
 {
   // Pass the tensor name with buffer_userp so we can show it when
   // releasing the buffer.
@@ -109,6 +110,7 @@ ResponseAlloc(
     void* allocated_ptr = nullptr;
     if (memory_type == TRTSERVER_MEMORY_CPU) {
       allocated_ptr = malloc(byte_size);
+      *allocated_memory_type = TRTSERVER_MEMORY_CPU;
 #ifdef TRTIS_ENABLE_GPU
     } else if (use_gpu_memory) {
       auto err = cudaSetDevice(memory_type_id);
@@ -118,6 +120,7 @@ ResponseAlloc(
       if (err != cudaSuccess) {
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
+        *allocated_memory_type = TRTSERVER_MEMORY_GPU;
       }
 #endif  // TRTIS_ENABLE_GPU
     }
@@ -126,8 +129,8 @@ ResponseAlloc(
       *buffer = allocated_ptr;
       *buffer_userp = new std::string(tensor_name);
       LOG_INFO << "allocated " << byte_size << " bytes in "
-               << MemoryTypeString(memory_type) << " for result tensor "
-               << tensor_name;
+               << MemoryTypeString(*allocated_memory_type)
+               << " for result tensor " << tensor_name;
     }
   }
 
