@@ -705,7 +705,7 @@ Status
 InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape, const TRTSERVER_Memory_Type preferred_memory_type, int64_t preferred_memory_type_id,
-    TRTSERVER_Memory_Type* actual_memory_type)
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id)
 {
   *content = nullptr;
 
@@ -728,6 +728,7 @@ InferResponseProvider::AllocateOutputBuffer(
   loutput->byte_size_ = content_byte_size;
   loutput->memory_type_ = preferred_memory_type;
   loutput->memory_type_id_ = preferred_memory_type_id;
+  // *actual_memory_type = preferred_memory_type;
 
   // For cls result, the provider will be responsible for allocating
   // the requested memory. The user-provided allocator should only be invoked
@@ -777,7 +778,7 @@ InferResponseProvider::AllocateOutputBuffer(
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, preferred_memory_type_id, alloc_userp_, actual_memory_type);
+      preferred_memory_type, preferred_memory_type_id, alloc_userp_, actual_memory_type, actual_device_id);
   Status status;
 #ifdef TRTIS_ENABLE_GPU
   cuerr = cudaSetDevice(current_device);
@@ -806,6 +807,8 @@ InferResponseProvider::AllocateOutputBuffer(
 
   loutput->release_buffer_ = buffer;
   loutput->release_userp_ = buffer_userp;
+  loutput->memory_type_ = *actual_memory_type;
+  loutput->memory_type_id_ = *actual_device_id;
 
   return Status::Success;
 }

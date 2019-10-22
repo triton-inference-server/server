@@ -169,6 +169,15 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockGpuNew(
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDelete(
     TRTSERVER_SharedMemoryBlock* shared_memory_block);
 
+/// Get the memory type of a shared memory block object.
+/// \param shared_memory_block The object whose memory type is required.
+/// \param memory_type Returns the memory type of the shared memory block.
+/// \param device_id The CPU/GPU number the shared memory region is in.
+/// \return a TRTSERVER_Error indicating success or failure.
+TRTSERVER_Error* TRTSERVER_SharedMemoryBlockDevice(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    TRTSERVER_Memory_Type* memory_type, int* device_id);
+
 /// TRTSERVER_ResponseAllocator
 ///
 /// Object representing a memory allocator for inference response
@@ -214,7 +223,7 @@ typedef TRTSERVER_Error* (*TRTSERVER_ResponseAllocatorAllocFn_t)(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* actual_memory_type);
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id);
 
 /// Type for function that is called when the server no longer holds
 /// any reference to a buffer allocated by

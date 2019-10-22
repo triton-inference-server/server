@@ -230,7 +230,9 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   using EVBufferPair = std::pair<
       evbuffer*,
-      std::unordered_map<std::string, std::pair<const void*, size_t>>>;
+      std::unordered_map<
+          std::string,
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>>;
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -268,7 +270,8 @@ class HTTPAPIServer : public HTTPServerImpl {
       TRTSERVER_ResponseAllocator* allocator, void** buffer,
       void** buffer_userp, const char* tensor_name, size_t byte_size,
       TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
-      void* userp, TRTSERVER_Memory_Type* actual_memory_type);
+      void* userp, TRTSERVER_Memory_Type* actual_memory_type,
+      int64_t* actual_device_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
@@ -291,7 +294,9 @@ class HTTPAPIServer : public HTTPServerImpl {
       const std::string& model_name, const InferRequestHeader& request_header,
       evbuffer* input_buffer,
       TRTSERVER_InferenceRequestProvider* request_provider,
-      std::unordered_map<std::string, std::pair<const void*, size_t>>&
+      std::unordered_map<
+          std::string,
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
           output_shm_map);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -321,11 +326,13 @@ HTTPAPIServer::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
-    void* userp, TRTSERVER_Memory_Type* actual_memory_type)
+    void* userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_device_id)
 {
   auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
   evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
-  const std::unordered_map<std::string, std::pair<const void*, size_t>>&
+  const std::unordered_map<
+      std::string, std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
       output_shm_map = userp_pair->second;
 
   *buffer = nullptr;
@@ -333,29 +340,31 @@ HTTPAPIServer::ResponseAlloc(
 
   // Don't need to do anything if no memory was requested.
   if (byte_size > 0) {
-    // Can't allocate for any memory type other than CPU.
-    if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
-      LOG_VERBOSE(1) << "HTTP allocation failed for type "
-                     << preferred_memory_type << " for " << tensor_name;
-      return nullptr;
-    }
-
     auto pr = output_shm_map.find(tensor_name);
     if (pr != output_shm_map.end()) {
       // If the output is in shared memory then check that the expected buffer
       // size is at least the byte size of the output.
-      if (byte_size > pr->second.second) {
+      if (byte_size > std::get<1>(pr->second)) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
             std::string(
                 "expected buffer size to be at least " +
-                std::to_string(pr->second.second) + " bytes but gets " +
+                std::to_string(std::get<1>(pr->second)) + " bytes but gets " +
                 std::to_string(byte_size) + " bytes in output tensor")
                 .c_str());
       }
 
-      *buffer = const_cast<void*>(pr->second.first);
+      *buffer = const_cast<void*>(std::get<0>(pr->second));
+      *actual_memory_type = std::get<2>(pr->second);
+      *actual_device_id = (int64_t)std::get<3>(pr->second);
     } else {
+      // Can't allocate for any memory type other than CPU.
+      if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
+        LOG_VERBOSE(1) << "HTTP allocation failed for type "
+                       << *actual_memory_type << " for " << tensor_name;
+        return nullptr;
+      }
+
       // Reserve requested space in evbuffer...
       struct evbuffer_iovec output_iovec;
       if (evbuffer_reserve_space(evhttp_buffer, byte_size, &output_iovec, 1) !=
@@ -846,7 +855,9 @@ HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, const InferRequestHeader& request_header,
     evbuffer* input_buffer,
     TRTSERVER_InferenceRequestProvider* request_provider,
-    std::unordered_map<std::string, std::pair<const void*, size_t>>&
+    std::unordered_map<
+        std::string,
+        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
         output_shm_map)
 {
   // Extract individual input data from HTTP body and register in
@@ -958,10 +969,15 @@ HTTPAPIServer::EVBufferToInput(
           server_.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
 
+      TRTSERVER_Memory_Type memory_type;
+      int device_id;
+      TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type, &device_id);
+
       output_shm_map.emplace(
           io.name(),
-          std::make_pair(
-              static_cast<const void*>(base), io.shared_memory().byte_size()));
+          std::make_tuple(
+              static_cast<const void*>(base), io.shared_memory().byte_size(),
+              memory_type, device_id));
     }
   }
 

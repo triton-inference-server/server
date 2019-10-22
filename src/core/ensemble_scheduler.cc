@@ -82,7 +82,7 @@ class EnsembleContext {
       TRTSERVER_ResponseAllocator* allocator, void** buffer,
       void** buffer_userp, const char* tensor_name, size_t byte_size,
       TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-      TRTSERVER_Memory_Type* allocated_memory_type);
+      TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
@@ -318,7 +318,7 @@ EnsembleContext::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* allocated_memory_type)
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id)
 {
   auto tensor_data_map = reinterpret_cast<
       std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>*>(

@@ -134,6 +134,8 @@ struct AllocPayload {
   struct ShmInfo {
     void* base_;
     size_t byte_size_;
+    TRTSERVER_Memory_Type memory_type_;
+    int64_t device_id_;
   };
 
   using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
@@ -636,7 +638,8 @@ InferResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
-    void* userp, TRTSERVER_Memory_Type* actual_memory_type)
+    void* userp, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_device_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   InferResponse* response = payload->response_;
@@ -644,14 +647,6 @@ InferResponseAlloc(
 
   *buffer = nullptr;
   *buffer_userp = nullptr;
-
-  // Can't allocate for any memory type other than CPU. If byte size is 0,
-  // proceed regardless of memory type as no allocation is required.
-  if ((preferred_memory_type != TRTSERVER_MEMORY_CPU) && (byte_size != 0)) {
-    LOG_VERBOSE(1) << "GRPC allocation failed for type "
-                   << preferred_memory_type << " for " << tensor_name;
-    return nullptr;
-  }
 
   // Called once for each result tensor in the inference request. Must
   // always add a raw output into the response's list of outputs so
@@ -678,6 +673,8 @@ InferResponseAlloc(
         }
 
         *buffer = const_cast<void*>(pr->second.base_);
+        *actual_memory_type = pr->second.memory_type_;
+        *actual_device_id = pr->second.device_id_;
         use_shm = true;
 
         LOG_VERBOSE(1) << "GRPC shared-memory: " << tensor_name << ", size "
@@ -686,6 +683,14 @@ InferResponseAlloc(
     }
 
     if (!use_shm) {
+      // Can't allocate for any memory type other than CPU. If byte size is 0,
+      // proceed regardless of memory type as no allocation is required.
+      if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
+        LOG_VERBOSE(1) << "GRPC allocation failed for type "
+                       << *actual_memory_type << " for " << tensor_name;
+        return nullptr;
+      }
+
       raw_output->resize(byte_size);
       *buffer = static_cast<void*>(&((*raw_output)[0]));
 
@@ -728,21 +733,24 @@ InferAllocatorPayload(
   // invoked.
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
-      TRTSERVER_SharedMemoryBlock* smb = nullptr;
-      RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
-
       if (alloc_payload->shm_map_ == nullptr) {
         alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
       }
 
       void* base;
+      TRTSERVER_SharedMemoryBlock* smb = nullptr;
+      RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
       RETURN_IF_ERR(TRTSERVER_ServerSharedMemoryAddress(
           trtserver.get(), smb, io.shared_memory().offset(),
           io.shared_memory().byte_size(), &base));
 
+      TRTSERVER_Memory_Type memory_type;
+      int device_id;
+      TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type, &device_id);
+
       alloc_payload->shm_map_->emplace(
-          io.name(),
-          AllocPayload::ShmInfo{base, io.shared_memory().byte_size()});
+          io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
+                                           memory_type, device_id});
     }
   }
 

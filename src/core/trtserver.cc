@@ -570,6 +570,18 @@ TRTSERVER_SharedMemoryBlockDelete(
   return nullptr;  // Success
 }
 
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockDevice(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block,
+    TRTSERVER_Memory_Type* memory_type, int* device_id)
+{
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
+  *memory_type = lsmb->Type();
+  *device_id = lsmb->DeviceId();
+  return nullptr;  // Success
+}
+
 //
 // TRTSERVER_ResponseAllocator
 //
