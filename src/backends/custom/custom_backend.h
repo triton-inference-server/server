@@ -126,7 +126,7 @@ class CustomBackend : public InferenceBackend {
     bool GetOutput(
         GetInputOutputContext* output_context, const char* name,
         size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
-        void** content, CustomMemoryType* memory_type);
+        void** content, CustomMemoryType* memory_type, int64_t* memory_type_id);
 
     // The handle to the shared library associated with this context.
     void* library_handle_;
@@ -165,7 +165,7 @@ bool CustomGetOutput(
     int64_t* shape_dims, uint64_t content_byte_size, void** content);
 
 // See CustomGetNextInput, except that the block may not be in CPU memory.
-// Thus 'memory_type' Acts as both input and output. On input gives the buffer
+// Thus 'memory_type' acts as both input and output. On input gives the buffer
 // memory type preferred by the function caller. On output returns
 // the actual memory type of 'content'.
 bool CustomGetNextInputV2(
@@ -173,12 +173,13 @@ bool CustomGetNextInputV2(
     uint64_t* content_byte_size, CustomMemoryType* memory_type);
 
 // See CustomGetOutput, except that the buffer is not limited to be
-// in CPU memory. 'memory_type' Acts as both input and output. On input
+// in CPU memory. 'memory_type' acts as both input and output. On input
 // gives the buffer memory type preferred by the function caller. On output
-// returns the actual memory type of 'content'.
+// returns the actual memory type of 'content'. 'memory_type_id' also acts as
+// both input and output in the same fashion.
 bool CustomGetOutputV2(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,
-    CustomMemoryType* memory_type);
+    CustomMemoryType* memory_type, int64_t* memory_type_id);
 
 }}  // namespace nvidia::inferenceserver

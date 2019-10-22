@@ -220,10 +220,13 @@ typedef bool (*CustomGetNextInputV2Fn_t)(
 /// \param memory_type Acts as both input and output. On input
 /// gives the buffer memory type preferred by the function caller.
 /// Returns the actual memory type of 'content'.
+/// \param memory_type_id Acts as both input and output. On input
+/// gives the buffer memory type id preferred by the function caller.
+/// Returns the actual memory type id of 'content'.
 typedef bool (*CustomGetOutputV2Fn_t)(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,
-    CustomMemoryType* memory_type);
+    CustomMemoryType* memory_type, int64_t* memory_type_id);
 
 /// Type for the CustomExecuteV2 function.
 typedef int (*CustomExecuteV2Fn_t)(
