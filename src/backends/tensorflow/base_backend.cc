@@ -199,6 +199,7 @@ BaseBackend::CreateExecutionContext(
     // Set default values
     tftrt_config.minimum_segment_size_ = 3;
     tftrt_config.max_workspace_size_bytes_ = 1 << 30;
+    tftrt_config.max_cached_engines_ = 100;
     tftrt_config.max_batch_size_ = std::max(Config().max_batch_size(), 1);
     tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
     tftrt_config.is_dynamic_op_ = false;
@@ -243,35 +244,28 @@ BaseBackend::CreateExecutionContext(
               tftrt_config.precision_mode_ = TRTISTF_MODE_FP32;
             } else if (parameter.second == "FP16") {
               tftrt_config.precision_mode_ = TRTISTF_MODE_FP16;
-            } else if (parameter.second == "INT8") {
-              tftrt_config.precision_mode_ = TRTISTF_MODE_INT8;
             } else {
               return Status(
-                  RequestStatusCode::INVALID_ARG, "unknown precision mode '" +
-                                                      parameter.second +
-                                                      "' is requested");
+                  RequestStatusCode::INVALID_ARG,
+                  "unsupported precision mode '" + parameter.second +
+                      "' is requested");
             }
           } else if (parameter.first == "minimum_segment_size") {
-            try {
-              tftrt_config.minimum_segment_size_ = std::stoul(parameter.second);
-            }
-            catch (const std::invalid_argument& ia) {
-              return Status(
-                  RequestStatusCode::INVALID_ARG,
-                  "failed to convert minimum_segment_size '" +
-                      parameter.second + "' to integral number");
-            }
+            RETURN_IF_ERROR(ParseLongLongParameter(
+                parameter.first, parameter.second,
+                &tftrt_config.minimum_segment_size_));
           } else if (parameter.first == "max_workspace_size_bytes") {
-            try {
-              tftrt_config.max_workspace_size_bytes_ =
-                  std::stoul(parameter.second);
-            }
-            catch (const std::invalid_argument& ia) {
-              return Status(
-                  RequestStatusCode::INVALID_ARG,
-                  "failed to convert max_workspace_size_bytes '" +
-                      parameter.second + "' to integral number");
-            }
+            RETURN_IF_ERROR(ParseLongLongParameter(
+                parameter.first, parameter.second,
+                &tftrt_config.max_workspace_size_bytes_));
+          } else if (parameter.first == "max_cached_engines") {
+            RETURN_IF_ERROR(ParseLongLongParameter(
+                parameter.first, parameter.second,
+                &tftrt_config.max_cached_engines_));
+          } else if (parameter.first == "is_dynamic_op") {
+            RETURN_IF_ERROR(ParseBoolParameter(
+                parameter.first, parameter.second,
+                &tftrt_config.is_dynamic_op_));
           } else {
             return Status(
                 RequestStatusCode::INVALID_ARG,

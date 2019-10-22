@@ -948,6 +948,43 @@ CheckAllowedModelOutput(
   return Status::Success;
 }
 
+Status
+ParseBoolParameter(
+    const std::string& key, std::string value, bool* parsed_value)
+{
+  std::transform(
+      value.begin(), value.end(), value.begin(),
+      [](unsigned char c) { return std::tolower(c); });
+
+  if ((value == "true") || (value == "1")) {
+    *parsed_value = true;
+  } else if ((value == "false") || (value == "0")) {
+    *parsed_value = false;
+  } else {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "failed to convert " + key + " '" + value + "' to boolean value");
+  }
+
+  return Status::Success;
+}
+
+Status
+ParseLongLongParameter(
+    const std::string& key, const std::string& value, int64_t* parsed_value)
+{
+  try {
+    *parsed_value = std::stoll(value);
+  }
+  catch (const std::invalid_argument& ia) {
+    return Status(
+        RequestStatusCode::INVALID_ARG,
+        "failed to convert " + key + " '" + value + "' to integral number");
+  }
+
+  return Status::Success;
+}
+
 #ifdef TRTIS_ENABLE_GPU
 Status
 CheckGPUCompatibility(const int gpu_id)

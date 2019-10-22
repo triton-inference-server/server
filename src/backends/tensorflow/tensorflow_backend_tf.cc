@@ -281,6 +281,8 @@ NewSessionOptions(
     (*trt_parameter_map)["max_batch_size"].set_i(tftrt_config->max_batch_size_);
     (*trt_parameter_map)["max_workspace_size_bytes"].set_i(
         tftrt_config->max_workspace_size_bytes_);
+    (*trt_parameter_map)["max_cached_engines"].set_i(
+        tftrt_config->max_cached_engines_);
   }
 }
 
