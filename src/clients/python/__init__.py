@@ -1458,11 +1458,8 @@ class InferContext:
         Parameters
         ----------
         request_id : int
-            The integer ID of the asynchronous request returned by async_run().
-
-        wait : bool
-            If True block until the request results are ready. If False return
-            immediately even if results are not ready.
+            The integer ID of the asynchronous request exposed in the
+            callback function of the async_run.
 
         Returns
         -------

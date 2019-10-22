@@ -762,7 +762,7 @@ main(int argc, char** argv)
     }
     while (!request_buffer_.empty()) {
       results.emplace_back();
-      err = ctx->GetAsyncRunResults(&(results.back()), request_buffer_.front());
+      err = ctx->GetAsyncRunResults(request_buffer_.front(), &(results.back()));
       if (!err.IsOk()) {
         std::cerr << "failed receiving infer response: " << err << std::endl;
         exit(1);

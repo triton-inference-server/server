@@ -546,7 +546,7 @@ InferContextGetAsyncRunResults(InferContextCtx* ctx, uint64_t request_id)
   auto itr = ctx->requests.find(request_id);
   if (itr != ctx->requests.end()) {
     nic::InferContext::ResultMap results;
-    nic::Error err = ctx->ctx->GetAsyncRunResults(&results, itr->second);
+    nic::Error err = ctx->ctx->GetAsyncRunResults(itr->second, &results);
     ctx->requests.erase(itr);
     ctx->async_results.emplace(request_id, std::move(results));
 

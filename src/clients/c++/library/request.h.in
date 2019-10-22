@@ -709,8 +709,8 @@ class InferContext {
   /// immediately.
   /// \return Error object indicating success or failure.
   virtual Error GetAsyncRunResults(
-      ResultMap* results,
-      const std::shared_ptr<Request>& async_request) = 0;
+      const std::shared_ptr<Request>& async_request,
+      ResultMap* results) = 0;
 };
 
 //==============================================================================

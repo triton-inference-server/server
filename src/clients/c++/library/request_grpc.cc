@@ -552,8 +552,8 @@ class InferGrpcContextImpl : public InferContextImpl {
   virtual Error Run(ResultMap* results) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
-      ResultMap* results,
-      const std::shared_ptr<Request>& async_request) override;
+      const std::shared_ptr<Request>& async_request,
+      ResultMap* results) override;
 
  protected:
   virtual Error AsyncRun(
@@ -832,7 +832,7 @@ InferGrpcContextImpl::AsyncRun(
 
 Error
 InferGrpcContextImpl::GetAsyncRunResults(
-    ResultMap* results, const std::shared_ptr<Request>& async_request)
+    const std::shared_ptr<Request>& async_request, ResultMap* results)
 {
   std::shared_ptr<GrpcRequestImpl> grpc_request =
       std::static_pointer_cast<GrpcRequestImpl>(async_request);
@@ -1068,7 +1068,7 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
     std::unique_lock<std::mutex> lk(mtx);
     cv.wait(lk, [&callback_invoked]() { return callback_invoked; });
   }
-  return GetAsyncRunResults(results, req);
+  return GetAsyncRunResults(req, results);
 }
 
 Error

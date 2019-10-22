@@ -927,8 +927,8 @@ class InferHttpContextImpl : public InferContextImpl {
   Error Run(ResultMap* results) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
-      ResultMap* results,
-      const std::shared_ptr<Request>& async_request) override;
+      const std::shared_ptr<Request>& async_request,
+      ResultMap* results) override;
 
  private:
   Error AsyncRun(
@@ -1344,7 +1344,8 @@ InferHttpContextImpl::AsyncRun(
 
 Error
 InferHttpContextImpl::GetAsyncRunResults(
-    ResultMap* results, const std::shared_ptr<Request>& async_request)
+    const std::shared_ptr<Request>& async_request,
+    ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);

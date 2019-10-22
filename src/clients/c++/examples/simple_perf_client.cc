@@ -268,7 +268,7 @@ RunAsyncComplete(
   // We include getting the results in the timing since that is
   // included in the sync case as well.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  ctx->GetAsyncRunResults(&results, request);
+  ctx->GetAsyncRunResults(request, &results);
 
   FAIL_IF(
       results.size() != 1,

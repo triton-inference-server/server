@@ -74,7 +74,7 @@ ValidateResults(
     const std::vector<int32_t>& input1_data)
 {
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  ctx->GetAsyncRunResults(&results, request);
+  ctx->GetAsyncRunResults(request, &results);
   // We expect there to be 2 results. Walk over all 16 result elements
   // and print the sum and difference calculated by the model.
   if (results.size() != 2) {

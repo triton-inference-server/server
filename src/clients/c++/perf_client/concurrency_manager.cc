@@ -575,7 +575,7 @@ ConcurrencyManager::AsyncInfer(
         }
         for (const auto& request : swap_vector) {
           *err =
-              ctxs[idx]->ctx_->GetAsyncRunResults(&results, request.request_);
+              ctxs[idx]->ctx_->GetAsyncRunResults(request.request_, &results);
           if (!err->IsOk()) {
             return;
           }
