@@ -940,14 +940,14 @@ InferGrpcContextImpl::AsyncTransfer()
       size_t got;
       bool ok = true;
       bool status = async_request_completion_queue_.Next((void**)(&got), &ok);
+      if (!ok) {
+        fprintf(stderr, "Unexpected not ok on client side.");
+      }
+      if (!status) {
+        fprintf(stderr, "Completion queue is closed.");
+      }
       {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (!ok) {
-          fprintf(stderr, "Unexpected not ok on client side.");
-        }
-        if (!status) {
-          fprintf(stderr, "Completion queue is closed.");
-        }
         auto itr = ongoing_async_requests_.find(got);
         if (itr == ongoing_async_requests_.end()) {
           fprintf(
