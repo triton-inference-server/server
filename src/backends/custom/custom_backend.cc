@@ -586,9 +586,10 @@ CustomBackend::Context::GetOutput(
 
     auto dst_memory_type = ToTRTServerMemoryType(*memory_type);
     auto actual_memory_type = dst_memory_type;
+    int64_t device_id;
     Status status = payload->response_provider_->AllocateOutputBuffer(
         name, content, content_byte_size, shape, dst_memory_type,
-        *memory_type_id, &actual_memory_type);
+        *memory_type_id, &actual_memory_type, &device_id);
 
     // Done with this output if 'content_byte_size' is 0
     if (content_byte_size == 0) {

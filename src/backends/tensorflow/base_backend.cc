@@ -437,8 +437,11 @@ ReadStringOutputTensor(
       }
 
       void* content;
+      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
+      TRTSERVER_Memory_Type actual_memory_type;
+      int64_t device_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, serialized.size(), shape);
+          output_name, &content, serialized.size(), shape, preferred_memory_type, &actual_memory_type, &device_id);
       if (status.IsOk()) {
         memcpy(
             content, reinterpret_cast<const void*>(serialized.c_str()),

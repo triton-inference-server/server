@@ -883,8 +883,11 @@ OnnxBackend::Context::SetStringOutputBuffer(
           data_byte_size + sizeof(uint32_t) * expected_element_cnt;
 
       void* buffer;
+      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
+      TRTSERVER_Memory_Type actual_memory_type;
+      int64_t device_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          name, &buffer, expected_byte_size, content_shape);
+          name, &buffer, expected_byte_size, content_shape, preferred_memory_type, &actual_memory_type, &device_id);
       if (status.IsOk()) {
         size_t copied_byte_size = 0;
         for (size_t e = 0; e < expected_element_cnt; ++e) {
