@@ -493,8 +493,15 @@ message ModelOptimizationPolicy
     //@@       For TensorFlow backend, possible values are "tensorrt", "gpu_io".
     //@@       For "tensorrt", the following parameters can be specified:
     //@@         "precision_mode" The precission used for optimization.
-    //@@         The value can be one of "FP32", "FP16" and "INT8".
+    //@@         The value can be one of "FP32" and "FP16".
     //@@         Default value is "FP32".
+    //@@
+    //@@         "is_dynamic_op" Whether at least one input has dynamic shape.
+    //@@         If not specified, the value will be inferred based on input
+    //@@         shapes from the model configuration.
+    //@@
+    //@@         "max_cached_engines" The maximum number of cached TensorRT
+    //@@         engines in dynamic TensorRT ops. Default value is 100.
     //@@
     //@@         "minimum_segment_size" The smallest model subgraph that will
     //@@         be considered for optimization by TensorRT. Default value is 3.
