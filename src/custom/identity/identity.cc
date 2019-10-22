@@ -247,10 +247,14 @@ Context::Execute(
       }
 
       auto dst_memory_type = src_memory_type;
+      // [TODO] should be able to get from 'input_fn', i.e. in this case,
+      // we would like to allocate output buffer on the same device as input
+      int64_t dst_memory_type_id = 0;
       void* obuffer;
       if (!output_fn(
               payload.output_context, output_cname, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer, &dst_memory_type)) {
+              batchn_byte_size, &obuffer, &dst_memory_type,
+              &dst_memory_type_id)) {
         payload.error_code = kOutputBuffer;
         break;
       }
