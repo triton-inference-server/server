@@ -941,9 +941,14 @@ InferGrpcContextImpl::AsyncTransfer()
       bool ok = true;
       bool status = async_request_completion_queue_.Next((void**)(&got), &ok);
       if (!ok) {
+        // The lock would prevent the jumbling up of the error messages.
+        // Additionally, doesn't impact performance as it is outside the
+        // execution path.
+        std::lock_guard<std::mutex> lock(mutex_);
         fprintf(stderr, "Unexpected not ok on client side.");
       }
       if (!status) {
+        std::lock_guard<std::mutex> lock(mutex_);
         fprintf(stderr, "Completion queue is closed.");
       }
       {
