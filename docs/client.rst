@@ -250,8 +250,8 @@ Client API
 
 The C++ client API exposes a class-based interface for querying server
 and model status and for performing inference. The commented interface
-is available at `src/core/request.h
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/core/request.h>`_
+is available at `src/clients/c++/library/request.h.in
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/library/request.h.in>`_
 and in the API Reference.
 
 The Python client API provides similar capabilities as the C++
@@ -260,8 +260,8 @@ API. The commented interface is available at
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/__init__.py>`_
 and in the API Reference.
 
-A simple C++ example application at `src/clients/c++/examples/simple\_client.cc
-<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_client.cc>`_
+A simple C++ example application at `src/clients/c++/examples/simple\_client.cc.in
+<https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/c%2B%2B/examples/simple_client.cc.in>`_
 and a Python version at `src/clients/python/simple\_client.py
 <https://github.com/NVIDIA/tensorrt-inference-server/blob/master/src/clients/python/simple_client.py>`_
 demonstrate basic client API usage.
