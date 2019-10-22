@@ -643,7 +643,8 @@ Status
 InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
     const std::vector<int64_t>& content_shape,
-    const TRTSERVER_Memory_Type preferred_memory_type)
+    TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id)
 {
   *content = nullptr;
 
@@ -701,7 +702,7 @@ InferResponseProvider::AllocateOutputBuffer(
 
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, 0 /* region_id */, alloc_userp_);
+      preferred_memory_type, preferred_memory_type_id, alloc_userp_);
   if (err != nullptr) {
     Status status = Status(
         TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),

@@ -664,9 +664,11 @@ BaseBackend::Context::ReadFixedSizedOutputTensor(
                                  : TRTSERVER_MEMORY_CPU;
   LOG_VERBOSE(1) << "output '" << output_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
+  int64_t memory_type_id =
+      (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   *cuda_copy |= SetFixedSizeOutputBuffer(
       output_name, batch1_byte_size, TRTISTF_TensorData(tensor), shape,
-      content_memory_type, payloads);
+      content_memory_type, memory_type_id, payloads);
 }
 
 Status

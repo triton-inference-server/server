@@ -70,7 +70,7 @@ struct BackendContext {
   bool SetFixedSizeOutputBuffer(
       const std::string& name, const size_t batch1_byte_size,
       const char* content, const std::vector<int64_t>& content_shape,
-      TRTSERVER_Memory_Type src_memory_type,
+      TRTSERVER_Memory_Type src_memory_type, int64_t src_memory_type_id,
       std::vector<Scheduler::Payload>* payloads);
 
   Status CopyBuffer(

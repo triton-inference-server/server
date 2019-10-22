@@ -454,9 +454,10 @@ LibTorchBackend::Context::ReadFixedSizedOutputTensor(
 
   auto content_memory_type =
       (device_ == torch::kCPU) ? TRTSERVER_MEMORY_CPU : TRTSERVER_MEMORY_GPU;
+  int64_t memory_type_id = (device_ == torch::kCPU) ? 0 : gpu_device_;
   *cuda_copy |= SetFixedSizeOutputBuffer(
       name, batch1_byte_size, (char*)content, content_shape,
-      content_memory_type, payloads);
+      content_memory_type, memory_type_id, payloads);
 
   return Status::Success;
 }

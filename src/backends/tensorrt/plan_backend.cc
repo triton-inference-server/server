@@ -1018,7 +1018,7 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
     cuda_copy |= SetFixedSizeOutputBuffer(
         name, batch1_byte_size,
         static_cast<char*>(buffers_[binding_offset_ + bindex]), shape,
-        TRTSERVER_MEMORY_GPU /* src_memory_type */, payloads);
+        TRTSERVER_MEMORY_GPU /* src_memory_type */, gpu_device_, payloads);
   }
 
   // Wait for the copy-out to complete
