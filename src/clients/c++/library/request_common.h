@@ -398,7 +398,7 @@ class ResultImpl : public InferContext::Result {
 class RequestImpl : public InferContext::Request {
  public:
   RequestImpl(const uint64_t id, InferContext::OnCompleteFn callback = nullptr)
-      : callback_(std::move(callback)), id_(id), ready_(false)
+      : callback_(std::move(callback)), id_(id)
   {
   }
   virtual ~RequestImpl() = default;
@@ -408,9 +408,6 @@ class RequestImpl : public InferContext::Request {
 
   uintptr_t RunIndex() const { return run_index_; }
   void SetRunIndex(uintptr_t idx) { run_index_ = idx; }
-
-  bool IsReady() const { return ready_; }
-  void SetIsReady(bool r) { ready_ = r; }
 
   bool HasCallback() const { return (callback_ != nullptr); }
 
@@ -431,9 +428,6 @@ class RequestImpl : public InferContext::Request {
 
   // Internal identifier for asynchronous call
   uintptr_t run_index_;
-
-  // Indicating if the request has been completed.
-  bool ready_;
 
   // The timers for infer request.
   RequestTimers timer_;

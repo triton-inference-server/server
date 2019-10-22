@@ -964,7 +964,6 @@ InferGrpcContextImpl::AsyncTransfer()
       std::shared_ptr<GrpcRequestImpl> grpc_request =
           std::static_pointer_cast<GrpcRequestImpl>(request);
       grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-      grpc_request->SetIsReady(true);
       if (grpc_request->HasCallback()) {
         grpc_request->callback_(this, request);
       }
@@ -1143,7 +1142,6 @@ InferGrpcStreamContextImpl::AsyncTransfer()
         std::static_pointer_cast<GrpcRequestImpl>(request);
     grpc_request->grpc_response_->Swap(&response);
     grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-    grpc_request->SetIsReady(true);
     if (grpc_request->HasCallback()) {
       grpc_request->callback_(this, request);
     }
