@@ -111,7 +111,10 @@ ResponseAlloc(
       allocated_ptr = malloc(byte_size);
 #ifdef TRTIS_ENABLE_GPU
     } else if (use_gpu_memory) {
-      auto err = cudaMalloc(&allocated_ptr, byte_size);
+      auto err = cudaSetDevice(memory_type_id);
+      if (err == cudaSuccess) {
+        err = cudaMalloc(&allocated_ptr, byte_size);
+      }
       if (err != cudaSuccess) {
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
