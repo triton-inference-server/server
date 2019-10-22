@@ -702,11 +702,7 @@ class InferContext {
   /// 'async_request'.
   /// \param results Returns Result objects holding inference results
   /// as a map from output name to Result object.
-  /// \param is_ready Returns boolean that indicates if the results are ready,
-  /// the results are valid only if is_ready returns true.
   /// \param async_request Request handle to retrieve results.
-  /// \param wait If true, block until the request completes. Otherwise, return
-  /// immediately.
   /// \return Error object indicating success or failure.
   virtual Error GetAsyncRunResults(
       const std::shared_ptr<Request>& async_request,

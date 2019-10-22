@@ -1482,7 +1482,6 @@ class InferContext:
 
         """
         # Get async run results
-        c_is_ready = c_bool()
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
             self._ctx, request_id))
 

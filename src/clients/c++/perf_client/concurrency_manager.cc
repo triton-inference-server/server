@@ -568,7 +568,6 @@ ConcurrencyManager::AsyncInfer(
     for (size_t idx = 0; idx < ctxs.size(); idx++) {
       if (ctxs[idx]->inflight_request_cnt_ > 0) {
         std::vector<RequestMetaData> swap_vector;
-        bool is_ready = false;
         {
           std::lock_guard<std::mutex> lk(ctxs[idx]->mtx_);
           swap_vector.swap(ctxs[idx]->completed_requests_);
@@ -578,12 +577,6 @@ ConcurrencyManager::AsyncInfer(
               ctxs[idx]->ctx_->GetAsyncRunResults(request.request_, &results);
           if (!err->IsOk()) {
             return;
-          }
-
-          if (!is_ready) {
-            *err = nic::Error(
-                ni::RequestStatusCode::INTERNAL,
-                "AsyncRun callback is invoked but request is not ready");
           }
 
           struct timespec end_time;
