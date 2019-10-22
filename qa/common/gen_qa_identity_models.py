@@ -574,8 +574,8 @@ def create_plan_dynamic_rf_modelfile(
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
     else:
-        shape_with_batchsize = [-1] + [i for i in shape] 
-    
+        shape_with_batchsize = [-1] + [i for i in shape]
+
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
     for io_num in range(io_cnt):
@@ -658,8 +658,8 @@ def create_plan_dynamic_modelfile(
     if max_batch == 0:
         shape_with_batchsize = [i for i in shape]
     else:
-        shape_with_batchsize = [-1] + [i for i in shape] 
-    
+        shape_with_batchsize = [-1] + [i for i in shape]
+
     trt_dtype = np_to_trt_dtype(dtype)
     for io_num in range(io_cnt):
         in_node = network.add_input("INPUT{}".format(io_num), trt_dtype, shape_with_batchsize)
@@ -679,7 +679,7 @@ def create_plan_dynamic_modelfile(
             # Generating a very generous optimization profile
             min_shape = min_shape + [1]
             opt_shape = opt_shape + [8]
-            max_shape = max_shape + [32]
+            max_shape = max_shape + [16 * 1024 * 1024]
         else:
             min_shape = min_shape + [i]
             opt_shape = opt_shape + [i]
@@ -708,7 +708,7 @@ def create_plan_dynamic_modelfile(
     engine.destroy()
     builder.destroy()
 
-                
+
 def create_plan_modelconfig(
         create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):

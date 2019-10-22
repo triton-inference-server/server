@@ -40,7 +40,7 @@ REPORTER=../common/reporter.py
 
 # The tensorrt identity model only allows variable size up to 32 so we
 # can't use it for the large tensor size runs we do here
-BACKENDS=${BACKENDS:="custom graphdef savedmodel onnx libtorch netdef"}
+BACKENDS=${BACKENDS:="custom plan graphdef savedmodel onnx libtorch netdef"}
 TENSOR_SIZES="16384 16777216"   # 16k and 16m fp32 elements
 CONCURRENCIES="1 8"
 
