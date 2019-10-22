@@ -374,7 +374,7 @@ class SequenceBatcherTest(unittest.TestCase):
                 processed_count = 0
                 while processed_count < i:
                     id = user_data._completed_requests.get()
-                    results = ctx.get_async_run_results(id, True)
+                    results = ctx.get_async_run_results(id)
                     self.assertEqual(len(results), 1)
                     self.assertTrue(OUTPUT in results)
                     result = results[OUTPUT][0][0]

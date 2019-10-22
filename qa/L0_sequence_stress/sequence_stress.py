@@ -120,7 +120,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
         processed_count += 1
         results = None
         while results == None:
-            results = ctx.get_async_run_results(id, False)
+            results = ctx.get_async_run_results(id)
             if results == None:
                 if timeout_ms != None:
                     now_ms = int(round(time.time() * 1000))

@@ -101,7 +101,7 @@ if __name__ == '__main__':
     max_completion_time = 0
     while True:
         request_id, finish_time = finish_times.get()
-        result = infer_ctx.get_async_run_results(request_id, True)
+        result = infer_ctx.get_async_run_results(request_id)
         finished_requests += 1
         print("Request %d"%request_id + " finished in %f"%finish_time)
         max_completion_time = max(max_completion_time, finish_time)

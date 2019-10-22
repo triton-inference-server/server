@@ -552,8 +552,8 @@ class InferGrpcContextImpl : public InferContextImpl {
   virtual Error Run(ResultMap* results) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) override;
+      ResultMap* results,
+      const std::shared_ptr<Request>& async_request) override;
 
  protected:
   virtual Error AsyncRun(
@@ -832,21 +832,15 @@ InferGrpcContextImpl::AsyncRun(
 
 Error
 InferGrpcContextImpl::GetAsyncRunResults(
-    ResultMap* results, bool* is_ready,
-    const std::shared_ptr<Request>& async_request, bool wait)
+    ResultMap* results, const std::shared_ptr<Request>& async_request)
 {
-  Error err = IsRequestReady(async_request, is_ready, wait);
-  if (!err.IsOk() || !(*is_ready)) {
-    return err;
-  }
-
   std::shared_ptr<GrpcRequestImpl> grpc_request =
       std::static_pointer_cast<GrpcRequestImpl>(async_request);
 
   grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_START);
   Error request_status = grpc_request->GetResults(*this, results);
   grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::RECV_END);
-  err = UpdateStat(grpc_request->Timer());
+  Error err = UpdateStat(grpc_request->Timer());
   {
     std::lock_guard<std::mutex> lock(mutex_);
     ongoing_async_requests_.erase(grpc_request->RunIndex());
@@ -1082,8 +1076,7 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
     std::unique_lock<std::mutex> lk(mtx);
     cv.wait(lk, [&callback_invoked]() { return callback_invoked; });
   }
-  bool is_ready;
-  return GetAsyncRunResults(results, &is_ready, req, true);
+  return GetAsyncRunResults(results, req);
 }
 
 Error

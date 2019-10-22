@@ -80,7 +80,7 @@ def async_send(ctx, value, corr_id, start_of_sequence, end_of_sequence, user_dat
                                batch_size=1, flags=flags, corr_id=corr_id)
 
 def async_receive(ctx, request_id):
-    return ctx.get_async_run_results(request_id, True)
+    return ctx.get_async_run_results(request_id)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -167,7 +167,9 @@ if __name__ == '__main__':
             result1_list.append(send(ctxs[1], value=-v,
                                      start_of_sequence=False, end_of_sequence=(v == 1)))
 
-    if not FLAGS.reverse:
+    if FLAGS.async_set:
+        print("streaming : streaming")
+    elif not FLAGS.reverse:
         print("streaming : non-streaming")
     else:
         print("non-streaming : streaming")

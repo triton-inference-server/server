@@ -190,10 +190,8 @@ AsyncReceive(
 {
   // Retrieve result of the inference request from the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  bool is_ready;
   FAIL_IF_ERR(
-      ctx->GetAsyncRunResults(&results, &is_ready, request, true),
-      "unable to get results");
+      ctx->GetAsyncRunResults(&results, request), "unable to get results");
 
   // We expect there to be 1 result value, return it...
   if (results.size() != 1) {

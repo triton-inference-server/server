@@ -315,7 +315,7 @@ if __name__ == '__main__':
         processed_count = 0
         while processed_count < i:
             (input_filenames, request_id) = user_data._completed_requests.get()
-            results.append(ctx.get_async_run_results(request_id, True))
+            results.append(ctx.get_async_run_results(request_id))
             result_filenames.append(input_filenames)
             processed_count += 1
     else:

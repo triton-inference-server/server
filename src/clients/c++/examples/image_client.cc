@@ -760,11 +760,9 @@ main(int argc, char** argv)
         }
       });
     }
-    bool is_ready;
     while (!request_buffer_.empty()) {
       results.emplace_back();
-      err = ctx->GetAsyncRunResults(
-          &(results.back()), &is_ready, request_buffer_.front(), true);
+      err = ctx->GetAsyncRunResults(&(results.back()), request_buffer_.front());
       if (!err.IsOk()) {
         std::cerr << "failed receiving infer response: " << err << std::endl;
         exit(1);

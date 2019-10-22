@@ -486,12 +486,6 @@ class InferContextImpl : public InferContext {
  protected:
   Error Init(std::unique_ptr<ServerStatusContext> sctx);
 
-  // Helper function called by GetAsyncRunResults() to check if the request
-  // is ready. If the request is valid and wait == true,
-  // the function will block until request is ready.
-  Error IsRequestReady(
-      const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait);
-
   // Update the context stat with the given timer
   Error UpdateStat(const RequestTimers& timer);
 

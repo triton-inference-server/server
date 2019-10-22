@@ -995,40 +995,4 @@ InferContextImpl::UpdateStat(const RequestTimers& timer)
   return Error::Success;
 }
 
-Error
-InferContextImpl::IsRequestReady(
-    const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait)
-{
-  *is_ready = false;
-  std::unique_lock<std::mutex> lock(mutex_);
-  if (ongoing_async_requests_.size() == 0) {
-    return Error(
-        RequestStatusCode::INVALID_ARG,
-        "No asynchronous requests have been sent");
-  }
-
-  std::shared_ptr<RequestImpl> request =
-      std::static_pointer_cast<RequestImpl>(async_request);
-
-  auto itr = ongoing_async_requests_.find(request->RunIndex());
-  if (itr == ongoing_async_requests_.end()) {
-    return Error(
-        RequestStatusCode::INVALID_ARG,
-        "No matched asynchronous request found.");
-  }
-
-  cv_.wait(lock, [is_ready, &request, wait] {
-    if (!request->IsReady()) {
-      if (wait) {
-        return false;
-      }
-    } else {
-      *is_ready = true;
-    }
-    return true;
-  });
-
-  return Error::Success;
-}
-
 }}}  // namespace nvidia::inferenceserver::client

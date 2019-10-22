@@ -73,13 +73,8 @@ ValidateResults(
     const std::vector<int32_t>& input0_data,
     const std::vector<int32_t>& input1_data)
 {
-  bool is_ready = false;
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  ctx->GetAsyncRunResults(&results, &is_ready, request, false);
-  if (is_ready == false) {
-    std::cerr << "Callback is called while request is not ready" << std::endl;
-    exit(1);
-  }
+  ctx->GetAsyncRunResults(&results, request);
   // We expect there to be 2 results. Walk over all 16 result elements
   // and print the sum and difference calculated by the model.
   if (results.size() != 2) {

@@ -100,7 +100,7 @@ if __name__ == '__main__':
         (infer_ctx, request_id, idx) = user_data._completed_requests.get()
 
         # Retrieve results and error checking
-        result = infer_ctx.get_async_run_results(request_id, True)
+        result = infer_ctx.get_async_run_results(request_id)
         output0_data = result['OUTPUT0'][0]
         output1_data = result['OUTPUT1'][0]
         print("Main thread retrieved request " + str(idx) + "'s results:")

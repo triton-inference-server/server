@@ -927,8 +927,8 @@ class InferHttpContextImpl : public InferContextImpl {
   Error Run(ResultMap* results) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) override;
+      ResultMap* results,
+      const std::shared_ptr<Request>& async_request) override;
 
  private:
   Error AsyncRun(
@@ -1344,14 +1344,8 @@ InferHttpContextImpl::AsyncRun(
 
 Error
 InferHttpContextImpl::GetAsyncRunResults(
-    ResultMap* results, bool* is_ready,
-    const std::shared_ptr<Request>& async_request, bool wait)
+    ResultMap* results, const std::shared_ptr<Request>& async_request)
 {
-  Error err = IsRequestReady(async_request, is_ready, wait);
-  if (!err.IsOk() || !(*is_ready)) {
-    return err;
-  }
-
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);
 
@@ -1361,7 +1355,7 @@ InferHttpContextImpl::GetAsyncRunResults(
     curl_multi_remove_handle(multi_handle_, http_request->easy_handle_);
   }
 
-  err = UpdateStat(http_request->Timer());
+  Error err = UpdateStat(http_request->Timer());
   if (!err.IsOk()) {
     std::cerr << "Failed to update context stat: " << err << std::endl;
   }

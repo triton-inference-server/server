@@ -148,7 +148,7 @@ _crequest_infer_ctx_async_run_with_cb.restype = c_void_p
 _crequest_infer_ctx_async_run_with_cb.argtypes = [c_void_p, _async_run_callback_prototype]
 _crequest_infer_ctx_get_async_run_results = _crequest.InferContextGetAsyncRunResults
 _crequest_infer_ctx_get_async_run_results.restype = c_void_p
-_crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, POINTER(c_bool), c_uint64, c_bool]
+_crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, c_uint64]
 
 _crequest_infer_ctx_options_new = _crequest.InferContextOptionsNew
 _crequest_infer_ctx_options_new.restype = c_void_p
@@ -1451,7 +1451,7 @@ class InferContext:
                 (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)
             self._callback_resources_dict_id += 1
 
-    def get_async_run_results(self, request_id, wait):
+    def get_async_run_results(self, request_id):
         """Retrieve the results of a previous async_run() using the supplied
         'request_id'
 
@@ -1487,12 +1487,9 @@ class InferContext:
         # Get async run results
         c_is_ready = c_bool()
         err = c_void_p(_crequest_infer_ctx_get_async_run_results(
-            self._ctx, byref(c_is_ready), request_id, wait))
+            self._ctx, request_id))
 
         self._last_request_id = _raise_if_error(err)
-
-        if not c_is_ready.value:
-            return None
 
         with self._lock:
             requested_outputs = self._requested_outputs_dict[request_id]
