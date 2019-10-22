@@ -43,7 +43,7 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run_with_cb()
+# Callback function used for async_run()
 def completion_callback(input_filenames, user_data, infer_ctx, request_id):
     user_data._completed_requests.put((request_id, input_filenames))
 
@@ -304,7 +304,7 @@ if __name__ == '__main__':
                 FLAGS.batch_size))
             result_filenames.append(input_filenames)
         else:
-            ctx.async_run_with_cb(partial(completion_callback, input_filenames, user_data), 
+            ctx.async_run(partial(completion_callback, input_filenames, user_data), 
                             { input_name :input_batch }, 
                             { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
                             FLAGS.batch_size)

@@ -45,7 +45,7 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run_with_cb()
+# Callback function used for async_run()
 def completion_callback(user_data, infer_ctx, request_id):
     user_data._completed_requests.put((infer_ctx, request_id))
 
@@ -74,7 +74,7 @@ def async_send(ctx, value, corr_id, start_of_sequence, end_of_sequence, user_dat
     if end_of_sequence:
         flags = flags | InferRequestHeader.FLAG_SEQUENCE_END
 
-    ctx.async_run_with_cb(partial(completion_callback, user_data),
+    ctx.async_run(partial(completion_callback, user_data),
                                { 'INPUT' : (value_data,) },
                                { 'OUTPUT' : InferContext.ResultFormat.RAW },
                                batch_size=1, flags=flags, corr_id=corr_id)

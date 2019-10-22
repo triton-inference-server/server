@@ -243,7 +243,7 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Send another AsyncRun with callback which will defer the completed request
+  // Send another AsyncRun whose callback defers the completed request
   // to another thread (main thread) to handle
   bool callback_invoked = false;
   std::shared_ptr<nic::InferContext::Request> request_placeholder;

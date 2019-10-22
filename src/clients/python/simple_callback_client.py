@@ -46,7 +46,7 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run_with_cb(), it can capture
+# Callback function used for async_run(), it can capture
 # additional information using functools.partial as long as the last
 # two arguments are reserved for InferContext and request id
 def completion_callback(user_data, idx, infer_ctx, request_id):
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     # Send async inference
     for idx in range(request_cnt):
-        ctx.async_run_with_cb(partial(completion_callback, user_data, idx),
+        ctx.async_run(partial(completion_callback, user_data, idx),
                                         { 'INPUT0' : (input0_data,),
                                           'INPUT1' : (input1_data,) },
                                         { 'OUTPUT0' : InferContext.ResultFormat.RAW,

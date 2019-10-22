@@ -1344,8 +1344,7 @@ InferHttpContextImpl::AsyncRun(
 
 Error
 InferHttpContextImpl::GetAsyncRunResults(
-    const std::shared_ptr<Request>& async_request,
-    ResultMap* results)
+    const std::shared_ptr<Request>& async_request, ResultMap* results)
 {
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);

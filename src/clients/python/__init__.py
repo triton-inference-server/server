@@ -143,9 +143,9 @@ _crequest_infer_ctx_run = _crequest.InferContextRun
 _crequest_infer_ctx_run.restype = c_void_p
 _crequest_infer_ctx_run.argtypes = [c_void_p]
 _async_run_callback_prototype = CFUNCTYPE(None, c_void_p, c_uint64)
-_crequest_infer_ctx_async_run_with_cb = _crequest.InferContextAsyncRunWithCallback
-_crequest_infer_ctx_async_run_with_cb.restype = c_void_p
-_crequest_infer_ctx_async_run_with_cb.argtypes = [c_void_p, _async_run_callback_prototype]
+_crequest_infer_ctx_async_run = _crequest.InferContextAsyncRun
+_crequest_infer_ctx_async_run.restype = c_void_p
+_crequest_infer_ctx_async_run.argtypes = [c_void_p, _async_run_callback_prototype]
 _crequest_infer_ctx_get_async_run_results = _crequest.InferContextGetAsyncRunResults
 _crequest_infer_ctx_get_async_run_results.restype = c_void_p
 _crequest_infer_ctx_get_async_run_results.argtypes = [c_void_p, c_uint64]
@@ -1376,7 +1376,7 @@ class InferContext:
 
         return self._get_results(outputs, batch_size)
 
-    def async_run_with_cb(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0):
+    def async_run(self, callback, inputs, outputs, batch_size=1, flags=0, corr_id=0):
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
@@ -1445,7 +1445,7 @@ class InferContext:
             # Run asynchronous inference...
             _raise_if_error(
                 c_void_p(
-                    _crequest_infer_ctx_async_run_with_cb(self._ctx, c_cb)))
+                    _crequest_infer_ctx_async_run(self._ctx, c_cb)))
 
             self._callback_resources_dict[self._callback_resources_dict_id] = \
                 (outputs, batch_size, contiguous_input, c_cb, wrapped_cb)

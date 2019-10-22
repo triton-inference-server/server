@@ -110,7 +110,7 @@ void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
 nic::Error* InferContextRun(InferContextCtx* ctx);
-nic::Error* InferContextAsyncRunWithCallback(
+nic::Error* InferContextAsyncRun(
     InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t));
 nic::Error* InferContextGetAsyncRunResults(
     InferContextCtx* ctx, uint64_t request_id);

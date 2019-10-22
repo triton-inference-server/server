@@ -79,7 +79,7 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run_with_cb()
+# Callback function used for async_run()
 def completion_callback(user_data, infer_ctx, request_id):
     user_data._completed_requests.put(request_id)
 
@@ -358,12 +358,12 @@ class SequenceBatcherTest(unittest.TestCase):
 
                     if "libtorch" not in trial:
 
-                        ctx.async_run_with_cb(partial(completion_callback, user_data), 
+                        ctx.async_run(partial(completion_callback, user_data), 
                             { 'INPUT' :input_info }, { 'OUTPUT' :output_info },
                                batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT"
                     else:
-                        ctx.async_run_with_cb(partial(completion_callback, user_data), 
+                        ctx.async_run(partial(completion_callback, user_data), 
                             { 'INPUT__0' :input_info }, { 'OUTPUT__0' :output_info },
                                batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"

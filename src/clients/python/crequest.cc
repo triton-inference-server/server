@@ -527,7 +527,7 @@ InferContextRun(InferContextCtx* ctx)
 }
 
 nic::Error*
-InferContextAsyncRunWithCallback(
+InferContextAsyncRun(
     InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t))
 {
   nic::Error err = ctx->ctx->AsyncRun(

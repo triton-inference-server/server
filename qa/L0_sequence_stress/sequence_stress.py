@@ -59,7 +59,7 @@ class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
 
-# Callback function used for async_run_with_cb()
+# Callback function used for async_run()
 def completion_callback(value, expected_result, user_data, infer_ctx, request_id):
     user_data._completed_requests.put((request_id, value, expected_result))
 
@@ -104,7 +104,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
                 in0 = np.full(tensor_shape, value, dtype=input_dtype)
             input_list.append(in0)
 
-        ctx.async_run_with_cb(partial(completion_callback, value, expected_result, user_data), 
+        ctx.async_run(partial(completion_callback, value, expected_result, user_data), 
                             { 'INPUT' :input_list }, { 'OUTPUT' : InferContext.ResultFormat.RAW},
                                batch_size=batch_size, flags=flags)
         i+=1
