@@ -76,7 +76,7 @@ function main() {
       "${WHLDIR}/tensorrtserver/shared_memory/."
   fi
 
-  if [ -z "$TRTIS_ENABLE_GPU" ]; then
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
     mkdir -p ${WHLDIR}/tensorrtserver/cuda_shared_memory
     cp libccudashm.so \
       "${WHLDIR}/tensorrtserver/cuda_shared_memory/."

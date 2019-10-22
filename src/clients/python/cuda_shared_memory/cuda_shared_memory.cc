@@ -37,7 +37,7 @@ namespace {
 
 void*
 CudaSharedMemoryHandleCreate(
-    std::string trtis_shm_name, cudaIpcMemHandle_t* cuda_shm_handle,
+    std::string trtis_shm_name, cudaIpcMemHandle_t cuda_shm_handle,
     void* base_addr, size_t byte_size, int device_id)
 {
   SharedMemoryHandle* handle = new SharedMemoryHandle();
@@ -46,6 +46,9 @@ CudaSharedMemoryHandleCreate(
   handle->base_addr_ = base_addr;
   handle->byte_size_ = byte_size;
   handle->device_id_ = device_id;
+  handle->offset_ = 0;
+  handle->shm_key_ = "";
+  handle->shm_fd_ = 0;
   return reinterpret_cast<void*>(handle);
 }
 
@@ -69,7 +72,7 @@ CudaSharedMemoryRegionCreate(
   cudaIpcMemHandle_t cuda_handle;
 
   // Allocate data and create cuda IPC handle for data on the gpu
-  cudaMalloc(&data_ptr, byte_size);
+  cudaMalloc((void**)&data_ptr, byte_size);
   err = cudaIpcGetMemHandle(&cuda_handle, data_ptr);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);
@@ -78,8 +81,7 @@ CudaSharedMemoryRegionCreate(
 
   // create a handle for the shared memory region
   *cuda_shm_handle = CudaSharedMemoryHandleCreate(
-      std::string(trtis_shm_name), &cuda_handle, data_ptr, byte_size,
-      device_id);
+      std::string(trtis_shm_name), cuda_handle, data_ptr, byte_size, device_id);
 
   // Set device to previous GPU
   cudaSetDevice(previous_device);
@@ -134,6 +136,7 @@ CudaSharedMemoryRegionDestroy(void* cuda_shm_handle)
   // Close cuda IPC handle
   void* base_addr =
       reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle)->base_addr_;
+  // TODO fix failure here
   err = cudaIpcCloseMemHandle(base_addr);
   if (err != cudaSuccess) {
     cudaSetDevice(previous_device);

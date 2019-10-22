@@ -34,7 +34,7 @@ struct SharedMemoryHandle {
   std::string trtis_shm_name_;
   std::string shm_key_;
 #if TRTIS_ENABLE_GPU
-  cudaIpcMemHandle_t* cuda_shm_handle_;
+  cudaIpcMemHandle_t cuda_shm_handle_;
   int device_id_;
 #endif  // TRTIS_ENABLE_GPU
   void* base_addr_;

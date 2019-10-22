@@ -396,7 +396,7 @@ SharedMemoryControlContextCudaRegister(
   SharedMemoryHandle* handle =
       reinterpret_cast<SharedMemoryHandle*>(cuda_shm_handle);
   nic::Error err = ctx->ctx->RegisterCudaSharedMemory(
-      handle->trtis_shm_name_, *(handle->cuda_shm_handle_), handle->byte_size_,
+      handle->trtis_shm_name_, handle->cuda_shm_handle_, handle->byte_size_,
       handle->device_id_);
   if (err.IsOk()) {
     return nullptr;
@@ -459,7 +459,23 @@ SharedMemoryControlContextGetSharedMemoryHandle(
 {
   SharedMemoryHandle* handle =
       reinterpret_cast<SharedMemoryHandle*>(shm_handle);
-  *shm_addr = handle->base_addr_;
+  if (handle->shm_key_ == "") {
+#if TRTIS_ENABLE_GPU
+    char* tmp_addr = new char[handle->byte_size_];
+    cudaError_t err = cudaMemcpy(
+        tmp_addr, handle->base_addr_, handle->byte_size_,
+        cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+      return new nic::Error(
+          ni::RequestStatusCode::INTERNAL,
+          "failed to read GPU shared memory results: " +
+              std::string(cudaGetErrorString(err)));
+    }
+    *shm_addr = tmp_addr;
+#endif  // TRTIS_ENABLE_GPU
+  } else {
+    *shm_addr = handle->base_addr_;
+  }
   *shm_key = handle->shm_key_.c_str();
   *shm_fd = handle->shm_fd_;
   *offset = handle->offset_;

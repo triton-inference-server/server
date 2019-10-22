@@ -231,9 +231,6 @@ _crequest_infer_ctx_result_next_class.argtypes = [c_void_p, c_uint64, POINTER(c_
 _crequest_get_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetSharedMemoryHandle
 _crequest_get_shared_memory_handle_info.restype = c_void_p
 _crequest_get_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_char_p), POINTER(c_int), POINTER(c_uint64), POINTER(c_uint64)]
-_crequest_get_cuda_shared_memory_handle_info = _crequest.SharedMemoryControlContextGetCudaSharedMemoryHandle
-_crequest_get_cuda_shared_memory_handle_info.restype = c_void_p
-_crequest_get_cuda_shared_memory_handle_info.argtypes = [c_void_p, POINTER(c_void_p), POINTER(c_uint64), POINTER(c_int)]
 
 def _raise_if_error(err):
     """
