@@ -111,24 +111,13 @@ ResponseAlloc(
       allocated_ptr = malloc(byte_size);
 #ifdef TRTIS_ENABLE_GPU
     } else if (use_gpu_memory) {
-      int current_device;
-      auto err = cudaGetDevice(&current_device);
-      bool overridden = false;
-      if (err == cudaSuccess) {
-        overridden = (current_device != memory_type_id);
-        if (overridden) {
-          err = cudaSetDevice(memory_type_id);
-        }
-      }
+      auto err = cudaSetDevice(memory_type_id);
       if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
       if (err != cudaSuccess) {
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
-      }
-      if (overridden) {
-        cudaSetDevice(current_device);
       }
 #endif  // TRTIS_ENABLE_GPU
     }
@@ -164,24 +153,13 @@ ResponseRelease(
     free(buffer);
 #ifdef TRTIS_ENABLE_GPU
   } else if (use_gpu_memory) {
-    int current_device;
-    auto err = cudaGetDevice(&current_device);
-    bool overridden = false;
-    if (err == cudaSuccess) {
-      overridden = (current_device != memory_type_id);
-      if (overridden) {
-        err = cudaSetDevice(memory_type_id);
-      }
-    }
+    auto err = cudaSetDevice(memory_type_id);
     if (err == cudaSuccess) {
       err = cudaFree(buffer);
     }
     if (err != cudaSuccess) {
       LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
                 << cudaGetErrorString(err);
-    }
-    if (overridden) {
-      cudaSetDevice(current_device);
     }
 #endif  // TRTIS_ENABLE_GPU
   } else {

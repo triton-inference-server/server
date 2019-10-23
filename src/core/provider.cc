@@ -744,15 +744,37 @@ InferResponseProvider::AllocateOutputBuffer(
 
   void* buffer = nullptr;
   void* buffer_userp = nullptr;
-
+#ifdef TRTIS_ENABLE_GPU
+  int current_device;
+  auto cuerr = cudaGetDevice(&current_device);
+  if (cuerr != cudaSuccess) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to get current CUDA device: " +
+            std::string(cudaGetErrorString(cuerr)));
+  }
+#endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
       preferred_memory_type, preferred_memory_type_id, alloc_userp_);
+  Status status;
+#ifdef TRTIS_ENABLE_GPU
+  cuerr = cudaSetDevice(current_device);
+  if (cuerr != cudaSuccess) {
+    // Not returning as we may need to delete 'err'
+    status = Status(
+        RequestStatusCode::INTERNAL,
+        "unable to recover CUDA device: " +
+            std::string(cudaGetErrorString(cuerr)));
+  }
+#endif  // TRTIS_ENABLE_GPU
   if (err != nullptr) {
-    Status status = Status(
+    status = Status(
         TrtServerCodeToRequestStatus(TRTSERVER_ErrorCode(err)),
         TRTSERVER_ErrorMessage(err));
     TRTSERVER_ErrorDelete(err);
+  }
+  if (!status.IsOk()) {
     return status;
   }
 
