@@ -73,4 +73,5 @@ if __name__ == '__main__':
     # and output tensor calculated by the model. They must be the same.
     output0_data = result['OUTPUT0'][0]
 
+    print(input0_data,"?=?",output0_data)
     assert np.equal(input0_data,output0_data).all()
