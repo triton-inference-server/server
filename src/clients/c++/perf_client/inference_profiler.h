@@ -51,7 +51,7 @@ struct LoadStatus {
   // Record of the measurements in the current session
   //
   // Stores the observations of infer_per_sec and latencies in a vector
-  std::vector<int> infer_per_sec;
+  std::vector<double> infer_per_sec;
   std::vector<uint64_t> latencies;
   // Records the average inference per second within the stability window
   double avg_ips = 0;
@@ -89,8 +89,8 @@ struct PerfStatus {
   uint64_t client_avg_send_time_ns;
   uint64_t client_avg_receive_time_ns;
   // Per sec stat
-  int client_infer_per_sec;
-  int client_sequence_per_sec;
+  double client_infer_per_sec;
+  double client_sequence_per_sec;
   bool on_sequence_model;
 
   // placeholder for the latency value that is used for conditional checking

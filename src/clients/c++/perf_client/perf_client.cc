@@ -989,7 +989,7 @@ main(int argc, char** argv)
             // request count ratio between the composing model and the ensemble
             double infer_ratio =
                 1.0 * stats.request_count / status.server_stats.request_count;
-            int infer_per_sec = infer_ratio * status.client_infer_per_sec;
+            double infer_per_sec = infer_ratio * status.client_infer_per_sec;
             ofs << status.concurrency << "," << infer_per_sec << ",0,"
                 << (avg_overhead_ns / 1000) << "," << (avg_queue_ns / 1000)
                 << "," << (avg_compute_ns / 1000) << ",0" << std::endl;
