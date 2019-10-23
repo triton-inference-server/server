@@ -61,18 +61,16 @@ if __name__ == '__main__':
     # Create the data for the input tensor. It contains a null character in
     # the middle of the string.
     tmp_str = "abc\0def"
-
     input0_data = np.array([tmp_str], dtype=object)
 
     # Send inference request to the inference server. Get results for
-    # both output tensors.
+    # output tensor.
     result = ctx.run({ 'INPUT0' : (input0_data,) },
                      { 'OUTPUT0' : InferContext.ResultFormat.RAW },
                      batch_size)
 
-    # We expect there to be 2 results (each with batch-size 1). Walk
-    # over all 16 result elements and print the sum and difference
-    # calculated by the model.
+    # We expect there to be 1 result (with batch-size 1). Compare the input
+    # and output tensor calculated by the model. They must be the same.
     output0_data = result['OUTPUT0'][0]
 
     assert np.equal(input0_data,output0_data).all()

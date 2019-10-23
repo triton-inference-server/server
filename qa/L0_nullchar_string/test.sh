@@ -59,15 +59,13 @@ RET=0
 
 set +e
 
-python $NULLCHAR_CLIENT_PY -m graphdef_nobatch_zero_1_object -v >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-python $NULLCHAR_CLIENT_PY -m onnx_nobatch_zero_1_object -v >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    RET=1
-fi
+for MODEL in graphdef_nobatch_zero_1_object onnx_nobatch_zero_1_object \
+          savedmodel_nobatch_zero_1_object; do
+  python $NULLCHAR_CLIENT_PY -m $MODEL -v >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      RET=1
+  fi
+done
 
 set -e
 

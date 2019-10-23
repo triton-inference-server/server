@@ -634,7 +634,6 @@ BaseBackend::Context::SetStringInputTensor(
 
       TRTISTF_TensorSetString(
           tensor, tensor_element_idx + element_idx, content, len);
-      std::string tmp = std::string(content, len);
       content += len;
       content_byte_size -= len;
       element_idx++;
