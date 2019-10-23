@@ -426,12 +426,12 @@ ReadStringOutputTensor(
       // with no null-terminator.
       std::string serialized;
       for (size_t e = 0; e < expected_element_cnt; ++e) {
-        const char* cstr = TRTISTF_TensorString(tensor, tensor_element_idx + e);
-        const uint32_t len = strlen(cstr);
+        size_t len;
+        const char* cstr = TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
         serialized.append(
             reinterpret_cast<const char*>(&len), sizeof(uint32_t));
         if (len > 0) {
-          serialized.append(cstr);
+          serialized.append(cstr, len);
         }
       }
 
@@ -633,6 +633,7 @@ BaseBackend::Context::SetStringInputTensor(
 
       TRTISTF_TensorSetString(
           tensor, tensor_element_idx + element_idx, content, len);
+      std::string tmp = std::string(content, len);
       content += len;
       content_byte_size -= len;
       element_idx++;
