@@ -1312,10 +1312,10 @@ InferHttpContextImpl::AsyncRun(
 
   Error err = PreRunProcessing(*async_request);
 
+  current_context->SetId(async_request_id_++);
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    current_context->SetId(async_request_id_++);
 
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
         reinterpret_cast<uintptr_t>(current_context->easy_handle_),
@@ -1326,16 +1326,16 @@ InferHttpContextImpl::AsyncRun(
           RequestStatusCode::INTERNAL,
           "Failed to insert new asynchronous request context.");
     }
+  }
 
-    curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
+  curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
 
-    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
-    if (current_context->total_input_byte_size_ == 0) {
-      // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
-      // content length is 0. In that case, we can't measure SEND_END properly
-      // (send ends after sending request header).
-      current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
-    }
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+  if (current_context->total_input_byte_size_ == 0) {
+    // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
+    // content length is 0. In that case, we can't measure SEND_END properly
+    // (send ends after sending request header).
+    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
 
   cv_.notify_all();

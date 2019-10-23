@@ -786,15 +786,13 @@ InferGrpcContextImpl::AsyncRun(
   }
 
   GrpcRequestImpl* current_context;
-  uintptr_t run_index;
+  current_context =
+      new GrpcRequestImpl(async_request_id_++, std::move(callback));
+  async_request->reset(static_cast<Request*>(current_context));
+  uintptr_t run_index = current_context->Id();
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    // Also need to protect the id
-    current_context =
-        new GrpcRequestImpl(async_request_id_++, std::move(callback));
-    async_request->reset(static_cast<Request*>(current_context));
-
-    run_index = current_context->Id();
     auto insert_result = ongoing_async_requests_.emplace(
         std::make_pair(run_index, *async_request));
     if (!insert_result.second) {
@@ -941,14 +939,9 @@ InferGrpcContextImpl::AsyncTransfer()
       bool ok = true;
       bool status = async_request_completion_queue_.Next((void**)(&got), &ok);
       if (!ok) {
-        // The lock would prevent the jumbling up of the error messages.
-        // Additionally, doesn't impact performance as it is outside the
-        // execution path.
-        std::lock_guard<std::mutex> lock(mutex_);
         fprintf(stderr, "Unexpected not ok on client side.");
       }
       if (!status) {
-        std::lock_guard<std::mutex> lock(mutex_);
         fprintf(stderr, "Completion queue is closed.");
       }
       {
@@ -1081,13 +1074,13 @@ InferGrpcStreamContextImpl::AsyncRun(
     std::shared_ptr<Request>* async_request, OnCompleteFn callback)
 {
   GrpcRequestImpl* current_context;
+  current_context =
+      new GrpcRequestImpl(async_request_id_++, std::move(callback));
+  async_request->reset(static_cast<Request*>(current_context));
+  uintptr_t run_index = current_context->Id();
+
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    current_context =
-        new GrpcRequestImpl(async_request_id_++, std::move(callback));
-    async_request->reset(static_cast<Request*>(current_context));
-
-    uintptr_t run_index = current_context->Id();
     auto insert_result = ongoing_async_requests_.emplace(
         std::make_pair(run_index, *async_request));
     if (!insert_result.second) {
