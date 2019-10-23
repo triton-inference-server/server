@@ -441,11 +441,31 @@ ReadStringOutputTensor(
       TRTSERVER_Memory_Type actual_memory_type;
       int64_t device_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
-          output_name, &content, serialized.size(), shape, preferred_memory_type, &actual_memory_type, &device_id);
+          output_name, &content, serialized.size(), shape,
+          preferred_memory_type, &actual_memory_type, &device_id);
       if (status.IsOk()) {
-        memcpy(
-            content, reinterpret_cast<const void*>(serialized.c_str()),
-            serialized.size());
+        if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
+#ifdef TRTIS_ENABLE_GPU
+          cudaStream_t stream = nullptr;
+          cudaError_t err = cudaMemcpyAsync(
+              content, reinterpret_cast<const void*>(serialized.c_str()),
+              serialized.size(), cudaMemcpyDeviceToHost, stream);
+          if (err != cudaSuccess) {
+            payload.status_ = Status(
+                RequestStatusCode::INTERNAL,
+                "output '" + output_name +
+                    "' is in GPU memory and failed to use" +
+                    " CUDA copy from CPU memory to get String output data: " +
+                    std::string(cudaGetErrorString(err)));
+          } else {
+            cudaStreamSynchronize(stream);
+          }
+#endif  // TRTIS_ENABLE_GPU
+        } else {
+          memcpy(
+              content, reinterpret_cast<const void*>(serialized.c_str()),
+              serialized.size());
+        }
       } else {
         payload.status_ = status;
       }
