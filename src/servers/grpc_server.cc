@@ -683,12 +683,13 @@ InferResponseAlloc(
     }
 
     if (!use_shm) {
-      // Can't allocate for any memory type other than CPU. If byte size is 0,
-      // proceed regardless of memory type as no allocation is required.
+      // Can't allocate for any memory type other than CPU. If asked to
+      // allocate on GPU memory then force allocation on CPu instead.
       if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "GRPC allocation failed for type "
-                       << *actual_memory_type << " for " << tensor_name;
-        return nullptr;
+                       << *actual_memory_type << " for " << tensor_name
+                       << ", will use type " << TRTSERVER_MEMORY_CPU;
+        *actual_memory_type = TRTSERVER_MEMORY_CPU;
       }
 
       raw_output->resize(byte_size);

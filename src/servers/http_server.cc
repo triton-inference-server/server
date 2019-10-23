@@ -361,8 +361,9 @@ HTTPAPIServer::ResponseAlloc(
       // Can't allocate for any memory type other than CPU.
       if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "HTTP allocation failed for type "
-                       << *actual_memory_type << " for " << tensor_name;
-        return nullptr;
+                       << *actual_memory_type << " for " << tensor_name
+                       << ", will use type " << TRTSERVER_MEMORY_CPU;
+        *actual_memory_type = TRTSERVER_MEMORY_CPU;
       }
 
       // Reserve requested space in evbuffer...

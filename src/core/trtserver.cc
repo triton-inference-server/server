@@ -578,7 +578,11 @@ TRTSERVER_SharedMemoryBlockDevice(
   TrtServerSharedMemoryBlock* lsmb =
       reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
   *memory_type = lsmb->Type();
+#ifdef TRTIS_ENABLE_GPU
   *device_id = lsmb->DeviceId();
+#else
+  *device_id = 0;
+#endif             // TRTIS_ENABLE_GPU
   return nullptr;  // Success
 }
 
