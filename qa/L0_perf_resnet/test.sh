@@ -40,17 +40,53 @@ CAFFE2PLAN=../common/caffe2plan
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
+TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
 PYT_MODEL_NAME="resnet50_fp32_libtorch"
-TRT_MODEL_NAME="resnet50_fp16_plan"
-MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME}"
+ONNX_MODEL_NAME="resnet50_fp32_onnx"
+NETDEF_MODEL_NAME="resnet50_fp32_netdef"
+
+#
+# Test minimum latency
+#
+STATIC_BATCH=1
+DYNAMIC_BATCH=1
+INSTANCE_CNT=1
+MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME} ${NETDEF_MODEL_NAME}"
+
+# Create the TensorRT plan from Caffe model
+rm -fr tensorrt_models && mkdir tensorrt_models
+cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
+    (cd tensorrt_models/${TRT_MODEL_NAME} && \
+            sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+    mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
+$CAFFE2PLAN -h -b ${STATIC_BATCH} \
+            -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
+            $REPODIR/caffe_models/resnet50.prototxt $REPODIR/caffe_models/resnet50.caffemodel
+
+for MODEL_NAME in $MODEL_NAMES; do
+    REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
+        REPO=$REPODIR/perf_model_store
+    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+    MODEL_NAME=${MODEL_NAME} \
+              MODEL_FRAMEWORK=${FRAMEWORK} \
+              MODEL_PATH="$REPO/${MODEL_NAME}" \
+              STATIC_BATCH_SIZES=${STATIC_BATCH} \
+              DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH} \
+              INSTANCE_COUNTS=${INSTANCE_CNT} \
+              bash -x run_test.sh
+done
 
 #
 # Test dynamic batcher 8 w/ 2 instances
 #
+# Can't test ONNX since model only supports batch-size 1 (can fix this
+# if we find a RN50 onnx that supports batching.
+#
 STATIC_BATCH=1
 DYNAMIC_BATCH=8
 INSTANCE_CNT=2
+MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${NETDEF_MODEL_NAME}"
 
 # Create the TensorRT plan from Caffe model
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -63,7 +99,8 @@ $CAFFE2PLAN -h -b ${DYNAMIC_BATCH} \
             $REPODIR/caffe_models/resnet50.prototxt $REPODIR/caffe_models/resnet50.caffemodel
 
 for MODEL_NAME in $MODEL_NAMES; do
-    REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && REPO=$REPODIR/perf_model_store
+    REPO=`pwd`/tensorrt_models && [ "$MODEL_NAME" != "$TRT_MODEL_NAME" ] && \
+        REPO=$REPODIR/perf_model_store
     FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
     MODEL_NAME=${MODEL_NAME} \
               MODEL_FRAMEWORK=${FRAMEWORK} \
