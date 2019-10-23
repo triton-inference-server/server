@@ -552,8 +552,9 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   // entire dynamic batched input.
   auto memory_type = (gpu_device_ == NO_GPU_DEVICE) ? TRTSERVER_MEMORY_CPU
                                                     : TRTSERVER_MEMORY_GPU;
+  int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
-      new AllocatedSystemMemory(total_byte_size, memory_type));
+      new AllocatedSystemMemory(total_byte_size, memory_type, memory_type_id));
   char* buffer = meta_data->input_buffer_->MutableBuffer(&memory_type);
 
   // Visit the payloads in order and copy the input tensors to 'buffer'.
