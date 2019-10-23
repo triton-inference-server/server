@@ -68,10 +68,10 @@ class CustomBackend : public InferenceBackend {
   friend bool CustomGetOutput(
       void*, const char*, size_t, int64_t*, uint64_t, void**);
   friend bool CustomGetNextInputV2(
-      void*, const char*, const void**, uint64_t*, CustomMemoryType*);
+      void*, const char*, const void**, uint64_t*, CustomMemoryType*, int64_t*);
   friend bool CustomGetOutputV2(
-      void*, const char*, size_t, int64_t*, uint64_t, void**,
-      CustomMemoryType*, int64_t*);
+      void*, const char*, size_t, int64_t*, uint64_t, void**, CustomMemoryType*,
+      int64_t*);
 
   // For each model instance there is a context.
   struct Context : BackendContext {
@@ -119,7 +119,7 @@ class CustomBackend : public InferenceBackend {
     bool GetNextInput(
         GetInputOutputContext* input_context, const char* name,
         const void** content, uint64_t* content_byte_size,
-        CustomMemoryType* memory_type);
+        CustomMemoryType* memory_type, int64_t* memory_type_id);
 
     // Callback used by custom backends to get the output buffer for a
     // 'name'd output tensor.
@@ -167,10 +167,12 @@ bool CustomGetOutput(
 // See CustomGetNextInput, except that the block may not be in CPU memory.
 // Thus 'memory_type' acts as both input and output. On input gives the buffer
 // memory type preferred by the function caller. On output returns
-// the actual memory type of 'content'.
+// the actual memory type of 'content'. 'memory_type_id' also acts as
+// both input and output in the same fashion.
 bool CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
-    uint64_t* content_byte_size, CustomMemoryType* memory_type);
+    uint64_t* content_byte_size, CustomMemoryType* memory_type,
+    int64_t* memory_type_id);
 
 // See CustomGetOutput, except that the buffer is not limited to be
 // in CPU memory. 'memory_type' acts as both input and output. On input

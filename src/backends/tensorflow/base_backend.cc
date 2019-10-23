@@ -538,10 +538,13 @@ BaseBackend::Context::SetFixedSizedInputTensor(
   auto content_memory_type = (TRTISTF_TensorIsGPUTensor(tensor))
                                  ? TRTSERVER_MEMORY_GPU
                                  : TRTSERVER_MEMORY_CPU;
+  int64_t content_memory_type_id =
+      (TRTISTF_TensorIsGPUTensor(tensor)) ? gpu_device_ : 0;
   LOG_VERBOSE(1) << "input '" << input_name
                  << "' is GPU tensor: " << TRTISTF_TensorIsGPUTensor(tensor);
   SetInputBuffer(
-      input_name, expected_byte_sizes, payloads, content_memory_type, buffer);
+      input_name, expected_byte_sizes, payloads, content_memory_type,
+      content_memory_type_id, buffer);
 }
 
 void
@@ -564,10 +567,12 @@ BaseBackend::Context::SetStringInputTensor(
     // For string data type, we always need to copy the data to CPU so that
     // we can read string length and construct the string properly.
     auto src_memory_type = TRTSERVER_MEMORY_CPU;
+    int64_t src_memory_type_id = 0;
     const void* vcontent;
     size_t content_byte_size = expected_element_cnt * sizeof(uint32_t);
     payload.status_ = payload.request_provider_->GetNextInputContent(
-        input_name, &vcontent, &content_byte_size, &src_memory_type, true);
+        input_name, &vcontent, &content_byte_size, &src_memory_type,
+        &src_memory_type_id, true);
 
     const char* content = reinterpret_cast<const char*>(vcontent);
 #ifdef TRTIS_ENABLE_GPU

@@ -389,8 +389,10 @@ LibTorchBackend::Context::SetInputTensor(
     const InputMetaData& meta_data, torch::jit::IValue* tensor)
 {
   TRTSERVER_Memory_Type memory_type;
+  int64_t memory_type_id;
   size_t total_byte_size = meta_data.input_buffer_->TotalByteSize();
-  char* buffer = meta_data.input_buffer_->MutableBuffer(&memory_type);
+  char* buffer =
+      meta_data.input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
 
   torch::TensorOptions options{meta_data.torch_type_};
   auto updated_options = options.device(
@@ -555,7 +557,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
   int64_t memory_type_id = (gpu_device_ == NO_GPU_DEVICE) ? 0 : gpu_device_;
   meta_data->input_buffer_.reset(
       new AllocatedSystemMemory(total_byte_size, memory_type, memory_type_id));
-  char* buffer = meta_data->input_buffer_->MutableBuffer(&memory_type);
+  char* buffer =
+      meta_data->input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
 
   // Visit the payloads in order and copy the input tensors to 'buffer'.
   std::vector<size_t> expected_byte_sizes;
@@ -566,8 +569,8 @@ LibTorchBackend::Context::SetFixedSizedInputBuffer(
         request_header.batch_size() * batch1_byte_size);
   }
 
-  *cuda_copy |=
-      SetInputBuffer(name, expected_byte_sizes, payloads, memory_type, buffer);
+  *cuda_copy |= SetInputBuffer(
+      name, expected_byte_sizes, payloads, memory_type, memory_type_id, buffer);
 
   return Status::Success;
 }

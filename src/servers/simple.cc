@@ -491,12 +491,12 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input0->name().c_str(), input0_base, input0_size,
-          memory_type),
+          memory_type, 0 /* memory_type_id */),
       "assigning INPUT0 data");
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, input1->name().c_str(), input1_base, input1_size,
-          memory_type),
+          memory_type, 0 /* memory_type_id */),
       "assigning INPUT1 data");
 
   // Perform inference...
@@ -551,10 +551,11 @@ main(int argc, char** argv)
   const void* output0_content;
   size_t output0_byte_size;
   TRTSERVER_Memory_Type output0_memory_type;
+  int64_t memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output0->name().c_str(), &output0_content,
-          &output0_byte_size, &output0_memory_type),
+          &output0_byte_size, &output0_memory_type, &memory_type_id),
       "getting output0 result");
   if (output0_byte_size != input0_size) {
     FAIL(
@@ -567,7 +568,8 @@ main(int argc, char** argv)
         "unexpected output0 memory type, expected to be allocated "
         "in " +
         MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output0_memory_type));
+        MemoryTypeString(output0_memory_type) + ", id " +
+        std::to_string(memory_type_id));
   }
 
   const void* output1_content;
@@ -576,7 +578,7 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output1->name().c_str(), &output1_content,
-          &output1_byte_size, &output1_memory_type),
+          &output1_byte_size, &output1_memory_type, &memory_type_id),
       "getting output1 result");
   if (output1_byte_size != input1_size) {
     FAIL(
@@ -589,7 +591,8 @@ main(int argc, char** argv)
         "unexpected output1 memory type, expected to be allocated "
         "in " +
         MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
-        MemoryTypeString(output1_memory_type));
+        MemoryTypeString(output1_memory_type) + ", id " +
+        std::to_string(memory_type_id));
   }
 
   const void* output0_result = output0_content;

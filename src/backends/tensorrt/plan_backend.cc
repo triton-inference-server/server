@@ -892,7 +892,7 @@ PlanBackend::Context::Run(std::vector<Scheduler::Payload>* payloads)
     }
 
     SetInputBuffer(
-        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU,
+        name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_GPU, gpu_device_,
         static_cast<char*>(buffers_[binding_offset_ + bindex]));
 
     // Set the binding dimension so that output dimensions can be obtained

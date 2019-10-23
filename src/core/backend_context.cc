@@ -80,7 +80,8 @@ bool
 BackendContext::SetInputBuffer(
     const std::string& name, const std::vector<size_t>& expected_byte_sizes,
     std::vector<Scheduler::Payload>* payloads,
-    TRTSERVER_Memory_Type dst_memory_type, char* input_buffer)
+    TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+    char* input_buffer)
 {
   bool cuda_copy = false;
   // Visit the payloads in order and copy the input tensors to
@@ -93,10 +94,12 @@ BackendContext::SetInputBuffer(
     size_t copied_byte_size = 0;
     while (payload.status_.IsOk()) {
       auto src_memory_type = dst_memory_type;
+      auto src_memory_type_id = dst_memory_type_id;
       const void* content;
       size_t content_byte_size = expected_byte_size - copied_byte_size;
       payload.status_ = payload.request_provider_->GetNextInputContent(
-          name, &content, &content_byte_size, &src_memory_type, false);
+          name, &content, &content_byte_size, &src_memory_type,
+          &src_memory_type_id, false);
       if (!payload.status_.IsOk()) {
         break;
       }

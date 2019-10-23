@@ -385,7 +385,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   }
 
   *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);

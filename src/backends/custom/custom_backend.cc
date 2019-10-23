@@ -519,8 +519,10 @@ CustomBackend::Context::GetNextInput(
     const void** content, uint64_t* content_byte_size)
 {
   auto src_memory_type = CUSTOM_MEMORY_CPU;
+  int64_t src_memory_type_id = 0;
   bool ok = GetNextInput(
-      input_context, cname, content, content_byte_size, &src_memory_type);
+      input_context, cname, content, content_byte_size, &src_memory_type,
+      &src_memory_type_id);
 
 #ifdef TRTIS_ENABLE_GPU
   // If the memory type is on GPU, implicitly copying it to CPU memory
@@ -549,14 +551,15 @@ bool
 CustomBackend::Context::GetNextInput(
     GetInputOutputContext* input_context, const char* cname,
     const void** content, uint64_t* content_byte_size,
-    CustomMemoryType* memory_type)
+    CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
   auto src_memory_type = ToTRTServerMemoryType(*memory_type);
   Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, &src_memory_type, false);
+      name, content, content_byte_size, &src_memory_type, memory_type_id,
+      false);
   *memory_type = ToCustomMemoryType(src_memory_type);
   return status.IsOk();
 }
@@ -654,6 +657,8 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
+  // [TODO] below assumption no longer hold, need to do internal buffering
+  // like for CustomGetNextInput()
   // internally call V2 as CPU memory request is default option and will
   // always be permitted
   auto memory_type = CUSTOM_MEMORY_CPU;
@@ -666,13 +671,14 @@ CustomGetOutput(
 bool
 CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
-    uint64_t* content_byte_size, CustomMemoryType* memory_type)
+    uint64_t* content_byte_size, CustomMemoryType* memory_type,
+    int64_t* memory_type_id)
 {
   CustomBackend::Context::GetInputOutputContext* icontext =
       static_cast<CustomBackend::Context::GetInputOutputContext*>(
           input_context);
   return icontext->context_->GetNextInput(
-      icontext, name, content, content_byte_size, memory_type);
+      icontext, name, content, content_byte_size, memory_type, memory_type_id);
 }
 
 bool

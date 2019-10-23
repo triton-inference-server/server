@@ -62,7 +62,8 @@ struct BackendContext {
   bool SetInputBuffer(
       const std::string& name, const std::vector<size_t>& expected_byte_sizes,
       std::vector<Scheduler::Payload>* payloads,
-      TRTSERVER_Memory_Type dst_memory_type, char* input_buffer);
+      TRTSERVER_Memory_Type dst_memory_type, int64_t dst_memory_type_id,
+      char* input_buffer);
 
   // Helper function to set output buffer of fixed size data type to payloads
   // Return true if cudaMemcpyAsync is called, and the caller should call

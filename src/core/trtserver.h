@@ -408,6 +408,7 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
     TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
     uint64_t* byte_size);
 
+// [TODO] add 'memory_type_id' option, same reason as 'memory_type'
 /// Assign a buffer of data to an input. The buffer will be appended
 /// to any existing buffers for that input. The 'request_provider'
 /// takes ownership of the buffer and so the caller should not modify
@@ -424,7 +425,8 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
     TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
-    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type);
+    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id);
 
 /// TRTSERVER_InferenceResponse
 ///
@@ -470,7 +472,8 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
-    size_t* byte_size, TRTSERVER_Memory_Type* memory_type);
+    size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    int64_t* memory_type_id);
 
 /// TRTSERVER_ServerOptions
 ///

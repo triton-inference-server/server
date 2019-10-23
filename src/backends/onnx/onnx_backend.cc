@@ -663,7 +663,7 @@ OnnxBackend::Context::SetInputTensor(
 
   // Store data into input buffer
   SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
