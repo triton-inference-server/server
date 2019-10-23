@@ -111,18 +111,24 @@ ResponseAlloc(
     if (memory_type == TRTSERVER_MEMORY_CPU) {
       allocated_ptr = malloc(byte_size);
       *actual_memory_type = TRTSERVER_MEMORY_CPU;
-#ifdef TRTIS_ENABLE_GPU
+      *actual_device_id = 0;
     } else if (use_gpu_memory) {
+#ifdef TRTIS_ENABLE_GPU
       auto err = cudaSetDevice(memory_type_id);
       if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
+
       if (err != cudaSuccess) {
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
         *actual_memory_type = TRTSERVER_MEMORY_GPU;
       }
 #endif  // TRTIS_ENABLE_GPU
+    } else {
+      allocated_ptr = malloc(byte_size);
+      *actual_memory_type = TRTSERVER_MEMORY_CPU;
+      *actual_device_id = 0;
     }
 
     if (allocated_ptr != nullptr) {
