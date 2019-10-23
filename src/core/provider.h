@@ -163,8 +163,12 @@ class InferRequestProvider {
   // buffer and the buffer owner may collect such information for other use.
   // On return 'memory_type' gives the actual memory type of the chunk
   // pointed to by 'content'.
-  // 'memory_type_id' also acts as both input and output in the same fashion
-  // as 'memory_type'.
+  // 'memory_type_id' acts as both input and output. On input 'memory_type_id'
+  // is the buffer memory type id preferred by the function caller, it will
+  // not affect the function behavior, but it will be propagated to the
+  // buffer and the buffer owner may collect such information for other use.
+  // On return 'memory_type_id' gives the actual memory type id of the chunk
+  // pointed to by 'content'.
   // If 'force_contiguous' is true then the entire (remaining) input will
   // be returned as a single chunk. In some cases this will require
   // copying the data.

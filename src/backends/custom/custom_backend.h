@@ -168,7 +168,8 @@ bool CustomGetOutput(
 // Thus 'memory_type' acts as both input and output. On input gives the buffer
 // memory type preferred by the function caller. On output returns
 // the actual memory type of 'content'. 'memory_type_id' also acts as
-// both input and output in the same fashion.
+// both input and output. On input gives the buffer memory type id preferred by
+// the function caller. On output returns the actual memory type of 'content'.
 bool CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
     uint64_t* content_byte_size, CustomMemoryType* memory_type,
@@ -178,7 +179,8 @@ bool CustomGetNextInputV2(
 // in CPU memory. 'memory_type' acts as both input and output. On input
 // gives the buffer memory type preferred by the function caller. On output
 // returns the actual memory type of 'content'. 'memory_type_id' also acts as
-// both input and output in the same fashion.
+// both input and output. On input gives the buffer memory type id preferred by
+// the function caller. On output returns the actual memory type of 'content'.
 bool CustomGetOutputV2(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,

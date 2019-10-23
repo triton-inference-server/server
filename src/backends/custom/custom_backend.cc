@@ -657,8 +657,11 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
-  // [TODO] below assumption no longer hold, need to do internal buffering
-  // like for CustomGetNextInput()
+  // [TODO] below assumption no longer hold after
+  // https://github.com/NVIDIA/tensorrt-inference-server/pull/780,
+  // either to perform internal buffering like for CustomGetNextInput(),
+  // or to return error if actual type is not CPU.
+  // The former requires work on CustomBackend::Context::Run().
   // internally call V2 as CPU memory request is default option and will
   // always be permitted
   auto memory_type = CUSTOM_MEMORY_CPU;
