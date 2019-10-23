@@ -88,7 +88,15 @@ AllocatedSystemMemory::AllocatedSystemMemory(
       }
     } else {
 #ifdef TRTIS_ENABLE_GPU
-      auto err = cudaSetDevice(memory_type_id_);
+      int current_device;
+      auto err = cudaGetDevice(&current_device);
+      bool overridden = false;
+      if (err == cudaSuccess) {
+        overridden = (current_device != memory_type_id_);
+        if (overridden) {
+          err = cudaSetDevice(memory_type_id_);
+        }
+      }
       if (err == cudaSuccess) {
         err = cudaMalloc((void**)&buffer_, byte_size);
       }
@@ -96,6 +104,9 @@ AllocatedSystemMemory::AllocatedSystemMemory(
         LOG_ERROR << "failed to allocate GPU memory with byte size" << byte_size
                   << ": " << std::string(cudaGetErrorString(err));
         buffer_ = nullptr;
+      }
+      if (overridden) {
+        cudaSetDevice(current_device);
       }
 #else
       buffer_ = nullptr;
@@ -116,13 +127,24 @@ AllocatedSystemMemory::~AllocatedSystemMemory()
       }
     } else {
 #ifdef TRTIS_ENABLE_GPU
-      auto err = cudaSetDevice(memory_type_id_);
+      int current_device;
+      auto err = cudaGetDevice(&current_device);
+      bool overridden = false;
+      if (err == cudaSuccess) {
+        overridden = (current_device != memory_type_id_);
+        if (overridden) {
+          err = cudaSetDevice(memory_type_id_);
+        }
+      }
       if (err == cudaSuccess) {
         err = cudaFree(buffer_);
       }
       if (err != cudaSuccess) {
         LOG_ERROR << "failed to free GPU memory at address " << buffer_ << ": "
                   << std::string(cudaGetErrorString(err));
+      }
+      if (overridden) {
+        cudaSetDevice(current_device);
       }
 #endif  // TRTIS_ENABLE_GPU
     }

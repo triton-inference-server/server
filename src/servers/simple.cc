@@ -111,13 +111,24 @@ ResponseAlloc(
       allocated_ptr = malloc(byte_size);
 #ifdef TRTIS_ENABLE_GPU
     } else if (use_gpu_memory) {
-      auto err = cudaSetDevice(memory_type_id);
+      int current_device;
+      auto err = cudaGetDevice(&current_device);
+      bool overridden = false;
+      if (err == cudaSuccess) {
+        overridden = (current_device != memory_type_id);
+        if (overridden) {
+          err = cudaSetDevice(memory_type_id);
+        }
+      }
       if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
       if (err != cudaSuccess) {
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
+      }
+      if (overridden) {
+        cudaSetDevice(current_device);
       }
 #endif  // TRTIS_ENABLE_GPU
     }
@@ -153,10 +164,24 @@ ResponseRelease(
     free(buffer);
 #ifdef TRTIS_ENABLE_GPU
   } else if (use_gpu_memory) {
-    auto err = cudaFree(buffer);
+    int current_device;
+    auto err = cudaGetDevice(&current_device);
+    bool overridden = false;
+    if (err == cudaSuccess) {
+      overridden = (current_device != memory_type_id);
+      if (overridden) {
+        err = cudaSetDevice(memory_type_id);
+      }
+    }
+    if (err == cudaSuccess) {
+      err = cudaFree(buffer);
+    }
     if (err != cudaSuccess) {
       LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
                 << cudaGetErrorString(err);
+    }
+    if (overridden) {
+      cudaSetDevice(current_device);
     }
 #endif  // TRTIS_ENABLE_GPU
   } else {
@@ -551,11 +576,11 @@ main(int argc, char** argv)
   const void* output0_content;
   size_t output0_byte_size;
   TRTSERVER_Memory_Type output0_memory_type;
-  int64_t memory_type_id;
+  int64_t output0_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output0->name().c_str(), &output0_content,
-          &output0_byte_size, &output0_memory_type, &memory_type_id),
+          &output0_byte_size, &output0_memory_type, &output0_memory_type_id),
       "getting output0 result");
   if (output0_byte_size != input0_size) {
     FAIL(
@@ -569,16 +594,17 @@ main(int argc, char** argv)
         "in " +
         MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
         MemoryTypeString(output0_memory_type) + ", id " +
-        std::to_string(memory_type_id));
+        std::to_string(output0_memory_type_id));
   }
 
   const void* output1_content;
   size_t output1_byte_size;
   TRTSERVER_Memory_Type output1_memory_type;
+  int64_t output1_memory_type_id;
   FAIL_IF_ERR(
       TRTSERVER_InferenceResponseOutputData(
           response, output1->name().c_str(), &output1_content,
-          &output1_byte_size, &output1_memory_type, &memory_type_id),
+          &output1_byte_size, &output1_memory_type, &output1_memory_type_id),
       "getting output1 result");
   if (output1_byte_size != input1_size) {
     FAIL(
@@ -592,7 +618,7 @@ main(int argc, char** argv)
         "in " +
         MemoryTypeString(TRTSERVER_MEMORY_CPU) + ", got " +
         MemoryTypeString(output1_memory_type) + ", id " +
-        std::to_string(memory_type_id));
+        std::to_string(output1_memory_type_id));
   }
 
   const void* output0_result = output0_content;
