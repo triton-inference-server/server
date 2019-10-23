@@ -1380,12 +1380,11 @@ class InferContext:
         """Run inference using the supplied 'inputs' to calculate the outputs
         specified by 'outputs'.
 
-        Similar to AsyncRun() above. However, this function does not return the
-        integer identifier. Instead, once the request is completed, the InferContext
-        object and the integer identifier will be passed to the provided 'callback'
-        function. It is the function caller's choice on either retrieving the results
-        inside the callback function or deferring it to a different thread so that
-        the InferContext is unblocked.
+        Once the request is completed, the InferContext object and the integer
+        identifier will be passed to the provided 'callback' function. It is the
+        function caller's choice on either retrieving the results inside the
+        callback function or deferring it to a different thread so that the
+        InferContext is unblocked.
 
         Parameters
         ----------
@@ -1414,9 +1413,10 @@ class InferContext:
             an appropriately sized batch of inputs.
 
         corr_id : int
-            The correlation id of the inference. Used by the sequence
-            scheduler to allocate the requests with identical 
-            correlation ids to same slot.
+            The correlation id of the inference. If non-zero this
+            correlation ID overrides the context's correlation ID for
+            all subsequent inference requests, else the context retains
+            its current correlation ID.
 
         flags : int
             The flags to use for the inference. The bitwise-or of

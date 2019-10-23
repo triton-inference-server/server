@@ -240,10 +240,8 @@ class ServerStatusContext {
 ///   objects are owned by the caller and may be retained and accessed
 ///   even after the InferContext object is destroyed.
 /// \par
-///   AsyncRun() and Run() calls are not thread-safe.
-///   What's more, calling one method while the other one is running
-///   will result in undefined behavior given that they will modify the
-///   shared data internally.
+///   The AsyncRun() and Run() calls are not thread-safe. However,
+///   GetAsyncRunResults() is thread-safe.
 /// \par
 ///   For more parallelism multiple InferContext objects can access the
 ///   same inference server with no serialization requirements across
@@ -687,22 +685,23 @@ class InferContext {
   virtual Error Run(ResultMap* results) = 0;
 
   /// Send an asynchronous request to the inference server to perform
-  /// an inference to produce results for the outputs specified in the
-  /// most recent call to SetRunOptions(). 
+  /// an inference on the server with options specified in the most recent
+  /// call to SetRunOptions().
   /// Once the request is completed, the InferContext pointer and the Request
   /// object will be passed to the provided 'callback' function. It is the 
   /// function caller's choice on either retrieving the results inside the 
   /// callback function or deferring it to a different thread so that the 
-  /// InferContext is unblocked.
+  /// InferContext is unblocked. See GetAsyncRunResults().
   /// \param callback The callback function to be invoked on request completion
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(OnCompleteFn callback) = 0;
 
   /// Get the results of the asynchronous request referenced by
   /// 'async_request'.
+  /// \param async_request Request handle exposed to the 'callback'
+  /// function of AsyncRun().
   /// \param results Returns Result objects holding inference results
   /// as a map from output name to Result object.
-  /// \param async_request Request handle to retrieve results.
   /// \return Error object indicating success or failure.
   virtual Error GetAsyncRunResults(
       const std::shared_ptr<Request>& async_request,
