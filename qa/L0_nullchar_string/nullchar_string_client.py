@@ -38,6 +38,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v', '--verbose', action="store_true", required=False, default=False,
                         help='Enable verbose output')
+    parser.add_argument('-m', '--model-name', type=str, required=True,
+                        help='Name of model')
     parser.add_argument('-u', '--url', type=str, required=False, default='localhost:8000',
                         help='Inference server URL. Default is localhost:8000.')
     parser.add_argument('-i', '--protocol', type=str, required=False, default='http',
@@ -47,15 +49,14 @@ if __name__ == '__main__':
     FLAGS = parser.parse_args()
     protocol = ProtocolType.from_str(FLAGS.protocol)
 
-    # We use an identity string model that takes 1 input tensor of a single string
+    # We use identity string models that takes 1 input tensor of a single string
     # and returns 1 output tensor of a single string. The output tensor is the
     # same as the input tensor.
-    model_name = "graphdef_nobatch_zero_1_object"
     model_version = -1
     batch_size = 1
 
     # Create the inference context for the model.
-    ctx = InferContext(FLAGS.url, protocol, model_name, model_version, FLAGS.verbose)
+    ctx = InferContext(FLAGS.url, protocol, FLAGS.model_name, model_version, FLAGS.verbose)
 
     # Create the data for the input tensor. It contains a null character in
     # the middle of the string.

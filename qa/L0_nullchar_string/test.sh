@@ -59,7 +59,12 @@ RET=0
 
 set +e
 
-python $NULLCHAR_CLIENT_PY -v >>$CLIENT_LOG 2>&1
+python $NULLCHAR_CLIENT_PY -m graphdef_nobatch_zero_1_object -v >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+python $NULLCHAR_CLIENT_PY -m onnx_nobatch_zero_1_object -v >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

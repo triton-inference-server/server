@@ -427,7 +427,8 @@ ReadStringOutputTensor(
       std::string serialized;
       for (size_t e = 0; e < expected_element_cnt; ++e) {
         size_t len;
-        const char* cstr = TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
+        const char* cstr =
+            TRTISTF_TensorString(tensor, tensor_element_idx + e, &len);
         serialized.append(
             reinterpret_cast<const char*>(&len), sizeof(uint32_t));
         if (len > 0) {
