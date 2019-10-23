@@ -71,7 +71,7 @@ class CustomBackend : public InferenceBackend {
       void*, const char*, const void**, uint64_t*, CustomMemoryType*);
   friend bool CustomGetOutputV2(
       void*, const char*, size_t, int64_t*, uint64_t, void**,
-      CustomMemoryType*);
+      CustomMemoryType*, int64_t*);
 
   // For each model instance there is a context.
   struct Context : BackendContext {
