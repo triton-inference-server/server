@@ -84,8 +84,11 @@ class SystemMemoryReference : public SystemMemory {
 
 class AllocatedSystemMemory : public SystemMemory {
  public:
-  // Create a continuous data buffer with 'byte_size' and 'memory_type'.
-  AllocatedSystemMemory(size_t byte_size, TRTSERVER_Memory_Type memory_type);
+  // Create a continuous data buffer with 'byte_size', 'memory_type' and
+  // 'memory_id.
+  AllocatedSystemMemory(
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
 
   ~AllocatedSystemMemory();
 
@@ -101,6 +104,7 @@ class AllocatedSystemMemory : public SystemMemory {
  private:
   char* buffer_;
   TRTSERVER_Memory_Type memory_type_;
+  int64_t memory_type_id_;
 };
 
 //
@@ -129,6 +133,7 @@ class InferRequestProvider {
   // batch-byte-size defined.
   const InferRequestHeader& RequestHeader() const { return request_header_; }
 
+  // [TODO] add 'memory_type_id' option, same reason as 'memory_type'
   // Get the next contiguous chunk of bytes for the 'name'd
   // input. Return a pointer to the chunk in 'content'.
   // If there are no more bytes for the input return 'content' == nullptr.
