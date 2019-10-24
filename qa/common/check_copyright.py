@@ -142,25 +142,26 @@ def visit(path):
         line = line.strip()
 
         # The next line must be the copyright line with a single year
-        # or a year range. It must start with either '#' or '//'
-        prefix = None
-        if line.startswith('#'):
-            prefix = '#'
-        elif line.startswith('//'):
-            prefix = '//'
-        else:
-            print("incorrect prefix for copyright line, expecting '#' or '//', for " +
+        # or a year range. It is optionally allowed to have '# ' or
+        # '// ' prefix.
+        prefix = ""
+        if line.startswith('# '):
+            prefix = '# '
+        elif line.startswith('// '):
+            prefix = '// '
+        elif not line.startswith(COPYRIGHT_YEAR_RE0[0]):
+            print("incorrect prefix for copyright line, allowed prefixes '# ' or '// ', for " +
                   path + ": " + line)
             return False
 
         start_year = 0
         end_year = 0
 
-        m = single_re.match(line[(len(prefix) + 1):])
+        m = single_re.match(line[len(prefix):])
         if m and len(m.groups()) == 1:
             start_year = end_year = int(m.group(1))
         else:
-            m = range_re.match(line[(len(prefix) + 1):])
+            m = range_re.match(line[len(prefix):])
             if m and len(m.groups()) == 2:
                 start_year = int(m.group(1))
                 end_year = int(m.group(2))
@@ -185,11 +186,15 @@ def visit(path):
             if copyright_idx >= len(copyright_body):
                 break
 
-            line = line.strip()
-            if len(copyright_body[copyright_idx]) == 0:
-                expected = prefix
+            if len(prefix) == 0:
+                line = line.rstrip()
             else:
-                expected = (prefix + " " + copyright_body[copyright_idx])
+                line = line.strip()
+
+            if len(copyright_body[copyright_idx]) == 0:
+                expected = prefix.strip()
+            else:
+                expected = (prefix + copyright_body[copyright_idx])
             if line != expected:
                 print("incorrect copyright body for " + path)
                 print("  expected: '" + expected + "'")
