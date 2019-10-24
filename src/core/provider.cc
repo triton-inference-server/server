@@ -659,9 +659,27 @@ InferResponseProvider::~InferResponseProvider()
 {
   for (const auto& output : outputs_) {
     if (output.release_buffer_ != nullptr) {
+#ifdef TRTIS_ENABLE_GPU
+      int current_device;
+      auto cuerr = cudaGetDevice(&current_device);
+      // Ignore error caused by CPU-only system.
+      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+          (cuerr != cudaErrorInsufficientDriver)) {
+        LOG_ERROR << "unable to get current CUDA device: "
+                  << cudaGetErrorString(cuerr);
+      }
+#endif  // TRTIS_ENABLE_GPU
       TRTSERVER_Error* err = release_fn_(
           allocator_, output.release_buffer_, output.release_userp_,
           output.byte_size_, output.memory_type_, output.memory_type_id_);
+#ifdef TRTIS_ENABLE_GPU
+      cuerr = cudaSetDevice(current_device);
+      if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+          (cuerr != cudaErrorInsufficientDriver)) {
+        LOG_ERROR << "unable to recover current CUDA device: "
+                  << cudaGetErrorString(cuerr);
+      }
+#endif  // TRTIS_ENABLE_GPU
       if (err != nullptr) {
         LOG_ERROR << "failed to release result tensor '" << output.name_
                   << "': " << TRTSERVER_ErrorMessage(err);
@@ -746,28 +764,28 @@ InferResponseProvider::AllocateOutputBuffer(
   void* buffer_userp = nullptr;
 #ifdef TRTIS_ENABLE_GPU
   int current_device;
-  // Not checking error here as "no device" will be returned on CPU-only system.
-  // We still need to get device since provider doesn't know, however, the
-  // actual memory type returned from 'alloc_fn_' implies whether the provider
-  // should (can) recover current device.
-  cudaGetDevice(&current_device);
+  auto cuerr = cudaGetDevice(&current_device);
+  // Ignore error caused by CPU-only system.
+  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+      (cuerr != cudaErrorInsufficientDriver)) {
+    return Status(
+        RequestStatusCode::INTERNAL,
+        "unable to get current CUDA device: " +
+            std::string(cudaGetErrorString(cuerr)));
+  }
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
       preferred_memory_type, preferred_memory_type_id, alloc_userp_);
   Status status;
 #ifdef TRTIS_ENABLE_GPU
-  // [TODO] change to check actual memory type after
-  // https://github.com/NVIDIA/tensorrt-inference-server/pull/780
-  if (preferred_memory_type == TRTSERVER_MEMORY_GPU) {
-    auto cuerr = cudaSetDevice(current_device);
-    if (cuerr != cudaSuccess) {
-      // Not returning as we may need to delete 'err'
-      status = Status(
-          RequestStatusCode::INTERNAL,
-          "unable to recover CUDA device: " +
-              std::string(cudaGetErrorString(cuerr)));
-    }
+  cuerr = cudaSetDevice(current_device);
+  if ((cuerr != cudaSuccess) && (cuerr != cudaErrorNoDevice) &&
+      (cuerr != cudaErrorInsufficientDriver)) {
+    status = Status(
+        RequestStatusCode::INTERNAL,
+        "unable to recover current CUDA device: " +
+            std::string(cudaGetErrorString(cuerr)));
   }
 #endif  // TRTIS_ENABLE_GPU
   if (err != nullptr) {
