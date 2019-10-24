@@ -552,7 +552,8 @@ output [
 
 
 def create_plan_modelfile(
-        create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape):
+        create_savedmodel, models_dir, model_version, io_cnt, max_batch,
+        dtype, shape, profile_max_size):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -560,13 +561,13 @@ def create_plan_modelfile(
     # generate models with different configuration to ensure test coverage
     if dtype != np.float32:
         create_plan_dynamic_rf_modelfile(
-            models_dir, model_version, io_cnt, max_batch, dtype, shape)
+            models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size)
     else:
         create_plan_dynamic_modelfile(
-            models_dir, model_version, io_cnt, max_batch, dtype, shape)
+            models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size)
 
 def create_plan_dynamic_rf_modelfile(
-        models_dir, model_version, io_cnt, max_batch, dtype, shape):
+        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
     G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
     builder = trt.infer.create_infer_builder(G_LOGGER)
@@ -605,7 +606,7 @@ def create_plan_dynamic_rf_modelfile(
             # Generating a very generous optimization profile
             min_shape = min_shape + [1]
             opt_shape = opt_shape + [8]
-            max_shape = max_shape + [32]
+            max_shape = max_shape + [profile_max_size]
         else:
             min_shape = min_shape + [i]
             opt_shape = opt_shape + [i]
@@ -650,7 +651,7 @@ def create_plan_dynamic_rf_modelfile(
 
 
 def create_plan_dynamic_modelfile(
-        models_dir, model_version, io_cnt, max_batch, dtype, shape):
+        models_dir, model_version, io_cnt, max_batch, dtype, shape, profile_max_size):
     # Create the model
     G_LOGGER = trt.infer.ConsoleLogger(trt.infer.LogSeverity.INFO)
     builder = trt.infer.create_infer_builder(G_LOGGER)
@@ -679,7 +680,7 @@ def create_plan_dynamic_modelfile(
             # Generating a very generous optimization profile
             min_shape = min_shape + [1]
             opt_shape = opt_shape + [8]
-            max_shape = max_shape + [16 * 1024 * 1024]
+            max_shape = max_shape + [profile_max_size]
         else:
             min_shape = min_shape + [i]
             opt_shape = opt_shape + [i]
@@ -793,10 +794,19 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
 
     if FLAGS.tensorrt:
         create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
-        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape, 32)
         if no_batch:
             create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
-            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0, dtype, shape, 32)
+
+    if FLAGS.tensorrt_big:
+        create_plan_modelconfig(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_plan_modelfile(True, models_dir, model_version, io_cnt, 8,
+                              dtype, shape, 16 * 1024 * 1024)
+        if no_batch:
+            create_plan_modelconfig(True, models_dir, model_version, io_cnt, 0, dtype, shape)
+            create_plan_modelfile(True, models_dir, model_version, io_cnt, 0,
+                                  dtype, shape, 16 * 1024 * 1024)
 
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
@@ -823,6 +833,8 @@ if __name__ == '__main__':
                         help='Generate Pytorch LibTorch models')
     parser.add_argument('--tensorrt', required=False, action='store_true',
                         help='Generate TensorRT PLAN models')
+    parser.add_argument('--tensorrt-big', required=False, action='store_true',
+                        help='Generate TensorRT PLAN models w/ opt profile with large max')
     parser.add_argument('--ensemble', required=False, action='store_true',
                         help='Generate ensemble models')
     FLAGS, unparsed = parser.parse_known_args()
@@ -838,15 +850,20 @@ if __name__ == '__main__':
     if FLAGS.libtorch:
         import torch
         from torch import nn
-    if FLAGS.tensorrt:
+    if FLAGS.tensorrt or FLAGS.tensorrt_big:
         import tensorrt.legacy as trt
 
     import test_util as tu
 
-    # Create models with variable-sized input and output.
-    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
-    create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3)
-    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1)
-    create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=3)
-    create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1)
-    create_models(FLAGS.models_dir, np_dtype_string, [-1,-1], io_cnt=3)
+    # Create models with variable-sized input and output. For big
+    # TensorRT models only create the one needed for performance
+    # testing
+    if FLAGS.tensorrt_big:
+        create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
+    else:
+        create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=1)
+        create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=3)
+        create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=1)
+        create_models(FLAGS.models_dir, np.float16, [-1,-1], io_cnt=3)
+        create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1)
+        create_models(FLAGS.models_dir, np_dtype_string, [-1,-1], io_cnt=3)
