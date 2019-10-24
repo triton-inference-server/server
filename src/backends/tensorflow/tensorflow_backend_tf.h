@@ -194,9 +194,10 @@ TRTISTF_EXPORT size_t TRTISTF_TensorDataByteSize(TRTISTF_Tensor* tensor);
 // Get a string at a specified index within a tensor. Defined only for
 // string type.. bad things might happen if called for non-string type
 // tensor. The returned string is owned by the Tensor and must be
-// copied if the caller requires ownership.
+// copied if the caller requires ownership. Additionally returns the
+// 'length' of the string.
 TRTISTF_EXPORT const char* TRTISTF_TensorString(
-    TRTISTF_Tensor* tensor, size_t idx);
+    TRTISTF_Tensor* tensor, size_t idx, size_t* length);
 
 // Set a string at a specified index within a tensor. Defined only for
 // string type.. bad things might happen if called for non-string type

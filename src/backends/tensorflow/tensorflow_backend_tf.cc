@@ -774,10 +774,11 @@ TRTISTF_TensorDataByteSize(TRTISTF_Tensor* tensor)
 }
 
 const char*
-TRTISTF_TensorString(TRTISTF_Tensor* tensor, size_t idx)
+TRTISTF_TensorString(TRTISTF_Tensor* tensor, size_t idx, size_t* length)
 {
   TensorImpl* t = reinterpret_cast<TensorImpl*>(tensor);
   const std::string& str = t->String(idx);
+  *length = str.length();
   return str.c_str();
 }
 
