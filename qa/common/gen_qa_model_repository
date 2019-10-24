@@ -57,6 +57,7 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/$TRTIS_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_model_repository
+HOST_IDENTITYBIGDESTDIR=/tmp/$TRTIS_VERSION/qa_identity_big_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/$TRTIS_VERSION/qa_sequence_model_repository
 HOST_VARSEQDESTDIR=/tmp/$TRTIS_VERSION/qa_variable_sequence_model_repository
@@ -65,7 +66,7 @@ HOST_NOSHAPEDESTDIR=/tmp/$TRTIS_VERSION/qa_noshape_model_repository
 HOST_PLGDESTDIR=/tmp/$TRTIS_VERSION/qa_trt_plugin_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
-rm -fr $HOST_IDENTITYDESTDIR $HOST_RESHAPEDESTDIR
+rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR
@@ -73,6 +74,7 @@ mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
+mkdir -p $HOST_IDENTITYBIGDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
@@ -110,6 +112,7 @@ SRCDIR=/tmp/src
 DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 IDENTITYDESTDIR=/tmp/zeromodels
+IDENTITYBIGDESTDIR=/tmp/zerobigmodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 VARSEQDESTDIR=/tmp/varseqmodels
@@ -223,6 +226,8 @@ python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
 chown -R $(id -u):$(id -g) $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
 chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
+python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
+chown -R $(id -u):$(id -g) $IDENTITYBIGDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
 chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
@@ -245,6 +250,7 @@ nvidia-docker run --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
        --mount type=bind,source=$HOST_IDENTITYDESTDIR,target=$IDENTITYDESTDIR \
+       --mount type=bind,source=$HOST_IDENTITYBIGDESTDIR,target=$IDENTITYBIGDESTDIR \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \

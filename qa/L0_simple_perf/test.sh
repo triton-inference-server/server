@@ -66,7 +66,8 @@ rm -fr ./custom_models && mkdir ./custom_models && \
 for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32
     REPO_DIR=./custom_models && \
-        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
+        [ $BACKEND != "custom" ] && REPO_DIR=$DATADIR/qa_identity_big_model_repository && \
+        [ $BACKEND != "plan" ] && REPO_DIR=$DATADIR/qa_identity_model_repository
     KIND="KIND_GPU" && [ $BACKEND == "custom" ] && KIND="KIND_CPU"
 
     rm -fr models && mkdir -p models && \
