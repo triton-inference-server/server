@@ -395,11 +395,10 @@ LibTorchBackend::Context::SetInputTensor(
       meta_data.input_buffer_->MutableBuffer(&memory_type, &memory_type_id);
 
   torch::TensorOptions options{meta_data.torch_type_};
-  auto updated_options = options.device(
-      (memory_type == TRTSERVER_MEMORY_CPU) ? torch::kCPU : torch::kCUDA);
+  auto updated_options = (memory_type == TRTSERVER_MEMORY_CPU) ?
+    options.device(torch::kCPU) : options.device(torch::kCUDA, memory_type_id);
   torch::Tensor input_tensor =
       torch::from_blob(buffer, meta_data.shape_, updated_options);
-  input_tensor = input_tensor.to(device_);
 
   if (input_tensor.nbytes() != total_byte_size) {
     return Status(
