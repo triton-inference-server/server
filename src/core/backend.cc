@@ -189,4 +189,25 @@ InferenceBackend::Run(
   OnCompleteQueuedPayloads(status);
 }
 
+Status
+InferenceBackend::WarmUp()
+{
+  // [TODO] run in parallel
+  for (auto& context : contexts_) {
+    std::vector<Scheduler::Payload> payloads;
+    RETURN_IF_ERROR(CreateWarmUpPayload(&payloads));
+    RETURN_IF_ERROR(context->Run(this, &payloads));
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceBackend::CreateWarmUpPayload(std::vector<Scheduler::Payload>* payloads)
+{
+  // [TODO] create request / response provider based on model_warm_up in config
+  payloads->clear();
+  return Status(RequestStatusCode::UNSUPPORTED, "Not implemented");
+}
+
 }}  // namespace nvidia::inferenceserver

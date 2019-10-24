@@ -92,6 +92,9 @@ class InferenceBackend {
       uint32_t runner_idx, std::vector<Scheduler::Payload>* payloads,
       std::function<void(Status)> OnCompleteQueuedPayloads);
 
+  // Send a sample request to every model instance for warm up.
+  Status WarmUp();
+
   // Set the configuration of the model being served.
   Status SetModelConfig(const std::string& path, const ModelConfig& config);
 
@@ -111,6 +114,9 @@ class InferenceBackend {
   std::vector<std::unique_ptr<BackendContext>> contexts_;
 
  private:
+  // Helper function to create the sample payload for warm up.
+  Status CreateWarmUpPayload(std::vector<Scheduler::Payload>* payloads);
+
   // Configuration of the model that this backend represents.
   ModelConfig config_;
 

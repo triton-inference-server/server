@@ -85,9 +85,11 @@ OnnxBackend::CreateExecutionContexts(
   RETURN_IF_ORT_ERROR(ort_api->SetSessionGraphOptimizationLevel(
       session_options, ORT_DISABLE_ALL));
 
-  Status status = CreateExecutionContextsHelper(session_options, models);
+  RETURN_IF_ERROR(CreateExecutionContextsHelper(session_options, models));
 
-  RETURN_IF_ERROR(status);
+  if (Config().has_model_warm_up()) {
+    WarmUp();
+  }
 
   LOG_VERBOSE(1) << "onnx backend for " << Name() << std::endl << *this;
 
