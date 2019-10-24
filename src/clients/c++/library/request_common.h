@@ -409,8 +409,6 @@ class RequestImpl : public InferContext::Request {
   uintptr_t RunIndex() const { return run_index_; }
   void SetRunIndex(uintptr_t idx) { run_index_ = idx; }
 
-  bool HasCallback() const { return (callback_ != nullptr); }
-
   RequestTimers& Timer() { return timer_; }
 
   // Set non-RAW results from the inference response

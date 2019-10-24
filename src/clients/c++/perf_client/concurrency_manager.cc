@@ -544,7 +544,6 @@ ConcurrencyManager::AsyncInfer(
                 }
                 cb_cv.notify_all();
               }
-              return;
             });
         if (!err->IsOk()) {
           return;

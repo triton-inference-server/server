@@ -285,7 +285,7 @@ if __name__ == '__main__':
     image_idx = 0
     last_request = False
     user_data = UserData()
-    i=0
+    sent_count=0
     while not last_request:
         input_filenames = []
         input_batch = []
@@ -308,12 +308,12 @@ if __name__ == '__main__':
                             { input_name :input_batch }, 
                             { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
                             FLAGS.batch_size)
-            i+=1
+            sent_count += 1
 
     # For async, retrieve results according to the send order
     if FLAGS.async_set:
         processed_count = 0
-        while processed_count < i:
+        while processed_count < sent_count:
             (input_filenames, request_id) = user_data._completed_requests.get()
             results.append(ctx.get_async_run_results(request_id))
             result_filenames.append(input_filenames)

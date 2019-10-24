@@ -300,7 +300,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     shm_ip_handle = []
                     shm_op_handle = []
 
-                i = 0
+                sent_count = 0
                 for flag_str, value, pre_delay_ms in values:
                     flags = InferRequestHeader.FLAG_NONE
                     if flag_str is not None:
@@ -367,12 +367,12 @@ class SequenceBatcherTest(unittest.TestCase):
                             { 'INPUT__0' :input_info }, { 'OUTPUT__0' :output_info },
                                batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"
-                    i+=1
+                    sent_count+=1
 
                 # Wait for the results in the order sent
                 result = None
                 processed_count = 0
-                while processed_count < i:
+                while processed_count < sent_count:
                     id = user_data._completed_requests.get()
                     results = ctx.get_async_run_results(id)
                     self.assertEqual(len(results), 1)

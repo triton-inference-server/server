@@ -1415,8 +1415,8 @@ class InferContext:
         corr_id : int
             The correlation id of the inference. If non-zero this
             correlation ID overrides the context's correlation ID for
-            all subsequent inference requests, else the context retains
-            its current correlation ID.
+            all subsequent inference requests, else the inference
+            request uses the context's correlation ID.
 
         flags : int
             The flags to use for the inference. The bitwise-or of

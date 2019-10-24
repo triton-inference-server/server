@@ -85,7 +85,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
     seq_start_ms = int(round(time.time() * 1000))
     user_data = UserData()
 
-    i=0
+    sent_count=0
     for flag_str, value, expected_result, delay_ms in steps:
         flags = InferRequestHeader.FLAG_NONE
         if flag_str is not None:
@@ -107,7 +107,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
         ctx.async_run(partial(completion_callback, value, expected_result, user_data), 
                             { 'INPUT' :input_list }, { 'OUTPUT' : InferContext.ResultFormat.RAW},
                                batch_size=batch_size, flags=flags)
-        i+=1
+        sent_count += 1
 
         if delay_ms is not None:
             time.sleep(delay_ms / 1000.0)
@@ -115,7 +115,7 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
     # Process the results in order that they were sent
     result = None
     processed_count = 0
-    while processed_count < i:
+    while processed_count < sent_count:
         (id, value, expected) = user_data._completed_requests.get()
         processed_count += 1
         results = None

@@ -214,12 +214,13 @@ main(int argc, char** argv)
             [&, i](
                 nic::InferContext* ctx,
                 const std::shared_ptr<nic::InferContext::Request>& request) {
-              std::lock_guard<std::mutex> lk(mtx);
-              std::cout << "Callback no." << i << " is called" << std::endl;
-              done_cnt++;
-              ValidateResults(ctx, request, input0_data, input1_data);
+              {
+                std::lock_guard<std::mutex> lk(mtx);
+                std::cout << "Callback no." << i << " is called" << std::endl;
+                done_cnt++;
+                ValidateResults(ctx, request, input0_data, input1_data);
+              }
               cv.notify_all();
-              return;
             }),
         "unable to run model");
   }
@@ -250,12 +251,13 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       ctx->AsyncRun([&](nic::InferContext* ctx,
                         std::shared_ptr<nic::InferContext::Request> request) {
-        // Defer the response retrieval to main thread
-        std::lock_guard<std::mutex> lk(mtx);
-        callback_invoked = true;
-        request_placeholder = std::move(request);
+        {
+          // Defer the response retrieval to main thread
+          std::lock_guard<std::mutex> lk(mtx);
+          callback_invoked = true;
+          request_placeholder = std::move(request);
+        }
         cv.notify_all();
-        return;
       }),
       "unable to run model");
 

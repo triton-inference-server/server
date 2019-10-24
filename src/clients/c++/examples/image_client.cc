@@ -689,7 +689,7 @@ main(int argc, char** argv)
   std::mutex mtx;
   std::condition_variable cv;
 
-  std::queue<std::shared_ptr<nic::InferContext::Request>> request_buffer_;
+  std::queue<std::shared_ptr<nic::InferContext::Request>> async_request_queue_;
 
   while (!last_request) {
     // Already verified that there is 1 input...
@@ -733,11 +733,12 @@ main(int argc, char** argv)
       err = ctx->AsyncRun(
           [&](nic::InferContext* ctx,
               const std::shared_ptr<nic::InferContext::Request>& request) {
-            std::lock_guard<std::mutex> lk(mtx);
-            done_cnt++;
-            request_buffer_.push(request);
+            {
+              std::lock_guard<std::mutex> lk(mtx);
+              done_cnt++;
+              async_request_queue_.push(request);
+            }
             cv.notify_all();
-            return;
           });
       if (!err.IsOk()) {
         std::cerr << "failed sending asynchronous infer request: " << err
@@ -760,14 +761,15 @@ main(int argc, char** argv)
         }
       });
     }
-    while (!request_buffer_.empty()) {
+    while (!async_request_queue_.empty()) {
       results.emplace_back();
-      err = ctx->GetAsyncRunResults(request_buffer_.front(), &(results.back()));
+      err = ctx->GetAsyncRunResults(
+          async_request_queue_.front(), &(results.back()));
       if (!err.IsOk()) {
         std::cerr << "failed receiving infer response: " << err << std::endl;
         exit(1);
       }
-      request_buffer_.pop();
+      async_request_queue_.pop();
     }
   }
 

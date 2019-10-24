@@ -175,10 +175,11 @@ AsyncSend(
       ctx->AsyncRun(
           [&](nic::InferContext* ctx,
               const std::shared_ptr<nic::InferContext::Request>& request) {
-            std::lock_guard<std::mutex> lk(mutex_);
-            request_list.push_back(request);
+            {
+              std::lock_guard<std::mutex> lk(mutex_);
+              request_list.push_back(request);
+            }
             cv_.notify_all();
-            return;
           }),
       "unable to run model");
 }
