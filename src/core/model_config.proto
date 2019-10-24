@@ -28,6 +28,8 @@
 
 syntax = "proto3";
 
+import "api.proto";
+
 package nvidia.inferenceserver;
 
 //@@.. cpp:namespace:: nvidia::inferenceserver
@@ -765,6 +767,30 @@ message ModelParameter
 }
 
 //@@
+//@@.. cpp:var:: message ModelWarmUp
+//@@
+//@@   Settings for warming up the model instances.
+//@@
+message ModelWarmUp
+{
+  //@@  .. cpp:var:: InferRequestHeader request_header
+  //@@
+  //@@     The header message of the request sample.
+  //@@
+  InferRequestHeader request_header = 1;
+
+  //@@  .. cpp:var:: bool use_zero_value
+  //@@
+  //@@     Whether to fill input data with zero value. If false, all input data
+  //@@     must be provided in a directory 'sample' under the model directory.
+  //@@     the data for each input must be the raw binary representation of the
+  //@@     input in row-major and it must correspond to the batch size in 
+  //@@     'request_header'. The data file must be named the same as the input.
+  //@@
+  bool use_zero_value = 2;
+}
+
+//@@
 //@@.. cpp:var:: message ModelConfig
 //@@
 //@@   A model configuration.
@@ -909,4 +935,11 @@ message ModelConfig
   //@@     are made available to custom backends.
   //@@
   map<string, ModelParameter> parameters = 14;
+
+  //@@  .. cpp:var:: ModelWarmUp model_warm_up
+  //@@
+  //@@     Warm up setting of this model. If specified, all instances
+  //@@     will be run with a request sample before serving the model.
+  //@@
+  ModelWarmUp model_warm_up = 16;
 }
