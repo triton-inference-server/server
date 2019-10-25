@@ -519,8 +519,10 @@ CustomBackend::Context::GetNextInput(
     const void** content, uint64_t* content_byte_size)
 {
   auto src_memory_type = CUSTOM_MEMORY_CPU;
+  int64_t src_memory_type_id = 0;
   bool ok = GetNextInput(
-      input_context, cname, content, content_byte_size, &src_memory_type);
+      input_context, cname, content, content_byte_size, &src_memory_type,
+      &src_memory_type_id);
 
 #ifdef TRTIS_ENABLE_GPU
   // If the memory type is on GPU, implicitly copying it to CPU memory
@@ -549,14 +551,15 @@ bool
 CustomBackend::Context::GetNextInput(
     GetInputOutputContext* input_context, const char* cname,
     const void** content, uint64_t* content_byte_size,
-    CustomMemoryType* memory_type)
+    CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   const std::string name(cname);
   Scheduler::Payload* payload = input_context->payload_;
 
   auto src_memory_type = ToTRTServerMemoryType(*memory_type);
   Status status = payload->request_provider_->GetNextInputContent(
-      name, content, content_byte_size, &src_memory_type, false);
+      name, content, content_byte_size, &src_memory_type, memory_type_id,
+      false);
   *memory_type = ToCustomMemoryType(src_memory_type);
   return status.IsOk();
 }
@@ -565,7 +568,7 @@ bool
 CustomBackend::Context::GetOutput(
     GetInputOutputContext* output_context, const char* cname,
     size_t shape_dim_cnt, int64_t* shape_dims, uint64_t content_byte_size,
-    void** content, CustomMemoryType* memory_type)
+    void** content, CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   const std::string name(cname);
   Scheduler::Payload* payload = output_context->payload_;
@@ -580,23 +583,24 @@ CustomBackend::Context::GetOutput(
     if (shape_dim_cnt > 0) {
       shape.assign(shape_dims, shape_dims + shape_dim_cnt);
     }
-
-    auto dst_memory_type = ToTRTServerMemoryType(*memory_type);
     Status status = payload->response_provider_->AllocateOutputBuffer(
-        name, content, content_byte_size, shape, dst_memory_type);
+        name, content, content_byte_size, shape,
+        ToTRTServerMemoryType(*memory_type), *memory_type_id);
 
     // Done with this output if 'content_byte_size' is 0
     if (content_byte_size == 0) {
       *content = nullptr;
     } else if (*content == nullptr) {
       // If first attempt is CPU and failed, then allocation failed
-      if ((!status.IsOk()) || (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+      if ((!status.IsOk()) || (*memory_type == CUSTOM_MEMORY_CPU)) {
         return false;
       }
 
-      dst_memory_type = TRTSERVER_MEMORY_CPU;
+      *memory_type = CUSTOM_MEMORY_CPU;
+      *memory_type_id = 0;
       status = payload->response_provider_->AllocateOutputBuffer(
-          name, content, content_byte_size, shape, dst_memory_type);
+          name, content, content_byte_size, shape,
+          ToTRTServerMemoryType(*memory_type), *memory_type_id);
       if (*content == nullptr) {
         return false;
       }
@@ -653,38 +657,45 @@ CustomGetOutput(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content)
 {
+  // [TODO] below assumption no longer hold after
+  // https://github.com/NVIDIA/tensorrt-inference-server/pull/780,
+  // either to perform internal buffering like for CustomGetNextInput(),
+  // or to return error if actual type is not CPU.
+  // The former requires work on CustomBackend::Context::Run().
   // internally call V2 as CPU memory request is default option and will
   // always be permitted
   auto memory_type = CUSTOM_MEMORY_CPU;
+  int64_t memory_type_id = 0;
   return CustomGetOutputV2(
       output_context, name, shape_dim_cnt, shape_dims, content_byte_size,
-      content, &memory_type);
+      content, &memory_type, &memory_type_id);
 }
 
 bool
 CustomGetNextInputV2(
     void* input_context, const char* name, const void** content,
-    uint64_t* content_byte_size, CustomMemoryType* memory_type)
+    uint64_t* content_byte_size, CustomMemoryType* memory_type,
+    int64_t* memory_type_id)
 {
   CustomBackend::Context::GetInputOutputContext* icontext =
       static_cast<CustomBackend::Context::GetInputOutputContext*>(
           input_context);
   return icontext->context_->GetNextInput(
-      icontext, name, content, content_byte_size, memory_type);
+      icontext, name, content, content_byte_size, memory_type, memory_type_id);
 }
 
 bool
 CustomGetOutputV2(
     void* output_context, const char* name, size_t shape_dim_cnt,
     int64_t* shape_dims, uint64_t content_byte_size, void** content,
-    CustomMemoryType* memory_type)
+    CustomMemoryType* memory_type, int64_t* memory_type_id)
 {
   CustomBackend::Context::GetInputOutputContext* ocontext =
       static_cast<CustomBackend::Context::GetInputOutputContext*>(
           output_context);
   return ocontext->context_->GetOutput(
       ocontext, name, shape_dim_cnt, shape_dims, content_byte_size, content,
-      memory_type);
+      memory_type, memory_type_id);
 }
 
 }}  // namespace nvidia::inferenceserver

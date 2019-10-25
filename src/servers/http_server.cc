@@ -880,7 +880,7 @@ HTTPAPIServer::EVBufferToInput(
     if (byte_size == 0) {
       RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
           request_provider, io.name().c_str(), nullptr, 0 /* byte_size */,
-          TRTSERVER_MEMORY_CPU));
+          TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
     } else {
       // If input is in shared memory then verify that the size is
       // correct and set input from the shared memory.
@@ -904,7 +904,7 @@ HTTPAPIServer::EVBufferToInput(
             io.shared_memory().byte_size(), &base));
         RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
             request_provider, io.name().c_str(), base, byte_size,
-            TRTSERVER_MEMORY_CPU));
+            TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
       } else {
         while ((byte_size > 0) && (v_idx < n)) {
           char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -922,7 +922,7 @@ HTTPAPIServer::EVBufferToInput(
 
           RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
               request_provider, io.name().c_str(), base, base_size,
-              TRTSERVER_MEMORY_CPU));
+              TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         }
 
         if (byte_size != 0) {

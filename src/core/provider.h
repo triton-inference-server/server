@@ -48,11 +48,12 @@ class SystemMemory {
   // 'idx' zero base index. Valid indices are continuous.
   // 'byte_size' returns the byte size of the chunk of bytes.
   // 'memory_type' returns the memory type of the chunk of bytes.
+  // 'memory_type_id' returns the memory type id of the chunk of bytes.
   // Return the pointer to the data block. Returns nullptr if 'idx' is
   // out of range
   virtual const char* BufferAt(
-      size_t idx, size_t* byte_size,
-      TRTSERVER_Memory_Type* memory_type) const = 0;
+      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      int64_t* memory_type_id) const = 0;
 
   // Return the total byte size of the data buffer
   size_t TotalByteSize() const { return total_byte_size_; }
@@ -69,38 +70,57 @@ class SystemMemoryReference : public SystemMemory {
 
   //\see SystemMemory::BufferAt()
   const char* BufferAt(
-      size_t idx, size_t* byte_size,
-      TRTSERVER_Memory_Type* memory_type) const override;
+      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      int64_t* memory_type_id) const override;
 
   // Add a 'buffer' with 'byte_size' as part of this data buffer
   // Return the index of the buffer
   size_t AddBuffer(
-      const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type);
+      const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
 
  private:
-  using Block = std::tuple<const char*, size_t, TRTSERVER_Memory_Type>;
+  struct Block {
+    Block(
+        const char* buffer, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+        int64_t memory_type_id)
+        : buffer_(buffer), byte_size_(byte_size), memory_type_(memory_type),
+          memory_type_id_(memory_type_id)
+    {
+    }
+    const char* buffer_;
+    size_t byte_size_;
+    TRTSERVER_Memory_Type memory_type_;
+    int64_t memory_type_id_;
+  };
   std::vector<Block> buffer_;
 };
 
 class AllocatedSystemMemory : public SystemMemory {
  public:
-  // Create a continuous data buffer with 'byte_size' and 'memory_type'.
-  AllocatedSystemMemory(size_t byte_size, TRTSERVER_Memory_Type memory_type);
+  // Create a continuous data buffer with 'byte_size', 'memory_type' and
+  // 'memory_id.
+  AllocatedSystemMemory(
+      size_t byte_size, TRTSERVER_Memory_Type memory_type,
+      int64_t memory_type_id);
 
   ~AllocatedSystemMemory();
 
   //\see SystemMemory::BufferAt()
   const char* BufferAt(
-      size_t idx, size_t* byte_size,
-      TRTSERVER_Memory_Type* memory_type) const override;
+      size_t idx, size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+      int64_t* memory_type_id) const override;
 
   // 'memory_type' returns the memory type of the chunk of bytes.
+  // 'memory_type_id' returns the memory type id of the chunk of bytes.
   // Return the mutable buffer
-  char* MutableBuffer(TRTSERVER_Memory_Type* memory_type);
+  char* MutableBuffer(
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id);
 
  private:
   char* buffer_;
   TRTSERVER_Memory_Type memory_type_;
+  int64_t memory_type_id_;
 };
 
 //
@@ -143,12 +163,19 @@ class InferRequestProvider {
   // buffer and the buffer owner may collect such information for other use.
   // On return 'memory_type' gives the actual memory type of the chunk
   // pointed to by 'content'.
+  // 'memory_type_id' acts as both input and output. On input 'memory_type_id'
+  // is the buffer memory type id preferred by the function caller, it will
+  // not affect the function behavior, but it will be propagated to the
+  // buffer and the buffer owner may collect such information for other use.
+  // On return 'memory_type_id' gives the actual memory type id of the chunk
+  // pointed to by 'content'.
   // If 'force_contiguous' is true then the entire (remaining) input will
   // be returned as a single chunk. In some cases this will require
   // copying the data.
   virtual Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
-      TRTSERVER_Memory_Type* memory_type, bool force_contiguous);
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
+      bool force_contiguous);
 
   // Retrieve the data buffer of input 'name'.
   Status GetSystemMemory(
@@ -223,7 +250,8 @@ class NULLInferRequestProvider : public InferRequestProvider {
 
   Status GetNextInputContent(
       const std::string& name, const void** content, size_t* content_byte_size,
-      TRTSERVER_Memory_Type* memory_type, bool force_contiguous) override;
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id,
+      bool force_contiguous) override;
 
  private:
   // A buffer of zero bytes that is used commonly as the NULL input.
@@ -269,13 +297,14 @@ class InferResponseProvider {
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape,
-      const TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU);
+      TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU,
+      int64_t preferred_memory_type_id = 0);
 
   // Get the address and byte-size of an output buffer. Error is
   // returned if the buffer is not already allocated.
   Status OutputBufferContents(
       const std::string& name, const void** content, size_t* content_byte_size,
-      TRTSERVER_Memory_Type* memory_type) const;
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
   // Get label provider.
   const std::shared_ptr<LabelProvider>& GetLabelProvider() const
@@ -317,6 +346,7 @@ class InferResponseProvider {
     void* ptr_;
     size_t byte_size_;
     TRTSERVER_Memory_Type memory_type_;
+    int64_t memory_type_id_;
 
     // Created buffer for non-RAW results
     std::unique_ptr<char[]> buffer_;
