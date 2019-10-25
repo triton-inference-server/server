@@ -904,7 +904,7 @@ InferGrpcContextImpl::PreRunProcessing(GrpcRequestImpl* request)
 void
 InferGrpcContextImpl::AsyncTransfer()
 {
-  while (!exiting) {
+  while (!exiting_) {
     // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
     GrpcRequestImpl* grpc_request_ptr;
     bool ok = true;
