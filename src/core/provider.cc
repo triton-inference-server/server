@@ -704,8 +704,10 @@ InferResponseProvider::MutableResponseHeader()
 Status
 InferResponseProvider::AllocateOutputBuffer(
     const std::string& name, void** content, size_t content_byte_size,
-    const std::vector<int64_t>& content_shape, const TRTSERVER_Memory_Type preferred_memory_type, int64_t preferred_memory_type_id,
-    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id)
+    const std::vector<int64_t>& content_shape,
+    const TRTSERVER_Memory_Type preferred_memory_type,
+    int64_t preferred_memory_type_id, TRTSERVER_Memory_Type* actual_memory_type,
+    int64_t* actual_device_id)
 {
   *content = nullptr;
 
@@ -778,7 +780,8 @@ InferResponseProvider::AllocateOutputBuffer(
 #endif  // TRTIS_ENABLE_GPU
   TRTSERVER_Error* err = alloc_fn_(
       allocator_, &buffer, &buffer_userp, name.c_str(), alloc_byte_size,
-      preferred_memory_type, preferred_memory_type_id, alloc_userp_, actual_memory_type, actual_device_id);
+      preferred_memory_type, preferred_memory_type_id, alloc_userp_,
+      actual_memory_type, actual_device_id);
   Status status;
 #ifdef TRTIS_ENABLE_GPU
   cuerr = cudaSetDevice(current_device);

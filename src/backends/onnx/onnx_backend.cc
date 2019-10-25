@@ -888,7 +888,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
       int64_t device_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape,
-          preferred_memory_type, &actual_memory_type, &device_id);
+          preferred_memory_type, 0, &actual_memory_type, &device_id);
       if (status.IsOk()) {
         size_t copied_byte_size = 0;
         for (size_t e = 0; e < expected_element_cnt; ++e) {

@@ -442,7 +442,7 @@ ReadStringOutputTensor(
       int64_t device_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, serialized.size(), shape,
-          preferred_memory_type, &actual_memory_type, &device_id);
+          preferred_memory_type, 0, &actual_memory_type, &device_id);
       if (status.IsOk()) {
         if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
 #ifdef TRTIS_ENABLE_GPU

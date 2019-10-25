@@ -82,7 +82,8 @@ class EnsembleContext {
       TRTSERVER_ResponseAllocator* allocator, void** buffer,
       void** buffer_userp, const char* tensor_name, size_t byte_size,
       TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-      TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id);
+      TRTSERVER_Memory_Type* allocated_memory_type,
+      int64_t* allocated_memory_type_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
@@ -318,7 +319,8 @@ EnsembleContext::ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id)
+    TRTSERVER_Memory_Type* allocated_memory_type,
+    int64_t* allocated_memory_type_id)
 {
   auto tensor_data_map = reinterpret_cast<
       std::unordered_map<std::string, std::shared_ptr<AllocatedSystemMemory>>*>(
@@ -330,9 +332,8 @@ EnsembleContext::ResponseAlloc(
   auto allocated_buffer = std::make_shared<AllocatedSystemMemory>(
       byte_size, memory_type, memory_type_id);
 
-  int64_t allocated_memory_type_id;
   auto mutable_buffer = allocated_buffer->MutableBuffer(
-      allocated_memory_type, &allocated_memory_type_id);
+      allocated_memory_type, allocated_memory_type_id);
   if ((mutable_buffer != nullptr) || (byte_size == 0)) {
     if (byte_size != 0) {
       *buffer = static_cast<void*>(mutable_buffer);
@@ -659,7 +660,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     }
 
     // Use the memory type of the memory block as preferred memory type
-    TRTSERVER_Memory_Type dst_memory_type, actual_memory_type;
+    TRTSERVER_Memory_Type dst_memory_type, allocated_memory_type;
     int64_t memory_type_id;
     size_t content_size;
     memory_block->BufferAt(0, &content_size, &dst_memory_type, &memory_type_id);
@@ -668,7 +669,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     int64_t device_id;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type,
-        memory_type_id, &actual_memory_type, &device_id));
+        memory_type_id, &allocated_memory_type, &device_id));
 
     // Done with this output if 'expected_byte_size' is 0
     if (expected_byte_size == 0) {
