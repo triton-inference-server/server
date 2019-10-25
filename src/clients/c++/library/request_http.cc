@@ -1275,6 +1275,11 @@ InferHttpContextImpl::Run(ResultMap* results)
 Error
 InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
 {
+  if (callback == nullptr) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "Callback function must be provided along with AsyncRun() call.");
+  }
   std::shared_ptr<Request> async_request;
   if (!multi_handle_) {
     return Error(
@@ -1594,9 +1599,7 @@ InferHttpContextImpl::AsyncTransfer()
     for (auto& request : request_list) {
       std::shared_ptr<HttpRequestImpl> http_request =
           std::static_pointer_cast<HttpRequestImpl>(request);
-      if (http_request->callback_ != nullptr) {
-        http_request->callback_(this, request);
-      }
+      http_request->callback_(this, request);
     }
   } while (!exiting_);
 }

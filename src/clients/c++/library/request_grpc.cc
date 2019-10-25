@@ -776,6 +776,11 @@ InferGrpcContextImpl::Run(ResultMap* results)
 Error
 InferGrpcContextImpl::AsyncRun(OnCompleteFn callback)
 {
+  if (callback == nullptr) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "Callback function must be provided along with AsyncRun() call.");
+  }
   if (!worker_.joinable()) {
     worker_ = std::thread(&InferGrpcContextImpl::AsyncTransfer, this);
   }
@@ -899,7 +904,7 @@ InferGrpcContextImpl::PreRunProcessing(GrpcRequestImpl* request)
 void
 InferGrpcContextImpl::AsyncTransfer()
 {
-  do {
+  while (!exiting) {
     // GRPC async APIs are thread-safe https://github.com/grpc/grpc/issues/4486
     GrpcRequestImpl* grpc_request_ptr;
     bool ok = true;
@@ -919,11 +924,9 @@ InferGrpcContextImpl::AsyncTransfer()
       async_request.reset(static_cast<Request*>(grpc_request_ptr));
       grpc_request_ptr->Timer().CaptureTimestamp(
           RequestTimers::Kind::REQUEST_END);
-      if (grpc_request_ptr->callback_ != nullptr) {
-        grpc_request_ptr->callback_(this, async_request);
-      }
+      grpc_request_ptr->callback_(this, async_request);
     }
-  } while (!exiting_);
+  }
 }
 
 Error
@@ -1012,6 +1015,11 @@ InferGrpcStreamContextImpl::Run(ResultMap* results)
 Error
 InferGrpcStreamContextImpl::AsyncRun(OnCompleteFn callback)
 {
+  if (callback == nullptr) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "callback function must be provided along with AsyncRun().");
+  }
   GrpcRequestImpl* grpc_request_ptr;
   grpc_request_ptr =
       new GrpcRequestImpl(async_request_id_++, std::move(callback));
@@ -1081,9 +1089,7 @@ InferGrpcStreamContextImpl::AsyncTransfer()
         std::static_pointer_cast<GrpcRequestImpl>(request);
     grpc_request->grpc_response_->Swap(&response);
     grpc_request->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_END);
-    if (grpc_request->callback_ != nullptr) {
-      grpc_request->callback_(this, request);
-    }
+    grpc_request->callback_(this, request);
   }
   stream_->Finish();
 }
