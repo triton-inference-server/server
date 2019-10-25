@@ -1316,11 +1316,16 @@ StreamInferHandler::Process(Handler::State* state, bool rpc_ok)
     // is not the expected next response. We don't necessarily cancel
     // right away. Need to wait for any pending reads, inferences and
     // writes to complete.
-    if (!rpc_ok || !state->context_->PopCompletedResponse(state)) {
-      LOG_ERROR << "Process for " << Name() << ", rpc_ok=" << rpc_ok
+    if (!rpc_ok) {
+      LOG_ERROR << "Write for " << Name() << ", rpc_ok=" << rpc_ok
                 << ", context " << state->context_->unique_id_ << ", "
-                << state->unique_id_ << " step " << state->step_
-                << ", failed or unexpected to be response";
+                << state->unique_id_ << " step " << state->step_ << ", failed";
+      state->context_->finish_ok_ = false;
+    }
+    if (!state->context_->PopCompletedResponse(state)) {
+      LOG_ERROR << "Unexpected response for " << Name() << ", rpc_ok=" << rpc_ok
+                << ", context " << state->context_->unique_id_ << ", "
+                << state->unique_id_ << " step " << state->step_;
       state->context_->finish_ok_ = false;
     }
 
