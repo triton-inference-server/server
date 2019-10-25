@@ -906,7 +906,6 @@ InferGrpcContextImpl::AsyncTransfer()
     bool status =
         async_request_completion_queue_.Next((void**)(&grpc_request_ptr), &ok);
     std::shared_ptr<Request> async_request;
-    async_request.reset(static_cast<Request*>(grpc_request_ptr));
     if (!ok) {
       fprintf(stderr, "Unexpected not ok on client side.\n");
     }
@@ -917,6 +916,7 @@ InferGrpcContextImpl::AsyncTransfer()
     } else if (grpc_request_ptr == nullptr) {
       fprintf(stderr, "Unexpected null tag received at client.\n");
     } else {
+      async_request.reset(static_cast<Request*>(grpc_request_ptr));
       grpc_request_ptr->Timer().CaptureTimestamp(
           RequestTimers::Kind::REQUEST_END);
       if (grpc_request_ptr->callback_ != nullptr) {

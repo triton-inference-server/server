@@ -330,15 +330,15 @@ class SequenceBatcherTest(unittest.TestCase):
                         # create and register shared memory region for inputs and outputs
                         if shm_region_names is None:
                             shm_ip_handle.append(shm.create_shared_memory_region(
-                                "input_data"+str(i), "/input"+str(i), input_byte_size))
+                                "input_data"+str(sent_count), "/input"+str(sent_count), input_byte_size))
                             shm_op_handle.append(shm.create_shared_memory_region(
-                                "output_data"+str(i), "/output"+str(i), output_byte_size))
+                                "output_data"+str(sent_count), "/output"+str(sent_count), output_byte_size))
                         else:
                             shm_ip_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[0]+str(i)+'_data', '/'+shm_region_names[0]+str(i),
+                                shm_region_names[0]+str(sent_count)+'_data', '/'+shm_region_names[0]+str(sent_count),
                                 input_byte_size))
                             shm_op_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[1]+str(i)+'_data', '/'+shm_region_names[1]+str(i),
+                                shm_region_names[1]+str(sent_count)+'_data', '/'+shm_region_names[1]+str(sent_count),
                                 output_byte_size))
                         # copy data into shared memory region for input values
                         shm.set_shared_memory_region(shm_ip_handle[-1], input_list_tmp)
