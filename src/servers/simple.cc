@@ -471,6 +471,7 @@ main(int argc, char** argv)
   std::unique_ptr<void, decltype(gpu_data_deleter)> input1_gpu(
       nullptr, gpu_data_deleter);
   if (use_gpu_memory) {
+    FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
     void* dst;
     FAIL_IF_CUDA_ERR(
         cudaMalloc(&dst, input0_size), "allocating GPU memory for INPUT0 data");
