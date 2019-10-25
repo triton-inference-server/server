@@ -420,11 +420,13 @@ TRTSERVER_InferenceRequestProviderInputBatchByteSize(
 /// \param base The base address of the input data.
 /// \param byte_size The size, in bytes, of the input data.
 /// \param memory_type The memory type of the input data.
+/// \param memory_type_id The memory type id of the input data.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
     TRTSERVER_InferenceRequestProvider* request_provider, const char* name,
-    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type);
+    const void* base, size_t byte_size, TRTSERVER_Memory_Type memory_type,
+    int64_t memory_type_id);
 
 /// TRTSERVER_InferenceResponse
 ///
@@ -467,10 +469,12 @@ TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseHeader(
 /// \param base Returns the result data for the named output.
 /// \param byte_size Returns the size, in bytes, of the output data.
 /// \param memory_type Returns the memory type of the output data.
+/// \param memory_type_id Returns the memory type id of the output data.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_EXPORT TRTSERVER_Error* TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
-    size_t* byte_size, TRTSERVER_Memory_Type* memory_type);
+    size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    int64_t* memory_type_id);
 
 /// TRTSERVER_ServerOptions
 ///

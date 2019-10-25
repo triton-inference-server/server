@@ -235,22 +235,26 @@ Context::Execute(
       }
 
       // copy....
-      // Peek memory type of the input content and use it as preferred type
+      // Peek memory type and id of the input content as
+      // we would like to allocate output buffer on the same device as input
       CustomMemoryType src_memory_type = CUSTOM_MEMORY_CPU;
+      int64_t src_memory_type_id = 0;
       const void* content;
       uint64_t content_byte_size = 128 * 1024;
       if (!input_fn(
               payload.input_context, input_name.c_str(), &content,
-              &content_byte_size, &src_memory_type)) {
+              &content_byte_size, &src_memory_type, &src_memory_type_id)) {
         payload.error_code = kInputContents;
         break;
       }
 
       auto dst_memory_type = src_memory_type;
+      int64_t dst_memory_type_id = src_memory_type_id;
       void* obuffer;
       if (!output_fn(
               payload.output_context, output_cname, shape.size(), &shape[0],
-              batchn_byte_size, &obuffer, &dst_memory_type)) {
+              batchn_byte_size, &obuffer, &dst_memory_type,
+              &dst_memory_type_id)) {
         payload.error_code = kOutputBuffer;
         break;
       }
@@ -299,7 +303,7 @@ Context::Execute(
 
         if (!input_fn(
                 payload.input_context, input_name.c_str(), &content,
-                &content_byte_size, &src_memory_type)) {
+                &content_byte_size, &src_memory_type, &src_memory_type_id)) {
           payload.error_code = kInputContents;
           break;
         }

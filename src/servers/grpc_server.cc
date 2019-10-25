@@ -263,10 +263,7 @@ class HandlerState {
     response_.Clear();
   }
 
-  void Release()
-  {
-    context_ = nullptr;
-  }
+  void Release() { context_ = nullptr; }
 
   std::shared_ptr<Context> context_;
 
@@ -802,7 +799,7 @@ InferGRPCToInput(
 
     RETURN_IF_ERR(TRTSERVER_InferenceRequestProviderSetInputData(
         request_provider, io.name().c_str(), base, byte_size,
-        TRTSERVER_MEMORY_CPU));
+        TRTSERVER_MEMORY_CPU, 0 /* memory_type_id */));
   }
 
   return nullptr;  // success

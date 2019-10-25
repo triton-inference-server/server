@@ -222,11 +222,10 @@ OnnxBackend::CreateExecutionContext(
                .execution_accelerators()
                .gpu_execution_accelerator()) {
         if (execution_accelerator.name() == kTensorRTExecutionAccelerator) {
-          RETURN_IF_ORT_ERROR(
-              OrtSessionOptionsAppendExecutionProvider_Tensorrt(
-                  session_options, gpu_device));
+          RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_Tensorrt(
+              session_options, gpu_device));
           LOG_VERBOSE(1) << "TensorRT Execution Accelerator is set for "
-                          << instance_name << " on device " << gpu_device;
+                         << instance_name << " on device " << gpu_device;
         } else {
           return Status(
               RequestStatusCode::INVALID_ARG,
@@ -253,9 +252,8 @@ OnnxBackend::CreateExecutionContext(
       if (execution_accelerator.name() == kOpenVINOExecutionAccelerator) {
 #ifdef TRTIS_ENABLE_ONNXRUNTIME_OPENVINO
         need_lock = true;
-        RETURN_IF_ORT_ERROR(
-            OrtSessionOptionsAppendExecutionProvider_OpenVINO(
-                session_options, "CPU"));
+        RETURN_IF_ORT_ERROR(OrtSessionOptionsAppendExecutionProvider_OpenVINO(
+            session_options, "CPU"));
         LOG_VERBOSE(1) << "OpenVINO Execution Accelerator is set for "
                        << instance_name << " on device CPU";
 #else
@@ -665,7 +663,7 @@ OnnxBackend::Context::SetInputTensor(
 
   // Store data into input buffer
   SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
 
   if (data_type != TYPE_STRING) {
     const OrtMemoryInfo* allocator_info;
@@ -844,9 +842,10 @@ OnnxBackend::Context::ReadOutputTensors(
       // [TODO] currently ONNX output data are always on CPU
       // https://github.com/microsoft/onnxruntime/issues/1621
       auto content_memory_type = TRTSERVER_MEMORY_CPU;
+      int64_t memory_type_id = 0;
       cuda_copy |= SetFixedSizeOutputBuffer(
           name, batch1_byte_size, content, content_shape, content_memory_type,
-          payloads);
+          memory_type_id, payloads);
     }
   }
 

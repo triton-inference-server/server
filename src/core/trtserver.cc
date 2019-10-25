@@ -345,8 +345,8 @@ TrtServerOptions::TrtServerOptions()
     : server_id_("inference:0"), model_control_mode_(ni::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       metrics_(true), gpu_metrics_(true), exit_timeout_(30),
-      pinned_memory_pool_size_(1 << 28),
-      tf_soft_placement_(true), tf_gpu_mem_fraction_(0)
+      pinned_memory_pool_size_(1 << 28), tf_soft_placement_(true),
+      tf_gpu_mem_fraction_(0)
 {
 #ifndef TRTIS_ENABLE_METRICS
   metrics_ = false;
@@ -375,7 +375,7 @@ class TrtServerRequestProvider {
 
   void SetInputData(
       const char* input_name, const void* base, size_t byte_size,
-      TRTSERVER_Memory_Type memory_type);
+      TRTSERVER_Memory_Type memory_type, int64_t memory_type_id);
 
  private:
   const std::string model_name_;
@@ -428,7 +428,7 @@ TrtServerRequestProvider::InputMap() const
 void
 TrtServerRequestProvider::SetInputData(
     const char* input_name, const void* base, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type)
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
   auto pr = input_map_.emplace(input_name, nullptr);
   std::shared_ptr<ni::SystemMemory>& smem = pr.first->second;
@@ -438,7 +438,7 @@ TrtServerRequestProvider::SetInputData(
 
   if (byte_size > 0) {
     std::static_pointer_cast<ni::SystemMemoryReference>(smem)->AddBuffer(
-        static_cast<const char*>(base), byte_size, memory_type);
+        static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
   }
 }
 
@@ -456,7 +456,7 @@ class TrtServerResponse {
   const ni::InferResponseHeader& Header() const;
   TRTSERVER_Error* OutputData(
       const char* name, const void** base, size_t* byte_size,
-      TRTSERVER_Memory_Type* memory_type) const;
+      TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const;
 
  private:
   const ni::Status infer_status_;
@@ -485,10 +485,10 @@ TrtServerResponse::Header() const
 TRTSERVER_Error*
 TrtServerResponse::OutputData(
     const char* name, const void** base, size_t* byte_size,
-    TRTSERVER_Memory_Type* memory_type) const
+    TRTSERVER_Memory_Type* memory_type, int64_t* memory_type_id) const
 {
   RETURN_IF_STATUS_ERROR(response_provider_->OutputBufferContents(
-      name, base, byte_size, memory_type));
+      name, base, byte_size, memory_type, memory_type_id));
   return nullptr;  // Success
 }
 
@@ -751,11 +751,12 @@ TRTSERVER_Error*
 TRTSERVER_InferenceRequestProviderSetInputData(
     TRTSERVER_InferenceRequestProvider* request_provider,
     const char* input_name, const void* base, size_t byte_size,
-    TRTSERVER_Memory_Type memory_type)
+    TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
   TrtServerRequestProvider* lprovider =
       reinterpret_cast<TrtServerRequestProvider*>(request_provider);
-  lprovider->SetInputData(input_name, base, byte_size, memory_type);
+  lprovider->SetInputData(
+      input_name, base, byte_size, memory_type, memory_type_id);
   return nullptr;  // Success
 }
 
@@ -795,10 +796,12 @@ TRTSERVER_InferenceResponseHeader(
 TRTSERVER_Error*
 TRTSERVER_InferenceResponseOutputData(
     TRTSERVER_InferenceResponse* response, const char* name, const void** base,
-    size_t* byte_size, TRTSERVER_Memory_Type* memory_type)
+    size_t* byte_size, TRTSERVER_Memory_Type* memory_type,
+    int64_t* memory_type_id)
 {
   TrtServerResponse* lresponse = reinterpret_cast<TrtServerResponse*>(response);
-  return lresponse->OutputData(name, base, byte_size, memory_type);
+  return lresponse->OutputData(
+      name, base, byte_size, memory_type, memory_type_id);
 }
 
 //

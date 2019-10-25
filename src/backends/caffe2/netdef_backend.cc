@@ -385,7 +385,7 @@ NetDefBackend::Context::SetFixedSizedInputTensor(
   }
 
   *cuda_copy |= SetInputBuffer(
-      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, buffer);
+      name, expected_byte_sizes, payloads, TRTSERVER_MEMORY_CPU, 0, buffer);
 
   Caffe2Workspace::Error err = workspace_->SetInputTensor(
       name, shape, dtype, static_cast<const char*>(buffer), total_byte_size);
@@ -446,9 +446,10 @@ NetDefBackend::Context::ReadFixedSizedOutputTensor(
   //                                ? TRTSERVER_MEMORY_CPU
   //                                : TRTSERVER_MEMORY_GPU;
   auto content_memory_type = TRTSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
   *cuda_copy |= SetFixedSizeOutputBuffer(
       name, batch1_byte_size, content, content_shape, content_memory_type,
-      payloads);
+      memory_type_id, payloads);
   return Status::Success;
 }
 
