@@ -230,6 +230,43 @@ install(
 )
 
 #
+# io_test_util (only build when TRTIS_ENABLE_GPU given the purpose)
+#
+if(${TRTIS_ENABLE_GPU})
+set(
+  IO_TEST_UTIL_SRCS
+  io_test_util.cc common.cc ../core/logging.cc
+)
+
+set(
+  IO_TEST_UTIL_HDRS
+  common.h ../core/logging.h
+)
+
+add_executable(
+  io_test_util
+  ${IO_TEST_UTIL_SRCS}
+  ${IO_TEST_UTIL_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+  ${TRACING_OBJECTS}
+)
+target_link_libraries(
+  io_test_util
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE trtserver
+  PRIVATE protobuf::libprotobuf
+  ${TRACING_LIBRARIES}
+)
+target_include_directories(io_test_util PRIVATE ${CUDA_INCLUDE_DIRS})
+install(
+  TARGETS io_test_util
+  RUNTIME DESTINATION bin
+)
+endif() # TRTIS_ENABLE_GPU
+
+#
 # libtrtserver.so
 #
 set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)
