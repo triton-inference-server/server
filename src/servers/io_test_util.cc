@@ -216,10 +216,9 @@ ParseModelConfig(
     if (data_type == ni::TYPE_INVALID) {
       data_type = input.data_type();
     } else if (input.data_type() != data_type) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG, "the inputs and outputs of '" +
-                                           config.name() +
-                                           "' model must have the data type");
+      auto err_str = "the inputs of '" + config.name() +
+                     "' model must have the same data type";
+      return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, err_str.c_str());
     }
   }
   for (const auto& output : config.output()) {
@@ -230,10 +229,9 @@ ParseModelConfig(
           "IO test utility only supports model with data type INT32 or "
           "FP32");
     } else if (output.data_type() != data_type) {
-      return TRTSERVER_ErrorNew(
-          TRTSERVER_ERROR_INVALID_ARG, "the inputs and outputs of '" +
-                                           config.name() +
-                                           "' model must have the data type");
+      auto err_str = "the inputs and outputs of '" + config.name() +
+                     "' model must have the same data type";
+      return TRTSERVER_ErrorNew(TRTSERVER_ERROR_INVALID_ARG, err_str.c_str());
     }
   }
 
