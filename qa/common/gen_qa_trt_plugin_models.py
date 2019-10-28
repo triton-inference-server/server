@@ -73,19 +73,27 @@ def np_to_trt_dtype(np_dtype):
         return trt.infer.DataType.FLOAT
     return None
 
-def get_trt_lrelu_plugin(plugin_name):
+def get_trt_plugin(plugin_name):
         plugin = None
         for plugin_creator in PLUGIN_CREATORS:
-            if plugin_creator.name == plugin_name:
+            if (plugin_creator.name == "CustomClipPlugin") and (plugin_name == "CustomClipPlugin"):
+                min_clip = trt.PluginField("clipMin", np.array([0.1],\
+                    dtype=np.float32), trt.PluginFieldType.FLOAT32)
+                max_clip = trt.PluginField("clipMax", np.array([0.5],\
+                    dtype=np.float32), trt.PluginFieldType.FLOAT32)
+                field_collection = trt.PluginFieldCollection([min_clip, max_clip])
+                plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
+                break
+            elif (plugin_creator.name == "LReLU_TRT") and (plugin_name == "LReLU_TRT"):
                 lrelu_slope_field = trt.PluginField("neg_slope", np.array([0.1],\
                     dtype=np.float32), trt.PluginFieldType.FLOAT32)
                 field_collection = trt.PluginFieldCollection([lrelu_slope_field])
                 plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
+                break
         return plugin
 
-def create_plan_modelfile(models_dir, max_batch, model_version,
-        input_shape, output0_shape,
-        input_dtype, output0_dtype):
+def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
+        input_shape, output0_shape, input_dtype, output0_dtype):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
                                      input_shape, output0_shape, output0_shape):
@@ -95,16 +103,15 @@ def create_plan_modelfile(models_dir, max_batch, model_version,
     trt_output0_dtype = np_to_trt_dtype(output0_dtype)
 
     model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
-                                   input_dtype, output0_dtype, output0_dtype)
+                               input_dtype, output0_dtype, output0_dtype) + '_' +  plugin_name
 
     with trt.Builder(TRT_LOGGER) as builder, builder.create_network() as network:
         builder.set_max_batch_size(max(1, max_batch))
         builder.set_max_workspace_size(1 << 20)
         input_layer = network.add_input(name="INPUT0", dtype=trt_input_dtype, shape=input_shape)
-        lrelu = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_lrelu_plugin("LReLU_TRT"))
-        lrelu.get_output(0).name = "OUTPUT0"
-        network.mark_output(lrelu.get_output(0))
-
+        plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
+        plugin_layer.get_output(0).name = "OUTPUT0"
+        network.mark_output(plugin_layer.get_output(0))
         engine = builder.build_cuda_engine(network)
         lengine = trt.lite.Engine(engine_stream=engine.serialize(),
                                   max_batch_size=max(1, max_batch))
@@ -118,9 +125,8 @@ def create_plan_modelfile(models_dir, max_batch, model_version,
         engine.destroy()
 
 def create_plan_modelconfig(
-        models_dir, max_batch, model_version,
-        input_shape, output0_shape,
-        input_dtype, output0_dtype):
+        models_dir, max_batch, model_version, plugin_name, input_shape,
+        output0_shape, input_dtype, output0_dtype):
 
     if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
                                      input_shape, output0_shape, output0_shape):
@@ -130,7 +136,7 @@ def create_plan_modelconfig(
 
     # Use a different model name for the non-batching variant
     model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
-                                   input_dtype, output0_dtype, output0_dtype)
+                               input_dtype, output0_dtype, output0_dtype) + '_' +  plugin_name
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -166,9 +172,13 @@ output [
 def create_plugin_models(models_dir):
     model_version = 1
 
-    create_plan_modelconfig(models_dir, 8, model_version, (16,), (16,), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, (16,), (16,), np.float32, np.float32)
+    # default LReLU_TRT plugin
+    create_plan_modelconfig(models_dir, 8, model_version, "LReLU_TRT", (16,), (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "LReLU_TRT", (16,), (16,), np.float32, np.float32)
 
+    # custom CustomClipPlugin
+    create_plan_modelconfig(models_dir, 8, model_version,  "CustomClipPlugin", (16,), (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin", (16,), (16,), np.float32, np.float32)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
