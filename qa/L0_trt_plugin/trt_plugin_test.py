@@ -35,13 +35,14 @@ from tensorrtserver.api import *
 import os
 
 class PluginModelTest(unittest.TestCase):
-    def _full_exact(self, batch_size, input_dtype, output_dtype, model_name):
+    def _full_exact(self, batch_size, input_dtype, output_dtype, model_name,
+                    plugin_name):
         input_list = list()
         for b in range(batch_size):
             in0 = np.random.randn(16).astype(input_dtype)
             input_list.append(in0)
 
-        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name,
+        ctx = InferContext("localhost:8000", ProtocolType.HTTP, model_name + '_' + plugin_name,
                            correlation_id=0, streaming=False, verbose=True)
         results = ctx.run(
             { "INPUT0" : input_list }, { "OUTPUT0" : InferContext.ResultFormat.RAW},
@@ -50,15 +51,26 @@ class PluginModelTest(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertTrue("OUTPUT0" in results)
         result = results["OUTPUT0"]
-        # verify values of Leaky RELU (it uses 0.1 instead of the default 0.01)
-        for b in range(batch_size):
-            test_input = np.where(input_list[b] > 0, input_list[b], input_list[b] * 0.1)
-            self.assertTrue(all(np.isclose(result[b], test_input)))
 
-    def test_raw_fff(self):
+        # Verify values of Leaky RELU (it uses 0.1 instead of the default 0.01)
+        # and for CustomClipPlugin min_clip = 0.1, max_clip = 0.5
+        for b in range(batch_size):
+            if plugin_name == 'LReLU_TRT':
+                test_input = np.where(input_list[b] > 0, input_list[b], input_list[b] * 0.1)
+                self.assertTrue(all(np.isclose(result[b], test_input)))
+            else:
+                # [TODO] Add test for CustomClip output
+                test_input = np.clip(input_list[b], 0.1, 0.5)
+
+    def test_raw_fff_lrelu(self):
         # model that supports batching
         for bs in (1, 8):
-            self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32')
+            self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32', 'LReLU_TRT')
+
+    def test_raw_fff_customclip(self):
+        # model that supports batching
+        for bs in (1, 8):
+            self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32', 'CustomClipPlugin')
 
 if __name__ == '__main__':
     unittest.main()
