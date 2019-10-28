@@ -666,10 +666,10 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     memory_block->BufferAt(0, &content_size, &dst_memory_type, &memory_type_id);
 
     void* buffer;
-    int64_t device_id;
+    int64_t allocated_memory_type_id;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type,
-        memory_type_id, &allocated_memory_type, &device_id));
+        memory_type_id, &allocated_memory_type, &allocated_memory_type_id));
 
     // Done with this output if 'expected_byte_size' is 0
     if (expected_byte_size == 0) {
@@ -677,8 +677,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     } else if (buffer == nullptr) {
       return Status(
           RequestStatusCode::INTERNAL,
-          "all attempts to allocate buffer for output '" + output_pair.first +
-              "' failed");
+          "failed to allocate buffer for output '" + output_pair.first + "'");
     }
 
     size_t content_offset = 0;

@@ -94,7 +94,7 @@ ResponseAlloc(
     TRTSERVER_ResponseAllocator* allocator, void** buffer, void** buffer_userp,
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type memory_type, int64_t memory_type_id, void* userp,
-    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_device_id)
+    TRTSERVER_Memory_Type* actual_memory_type, int64_t* actual_memory_type_id)
 {
   // Pass the tensor name with buffer_userp so we can show it when
   // releasing the buffer.
@@ -108,27 +108,40 @@ ResponseAlloc(
              << tensor_name;
   } else {
     void* allocated_ptr = nullptr;
-    if (memory_type == TRTSERVER_MEMORY_CPU) {
+    if (!use_gpu_memory || (memory_type == TRTSERVER_MEMORY_CPU)) {
       allocated_ptr = malloc(byte_size);
       *actual_memory_type = TRTSERVER_MEMORY_CPU;
-      *actual_device_id = 0;
+      *actual_memory_type_id = 0;
     } else if (use_gpu_memory) {
 #ifdef TRTIS_ENABLE_GPU
       auto err = cudaSetDevice(memory_type_id);
-      if (err == cudaSuccess) {
+      if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
+          (err != cudaErrorInsufficientDriver)) {
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "unable to recover current CUDA device: " +
+                std::string(cudaGetErrorString(err)))
+                .c_str());
+      } else if (err == cudaSuccess) {
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
 
       if (err != cudaSuccess) {
-        LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL,
+            std::string(
+                "cudaMalloc failed: " + std::string(cudaGetErrorString(err)))
+                .c_str());
         allocated_ptr = nullptr;
         *actual_memory_type = TRTSERVER_MEMORY_GPU;
+        *actual_memory_type_id = 0;
       }
 #endif  // TRTIS_ENABLE_GPU
     } else {
       allocated_ptr = malloc(byte_size);
       *actual_memory_type = TRTSERVER_MEMORY_CPU;
-      *actual_device_id = 0;
+      *actual_memory_type_id = 0;
     }
 
     if (allocated_ptr != nullptr) {

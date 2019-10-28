@@ -639,7 +639,7 @@ InferResponseAlloc(
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
     void* userp, TRTSERVER_Memory_Type* actual_memory_type,
-    int64_t* actual_device_id)
+    int64_t* actual_memory_type_id)
 {
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   InferResponse* response = payload->response_;
@@ -674,7 +674,7 @@ InferResponseAlloc(
 
         *buffer = const_cast<void*>(pr->second.base_);
         *actual_memory_type = pr->second.memory_type_;
-        *actual_device_id = pr->second.device_id_;
+        *actual_memory_type_id = pr->second.device_id_;
         use_shm = true;
 
         LOG_VERBOSE(1) << "GRPC shared-memory: " << tensor_name << ", size "
@@ -690,6 +690,7 @@ InferResponseAlloc(
                        << *actual_memory_type << " for " << tensor_name
                        << ", will use type " << TRTSERVER_MEMORY_CPU;
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
+        *actual_memory_type_id = 0;
       }
 
       raw_output->resize(byte_size);
@@ -734,10 +735,6 @@ InferAllocatorPayload(
   // invoked.
   for (const auto& io : request_header.output()) {
     if (io.has_shared_memory()) {
-      if (alloc_payload->shm_map_ == nullptr) {
-        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
-      }
-
       void* base;
       TRTSERVER_SharedMemoryBlock* smb = nullptr;
       RETURN_IF_ERR(smb_manager->Get(&smb, io.shared_memory().name()));
@@ -746,12 +743,18 @@ InferAllocatorPayload(
           io.shared_memory().byte_size(), &base));
 
       TRTSERVER_Memory_Type memory_type;
-      int device_id;
-      TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type, &device_id);
+      int64_t memory_type_id;
+      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
+
+      // if shm_map_ does not exist, then create an empty shm_map
+      if (alloc_payload->shm_map_ == nullptr) {
+        alloc_payload->shm_map_ = new AllocPayload::TensorShmMap;
+      }
 
       alloc_payload->shm_map_->emplace(
           io.name(), AllocPayload::ShmInfo{base, io.shared_memory().byte_size(),
-                                           memory_type, device_id});
+                                           memory_type, memory_type_id});
     }
   }
 

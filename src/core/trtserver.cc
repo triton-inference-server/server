@@ -571,17 +571,26 @@ TRTSERVER_SharedMemoryBlockDelete(
 }
 
 TRTSERVER_Error*
-TRTSERVER_SharedMemoryBlockDevice(
+TRTSERVER_SharedMemoryBlockMemoryType(
     TRTSERVER_SharedMemoryBlock* shared_memory_block,
-    TRTSERVER_Memory_Type* memory_type, int* device_id)
+    TRTSERVER_Memory_Type* memory_type)
 {
   TrtServerSharedMemoryBlock* lsmb =
       reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
   *memory_type = lsmb->Type();
+  return nullptr;  // Success
+}
+
+TRTSERVER_Error*
+TRTSERVER_SharedMemoryBlockMemoryTypeId(
+    TRTSERVER_SharedMemoryBlock* shared_memory_block, int64_t* memory_type_id)
+{
+  TrtServerSharedMemoryBlock* lsmb =
+      reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
 #ifdef TRTIS_ENABLE_GPU
-  *device_id = lsmb->DeviceId();
+  *memory_type_id = lsmb->DeviceId();
 #else
-  *device_id = 0;
+  *memory_type_id = 0;
 #endif             // TRTIS_ENABLE_GPU
   return nullptr;  // Success
 }

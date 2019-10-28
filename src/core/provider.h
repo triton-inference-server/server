@@ -297,10 +297,10 @@ class InferResponseProvider {
   Status AllocateOutputBuffer(
       const std::string& name, void** content, size_t content_byte_size,
       const std::vector<int64_t>& content_shape,
-      const TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU,
-      int64_t preferred_memory_type_id = 0,
-      TRTSERVER_Memory_Type* actual_memory_type = nullptr,
-      int64_t* actual_device_id = nullptr);
+      const TRTSERVER_Memory_Type preferred_memory_type,
+      const int64_t preferred_memory_type_id,
+      TRTSERVER_Memory_Type* actual_memory_type,
+      int64_t* actual_memory_type_id);
 
   // Get the address and byte-size of an output buffer. Error is
   // returned if the buffer is not already allocated.

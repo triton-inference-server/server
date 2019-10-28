@@ -232,7 +232,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       evbuffer*,
       std::unordered_map<
           std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>>;
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>>;
 
   // Class object associated to evhtp thread, requests received are bounded
   // with the thread that accepts it. Need to keep track of that and let the
@@ -271,7 +271,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       void** buffer_userp, const char* tensor_name, size_t byte_size,
       TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
       void* userp, TRTSERVER_Memory_Type* actual_memory_type,
-      int64_t* actual_device_id);
+      int64_t* actual_memory_type_id);
   static TRTSERVER_Error* ResponseRelease(
       TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
       size_t byte_size, TRTSERVER_Memory_Type memory_type,
@@ -296,7 +296,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       TRTSERVER_InferenceRequestProvider* request_provider,
       std::unordered_map<
           std::string,
-          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
+          std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
           output_shm_map);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
@@ -327,12 +327,13 @@ HTTPAPIServer::ResponseAlloc(
     const char* tensor_name, size_t byte_size,
     TRTSERVER_Memory_Type preferred_memory_type, int64_t memory_type_id,
     void* userp, TRTSERVER_Memory_Type* actual_memory_type,
-    int64_t* actual_device_id)
+    int64_t* actual_memory_type_id)
 {
   auto userp_pair = reinterpret_cast<EVBufferPair*>(userp);
   evbuffer* evhttp_buffer = reinterpret_cast<evbuffer*>(userp_pair->first);
   const std::unordered_map<
-      std::string, std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
+      std::string,
+      std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
       output_shm_map = userp_pair->second;
 
   *buffer = nullptr;
@@ -356,14 +357,15 @@ HTTPAPIServer::ResponseAlloc(
 
       *buffer = const_cast<void*>(std::get<0>(pr->second));
       *actual_memory_type = std::get<2>(pr->second);
-      *actual_device_id = (int64_t)std::get<3>(pr->second);
+      *actual_memory_type_id = std::get<3>(pr->second);
     } else {
       // Can't allocate for any memory type other than CPU.
-      if (*actual_memory_type != TRTSERVER_MEMORY_CPU) {
+      if (preferred_memory_type != TRTSERVER_MEMORY_CPU) {
         LOG_VERBOSE(1) << "HTTP allocation failed for type "
-                       << *actual_memory_type << " for " << tensor_name
+                       << preferred_memory_type << " for " << tensor_name
                        << ", will use type " << TRTSERVER_MEMORY_CPU;
         *actual_memory_type = TRTSERVER_MEMORY_CPU;
+        *actual_memory_type_id = 0;
       }
 
       // Reserve requested space in evbuffer...
@@ -858,7 +860,7 @@ HTTPAPIServer::EVBufferToInput(
     TRTSERVER_InferenceRequestProvider* request_provider,
     std::unordered_map<
         std::string,
-        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int>>&
+        std::tuple<const void*, size_t, TRTSERVER_Memory_Type, int64_t>>&
         output_shm_map)
 {
   // Extract individual input data from HTTP body and register in
@@ -971,14 +973,15 @@ HTTPAPIServer::EVBufferToInput(
           io.shared_memory().byte_size(), &base));
 
       TRTSERVER_Memory_Type memory_type;
-      int device_id;
-      TRTSERVER_SharedMemoryBlockDevice(smb, &memory_type, &device_id);
+      int64_t memory_type_id;
+      TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
+      TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
 
       output_shm_map.emplace(
           io.name(),
           std::make_tuple(
               static_cast<const void*>(base), io.shared_memory().byte_size(),
-              memory_type, device_id));
+              memory_type, memory_type_id));
     }
   }
 
