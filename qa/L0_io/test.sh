@@ -41,38 +41,22 @@ MODELSDIR=`pwd`/models
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0,1
 
 rm -f $CLIENT_LOG.*
 
 RET=0
 
+# Prepare models with basic config
+rm -rf $MODELSDIR
 for trial in graphdef savedmodel netdef onnx libtorch plan ; do
     full=${trial}_float32_float32_float32
-    rm -rf $MODELSDIR/${full}
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
         cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
         (cd $MODELSDIR/${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt)
-
-    set +e
-
-    $IO_TEST_UTIL -i -1 -o -1 -r $MODELSDIR -m $full >>$CLIENT_LOG.$trial.cpu 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$trial.cpu
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $IO_TEST_UTIL -i 0 -o 0 -r $MODELSDIR -m $full >>$CLIENT_LOG.$trial.gpu 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG.$trial.gpu
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    set -e
+                sed -i "s/label_filename:.*//" config.pbtxt && \
+                echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
 
 # custom model needs to be obtained elsewhere
@@ -82,26 +66,42 @@ mkdir -p $MODELSDIR/${full}/1 && \
     cp -r ../custom_models/${full}/1/* $MODELSDIR/${full}/1/. && \
     cp ../custom_models/${full}/config.pbtxt $MODELSDIR/${full}/.
         (cd $MODELSDIR/${full} && \
-                sed -i "s/label_filename:.*//" config.pbtxt)
+                sed -i "s/label_filename:.*//" config.pbtxt && \
+                echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 
-set +e
+for input_device in -1 0 1; do
+    for output_device in -1 0 1; do
+        for trial in graphdef savedmodel netdef onnx libtorch plan custom; do
+            # TensorRT Plan should only be deployed on GPU device
+            model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
+            for model_device in $model_devices; do
+                full=${trial}_float32_float32_float32
+                full_log=$CLIENT_LOG.$trial.$input_device.$output_device.$model_device
+                
+                if [ "$model_device" == "-1" ]; then
+                    (cd $MODELSDIR/${full} && \
+                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
+                else
+                    (cd $MODELSDIR/${full} && \
+                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
+                fi
+                
+                set +e
 
-$IO_TEST_UTIL -i -1 -o -1 -r $MODELSDIR -m $full >>$CLIENT_LOG.custom.cpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.custom.cpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
+                if [ $? -ne 0 ]; then
+                    cat $full_log
+                    echo -e "\n***\n*** Test Failed\n***"
+                    RET=1
+                fi
 
-$IO_TEST_UTIL -i 0 -o 0 -r $MODELSDIR -m $full >>$CLIENT_LOG.custom.gpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.custom.gpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+                set -e
+            done
+        done
+    done
+done
 
-set -e
-
+# [TODO] how to handle ensemble
 # set up "addsub" ensemble
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
 rm -rf $MODELSDIR/ensemble/1/*
