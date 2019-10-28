@@ -10,7 +10,7 @@ assignees: ''
 **Description**
 A clear and concise description of what the bug is.
 
-** TRTIS Information **
+**TRTIS Information**
 What version of TRTIS are you using?
 Are you using the TRTIS container or did you build it yourself?
 
