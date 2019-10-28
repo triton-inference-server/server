@@ -67,7 +67,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_shared_memory/models/. && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
-    cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/.
+    cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/. && \
+    cp /opt/tensorrtserver/bin/io_test_util qa/L0_io/.
 
 RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.
 
@@ -139,6 +140,8 @@ RUN cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_simple_lib/. && \
     cp builddir/trtis-custom-backends/install/lib/libidentity.so \
         qa/L0_pinned_memory/. && \
+    cp builddir/trtis-custom-backends/install/lib/libidentity.so \
+        qa/L0_io/. && \
     mkdir -p qa/L0_infer_shm && \
     cp -r qa/L0_infer/. qa/L0_infer_shm && \
     mkdir -p qa/L0_batcher_shm && \

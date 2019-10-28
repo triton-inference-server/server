@@ -35,7 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-IO_TEST_UTIL=../../bin/io_test_util
+IO_TEST_UTIL=./io_test_util
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
@@ -78,10 +78,11 @@ done
 # custom model needs to be obtained elsewhere
 full=custom_float32_float32_float32
 rm -rf $MODELSDIR/${full}/1/*
-cp -r ../custom_models/custom_float32_float32_float32/1/* $MODELSDIR/${full}/1/.
-cp ../custom_models/custom_float32_float32_float32/config.pbtxt $MODELSDIR/${full}/.
-(cd $MODELSDIR/${full} && \
-            sed -i "s/label_filename:.*//" config.pbtxt)
+mkdir -p $MODELSDIR/${full}/1 && \
+    cp -r ../custom_models/${full}/1/* $MODELSDIR/${full}/1/. && \
+    cp ../custom_models/${full}/config.pbtxt $MODELSDIR/${full}/.
+        (cd $MODELSDIR/${full} && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
 
 set +e
 
