@@ -114,12 +114,12 @@ ExternalProject_Add(protobuf
   DEPENDS grpc-repo
 )
 
-# Location where protobuf-config.cmake will be installed varies by	
-# platform	
-if (WIN32)	
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/cmake")	
-else()	
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/lib/cmake/protobuf")	
+# Location where protobuf-config.cmake will be installed varies by
+# platform
+if (WIN32)
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/cmake")
+else()
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/protobuf/lib/cmake/protobuf")
 endif()
 
 
@@ -209,6 +209,7 @@ ExternalProject_Add(libevhtp
   COMMAND patch -i ${CMAKE_SOURCE_DIR}/libevhtp/config.h.in.patch ${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp/include/evhtp/config.h.in
   SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/libevhtp/src/libevhtp"
   CMAKE_CACHE_ARGS
+    -DEVHTP_DISABLE_REGEX:BOOL=ON
     -DEVHTP_DISABLE_SSL:BOOL=ON
     -DEVHTP_TRTIS_ENABLE_HTTP_CONTIGUOUS:BOOL=ON
     -DEVHTP_TRTIS_ENABLE_TRACING:BOOL=${TRTIS_ENABLE_TRACING}
