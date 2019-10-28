@@ -585,9 +585,9 @@ TRTSERVER_Error*
 TRTSERVER_SharedMemoryBlockMemoryTypeId(
     TRTSERVER_SharedMemoryBlock* shared_memory_block, int64_t* memory_type_id)
 {
+#ifdef TRTIS_ENABLE_GPU
   TrtServerSharedMemoryBlock* lsmb =
       reinterpret_cast<TrtServerSharedMemoryBlock*>(shared_memory_block);
-#ifdef TRTIS_ENABLE_GPU
   *memory_type_id = lsmb->DeviceId();
 #else
   *memory_type_id = 0;
