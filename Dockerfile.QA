@@ -68,7 +68,7 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_cmdline_trace/models && \
     cp -r docs/examples/model_repository/simple qa/L0_cmdline_trace/models/. && \
     cp /opt/tensorrtserver/bin/simple qa/L0_simple_lib/. && \
-    cp /opt/tensorrtserver/bin/io_test_util qa/L0_io/.
+    cp /opt/tensorrtserver/bin/memory_alloc qa/L0_io/.
 
 RUN cp /workspace/builddir/trtis-test-utils/install/bin/caffe2plan qa/common/.
 

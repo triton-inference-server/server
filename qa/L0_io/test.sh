@@ -35,7 +35,7 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-IO_TEST_UTIL=./io_test_util
+IO_TEST_UTIL=./memory_alloc
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 

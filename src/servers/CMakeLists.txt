@@ -230,28 +230,28 @@ install(
 )
 
 #
-# io_test_util (only build when TRTIS_ENABLE_GPU given the purpose)
+# memory_alloc (only build when TRTIS_ENABLE_GPU given the purpose)
 #
 if(${TRTIS_ENABLE_GPU})
 set(
-  IO_TEST_UTIL_SRCS
-  io_test_util.cc common.cc ../core/logging.cc
+  MEMORY_ALLOC_SRCS
+  memory_alloc.cc common.cc ../core/logging.cc
 )
 
 set(
-  IO_TEST_UTIL_HDRS
+  MEMORY_ALLOC_HDRS
   common.h ../core/logging.h
 )
 
 add_executable(
-  io_test_util
-  ${IO_TEST_UTIL_SRCS}
-  ${IO_TEST_UTIL_HDRS}
+  memory_alloc
+  ${MEMORY_ALLOC_SRCS}
+  ${MEMORY_ALLOC_HDRS}
   $<TARGET_OBJECTS:proto-library>
   ${TRACING_OBJECTS}
 )
 target_link_libraries(
-  io_test_util
+  memory_alloc
   PUBLIC -L/usr/local/cuda/lib64/stubs
   PUBLIC -lnvidia-ml
   PRIVATE ${CUDA_LIBRARIES}
@@ -259,9 +259,9 @@ target_link_libraries(
   PRIVATE protobuf::libprotobuf
   ${TRACING_LIBRARIES}
 )
-target_include_directories(io_test_util PRIVATE ${CUDA_INCLUDE_DIRS})
+target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
 install(
-  TARGETS io_test_util
+  TARGETS memory_alloc
   RUNTIME DESTINATION bin
 )
 endif() # TRTIS_ENABLE_GPU

@@ -64,14 +64,11 @@ IOSpec io_spec;
 
 static auto gpu_data_deleter = [](void* data) {
   if (data != nullptr) {
-    auto err = cudaSetDevice(io_spec.input_type_id_);
-    if (err == cudaSuccess) {
-      err = cudaFree(data);
-    }
-    if (err != cudaSuccess) {
-      LOG_ERROR << "error: failed to cudaFree " << data << ": "
-                << cudaGetErrorString(err);
-    }
+    FAIL_IF_CUDA_ERR(
+        cudaSetDevice(io_spec.input_type_id_),
+        "setting CUDA device to release GPU memory on " +
+            std::to_string(io_spec.input_type_id_));
+    FAIL_IF_CUDA_ERR(cudaFree(data), "releasing GPU memory");
   }
 };
 
@@ -126,18 +123,29 @@ ResponseAlloc(
         err = cudaMalloc(&allocated_ptr, byte_size);
       }
       if (err != cudaSuccess) {
-        LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
-        allocated_ptr = nullptr;
+        return TRTSERVER_ErrorNew(
+            TRTSERVER_ERROR_INTERNAL, std::string(
+                                          "failed to allocate CUDA memory: " +
+                                          std::string(cudaGetErrorString(err)))
+                                          .c_str());
       }
     }
 
-    if (allocated_ptr != nullptr) {
-      *buffer = allocated_ptr;
-      *buffer_userp = new std::string(tensor_name);
-      LOG_INFO << "allocated " << byte_size << " bytes in "
-               << MemoryTypeString(memory_type) << " for result tensor "
-               << tensor_name;
+    if (allocated_ptr == nullptr) {
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL,
+          std::string(
+              "failed to allocate " + std::to_string(byte_size) + " bytes in " +
+              MemoryTypeString(memory_type) + " for result tensor " +
+              tensor_name)
+              .c_str());
     }
+
+    *buffer = allocated_ptr;
+    *buffer_userp = new std::string(tensor_name);
+    LOG_INFO << "allocated " << byte_size << " bytes in "
+             << MemoryTypeString(memory_type) << " for result tensor "
+             << tensor_name;
   }
 
   return nullptr;  // Success
@@ -148,11 +156,11 @@ ResponseRelease(
     TRTSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRTSERVER_Memory_Type memory_type, int64_t memory_type_id)
 {
-  std::string* name = nullptr;
+  std::unique_ptr<std::string> name;
   if (buffer_userp != nullptr) {
-    name = reinterpret_cast<std::string*>(buffer_userp);
+    name.reset(reinterpret_cast<std::string*>(buffer_userp));
   } else {
-    name = new std::string("<unknown>");
+    name.reset(new std::string("<unknown>"));
   }
 
   LOG_INFO << "Releasing buffer " << buffer << " of size " << byte_size
@@ -160,20 +168,19 @@ ResponseRelease(
            << *name << "'";
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
-  } else if (io_spec.output_type_ == TRTSERVER_MEMORY_GPU) {
+  } else {
     auto err = cudaSetDevice(memory_type_id);
     if (err == cudaSuccess) {
       err = cudaFree(buffer);
     }
     if (err != cudaSuccess) {
-      LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
-                << cudaGetErrorString(err);
+      return TRTSERVER_ErrorNew(
+          TRTSERVER_ERROR_INTERNAL, std::string(
+                                        "failed to release CUDA memory: " +
+                                        std::string(cudaGetErrorString(err)))
+                                        .c_str());
     }
-  } else {
-    LOG_ERROR << "error: unexpected buffer allocated in GPU memory";
   }
-
-  delete name;
 
   return nullptr;  // Success
 }
@@ -426,6 +433,10 @@ main(int argc, char** argv)
       FAIL("error: failed to parse model status");
     }
 
+    FAIL_IF_ERR(
+        TRTSERVER_ProtobufDelete(model_status_protobuf),
+        "deleting status protobuf");
+
     auto itr = model_status.model_status().find(model_name);
     if (itr == model_status.model_status().end()) {
       FAIL("unable to find status for model '" + model_name + "'");
@@ -444,11 +455,6 @@ main(int argc, char** argv)
           "parsing model config");
       break;
     }
-
-    // [TODO] do so before break
-    FAIL_IF_ERR(
-        TRTSERVER_ProtobufDelete(model_status_protobuf),
-        "deleting status protobuf");
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
