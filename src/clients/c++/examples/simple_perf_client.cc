@@ -295,12 +295,30 @@ RunAsyncConcurrent(
   sem_t* sem = &lsem;
   sem_init(sem, 0, concurrency);
 
-  struct timespec total_start;
-  clock_gettime(CLOCK_MONOTONIC, &total_start);
-  request_duration_ns->resize(iters * concurrency);
+  struct timespec total_start, total_end;
+  std::vector<uint64_t> request_duration_buffer_ns(iters * concurrency);
 
-  for (std::vector<uint64_t>::iterator iter = request_duration_ns->begin();
-       iter != request_duration_ns->end(); ++iter) {
+  // We will be selecting 'iters' readings from the center to finally report the
+  // stable results with the given concurrency.
+  uint64_t start_window = (iters * (concurrency - 1)) / 2;
+  uint64_t end_window = start_window + iters;
+  bool signal_end;
+
+  uint64_t index = 0;
+  for (std::vector<uint64_t>::iterator iter =
+           request_duration_buffer_ns.begin();
+       iter != request_duration_buffer_ns.end(); ++iter) {
+    if (index == start_window) {
+      clock_gettime(CLOCK_MONOTONIC, &total_start);
+    }
+    index += 1;
+
+    if ((index) == end_window) {
+      signal_end = true;
+    } else {
+      signal_end = false;
+    }
+
     // Wait so that only 'concurrency' requests are in flight at any
     // given time.
     sem_wait(sem);
@@ -311,10 +329,13 @@ RunAsyncConcurrent(
 
     FAIL_IF_ERR(
         ctx->AsyncRun(
-            [sem, iter](
+            [sem, iter, signal_end, &total_end](
                 nic::InferContext* ctx,
                 const std::shared_ptr<nic::InferContext::Request>& request) {
               RunAsyncComplete(ctx, request, sem, iter);
+              if (signal_end) {
+                clock_gettime(CLOCK_MONOTONIC, &total_end);
+              }
             }),
         "unable to async run");
   }
@@ -329,8 +350,10 @@ RunAsyncConcurrent(
     // FIXME quick sleep here
   }
 
-  struct timespec total_end;
-  clock_gettime(CLOCK_MONOTONIC, &total_end);
+  // extract the readings from the target window
+  request_duration_ns->assign(
+      request_duration_buffer_ns.begin() + start_window,
+      request_duration_buffer_ns.begin() + end_window);
 
   if (total_duration_ns != nullptr) {
     uint64_t total_start_ns = TIMESPEC_TO_NANOS(total_start);
