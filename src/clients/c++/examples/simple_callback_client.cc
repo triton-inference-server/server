@@ -73,13 +73,8 @@ ValidateResults(
     const std::vector<int32_t>& input0_data,
     const std::vector<int32_t>& input1_data)
 {
-  bool is_ready = false;
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  ctx->GetAsyncRunResults(&results, &is_ready, request, false);
-  if (is_ready == false) {
-    std::cerr << "Callback is called while request is not ready" << std::endl;
-    exit(1);
-  }
+  ctx->GetAsyncRunResults(request, &results);
   // We expect there to be 2 results. Walk over all 16 result elements
   // and print the sum and difference calculated by the model.
   if (results.size() != 2) {
@@ -219,12 +214,13 @@ main(int argc, char** argv)
             [&, i](
                 nic::InferContext* ctx,
                 const std::shared_ptr<nic::InferContext::Request>& request) {
-              std::lock_guard<std::mutex> lk(mtx);
-              std::cout << "Callback no." << i << " is called" << std::endl;
-              done_cnt++;
-              ValidateResults(ctx, request, input0_data, input1_data);
+              {
+                std::lock_guard<std::mutex> lk(mtx);
+                std::cout << "Callback no." << i << " is called" << std::endl;
+                done_cnt++;
+                ValidateResults(ctx, request, input0_data, input1_data);
+              }
               cv.notify_all();
-              return;
             }),
         "unable to run model");
   }
@@ -248,37 +244,22 @@ main(int argc, char** argv)
     exit(1);
   }
 
-  // Send another AsyncRun with callback which will defer the completed request
+  // Send another AsyncRun whose callback defers the completed request
   // to another thread (main thread) to handle
   bool callback_invoked = false;
   std::shared_ptr<nic::InferContext::Request> request_placeholder;
   FAIL_IF_ERR(
       ctx->AsyncRun([&](nic::InferContext* ctx,
                         std::shared_ptr<nic::InferContext::Request> request) {
-        // Defer the response retrieval to main thread
-        std::lock_guard<std::mutex> lk(mtx);
-        callback_invoked = true;
-        request_placeholder = std::move(request);
+        {
+          // Defer the response retrieval to main thread
+          std::lock_guard<std::mutex> lk(mtx);
+          callback_invoked = true;
+          request_placeholder = std::move(request);
+        }
         cv.notify_all();
-        return;
       }),
       "unable to run model");
-
-  std::shared_ptr<nic::InferContext::Request> request;
-  bool is_ready = false;
-  nic::Error error = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
-  if (error.IsOk()) {
-    std::cerr << "Expecting error on GetReadyAsyncRequest" << std::endl;
-    exit(1);
-  } else if (
-      error.Message() !=
-      "No asynchronous requests can be returned, all outstanding requests "
-      "will signal completion via their callback function") {
-    std::cerr
-        << "Expecting different error message on GetReadyAsyncRequest, got: "
-        << error.Message() << std::endl;
-    exit(1);
-  }
 
   // Ensure callback is completed
   {
@@ -289,18 +270,6 @@ main(int argc, char** argv)
   // Get deferred response
   std::cout << "Getting results from deferred response" << std::endl;
   ValidateResults(ctx.get(), request_placeholder, input0_data, input1_data);
-
-  // Check again, should return different error message
-  error = ctx->GetReadyAsyncRequest(&request, &is_ready, false);
-  if (error.IsOk()) {
-    std::cerr << "Expecting error on GetReadyAsyncRequest" << std::endl;
-    exit(1);
-  } else if (error.Message() != "No asynchronous requests have been sent") {
-    std::cerr
-        << "Expecting different error message on GetReadyAsyncRequest, got: "
-        << error.Message() << std::endl;
-    exit(1);
-  }
 
   return 0;
 }

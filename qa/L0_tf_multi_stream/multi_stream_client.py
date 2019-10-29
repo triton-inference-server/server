@@ -44,7 +44,7 @@ FLAGS = None
 start_time = None
 finish_times = queue.Queue()
 
-# Callback function used for async_run_with_cb(), it can capture
+# Callback function used for async_run(), it can capture
 # additional information using functools.partial as long as the last
 # two arguments are reserved for InferContext and request id
 def completion_callback(infer_ctx, request_id):
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     start_time = time()
 
     for i in range(FLAGS.count):
-        infer_ctx.async_run_with_cb(partial(completion_callback), 
+        infer_ctx.async_run(partial(completion_callback), 
             { 'in' : (input_data,) }, 
             { 'out' : InferContext.ResultFormat.RAW }, 
             batch_size)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
     max_completion_time = 0
     while True:
         request_id, finish_time = finish_times.get()
-        result = infer_ctx.get_async_run_results(request_id, True)
+        result = infer_ctx.get_async_run_results(request_id)
         finished_requests += 1
         print("Request %d"%request_id + " finished in %f"%finish_time)
         max_completion_time = max(max_completion_time, finish_time)

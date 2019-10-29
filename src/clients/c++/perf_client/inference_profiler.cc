@@ -141,8 +141,8 @@ InferenceProfiler::Profile(
       load_status.latencies.push_back(std::numeric_limits<uint64_t>::max());
     }
 
-    load_status.avg_ips += load_status.infer_per_sec.back() /
-                           load_parameters_.stability_window;
+    load_status.avg_ips +=
+        load_status.infer_per_sec.back() / load_parameters_.stability_window;
     load_status.avg_latency +=
         load_status.latencies.back() / load_parameters_.stability_window;
 
@@ -473,8 +473,7 @@ InferenceProfiler::SummarizeClientStat(
   summary.client_duration_ns = duration_ns;
   float client_duration_sec =
       (float)summary.client_duration_ns / ni::NANOS_PER_SECOND;
-  summary.client_sequence_per_sec =
-      valid_sequence_count / client_duration_sec;
+  summary.client_sequence_per_sec = valid_sequence_count / client_duration_sec;
   summary.client_infer_per_sec =
       (valid_request_count * summary.batch_size) / client_duration_sec;
 

@@ -110,18 +110,16 @@ void InferContextDelete(InferContextCtx* ctx);
 nic::Error* InferContextSetOptions(
     InferContextCtx* ctx, nic::InferContext::Options* options);
 nic::Error* InferContextRun(InferContextCtx* ctx);
-nic::Error* InferContextAsyncRun(InferContextCtx* ctx, uint64_t* request_id);
-nic::Error* InferContextAsyncRunWithCallback(
+nic::Error* InferContextAsyncRun(
     InferContextCtx* ctx, void (*callback)(InferContextCtx*, uint64_t));
 nic::Error* InferContextGetAsyncRunResults(
-    InferContextCtx* ctx, bool* is_ready, uint64_t request_id, bool wait);
-nic::Error* InferContextGetReadyAsyncRequest(
-    InferContextCtx* ctx, bool* is_ready, uint64_t* request_id, bool wait);
+    InferContextCtx* ctx, uint64_t request_id);
 
 //==============================================================================
 // InferContext::Options
 nic::Error* InferContextOptionsNew(
-    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size);
+    nic::InferContext::Options** ctx, uint32_t flags, uint64_t batch_size,
+    ni::CorrelationID corr_id);
 void InferContextOptionsDelete(nic::InferContext::Options* ctx);
 nic::Error* InferContextOptionsAddRaw(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
@@ -132,6 +130,7 @@ nic::Error* InferContextOptionsAddClass(
 nic::Error* InferContextOptionsAddSharedMemory(
     InferContextCtx* infer_ctx, nic::InferContext::Options* ctx,
     const char* output_name, void* shm_handle);
+ni::CorrelationID CorrelationId(InferContextCtx* ctx);
 
 //==============================================================================
 // InferContext::Input

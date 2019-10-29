@@ -37,8 +37,14 @@ import threading
 import traceback
 import numpy as np
 import test_util as tu
+from functools import partial
 from tensorrtserver.api import *
 import tensorrtserver.api.server_status_pb2 as server_status
+
+if sys.version_info >= (3, 0):
+  import queue
+else:
+  import Queue as queue
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 100
@@ -48,6 +54,14 @@ SEQUENCE_LENGTH_STDEV = 8
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
+
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+# Callback function used for async_run()
+def completion_callback(value, expected_result, user_data, infer_ctx, request_id):
+    user_data._completed_requests.put((request_id, value, expected_result))
 
 class TimeoutException(Exception):
     pass
@@ -69,10 +83,9 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
 
     # Execute the sequence of inference...
     seq_start_ms = int(round(time.time() * 1000))
-    input_values = list()
-    result_ids = list()
-    expected_results = list()
+    user_data = UserData()
 
+    sent_count=0
     for flag_str, value, expected_result, delay_ms in steps:
         flags = InferRequestHeader.FLAG_NONE
         if flag_str is not None:
@@ -91,21 +104,23 @@ def check_sequence_async(ctx, trial, model_name, input_dtype, steps,
                 in0 = np.full(tensor_shape, value, dtype=input_dtype)
             input_list.append(in0)
 
-        input_values.append(value)
-        expected_results.append(expected_result)
-        result_ids.append(ctx.async_run(
-            { "INPUT" : input_list }, { "OUTPUT" : InferContext.ResultFormat.RAW},
-            batch_size=batch_size, flags=flags))
+        ctx.async_run(partial(completion_callback, value, expected_result, user_data), 
+                            { 'INPUT' :input_list }, { 'OUTPUT' : InferContext.ResultFormat.RAW},
+                               batch_size=batch_size, flags=flags)
+        sent_count += 1
 
         if delay_ms is not None:
             time.sleep(delay_ms / 1000.0)
 
-    # Wait for the results in the order sent
+    # Process the results in order that they were sent
     result = None
-    for id, expected, value in zip(result_ids, expected_results, input_values):
+    processed_count = 0
+    while processed_count < sent_count:
+        (id, value, expected) = user_data._completed_requests.get()
+        processed_count += 1
         results = None
         while results == None:
-            results = ctx.get_async_run_results(id, False)
+            results = ctx.get_async_run_results(id)
             if results == None:
                 if timeout_ms != None:
                     now_ms = int(round(time.time() * 1000))

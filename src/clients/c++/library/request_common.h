@@ -398,7 +398,7 @@ class ResultImpl : public InferContext::Result {
 class RequestImpl : public InferContext::Request {
  public:
   RequestImpl(const uint64_t id, InferContext::OnCompleteFn callback = nullptr)
-      : callback_(std::move(callback)), id_(id), ready_(false)
+      : callback_(std::move(callback)), id_(id)
   {
   }
   virtual ~RequestImpl() = default;
@@ -408,11 +408,6 @@ class RequestImpl : public InferContext::Request {
 
   uintptr_t RunIndex() const { return run_index_; }
   void SetRunIndex(uintptr_t idx) { run_index_ = idx; }
-
-  bool IsReady() const { return ready_; }
-  void SetIsReady(bool r) { ready_ = r; }
-
-  bool HasCallback() const { return (callback_ != nullptr); }
 
   RequestTimers& Timer() { return timer_; }
 
@@ -431,9 +426,6 @@ class RequestImpl : public InferContext::Request {
 
   // Internal identifier for asynchronous call
   uintptr_t run_index_;
-
-  // Indicating if the request has been completed.
-  bool ready_;
 
   // The timers for infer request.
   RequestTimers timer_;
@@ -483,18 +475,8 @@ class InferContextImpl : public InferContext {
   Error GetStat(Stat* stat) const override;
   int64_t ByteSize(const DimsList& dims, DataType dtype) const override;
 
-  virtual Error GetReadyAsyncRequest(
-      std::shared_ptr<Request>* async_request, bool* is_ready,
-      bool wait) override;
-
  protected:
   Error Init(std::unique_ptr<ServerStatusContext> sctx);
-
-  // Helper function called by GetAsyncRunResults() to check if the request
-  // is ready. If the request is valid and wait == true,
-  // the function will block until request is ready.
-  Error IsRequestReady(
-      const std::shared_ptr<Request>& async_request, bool* is_ready, bool wait);
 
   // Update the context stat with the given timer
   Error UpdateStat(const RequestTimers& timer);
@@ -502,7 +484,7 @@ class InferContextImpl : public InferContext {
   using AsyncReqMap = std::map<uintptr_t, std::shared_ptr<Request>>;
 
   // map to record ongoing asynchronous requests with pointer to easy handle
-  // as key
+  // or tag id as key
   AsyncReqMap ongoing_async_requests_;
 
   // Model name

@@ -240,10 +240,8 @@ class ServerStatusContext {
 ///   objects are owned by the caller and may be retained and accessed
 ///   even after the InferContext object is destroyed.
 /// \par
-///   AsyncRun() and GetReadyAsyncRequest() calls are not thread-safe.
-///   What's more, calling one method while the other one is running
-///   will result in undefined behavior given that they will modify the
-///   shared data internally.
+///   The AsyncRun() and Run() calls are not thread-safe. However,
+///   GetAsyncRunResults() is thread-safe.
 /// \par
 ///   For more parallelism multiple InferContext objects can access the
 ///   same inference server with no serialization requirements across
@@ -686,56 +684,30 @@ class InferContext {
   /// \return Error object indicating success or failure.
   virtual Error Run(ResultMap* results) = 0;
 
-  /// DEPRECATED: This function is deprecated and will be removed in
-  /// a future version of this API. Instead use AsyncRun(OnCompleteFn).
-  ///
   /// Send an asynchronous request to the inference server to perform
-  /// an inference to produce results for the outputs specified in the
-  /// most recent call to SetRunOptions().
-  /// \param async_request Returns a Request object that can be used
-  /// to retrieve the inference results for the request.
-  /// \return Error object indicating success or failure.
-  virtual Error AsyncRun(std::shared_ptr<Request>* async_request) = 0;
-
-  /// Similar to AsyncRun() above. However, this function does not return the
-  /// Request object for retrieving the inference results, and such Request
-  /// object will not be returned via GetReadyAsyncRequest(). Instead, once the
-  /// request is completed, the InferContext pointer and the Request object will
-  /// be passed to the provided 'callback' function. It is the function caller's
-  /// choice on either retrieving the results inside the callback function or
-  /// deferring it to a different thread so that the InferContext is unblocked.
+  /// an inference on the server with options specified in the most recent
+  /// call to SetRunOptions().
+  /// Once the request is completed, the InferContext pointer and the Request
+  /// object will be passed to the provided 'callback' function. Upon the
+  /// invocation of callback function, the ownership of Request object is 
+  /// transfered to the function caller. It is then the caller's choice on 
+  /// either retrieving the results inside the callback function or deferring
+  /// it to a different thread so that the InferContext is unblocked. See 
+  /// GetAsyncRunResults().
   /// \param callback The callback function to be invoked on request completion
   /// \return Error object indicating success or failure.
   virtual Error AsyncRun(OnCompleteFn callback) = 0;
 
   /// Get the results of the asynchronous request referenced by
   /// 'async_request'.
+  /// \param async_request Request handle exposed to the 'callback'
+  /// function of AsyncRun().
   /// \param results Returns Result objects holding inference results
   /// as a map from output name to Result object.
-  /// \param is_ready Returns boolean that indicates if the results are ready,
-  /// the results are valid only if is_ready returns true.
-  /// \param async_request Request handle to retrieve results.
-  /// \param wait If true, block until the request completes. Otherwise, return
-  /// immediately.
   /// \return Error object indicating success or failure.
   virtual Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) = 0;
-
-  /// DEPRECATED: This function is deprecated and will be removed in
-  /// a future version of this API. This function is only useful with
-  /// the deprecated version of AsyncRun(). Instead use AsyncRun(OnCompleteFn).
-  ///
-  /// Get any one completed asynchronous request.
-  /// \param async_request Returns the Request object holding the
-  /// completed request.
-  /// \param is_ready Returns boolean that indicates if the request is ready,
-  /// the async_request returned is valid only if is_ready returns true.
-  /// \param wait If true, block until the request completes. Otherwise, return
-  /// immediately.
-  /// \return Error object indicating success or failure.
-  virtual Error GetReadyAsyncRequest(
-      std::shared_ptr<Request>* async_request, bool* is_ready, bool wait) = 0;
+      const std::shared_ptr<Request>& async_request,
+      ResultMap* results) = 0;
 };
 
 //==============================================================================

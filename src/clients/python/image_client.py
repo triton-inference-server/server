@@ -30,8 +30,22 @@ import numpy as np
 import os
 from builtins import range
 from PIL import Image
+from functools import partial
 from tensorrtserver.api import *
 import tensorrtserver.api.model_config_pb2 as model_config
+
+if sys.version_info >= (3, 0):
+  import queue
+else:
+  import Queue as queue
+
+class UserData:
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+# Callback function used for async_run()
+def completion_callback(input_filenames, user_data, infer_ctx, request_id):
+    user_data._completed_requests.put((request_id, input_filenames))
 
 FLAGS = None
 
@@ -270,6 +284,8 @@ if __name__ == '__main__':
     request_ids = []
     image_idx = 0
     last_request = False
+    user_data = UserData()
+    sent_count=0
     while not last_request:
         input_filenames = []
         input_batch = []
@@ -280,25 +296,29 @@ if __name__ == '__main__':
             if image_idx == 0:
                 last_request = True
 
-        result_filenames.append(input_filenames)
-
         # Send request
         if not FLAGS.async_set:
             results.append(ctx.run(
                 { input_name : input_batch },
                 { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
                 FLAGS.batch_size))
+            result_filenames.append(input_filenames)
         else:
-            request_ids.append(ctx.async_run(
-                { input_name : input_batch },
-                { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
-                FLAGS.batch_size))
+            ctx.async_run(partial(completion_callback, input_filenames, user_data), 
+                            { input_name :input_batch }, 
+                            { output_name : (InferContext.ResultFormat.CLASS, FLAGS.classes) },
+                            FLAGS.batch_size)
+            sent_count += 1
 
     # For async, retrieve results according to the send order
     if FLAGS.async_set:
-        for request_id in request_ids:
-            results.append(ctx.get_async_run_results(request_id, True))
-
-    for idx in range(len(results)):
-        print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
-        postprocess(results[idx], result_filenames[idx], FLAGS.batch_size)
+        processed_count = 0
+        while processed_count < sent_count:
+            (input_filenames, request_id) = user_data._completed_requests.get()
+            results.append(ctx.get_async_run_results(request_id))
+            result_filenames.append(input_filenames)
+            processed_count += 1
+    else:
+        for idx in range(len(results)):
+            print("Request {}, batch size {}".format(idx, FLAGS.batch_size))
+            postprocess(results[idx], result_filenames[idx], FLAGS.batch_size)
