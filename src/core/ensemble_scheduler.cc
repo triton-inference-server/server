@@ -688,7 +688,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
         content_idx, &content_size, &src_memory_type, &memory_type_id);
     while (content != nullptr) {
       if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
-          (dst_memory_type == TRTSERVER_MEMORY_CPU)) {
+          (allocated_memory_type == TRTSERVER_MEMORY_CPU)) {
         memcpy(((char*)buffer) + content_offset, content, content_size);
       } else {
 #ifdef TRTIS_ENABLE_GPU

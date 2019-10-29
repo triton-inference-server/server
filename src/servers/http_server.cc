@@ -976,7 +976,6 @@ HTTPAPIServer::EVBufferToInput(
       int64_t memory_type_id;
       TRTSERVER_SharedMemoryBlockMemoryType(smb, &memory_type);
       TRTSERVER_SharedMemoryBlockMemoryTypeId(smb, &memory_type_id);
-
       output_shm_map.emplace(
           io.name(),
           std::make_tuple(

@@ -112,7 +112,7 @@ ResponseAlloc(
       allocated_ptr = malloc(byte_size);
       *actual_memory_type = TRTSERVER_MEMORY_CPU;
       *actual_memory_type_id = 0;
-    } else if (use_gpu_memory) {
+    } else {
 #ifdef TRTIS_ENABLE_GPU
       auto err = cudaSetDevice(memory_type_id);
       if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
@@ -123,25 +123,17 @@ ResponseAlloc(
                 "unable to recover current CUDA device: " +
                 std::string(cudaGetErrorString(err)))
                 .c_str());
-      } else if (err == cudaSuccess) {
-        err = cudaMalloc(&allocated_ptr, byte_size);
       }
 
+      err = cudaMalloc(&allocated_ptr, byte_size);
       if (err != cudaSuccess) {
         return TRTSERVER_ErrorNew(
             TRTSERVER_ERROR_INTERNAL,
             std::string(
                 "cudaMalloc failed: " + std::string(cudaGetErrorString(err)))
                 .c_str());
-        allocated_ptr = nullptr;
-        *actual_memory_type = TRTSERVER_MEMORY_GPU;
-        *actual_memory_type_id = 0;
       }
 #endif  // TRTIS_ENABLE_GPU
-    } else {
-      allocated_ptr = malloc(byte_size);
-      *actual_memory_type = TRTSERVER_MEMORY_CPU;
-      *actual_memory_type_id = 0;
     }
 
     if (allocated_ptr != nullptr) {

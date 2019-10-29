@@ -179,7 +179,7 @@ TRTSERVER_Error* TRTSERVER_SharedMemoryBlockMemoryType(
 
 /// Get the memory type id of a shared memory block object.
 /// \param shared_memory_block The object whose memory type is required.
-/// \param memory_type_id The CPU/GPU number the shared memory region is in.
+/// \param memory_type_id The device ID if the region is in GPU shared memory.
 /// \return a TRTSERVER_Error indicating success or failure.
 TRTSERVER_Error* TRTSERVER_SharedMemoryBlockMemoryTypeId(
     TRTSERVER_SharedMemoryBlock* shared_memory_block, int64_t* memory_type_id);

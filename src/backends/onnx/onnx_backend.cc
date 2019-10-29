@@ -817,7 +817,7 @@ OnnxBackend::Context::ReadOutputTensors(
       // Mark "passed end byte offset"
       offsets[element_count] = total_length;
 
-      SetStringOutputBuffer(
+      cuda_copy |= SetStringOutputBuffer(
           name, batch1_element_cnt, content, content_shape, offsets, payloads);
     } else {
       // Fixed size data type...
@@ -858,13 +858,14 @@ OnnxBackend::Context::ReadOutputTensors(
   return Status::Success;
 }
 
-void
+bool
 OnnxBackend::Context::SetStringOutputBuffer(
     const std::string& name, const size_t batch1_element_cnt,
     const char* content, const std::vector<int64_t>& content_shape,
     const size_t* offsets, std::vector<Scheduler::Payload>* payloads)
 {
   size_t element_idx = 0;
+  bool cuda_copy = false;
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
@@ -885,10 +886,11 @@ OnnxBackend::Context::SetStringOutputBuffer(
       void* buffer;
       TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
       TRTSERVER_Memory_Type actual_memory_type;
-      int64_t device_id;
+      int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           name, &buffer, expected_byte_size, content_shape,
-          preferred_memory_type, 0, &actual_memory_type, &device_id);
+          preferred_memory_type, 0 /* preferred_memory_type_id */,
+          &actual_memory_type, &actual_memory_type_id);
       if (status.IsOk()) {
         size_t copied_byte_size = 0;
         for (size_t e = 0; e < expected_element_cnt; ++e) {
@@ -907,7 +909,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
                       " CUDA copy from CPU memory to get String output data: " +
                       std::string(cudaGetErrorString(err)));
             } else {
-              cudaStreamSynchronize(stream_);
+              cuda_copy = true;
             }
 #endif  // TRTIS_ENABLE_GPU
           } else {
@@ -930,7 +932,7 @@ OnnxBackend::Context::SetStringOutputBuffer(
                       " CUDA copy from CPU memory to get String output data: " +
                       std::string(cudaGetErrorString(err)));
             } else {
-              cudaStreamSynchronize(stream_);
+              cuda_copy = true;
             }
 #endif  // TRTIS_ENABLE_GPU
           } else {
@@ -947,6 +949,8 @@ OnnxBackend::Context::SetStringOutputBuffer(
 
     element_idx += expected_element_cnt;
   }
+
+  return cuda_copy;
 }
 
 void

@@ -410,6 +410,16 @@ ReadStringOutputTensor(
 {
   size_t tensor_element_idx = 0;
 
+#ifdef TRTIS_ENABLE_GPU
+  bool cuda_copy = false;
+  cudaStream_t stream;
+  cudaError_t cuerr = cudaStreamCreate(&stream);
+  if (cuerr != cudaSuccess) {
+    LOG_VERBOSE(1) << "unable to create stream for " << output_name << ": "
+                   << cudaGetErrorString(cuerr);
+  }
+#endif  // TRTIS_ENABLE_GPU
+
   for (auto& payload : *payloads) {
     const InferRequestHeader& request_header =
         payload.request_provider_->RequestHeader();
@@ -439,14 +449,14 @@ ReadStringOutputTensor(
       void* content;
       TRTSERVER_Memory_Type preferred_memory_type = TRTSERVER_MEMORY_CPU;
       TRTSERVER_Memory_Type actual_memory_type;
-      int64_t device_id;
+      int64_t actual_memory_type_id;
       Status status = payload.response_provider_->AllocateOutputBuffer(
           output_name, &content, serialized.size(), shape,
-          preferred_memory_type, 0, &actual_memory_type, &device_id);
+          preferred_memory_type, 0 /* preferred_memory_type_id */,
+          &actual_memory_type, &actual_memory_type_id);
       if (status.IsOk()) {
         if (actual_memory_type == TRTSERVER_MEMORY_GPU) {
 #ifdef TRTIS_ENABLE_GPU
-          cudaStream_t stream = nullptr;
           cudaError_t err = cudaMemcpyAsync(
               content, reinterpret_cast<const void*>(serialized.c_str()),
               serialized.size(), cudaMemcpyDeviceToHost, stream);
@@ -458,7 +468,7 @@ ReadStringOutputTensor(
                     " CUDA copy from CPU memory to get String output data: " +
                     std::string(cudaGetErrorString(err)));
           } else {
-            cudaStreamSynchronize(stream);
+            cuda_copy = true;
           }
 #endif  // TRTIS_ENABLE_GPU
         } else {
@@ -473,6 +483,12 @@ ReadStringOutputTensor(
 
     tensor_element_idx += expected_element_cnt;
   }
+
+#ifdef TRTIS_ENABLE_GPU
+  if (cuda_copy) {
+    cudaStreamSynchronize(stream);
+  }
+#endif  // TRTIS_ENABLE_GPU
 }
 
 }  // namespace
