@@ -122,7 +122,8 @@ BackendContext::SetInputBuffer(
       if (content_byte_size > 0) {
         bool cuda_used = false;
         payload.status_ = CopyBuffer(
-            name, src_memory_type, dst_memory_type, content_byte_size, content,
+            name, src_memory_type, (int)src_memory_type_id, dst_memory_type,
+            (int)dst_memory_type_id, content_byte_size, content,
             input_buffer + buffer_copy_offset + copied_byte_size, &cuda_used);
         cuda_copy |= cuda_used;
       }
@@ -180,7 +181,8 @@ BackendContext::SetFixedSizeOutputBuffer(
         } else {
           bool cuda_used = false;
           status = CopyBuffer(
-              name, src_memory_type, dst_memory_type, expected_byte_size,
+              name, src_memory_type, (int)src_memory_type_id, dst_memory_type,
+              (int)dst_memory_type_id, expected_byte_size,
               content + content_offset, buffer, &cuda_used);
           cuda_copy |= cuda_used;
         }
@@ -198,8 +200,9 @@ BackendContext::SetFixedSizeOutputBuffer(
 Status
 BackendContext::CopyBuffer(
     const std::string& name, const TRTSERVER_Memory_Type src_memory_type,
-    const TRTSERVER_Memory_Type dst_memory_type, const size_t byte_size,
-    const void* src, void* dst, bool* cuda_used)
+    const int src_memory_type_id, const TRTSERVER_Memory_Type dst_memory_type,
+    const int dst_memory_type_id, const size_t byte_size, const void* src,
+    void* dst, bool* cuda_used)
 {
   *cuda_used = false;
 
@@ -208,6 +211,8 @@ BackendContext::CopyBuffer(
     memcpy(dst, src, byte_size);
   } else {
 #ifdef TRTIS_ENABLE_GPU
+    // [TODO] Add check for Peer Access between two GPUs before using
+    // cudaMemcpyPeerAsync and use DeviceToHost + HostToDevice otherwise
     // [TODO] use cudaMemcpyDefault if UVM is supported for the device
     auto copy_kind = cudaMemcpyDeviceToDevice;
     if (src_memory_type == TRTSERVER_MEMORY_CPU) {
@@ -215,7 +220,16 @@ BackendContext::CopyBuffer(
     } else if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
       copy_kind = cudaMemcpyDeviceToHost;
     }
-    cudaError_t err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, stream_);
+
+    cudaError_t err;
+    if ((src_memory_type_id != dst_memory_type_id) &&
+        (copy_kind == cudaMemcpyDeviceToDevice)) {
+      err = cudaMemcpyPeerAsync(
+          dst, dst_memory_type_id, src, src_memory_type_id, byte_size, stream_);
+    } else {
+      err = cudaMemcpyAsync(dst, src, byte_size, copy_kind, stream_);
+    }
+
     if (err != cudaSuccess) {
       return Status(
           RequestStatusCode::INTERNAL,

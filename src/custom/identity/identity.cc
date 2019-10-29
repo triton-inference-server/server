@@ -289,9 +289,17 @@ Context::Execute(
         if (copy_type == cudaMemcpyHostToHost) {
           memcpy(output_buffer + total_byte_size, content, content_byte_size);
         } else {
-          auto err = cudaMemcpyAsync(
-              output_buffer + total_byte_size, content, content_byte_size,
-              copy_type, stream_);
+          cudaError_t err;
+          if ((src_memory_type_id != dst_memory_type_id) &&
+              (copy_type == cudaMemcpyDeviceToDevice)) {
+            err = cudaMemcpyPeerAsync(
+                output_buffer + total_byte_size, dst_memory_type_id, content,
+                src_memory_type_id, content_byte_size, stream_);
+          } else {
+            err = cudaMemcpyAsync(
+                output_buffer + total_byte_size, content, content_byte_size,
+                copy_type, stream_);
+          }
           if (err != cudaSuccess) {
             payload.error_code = kCopyBuffer;
             break;

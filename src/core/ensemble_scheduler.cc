@@ -661,15 +661,16 @@ EnsembleContext::CheckAndSetEnsembleOutput()
 
     // Use the memory type of the memory block as preferred memory type
     TRTSERVER_Memory_Type dst_memory_type, allocated_memory_type;
-    int64_t memory_type_id;
+    int64_t dst_memory_type_id;
     size_t content_size;
-    memory_block->BufferAt(0, &content_size, &dst_memory_type, &memory_type_id);
+    memory_block->BufferAt(
+        0, &content_size, &dst_memory_type, &dst_memory_type_id);
 
     void* buffer;
     int64_t allocated_memory_type_id;
     RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type,
-        memory_type_id, &allocated_memory_type, &allocated_memory_type_id));
+        dst_memory_type_id, &allocated_memory_type, &allocated_memory_type_id));
 
     // Done with this output if 'expected_byte_size' is 0
     if (expected_byte_size == 0) {
@@ -683,9 +684,10 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     size_t content_offset = 0;
     size_t content_idx = 0;
     TRTSERVER_Memory_Type src_memory_type;
+    int64_t src_memory_type_id;
 
     const char* content = memory_block->BufferAt(
-        content_idx, &content_size, &src_memory_type, &memory_type_id);
+        content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     while (content != nullptr) {
       if ((src_memory_type == TRTSERVER_MEMORY_CPU) &&
           (allocated_memory_type == TRTSERVER_MEMORY_CPU)) {
@@ -702,13 +704,27 @@ EnsembleContext::CheckAndSetEnsembleOutput()
         cudaError_t err;
         // use default stream if no CUDA stream is created for the ensemble
         if (stream_ == nullptr) {
-          err = cudaMemcpy(
-              ((char*)buffer) + content_offset, content, content_size,
-              copy_type);
+          if ((src_memory_type_id != allocated_memory_type_id) &&
+              (copy_type == cudaMemcpyDeviceToDevice)) {
+            err = cudaMemcpyPeer(
+                ((char*)buffer) + content_offset, allocated_memory_type_id,
+                content, src_memory_type_id, content_size);
+          } else {
+            err = cudaMemcpy(
+                ((char*)buffer) + content_offset, content, content_size,
+                copy_type);
+          }
         } else {
-          err = cudaMemcpyAsync(
-              ((char*)buffer) + content_offset, content, content_size,
-              copy_type, stream_);
+          if ((src_memory_type_id != allocated_memory_type_id) &&
+              (copy_type == cudaMemcpyDeviceToDevice)) {
+            err = cudaMemcpyPeerAsync(
+                ((char*)buffer) + content_offset, allocated_memory_type_id,
+                content, src_memory_type_id, content_size, stream_);
+          } else {
+            err = cudaMemcpyAsync(
+                ((char*)buffer) + content_offset, content, content_size,
+                copy_type, stream_);
+          }
           cuda_async_copy |= (err == cudaSuccess);
         }
 
@@ -729,7 +745,7 @@ EnsembleContext::CheckAndSetEnsembleOutput()
       content_offset += content_size;
       content_idx++;
       content = memory_block->BufferAt(
-          content_idx, &content_size, &src_memory_type, &memory_type_id);
+          content_idx, &content_size, &src_memory_type, &src_memory_type_id);
     }
   }
 
