@@ -67,10 +67,7 @@ class PluginModelTest(unittest.TestCase):
         for bs in (1, 8):
             self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32', 'LReLU_TRT')
 
-    def test_raw_fff_customclip(self):
-        # model that supports batching
-        for bs in (1, 8):
-            self._full_exact(bs, np.float32, np.float32, 'plan_float32_float32_float32', 'CustomClipPlugin')
+    # add test for CustomClipPlugin after model is fixed
 
 if __name__ == '__main__':
     unittest.main()
