@@ -116,6 +116,7 @@ RUN git clone --recursive https://github.com/Microsoft/onnxruntime && \
 ENV PATH="/opt/cmake/bin:${PATH}"
 ARG SCRIPT_DIR=/workspace/onnxruntime/tools/ci_build/github/linux/docker/scripts
 
+RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh -p 3.6 -o 18.04 && ${SCRIPT_DIR}/install_deps.sh -p 3.6
 
