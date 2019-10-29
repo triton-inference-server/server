@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <cuda_runtime_api.h>
 #include <unistd.h>
 #include <chrono>
 #include <future>
@@ -35,10 +36,6 @@
 #include "src/core/server_status.pb.h"
 #include "src/core/trtserver.h"
 #include "src/servers/common.h"
-
-#ifdef TRTIS_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRTIS_ENABLE_GPU
 
 namespace ni = nvidia::inferenceserver;
 
@@ -55,7 +52,6 @@ struct IOSpec {
 // Meta data used for preparing input data and validate output data
 IOSpec io_spec;
 
-#ifdef TRTIS_ENABLE_GPU
 #define FAIL_IF_CUDA_ERR(X, MSG)                                          \
   do {                                                                    \
     cudaError_t err = (X);                                                \
@@ -78,7 +74,6 @@ static auto gpu_data_deleter = [](void* data) {
     }
   }
 };
-#endif  // TRTIS_ENABLE_GPU
 
 void
 Usage(char** argv, const std::string& msg = std::string())
@@ -125,7 +120,6 @@ ResponseAlloc(
     void* allocated_ptr = nullptr;
     if (memory_type == TRTSERVER_MEMORY_CPU) {
       allocated_ptr = malloc(byte_size);
-#ifdef TRTIS_ENABLE_GPU
     } else if (io_spec.output_type_ == TRTSERVER_MEMORY_GPU) {
       auto err = cudaSetDevice(memory_type_id);
       if (err == cudaSuccess) {
@@ -135,7 +129,6 @@ ResponseAlloc(
         LOG_INFO << "cudaMalloc failed: " << cudaGetErrorString(err);
         allocated_ptr = nullptr;
       }
-#endif  // TRTIS_ENABLE_GPU
     }
 
     if (allocated_ptr != nullptr) {
@@ -167,7 +160,6 @@ ResponseRelease(
            << *name << "'";
   if (memory_type == TRTSERVER_MEMORY_CPU) {
     free(buffer);
-#ifdef TRTIS_ENABLE_GPU
   } else if (io_spec.output_type_ == TRTSERVER_MEMORY_GPU) {
     auto err = cudaSetDevice(memory_type_id);
     if (err == cudaSuccess) {
@@ -177,7 +169,6 @@ ResponseRelease(
       LOG_ERROR << "error: failed to cudaFree " << buffer << ": "
                 << cudaGetErrorString(err);
     }
-#endif  // TRTIS_ENABLE_GPU
   } else {
     LOG_ERROR << "error: unexpected buffer allocated in GPU memory";
   }
@@ -515,7 +506,6 @@ main(int argc, char** argv)
 
   const void* input0_base = &input0_data[0];
   const void* input1_base = &input1_data[0];
-#ifdef TRTIS_ENABLE_GPU
   bool gpu_input = (io_spec.input_type_ == TRTSERVER_MEMORY_GPU);
   std::unique_ptr<void, decltype(gpu_data_deleter)> input0_gpu(
       nullptr, gpu_data_deleter);
@@ -543,7 +533,6 @@ main(int argc, char** argv)
 
   input0_base = gpu_input ? input0_gpu.get() : &input0_data[0];
   input1_base = gpu_input ? input1_gpu.get() : &input1_data[0];
-#endif  // TRTIS_ENABLE_GPU
 
   FAIL_IF_ERR(
       TRTSERVER_InferenceRequestProviderSetInputData(
@@ -658,7 +647,6 @@ main(int argc, char** argv)
   const void* output0_result = output0_content;
   const void* output1_result = output1_content;
 
-#ifdef TRTIS_ENABLE_GPU
   // Different from CPU memory, outputs in GPU memory must be copied to CPU
   // memory to be read directly.
   std::vector<char> output0_data(output0_byte_size);
@@ -686,7 +674,6 @@ main(int argc, char** argv)
         "setting INPUT0 data in GPU memory");
     output1_result = &output1_data[0];
   }
-#endif  // TRTIS_ENABLE_GPU
 
   if (is_int) {
     CompareResult<int32_t>(

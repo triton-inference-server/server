@@ -117,9 +117,9 @@ for input_device in -1 0 1; do
 
                 # ensemble
                 set +e
-                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>ensemble_$full_log 2>&1
+                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>$full_log.ensemble 2>&1
                 if [ $? -ne 0 ]; then
-                    cat ensemble_$full_log
+                    cat $full_log.ensemble
                     echo -e "\n***\n*** Test Failed\n***"
                     RET=1
                 fi
