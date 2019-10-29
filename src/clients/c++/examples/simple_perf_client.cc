@@ -263,7 +263,7 @@ void
 RunAsyncComplete(
     nic::InferContext* ctx,
     const std::shared_ptr<nic::InferContext::Request>& request, sem_t* sem,
-    uint64_t* ns)
+    std::vector<uint64_t>::iterator iter)
 {
   // We include getting the results in the timing since that is
   // included in the sync case as well.
@@ -274,12 +274,10 @@ RunAsyncComplete(
       results.size() != 1,
       "expected 1 result, got " + std::to_string(results.size()));
 
-  if (ns != nullptr) {
-    struct timespec end;
-    clock_gettime(CLOCK_MONOTONIC, &end);
-    uint64_t end_ns = TIMESPEC_TO_NANOS(end);
-    *ns = end_ns - *ns;
-  }
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  uint64_t end_ns = TIMESPEC_TO_NANOS(end);
+  *iter = end_ns - *iter;
 
   sem_post(sem);
 }
@@ -299,26 +297,24 @@ RunAsyncConcurrent(
 
   struct timespec total_start;
   clock_gettime(CLOCK_MONOTONIC, &total_start);
+  request_duration_ns->resize(iters * concurrency);
 
-  for (uint32_t iter = 0; iter < (iters * concurrency); iter++) {
+  for (std::vector<uint64_t>::iterator iter = request_duration_ns->begin();
+       iter != request_duration_ns->end(); ++iter) {
     // Wait so that only 'concurrency' requests are in flight at any
     // given time.
     sem_wait(sem);
 
-    uint64_t* ns = nullptr;
-    if (request_duration_ns != nullptr) {
-      struct timespec start;
-      clock_gettime(CLOCK_MONOTONIC, &start);
-      request_duration_ns->push_back(TIMESPEC_TO_NANOS(start));
-      ns = &request_duration_ns->back();
-    }
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    *iter = TIMESPEC_TO_NANOS(start);
 
     FAIL_IF_ERR(
         ctx->AsyncRun(
-            [sem, ns](
+            [sem, iter](
                 nic::InferContext* ctx,
                 const std::shared_ptr<nic::InferContext::Request>& request) {
-              RunAsyncComplete(ctx, request, sem, ns);
+              RunAsyncComplete(ctx, request, sem, iter);
             }),
         "unable to async run");
   }

@@ -119,28 +119,25 @@ for BACKEND in $BACKENDS; do
                 RET=1
             fi
 
-            # FIXME bug with >1 concurrency in clients
-            if (( $CONCURRENCY == 1 )); then
 
-                echo -e "," >> ${BACKEND}.log
+            echo -e "," >> ${BACKEND}.log
 
-                # async HTTP API
-                $CLIENT -a -l"async" \
-                        -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
-                        -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-                if (( $? != 0 )); then
-                    RET=1
-                fi
+            # async HTTP API
+            $CLIENT -a -l"async" \
+                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            if (( $? != 0 )); then
+                RET=1
+            fi
 
-                echo -e "," >> ${BACKEND}.log
+            echo -e "," >> ${BACKEND}.log
 
-                # async GRPC API
-                $CLIENT -a -l"async" -i grpc -u localhost:8001 \
-                        -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
-                        -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
-                if (( $? != 0 )); then
-                    RET=1
-                fi
+            # async GRPC API
+            $CLIENT -a -l"async" -i grpc -u localhost:8001 \
+                    -f${BACKEND} -m${MODEL_NAME} -c${CONCURRENCY} -s${TENSOR_SIZE} \
+                    -w${WARMUP_ITERS} -n${MEASURE_ITERS} >> ${BACKEND}.log 2>&1
+            if (( $? != 0 )); then
+                RET=1
             fi
         done
         set -e
