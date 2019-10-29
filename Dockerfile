@@ -120,6 +120,7 @@ RUN sed -i "s/libicu55/libicu60/" ${SCRIPT_DIR}/install_ubuntu.sh && \
     sed -i "s/libprotobuf9v5/libprotobuf10/" ${SCRIPT_DIR}/install_ubuntu.sh && \
     sed -i "s/libcurl3/libcurl4/" ${SCRIPT_DIR}/install_ubuntu.sh && \
     sed -i "s/3\.5/3.6/" ${SCRIPT_DIR}/install_ubuntu.sh
+RUN sed -i "s/backend-test-tools.*//" ${SCRIPT_DIR}/install_onnx.sh
 RUN cp -r ${SCRIPT_DIR} /tmp/scripts && \
     ${SCRIPT_DIR}/install_ubuntu.sh && ${SCRIPT_DIR}/install_deps.sh
 
