@@ -267,10 +267,8 @@ RunAsyncComplete(
 {
   // We include getting the results in the timing since that is
   // included in the sync case as well.
-  bool is_ready = false;
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  ctx->GetAsyncRunResults(&results, &is_ready, request, false);
-  FAIL_IF(!is_ready, "callback invoked when request is not ready");
+  ctx->GetAsyncRunResults(request, &results);
 
   FAIL_IF(
       results.size() != 1,

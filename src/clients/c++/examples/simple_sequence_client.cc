@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <unistd.h>
+#include <condition_variable>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -33,6 +34,12 @@
 
 namespace ni = nvidia::inferenceserver;
 namespace nic = nvidia::inferenceserver::client;
+
+using RequestList = std::vector<std::shared_ptr<nic::InferContext::Request>>;
+
+// Global mutex to synchronize the threads
+std::mutex mutex_;
+std::condition_variable cv_;
 
 #define FAIL_IF_ERR(X, MSG)                                        \
   {                                                                \
@@ -124,11 +131,11 @@ Send(
   return r;
 }
 
-std::shared_ptr<nic::InferContext::Request>
+void
 AsyncSend(
     const std::unique_ptr<nic::InferContext>& ctx, int32_t value,
-    const uint64_t correlation_id = 0, bool start_of_sequence = false,
-    bool end_of_sequence = false)
+    const uint64_t correlation_id, bool start_of_sequence, bool end_of_sequence,
+    RequestList& request_list)
 {
   std::shared_ptr<nic::InferContext::Request> request;
 
@@ -164,9 +171,17 @@ AsyncSend(
       "unable to set data for INPUT");
 
   // Send inference request to the inference server.
-  FAIL_IF_ERR(ctx->AsyncRun(&request), "unable to run model");
-
-  return request;
+  FAIL_IF_ERR(
+      ctx->AsyncRun(
+          [&](nic::InferContext* ctx,
+              const std::shared_ptr<nic::InferContext::Request>& request) {
+            {
+              std::lock_guard<std::mutex> lk(mutex_);
+              request_list.push_back(request);
+            }
+            cv_.notify_all();
+          }),
+      "unable to run model");
 }
 
 int32_t
@@ -176,10 +191,8 @@ AsyncReceive(
 {
   // Retrieve result of the inference request from the inference server.
   std::map<std::string, std::unique_ptr<nic::InferContext::Result>> results;
-  bool is_ready;
   FAIL_IF_ERR(
-      ctx->GetAsyncRunResults(&results, &is_ready, request, true),
-      "unable to get results");
+      ctx->GetAsyncRunResults(request, &results), "unable to get results");
 
   // We expect there to be 1 result value, return it...
   if (results.size() != 1) {
@@ -275,22 +288,38 @@ main(int argc, char** argv)
   std::vector<int32_t> result1_list;
 
   if (async) {
-    std::vector<std::shared_ptr<nic::InferContext::Request>> request0_list;
-    std::vector<std::shared_ptr<nic::InferContext::Request>> request1_list;
+    RequestList request0_list;
+    RequestList request1_list;
 
     // Send requests, first reset accumulator for the sequence.
-    request0_list.emplace_back(
-        AsyncSend(ctx0, 0, correlation_id0, true /* start-of-sequence */));
-    request1_list.emplace_back(
-        AsyncSend(ctx0, 100, correlation_id1, true /* start-of-sequence */));
+    AsyncSend(
+        ctx0, 0, correlation_id0, true /* start-of-sequence */,
+        false /* end-of-sequence */, request0_list);
+    AsyncSend(
+        ctx0, 100, correlation_id1, true /* start-of-sequence */,
+        false /* end-of-sequence */, request1_list);
+
     // Now send a sequence of values...
     for (int32_t v : values) {
-      request0_list.emplace_back(AsyncSend(
+      AsyncSend(
           ctx0, v, correlation_id0, false /* start-of-sequence */,
-          (v == 1) /* end-of-sequence */));
-      request1_list.emplace_back(AsyncSend(
+          (v == 1) /* end-of-sequence */, request0_list);
+      AsyncSend(
           ctx0, -v, correlation_id1, false /* start-of-sequence */,
-          (v == 1) /* end-of-sequence */));
+          (v == 1) /* end-of-sequence */, request1_list);
+    }
+
+    // Wait until all callbacks are invoked
+    {
+      std::unique_lock<std::mutex> lk(mutex_);
+      cv_.wait(lk, [&]() {
+        if (request0_list.size() > values.size() &&
+            request1_list.size() > values.size()) {
+          return true;
+        } else {
+          return false;
+        }
+      });
     }
     // Get results
     for (size_t i = 0; i < request0_list.size(); i++) {
@@ -333,7 +362,9 @@ main(int argc, char** argv)
     }
   }
 
-  if (!reverse) {
+  if (async) {
+    std::cout << "streaming : streaming" << std::endl;
+  } else if (!reverse) {
     std::cout << "streaming : non-streaming" << std::endl;
   } else {
     std::cout << "non-streaming : streaming" << std::endl;

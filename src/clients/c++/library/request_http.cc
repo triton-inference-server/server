@@ -925,11 +925,10 @@ class InferHttpContextImpl : public InferContextImpl {
   Error InitHttp(const std::string& server_url);
 
   Error Run(ResultMap* results) override;
-  Error AsyncRun(std::shared_ptr<Request>* async_request) override;
   Error AsyncRun(OnCompleteFn callback) override;
   Error GetAsyncRunResults(
-      ResultMap* results, bool* is_ready,
-      const std::shared_ptr<Request>& async_request, bool wait) override;
+      const std::shared_ptr<Request>& async_request,
+      ResultMap* results) override;
 
  private:
   Error AsyncRun(
@@ -1274,23 +1273,14 @@ InferHttpContextImpl::Run(ResultMap* results)
 }
 
 Error
-InferHttpContextImpl::AsyncRun(std::shared_ptr<Request>* async_request)
-{
-  return AsyncRun(async_request, nullptr);
-}
-
-Error
 InferHttpContextImpl::AsyncRun(InferContext::OnCompleteFn callback)
 {
+  if (callback == nullptr) {
+    return Error(
+        RequestStatusCode::INVALID_ARG,
+        "Callback function must be provided along with AsyncRun() call.");
+  }
   std::shared_ptr<Request> async_request;
-  return AsyncRun(&async_request, std::move(callback));
-}
-
-Error
-InferHttpContextImpl::AsyncRun(
-    std::shared_ptr<Request>* async_request,
-    InferContext::OnCompleteFn callback)
-{
   if (!multi_handle_) {
     return Error(
         RequestStatusCode::INTERNAL,
@@ -1308,7 +1298,7 @@ InferHttpContextImpl::AsyncRun(
 
   HttpRequestImpl* current_context =
       new HttpRequestImpl(0 /* temp id */, inputs, std::move(callback));
-  async_request->reset(static_cast<Request*>(current_context));
+  async_request.reset(static_cast<Request*>(current_context));
 
   if (!current_context->easy_handle_) {
     return Error(
@@ -1317,32 +1307,31 @@ InferHttpContextImpl::AsyncRun(
 
   current_context->Timer().CaptureTimestamp(RequestTimers::Kind::REQUEST_START);
 
-  Error err = PreRunProcessing(*async_request);
+  Error err = PreRunProcessing(async_request);
+
+  current_context->SetId(async_request_id_++);
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    current_context->SetId(async_request_id_++);
-
     auto insert_result = ongoing_async_requests_.emplace(std::make_pair(
         reinterpret_cast<uintptr_t>(current_context->easy_handle_),
-        *async_request));
+        async_request));
 
     if (!insert_result.second) {
       return Error(
           RequestStatusCode::INTERNAL,
           "Failed to insert new asynchronous request context.");
     }
-
     curl_multi_add_handle(multi_handle_, current_context->easy_handle_);
+  }
 
-    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
-    if (current_context->total_input_byte_size_ == 0) {
-      // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
-      // content length is 0. In that case, we can't measure SEND_END properly
-      // (send ends after sending request header).
-      current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
-    }
+  current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_START);
+  if (current_context->total_input_byte_size_ == 0) {
+    // Set SEND_END here because CURLOPT_READFUNCTION will not be called if
+    // content length is 0. In that case, we can't measure SEND_END properly
+    // (send ends after sending request header).
+    current_context->Timer().CaptureTimestamp(RequestTimers::Kind::SEND_END);
   }
 
   cv_.notify_all();
@@ -1351,27 +1340,11 @@ InferHttpContextImpl::AsyncRun(
 
 Error
 InferHttpContextImpl::GetAsyncRunResults(
-    ResultMap* results, bool* is_ready,
-    const std::shared_ptr<Request>& async_request, bool wait)
+    const std::shared_ptr<Request>& async_request, ResultMap* results)
 {
-  Error err = IsRequestReady(async_request, is_ready, wait);
-  if (!err.IsOk() || !(*is_ready)) {
-    return err;
-  }
-
   std::shared_ptr<HttpRequestImpl> http_request =
       std::static_pointer_cast<HttpRequestImpl>(async_request);
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    ongoing_async_requests_.erase(http_request->RunIndex());
-    curl_multi_remove_handle(multi_handle_, http_request->easy_handle_);
-  }
-
-  err = UpdateStat(http_request->Timer());
-  if (!err.IsOk()) {
-    std::cerr << "Failed to update context stat: " << err << std::endl;
-  }
   return http_request->GetResults(results);
 }
 
@@ -1576,8 +1549,7 @@ InferHttpContextImpl::AsyncTransfer()
   int place_holder = 0;
   CURLMsg* msg = nullptr;
   do {
-    std::vector<std::shared_ptr<Request>> request_with_callback;
-    bool has_completed = false;
+    std::vector<std::shared_ptr<Request>> request_list;
 
     // sleep if no work is available
     std::unique_lock<std::mutex> lock(mutex_);
@@ -1585,17 +1557,9 @@ InferHttpContextImpl::AsyncTransfer()
       if (this->exiting_) {
         return true;
       }
-      // wake up if at least one request is not ready
-      for (auto& ongoing_async_request : this->ongoing_async_requests_) {
-        if (!std::static_pointer_cast<HttpRequestImpl>(
-                 ongoing_async_request.second)
-                 ->IsReady()) {
-          return true;
-        }
-      }
-      return false;
+      // wake up if an async request has been generated
+      return !this->ongoing_async_requests_.empty();
     });
-
     curl_multi_perform(multi_handle_, &place_holder);
     while ((msg = curl_multi_info_read(multi_handle_, &place_holder))) {
       // update request status
@@ -1611,9 +1575,11 @@ InferHttpContextImpl::AsyncTransfer()
         curl_easy_cleanup(msg->easy_handle);
         continue;
       }
-
+      request_list.emplace_back(itr->second);
+      ongoing_async_requests_.erase(identifier);
+      curl_multi_remove_handle(multi_handle_, msg->easy_handle);
       std::shared_ptr<HttpRequestImpl> http_request =
-          std::static_pointer_cast<HttpRequestImpl>(itr->second);
+          std::static_pointer_cast<HttpRequestImpl>(request_list.back());
 
       if (msg->msg != CURLMSG_DONE) {
         // Something wrong happened.
@@ -1621,29 +1587,19 @@ InferHttpContextImpl::AsyncTransfer()
       } else {
         http_request->Timer().CaptureTimestamp(
             RequestTimers::Kind::REQUEST_END);
+        Error err = UpdateStat(http_request->Timer());
+        if (!err.IsOk()) {
+          std::cerr << "Failed to update context stat: " << err << std::endl;
+        }
       }
-
       http_request->http_status_ = msg->data.result;
-      http_request->SetIsReady(true);
-
-      has_completed = true;
-      if (http_request->HasCallback()) {
-        request_with_callback.emplace_back(itr->second);
-      }
     }
-
     lock.unlock();
 
-    // Were task(s) completed? If so send signal in case the main
-    // thread is waiting
-    if (has_completed) {
-      cv_.notify_all();
-    }
-
-    for (auto& request : request_with_callback) {
-      HttpRequestImpl* request_ptr =
-          static_cast<HttpRequestImpl*>(request.get());
-      request_ptr->callback_(this, request);
+    for (auto& request : request_list) {
+      std::shared_ptr<HttpRequestImpl> http_request =
+          std::static_pointer_cast<HttpRequestImpl>(request);
+      http_request->callback_(this, request);
     }
   } while (!exiting_);
 }
@@ -1700,5 +1656,4 @@ InferHttpContext::Create(
 
   return err;
 }
-
 }}}  // namespace nvidia::inferenceserver::client
