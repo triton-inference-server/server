@@ -40,6 +40,7 @@ CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
+ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
 
 export CUDA_VISIBLE_DEVICES=0,1
 
@@ -57,6 +58,15 @@ for trial in graphdef savedmodel netdef onnx libtorch plan ; do
         (cd $MODELSDIR/${full} && \
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
+
+    # set up "addsub" ensemble.
+    # [DLIS-843] Not copying the correspondent in ENSEMBLEDIR
+    # because some backends (ONNX, PyTorch) don't have ensemble for them
+    mkdir -p $MODELSDIR/fan_${full}/1 && \
+    cp $ENSEMBLEDIR/fan_graphdef_float32_float32_float32/config.pbtxt $MODELSDIR/fan_${full}/. && \
+        (cd $MODELSDIR/fan_${full} && \
+                sed -i "s/graphdef_float32_float32_float32/${full}/" config.pbtxt && \
+                sed -i "s/label_filename:.*//" config.pbtxt)
 done
 
 # custom model needs to be obtained elsewhere
@@ -68,6 +78,16 @@ mkdir -p $MODELSDIR/${full}/1 && \
         (cd $MODELSDIR/${full} && \
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
+
+# set up "addsub" ensemble for custom model
+cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && \
+    (cd $MODELSDIR/fan_${full} && \
+            sed -i "s/graphdef_float32_float32_float32/${full}/" config.pbtxt)
+
+# custom component of ensemble
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
+    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
@@ -87,65 +107,27 @@ for input_device in -1 0 1; do
                 fi
                 
                 set +e
-
                 $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m $full >>$full_log 2>&1
                 if [ $? -ne 0 ]; then
                     cat $full_log
                     echo -e "\n***\n*** Test Failed\n***"
                     RET=1
                 fi
+                set -e
 
+                # ensemble
+                set +e
+                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>ensemble_$full_log 2>&1
+                if [ $? -ne 0 ]; then
+                    cat ensemble_$full_log
+                    echo -e "\n***\n*** Test Failed\n***"
+                    RET=1
+                fi
                 set -e
             done
         done
     done
 done
-
-# [TODO] how to handle ensemble
-# set up "addsub" ensemble
-ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
-rm -rf $MODELSDIR/ensemble/1/*
-mkdir -p $MODELSDIR/ensemble/1 && \
-    cp $ENSEMBLEDIR/fan_plan_float32_float32_float32/config.pbtxt $MODELSDIR/ensemble/. && \
-        (cd $MODELSDIR/ensemble && \
-                sed -i "s/^name:.*/name: \"ensemble\"/" config.pbtxt && \
-                sed -i "s/label_filename:.*//" config.pbtxt)
-
-cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
-    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1 && \
-    cp libidentity.so $MODELSDIR/nop_TYPE_FP32_-1/1/.
-
-cp -r $DATADIR/plan_float32_float32_float32 $MODELSDIR/. && \
-    # make sure version 1 is used (no swap)
-    rm -r $MODELSDIR/plan_float32_float32_float32/2 && \
-    rm -r $MODELSDIR/plan_float32_float32_float32/3
-
-set +e
-
-$IO_TEST_UTIL -i 0 -o 0 -r $MODELSDIR -m ensemble >>$CLIENT_LOG.ensemble.cpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.ensemble.cpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-
-$IO_TEST_UTIL -i 0 -o 0 -r $MODELSDIR -m ensemble -v >>$CLIENT_LOG.ensemble.gpu 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG.ensemble.gpu
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    # For GPU input / output case, all ensemble allocation should be on GPU
-    if grep ^I[0-9][0-9][0-9][0-9].*"Internal response".*"memory type 0" $CLIENT_LOG.ensemble.gpu; then
-        echo -e "\n*** FAILED: unexpected CPU allocation for ensemble" >> $CLIENT_LOG.ensemble.gpu
-        cat $CLIENT_LOG.ensemble.gpu
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-fi
-
-set -e
-
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
