@@ -230,6 +230,43 @@ install(
 )
 
 #
+# memory_alloc (only build when TRTIS_ENABLE_GPU given the purpose)
+#
+if(${TRTIS_ENABLE_GPU})
+set(
+  MEMORY_ALLOC_SRCS
+  memory_alloc.cc common.cc ../core/logging.cc
+)
+
+set(
+  MEMORY_ALLOC_HDRS
+  common.h ../core/logging.h
+)
+
+add_executable(
+  memory_alloc
+  ${MEMORY_ALLOC_SRCS}
+  ${MEMORY_ALLOC_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+  ${TRACING_OBJECTS}
+)
+target_link_libraries(
+  memory_alloc
+  PUBLIC -L/usr/local/cuda/lib64/stubs
+  PUBLIC -lnvidia-ml
+  PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE trtserver
+  PRIVATE protobuf::libprotobuf
+  ${TRACING_LIBRARIES}
+)
+target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
+install(
+  TARGETS memory_alloc
+  RUNTIME DESTINATION bin
+)
+endif() # TRTIS_ENABLE_GPU
+
+#
 # libtrtserver.so
 #
 set(BACKEND_OBJS $<TARGET_OBJECTS:ensemble-backend-library>)

@@ -664,9 +664,13 @@ EnsembleContext::CheckAndSetEnsembleOutput()
     memory_block->BufferAt(0, &content_size, &dst_memory_type, &memory_type_id);
 
     void* buffer;
-    RETURN_IF_ERROR(response_provider_->AllocateOutputBuffer(
+    // Don't return on error if we haven't try all types
+    auto status = response_provider_->AllocateOutputBuffer(
         output_pair.first, &buffer, expected_byte_size, shape, dst_memory_type,
-        memory_type_id));
+        memory_type_id);
+    if (dst_memory_type == TRTSERVER_MEMORY_CPU) {
+      RETURN_IF_ERROR(status);
+    }
 
     // Done with this output if 'expected_byte_size' is 0
     if (expected_byte_size == 0) {
