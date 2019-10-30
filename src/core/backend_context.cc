@@ -172,8 +172,9 @@ BackendContext::SetFixedSizeOutputBuffer(
           name, &buffer, expected_byte_size, content_shape, src_memory_type,
           src_memory_type_id);
 
-      if (status.IsOk() && (expected_byte_size != 0)) {
-        if ((buffer == nullptr) && (src_memory_type != TRTSERVER_MEMORY_CPU)) {
+      if (expected_byte_size != 0) {
+        if ((!status.IsOk() || (buffer == nullptr)) &&
+            (src_memory_type != TRTSERVER_MEMORY_CPU)) {
           // Use default (CPU memory type) if preferred type can't be fulfilled
           status = payload.response_provider_->AllocateOutputBuffer(
               name, &buffer, expected_byte_size, content_shape);
