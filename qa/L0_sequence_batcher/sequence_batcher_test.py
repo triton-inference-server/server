@@ -40,16 +40,16 @@ import infer_util as iu
 import test_util as tu
 from functools import partial
 from tensorrtserver.api import *
-if "TEST_SHARED_MEMORY" in os.environ:
-    TEST_SHARED_MEMORY=int(os.environ["TEST_SHARED_MEMORY"])
-else:
-    TEST_SHARED_MEMORY=0
 import tensorrtserver.shared_memory as shm
 import tensorrtserver.api.server_status_pb2 as server_status
 if sys.version_info >= (3, 0):
   import queue
 else:
   import Queue as queue
+
+_test_shared_memory = False
+if "TEST_SHARED_MEMORY" in os.environ:
+  _test_shared_memory = True if (os.environ["TEST_SHARED_MEMORY"] == "1") else False
 
 _no_batching = (int(os.environ['NO_BATCHING']) == 1)
 _model_instances = int(os.environ['MODEL_INSTANCES'])
@@ -106,30 +106,21 @@ class SequenceBatcherTest(unittest.TestCase):
 
         if (("savedmodel" in trial) or ("graphdef" in trial) or
             ("netdef" in trial) or ("custom" in trial) or
-            ("onnx" in trial) or ("libtorch" in trial) or 
+            ("onnx" in trial) or ("libtorch" in trial) or
 	        ("plan" in trial)):
             tensor_shape = (1,)
         else:
             self.assertFalse(True, "unknown trial type: " + trial)
 
         # Can only send the request exactly once since it is a
-        # sequence model with state
+        # sequence model with state, so can have only a single config.
         configs = []
         if protocol == "http":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-            else:
-                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_shared_memory))
         if protocol == "grpc":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-            else:
-                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_shared_memory))
         if protocol == "streaming":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-            else:
-                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_shared_memory))
 
         self.assertEqual(len(configs), 1)
 
@@ -172,8 +163,10 @@ class SequenceBatcherTest(unittest.TestCase):
                         input_byte_size = sum([i0.nbytes for i0 in input_list_tmp])
                         output_byte_size = np.dtype(input_dtype).itemsize + 2
                         # create and register shared memory region for inputs and outputs
-                        shm_ip_handle = shm.create_shared_memory_region("input_data", "/input", input_byte_size)
-                        shm_op_handle = shm.create_shared_memory_region("output_data", "/output", output_byte_size)
+                        shm_ip_handle = shm.create_shared_memory_region(
+                            "input_data", "/input", input_byte_size)
+                        shm_op_handle = shm.create_shared_memory_region(
+                            "output_data", "/output", output_byte_size)
                         # copy data into shared memory region for input values
                         shm.set_shared_memory_region(shm_ip_handle, input_list_tmp)
                         shared_memory_ctx.unregister(shm_ip_handle)
@@ -270,20 +263,11 @@ class SequenceBatcherTest(unittest.TestCase):
         # sequence model with state
         configs = []
         if protocol == "http":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8000", ProtocolType.HTTP, False, True))
-            else:
-                configs.append(("localhost:8000", ProtocolType.HTTP, False, False))
+            configs.append(("localhost:8000", ProtocolType.HTTP, False, _test_shared_memory))
         if protocol == "grpc":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8001", ProtocolType.GRPC, False, True))
-            else:
-                configs.append(("localhost:8001", ProtocolType.GRPC, False, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, False, _test_shared_memory))
         if protocol == "streaming":
-            if TEST_SHARED_MEMORY:
-                configs.append(("localhost:8001", ProtocolType.GRPC, True, True))
-            else:
-                configs.append(("localhost:8001", ProtocolType.GRPC, True, False))
+            configs.append(("localhost:8001", ProtocolType.GRPC, True, _test_shared_memory))
         self.assertEqual(len(configs), 1)
 
         for config in configs:
@@ -335,10 +319,12 @@ class SequenceBatcherTest(unittest.TestCase):
                                 "output_data"+str(sent_count), "/output"+str(sent_count), output_byte_size))
                         else:
                             shm_ip_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[0]+str(sent_count)+'_data', '/'+shm_region_names[0]+str(sent_count),
+                                shm_region_names[0] + str(sent_count) + '_data',
+                                '/' + shm_region_names[0] + str(sent_count),
                                 input_byte_size))
                             shm_op_handle.append(shm.create_shared_memory_region(
-                                shm_region_names[1]+str(sent_count)+'_data', '/'+shm_region_names[1]+str(sent_count),
+                                shm_region_names[1] + str(sent_count) + '_data',
+                                '/' + shm_region_names[1] + str(sent_count),
                                 output_byte_size))
                         # copy data into shared memory region for input values
                         shm.set_shared_memory_region(shm_ip_handle[-1], input_list_tmp)
@@ -357,13 +343,12 @@ class SequenceBatcherTest(unittest.TestCase):
                         time.sleep(pre_delay_ms / 1000.0)
 
                     if "libtorch" not in trial:
-
-                        ctx.async_run(partial(completion_callback, user_data), 
+                        ctx.async_run(partial(completion_callback, user_data),
                             { 'INPUT' :input_info }, { 'OUTPUT' :output_info },
                                batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT"
                     else:
-                        ctx.async_run(partial(completion_callback, user_data), 
+                        ctx.async_run(partial(completion_callback, user_data),
                             { 'INPUT__0' :input_info }, { 'OUTPUT__0' :output_info },
                                batch_size=batch_size, flags=flags)
                         OUTPUT = "OUTPUT__0"
@@ -745,7 +730,7 @@ class SequenceBatcherTest(unittest.TestCase):
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_half_batch(self):
-        # Test model instances together are configured with
+        # Test model instances that together are configured with
         # total-batch-size 4.  Send two equal-length sequences in
         # parallel and make sure they get completely batched into
         # batch-size 2 inferences.
